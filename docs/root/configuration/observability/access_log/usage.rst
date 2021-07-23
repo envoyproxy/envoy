@@ -458,9 +458,9 @@ The following command operators are supported:
     ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
 
     * %DYNAMIC_METADATA(com.test.my_filter)% will log: ``{"test_key": "foo", "test_object": {"inner_key": "bar"}}``
-    * %DYNAMIC_METADATA(com.test.my_filter:test_key)% will log: ``"foo"``
+    * %DYNAMIC_METADATA(com.test.my_filter:test_key)% will log: ``foo``
     * %DYNAMIC_METADATA(com.test.my_filter:test_object)% will log: ``{"inner_key": "bar"}``
-    * %DYNAMIC_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``"bar"``
+    * %DYNAMIC_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``bar``
     * %DYNAMIC_METADATA(com.unknown_filter)% will log: ``-``
     * %DYNAMIC_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
     * %DYNAMIC_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
@@ -488,9 +488,9 @@ The following command operators are supported:
     ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
 
     * %CLUSTER_METADATA(com.test.my_filter)% will log: ``{"test_key": "foo", "test_object": {"inner_key": "bar"}}``
-    * %CLUSTER_METADATA(com.test.my_filter:test_key)% will log: ``"foo"``
+    * %CLUSTER_METADATA(com.test.my_filter:test_key)% will log: ``foo``
     * %CLUSTER_METADATA(com.test.my_filter:test_object)% will log: ``{"inner_key": "bar"}``
-    * %CLUSTER_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``"bar"``
+    * %CLUSTER_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``bar``
     * %CLUSTER_METADATA(com.unknown_filter)% will log: ``-``
     * %CLUSTER_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
     * %CLUSTER_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``

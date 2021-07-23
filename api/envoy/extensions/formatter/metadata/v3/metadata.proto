@@ -33,9 +33,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //    ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
 //
 //    * %METADATA(ROUTE:com.test.my_filter)% will log: ``{"test_key": "foo", "test_object": {"inner_key": "bar"}}``
-//    * %METADATA(ROUTE:com.test.my_filter:test_key)% will log: ``"foo"``
+//    * %METADATA(ROUTE:com.test.my_filter:test_key)% will log: ``foo``
 //    * %METADATA(ROUTE:com.test.my_filter:test_object)% will log: ``{"inner_key": "bar"}``
-//    * %METADATA(ROUTE:com.test.my_filter:test_object:inner_key)% will log: ``"bar"``
+//    * %METADATA(ROUTE:com.test.my_filter:test_object:inner_key)% will log: ``bar``
 //    * %METADATA(ROUTE:com.unknown_filter)% will log: ``-``
 //    * %METADATA(ROUTE:com.test.my_filter:unknown_key)% will log: ``-``
 //    * %METADATA(ROUTE:com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
