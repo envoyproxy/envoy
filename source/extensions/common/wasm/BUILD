@@ -75,6 +75,7 @@ envoy_cc_library(
         "//external:zlib",
         "//envoy/server:lifecycle_notifier_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/server/admin:prometheus_stats_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:safe_memcpy_lib",
         "//source/common/config:remote_data_fetcher_lib",

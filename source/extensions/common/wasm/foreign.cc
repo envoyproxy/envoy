@@ -1,6 +1,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
 #include "source/extensions/common/wasm/wasm.h"
+#include "source/server/admin/prometheus_stats.h"
 
 #if defined(WASM_USE_CEL_PARSER)
 #include "eval/public/builtin_func_registrar.h"
@@ -59,6 +60,22 @@ RegisterForeignFunction registerUncompressForeignFunction(
         }
         dest_len = dest_len * 2;
       }
+    });
+
+RegisterForeignFunction registerPrometheusNamespace(
+    "register_prometheus_namespace",
+    [](WasmBase&, std::string_view arguments,
+       const std::function<void*(size_t size)>&) -> WasmResult {
+      Server::PrometheusStatsFormatter::registerPrometheusNamespace(toAbslStringView(arguments));
+      return WasmResult::Ok;
+    });
+
+RegisterForeignFunction unregisterPrometheusNamespace(
+    "unregister_prometheus_namespace",
+    [](WasmBase&, std::string_view arguments,
+       const std::function<void*(size_t size)>&) -> WasmResult {
+      Server::PrometheusStatsFormatter::unregisterPrometheusNamespace(toAbslStringView(arguments));
+      return WasmResult::Ok;
     });
 
 #if defined(WASM_USE_CEL_PARSER)

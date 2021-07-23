@@ -4,6 +4,7 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/common/wasm/wasm.h"
+#include "source/server/admin/prometheus_stats.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"
@@ -567,6 +568,10 @@ TEST_P(WasmCommonTest, Foreign) {
   EXPECT_FALSE(code.empty());
   EXPECT_TRUE(wasm->load(code, false));
   EXPECT_TRUE(wasm->initialize());
+  // Register the deletion target prometheus namespace.
+  Server::PrometheusStatsFormatter::registerPrometheusNamespace("foo");
+  auto registered = Server::PrometheusStatsFormatter::prometheusNamespacesForTest();
+  EXPECT_TRUE(registered.find("foo") != registered.end());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
@@ -577,9 +582,17 @@ TEST_P(WasmCommonTest, Foreign) {
         EXPECT_CALL(*root_context, log_(spdlog::level::trace, Eq("compress 2000 -> 23")));
         EXPECT_CALL(*root_context, log_(spdlog::level::debug, Eq("uncompress 23 -> 2000")));
 #endif
+        EXPECT_CALL(*root_context, log_(spdlog::level::debug,
+                                        Eq("prometheus namespace 'mynamespace' registered")));
+        EXPECT_CALL(*root_context,
+                    log_(spdlog::level::debug, Eq("prometheus namespace 'foo' unregistered")));
         return root_context;
       });
   wasm->start(plugin);
+  // Check prometheus namespaces.
+  registered = Server::PrometheusStatsFormatter::prometheusNamespacesForTest();
+  EXPECT_TRUE(registered.find("foo") == registered.end());         // must be unregistered.
+  EXPECT_TRUE(registered.find("mynamespace") != registered.end()); // must be registered.
 }
 
 TEST_P(WasmCommonTest, OnForeign) {

@@ -191,6 +191,23 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
     if (result) {
       ::free(result);
     }
+    function = "register_prometheus_namespace";
+    result = nullptr;
+    result_size = 0;
+    const std::string my_namespace = "mynamespace";
+    CHECK_RESULT(proxy_call_foreign_function(function.data(), function.size(), my_namespace.c_str(),
+                                             my_namespace.size(), &result, &result_size));
+    message = "prometheus namespace '" + my_namespace + "' registered";
+    proxy_log(LogLevel::debug, message.c_str(), message.size());
+    function = "unregister_prometheus_namespace";
+    result = nullptr;
+    result_size = 0;
+    const std::string unregister_namespace = "foo";
+    CHECK_RESULT(proxy_call_foreign_function(function.data(), function.size(),
+                                             unregister_namespace.c_str(),
+                                             unregister_namespace.size(), &result, &result_size));
+    message = "prometheus namespace '" + unregister_namespace + "' unregistered";
+    proxy_log(LogLevel::debug, message.c_str(), message.size());
   } else if (configuration == "configuration") {
     std::string message = "configuration";
     proxy_log(LogLevel::error, message.c_str(), message.size());

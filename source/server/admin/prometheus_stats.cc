@@ -48,6 +48,12 @@ struct MetricLessThan {
   }
 };
 
+absl::flat_hash_set<std::string>& prometheusNamespaces() {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>);
+}
+
+absl::Mutex& prometheusNamespacesMutex() { MUTABLE_CONSTRUCT_ON_FIRST_USE(absl::Mutex); }
+
 /**
  * Processes a stat type (counter, gauge, histogram) by generating all output lines, sorting
  * them by tag-extracted metric name, and then outputting them in the correct sorted order into
@@ -68,6 +74,9 @@ uint64_t outputStatType(
     const std::function<std::string(
         const StatType& metric, const std::string& prefixed_tag_extracted_name)>& generate_output,
     absl::string_view type) {
+
+  // Lock prometheus namespaces so the output would be consistent.
+  absl::ReaderMutexLock lock(&prometheusNamespacesMutex());
 
   /*
    * From
@@ -176,10 +185,6 @@ std::string generateHistogramOutput(const Stats::ParentHistogram& histogram,
   return output;
 };
 
-absl::flat_hash_set<std::string>& prometheusNamespaces() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>);
-}
-
 } // namespace
 
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
@@ -230,6 +235,8 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
 bool PrometheusStatsFormatter::registerPrometheusNamespace(absl::string_view prometheus_namespace) {
   if (std::regex_match(prometheus_namespace.begin(), prometheus_namespace.end(),
                        namespaceRegex())) {
+    // Some extensions would call this from worker threads so we take lock here.
+    absl::WriterMutexLock lock(&prometheusNamespacesMutex());
     return prometheusNamespaces().insert(std::string(prometheus_namespace)).second;
   }
   return false;
@@ -237,12 +244,19 @@ bool PrometheusStatsFormatter::registerPrometheusNamespace(absl::string_view pro
 
 bool PrometheusStatsFormatter::unregisterPrometheusNamespace(
     absl::string_view prometheus_namespace) {
+  // Some extensions would call this from worker threads so we take lock here.
+  absl::WriterMutexLock lock(&prometheusNamespacesMutex());
   auto it = prometheusNamespaces().find(prometheus_namespace);
   if (it == prometheusNamespaces().end()) {
     return false;
   }
   prometheusNamespaces().erase(it);
   return true;
+}
+
+absl::flat_hash_set<std::string> PrometheusStatsFormatter::prometheusNamespacesForTest() {
+  absl::ReaderMutexLock lock(&prometheusNamespacesMutex());
+  return absl::flat_hash_set<std::string>(prometheusNamespaces()); // Take copy.
 }
 
 } // namespace Server
