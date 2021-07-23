@@ -79,10 +79,6 @@ public:
   bool ready();
 
 private:
-  // This is a guard to allow ready() to verify that this object is still alive. See the comments
-  // there for more information.
-  std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
-
   // Human-readable name for logging
   const std::string name_;
 
