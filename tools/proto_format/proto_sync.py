@@ -51,6 +51,10 @@ licenses(["notice"])  # Apache 2
 api_proto_package($fields)
 """)
 
+KEEP_V2_PROTOS = [
+    "envoy/config/health_checker/redis/v2",
+]
+
 IGNORED_V2_PROTOS = [
     "envoy/config/accesslog/v2",
     "envoy/config/cluster/aggregate/v2alpha",
@@ -103,11 +107,13 @@ IGNORED_V2_PROTOS = [
     "envoy/config/filter/network/mysql_proxy/v1alpha1",
     "envoy/config/filter/network/rate_limit/v2",
     "envoy/config/filter/network/rbac/v2",
+    "envoy/config/filter/network/redis_proxy/v2",
     "envoy/config/filter/network/sni_cluster/v2",
     "envoy/config/filter/network/zookeeper_proxy/v1alpha1",
     "envoy/config/filter/thrift/rate_limit/v2alpha1",
     "envoy/config/filter/udp/udp_proxy/v2alpha",
     "envoy/config/grpc_credential/v2alpha",
+    "envoy/config/health_checker/redis/v2",
     "envoy/config/ratelimit/v2",
     "envoy/config/rbac/v2",
     "envoy/config/retry/omit_host_metadata/v2",
@@ -400,7 +406,8 @@ def generate_current_api_dir(api_dir, dst_dir):
     shutil.rmtree(str(dst.joinpath("service", "auth", "v2alpha")))
 
     for proto in IGNORED_V2_PROTOS:
-        shutil.rmtree(str(dst.joinpath(proto[6:])))
+        if proto not in KEEP_V2_PROTOS:
+            shutil.rmtree(str(dst.joinpath(proto[6:])))
 
 
 def git_status(path):
