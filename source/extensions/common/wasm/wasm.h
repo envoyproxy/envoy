@@ -89,6 +89,15 @@ public:
   }
   void setFailStateForTesting(proxy_wasm::FailState fail_state) { failed_ = fail_state; }
 
+  // Called via failCallback in case of restarting VM from multiple plugins with the same vm_key.
+  void incRestartCount() {
+    if (!restart_count_incremented_) {
+      ENVOY_LOG(error, "Restarting Thread-local Wasm");
+      restart_count_incremented_ = true;
+      lifecycle_stats_handler_.onEvent(WasmEvent::VmRestart);
+    }
+  }
+
 protected:
   friend class Context;
 
@@ -106,6 +115,7 @@ protected:
 
   // Lifecycle stats
   LifecycleStatsHandler lifecycle_stats_handler_;
+  bool restart_count_incremented_{false};
 
   // Plugin stats
   absl::flat_hash_map<uint32_t, Stats::Counter*> counters_;
@@ -151,12 +161,14 @@ using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
 class PluginHandleSharedPtrThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
-  PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr handle) : handle_(handle){};
+  PluginHandleSharedPtrThreadLocal() = default;
   PluginHandleSharedPtr& handle() { return handle_; }
 
 private:
-  PluginHandleSharedPtr handle_;
+  PluginHandleSharedPtr handle_{nullptr};
 };
+
+using PluginHandleThreadLocalSharedPtr = std::shared_ptr<PluginHandleSharedPtrThreadLocal>;
 
 using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 
@@ -172,10 +184,10 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                 CreateWasmCallback&& callback,
                 CreateContextFn create_root_context_for_testing = nullptr);
 
-PluginHandleSharedPtr
-getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
-                             Event::Dispatcher& dispatcher,
-                             CreateContextFn create_root_context_for_testing = nullptr);
+PluginHandleThreadLocalSharedPtr
+getPluginHandleThreadLocal(const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
+                           Event::Dispatcher& dispatcher,
+                           CreateContextFn create_root_context_for_testing = nullptr);
 
 void clearCodeCacheForTesting();
 void setTimeOffsetForCodeCacheForTesting(MonotonicTime::duration d);

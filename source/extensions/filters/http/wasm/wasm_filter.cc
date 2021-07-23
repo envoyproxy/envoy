@@ -15,8 +15,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Was
   auto callback = [plugin, this](const Common::Wasm::WasmHandleSharedPtr& base_wasm) {
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
     tls_slot_->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
-      return std::make_shared<PluginHandleSharedPtrThreadLocal>(
-          Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher));
+      return Common::Wasm::getPluginHandleThreadLocal(base_wasm, plugin, dispatcher);
     });
   };
 

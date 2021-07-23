@@ -32,8 +32,8 @@ void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContex
     if (config_.singleton()) {
       // Return a Wasm VM which will be stored as a singleton by the Server.
       wasm_service_ = std::make_unique<WasmService>(
-          plugin,
-          Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, context.dispatcher()));
+          plugin, Common::Wasm::getPluginHandleThreadLocal(base_wasm, plugin, context.dispatcher())
+                      ->handle());
       return;
     }
     // Per-thread WASM VM.
@@ -42,8 +42,7 @@ void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContex
         ThreadLocal::TypedSlot<Common::Wasm::PluginHandleSharedPtrThreadLocal>::makeUnique(
             context.threadLocal());
     tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
-      return std::make_shared<Common::Wasm::PluginHandleSharedPtrThreadLocal>(
-          Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher));
+      return Common::Wasm::getPluginHandleThreadLocal(base_wasm, plugin, dispatcher);
     });
     wasm_service_ = std::make_unique<WasmService>(plugin, std::move(tls_slot));
   };

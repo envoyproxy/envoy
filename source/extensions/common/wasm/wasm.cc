@@ -456,10 +456,10 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
   return true;
 }
 
-PluginHandleSharedPtr
-getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
-                             Event::Dispatcher& dispatcher,
-                             CreateContextFn create_root_context_for_testing) {
+void setPluginHandleToTls(PluginHandleSharedPtrThreadLocal& tls,
+                          const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
+                          Event::Dispatcher& dispatcher,
+                          CreateContextFn create_root_context_for_testing, uint32_t restart_left) {
   if (!base_wasm) {
     if (!plugin->fail_open_) {
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), critical,
@@ -467,12 +467,47 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
     }
     // To handle the case when failed to create VMs and fail-open/close properly,
     // we still create PluginHandle with null WasmBase.
-    return std::make_shared<PluginHandle>(nullptr, plugin);
+    tls.handle() = std::make_shared<PluginHandle>(nullptr, plugin);
+    return;
   }
-  return std::static_pointer_cast<PluginHandle>(proxy_wasm::getOrCreateThreadLocalPlugin(
-      std::static_pointer_cast<WasmHandle>(base_wasm), plugin,
-      getWasmHandleCloneFactory(dispatcher, create_root_context_for_testing),
-      getPluginHandleFactory()));
+
+  // Create a new handle.
+  auto plugin_handle =
+      std::static_pointer_cast<PluginHandle>(proxy_wasm::getOrCreateThreadLocalPlugin(
+          std::static_pointer_cast<WasmHandle>(base_wasm), plugin,
+          getWasmHandleCloneFactory(dispatcher, create_root_context_for_testing),
+          getPluginHandleFactory()));
+
+  // Set the handle to tls.
+  tls.handle() = plugin_handle;
+
+  // Set restart callback if necessary.
+  auto wasm = tls.handle()->wasm();
+  if (wasm && restart_left > 0) {
+    wasm->wasm_vm()->addFailCallback([&tls, base_wasm, &dispatcher, plugin,
+                                      create_root_context_for_testing,
+                                      restart_left](proxy_wasm::FailState fail_state) {
+      if (fail_state == proxy_wasm::FailState::RuntimeError) {
+        ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), critical,
+                            "Restarting Plugin due to runtime error");
+        setPluginHandleToTls(tls, base_wasm, plugin, dispatcher, create_root_context_for_testing,
+                             restart_left - 1);
+        if (auto wasm = tls.handle()->wasm()) {
+          std::static_pointer_cast<Wasm>(wasm)->incRestartCount();
+        };
+      };
+    });
+  }
+}
+
+PluginHandleThreadLocalSharedPtr
+getPluginHandleThreadLocal(const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
+                           Event::Dispatcher& dispatcher,
+                           CreateContextFn create_root_context_for_testing) {
+  auto tls = std::make_shared<PluginHandleSharedPtrThreadLocal>();
+  setPluginHandleToTls(*tls, base_wasm, plugin, dispatcher, create_root_context_for_testing,
+                       plugin->wasmConfig().config().vm_config().max_restart_count());
+  return tls;
 }
 
 } // namespace Wasm

@@ -96,7 +96,7 @@ INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmNetworkFilterTest,
 // Bad code in initial config.
 TEST_P(WasmNetworkFilterTest, BadCode) {
   setupConfig("bad code");
-  EXPECT_EQ(wasm_, nullptr);
+  EXPECT_EQ(wasmHandle(), nullptr);
   setupFilter();
   filter().isFailed();
   EXPECT_CALL(read_filter_callbacks_.connection_,
@@ -106,7 +106,7 @@ TEST_P(WasmNetworkFilterTest, BadCode) {
 
 TEST_P(WasmNetworkFilterTest, BadCodeFailOpen) {
   setupConfig("bad code", "", "", true);
-  EXPECT_EQ(wasm_, nullptr);
+  EXPECT_EQ(wasmHandle(), nullptr);
   setupFilter();
   filter().isFailed();
   EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
@@ -190,7 +190,7 @@ TEST_P(WasmNetworkFilterTest, SegvFailOpen) {
 
   EXPECT_CALL(filter(), log_(spdlog::level::trace, Eq(absl::string_view("before segv"))));
   filter().onForeignFunction(0, 0);
-  EXPECT_TRUE(wasm_->wasm()->isFailed());
+  EXPECT_TRUE(wasmHandle()->wasm()->isFailed());
 
   Buffer::OwnedImpl fake_downstream_data("Fake");
   // No logging expected.
