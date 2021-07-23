@@ -20,7 +20,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This API is a work in progress.
 
 message PathTransformation {
+  // Action to take on a http request when the request path url has been modified by a transformation.
+  enum NormalizePathAction {
+    CONTINUE = 0;
+    REJECT = 1;
+    REDIRECT = 2;
+  }
+
   // A type of operation to alter text.
+  // [#next-free-field: 12]
   message Operation {
     // Should text be normalized according to RFC 3986? This typically is used for path headers
     // before any processing of requests by HTTP filters or routing. This applies percent-encoded
@@ -41,6 +49,10 @@ message PathTransformation {
     message MergeSlashes {
     }
 
+    // When request URL path contains escaped slash sequences (%2F, %2f, %5C and %5c), unescape these sequences.
+    message UnescapeSlashes {
+    }
+
     oneof operation_specifier {
       option (validate.required) = true;
 
@@ -49,7 +61,13 @@ message PathTransformation {
 
       // Enable merging adjacent slashes.
       MergeSlashes merge_slashes = 3;
+
+      // Enable unescaping escaped slashes.
+      UnescapeSlashes unescape_slashes = 4;
     }
+
+    // Action to take when request URL path is modified by the operation.
+    NormalizePathAction normalize_path_action = 11;
   }
 
   // A list of operations to apply. Transformations will be performed in the order that they appear.

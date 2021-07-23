@@ -20,6 +20,7 @@
 #include "source/common/http/date_provider_impl.h"
 #include "source/common/http/exception.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/path_utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 
@@ -197,8 +198,6 @@ public:
     return stream_error_on_invalid_http_messaging_;
   }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
-  bool shouldNormalizePath() const override { return false; }
-  bool shouldMergeSlashes() const override { return false; }
   bool shouldStripTrailingHostDot() const override { return false; }
   Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -206,6 +205,13 @@ public:
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
+  const Http::PathTransformer& forwardingPathTransformer() const override {
+    return forwarding_path_transformer_;
+  }
+
+  const Http::PathTransformer& filterPathTransformer() const override {
+    return filter_path_transformer_;
+  }
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction
       pathWithEscapedSlashesAction() const override {
@@ -263,6 +269,8 @@ public:
   Http::DefaultInternalAddressConfig internal_address_config_;
   bool normalize_path_{true};
   LocalReply::LocalReplyPtr local_reply_;
+  Http::PathTransformer forwarding_path_transformer_;
+  Http::PathTransformer filter_path_transformer_;
   std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
 };
 

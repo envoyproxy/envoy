@@ -1,3 +1,4 @@
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/config/trace/v3/opencensus.pb.h"
@@ -1098,6 +1099,92 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesDefault) {
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
   EXPECT_FALSE(config.shouldMergeSlashes());
+}
+
+// Validated that forwarding transformation is applied to both forwarding path and filter path.
+TEST_F(HttpConnectionManagerConfigTest, ForwadingTransformation) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  path_normalization_options:
+    forwarding_transformation:
+      operations:
+      - normalize_path_rfc_3986: {}
+      - merge_slashes: {}
+    http_filter_transformation:
+      operations:
+  merge_slashes: true
+  normalize_path: true
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  Http::TestRequestHeaderMapImpl header_map{
+      {":method", "GET"}, {":path", "/foo//bar"}, {":authority", "host"}, {":scheme", "http"}};
+  Http::ConnectionManagerUtility::maybeNormalizePath(header_map, config);
+  EXPECT_EQ(header_map.getForwardingPath(), "/foo/bar");
+  EXPECT_EQ(header_map.getFilterPath(), "/foo/bar");
+}
+
+// Validated that http filter transformation is applied to only filter path.
+TEST_F(HttpConnectionManagerConfigTest, FilterTransformation) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  path_normalization_options:
+    forwarding_transformation:
+      operations:
+    http_filter_transformation:
+      operations:
+      - normalize_path_rfc_3986: {}
+      - merge_slashes: {}
+  merge_slashes: true
+  normalize_path: true
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  Http::TestRequestHeaderMapImpl header_map{
+      {":method", "GET"}, {":path", "/foo//bar"}, {":authority", "host"}, {":scheme", "http"}};
+  Http::ConnectionManagerUtility::maybeNormalizePath(header_map, config);
+  EXPECT_EQ(header_map.getForwardingPath(), "/foo//bar");
+  EXPECT_EQ(header_map.getFilterPath(), "/foo/bar");
+}
+
+// Validated duplicate operation inside a transformation throw exception.
+TEST_F(HttpConnectionManagerConfigTest, DuplicatePathTransformation) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  path_normalization_options:
+    forwarding_transformation:
+      operations:
+      - normalize_path_rfc_3986: {}
+      - normalize_path_rfc_3986: {}
+    http_filter_transformation:
+      operations:
+  merge_slashes: true
+  normalize_path: true
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW(HttpConnectionManagerConfig(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_,
+                                           http_tracer_manager_, filter_config_provider_manager_),
+               EnvoyException);
 }
 
 // Validated that when configured, we merge slashes.

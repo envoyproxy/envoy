@@ -11,6 +11,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/http/date_provider.h"
+#include "source/common/http/path_utility.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/symbol_table_impl.h"
@@ -450,17 +451,6 @@ public:
   virtual const Http::Http1Settings& http1Settings() const PURE;
 
   /**
-   * @return if the HttpConnectionManager should normalize url following RFC3986
-   */
-  virtual bool shouldNormalizePath() const PURE;
-
-  /**
-   * @return if the HttpConnectionManager should merge two or more adjacent slashes in the path into
-   * one.
-   */
-  virtual bool shouldMergeSlashes() const PURE;
-
-  /**
    * @return port strip type from host/authority header.
    */
   virtual StripPortType stripPortType() const PURE;
@@ -477,6 +467,17 @@ public:
    */
   virtual const LocalReply::LocalReply& localReply() const PURE;
 
+  /**
+   * @return PathTransformer that normalize the request path url, changes to the path will be
+   * applied at the end of the filter chain and only visible to upstream servers.
+   */
+  virtual const PathTransformer& forwardingPathTransformer() const PURE;
+
+  /**
+   * @return PathTransformer that normalize the request path url, changes to the path will be
+   * applied at the beginning of the filter chain and visible to both filters and upstream servers.
+   */
+  virtual const PathTransformer& filterPathTransformer() const PURE;
   /**
    * @return the action HttpConnectionManager should take when receiving client request
    * with URI path containing %2F, %2f, %5c or %5C sequences.

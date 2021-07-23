@@ -467,7 +467,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
   }
 }
 
-ConnectionManagerUtility::NormalizePathAction
+NormalizePathAction
 ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
                                              const ConnectionManagerConfig& config) {
   if (!request_headers.Path()) {
@@ -475,37 +475,30 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
   }
 
   NormalizePathAction final_action = NormalizePathAction::Continue;
-  const auto escaped_slashes_action = config.pathWithEscapedSlashesAction();
-  ASSERT(escaped_slashes_action != envoy::extensions::filters::network::http_connection_manager::
-                                       v3::HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT);
-  if (escaped_slashes_action != envoy::extensions::filters::network::http_connection_manager::v3::
-                                    HttpConnectionManager::KEEP_UNCHANGED) {
-    auto escaped_slashes_result = PathUtil::unescapeSlashes(request_headers);
-    if (escaped_slashes_result == PathUtil::UnescapeSlashesResult::FoundAndUnescaped) {
-      if (escaped_slashes_action == envoy::extensions::filters::network::http_connection_manager::
-                                        v3::HttpConnectionManager::REJECT_REQUEST) {
-        return NormalizePathAction::Reject;
-      } else if (escaped_slashes_action ==
-                 envoy::extensions::filters::network::http_connection_manager::v3::
-                     HttpConnectionManager::UNESCAPE_AND_REDIRECT) {
-        final_action = NormalizePathAction::Redirect;
-      } else {
-        ASSERT(escaped_slashes_action ==
-               envoy::extensions::filters::network::http_connection_manager::v3::
-                   HttpConnectionManager::UNESCAPE_AND_FORWARD);
-      }
+
+  const auto original_path = request_headers.getPathValue();
+  absl::optional<std::string> forwarding_path =
+      config.forwardingPathTransformer().transform(original_path, final_action);
+  if (final_action == NormalizePathAction::Reject) {
+    return final_action;
+  }
+  ASSERT(forwarding_path.has_value());
+  absl::optional<std::string> filter_path;
+
+  request_headers.setForwardingPath(forwarding_path.value());
+  filter_path = config.filterPathTransformer().transform(forwarding_path.value(), final_action);
+
+  if (final_action == NormalizePathAction::Continue) {
+    if (filter_path.has_value()) {
+      request_headers.setPath(filter_path.value());
+      request_headers.setFilterPath(filter_path.value());
+    } else {
+      return NormalizePathAction::Reject;
     }
+  } else if (final_action == NormalizePathAction::Redirect) {
+    ASSERT(forwarding_path.has_value());
+    request_headers.setPath(forwarding_path.value());
   }
-
-  if (config.shouldNormalizePath() && !PathUtil::canonicalPath(request_headers)) {
-    return NormalizePathAction::Reject;
-  }
-
-  // Merge slashes after path normalization to catch potential edge cases with percent encoding.
-  if (config.shouldMergeSlashes()) {
-    PathUtil::mergeSlashes(request_headers);
-  }
-
   return final_action;
 }
 

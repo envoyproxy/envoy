@@ -25,6 +25,7 @@
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/http3/codec_stats.h"
+#include "source/common/http/path_utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/router/rds_impl.h"
@@ -198,8 +199,8 @@ public:
     return stream_error_on_invalid_http_messaging_;
   }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
-  bool shouldNormalizePath() const override { return normalize_path_; }
-  bool shouldMergeSlashes() const override { return merge_slashes_; }
+  bool shouldNormalizePath() const { return normalize_path_; }
+  bool shouldMergeSlashes() const { return merge_slashes_; }
   bool shouldStripTrailingHostDot() const override { return strip_trailing_host_dot_; }
   Http::StripPortType stripPortType() const override { return strip_port_type_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -208,6 +209,12 @@ public:
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
+  const Http::PathTransformer& filterPathTransformer() const override {
+    return filter_path_transformer_;
+  }
+  const Http::PathTransformer& forwardingPathTransformer() const override {
+    return forwarding_path_transformer_;
+  }
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction
       pathWithEscapedSlashesAction() const override {
@@ -309,7 +316,9 @@ private:
   static const uint64_t RequestTimeoutMs = 0;
   // request header timeout is disabled by default
   static const uint64_t RequestHeaderTimeoutMs = 0;
-  const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+  Http::PathTransformer forwarding_path_transformer_;
+  Http::PathTransformer filter_path_transformer_;
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction path_with_escaped_slashes_action_;
   const bool strip_trailing_host_dot_;
   const uint64_t max_requests_per_connection_;

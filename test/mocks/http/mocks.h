@@ -588,8 +588,8 @@ public:
   MOCK_METHOD(bool, proxy100Continue, (), (const));
   MOCK_METHOD(bool, streamErrorOnInvalidHttpMessaging, (), (const));
   MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
-  MOCK_METHOD(bool, shouldNormalizePath, (), (const));
-  MOCK_METHOD(bool, shouldMergeSlashes, (), (const));
+  MOCK_METHOD(const Http::PathTransformer&, filterPathTransformer, (), (const));
+  MOCK_METHOD(const Http::PathTransformer&, forwardingPathTransformer, (), (const));
   MOCK_METHOD(bool, shouldStripTrailingHostDot, (), (const));
   MOCK_METHOD(Http::StripPortType, stripPortType, (), (const));
   MOCK_METHOD(envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction,

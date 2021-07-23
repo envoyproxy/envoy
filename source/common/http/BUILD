@@ -493,8 +493,11 @@ envoy_cc_library(
         ":legacy_path_canonicalizer",
         "//envoy/http:header_map_interface",
         "//source/common/common:logger_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "@com_googlesource_googleurl//url:envoy_url",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/http/v3:pkg_cc_proto",
     ],
 )
 

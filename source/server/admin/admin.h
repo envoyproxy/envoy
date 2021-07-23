@@ -29,6 +29,7 @@
 #include "source/common/http/default_server_string.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/path_utility.h"
 #include "source/common/http/request_id_extension_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/connection_balancer_impl.h"
@@ -174,8 +175,6 @@ public:
   bool proxy100Continue() const override { return false; }
   bool streamErrorOnInvalidHttpMessaging() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
-  bool shouldNormalizePath() const override { return true; }
-  bool shouldMergeSlashes() const override { return true; }
   bool shouldStripTrailingHostDot() const override { return false; }
   Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -206,6 +205,11 @@ public:
     };
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
+
+  const Http::PathTransformer& forwardingPathTransformer() const override {
+    return path_transformer_;
+  }
+  const Http::PathTransformer& filterPathTransformer() const override { return path_transformer_; }
 
 private:
   /**
@@ -451,6 +455,7 @@ private:
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
+  Http::PathTransformer path_transformer_;
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   const absl::optional<std::string> scheme_{};
 };

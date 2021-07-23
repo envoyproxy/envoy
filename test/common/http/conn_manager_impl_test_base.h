@@ -3,6 +3,7 @@
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/http/date_provider_impl.h"
+#include "source/common/http/path_utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
@@ -134,8 +135,6 @@ public:
     return stream_error_on_invalid_http_messaging_;
   }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
-  bool shouldNormalizePath() const override { return normalize_path_; }
-  bool shouldMergeSlashes() const override { return merge_slashes_; }
   bool shouldStripTrailingHostDot() const override { return strip_trailing_host_dot_; }
   Http::StripPortType stripPortType() const override { return strip_port_type_; }
   const RequestIDExtensionSharedPtr& requestIDExtension() override { return request_id_extension_; }
@@ -144,6 +143,10 @@ public:
     return headers_with_underscores_action_;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
+  const PathTransformer& forwardingPathTransformer() const override {
+    return forwarding_path_transformer_;
+  }
+  const PathTransformer& filterPathTransformer() const override { return filter_path_transformer_; }
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction
       pathWithEscapedSlashesAction() const override {
@@ -212,8 +215,6 @@ public:
   bool stream_error_on_invalid_http_messaging_ = false;
   bool preserve_external_request_id_ = false;
   Http::Http1Settings http1_settings_;
-  bool normalize_path_ = false;
-  bool merge_slashes_ = false;
   Http::StripPortType strip_port_type_ = Http::StripPortType::None;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
@@ -229,6 +230,8 @@ public:
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
   std::shared_ptr<AccessLog::MockInstance> log_handler_;
+  PathTransformer forwarding_path_transformer_;
+  PathTransformer filter_path_transformer_;
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction path_with_escaped_slashes_action_{
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
