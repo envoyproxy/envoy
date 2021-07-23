@@ -5,7 +5,7 @@ package envoy.service.health.v4alpha;
 import "envoy/config/cluster/v4alpha/cluster.proto";
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/health_check.proto";
-import "envoy/config/endpoint/v3/endpoint_components.proto";
+import "envoy/config/endpoint/v4alpha/endpoint_components.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -103,7 +103,7 @@ message EndpointHealth {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.health.v3.EndpointHealth";
 
-  config.endpoint.v3.Endpoint endpoint = 1;
+  config.endpoint.v4alpha.Endpoint endpoint = 1;
 
   config.core.v4alpha.HealthStatus health_status = 2;
 }
@@ -158,7 +158,7 @@ message LocalityEndpoints {
 
   config.core.v4alpha.Locality locality = 1;
 
-  repeated config.endpoint.v3.Endpoint endpoints = 2;
+  repeated config.endpoint.v4alpha.Endpoint endpoints = 2;
 }
 
 // The cluster name and locality is provided to Envoy for the endpoints that it
