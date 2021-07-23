@@ -39,8 +39,21 @@ trap_errors () {
     set -v
 }
 
+test_versions () {
+    local bazel_version repo_version
+    bazel_version="$(grep -E '^VERSION =' versions.bzl | cut -d= -f2 | xargs)"
+    repo_version="$(cat VERSION)"
+    if [[ "$bazel_version" != "$repo_version" ]]; then
+        echo "##[error]: Versions do not match, versions.bzl=${bazel_version} VERSION=${repo_version}" >&2
+        return 1
+    fi
+}
+
 trap trap_errors ERR
 trap exit 1 INT
+
+CURRENT=versions
+test_versions
 
 # TODO: move these to bazel
 CURRENT=glint
