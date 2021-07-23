@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/router/router.h"
+#include "source/common/config/metadata.h"
 
 namespace Envoy {
 namespace Router {
@@ -15,7 +16,7 @@ namespace Router {
  */
 class DelegatingRoute : public Router::Route {
 public:
-  explicit DelegatingRoute(Router::RouteConstSharedPtr route) : base_route_(std::move(route)) {
+  explicit DelegatingRoute(Router::RouteConstSharedPtr route) : base_route_(std::move(route)), typed_metadata_({}) {
     ASSERT(base_route_ != nullptr);
   }
 
@@ -25,9 +26,14 @@ public:
   const Router::Decorator* decorator() const override;
   const Router::RouteTracing* tracingConfig() const override;
   const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
+  const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
 
 private:
   const Router::RouteConstSharedPtr base_route_;
+  const envoy::config::core::v3::Metadata metadata_;
+  const Envoy::Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
+      typed_metadata_;
 };
 
 /**
