@@ -450,6 +450,16 @@ TEST_F(HappyEyeballsConnectionImplTest, InitializeReadFilters) {
   impl_->addReadFilter(filter2);
 }
 
+TEST_F(HappyEyeballsConnectionImplTest, InitializeReadFiltersAfterConnect) {
+  startConnect();
+
+  connectFirstAttempt();
+
+  // Verify that initializeReadFilters() calls are delegated to the remaining connection.
+  EXPECT_CALL(*created_connections_[0], initializeReadFilters()).WillOnce(Return(false));
+  EXPECT_FALSE(impl_->initializeReadFilters());
+}
+
 TEST_F(HappyEyeballsConnectionImplTest, AddConnectionCallbacks) {
   MockConnectionCallbacks callbacks;
   // The filter will be captured by the impl and not passed to the connection until it completes.
@@ -975,6 +985,15 @@ TEST_F(HappyEyeballsConnectionImplTest, StreamInfo) {
   StreamInfo::MockStreamInfo info;
   EXPECT_CALL(*created_connections_[0], streamInfo()).WillOnce(ReturnRef(info));
   EXPECT_EQ(&info, &impl_->streamInfo());
+}
+
+TEST_F(HappyEyeballsConnectionImplTest, ConstStreamInfo) {
+  connectFirstAttempt();
+
+  StreamInfo::MockStreamInfo info;
+  EXPECT_CALL(*created_connections_[0], streamInfo()).WillOnce(ReturnRef(info));
+  const HappyEyeballsConnectionImpl* impl = impl_.get();
+  EXPECT_EQ(&info, &impl->streamInfo());
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, TransportFailureReason) {
