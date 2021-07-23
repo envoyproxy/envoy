@@ -8,7 +8,7 @@
     "//examples/objective-c/hello_world:appmain",
     "//examples/swift/hello_world:app",
     "//examples/swift/hello_world:appmain",
-    "//library/swift:ios_framework_archive",
+    "//library/swift:ios_lib",
     "//test/swift/integration:cancel_stream_test",
     "//test/swift/integration:cancel_stream_test_lib",
     "//test/swift/integration:direct_response_contains_headers_integration_test",
