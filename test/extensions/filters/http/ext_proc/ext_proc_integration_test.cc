@@ -1027,6 +1027,61 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithEmptyBody) {
   verifyDownstreamResponse(*response, 200);
 }
 
+// Test how the filter responds when asked to buffer a response body for a POST
+// request with an empty body. We should get an empty body message because
+// the Envoy filter stream received the body after all the headers.
+TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetWithEmptyResponseBody) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(true, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_TRUE(headers.end_of_stream());
+    return true;
+  });
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(0, true);
+  processResponseHeadersMessage(false, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_FALSE(headers.end_of_stream());
+    return true;
+  });
+  // We should get an empty body message this time
+  processResponseBodyMessage(false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    EXPECT_EQ(body.body().size(), 0);
+    return true;
+  });
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test how the filter responds when asked to buffer a response body for a POST
+// request with no body. We should not get an empty body message because
+// the Envoy filter stream received headers with no body.
+TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetWithNoResponseBody) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(true, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_TRUE(headers.end_of_stream());
+    return true;
+  });
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  processResponseHeadersMessage(false, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_TRUE(headers.end_of_stream());
+    return true;
+  });
+  verifyDownstreamResponse(*response, 200);
+}
+
 // Test how the filter responds when asked to stream a request body for a POST
 // request with an empty body. We should get an empty body message because
 // the Envoy filter stream received the body after all the headers.
