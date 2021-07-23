@@ -210,6 +210,35 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondFailsAndFirstSuc
   connection_callbacks_[0]->onEvent(ConnectionEvent::RemoteClose);
 }
 
+TEST_F(HappyEyeballsConnectionImplTest, ConnectThenAllTimeoutAndFail) {
+  startConnect();
+
+  next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
+  timeoutAndStartNextAttempt();
+
+  // After the second timeout the third and final attempt will be started.
+  next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
+  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
+  EXPECT_CALL(dispatcher_, createClientConnection_(address_list_[2], _, _, _))
+      .WillOnce(
+          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
+  EXPECT_CALL(*next_connections_.back(), connect());
+  ASSERT_EQ(2, created_connections_.size());
+  failover_timer_->invokeCallback();
+
+  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[1], close(ConnectionCloseType::NoFlush));
+  connection_callbacks_[1]->onEvent(ConnectionEvent::RemoteClose);
+
+  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
+  connection_callbacks_[0]->onEvent(ConnectionEvent::RemoteClose);
+
+  EXPECT_CALL(*created_connections_[2], removeConnectionCallbacks(_));
+  EXPECT_CALL(*failover_timer_, disableTimer());
+  connection_callbacks_[2]->onEvent(ConnectionEvent::RemoteClose);
+}
+
 TEST_F(HappyEyeballsConnectionImplTest, Id) {
   uint64_t id = ConnectionImpl::nextGlobalIdForTest() - 1;
   EXPECT_EQ(id, impl_->id());
@@ -304,6 +333,27 @@ TEST_F(HappyEyeballsConnectionImplTest, CloseDuringAttempt) {
   impl_->close(ConnectionCloseType::FlushWrite);
 }
 
+TEST_F(HappyEyeballsConnectionImplTest, CloseDuringAttemptWithCallbacks) {
+  startConnect();
+
+  MockConnectionCallbacks callbacks;
+  // The filter will be captured by the impl and not passed to the connection until it is closed.
+  impl_->addConnectionCallbacks(callbacks);
+
+  next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
+  timeoutAndStartNextAttempt();
+
+  EXPECT_CALL(*failover_timer_, disableTimer());
+  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[1], close(ConnectionCloseType::NoFlush));
+  // addConnectionCallbacks() should be applied to the now final connection.
+  EXPECT_CALL(*created_connections_[0], addConnectionCallbacks(_))
+      .WillOnce(Invoke([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks); }));
+  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::FlushWrite));
+  impl_->close(ConnectionCloseType::FlushWrite);
+}
+
 TEST_F(HappyEyeballsConnectionImplTest, CloseAfterAttemptComplete) {
   connectFirstAttempt();
 
@@ -332,6 +382,42 @@ TEST_F(HappyEyeballsConnectionImplTest, AddReadFilter) {
   // Verify that addReadFilter() calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[1], addReadFilter(filter2));
   impl_->addReadFilter(filter2);
+}
+
+TEST_F(HappyEyeballsConnectionImplTest, RemoveReadFilter) {
+  startConnect();
+
+  connectFirstAttempt();
+
+  MockReadFilterCallbacks callbacks;
+  ReadFilterSharedPtr filter = std::make_shared<MockReadFilter>();
+  filter->initializeReadFilterCallbacks(callbacks);
+  // Verify that removeReadFilter() calls are delegated to the final connection.
+  EXPECT_CALL(*created_connections_[0], removeReadFilter(filter));
+  impl_->removeReadFilter(filter);
+}
+
+TEST_F(HappyEyeballsConnectionImplTest, RemoveReadFilterBeforeConnectFinished) {
+  startConnect();
+
+  MockReadFilterCallbacks callbacks;
+  ReadFilterSharedPtr filter = std::make_shared<MockReadFilter>();
+  filter->initializeReadFilterCallbacks(callbacks);
+  ReadFilterSharedPtr filter2 = std::make_shared<MockReadFilter>();
+  filter2->initializeReadFilterCallbacks(callbacks);
+  // The filters will be captured by the impl and not passed to the connection until it completes.
+  impl_->addReadFilter(filter);
+  impl_->addReadFilter(filter2);
+
+  // The removal will be captured by the impl and not passed to the connection until it completes.
+  impl_->removeReadFilter(filter);
+
+  next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
+  timeoutAndStartNextAttempt();
+
+  // Verify that addReadFilter() calls are delegated to the remaining connection.
+  EXPECT_CALL(*created_connections_[1], addReadFilter(filter2));
+  connectSecondAttempt();
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, InitializeReadFilters) {
@@ -481,6 +567,29 @@ TEST_F(HappyEyeballsConnectionImplTest, SetBufferLimits) {
   // Verify that removeConnectionCallbacks calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[1], setBufferLimits(420));
   impl_->setBufferLimits(420);
+}
+
+TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeLimit) {
+  startConnect();
+
+  Buffer::OwnedImpl data("hello world");
+  size_t length = data.length();
+  bool end_stream = false;
+
+  impl_->write(data, end_stream);
+  EXPECT_FALSE(impl_->aboveHighWatermark());
+
+  EXPECT_CALL(*created_connections_[0], setBufferLimits(length - 1));
+  impl_->setBufferLimits(length - 1);
+  EXPECT_TRUE(impl_->aboveHighWatermark());
+
+  // The call to write() will be replayed on the underlying connection.
+  EXPECT_CALL(*created_connections_[0], write(_, _))
+      .WillOnce(Invoke([](Buffer::Instance& data, bool end_stream) -> void {
+        EXPECT_EQ("hello world", data.toString());
+        EXPECT_FALSE(end_stream);
+      }));
+  connectFirstAttempt();
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeConnectOverLimit) {

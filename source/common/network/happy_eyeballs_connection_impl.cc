@@ -69,7 +69,7 @@ void HappyEyeballsConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
       return;
     }
   }
-  ASSERT(false);
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 bool HappyEyeballsConnectionImpl::initializeReadFilters() {
@@ -304,7 +304,7 @@ void HappyEyeballsConnectionImpl::removeConnectionCallbacks(ConnectionCallbacks&
       return;
     }
   }
-  ASSERT(false);
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void HappyEyeballsConnectionImpl::close(ConnectionCloseType type) {
@@ -528,12 +528,12 @@ void HappyEyeballsConnectionImpl::cleanupWrapperAndConnection(ConnectionCallback
 
 void HappyEyeballsConnectionImpl::onAboveWriteBufferHighWatermark(
     ConnectionCallbacksWrapper* /*wrapper*/) {
-  ASSERT(false);
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void HappyEyeballsConnectionImpl::onBelowWriteBufferLowWatermark(
     ConnectionCallbacksWrapper* /*wrapper*/) {
-  ASSERT(false);
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void HappyEyeballsConnectionImpl::onWriteBufferHighWatermark() { ASSERT(!connect_finished_); }
