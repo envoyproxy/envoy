@@ -153,6 +153,10 @@ public:
                                 const envoy::config::core::v3::Metadata* metadata) const;
   MonotonicTime creationTime() const override { return creation_time_; }
 
+  void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
+    address_list_ = address_list;
+  }
+
 protected:
   void setAddress(Network::Address::InstanceConstSharedPtr address) { address_ = address; }
 
@@ -265,6 +269,7 @@ protected:
   static Network::ClientConnectionPtr
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                    const Network::Address::InstanceConstSharedPtr& address,
+                   const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
                    Network::TransportSocketFactory& socket_factory,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    Network::TransportSocketOptionsConstSharedPtr transport_socket_options);
