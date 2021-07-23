@@ -800,6 +800,13 @@ public:
   void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
 
   /**
+   * Set the TransportSocketFactoryContext pointer so that the memory isn't lost
+   * for the cluster lifetime in case SDS is used.
+   */
+  void setTransportFactoryContext(
+      Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context);
+
+  /**
    * Wrapper around Network::Address::resolveProtoAddress() that provides improved error message
    * based on the cluster's type.
    * @param address supplies the address proto to resolve.
@@ -890,6 +897,7 @@ private:
   const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
+  Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context_{};
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;

@@ -101,6 +101,8 @@ public:
   virtual Api::Api& api() PURE;
 };
 
+using TransportSocketFactoryContextPtr = std::unique_ptr<TransportSocketFactoryContext>;
+
 class TransportSocketConfigFactory : public Config::TypedFactory {
 public:
   ~TransportSocketConfigFactory() override = default;

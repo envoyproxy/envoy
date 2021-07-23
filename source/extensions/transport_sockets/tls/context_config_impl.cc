@@ -181,7 +181,8 @@ ContextConfigImpl::ContextConfigImpl(
       min_protocol_version_(tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(),
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
-                                                default_max_protocol_version)) {
+                                                default_max_protocol_version)),
+      factory_context_(factory_context) {
   if (certificate_validation_context_provider_ != nullptr) {
     if (default_cvc_) {
       // We need to validate combined certificate validation context.
@@ -212,7 +213,7 @@ ContextConfigImpl::ContextConfigImpl(
   if (!tls_certificate_providers_.empty()) {
     for (auto& provider : tls_certificate_providers_) {
       if (provider->secret() != nullptr) {
-        tls_certificate_configs_.emplace_back(*provider->secret(), &factory_context, api_);
+        tls_certificate_configs_.emplace_back(*provider->secret(), factory_context, api_);
       }
     }
   }
@@ -257,7 +258,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
           for (const auto& tls_certificate_provider : tls_certificate_providers_) {
             auto* secret = tls_certificate_provider->secret();
             if (secret != nullptr) {
-              tls_certificate_configs_.emplace_back(*secret, nullptr, api_);
+              tls_certificate_configs_.emplace_back(*secret, factory_context_, api_);
             }
           }
           callback();
