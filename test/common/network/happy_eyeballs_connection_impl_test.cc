@@ -224,7 +224,7 @@ TEST_F(HappyEyeballsConnectionImplTest, HashKey) {
 
   startConnect();
 
-  std::vector<uint8_t> hash_key = {'A', 'B', 'C' };
+  std::vector<uint8_t> hash_key = {'A', 'B', 'C'};
   uint8_t* id_array = reinterpret_cast<uint8_t*>(&id);
   impl_->hashKey(hash_key);
   EXPECT_EQ(3 + sizeof(id), hash_key.size());
@@ -232,7 +232,7 @@ TEST_F(HappyEyeballsConnectionImplTest, HashKey) {
   EXPECT_EQ('B', hash_key[1]);
   EXPECT_EQ('C', hash_key[2]);
   for (size_t i = 0; i < sizeof(id); ++i) {
-    EXPECT_EQ(id_array[i], hash_key[i+3]);
+    EXPECT_EQ(id_array[i], hash_key[i + 3]);
   }
 }
 
@@ -345,7 +345,8 @@ TEST_F(HappyEyeballsConnectionImplTest, InitializeReadFilters) {
   filter->initializeReadFilterCallbacks(callbacks);
   impl_->addReadFilter(filter);
 
-  // initializeReadFilters() will be captured by the impl and not passed to the connection until it completes.
+  // initializeReadFilters() will be captured by the impl and not passed to the connection until it
+  // completes.
   EXPECT_TRUE(impl_->initializeReadFilters());
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());

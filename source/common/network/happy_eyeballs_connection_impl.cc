@@ -536,9 +536,7 @@ void HappyEyeballsConnectionImpl::onBelowWriteBufferLowWatermark(
   ASSERT(false);
 }
 
-void HappyEyeballsConnectionImpl::onWriteBufferHighWatermark() {
-  ASSERT(!connect_finished_);
-}
+void HappyEyeballsConnectionImpl::onWriteBufferHighWatermark() { ASSERT(!connect_finished_); }
 
 } // namespace Network
 } // namespace Envoy
