@@ -260,12 +260,6 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
       config, quic::kMinimumFlowControlSendWindow);
 }
 
-enum class QuicVersionType {
-  GquicQuicCrypto,
-  GquicTls,
-  Iquic,
-};
-
 std::string spdyHeaderToHttp3StreamPayload(const spdy::SpdyHeaderBlock& header) {
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
   quic::test::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
