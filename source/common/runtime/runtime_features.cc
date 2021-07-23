@@ -123,6 +123,7 @@ constexpr const char* disabled_runtime_features[] = {
     // CacheOption is CacheWhenRuntimeEnabled.
     // Caller that use AlwaysCache option will always cache, unaffected by this runtime.
     "envoy.reloadable_features.enable_grpc_async_client_cache",
+    "envoy.reloadable_features.sanitize_http_header_referer",
 };
 
 RuntimeFeatures::RuntimeFeatures() {
