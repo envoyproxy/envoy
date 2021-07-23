@@ -1,0 +1,6 @@
+syntax = "proto3";
+package testingprotos;
+
+message SampleMessage {
+    string useremail = 1 [(validate.rules).string.email = true];
+}

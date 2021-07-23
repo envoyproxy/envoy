@@ -1,0 +1,10 @@
+syntax = "proto3";
+package testingprotos;
+
+message SampleMessage {
+    oneof test_oneof {
+      string name = 4;
+      SubMessage sub_message = 9;
+      float loner = 10;
+    }
+}

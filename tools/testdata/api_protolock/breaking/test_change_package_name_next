@@ -1,0 +1,6 @@
+syntax = "proto3";
+package evaluatingprotos;
+
+message SampleMessage {
+    string passcode = 69;
+}

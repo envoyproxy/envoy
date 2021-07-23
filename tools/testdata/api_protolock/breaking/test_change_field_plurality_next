@@ -1,0 +1,6 @@
+syntax = "proto3";
+package testingprotos;
+
+message SampleMessage {
+    repeated string from = 1;
+}
