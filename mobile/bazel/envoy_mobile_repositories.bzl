@@ -15,24 +15,6 @@ def envoy_mobile_repositories():
     python_repos()
 
 def upstream_envoy_overrides():
-    # Patch protobuf to prevent duplicate symbols: https://github.com/lyft/envoy-mobile/issues/617
-    # More details: https://github.com/protocolbuffers/protobuf/issues/7046
-    # TODO: Remove after https://github.com/bazelbuild/bazel/pull/10493 is merged to Bazel
-    # Reverts:
-    # - https://github.com/protocolbuffers/protobuf/commit/7b28278c7d4f4175e70aef2f89d304696eb85ae3
-    # - https://github.com/protocolbuffers/protobuf/commit/a03d332aca5d33c5d4b2cd25037c9e37d57eff02
-    http_archive(
-        name = "com_google_protobuf",
-        patch_args = ["-p1"],
-        patches = [
-            "@envoy//bazel:protobuf.patch",
-            "@envoy_mobile//bazel:protobuf.patch",
-        ],
-        sha256 = "d7371dc2d46fddac1af8cb27c0394554b068768fc79ecaf5be1a1863e8ff3392",
-        strip_prefix = "protobuf-3.16.0",
-        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.16.0/protobuf-all-3.16.0.tar.gz"],
-    )
-
     # Workaround old NDK version breakages https://github.com/lyft/envoy-mobile/issues/934
     http_archive(
         name = "com_github_libevent_libevent",
@@ -78,14 +60,15 @@ def upstream_envoy_overrides():
 def swift_repos():
     http_archive(
         name = "build_bazel_rules_apple",
-        sha256 = "55f4dc1c9bf21bb87442665f4618cff1f1343537a2bd89252078b987dcd9c382",
-        url = "https://github.com/bazelbuild/rules_apple/releases/download/0.20.0/rules_apple.0.20.0.tar.gz",
+        sha256 = "747d30a8d96e0f4d093c55ebcdc07ac5ef2529c7aa5c41b45788a36ca3a4cb05",
+        strip_prefix = "rules_apple-8b42998e2086325c3290f4e68752a50cf077fb92",
+        url = "https://github.com/bazelbuild/rules_apple/archive/8b42998e2086325c3290f4e68752a50cf077fb92.tar.gz",
     )
 
     http_archive(
         name = "build_bazel_rules_swift",
-        sha256 = "cea22c0616d797e494d7844a9b604520c87f53c81de49613a7e679ec5b821620",
-        url = "https://github.com/bazelbuild/rules_swift/releases/download/0.14.0/rules_swift.0.14.0.tar.gz",
+        sha256 = "a228a8e41fdc165a2c55924b728c466e0086f3e638a05d6da98aa6222cbb19c1",
+        url = "https://github.com/bazelbuild/rules_swift/releases/download/0.16.1/rules_swift.0.16.1.tar.gz",
     )
 
 def kotlin_repos():

@@ -1,9 +1,11 @@
-load("@envoy_mobile//bazel:swift_static_framework.bzl", "swift_static_framework")
+load("@build_bazel_rules_apple//apple:ios.bzl", "ios_static_framework")
+load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
+load("//bazel:swift_header_collector.bzl", "swift_header_collector")
 
 licenses(["notice"])  # Apache 2
 
-swift_static_framework(
-    name = "ios_framework",
+swift_library(
+    name = "ios_lib",
     srcs = glob([
         "DirectResponse.swift",
         "Engine.swift",
@@ -40,7 +42,22 @@ swift_static_framework(
         "mocks/*.swift",
         "stats/*.swift",
     ]),
+    features = ["swift.enable_library_evolution"],
     module_name = "Envoy",
     private_deps = ["//library/objective-c:envoy_engine_objc_lib"],
     visibility = ["//visibility:public"],
+)
+
+swift_header_collector(
+    name = "ios_lib_headers",
+    library = "ios_lib",
+)
+
+ios_static_framework(
+    name = "ios_framework",
+    hdrs = ["ios_lib_headers"],
+    bundle_name = "Envoy",
+    minimum_os_version = "11.0",
+    visibility = ["//visibility:public"],
+    deps = ["ios_lib"],
 )

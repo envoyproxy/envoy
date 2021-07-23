@@ -25,7 +25,7 @@ def envoy_mobile_swift_test(name, srcs, data = [], deps = [], repository = ""):
         srcs = srcs,
         data = data,
         deps = [
-            repository + "//library/swift:ios_framework_archive",
+            repository + "//library/swift:ios_lib",
         ] + deps,
         linkopts = ["-lresolv.9"],
         visibility = ["//visibility:private"],
