@@ -40,7 +40,7 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   Envoy::Ssl::ClientContextSharedPtr client_context_;
   // If client context changes, client config will be updated as well.
   std::shared_ptr<quic::QuicCryptoClientConfig> client_config_;
-  const quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedVersions()};
+  const quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedHttp3Versions()};
   quic::QuicConfig quic_config_;
   // The cluster buffer limits.
   const uint32_t buffer_limit_;

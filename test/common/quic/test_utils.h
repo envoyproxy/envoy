@@ -294,7 +294,7 @@ class QuicMultiVersionTest : public testing::TestWithParam<
 std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> generateTestParam() {
   std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> param;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    for (auto quic_version : quic::CurrentSupportedHttp3Versions()) {
+    for (const auto& quic_version : quic::CurrentSupportedHttp3Versions()) {
       param.emplace_back(ip_version, quic_version);
     }
   }

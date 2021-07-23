@@ -104,15 +104,6 @@ void EnvoyQuicServerSession::OnCanWrite() {
   maybeApplyDelayClosePolicy();
 }
 
-void EnvoyQuicServerSession::SetDefaultEncryptionLevel(quic::EncryptionLevel level) {
-  quic::QuicServerSessionBase::SetDefaultEncryptionLevel(level);
-  if (level != quic::ENCRYPTION_FORWARD_SECURE) {
-    return;
-  }
-  // This is only reached once, when handshake is done.
-  raiseConnectionEvent(Network::ConnectionEvent::Connected);
-}
-
 bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
 
 const quic::QuicConnection* EnvoyQuicServerSession::quicConnection() const {
