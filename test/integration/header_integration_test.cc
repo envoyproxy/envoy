@@ -210,7 +210,6 @@ public:
   }
 
   void prepareEDS() {
-
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       ASSERT(static_resources->clusters_size() == 1);
@@ -1449,8 +1448,6 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRedirected) {
 
 // Path normalization triggers redirect action.
 TEST_P(HeaderIntegrationTest, PathNormalizedAndRedirect) {
-  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
-      v3::HttpConnectionManager::KEEP_UNCHANGED;
   forwarding_transformation_ = R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
@@ -1479,8 +1476,6 @@ TEST_P(HeaderIntegrationTest, PathNormalizedAndRedirect) {
 
 // Path normalization triggers redirect action.
 TEST_P(HeaderIntegrationTest, RedirectOverwriteContinueAction) {
-  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
-      v3::HttpConnectionManager::KEEP_UNCHANGED;
   forwarding_transformation_ = R"EOF(
       operations:
       - normalize_path_rfc_3986: {}

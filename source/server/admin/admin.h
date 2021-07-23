@@ -206,12 +206,9 @@ public:
   }
 
   const Http::PathTransformer& forwardingPathTransformer() const override {
-    return forwarding_path_transformer_;
+    return path_transformer_;
   }
-
-  const Http::PathTransformer& filterPathTransformer() const override {
-    return filter_path_transformer_;
-  }
+  const Http::PathTransformer& filterPathTransformer() const override { return path_transformer_; }
 
 private:
   /**
@@ -458,8 +455,7 @@ private:
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
-  Http::PathTransformer forwarding_path_transformer_;
-  Http::PathTransformer filter_path_transformer_;
+  Http::PathTransformer path_transformer_;
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   const absl::optional<std::string> scheme_{};
 };
