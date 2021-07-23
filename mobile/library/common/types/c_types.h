@@ -160,16 +160,16 @@ void* safe_malloc(size_t size);
 void* safe_calloc(size_t count, size_t size);
 
 /**
- * Called by a receiver of envoy_map to indicate memory/resources can be released.
- * @param data, envoy_map to release.
- */
-void release_envoy_map(envoy_map map);
-
-/**
  * Called by a receiver of envoy_data to indicate memory/resources can be released.
  * @param data, envoy_data to release.
  */
 void release_envoy_data(envoy_data data);
+
+/**
+ * Called by a receiver of envoy_map to indicate memory/resources can be released.
+ * @param map, envoy_map to release.
+ */
+void release_envoy_map(envoy_map map);
 
 /**
  * Called by a receiver of envoy_headers to indicate memory/resources can be released.
@@ -178,16 +178,16 @@ void release_envoy_data(envoy_data data);
 void release_envoy_headers(envoy_headers headers);
 
 /**
- * Called by a receiver of envoy_error to indicate memory/resources can be released.
- * @param error, envoy_error to release.
- */
-void release_envoy_error(envoy_error error);
-
-/**
  * Called by a receiver of envoy_stats_tags to indicate memory/resources can be released.
  * @param stats_tags, envoy_stats_tags to release.
  */
 void release_envoy_stats_tags(envoy_stats_tags stats_tags);
+
+/**
+ * Called by a receiver of envoy_error to indicate memory/resources can be released.
+ * @param error, envoy_error to release.
+ */
+void release_envoy_error(envoy_error error);
 
 /**
  * Helper function to copy envoy_headers.
