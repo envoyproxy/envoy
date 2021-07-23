@@ -16,6 +16,7 @@
 #include "source/common/common/random_generator.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/runtime/runtime_impl.h"
@@ -108,8 +109,10 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
+  bool enableReusePortDefault() override { return true; }
 
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
@@ -144,9 +147,12 @@ public:
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
                                               Network::Socket::Type,
                                               const Network::Socket::OptionsSharedPtr&,
-                                              const ListenSocketCreationParams&) override {
+                                              ListenerComponentFactory::BindType,
+                                              uint32_t) override {
     // Returned sockets are not currently used so we can return nothing here safely vs. a
     // validation mock.
+    // TODO(mattklein123): The fact that this returns nullptr makes the production code more
+    // convoluted than it needs to be. Fix this to return a mock in a follow up.
     return nullptr;
   }
   DrainManagerPtr createDrainManager(envoy::config::listener::v3::Listener::DrainType) override {
@@ -208,6 +214,7 @@ private:
   Router::ContextImpl router_context_;
   Event::TimeSystem& time_system_;
   ServerFactoryContextImpl server_contexts_;
+  Quic::QuicStatNames quic_stat_names_;
 };
 
 } // namespace Server

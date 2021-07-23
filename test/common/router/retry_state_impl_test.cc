@@ -477,11 +477,11 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersPolicyViaRetryPolicyConfigurati
 
   auto* matcher2 = matchers.Add();
   matcher2->set_name("should-retry");
-  matcher2->set_exact_match("yes");
+  matcher2->mutable_string_match()->set_exact("yes");
 
   auto* matcher3 = matchers.Add();
   matcher3->set_name("X-Verdict");
-  matcher3->set_prefix_match("retry");
+  matcher3->mutable_string_match()->set_prefix("retry");
 
   auto* matcher4 = matchers.Add();
   matcher4->set_name(":status");
@@ -623,7 +623,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersMergedConfigAndRequestHeaders) 
   // Config says: retry if response is not 200.
   auto* matcher = matchers.Add();
   matcher->set_name(":status");
-  matcher->set_exact_match("200");
+  matcher->mutable_string_match()->set_exact("200");
   matcher->set_invert_match(true);
 
   policy_.retriable_headers_ = Http::HeaderUtility::buildHeaderMatcherVector(matchers);
@@ -674,11 +674,11 @@ TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
   Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher> matchers;
   auto* matcher = matchers.Add();
   matcher->set_name(":method");
-  matcher->set_exact_match("GET");
+  matcher->mutable_string_match()->set_exact("GET");
 
   auto* matcher2 = matchers.Add();
   matcher2->set_name(":method");
-  matcher2->set_exact_match("HEAD");
+  matcher2->mutable_string_match()->set_exact("HEAD");
 
   policy_.retriable_request_headers_ = Http::HeaderUtility::buildHeaderMatcherVector(matchers);
 

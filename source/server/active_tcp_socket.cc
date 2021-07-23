@@ -1,9 +1,9 @@
 #include "source/server/active_tcp_socket.h"
 
 #include "envoy/network/filter.h"
-#include "envoy/stats/scope.h"
 
-#include "source/common/stats/timespan_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/server/active_stream_listener_base.h"
 
 namespace Envoy {
 namespace Server {
@@ -76,7 +76,7 @@ void ActiveTcpSocket::startTimer() {
 }
 
 void ActiveTcpSocket::unlink() {
-  auto removed = removeFromList(listener_.sockets_);
+  auto removed = listener_.removeSocket(std::move(*this));
   if (removed->timer_ != nullptr) {
     removed->timer_->disableTimer();
   }

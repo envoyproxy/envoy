@@ -122,16 +122,11 @@ WasmResult Buffer::copyTo(WasmBase* wasm, size_t start, size_t length, uint64_t 
 WasmResult Buffer::copyFrom(size_t start, size_t length, std::string_view data) {
   if (buffer_instance_) {
     if (start == 0) {
-      if (length == 0) {
-        buffer_instance_->prepend(toAbslStringView(data));
-        return WasmResult::Ok;
-      } else if (length >= buffer_instance_->length()) {
-        buffer_instance_->drain(buffer_instance_->length());
-        buffer_instance_->add(toAbslStringView(data));
-        return WasmResult::Ok;
-      } else {
-        return WasmResult::BadArgument;
+      if (length != 0) {
+        buffer_instance_->drain(length);
       }
+      buffer_instance_->prepend(toAbslStringView(data));
+      return WasmResult::Ok;
     } else if (start >= buffer_instance_->length()) {
       buffer_instance_->add(toAbslStringView(data));
       return WasmResult::Ok;
@@ -1028,11 +1023,9 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   auto& handler = grpc_call_request_[token];
   handler.context_ = this;
   handler.token_ = token;
-  auto grpc_client =
-      clusterManager()
-          .grpcAsyncClientManager()
-          .factoryForGrpcService(service_proto, *wasm()->scope_, true /* skip_cluster_check */)
-          ->create();
+  auto grpc_client = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+      service_proto, *wasm()->scope_, true /* skip_cluster_check */,
+      Grpc::CacheOption::CacheWhenRuntimeEnabled);
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1099,11 +1092,9 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
   auto& handler = grpc_stream_[token];
   handler.context_ = this;
   handler.token_ = token;
-  auto grpc_client =
-      clusterManager()
-          .grpcAsyncClientManager()
-          .factoryForGrpcService(service_proto, *wasm()->scope_, true /* skip_cluster_check */)
-          ->create();
+  auto grpc_client = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+      service_proto, *wasm()->scope_, true /* skip_cluster_check */,
+      Grpc::CacheOption::CacheWhenRuntimeEnabled);
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1602,7 +1593,8 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
       if (!decoder_callbacks_->streamInfo().responseCodeDetails().has_value()) {
         decoder_callbacks_->streamInfo().setResponseCodeDetails(CloseStreamResponseDetails);
       }
-      decoder_callbacks_->resetStream();
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] { decoder_callbacks_->resetStream(); });
     }
     return WasmResult::Ok;
   case WasmStreamType::Response:
@@ -1610,19 +1602,26 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
       if (!encoder_callbacks_->streamInfo().responseCodeDetails().has_value()) {
         encoder_callbacks_->streamInfo().setResponseCodeDetails(CloseStreamResponseDetails);
       }
-      encoder_callbacks_->resetStream();
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] { encoder_callbacks_->resetStream(); });
     }
     return WasmResult::Ok;
   case WasmStreamType::Downstream:
     if (network_read_filter_callbacks_) {
-      network_read_filter_callbacks_->connection().close(
-          Envoy::Network::ConnectionCloseType::FlushWrite);
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] {
+        network_read_filter_callbacks_->connection().close(
+            Envoy::Network::ConnectionCloseType::FlushWrite);
+      });
     }
     return WasmResult::Ok;
   case WasmStreamType::Upstream:
     if (network_write_filter_callbacks_) {
-      network_write_filter_callbacks_->connection().close(
-          Envoy::Network::ConnectionCloseType::FlushWrite);
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] {
+        network_write_filter_callbacks_->connection().close(
+            Envoy::Network::ConnectionCloseType::FlushWrite);
+      });
     }
     return WasmResult::Ok;
   }

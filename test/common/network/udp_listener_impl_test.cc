@@ -71,6 +71,8 @@ public:
         envoy::config::core::v3::SocketOption::STATE_BOUND,
         ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 4 * 1024 * 1024));
     server_socket_->addOptions(std::move(options));
+    ASSERT_TRUE(Network::Socket::applyOptions(server_socket_->options(), *server_socket_,
+                                              envoy::config::core::v3::SocketOption::STATE_BOUND));
     envoy::config::core::v3::UdpSocketConfig config;
     if (prefer_gro) {
       config.mutable_prefer_gro()->set_value(prefer_gro);
@@ -100,32 +102,6 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
-
-// Test that socket options are set after the listener is setup.
-TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
-  setup();
-
-  MockUdpListenerCallbacks listener_callbacks;
-  auto socket = std::make_shared<Network::UdpListenSocket>(Network::Test::getAnyAddress(version_),
-                                                           nullptr, true);
-  std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
-  socket->addOption(option);
-  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
-      .WillOnce(Return(true));
-  UdpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks,
-                           dispatcherImpl().timeSource(),
-                           envoy::config::core::v3::UdpSocketConfig());
-
-#ifdef SO_RXQ_OVFL
-  // Verify that overflow detection is enabled.
-  int get_overflow = 0;
-  socklen_t int_size = static_cast<socklen_t>(sizeof(get_overflow));
-  const Api::SysCallIntResult result =
-      server_socket_->getSocketOption(SOL_SOCKET, SO_RXQ_OVFL, &get_overflow, &int_size);
-  EXPECT_EQ(0, result.rc_);
-  EXPECT_EQ(1, get_overflow);
-#endif
-}
 
 /**
  * Tests UDP listener for actual destination and data.

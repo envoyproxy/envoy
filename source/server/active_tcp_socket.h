@@ -8,21 +8,12 @@
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/network/connection.h"
-#include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
-#include "envoy/server/listener_manager.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/timespan.h"
 
 #include "source/common/common/linked_object.h"
-#include "source/common/common/non_copyable.h"
-#include "source/common/stream_info/stream_info_impl.h"
 #include "source/server/active_listener_base.h"
-
-#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Server {
@@ -96,6 +87,7 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
 
   StreamInfo::FilterState& filterState() override { return *stream_info_->filterState().get(); }
 
+  // The owner of this ActiveTcpSocket.
   ActiveStreamListenerBase& listener_;
   Network::ConnectionSocketPtr socket_;
   const bool hand_off_restored_destination_connections_;

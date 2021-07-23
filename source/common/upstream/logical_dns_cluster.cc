@@ -98,7 +98,7 @@ void LogicalDnsCluster::startPreInit() {
 
 LogicalDnsCluster::~LogicalDnsCluster() {
   if (active_dns_query_) {
-    active_dns_query_->cancel();
+    active_dns_query_->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
   }
 }
 

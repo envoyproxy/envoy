@@ -55,7 +55,8 @@ public:
                     prefix: "/"
                     headers:
                       - name: Authorization
-                        exact_match: AUTH_TOKEN
+                        string_match:
+                          exact: AUTH_TOKEN
                 - name: no_auth_route
                   direct_response:
                     status: {}

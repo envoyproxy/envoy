@@ -3,12 +3,9 @@
 #include <chrono>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
-#include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/event/deferred_task.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/timespan_impl.h"
@@ -20,9 +17,10 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerConfig& config)
     : TypedActiveStreamListenerBase<ActiveTcpConnection>(
           parent, parent.dispatcher(),
-          parent.dispatcher().createListener(config.listenSocketFactory().getListenSocket(), *this,
-                                             config.bindToPort(), config.tcpBacklogSize()),
-          config),
+                               parent.dispatcher().createListener(
+                                   config.listenSocketFactory().getListenSocket(worker_index),
+                                   *this, config.bindToPort()),
+                               config),
       tcp_conn_handler_(parent) {
   config.connectionBalancer().registerHandler(*this);
 }
@@ -48,9 +46,9 @@ ActiveTcpListener::~ActiveTcpListener() {
     dispatcher().deferredDelete(std::move(removed));
   }
 
-  for (auto& chain_and_connections : connections_by_context_) {
-    ASSERT(chain_and_connections.second != nullptr);
-    auto& connections = chain_and_connections.second->connections_;
+  for (auto& [chain, active_connections] : connections_by_context_) {
+    ASSERT(active_connections != nullptr);
+    auto& connections = active_connections->connections_;
     while (!connections.empty()) {
       connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
     }
@@ -136,7 +134,7 @@ void ActiveTcpListener::newActiveConnection(const Network::FilterChain& filter_c
                                             Network::ServerConnectionPtr server_conn_ptr,
                                             std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
   auto& active_connections = getOrCreateActiveConnections(filter_chain);
-  ActiveConnectionPtr active_connection(
+  ActiveTcpConnectionPtr active_connection(
       new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
                               dispatcher().timeSource(), std::move(stream_info)));
   // If the connection is already closed, we can just let this connection immediately die.
@@ -201,7 +199,6 @@ ActiveTcpConnection::ActiveTcpConnection(ActiveConnections& active_connections,
   listener.stats_.downstream_cx_active_.inc();
   listener.per_worker_stats_.downstream_cx_total_.inc();
   listener.per_worker_stats_.downstream_cx_active_.inc();
-  stream_info_->setConnectionID(connection_->id());
 
   // Active connections on the handler (not listener). The per listener connections have already
   // been incremented at this point either via the connection balancer or in the socket accept

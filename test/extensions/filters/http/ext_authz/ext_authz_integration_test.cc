@@ -48,6 +48,7 @@ public:
 
       proto_config_.mutable_filter_enabled()->set_runtime_key("envoy.ext_authz.enable");
       proto_config_.mutable_filter_enabled()->mutable_default_value()->set_numerator(100);
+      proto_config_.set_bootstrap_metadata_labels_key("labels");
       if (disable_with_metadata) {
         // Disable the ext_authz filter with metadata matcher that never matches.
         auto* metadata = proto_config_.mutable_filter_enabled_metadata();
@@ -58,6 +59,23 @@ public:
       proto_config_.mutable_deny_at_disable()->set_runtime_key("envoy.ext_authz.deny_at_disable");
       proto_config_.mutable_deny_at_disable()->mutable_default_value()->set_value(false);
       proto_config_.set_transport_api_version(apiVersion());
+
+      // Add labels and verify they are passed.
+      std::map<std::string, std::string> labels;
+      labels["label_1"] = "value_1";
+      labels["label_2"] = "value_2";
+
+      ProtobufWkt::Struct metadata;
+      ProtobufWkt::Value val;
+      ProtobufWkt::Struct* labels_obj = val.mutable_struct_value();
+      for (const auto& pair : labels) {
+        ProtobufWkt::Value val;
+        val.set_string_value(pair.second);
+        (*labels_obj->mutable_fields())[pair.first] = val;
+      }
+      (*metadata.mutable_fields())["labels"] = val;
+
+      *bootstrap.mutable_node()->mutable_metadata() = metadata;
 
       envoy::config::listener::v3::Filter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
@@ -134,6 +152,8 @@ public:
     auto* http_request = attributes->mutable_request()->mutable_http();
 
     EXPECT_TRUE(attributes->request().has_time());
+    EXPECT_EQ("value_1", attributes->destination().labels().at("label_1"));
+    EXPECT_EQ("value_2", attributes->destination().labels().at("label_2"));
 
     // Clear fields which are not relevant.
     attributes->clear_source();
@@ -796,18 +816,20 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   HttpIntegrationTest::initialize();
 
   int expected_grpc_client_creation_count = 0;
+
+  initiateClientConnection(4, Headers{}, Headers{});
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+                       Http::TestRequestHeaderMapImpl{}, Headers{});
+
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
+
     // Make sure Google grpc client is created before the request coming in.
     // Since this is not laziness creation, it should create one client per
     // thread before the traffic comes.
     expected_grpc_client_creation_count =
         test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value();
   }
-
-  initiateClientConnection(4, Headers{}, Headers{});
-  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP2));
-  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                       Http::TestRequestHeaderMapImpl{}, Headers{});
 
   waitForSuccessfulUpstreamResponse("200");
 

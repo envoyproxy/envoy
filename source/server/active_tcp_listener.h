@@ -1,12 +1,12 @@
 #pragma once
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 #include "envoy/stats/timespan.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/linked_object.h"
-#include "source/common/stream_info/stream_info_impl.h"
 #include "source/server/active_listener_base.h"
+#include "source/server/active_stream_listener_base.h"
 #include "source/server/active_tcp_socket.h"
 
 namespace Envoy {
@@ -16,7 +16,6 @@ struct ActiveTcpConnection;
 using ActiveTcpConnectionPtr = std::unique_ptr<ActiveTcpConnection>;
 class ActiveConnections;
 using ActiveConnectionCollectionPtr = std::unique_ptr<ActiveConnections>;
-
 class ActiveTcpListener;
 
 namespace {
@@ -72,10 +71,12 @@ class ActiveTcpListener final : public Network::TcpListenerCallbacks,
                                 public TypedActiveStreamListenerBase<ActiveTcpConnection>,
                                 public Network::BalancedConnectionHandler {
 public:
-  ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config);
+  ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config,
+                    uint32_t worker_index);
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
                     Network::ListenerConfig& config);
   ~ActiveTcpListener() override;
+
   bool listenerConnectionLimitReached() const {
     // TODO(tonya11en): Delegate enforcement of per-listener connection limits to overload
     // manager.
@@ -111,9 +112,6 @@ public:
   void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                       bool hand_off_restored_destination_connections, bool rebalanced) override;
 
-  /**
-   * Create active connection from the server connection.
-   */
   void newActiveConnection(const Network::FilterChain& filter_chain,
                            Network::ServerConnectionPtr server_conn_ptr,
                            std::unique_ptr<StreamInfo::StreamInfo> stream_info) override;
@@ -129,6 +127,17 @@ public:
    */
   void updateListenerConfig(Network::ListenerConfig& config);
 
+  void removeFilterChain(const Network::FilterChain* filter_chain) override;
+
+  /**
+   * Remove and destroy an active connection.
+   * @param connection supplies the connection to remove.
+   */
+  void removeConnection(ActiveTcpConnection& connection);
+
+  absl::flat_hash_map<const Network::FilterChain*, std::unique_ptr<ActiveConnections>>
+      connections_by_context_;
+
   Network::TcpConnectionHandler& tcp_conn_handler_;
   // The number of connections currently active on this listener. This is typically used for
   // connection balancing across per-handler listeners.
@@ -136,6 +145,5 @@ public:
 };
 
 using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
-
 } // namespace Server
 } // namespace Envoy

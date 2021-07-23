@@ -31,7 +31,7 @@ public:
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
-          SetQuicReloadableFlag(quic_enable_version_rfcv1, GetParam());
+          SetQuicReloadableFlag(quic_disable_version_rfcv1, !GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -42,8 +42,10 @@ public:
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, &writer_,
             /*owns_writer=*/false, {quic_version_}, *dispatcher_,
             createConnectionSocket(peer_addr_, self_addr_, nullptr))),
-        quic_session_(quic_config_, {quic_version_}, quic_connection_, *dispatcher_,
-                      quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
+        quic_session_(quic_config_, {quic_version_},
+                      std::unique_ptr<EnvoyQuicClientConnection>(quic_connection_), *dispatcher_,
+                      quic_config_.GetInitialStreamFlowControlWindowToSend() * 2,
+                      crypto_stream_factory_),
         stream_id_(quic::VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
                                       POOL_GAUGE_PREFIX(scope_, "http3."))}),
@@ -51,6 +53,7 @@ public:
                                                stats_, http3_options_)),
         request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}},
         request_trailers_{{"trailer-key", "trailer-value"}} {
+    SetQuicReloadableFlag(quic_single_ack_in_packet2, false);
     quic_stream_->setResponseDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicClientStream>(quic_stream_));
@@ -145,6 +148,7 @@ protected:
   Network::Address::InstanceConstSharedPtr self_addr_;
   MockDelegate delegate_;
   EnvoyQuicClientConnection* quic_connection_;
+  TestQuicCryptoClientStreamFactory crypto_stream_factory_;
   MockEnvoyQuicClientSession quic_session_;
   quic::QuicStreamId stream_id_;
   Stats::IsolatedStoreImpl scope_;

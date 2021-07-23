@@ -24,15 +24,7 @@ Cluster::Cluster(
                                        added_via_api, factory_context.dispatcher().timeSource()),
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
-      update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info) {
-  // Block certain TLS context parameters that don't make sense on a cluster-wide scale. We will
-  // support these parameters dynamically in the future. This is not an exhaustive list of
-  // parameters that don't make sense but should be the most obvious ones that a user might set
-  // in error.
-  if (!cluster.hidden_envoy_deprecated_tls_context().sni().empty()) {
-    throw EnvoyException("dynamic_forward_proxy cluster cannot configure 'sni'");
-  }
-}
+      update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info) {}
 
 void Cluster::startPreInit() {
   // If we are attaching to a pre-populated cache we need to initialize our hosts.
