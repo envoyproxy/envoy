@@ -9,6 +9,8 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* config: configuration files ending in .yml now load as YAML.
+* config: configuration file extensions now ignore case when deciding the file type. E.g., .JSON file load as JSON.
 * config: reduced log level for "Unable to establish new stream" xDS logs to debug. The log level
   for "gRPC config stream closed" is now reduced to debug when the status is ``Ok`` or has been
   retriable (``DeadlineExceeded``, ``ResourceExhausted``, or ``Unavailable``) for less than 30
