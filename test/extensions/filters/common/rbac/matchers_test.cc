@@ -180,6 +180,7 @@ TEST(IPMatcher, IPMatcher) {
   info.downstream_address_provider_->setLocalAddress(direct_local);
   info.downstream_address_provider_->setDirectRemoteAddressForTest(direct_remote);
   info.downstream_address_provider_->setRemoteAddress(downstream_remote);
+  // note: upstream address defaults to 10.0.0.1 via MockHostDescription constructor
 
   envoy::config::core::v3::CidrRange connection_remote_cidr;
   connection_remote_cidr.set_address_prefix("12.13.14.15");
@@ -197,6 +198,10 @@ TEST(IPMatcher, IPMatcher) {
   downstream_remote_cidr.set_address_prefix("8.9.10.11");
   downstream_remote_cidr.mutable_prefix_len()->set_value(32);
 
+  envoy::config::core::v3::CidrRange upstream_cidr;
+  upstream_cidr.set_address_prefix("10.0.0.1");
+  upstream_cidr.mutable_prefix_len()->set_value(32);
+
   checkMatcher(IPMatcher(connection_remote_cidr, IPMatcher::Type::ConnectionRemote), true, conn,
                headers, info);
   checkMatcher(IPMatcher(downstream_local_cidr, IPMatcher::Type::DownstreamLocal), true, conn,
@@ -205,11 +210,14 @@ TEST(IPMatcher, IPMatcher) {
                true, conn, headers, info);
   checkMatcher(IPMatcher(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote), true, conn,
                headers, info);
+  checkMatcher(IPMatcher(upstream_cidr, IPMatcher::Type::UpstreamRemote), true, conn, headers,
+               info);
 
   connection_remote_cidr.set_address_prefix("4.5.6.7");
   downstream_local_cidr.set_address_prefix("1.2.4.8");
   downstream_direct_remote_cidr.set_address_prefix("4.5.6.0");
   downstream_remote_cidr.set_address_prefix("4.5.6.7");
+  upstream_cidr.set_address_prefix("10.2.2.2");
 
   checkMatcher(IPMatcher(connection_remote_cidr, IPMatcher::Type::ConnectionRemote), false, conn,
                headers, info);
@@ -219,6 +227,8 @@ TEST(IPMatcher, IPMatcher) {
                false, conn, headers, info);
   checkMatcher(IPMatcher(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote), false, conn,
                headers, info);
+  checkMatcher(IPMatcher(upstream_cidr, IPMatcher::Type::UpstreamRemote), false, conn, headers,
+               info);
 }
 
 TEST(PortMatcher, PortMatcher) {
