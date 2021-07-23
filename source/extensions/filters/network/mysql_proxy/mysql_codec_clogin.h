@@ -25,6 +25,9 @@ public:
   const std::vector<uint8_t>& getAuthResp() const { return auth_resp_; }
   const std::string& getDb() const { return db_; }
   const std::string& getAuthPluginName() const { return auth_plugin_name_; }
+  const std::vector<std::pair<std::string, std::string>>& getConnectionAttribute() const {
+    return conn_attr_;
+  }
   bool isResponse41() const;
   bool isResponse320() const;
   bool isSSLRequest() const;
@@ -40,6 +43,7 @@ public:
   void setAuthResp(const std::vector<uint8_t>& auth_resp);
   void setDb(const std::string& db);
   void setAuthPluginName(const std::string& auth_plugin_name);
+  void addConnectionAttribute(const std::pair<std::string, std::string>&);
 
 private:
   DecodeStatus parseResponseSsl(Buffer::Instance& buffer);
@@ -56,6 +60,7 @@ private:
   std::vector<uint8_t> auth_resp_;
   std::string db_;
   std::string auth_plugin_name_;
+  std::vector<std::pair<std::string, std::string>> conn_attr_;
 };
 
 } // namespace MySQLProxy
