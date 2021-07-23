@@ -288,33 +288,25 @@ std::string bodyToHttp3StreamPayload(const std::string& body) {
 }
 
 // A test suite with variation of ip version and a knob to turn on/off IETF QUIC implementation.
-class QuicMultiVersionTest
-    : public testing::TestWithParam<std::pair<Network::Address::IpVersion, QuicVersionType>> {};
+class QuicMultiVersionTest : public testing::TestWithParam<
+                                 std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> {
+};
 
-std::vector<std::pair<Network::Address::IpVersion, QuicVersionType>> generateTestParam() {
-  std::vector<std::pair<Network::Address::IpVersion, QuicVersionType>> param;
+std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> generateTestParam() {
+  std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> param;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    param.emplace_back(ip_version, QuicVersionType::GquicQuicCrypto);
-    param.emplace_back(ip_version, QuicVersionType::GquicTls);
-    param.emplace_back(ip_version, QuicVersionType::Iquic);
+    for (auto quic_version : quic::CurrentSupportedHttp3Versions()) {
+      param.emplace_back(ip_version, quic_version);
+    }
   }
-
   return param;
 }
 
 std::string testParamsToString(
-    const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, QuicVersionType>>&
+    const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>>&
         params) {
   std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
-  switch (params.param.second) {
-  case QuicVersionType::GquicQuicCrypto:
-    return absl::StrCat(ip_version, "_UseGQuicWithQuicCrypto");
-  case QuicVersionType::GquicTls:
-    return absl::StrCat(ip_version, "_UseGQuicWithTLS");
-  case QuicVersionType::Iquic:
-    return absl::StrCat(ip_version, "_UseHttp3");
-  }
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  return absl::StrCat(ip_version, quic::QuicVersionToString(params.param.second.transport_version));
 }
 
 } // namespace Quic

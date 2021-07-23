@@ -39,16 +39,12 @@ using testing::Invoke;
 namespace Envoy {
 namespace Quic {
 
-class EnvoyQuicServerStreamTest : public testing::TestWithParam<bool> {
+class EnvoyQuicServerStreamTest : public testing::TestWithParam<quic::ParsedQuicVersion> {
 public:
   EnvoyQuicServerStreamTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
-          SetQuicReloadableFlag(quic_disable_version_rfcv1, !GetParam());
-          return quic::CurrentSupportedVersions()[0];
-        }()),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_(GetParam()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
@@ -56,7 +52,7 @@ public:
                          quic::ParsedQuicVersionVector{quic_version_}, *listener_config_.socket_),
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
-        stream_id_(VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
+        stream_id_(4u),
         stats_(
             {ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
                                    POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}),
@@ -87,12 +83,6 @@ public:
     quic_session_.Initialize();
     setQuicConfigWithDefaultValues(quic_session_.config());
     quic_session_.OnConfigNegotiated();
-    request_headers_.OnHeaderBlockStart();
-    request_headers_.OnHeader(":authority", host_);
-    request_headers_.OnHeader(":method", "POST");
-    request_headers_.OnHeader(":path", "/");
-    request_headers_.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0,
-                                      /*compressed_header_bytes=*/0);
     spdy_request_headers_[":authority"] = host_;
     spdy_request_headers_[":method"] = "POST";
     spdy_request_headers_[":path"] = "/";
@@ -107,13 +97,6 @@ public:
                   SendConnectionClosePacket(_, quic::NO_IETF_QUIC_ERROR, "Closed by application"));
       quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
-  }
-
-  std::string bodyToStreamPayload(const std::string& body) {
-    if (!quic::VersionUsesHttp3(quic_version_.transport_version)) {
-      return body;
-    }
-    return bodyToHttp3StreamPayload(body);
   }
 
   size_t receiveRequest(const std::string& payload, bool fin,
@@ -133,38 +116,19 @@ public:
             quic_stream_->readDisable(true);
           }
         }));
-    if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-      std::string data = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_request_headers_),
-                                      bodyToStreamPayload(payload));
-      quic::QuicStreamFrame frame(stream_id_, fin, 0, data);
-      quic_stream_->OnStreamFrame(frame);
-      EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
-      return data.length();
-    }
-    quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
-                                     request_headers_);
-
-    quic::QuicStreamFrame frame(stream_id_, fin, 0, payload);
+    std::string data = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_request_headers_),
+                                    bodyToHttp3StreamPayload(payload));
+    quic::QuicStreamFrame frame(stream_id_, fin, 0, data);
     quic_stream_->OnStreamFrame(frame);
     EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
-    return payload.length();
+    return data.length();
   }
 
   void receiveTrailers(size_t offset) {
-    if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-      spdy_trailers_["key1"] = "value1";
-      std::string payload = spdyHeaderToHttp3StreamPayload(spdy_trailers_);
-      quic::QuicStreamFrame frame(stream_id_, true, offset, payload);
-      quic_stream_->OnStreamFrame(frame);
-    } else {
-      trailers_.OnHeaderBlockStart();
-      trailers_.OnHeader("key1", "value1");
-      // ":final-offset" is required and stripped off by quic.
-      trailers_.OnHeader(":final-offset", absl::StrCat("", offset));
-      trailers_.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
-      quic_stream_->OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(),
-                                       trailers_);
-    }
+    spdy_trailers_["key1"] = "value1";
+    std::string payload = spdyHeaderToHttp3StreamPayload(spdy_trailers_);
+    quic::QuicStreamFrame frame(stream_id_, true, offset, payload);
+    quic_stream_->OnStreamFrame(frame);
   }
 
 protected:
@@ -185,33 +149,19 @@ protected:
   EnvoyQuicServerStream* quic_stream_;
   Http::MockRequestDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;
-  quic::QuicHeaderList request_headers_;
   spdy::SpdyHeaderBlock spdy_request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
-  quic::QuicHeaderList trailers_;
   spdy::SpdyHeaderBlock spdy_trailers_;
   std::string host_{"www.abc.com"};
   std::string request_body_{"Hello world"};
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicServerStreamTests, EnvoyQuicServerStreamTest,
-                         testing::ValuesIn({true, false}));
+                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
 
 TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
-  quic::QuicHeaderList request_headers;
-  request_headers.OnHeaderBlockStart();
-  request_headers.OnHeader(":authority", host_);
-  request_headers.OnHeader(":method", "GET");
-  request_headers.OnHeader(":path", "/");
-  // QUICHE stack doesn't coalesce Cookie headers for header compression optimization.
-  request_headers.OnHeader("cookie", "a=b");
-  request_headers.OnHeader("cookie", "c=d");
-  request_headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0,
-                                   /*compressed_header_bytes=*/0);
-
-  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/!quic::VersionUsesHttp3(
-                                                  quic_version_.transport_version)))
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
         EXPECT_EQ(host_, headers->getHostValue());
         EXPECT_EQ("/", headers->getPathValue());
@@ -224,21 +174,16 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
                     headers->get(Http::Headers::get().Cookie)[0]->value().getStringView());
         }
       }));
-  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
-    spdy::SpdyHeaderBlock spdy_headers;
-    spdy_headers[":authority"] = host_;
-    spdy_headers[":method"] = "GET";
-    spdy_headers[":path"] = "/";
-    spdy_headers.AppendValueOrAddHeader("cookie", "a=b");
-    spdy_headers.AppendValueOrAddHeader("cookie", "c=d");
-    std::string payload = spdyHeaderToHttp3StreamPayload(spdy_headers);
-    quic::QuicStreamFrame frame(stream_id_, true, 0, payload);
-    quic_stream_->OnStreamFrame(frame);
-  } else {
-    quic_stream_->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
-                                     request_headers);
-  }
+  EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
+  spdy::SpdyHeaderBlock spdy_headers;
+  spdy_headers[":authority"] = host_;
+  spdy_headers[":method"] = "GET";
+  spdy_headers[":path"] = "/";
+  spdy_headers.AppendValueOrAddHeader("cookie", "a=b");
+  spdy_headers.AppendValueOrAddHeader("cookie", "c=d");
+  std::string payload = spdyHeaderToHttp3StreamPayload(spdy_headers);
+  quic::QuicStreamFrame frame(stream_id_, true, 0, payload);
+  quic_stream_->OnStreamFrame(frame);
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
 }
@@ -264,46 +209,9 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
-TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
-  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
-  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    return;
-  }
-  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
-      .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
-        EXPECT_EQ(host_, headers->getHostValue());
-        EXPECT_EQ("/", headers->getPathValue());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Post, headers->getMethodValue());
-      }));
-  quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
-                                   request_headers_);
-  EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
-
-  // Trailer should be delivered to HCM later after body arrives.
-  receiveTrailers(request_body_.length());
-
-  quic::QuicStreamFrame frame(stream_id_, false, 0, request_body_);
-  EXPECT_CALL(stream_decoder_, decodeData(_, _))
-      .WillOnce(Invoke([this](Buffer::Instance& buffer, bool finished_reading) {
-        EXPECT_EQ(request_body_, buffer.toString());
-        EXPECT_FALSE(finished_reading);
-      }));
-
-  EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
-      .WillOnce(Invoke([](const Http::RequestTrailerMapPtr& headers) {
-        Http::LowerCaseString key1("key1");
-        Http::LowerCaseString key2(":final-offset");
-        EXPECT_EQ("value1", headers->get(key1)[0]->value().getStringView());
-        EXPECT_TRUE(headers->get(key2).empty());
-      }));
-  quic_stream_->OnStreamFrame(frame);
-}
-
 TEST_P(EnvoyQuicServerStreamTest, ResetStreamByHCM) {
   receiveRequest(request_body_, false, request_body_.size() * 2);
-  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
-  }
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
@@ -315,11 +223,7 @@ TEST_P(EnvoyQuicServerStreamTest, EarlyResponseWithStopSending) {
   // Write response headers with FIN before finish receiving request.
   quic_stream_->encodeHeaders(response_headers_, true);
   // Resetting the stream now means stop reading and sending QUIC_STREAM_NO_ERROR or STOP_SENDING.
-  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
-  } else {
-    EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
-  }
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
   EXPECT_TRUE(quic_stream_->reading_stopped());
@@ -333,7 +237,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   EXPECT_FALSE(quic_stream_->HasBytesToRead());
   // Disable reading one more time.
   quic_stream_->readDisable(true);
-  std::string second_part_request = bodyToStreamPayload("bbb");
+  std::string second_part_request = bodyToHttp3StreamPayload("bbb");
   // Receiving more data in the same event loop will push the receiving pipe line.
   EXPECT_CALL(stream_decoder_, decodeData(_, _))
       .WillOnce(Invoke([](Buffer::Instance& buffer, bool finished_reading) {
@@ -350,7 +254,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // This data frame should also be buffered.
-  std::string last_part_request = bodyToStreamPayload("ccc");
+  std::string last_part_request = bodyToHttp3StreamPayload("ccc");
   quic::QuicStreamFrame frame2(stream_id_, false, payload_offset, last_part_request);
   quic_stream_->OnStreamFrame(frame2);
   payload_offset += last_part_request.length();
@@ -376,17 +280,9 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
 
 // Tests that readDisable() doesn't cause re-entry of OnBodyAvailable().
 TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
-  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
-      .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
-        EXPECT_EQ(host_, headers->getHostValue());
-        EXPECT_EQ("/", headers->getPathValue());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Post, headers->getMethodValue());
-      }));
-  quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
-                                   request_headers_);
-  EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
-
   std::string payload(1024, 'a');
+  size_t offset = receiveRequest(payload, false, 2048);
+
   EXPECT_CALL(stream_decoder_, decodeData(_, _))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool finished_reading) {
         EXPECT_EQ(payload, buffer.toString());
@@ -395,14 +291,15 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
         // Re-enable reading should not trigger another decodeData.
         quic_stream_->readDisable(false);
       }));
-  std::string data = bodyToStreamPayload(payload);
-  quic::QuicStreamFrame frame(stream_id_, false, 0, data);
+  std::string data = bodyToHttp3StreamPayload(payload);
+  quic::QuicStreamFrame frame(stream_id_, false, offset, data);
   quic_stream_->OnStreamFrame(frame);
+  offset += data.length();
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // The stream shouldn't be blocked in the next event loop.
-  std::string last_part_request = bodyToStreamPayload("bbb");
-  quic::QuicStreamFrame frame2(stream_id_, true, data.length(), last_part_request);
+  std::string last_part_request = bodyToHttp3StreamPayload("bbb");
+  quic::QuicStreamFrame frame2(stream_id_, true, offset, last_part_request);
   EXPECT_CALL(stream_decoder_, decodeData(_, _))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool finished_reading) {
         EXPECT_EQ("bbb", buffer.toString());
@@ -421,32 +318,18 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
       .WillOnce(Invoke(
           [this](const Http::RequestHeaderMapPtr&, bool) { quic_stream_->readDisable(true); }));
   EXPECT_CALL(stream_decoder_, decodeData(_, _));
-  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    std::string data = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_request_headers_),
-                                    bodyToStreamPayload(payload));
-    quic::QuicStreamFrame frame(stream_id_, false, 0, data);
-    quic_stream_->OnStreamFrame(frame);
-    EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
-  } else {
-    quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
-                                     request_headers_);
-    EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
-
-    quic::QuicStreamFrame frame(stream_id_, false, 0, payload);
-    quic_stream_->OnStreamFrame(frame);
-  }
+  std::string data = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_request_headers_),
+                                  bodyToHttp3StreamPayload(payload));
+  quic::QuicStreamFrame frame(stream_id_, false, 0, data);
+  quic_stream_->OnStreamFrame(frame);
+  EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
   // Stream should be blocked in the next event loop.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // Receiving more date shouldn't trigger decoding.
   EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
-  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    std::string data = bodyToStreamPayload(payload);
-    quic::QuicStreamFrame frame(stream_id_, false, 0, data);
-    quic_stream_->OnStreamFrame(frame);
-  } else {
-    quic::QuicStreamFrame frame(stream_id_, false, 0, payload);
-    quic_stream_->OnStreamFrame(frame);
-  }
+  data = bodyToHttp3StreamPayload(payload);
+  quic::QuicStreamFrame frame2(stream_id_, false, 0, data);
+  quic_stream_->OnStreamFrame(frame2);
 
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
@@ -523,113 +406,25 @@ TEST_P(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
   EXPECT_TRUE(quic_stream_->write_side_closed());
 }
 
-TEST_P(EnvoyQuicServerStreamTest, HeadersContributeToWatermarkIquic) {
-  if (!quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
-    return;
-  }
-
-  receiveRequest(request_body_, true, request_body_.size() * 2);
-
-  // Bump connection flow control window large enough not to cause connection level flow control
-  // blocked
-  quic::QuicWindowUpdateFrame window_update(
-      quic::kInvalidControlFrameId,
-      quic::QuicUtils::GetInvalidStreamId(quic_version_.transport_version), 1024 * 1024);
-  quic_session_.OnWindowUpdateFrame(window_update);
-
-  // Make the stream blocked by congestion control.
-  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
-      .WillOnce(
-          Invoke([](quic::QuicStreamId, size_t /*write_length*/, quic::QuicStreamOffset,
-                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
-            return quic::QuicConsumedData{0u, state != quic::NO_FIN};
-          }));
-  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
-
-  // Encode 16kB -10 bytes request body. Because the high watermark is 16KB, with previously
-  // buffered headers, this call should make the send buffers reach their high watermark.
-  std::string response(16 * 1024 - 10, 'a');
-  Buffer::OwnedImpl buffer(response);
-  EXPECT_CALL(stream_callbacks_, onAboveWriteBufferHighWatermark());
-  quic_stream_->encodeData(buffer, false);
-  EXPECT_EQ(0u, buffer.length());
-
-  // Unblock writing now, and this will write out 16kB data and cause stream to
-  // be blocked by the flow control limit.
-  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
-      .WillOnce(
-          Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
-                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
-            return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
-          }));
-  EXPECT_CALL(stream_callbacks_, onBelowWriteBufferLowWatermark());
-  quic_session_.OnCanWrite();
-  EXPECT_TRUE(quic_stream_->IsFlowControlBlocked());
-
-  // Update flow control window to write all the buffered data.
-  quic::QuicWindowUpdateFrame window_update1(quic::kInvalidControlFrameId, quic_stream_->id(),
-                                             32 * 1024);
-  quic_stream_->OnWindowUpdateFrame(window_update1);
-  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
-      .WillOnce(
-          Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
-                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
-            return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
-          }));
-  quic_session_.OnCanWrite();
-  // No data should be buffered at this point.
-
-  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
-      .WillRepeatedly(
-          Invoke([](quic::QuicStreamId, size_t, quic::QuicStreamOffset,
-                    quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
-            return quic::QuicConsumedData{0u, state != quic::NO_FIN};
-          }));
-  // Send more data. If watermark bytes counting were not cleared in previous
-  // OnCanWrite, this write would have caused the stream to exceed its high watermark.
-  std::string response1(16 * 1024 - 3, 'a');
-  Buffer::OwnedImpl buffer1(response1);
-  quic_stream_->encodeData(buffer1, false);
-  // Buffering more trailers will cause stream to reach high watermark, but
-  // because trailers closes the stream, no callback should be triggered.
-  quic_stream_->encodeTrailers(response_trailers_);
-}
-
 TEST_P(EnvoyQuicServerStreamTest, RequestHeaderTooLarge) {
   // Bump stream flow control window to allow request headers larger than 16K.
   quic::QuicWindowUpdateFrame window_update1(quic::kInvalidControlFrameId, quic_stream_->id(),
                                              32 * 1024);
   quic_stream_->OnWindowUpdateFrame(window_update1);
-  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
-  }
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
-  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    spdy::SpdyHeaderBlock spdy_headers;
-    spdy_headers[":authority"] = host_;
-    spdy_headers[":method"] = "POST";
-    spdy_headers[":path"] = "/";
-    // This header exceeds max header size limit and should cause stream reset.
-    spdy_headers["long_header"] = std::string(16 * 1024 + 1, 'a');
-    std::string payload = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_headers),
-                                       bodyToStreamPayload(request_body_));
-    quic::QuicStreamFrame frame(stream_id_, false, 0, payload);
-    quic_stream_->OnStreamFrame(frame);
-  } else {
-    quic::QuicHeaderList request_headers;
-    request_headers.set_max_header_list_size(16 * 1024);
-    request_headers.OnHeaderBlockStart();
-    request_headers.OnHeader(":authority", host_);
-    request_headers.OnHeader(":method", "POST");
-    request_headers.OnHeader(":path", "/");
-    request_headers.OnHeader("long_header", std::string(16 * 1024 + 1, 'a'));
-    request_headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0,
-                                     /*compressed_header_bytes=*/0);
-    quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers.uncompressed_header_bytes(),
-                                     request_headers);
-  }
+  spdy::SpdyHeaderBlock spdy_headers;
+  spdy_headers[":authority"] = host_;
+  spdy_headers[":method"] = "POST";
+  spdy_headers[":path"] = "/";
+  // This header exceeds max header size limit and should cause stream reset.
+  spdy_headers["long_header"] = std::string(16 * 1024 + 1, 'a');
+  std::string payload = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_headers),
+                                     bodyToHttp3StreamPayload(request_body_));
+  quic::QuicStreamFrame frame(stream_id_, false, 0, payload);
+  quic_stream_->OnStreamFrame(frame);
+
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
@@ -640,28 +435,16 @@ TEST_P(EnvoyQuicServerStreamTest, RequestTrailerTooLarge) {
   size_t offset = receiveRequest(request_body_, false, request_body_.size() * 2);
 
   quic_stream_->OnWindowUpdateFrame(window_update1);
-  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
-  }
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
-  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    spdy::SpdyHeaderBlock spdy_trailers;
-    // This header exceeds max header size limit and should cause stream reset.
-    spdy_trailers["long_header"] = std::string(16 * 1024 + 1, 'a');
-    std::string payload = spdyHeaderToHttp3StreamPayload(spdy_trailers);
-    quic::QuicStreamFrame frame(stream_id_, false, offset, payload);
-    quic_stream_->OnStreamFrame(frame);
-  } else {
-    quic::QuicHeaderList spdy_trailers;
-    spdy_trailers.set_max_header_list_size(16 * 1024);
-    spdy_trailers.OnHeaderBlockStart();
-    spdy_trailers.OnHeader("long_header", std::string(16 * 1024 + 1, 'a'));
-    spdy_trailers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0,
-                                   /*compressed_header_bytes=*/0);
-    quic_stream_->OnStreamHeaderList(/*fin=*/true, spdy_trailers.uncompressed_header_bytes(),
-                                     spdy_trailers);
-  }
+  spdy::SpdyHeaderBlock spdy_trailers;
+  // This header exceeds max header size limit and should cause stream reset.
+  spdy_trailers["long_header"] = std::string(16 * 1024 + 1, 'a');
+  std::string payload = spdyHeaderToHttp3StreamPayload(spdy_trailers);
+  quic::QuicStreamFrame frame(stream_id_, false, offset, payload);
+  quic_stream_->OnStreamFrame(frame);
+
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 

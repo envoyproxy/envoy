@@ -64,16 +64,12 @@ public:
   using EnvoyQuicClientConnection::connectionStats;
 };
 
-class EnvoyQuicClientSessionTest : public testing::TestWithParam<bool> {
+class EnvoyQuicClientSessionTest : public testing::TestWithParam<quic::ParsedQuicVersion> {
 public:
   EnvoyQuicClientSessionTest()
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
-          SetQuicReloadableFlag(quic_disable_version_rfcv1, !GetParam());
-          return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
-        }()),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_({GetParam()}),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
                                                         12345)),
         self_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -162,7 +158,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest,
-                         testing::ValuesIn({true, false}));
+                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
 
 TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   Http::MockResponseDecoder response_decoder;
@@ -238,12 +234,7 @@ TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
   Http::MockStreamCallbacks stream_callbacks;
 
   EXPECT_CALL(http_connection_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
-  if (quic::VersionUsesHttp3(quic_version_[0].transport_version)) {
-    envoy_quic_session_.OnHttp3GoAway(4u);
-  } else {
-    quic::QuicGoAwayFrame goaway;
-    quic_connection_->OnGoAwayFrame(goaway);
-  }
+  envoy_quic_session_.OnHttp3GoAway(4u);
 }
 
 TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {
@@ -272,91 +263,7 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionCloseWithActiveStream) {
   EXPECT_TRUE(stream.write_side_closed() && stream.reading_stopped());
 }
 
-class EnvoyQuicClientSessionAllQuicVersionTest
-    : public testing::TestWithParam<quic::ParsedQuicVersion> {
-public:
-  EnvoyQuicClientSessionAllQuicVersionTest()
-      : api_(Api::createApiForTest(time_system_)),
-        dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
-        peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
-                                                        12345)),
-        self_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
-                                                        54321)),
-        quic_connection_(new TestEnvoyQuicClientConnection(
-            quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_,
-            quic::test::SupportedVersions(GetParam()), *dispatcher_,
-            createConnectionSocket(peer_addr_, self_addr_, nullptr))),
-        crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
-            quic::test::crypto_test_utils::ProofVerifierForTesting())),
-        envoy_quic_session_(quic_config_, quic::test::SupportedVersions(GetParam()),
-                            std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
-                            quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr,
-                            *dispatcher_,
-                            /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_),
-        stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
-                                      POOL_GAUGE_PREFIX(scope_, "http3."))}),
-        http_connection_(envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_,
-                         64 * 1024, 100) {
-    EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
-    EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
-    EXPECT_EQ(Http::Protocol::Http3, http_connection_.protocol());
-
-    time_system_.advanceTimeWait(std::chrono::milliseconds(1));
-    ON_CALL(writer_, WritePacket(_, _, _, _, _))
-        .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 1)));
-  }
-
-  void SetUp() override {
-    envoy_quic_session_.Initialize();
-    setQuicConfigWithDefaultValues(envoy_quic_session_.config());
-    envoy_quic_session_.OnConfigNegotiated();
-    envoy_quic_session_.addConnectionCallbacks(network_connection_callbacks_);
-    envoy_quic_session_.setConnectionStats(
-        {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
-    EXPECT_EQ(&read_total_, &quic_connection_->connectionStats().read_total_);
-  }
-
-  void TearDown() override {
-    if (quic_connection_->connected()) {
-      EXPECT_CALL(*quic_connection_,
-                  SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
-      EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-      envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
-    }
-  }
-
-protected:
-  Event::SimulatedTimeSystemHelper time_system_;
-  Api::ApiPtr api_;
-  Event::DispatcherPtr dispatcher_;
-  EnvoyQuicConnectionHelper connection_helper_;
-  EnvoyQuicAlarmFactory alarm_factory_;
-  testing::NiceMock<quic::test::MockPacketWriter> writer_;
-  Network::Address::InstanceConstSharedPtr peer_addr_;
-  Network::Address::InstanceConstSharedPtr self_addr_;
-  TestEnvoyQuicClientConnection* quic_connection_;
-  quic::QuicConfig quic_config_;
-  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
-  TestQuicCryptoClientStreamFactory crypto_stream_factory_;
-  EnvoyQuicClientSession envoy_quic_session_;
-  Network::MockConnectionCallbacks network_connection_callbacks_;
-  Http::MockServerConnectionCallbacks http_connection_callbacks_;
-  testing::StrictMock<Stats::MockCounter> read_total_;
-  testing::StrictMock<Stats::MockGauge> read_current_;
-  testing::StrictMock<Stats::MockCounter> write_total_;
-  testing::StrictMock<Stats::MockGauge> write_current_;
-  Stats::IsolatedStoreImpl scope_;
-  Http::Http3::CodecStats stats_;
-  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
-  QuicHttpClientConnectionImpl http_connection_;
-};
-
-INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionAllQuicVersionTests,
-                         EnvoyQuicClientSessionAllQuicVersionTest,
-                         testing::ValuesIn(quic::AllSupportedVersions()));
-
-TEST_P(EnvoyQuicClientSessionAllQuicVersionTest, ConnectionClosePopulatesQuicVersionStats) {
+TEST_P(EnvoyQuicClientSessionTest, ConnectionClosePopulatesQuicVersionStats) {
   std::string error_details("dummy details");
   quic::QuicErrorCode error(quic::QUIC_INVALID_FRAME_DATA);
   quic::QuicConnectionCloseFrame frame(GetParam().transport_version, error,
@@ -369,18 +276,6 @@ TEST_P(EnvoyQuicClientSessionAllQuicVersionTest, ConnectionClosePopulatesQuicVer
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   std::string quic_version_stat_name;
   switch (GetParam().transport_version) {
-  case quic::QUIC_VERSION_43:
-    quic_version_stat_name = "43";
-    break;
-  case quic::QUIC_VERSION_46:
-    quic_version_stat_name = "46";
-    break;
-  case quic::QUIC_VERSION_50:
-    quic_version_stat_name = "50";
-    break;
-  case quic::QUIC_VERSION_51:
-    quic_version_stat_name = "51";
-    break;
   case quic::QUIC_VERSION_IETF_DRAFT_29:
     quic_version_stat_name = "h3_29";
     break;

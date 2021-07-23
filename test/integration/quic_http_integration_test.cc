@@ -68,16 +68,8 @@ public:
   QuicHttpIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam().first,
                             ConfigHelper::quicHttpProxyConfig()),
-        supported_versions_([]() {
-          if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
-            return quic::CurrentSupportedVersionsWithQuicCrypto();
-          }
-          bool use_http3 = GetParam().second == QuicVersionType::Iquic;
-          SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
-          SetQuicReloadableFlag(quic_disable_version_rfcv1, !use_http3);
-          return quic::CurrentSupportedVersions();
-        }()),
-        conn_helper_(*dispatcher_), alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
+        supported_versions_({GetParam().second}), conn_helper_(*dispatcher_),
+        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
 
   ~QuicHttpIntegrationTest() override {
     cleanupUpstreamAndDownstream();
@@ -274,10 +266,8 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
                                    "error_code_QUIC_NO_ERROR",
                                    2u);
   }
-  if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
-    test_server_->waitForCounterEq("http3.quic_version_50", 2u);
-  } else if (GetParam().second == QuicVersionType::GquicTls) {
-    test_server_->waitForCounterEq("http3.quic_version_51", 2u);
+  if (GetParam().second.transport_version == quic::QUIC_VERSION_IETF_DRAFT_29) {
+    test_server_->waitForCounterEq("http3.quic_version_h3_29", 2u);
   } else {
     test_server_->waitForCounterEq("http3.quic_version_rfc_v1", 2u);
   }
@@ -352,13 +342,9 @@ TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
   initialize();
   codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt);
   EXPECT_FALSE(codec_client_->connected());
-  std::string failure_reason =
-      GetParam().second == QuicVersionType::GquicQuicCrypto
-          ? "QUIC_PROOF_INVALID with details: Proof invalid: X509_verify_cert: certificate "
-            "verification error at depth 0: ok"
-          : "QUIC_TLS_CERTIFICATE_UNKNOWN with details: TLS handshake failure "
-            "(ENCRYPTION_HANDSHAKE) 46: "
-            "certificate unknown";
+  std::string failure_reason = "QUIC_TLS_CERTIFICATE_UNKNOWN with details: TLS handshake failure "
+                               "(ENCRYPTION_HANDSHAKE) 46: "
+                               "certificate unknown";
   EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
 }
 
@@ -393,9 +379,7 @@ TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
   std::string counter_scope = GetParam().first == Network::Address::IpVersion::v4
                                   ? "listener.127.0.0.1_0.http3.downstream.rx."
                                   : "listener.[__1]_0.http3.downstream.rx.";
-  std::string error_code = GetParam().second == QuicVersionType::Iquic
-                               ? "quic_reset_stream_error_code_QUIC_STREAM_GENERAL_PROTOCOL_ERROR"
-                               : "quic_reset_stream_error_code_QUIC_BAD_APPLICATION_PAYLOAD";
+  std::string error_code = "quic_reset_stream_error_code_QUIC_STREAM_GENERAL_PROTOCOL_ERROR";
   test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
 }
 

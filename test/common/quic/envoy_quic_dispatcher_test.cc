@@ -61,15 +61,7 @@ public:
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::unique_ptr<TestProofSource>(proof_source_),
                        quic::KeyExchangeSource::Default()),
-        version_manager_([]() {
-          if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
-            return quic::CurrentSupportedVersionsWithQuicCrypto();
-          }
-          bool use_http3 = GetParam().second == QuicVersionType::Iquic;
-          SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
-          SetQuicReloadableFlag(quic_disable_version_rfcv1, !use_http3);
-          return quic::CurrentSupportedVersions();
-        }()),
+        version_manager_({GetParam().second}),
         quic_version_(version_manager_.GetSupportedVersions()[0]),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
@@ -198,16 +190,10 @@ public:
     EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
     EXPECT_CALL(filter_chain_manager, findFilterChain(_))
         .WillOnce(Invoke([this](const Network::ConnectionSocket& socket) {
-          switch (GetParam().second) {
-          case QuicVersionType::GquicQuicCrypto:
-            EXPECT_EQ("", socket.requestedApplicationProtocols()[0]);
-            break;
-          case QuicVersionType::GquicTls:
-            EXPECT_EQ("h3-T051", socket.requestedApplicationProtocols()[0]);
-            break;
-          case QuicVersionType::Iquic:
+          if (GetParam().second.transport_version == quic::QUIC_VERSION_IETF_DRAFT_29) {
+            EXPECT_EQ("h3-29", socket.requestedApplicationProtocols()[0]);
+          } else {
             EXPECT_EQ("h3", socket.requestedApplicationProtocols()[0]);
-            break;
           }
           EXPECT_EQ("test.example.org", socket.requestedServerName());
           return &proof_source_->filterChain();

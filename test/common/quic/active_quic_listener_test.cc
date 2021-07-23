@@ -79,15 +79,7 @@ protected:
       : version_(GetParam().first), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
-        connection_handler_(*dispatcher_, absl::nullopt), quic_version_([]() {
-          if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
-            return quic::CurrentSupportedVersionsWithQuicCrypto();
-          }
-          bool use_http3 = GetParam().second == QuicVersionType::Iquic;
-          SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
-          SetQuicReloadableFlag(quic_disable_version_rfcv1, !use_http3);
-          return quic::CurrentSupportedVersions();
-        }()[0]),
+        connection_handler_(*dispatcher_, absl::nullopt), quic_version_(GetParam().second),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
   template <typename A, typename B>
@@ -355,22 +347,14 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   EXPECT_EQ(quic::kMinimumFlowControlSendWindow, const_cast<quic::QuicSession*>(session)
                                                      ->config()
                                                      ->GetInitialSessionFlowControlWindowToSend());
-  // IETF Quic supports low flow control limit. But Google Quic only supports flow control window no
-  // smaller than 16kB.
-  if (GetParam().second == QuicVersionType::Iquic) {
-    EXPECT_EQ(stream_window_size_, const_cast<quic::QuicSession*>(session)
-                                       ->config()
-                                       ->GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
-  } else {
-    EXPECT_EQ(quic::kMinimumFlowControlSendWindow, const_cast<quic::QuicSession*>(session)
-                                                       ->config()
-                                                       ->GetInitialStreamFlowControlWindowToSend());
-  }
+  EXPECT_EQ(stream_window_size_, const_cast<quic::QuicSession*>(session)
+                                     ->config()
+                                     ->GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
   readFromClientSockets();
 }
 
 TEST_P(ActiveQuicListenerTest, ConfigureReasonableInitialFlowControlWindow) {
-  // These initial flow control windows should be accepted by both Google QUIC and IETF QUIC.
+  // These initial flow control windows should be accepted by QUIC.
   connection_window_size_ = 64 * 1024;
   stream_window_size_ = 32 * 1024;
   initialize();
