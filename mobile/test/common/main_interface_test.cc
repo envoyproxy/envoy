@@ -270,7 +270,7 @@ TEST(MainInterfaceTest, UsingMainInterfaceWithoutARunningEngine) {
 
   // Release memory
   release_envoy_headers(c_headers);
-  c_data.release(c_data.context);
+  release_envoy_data(c_data);
   release_envoy_headers(c_trailers);
 }
 
@@ -467,7 +467,7 @@ TEST(EngineTest, Logger) {
   envoy_logger logger{[](envoy_data data, const void* context) -> void {
                         auto* test_context =
                             static_cast<engine_test_context*>(const_cast<void*>(context));
-                        data.release(data.context);
+                        release_envoy_data(data);
                         if (!test_context->on_log.HasBeenNotified()) {
                           test_context->on_log.Notify();
                         }

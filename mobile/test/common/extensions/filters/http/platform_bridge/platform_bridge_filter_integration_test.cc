@@ -104,7 +104,7 @@ public:
 //     static_cast<filter_invocations*>(const_cast<void*>(context));
 //     invocations->on_response_data_calls++;
 //     if (!end_stream) {
-//       c_data.release(c_data.context);
+//       release_envoy_data(c_data);
 //       return {kEnvoyFilterDataStatusStopIterationAndBuffer, envoy_nodata, nullptr};
 //     } else {
 //       return {kEnvoyFilterDataStatusResumeIteration, c_data, nullptr};

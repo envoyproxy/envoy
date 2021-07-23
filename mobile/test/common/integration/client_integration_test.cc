@@ -72,7 +72,7 @@ public:
     bridge_callbacks_.on_data = [](envoy_data c_data, bool, void* context) -> void* {
       callbacks_called* cc_ = static_cast<callbacks_called*>(context);
       cc_->on_data_calls++;
-      c_data.release(c_data.context);
+      release_envoy_data(c_data);
       return nullptr;
     };
     bridge_callbacks_.on_complete = [](void* context) -> void* {
@@ -82,7 +82,7 @@ public:
       return nullptr;
     };
     bridge_callbacks_.on_error = [](envoy_error error, void* context) -> void* {
-      error.message.release(error.message.context);
+      release_envoy_error(error);
       callbacks_called* cc_ = static_cast<callbacks_called*>(context);
       cc_->on_error_calls++;
       cc_->terminal_callback->setReady();
@@ -169,7 +169,7 @@ TEST_P(ClientIntegrationTest, Basic) {
     }
     callbacks_called* cc_ = static_cast<callbacks_called*>(context);
     cc_->on_data_calls++;
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     return nullptr;
   };
 

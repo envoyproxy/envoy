@@ -32,7 +32,7 @@ TEST(DataConstructorTest, FromCppToCEmpty) {
   envoy_data c_data = Utility::toBridgeData(empty_data);
 
   ASSERT_EQ(c_data.length, 0);
-  c_data.release(c_data.context);
+  release_envoy_data(c_data);
 }
 
 TEST(DataConstructorTest, FromCppToC) {
@@ -43,7 +43,7 @@ TEST(DataConstructorTest, FromCppToC) {
 
   ASSERT_EQ(c_data.length, s.size());
   ASSERT_EQ(Utility::copyToString(c_data), s);
-  c_data.release(c_data.context);
+  release_envoy_data(c_data);
 }
 
 TEST(DataConstructorTest, FromCppToCPartial) {
@@ -56,7 +56,7 @@ TEST(DataConstructorTest, FromCppToCPartial) {
   ASSERT_EQ(Utility::copyToString(c_data), "test");
   ASSERT_EQ(cpp_data.length(), 7);
   ASSERT_EQ(cpp_data.toString(), " string");
-  c_data.release(c_data.context);
+  release_envoy_data(c_data);
 }
 
 TEST(DataConstructorTest, CopyFromCppToC) {
@@ -67,7 +67,7 @@ TEST(DataConstructorTest, CopyFromCppToC) {
 
   ASSERT_EQ(c_data.length, s.size());
   ASSERT_EQ(Utility::copyToString(c_data), s);
-  c_data.release(c_data.context);
+  release_envoy_data(c_data);
 }
 
 TEST(DataConstructorTest, CopyFromCppToCPartial) {
@@ -80,7 +80,7 @@ TEST(DataConstructorTest, CopyFromCppToCPartial) {
   ASSERT_EQ(Utility::copyToString(c_data), "test");
   ASSERT_EQ(cpp_data.length(), 11);
   ASSERT_EQ(cpp_data.toString(), "test string");
-  c_data.release(c_data.context);
+  release_envoy_data(c_data);
 }
 
 TEST(DataConstructorTest, CopyStringFromCppToC) {
@@ -90,7 +90,7 @@ TEST(DataConstructorTest, CopyStringFromCppToC) {
 
   ASSERT_EQ(c_data.length, s.size());
   ASSERT_EQ(Utility::copyToString(c_data), s);
-  c_data.release(c_data.context);
+  release_envoy_data(c_data);
 }
 
 } // namespace Data
