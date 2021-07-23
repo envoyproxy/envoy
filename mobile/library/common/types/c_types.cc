@@ -28,24 +28,22 @@ void envoy_noop_release(void* context) { (void)context; }
 
 void envoy_noop_const_release(const void* context) { (void)context; }
 
-void release_envoy_data_map(envoy_map map) {
+void release_envoy_data(envoy_data data) { data.release(data.context); }
+
+void release_envoy_map(envoy_map map) {
   for (envoy_map_size_t i = 0; i < map.length; i++) {
     envoy_map_entry entry = map.entries[i];
-    entry.key.release(entry.key.context);
-    entry.value.release(entry.value.context);
+    release_envoy_data(entry.key);
+    release_envoy_data(entry.value);
   }
   free(map.entries);
 }
 
-void release_envoy_data(envoy_data data) { data.release(data.context); }
-
-void release_envoy_headers(envoy_headers headers) { release_envoy_data_map(headers); }
+void release_envoy_headers(envoy_headers headers) { release_envoy_map(headers); }
 
 void release_envoy_error(envoy_error error) { error.message.release(error.message.context); }
 
-void release_envoy_stats_tags(envoy_stats_tags stats_tags) { release_envoy_data_map(stats_tags); }
-
-void release_envoy_map(envoy_map event) { release_envoy_data_map(event); }
+void release_envoy_stats_tags(envoy_stats_tags stats_tags) { release_envoy_map(stats_tags); }
 
 envoy_map copy_envoy_data_map(envoy_map src) {
   envoy_map_entry* dst_entries =
