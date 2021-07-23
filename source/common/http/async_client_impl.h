@@ -353,6 +353,10 @@ private:
     const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
       return nullptr;
     }
+    const Router::RouteSpecificFilterConfig*
+    mostSpecificPerFilterConfig(const std::string&) const override {
+      return nullptr;
+    }
 
     RouteEntryImpl route_entry_;
   };

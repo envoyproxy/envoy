@@ -7532,7 +7532,7 @@ public:
   };
 
   void checkEach(const std::string& yaml, uint32_t expected_entry, uint32_t expected_route,
-                 uint32_t expected_vhost) {
+                 uint32_t expected_vhost, uint32_t expected_most_specific_config) {
     const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
@@ -7545,6 +7545,9 @@ public:
           "route");
     check(vhost.perFilterConfigTyped<DerivedFilterConfig>(factory_.name()), expected_vhost,
           "virtual host");
+    check(dynamic_cast<const DerivedFilterConfig*>(
+              route->mostSpecificPerFilterConfig(factory_.name())),
+          expected_most_specific_config, "most specific config");
   }
 
   void check(const DerivedFilterConfig* cfg, uint32_t expected_seconds, std::string source) {
@@ -7955,7 +7958,7 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkEach(yaml, 123, 123, 456);
+  checkEach(yaml, 123, 123, 456, 123);
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfig) {
@@ -7979,7 +7982,7 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkEach(yaml, 123, 123, 456);
+  checkEach(yaml, 123, 123, 456, 123);
 }
 
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterConfig)) {
@@ -8000,7 +8003,7 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkEach(yaml, 789, 789, 1011);
+  checkEach(yaml, 789, 789, 1011, 789);
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterTypedConfig) {
@@ -8028,7 +8031,7 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkEach(yaml, 789, 789, 1011);
+  checkEach(yaml, 789, 789, 1011, 789);
 }
 
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterFallthroughConfig)) {
@@ -8049,7 +8052,7 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkEach(yaml, 1213, 1213, 1415);
+  checkEach(yaml, 1213, 1213, 1415, 1213);
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughTypedConfig) {
@@ -8077,7 +8080,7 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkEach(yaml, 1213, 1213, 1415);
+  checkEach(yaml, 1213, 1213, 1415, 1213);
 }
 
 class RouteMatchOverrideTest : public testing::Test, public ConfigImplTestBase {};

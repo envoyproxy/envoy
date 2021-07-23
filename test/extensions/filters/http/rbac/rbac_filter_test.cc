@@ -212,7 +212,7 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   EXPECT_CALL(engine, handleAction(_, _, _, _)).WillRepeatedly(Return(true));
   EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
 
-  EXPECT_CALL(callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.rbac"))
+  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.rbac"))
       .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, true));
