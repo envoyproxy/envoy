@@ -31,6 +31,11 @@ struct ControlPlaneStats {
                           GENERATE_TEXT_READOUT_STRUCT)
 };
 
+// TODO (dmitri-d) This forward declaration is needed in order for the unified mux to fulfill legacy
+// mux interface. It should be removed together with the rest of legacy mux code when the switch to
+// unified mux has been finalized.
+struct Watch;
+
 /**
  * Handle on a muxed gRPC subscription. The subscription is canceled on destruction.
  */
@@ -105,6 +110,32 @@ public:
 
   virtual void requestOnDemandUpdate(const std::string& type_url,
                                      const absl::flat_hash_set<std::string>& for_update) PURE;
+
+  // Unified mux interface starts here
+  // Updates the list of resource names watched by the given watch. If an added name is new across
+  // the whole subscription, or if a removed name has no other watch interested in it, then the
+  // subscription will enqueue and attempt to send an appropriate discovery request.
+  virtual void updateWatch(const std::string& type_url, Watch* watch,
+                           const absl::flat_hash_set<std::string>& resources,
+                           const SubscriptionOptions& options) PURE;
+
+  /**
+   * Cleanup of a Watch* added by addOrUpdateWatch(). Receiving a Watch* from addOrUpdateWatch()
+   * makes you responsible for eventually invoking this cleanup.
+   * @param type_url type URL corresponding to xDS API e.g. type.googleapis.com/envoy.api.v2.Cluster
+   * @param watch the watch to be cleaned up.
+   */
+  virtual void removeWatch(const std::string& type_url, Watch* watch) PURE;
+
+  /**
+   * Retrieves the current pause state as set by pause()/resume().
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.api.v2.Cluster
+   * @return bool whether the API is paused.
+   */
+  virtual bool paused(const std::string& type_url) const PURE;
+
+  virtual bool isUnified() const { return false; }
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;

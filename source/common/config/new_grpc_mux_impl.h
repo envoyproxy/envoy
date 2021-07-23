@@ -65,6 +65,10 @@ public:
   // TODO(fredlas) remove this from the GrpcMux interface.
   void start() override;
 
+  bool paused(const std::string& type_url) const override {
+    return !pausable_ack_queue_.paused(type_url);
+  }
+
   GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
              envoy::service::discovery::v3::DeltaDiscoveryResponse>&
   grpcStreamForTest() {
@@ -120,14 +124,14 @@ private:
     const SubscriptionOptions options_;
   };
 
-  void removeWatch(const std::string& type_url, Watch* watch);
+  void removeWatch(const std::string& type_url, Watch* watch) override;
 
   // Updates the list of resource names watched by the given watch. If an added name is new across
   // the whole subscription, or if a removed name has no other watch interested in it, then the
   // subscription will enqueue and attempt to send an appropriate discovery request.
   void updateWatch(const std::string& type_url, Watch* watch,
                    const absl::flat_hash_set<std::string>& resources,
-                   const SubscriptionOptions& options);
+                   const SubscriptionOptions& options) override;
 
   // Adds a subscription for the type_url to the subscriptions map and order list.
   void addSubscription(const std::string& type_url, bool use_namespace_matching,

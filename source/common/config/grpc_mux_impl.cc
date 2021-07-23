@@ -343,5 +343,15 @@ void GrpcMuxImpl::drainRequests() {
   grpc_stream_.maybeUpdateQueueSizeStat(request_queue_->size());
 }
 
+void NullGrpcMuxImpl::updateWatch(const std::string&, Watch*,
+                                  const absl::flat_hash_set<std::string>&,
+                                  const SubscriptionOptions&) {
+  throw EnvoyException("ADS must be configured to support an ADS config source");
+}
+
+void NullGrpcMuxImpl::removeWatch(const std::string&, Watch*) {
+  throw EnvoyException("ADS must be configured to support an ADS config source");
+}
+
 } // namespace Config
 } // namespace Envoy
