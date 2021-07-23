@@ -5,7 +5,6 @@
 #include "source/extensions/filters/network/rocketmq_proxy/codec.h"
 #include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"
 #include "source/extensions/filters/network/rocketmq_proxy/protocol.h"
-#include "source/extensions/filters/network/rocketmq_proxy/well_known_names.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {

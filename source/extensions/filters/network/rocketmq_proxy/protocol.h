@@ -18,6 +18,13 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RocketmqProxy {
 
+constexpr char BrokerName[] = "broker_name";
+constexpr char ClusterName[] = "cluster_name";
+constexpr char WriteQueueNum[] = "write_queue_num";
+constexpr char ReadQueueNum[] = "read_queue_num";
+constexpr char BrokerId[] = "broker_id";
+constexpr char Perm[] = "perm";
+
 /**
  * Retry topic prefix
  */

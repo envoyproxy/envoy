@@ -2,7 +2,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
-#include "source/extensions/filters/network/rocketmq_proxy/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -735,10 +734,9 @@ void MetadataHelper::parseRequest(RemotingCommandPtr& request, MessageMetadataSh
   metadata->headers().addCopy(Http::LowerCaseString("code"), code);
 
   if (enumToInt(RequestCode::AckMessage) == code) {
-    metadata->headers().addCopy(Http::LowerCaseString(RocketmqConstants::get().BrokerName),
+    metadata->headers().addCopy(Http::LowerCaseString(BrokerName),
                                 custom_header->targetBrokerName());
-    metadata->headers().addCopy(Http::LowerCaseString(RocketmqConstants::get().BrokerId),
-                                custom_header->targetBrokerId());
+    metadata->headers().addCopy(Http::LowerCaseString(BrokerId), custom_header->targetBrokerId());
   }
 }
 
