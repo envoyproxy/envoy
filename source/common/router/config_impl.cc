@@ -1468,6 +1468,9 @@ RouteConstSharedPtr RouteMatcher::route(const RouteCallback& cb,
 }
 
 const SslRedirector SslRedirectRoute::SSL_REDIRECTOR;
+const envoy::config::core::v3::Metadata SslRedirectRoute::metadata_;
+const Envoy::Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory> SslRedirectRoute::typed_metadata_({});
+
 const std::shared_ptr<const SslRedirectRoute> VirtualHostImpl::SSL_REDIRECT_ROUTE{
     new SslRedirectRoute()};
 

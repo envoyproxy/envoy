@@ -80,7 +80,6 @@ public:
   const MetadataMatchCriteria* metadataMatchCriteria() const override;
   const std::multimap<std::string, std::string>& opaqueConfig() const override;
   bool includeVirtualHostRateLimits() const override;
-  const Envoy::Config::TypedMetadata& typedMetadata() const override;
   const TlsContextMatchCriteria* tlsContextMatchCriteria() const override;
   const PathMatchCriterion& pathMatchCriterion() const override;
   const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;

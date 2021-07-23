@@ -892,12 +892,6 @@ public:
   virtual bool includeVirtualHostRateLimits() const PURE;
 
   /**
-   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
-   * for this route.
-   */
-  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
-
-  /**
    * @return TlsContextMatchCriteria* the tls context match criterion for this route. If there is no
    * tls context match criteria, nullptr is returned.
    */
@@ -1074,10 +1068,13 @@ public:
    * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
    * this route.
    */
-  virtual const envoy::config::core::v3::Metadata& metadata() const { return empty_metadata_; }
+  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
 
-private:
-  envoy::config::core::v3::Metadata empty_metadata_;
+  /**
+   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
+   * for this route.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;

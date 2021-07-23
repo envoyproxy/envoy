@@ -1074,7 +1074,6 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         EXPECT_EQ(default_route->routeEntry()->includeVirtualHostRateLimits(),
                   delegating_route_foo->routeEntry()->includeVirtualHostRateLimits());
 
-        // NOTE: no coverage for routeEntry()->typedMetadata()
         // "The mock function has no default action set, and its return type has no default value
         // set"
         EXPECT_EQ(default_route->routeEntry()->tlsContextMatchCriteria(),
