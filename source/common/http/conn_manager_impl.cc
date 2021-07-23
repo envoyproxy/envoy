@@ -565,8 +565,11 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
     requestVhdsUpdate(host_header, thread_local_dispatcher, std::move(route_config_updated_cb));
     return;
   } else if (parent_.snapped_scoped_routes_config_ != nullptr) {
-    Router::ScopeKeyPtr scope_key =
-        parent_.snapped_scoped_routes_config_->computeScopeKey(*parent_.request_headers_);
+    // @tallen
+    const auto& conn_metadata = parent_.connection()->streamInfo().dynamicMetadata();
+    const auto& stream_metadata = parent_.streamInfo().dynamicMetadata();
+    Router::ScopeKeyPtr scope_key = parent_.snapped_scoped_routes_config_->computeScopeKey(
+        *parent_.request_headers_, conn_metadata, stream_metadata);
     // If scope_key is not null, the scope exists but RouteConfiguration is not initialized.
     if (scope_key != nullptr) {
       requestSrdsUpdate(std::move(scope_key), thread_local_dispatcher,
@@ -1178,7 +1181,9 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
-  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*request_headers_);
+  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(
+      *request_headers_, connection()->streamInfo().dynamicMetadata(),
+      streamInfo().dynamicMetadata());
   if (snapped_route_config_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
     // TODO(stevenzzzz): Consider to pass an error message to router filter, so that it can

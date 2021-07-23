@@ -11,6 +11,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/hash.h"
+#include "source/common/common/logger.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 
@@ -20,6 +21,7 @@
 namespace Envoy {
 namespace Router {
 
+using envoy::config::core::v3::Metadata;
 using envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes;
 
 /**
@@ -27,29 +29,45 @@ using envoy::extensions::filters::network::http_connection_manager::v3::ScopedRo
  */
 class FragmentBuilderBase {
 public:
-  explicit FragmentBuilderBase(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder&& config)
+  explicit FragmentBuilderBase(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config)
       : config_(std::move(config)) {}
   virtual ~FragmentBuilderBase() = default;
 
   // Returns a fragment if the fragment rule applies, a nullptr indicates no fragment could be
-  // generated from the headers.
+  // generated from the headers/metadata.
   virtual std::unique_ptr<ScopeKeyFragmentBase>
-  computeFragment(const Http::HeaderMap& headers) const PURE;
+  computeFragment(const Http::HeaderMap& headers,
+                  const envoy::config::core::v3::Metadata& conn_meta,
+                  const envoy::config::core::v3::Metadata& filter_meta) const PURE;
 
 protected:
   const ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config_;
 };
 
-class HeaderValueExtractorImpl : public FragmentBuilderBase {
+class FragmentBuilderImpl : public FragmentBuilderBase,
+                            public Logger::Loggable<Logger::Id::router> {
 public:
-  explicit HeaderValueExtractorImpl(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder&& config);
+  using FragmentBuilderConfig = ScopedRoutes::ScopeKeyBuilder::FragmentBuilder;
+  using HeaderValueExtractorConfig = FragmentBuilderConfig::HeaderValueExtractor;
+  using MetadataValueExtractorConfig = FragmentBuilderConfig::DynamicMetadataValueExtractor;
+
+  explicit FragmentBuilderImpl(FragmentBuilderConfig config);
 
   std::unique_ptr<ScopeKeyFragmentBase>
-  computeFragment(const Http::HeaderMap& headers) const override;
+  computeFragment(const Http::HeaderMap& headers,
+                  const envoy::config::core::v3::Metadata& conn_meta,
+                  const envoy::config::core::v3::Metadata& filter_meta) const override;
 
 private:
-  const ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::HeaderValueExtractor&
-      header_value_extractor_config_;
+  void validateHeaderValueExtractorConfig(const HeaderValueExtractorConfig& config) const;
+  std::unique_ptr<ScopeKeyFragmentBase>
+  computeFragmentFromHeader(const Http::HeaderMap& headers,
+                            const HeaderValueExtractorConfig& config) const;
+
+  void validateMetadataValueExtractorConfig(const MetadataValueExtractorConfig& config) const;
+  std::unique_ptr<ScopeKeyFragmentBase>
+  computeFragmentFromMetadata(const Metadata& meta,
+                              const MetadataValueExtractorConfig& config) const;
 };
 
 /**
@@ -61,8 +79,11 @@ public:
       : config_(std::move(config)) {}
   virtual ~ScopeKeyBuilderBase() = default;
 
-  // Computes scope key for given headers, returns nullptr if a key can't be computed.
-  virtual ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const PURE;
+  // Computes scope key for given headers/metadata, returns nullptr if a key can't be computed.
+  virtual ScopeKeyPtr
+  computeScopeKey(const Http::HeaderMap& headers,
+                  const envoy::config::core::v3::Metadata& conn_meta,
+                  const envoy::config::core::v3::Metadata& filter_meta) const PURE;
 
 protected:
   const ScopedRoutes::ScopeKeyBuilder config_;
@@ -72,7 +93,9 @@ class ScopeKeyBuilderImpl : public ScopeKeyBuilderBase {
 public:
   explicit ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder&& config);
 
-  ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const override;
+  ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers,
+                              const envoy::config::core::v3::Metadata& conn_meta,
+                              const envoy::config::core::v3::Metadata& filter_meta) const override;
 
 private:
   std::vector<std::unique_ptr<FragmentBuilderBase>> fragment_builders_;
@@ -118,9 +141,14 @@ public:
   void removeRoutingScopes(const std::vector<std::string>& scope_names);
 
   // Envoy::Router::ScopedConfig
-  Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const override;
-  // The return value is not null only if the scope corresponding to the header exists.
-  ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const override;
+  Router::ConfigConstSharedPtr
+  getRouteConfig(const Http::HeaderMap& headers, const envoy::config::core::v3::Metadata& conn_meta,
+                 const envoy::config::core::v3::Metadata& filter_meta) const override;
+
+  // The return value is not null only if the scope corresponding to the header or metadata exists.
+  ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers,
+                              const envoy::config::core::v3::Metadata& conn_meta,
+                              const envoy::config::core::v3::Metadata& filter_meta) const override;
 
 private:
   ScopeKeyBuilderImpl scope_key_builder_;
@@ -135,7 +163,9 @@ private:
  */
 class NullScopedConfigImpl : public ScopedConfig {
 public:
-  Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap&) const override {
+  Router::ConfigConstSharedPtr
+  getRouteConfig(const Http::HeaderMap&, const envoy::config::core::v3::Metadata&,
+                 const envoy::config::core::v3::Metadata&) const override {
     return std::make_shared<const NullConfigImpl>();
   }
 };
