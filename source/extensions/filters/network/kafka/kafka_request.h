@@ -163,7 +163,6 @@ public:
     return request_header_ == rhs.request_header_ && data_ == rhs.data_;
   };
 
-private:
   const Data data_;
 };
 

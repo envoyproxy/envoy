@@ -257,6 +257,8 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/redis_proxy",
   "extensions/filters/network/kafka",
   "extensions/filters/network/kafka/broker",
+  "extensions/filters/network/kafka/mesh",
+  "extensions/filters/network/kafka/mesh/command_handlers",
   "extensions/filters/network/kafka/protocol",
   "extensions/filters/network/kafka/serialization",
   "extensions/filters/network/mongo_proxy",
