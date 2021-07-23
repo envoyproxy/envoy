@@ -53,10 +53,15 @@ struct RateLimitSettings {
   static const uint32_t DefaultMaxTokens = 100;
   // Default Fill Rate.
   static constexpr double DefaultFillRate = 10;
-
+  // Default Retry Initial Delay.
+  static constexpr uint32_t DefaultRetryInitialDelayMs = 500;
+  // Default Retry Max Delay. Do not cross more than 30s.
+  static constexpr uint32_t DefaultRetryMaxDelayMs = 30000;
   uint32_t max_tokens_{DefaultMaxTokens};
   double fill_rate_{DefaultFillRate};
   bool enabled_{false};
+  envoy::config::core::v3::BackOffStrategy backoff_strategy_{DefaultRetryInitialDelayMs,
+                                                             DefaultRetryMaxDelayMs};
 };
 
 using ApiType = ConstSingleton<ApiTypeValues>;
