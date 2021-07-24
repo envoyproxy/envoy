@@ -940,8 +940,8 @@ TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {
   EXPECT_CALL(*upstream_connections_.at(0), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 
   raiseEventUpstreamConnected(0);
-  ASSERT_NE(nullptr, filter_->getStreamInfo().downstreamAddressProvider().upstreamSslConnection());
-  EXPECT_EQ(session_id, filter_->getStreamInfo().downstreamAddressProvider().upstreamSslConnection()->sessionId());
+  ASSERT_NE(nullptr, filter_->getStreamInfo().upstreamSslConnection());
+  EXPECT_EQ(session_id, filter_->getStreamInfo().upstreamSslConnection()->sessionId());
 }
 
 // Tests that upstream flush works properly with no idle timeout configured.
@@ -1100,7 +1100,7 @@ TEST_F(TcpProxyTest, AccessDownstreamAndUpstreamProperties) {
             filter_callbacks_.connection().ssl());
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamLocalAddress(),
             upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().localAddress());
-  EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamAddressProvider().upstreamSslConnection(),
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamSslConnection(),
             upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().downstreamSslConnection());
 }
 } // namespace

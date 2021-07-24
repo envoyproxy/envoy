@@ -79,7 +79,7 @@ public:
   const Network::SocketAddressSetter& addressProvider() const override {
     return *address_provider_;
   }
-  Network::SocketAddressSetterSharedPtr addressProviderSharedPtr() const override {
+  Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
     return address_provider_;
   }
 

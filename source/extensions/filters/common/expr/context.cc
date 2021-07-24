@@ -231,7 +231,7 @@ absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
     return CelValue::CreateStringView(info_.upstreamTransportFailureReason());
   }
 
-  auto ssl_info = info_.downstreamAddressProvider().upstreamSslConnection();
+  auto ssl_info = info_.upstreamSslConnection();
   if (ssl_info != nullptr) {
     return extractSslInfo(*ssl_info, value);
   }

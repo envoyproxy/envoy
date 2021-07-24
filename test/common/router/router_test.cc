@@ -4867,8 +4867,8 @@ TEST_F(RouterTest, UpstreamSSLConnection) {
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
-  ASSERT_NE(nullptr, callbacks_.streamInfo().downstreamAddressProvider().upstreamSslConnection());
-  EXPECT_EQ(session_id, callbacks_.streamInfo().downstreamAddressProvider().upstreamSslConnection()->sessionId());
+  ASSERT_NE(nullptr, callbacks_.streamInfo().upstreamSslConnection());
+  EXPECT_EQ(session_id, callbacks_.streamInfo().upstreamSslConnection()->sessionId());
 }
 
 // Verify that upstream timing information is set into the StreamInfo after the upstream

@@ -80,9 +80,12 @@ public:
   }
 
   void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
-    downstream_address_provider_->setUpstreamSslConnection(connection_info);
+    upstream_connection_info_ = connection_info;
   }
 
+  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
+    return upstream_connection_info_;
+  }
   void setRouteName(absl::string_view route_name) override {
     route_name_ = std::string(route_name);
   }

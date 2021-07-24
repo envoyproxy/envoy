@@ -442,7 +442,7 @@ TEST(Context, ConnectionAttributes) {
   info.downstream_address_provider_->setRemoteAddress(remote);
   info.downstream_address_provider_->setRequestedServerName(sni_name);
   info.downstream_address_provider_->setDownstreamSslConnection(downstream_ssl_info);
-  info.downstream_address_provider_->setUpstreamSslConnection(upstream_ssl_info);
+  EXPECT_CALL(info, upstreamSslConnection()).WillRepeatedly(Return(upstream_ssl_info));
   EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(upstream_host));
   EXPECT_CALL(info, upstreamLocalAddress()).WillRepeatedly(ReturnRef(upstream_local_address));
   const std::string upstream_transport_failure_reason = "ConnectionTermination";

@@ -630,7 +630,7 @@ public:
     return StreamInfoImpl::downstreamAddressProvider().downstreamSslConnection();
   }
   Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
-    return StreamInfoImpl::downstreamAddressProvider().upstreamSslConnection();
+    return StreamInfoImpl::upstreamSslConnection();
   }
   void dumpState(std::ostream& os, int indent_level) const override {
     StreamInfoImpl::dumpState(os, indent_level);
