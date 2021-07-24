@@ -178,7 +178,7 @@ public:
    */
   virtual SocketAddressSetter& addressProvider() PURE;
   virtual const SocketAddressProvider& addressProvider() const PURE;
-  virtual SocketAddressSetterSharedPtr addressProviderSharedPtr() const PURE;
+  virtual SocketAddressProviderSharedPtr addressProviderSharedPtr() const PURE;
 
   /**
    * @return IoHandle for the underlying connection
