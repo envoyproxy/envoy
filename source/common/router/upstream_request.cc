@@ -445,13 +445,10 @@ void UpstreamRequest::onPoolReady(
     paused_for_connect_ = true;
   }
 
-  absl::optional<std::chrono::milliseconds> max_stream_duration = absl::nullopt;
-  if (parent_.maxStreamDuration().has_value()) {
-    max_stream_duration = parent_.maxStreamDuration().value();
-  }
-
-  if (!max_stream_duration.has_value() &&
-      upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
+  absl::optional<std::chrono::milliseconds> max_stream_duration;
+  if (parent_.dynamicMaxStreamDuration().has_value()) {
+    max_stream_duration = parent_.dynamicMaxStreamDuration().value();
+  } else if (upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
     max_stream_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
         upstream_host_->cluster().commonHttpProtocolOptions().max_stream_duration()));
   }

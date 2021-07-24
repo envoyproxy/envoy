@@ -6072,7 +6072,7 @@ TEST_F(RouterTest, SetDynamicMaxStreamDuration) {
       }));
   expectMaxStreamDurationTimerCreate();
 
-  Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-stream-timeout-ms", "500"}};
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-stream-duration-ms", "500"}};
 
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
@@ -6092,10 +6092,10 @@ TEST_F(RouterTest, NotSetDynamicMaxStreamDurationIfZero) {
         return nullptr;
       }));
 
-  // not to be called timer creation.
+  // The timer will not be created.
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_).Times(0);
 
-  Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-stream-timeout-ms", "0"}};
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-stream-duration-ms", "0"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
 

@@ -1333,7 +1333,7 @@ TEST_P(ProtocolIntegrationTest, BasicDynamicMaxStreamDuration) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  default_request_headers_.setEnvoyUpstreamStreamTimeoutMs(500);
+  default_request_headers_.setEnvoyUpstreamStreamDurationMs(500);
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
@@ -1365,7 +1365,7 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationTimerDisarmedWithDynamicValue) 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  default_request_headers_.setEnvoyUpstreamStreamTimeoutMs(0);
+  default_request_headers_.setEnvoyUpstreamStreamDurationMs(0);
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
@@ -1373,7 +1373,7 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationTimerDisarmedWithDynamicValue) 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 0);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_max_duration_reached", 0);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, true);

@@ -171,8 +171,8 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
     } else {
       const Http::HeaderEntry* header_timeout_entry =
           request_headers.EnvoyUpstreamRequestTimeoutMs();
-      if (header_timeout_entry) {
-        trySetGlobalTimeout(header_timeout_entry, timeout);
+
+      if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
         request_headers.removeEnvoyUpstreamRequestTimeoutMs();
       }
     }
@@ -586,11 +586,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                                          config_.respect_expected_rq_timeout_);
 
   const Http::HeaderEntry* header_max_stream_duration_entry =
-      headers.EnvoyUpstreamStreamTimeoutMs();
+      headers.EnvoyUpstreamStreamDurationMs();
   if (header_max_stream_duration_entry) {
-    dymamic_max_stream_duration_ =
+    dynamic_max_stream_duration_ =
         FilterUtility::tryParseHeaderTimeout(header_max_stream_duration_entry);
-    headers.removeEnvoyUpstreamStreamTimeoutMs();
+    headers.removeEnvoyUpstreamStreamDurationMs();
   }
 
   // If this header is set with any value, use an alternate response code on timeout

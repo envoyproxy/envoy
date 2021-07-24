@@ -146,6 +146,12 @@ public:
                                   bool per_try_timeout_hedging_enabled,
                                   bool respect_expected_rq_timeout);
 
+  /**
+   * Try to parse header entry that may have timeout field.
+   *
+   * @param header_timeout_entry header entry which may contain timeout value.
+   * @return result timeout value from header. It will return nullopt if parse failed.
+   */
   static absl::optional<std::chrono::milliseconds>
   tryParseHeaderTimeout(const Http::HeaderEntry* header_timeout_entry);
 
@@ -265,7 +271,7 @@ public:
   virtual Upstream::ClusterInfoConstSharedPtr cluster() PURE;
   virtual FilterConfig& config() PURE;
   virtual FilterUtility::TimeoutData timeout() PURE;
-  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
+  virtual absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const PURE;
   virtual Http::RequestHeaderMap* downstreamHeaders() PURE;
   virtual Http::RequestTrailerMap* downstreamTrailers() PURE;
   virtual bool downstreamResponseStarted() const PURE;
@@ -440,8 +446,8 @@ public:
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
   FilterConfig& config() override { return config_; }
   FilterUtility::TimeoutData timeout() override { return timeout_; }
-  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
-    return dymamic_max_stream_duration_;
+  absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const override {
+    return dynamic_max_stream_duration_;
   }
   Http::RequestHeaderMap* downstreamHeaders() override { return downstream_headers_; }
   Http::RequestTrailerMap* downstreamTrailers() override { return downstream_trailers_; }
@@ -542,7 +548,8 @@ private:
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
-  absl::optional<std::chrono::milliseconds> dymamic_max_stream_duration_;
+  // THe stream lifetime configured by request header.
+  absl::optional<std::chrono::milliseconds> dynamic_max_stream_duration_;
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;
 
