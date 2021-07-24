@@ -79,12 +79,6 @@ TEST(StringKeyFragmentTest, Normal) {
 
 TEST(HeaderValueExtractorImplDeathTest, InvalidConfig) {
   ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config;
-  // Type not set, ASSERT only fails in debug mode.
-#if !defined(NDEBUG)
-  EXPECT_DEATH((FragmentBuilderImpl(config)), "not reached.");
-#else
-  EXPECT_THROW_WITH_REGEX((FragmentBuilderImpl(config)), ProtoValidationException, "not reached.+");
-#endif // !defined(NDEBUG)
 
   // Index non-zero when element separator is an empty string.
   std::string yaml_plain = R"EOF(
