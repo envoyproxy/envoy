@@ -270,21 +270,15 @@ TEST_F(GrpcAccessLogTest, StreamFailureAndRetry) {
   config_.mutable_grpc_stream_retry_policy()->mutable_num_retries()->set_value(2);
   initLogger(FlushInterval, 1);
 
-  MockAccessLogStream stream;
-
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
-      .WillOnce(Invoke(
-          [&stream](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
+      .WillOnce(
+          Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks&,
                     const Http::AsyncClient::StreamOptions& options) -> Grpc::RawAsyncStream* {
             EXPECT_TRUE(options.retry_policy.has_value());
             EXPECT_TRUE(options.retry_policy.value().has_num_retries());
             EXPECT_EQ(PROTOBUF_GET_WRAPPED_REQUIRED(options.retry_policy.value(), num_retries), 2);
-            callbacks.onRemoteClose(Grpc::Status::Unavailable, "unavailable");
-            return &stream;
+            return nullptr;
           }));
-
-  EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
-  EXPECT_CALL(stream, sendMessageRaw_(_, _));
   logger_->log(mockHttpEntry());
 }
 
