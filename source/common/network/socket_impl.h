@@ -54,8 +54,8 @@ public:
   Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
     return downstream_ssl_info_;
   }
-  void setDownstreamSslConnection(
-      const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
+  void
+  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
     downstream_ssl_info_ = ssl_connection_info;
   }
   Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
