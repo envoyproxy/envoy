@@ -10,13 +10,15 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
     std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
     quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
-    uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory)
+    uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
+    QuicStatNames& quic_stat_names, Stats::Scope& scope)
     : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
                                       send_buffer_limit),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
       host_name_(server_id.host()), crypto_config_(crypto_config),
-      crypto_stream_factory_(crypto_stream_factory) {}
+      crypto_stream_factory_(crypto_stream_factory), quic_stat_names_(quic_stat_names),
+      scope_(scope) {}
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
@@ -35,6 +37,7 @@ void EnvoyQuicClientSession::connect() {
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
   quic::QuicSpdyClientSession::OnConnectionClosed(frame, source);
+  quic_stat_names_.chargeQuicConnectionCloseStats(scope_, frame.quic_error_code, source, true);
   onConnectionCloseEvent(frame, source, version());
 }
 

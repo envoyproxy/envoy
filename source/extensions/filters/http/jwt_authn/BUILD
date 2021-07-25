@@ -56,6 +56,7 @@ envoy_cc_library(
     ],
     deps = [
         "jwks_async_fetcher_lib",
+        ":jwt_cache_lib",
         "//source/common/config:datasource_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
@@ -140,6 +141,20 @@ envoy_cc_library(
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_macros",
         "//envoy/thread_local:thread_local_interface",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "jwt_cache_lib",
+    srcs = ["jwt_cache.cc"],
+    hdrs = ["jwt_cache.h"],
+    external_deps = [
+        "jwt_verify_lib",
+        "simple_lru_cache_lib",
+    ],
+    deps = [
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )

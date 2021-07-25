@@ -11,7 +11,6 @@
 #endif
 
 #include "quiche/quic/core/http/quic_spdy_session.h"
-#include "quiche/quic/core/http/quic_spdy_client_session.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 #include "quiche/quic/test_tools/first_flight.h"
 #include "quiche/quic/core/quic_utils.h"
@@ -25,7 +24,9 @@
 #endif
 
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_client_session.h"
 #include "test/test_common/environment.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -66,6 +67,14 @@ public:
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 };
 
+class TestQuicCryptoStream : public quic::test::MockQuicCryptoStream {
+public:
+  explicit TestQuicCryptoStream(quic::QuicSession* session)
+      : quic::test::MockQuicCryptoStream(session) {}
+
+  bool encryption_established() const override { return true; }
+};
+
 class MockEnvoyQuicSession : public quic::QuicSpdySession, public QuicFilterManagerConnectionImpl {
 public:
   MockEnvoyQuicSession(const quic::QuicConfig& config,
@@ -74,9 +83,8 @@ public:
                        uint32_t send_buffer_limit)
       : quic::QuicSpdySession(connection, /*visitor=*/nullptr, config, supported_versions),
         QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                        send_buffer_limit) {
-    crypto_stream_ = std::make_unique<quic::test::MockQuicCryptoStream>(this);
-  }
+                                        send_buffer_limit),
+        crypto_stream_(std::make_unique<TestQuicCryptoStream>(this)) {}
 
   void Initialize() override {
     quic::QuicSpdySession::Initialize();
@@ -124,22 +132,48 @@ private:
   std::unique_ptr<quic::QuicCryptoStream> crypto_stream_;
 };
 
-class MockEnvoyQuicClientSession : public quic::QuicSpdyClientSession,
-                                   public QuicFilterManagerConnectionImpl {
+class TestQuicCryptoClientStream : public quic::QuicCryptoClientStream {
+public:
+  TestQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
+                             std::unique_ptr<quic::ProofVerifyContext> verify_context,
+                             quic::QuicCryptoClientConfig* crypto_config,
+                             ProofHandler* proof_handler, bool has_application_state)
+      : quic::QuicCryptoClientStream(server_id, session, std::move(verify_context), crypto_config,
+                                     proof_handler, has_application_state) {}
+
+  bool encryption_established() const override { return true; }
+};
+
+class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactoryInterface {
+public:
+  std::unique_ptr<quic::QuicCryptoClientStreamBase>
+  createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
+                                    std::unique_ptr<quic::ProofVerifyContext> verify_context,
+                                    quic::QuicCryptoClientConfig* crypto_config,
+                                    quic::QuicCryptoClientStream::ProofHandler* proof_handler,
+                                    bool has_application_state) override {
+    return std::make_unique<TestQuicCryptoClientStream>(server_id, session,
+                                                        std::move(verify_context), crypto_config,
+                                                        proof_handler, has_application_state);
+  }
+};
+
+class MockEnvoyQuicClientSession : public EnvoyQuicClientSession {
 public:
   MockEnvoyQuicClientSession(const quic::QuicConfig& config,
                              const quic::ParsedQuicVersionVector& supported_versions,
-                             EnvoyQuicClientConnection* connection, Event::Dispatcher& dispatcher,
-                             uint32_t send_buffer_limit)
-      : quic::QuicSpdyClientSession(config, supported_versions, connection,
-                                    quic::QuicServerId("example.com", 443, false), &crypto_config_,
-                                    nullptr),
-        QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                        send_buffer_limit),
-        crypto_config_(quic::test::crypto_test_utils::ProofVerifierForTesting()) {}
+                             std::unique_ptr<EnvoyQuicClientConnection> connection,
+                             Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+                             EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory)
+      : EnvoyQuicClientSession(config, supported_versions, std::move(connection),
+                               quic::QuicServerId("example.com", 443, false),
+                               std::make_shared<quic::QuicCryptoClientConfig>(
+                                   quic::test::crypto_test_utils::ProofVerifierForTesting()),
+                               nullptr, dispatcher, send_buffer_limit, crypto_stream_factory,
+                               quic_stat_names_, stats_store_) {}
 
   void Initialize() override {
-    quic::QuicSpdyClientSession::Initialize();
+    EnvoyQuicClientSession::Initialize();
     initialized_ = true;
   }
 
@@ -172,8 +206,8 @@ protected:
   }
   quic::QuicConnection* quicConnection() override { return initialized_ ? connection() : nullptr; }
 
-private:
-  quic::QuicCryptoClientConfig crypto_config_;
+  Stats::IsolatedStoreImpl stats_store_;
+  QuicStatNames quic_stat_names_{stats_store_.symbolTable()};
 };
 
 Buffer::OwnedImpl
@@ -253,11 +287,9 @@ std::string spdyHeaderToHttp3StreamPayload(const spdy::SpdyHeaderBlock& header) 
 }
 
 std::string bodyToHttp3StreamPayload(const std::string& body) {
-  std::unique_ptr<char[]> data_buffer;
-  quic::QuicByteCount data_frame_header_length =
-      quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &data_buffer);
-  absl::string_view data_frame_header(data_buffer.get(), data_frame_header_length);
-  return absl::StrCat(data_frame_header, body);
+  quic::SimpleBufferAllocator allocator;
+  quic::QuicBuffer header = quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &allocator);
+  return absl::StrCat(header.AsStringView(), body);
 }
 
 // A test suite with variation of ip version and a knob to turn on/off IETF QUIC implementation.

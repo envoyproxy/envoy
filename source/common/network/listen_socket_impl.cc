@@ -35,17 +35,13 @@ Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstShar
 void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
   if (!Network::Socket::applyOptions(options, *this,
                                      envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
-    throw CreateListenerException("ListenSocket: Setting socket options failed");
+    throw SocketOptionException("ListenSocket: Setting socket options failed");
   }
 }
 
-void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& options,
-                                   bool bind_to_port) {
+void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& options) {
   setListenSocketOptions(options);
-
-  if (bind_to_port) {
-    bind(address_provider_->localAddress());
-  }
+  bind(address_provider_->localAddress());
 }
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)

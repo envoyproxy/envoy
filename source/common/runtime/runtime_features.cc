@@ -60,6 +60,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
     "envoy.reloadable_features.check_ocsp_policy",
+    "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     "envoy.reloadable_features.enable_compression_without_content_length_header",
@@ -74,6 +75,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.improved_stream_limit_handling",
     "envoy.reloadable_features.internal_redirects_with_body",
+    "envoy.reloadable_features.listener_reuse_port_default_enabled",
     "envoy.reloadable_features.listener_wildcard_match_ip_family",
     "envoy.reloadable_features.new_tcp_connection_pool",
     "envoy.reloadable_features.no_chunked_encoding_header_for_304",
@@ -117,6 +119,10 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.test_only.per_stream_buffer_accounting",
     // Allows the use of ExtensionWithMatcher to wrap a HTTP filter with a match tree.
     "envoy.reloadable_features.experimental_matching_api",
+    // When the runtime is flipped to true, use shared cache in getOrCreateRawAsyncClient method if
+    // CacheOption is CacheWhenRuntimeEnabled.
+    // Caller that use AlwaysCache option will always cache, unaffected by this runtime.
+    "envoy.reloadable_features.enable_grpc_async_client_cache",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

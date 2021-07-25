@@ -304,7 +304,7 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
   EXPECT_EQ(ssl_connection_,
             decoder_->streamInfo().downstreamAddressProvider().downstreamSslConnection());
   EXPECT_EQ(filter_callbacks_.connection_.id_,
-            decoder_->streamInfo().downstreamAddressProvider().connectionID());
+            decoder_->streamInfo().downstreamAddressProvider().connectionID().value());
   EXPECT_EQ(server_name_, decoder_->streamInfo().downstreamAddressProvider().requestedServerName());
 
   // Clean up.

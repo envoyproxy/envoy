@@ -74,7 +74,7 @@ public:
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
-          SetQuicReloadableFlag(quic_enable_version_rfcv1, use_http3);
+          SetQuicReloadableFlag(quic_disable_version_rfcv1, !use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         conn_helper_(*dispatcher_), alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
@@ -111,7 +111,7 @@ public:
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
-        persistent_info.crypto_stream_factory_);
+        persistent_info.crypto_stream_factory_, quic_stat_names_, stats_store_);
     return session;
   }
 
@@ -158,7 +158,6 @@ public:
 
   void testMultipleQuicConnections() {
     concurrency_ = 8;
-    set_reuse_port_ = true;
     initialize();
     std::vector<IntegrationCodecClientPtr> codec_clients;
     for (size_t i = 1; i <= concurrency_; ++i) {
@@ -301,7 +300,6 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsNoBPF) {
 // worker.
 TEST_P(QuicHttpIntegrationTest, MultiWorkerWithLongConnectionId) {
   concurrency_ = 8;
-  set_reuse_port_ = true;
   initialize();
   // Setup 9-byte CID for the next connection.
   designated_connection_ids_.push_back(quic::test::TestConnectionIdNineBytesLong(2u));
@@ -310,7 +308,6 @@ TEST_P(QuicHttpIntegrationTest, MultiWorkerWithLongConnectionId) {
 
 TEST_P(QuicHttpIntegrationTest, PortMigration) {
   concurrency_ = 2;
-  set_reuse_port_ = true;
   initialize();
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);

@@ -45,13 +45,14 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   Http::ContextImpl http_context(stats_store.symbolTable());
   Grpc::ContextImpl grpc_context(stats_store.symbolTable());
   Router::ContextImpl router_context(stats_store.symbolTable());
+  Quic::QuicStatNames quic_stat_names(stats_store.symbolTable());
   AccessLog::MockAccessLogManager log_manager;
   Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
 
   ValidationClusterManagerFactory factory(
       admin, runtime, stats_store, tls, dns_resolver, ssl_context_manager, dispatcher, local_info,
       secret_manager, validation_context, *api, http_context, grpc_context, router_context,
-      log_manager, singleton_manager, options);
+      log_manager, singleton_manager, options, quic_stat_names);
 
   const envoy::config::bootstrap::v3::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(bootstrap);
