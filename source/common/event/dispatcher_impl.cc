@@ -165,7 +165,7 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
 
   Network::DnsResolverFactory* dns_resolver_factory;
 
-  if (dns_resolver_config.name().empty()) {
+  if (dns_resolver_config.typed_config().type_url().empty()) {
     // If the typed dns resolver configuration is missing, synthetic a dns_resolver_config
     // based on the run time use_apple_api_for_dns_lookups flag. Then using
     // the dns_resolver_config to retrieve dns_resolver_factory.
