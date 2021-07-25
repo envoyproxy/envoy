@@ -555,14 +555,6 @@ public:
   virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
 
   /**
-   * This is a helper on top of perFilterConfig() that casts the return object to the specified
-   * type.
-   */
-  template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
-    return dynamic_cast<const Derived*>(perFilterConfig(name));
-  }
-
-  /**
    * @return bool whether to include the request count header in upstream requests.
    */
   virtual bool includeAttemptCountInRequest() const PURE;
@@ -922,14 +914,6 @@ public:
   virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
 
   /**
-   * This is a helper on top of perFilterConfig() that casts the return object to the specified
-   * type.
-   */
-  template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
-    return dynamic_cast<const Derived*>(perFilterConfig(name));
-  };
-
-  /**
    * True if the virtual host this RouteEntry belongs to is configured to include the attempt
    * count header.
    * @return bool whether x-envoy-attempt-count should be included on the upstream request.
@@ -1074,14 +1058,6 @@ public:
   virtual void traversePerFilterConfig(
       const std::string& filter_name,
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
-
-  /**
-   * This is a helper on top of perFilterConfig() that casts the return object to the specified
-   * type.
-   */
-  template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
-    return dynamic_cast<const Derived*>(perFilterConfig(name));
-  }
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
