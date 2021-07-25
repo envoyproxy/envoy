@@ -1,4 +1,4 @@
-#include "source/common/network/apple_dns_impl.h"
+#include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"
 
 #include <dns_sd.h>
 
@@ -10,6 +10,7 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/event/file_event.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
@@ -313,6 +314,9 @@ AppleDnsResolverImpl::PendingResolution::buildDnsResponse(const struct sockaddr*
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
+
+// Register the AppleDnsResolverFactory
+REGISTER_FACTORY(AppleDnsResolverFactoryImpl, DnsResolverFactory);
 
 } // namespace Network
 } // namespace Envoy

@@ -228,8 +228,9 @@ public:
    * @return Network::DnsResolverSharedPtr that is owned by the caller.
    */
   virtual Network::DnsResolverSharedPtr
-  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) PURE;
+  createDnsResolver(
+      envoy::config::core::v3::DnsResolutionConfig& dns_resolution_config,
+      envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) PURE;
 
   /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.

@@ -1,4 +1,4 @@
-#include "source/common/network/dns_impl.h"
+#include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -7,6 +7,7 @@
 #include <string>
 
 #include "envoy/common/platform.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
@@ -309,6 +310,9 @@ void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
       },
       this);
 }
+
+// Register the c-aresDnsResolverFactory
+REGISTER_FACTORY(CaresDnsResolverFactoryImpl, DnsResolverFactory);
 
 } // namespace Network
 } // namespace Envoy

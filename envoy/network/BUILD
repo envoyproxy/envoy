@@ -64,6 +64,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dns_factory_interface",
+    hdrs = ["dns_factory.h"],
+    deps = [
+        ":dns_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/api:api_interface",
+    ],
+)
+
+
+envoy_cc_library(
     name = "drain_decision_interface",
     hdrs = ["drain_decision.h"],
     external_deps = ["abseil_base"],

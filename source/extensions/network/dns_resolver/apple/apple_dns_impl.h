@@ -10,6 +10,7 @@
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
+#include "envoy/network/dns_factory.h"
 
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/common/linked_object.h"
@@ -124,6 +125,21 @@ private:
   Stats::ScopePtr scope_;
   AppleDnsResolverStats stats_;
 };
+
+
+class AppleDnsResolverFactoryImpl : public DnsResolverFactory {
+public:
+  std::string name() const override { return "envoy.dns_resolver.apple"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+  DnsResolverSharedPtr  createDnsResolverCb(Event::Dispatcher& dispatcher,
+                                            const Api::Api& api,
+                                            const envoy::config::core::v3::TypedExtensionConfig& ) override {
+    return std::make_shared<Network::AppleDnsResolverImpl>(dispatcher, api.rootScope());
+  }
+};
+
 
 } // namespace Network
 } // namespace Envoy

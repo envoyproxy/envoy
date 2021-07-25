@@ -10,6 +10,7 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+#include "envoy/network/dns_factory.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
@@ -22,10 +23,10 @@
 #include "source/common/event/timer_impl.h"
 #include "source/common/filesystem/watcher_impl.h"
 #include "source/common/network/connection_impl.h"
-#include "source/common/network/dns_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/config/utility.h"
 
 #include "event2/event.h"
 
@@ -33,9 +34,6 @@
 #include "source/common/signal/signal_action.h"
 #endif
 
-#ifdef __APPLE__
-#include "source/common/network/apple_dns_impl.h"
-#endif
 
 namespace Envoy {
 namespace Event {
@@ -155,28 +153,46 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                                          std::move(transport_socket), options);
 }
 
+// @param dns_resolution_config always contains data since even DnsResolutionConfig is not present
+// in the caller protobuf config (could be bootstrap_, cluster, or dns_cache_config),
+// the caller will program some other data in it, like use_tcp_for_dns_lookups or dns_resolvers.
+// @param dns_resolver_config could be empty.
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) {
+    envoy::config::core::v3::DnsResolutionConfig& dns_resolution_config,
+    envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) {
+
   ASSERT(isThreadSafe());
-#ifdef __APPLE__
-  static bool use_apple_api_for_dns_lookups =
+
+  Network::DnsResolverFactory* dns_resolver_factory;
+
+  if (dns_resolver_config.name().empty()) {
+    // If the typed dns resolver configuration is missing, synthetic a dns_resolver_config
+    // based on the run time use_apple_api_for_dns_lookups flag. Then using
+    // the dns_resolver_config to retrieve dns_resolver_factory.
+
+    static bool use_apple_api_for_dns_lookups =
       Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups");
-  if (use_apple_api_for_dns_lookups) {
-    RELEASE_ASSERT(
-        resolvers.empty(),
-        "defining custom resolvers is not possible when using Apple APIs for DNS resolution. "
-        "Apple's API only allows overriding DNS resolvers via system settings. Delete resolvers "
-        "config or disable the envoy.restart_features.use_apple_api_for_dns_lookups runtime "
-        "feature.");
-    RELEASE_ASSERT(!dns_resolver_options.use_tcp_for_dns_lookups(),
-                   "using TCP for DNS lookups is not possible when using Apple APIs for DNS "
-                   "resolution. Apple' API only uses UDP for DNS resolution. Use UDP or disable "
-                   "the envoy.restart_features.use_apple_api_for_dns_lookups runtime feature.");
-    return std::make_shared<Network::AppleDnsResolverImpl>(*this, api_.rootScope());
+    if (use_apple_api_for_dns_lookups) {
+      // In Apple system, ignore the dns_resolution_config.
+      dns_resolver_config.mutable_typed_config()->PackFrom(Envoy::ProtobufWkt::Struct());
+    } else {
+      dns_resolver_config.mutable_typed_config()->PackFrom(dns_resolution_config);
+    }
   }
-#endif
-  return std::make_shared<Network::DnsResolverImpl>(*this, resolvers, dns_resolver_options);
+
+  // If a typed dns resolver is configured, derive the DNS resolver factory from the config.
+  dns_resolver_factory =
+      &Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(dns_resolver_config);
+  if (dns_resolver_factory != nullptr) {
+    ENVOY_LOG(info, "create DNS resolver type: {}", dns_resolver_config.name());
+    return dns_resolver_factory->createDnsResolverCb(*this,
+                                                     api_,
+                                                     dns_resolver_config);
+
+  }
+
+  return nullptr;
+
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,

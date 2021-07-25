@@ -7,10 +7,12 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/network/dns.h"
+#include "envoy/network/dns_factory.h"
 
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
+#include "source/common/network/resolver_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "ares.h"
@@ -112,6 +114,37 @@ private:
   absl::node_hash_map<int, Event::FileEventPtr> events_;
   const absl::optional<std::string> resolvers_csv_;
 };
+
+class CaresDnsResolverFactoryImpl : public DnsResolverFactory {
+public:
+  std::string name() const override { return "envoy.dns_resolver.cares"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new envoy::config::core::v3::DnsResolutionConfig};
+  }
+
+  DnsResolverSharedPtr createDnsResolverCb(Event::Dispatcher& dispatcher,
+                                           const Api::Api&,
+                                           const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) override {
+    envoy::config::core::v3::DnsResolutionConfig dns_resolution_config;
+    envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
+    std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
+
+    dns_resolver_config.typed_config().UnpackTo(&dns_resolution_config);
+
+    dns_resolver_options.CopyFrom(dns_resolution_config.dns_resolver_options());
+    if (!dns_resolution_config.resolvers().empty()) {
+      const auto& resolver_addrs = dns_resolution_config.resolvers();
+      resolvers.reserve(resolver_addrs.size());
+      for (const auto& resolver_addr : resolver_addrs) {
+        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
+      }
+    }
+    return std::make_shared<Network::DnsResolverImpl>(dispatcher,
+                                                      resolvers, dns_resolver_options);
+  }
+};
+
 
 } // namespace Network
 } // namespace Envoy

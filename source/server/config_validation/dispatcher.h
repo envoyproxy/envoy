@@ -24,8 +24,8 @@ public:
                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&&,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   Network::DnsResolverSharedPtr createDnsResolver(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-      const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) override;
+    envoy::config::core::v3::DnsResolutionConfig& dns_resolution_config,
+    envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&&, Network::TcpListenerCallbacks&,
                                       bool bind_to_port) override;
 

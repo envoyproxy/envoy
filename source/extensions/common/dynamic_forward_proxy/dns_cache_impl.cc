@@ -71,24 +71,23 @@ DnsCacheImpl::~DnsCacheImpl() {
 Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
     Event::Dispatcher& main_thread_dispatcher) {
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-  if (config.has_dns_resolution_config()) {
-    dns_resolver_options.CopyFrom(config.dns_resolution_config().dns_resolver_options());
-    if (!config.dns_resolution_config().resolvers().empty()) {
-      const auto& resolver_addrs = config.dns_resolution_config().resolvers();
-      resolvers.reserve(resolver_addrs.size());
-      for (const auto& resolver_addr : resolver_addrs) {
-        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
-      }
-    }
+  envoy::config::core::v3::DnsResolutionConfig dns_resolution_config;
+  envoy::config::core::v3::TypedExtensionConfig dns_resolver_config;
+
+  if (config.has_typed_dns_resolver_config()) {
+    dns_resolver_config.CopyFrom(config.typed_dns_resolver_config());
   } else {
-    // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward
-    // compatible utilize config.use_tcp_for_dns_lookups() if `config.dns_resolution_config`
-    // is not set.
-    dns_resolver_options.set_use_tcp_for_dns_lookups(config.use_tcp_for_dns_lookups());
+    if (config.has_dns_resolution_config()) {
+      dns_resolution_config.CopyFrom(config.dns_resolution_config());
+    } else {
+      // If DnsResolutionConfig proto config is missing, put the to-be-deprecated config
+      // use_tcp_for_dns_lookups in dns_resolution_config for backward compatibility support.
+      dns_resolution_config.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(config.use_tcp_for_dns_lookups());
+    }
   }
-  return main_thread_dispatcher.createDnsResolver(resolvers, dns_resolver_options);
+  return main_thread_dispatcher.createDnsResolver(dns_resolution_config,
+                                                  dns_resolver_config);
+
 }
 
 DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {
