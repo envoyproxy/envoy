@@ -1,8 +1,9 @@
 import argparse
 import asyncio
+import logging
 import os
 from functools import cached_property
-from typing import Sequence, Tuple, Type
+from typing import Optional, Sequence, Tuple, Type
 
 from tools.base import runner
 
@@ -13,6 +14,7 @@ class Checker(runner.Runner):
     Check methods should call the `self.warn`, `self.error` or `self.succeed`
     depending upon the outcome of the checks.
     """
+    _active_check: Optional[str] = None
     checks: Tuple[str, ...] = ()
 
     def __init__(self, *args):
@@ -20,6 +22,10 @@ class Checker(runner.Runner):
         self.success = {}
         self.errors = {}
         self.warnings = {}
+
+    @property
+    def active_check(self) -> Optional[str]:
+        return self._active_check
 
     @property
     def diff(self) -> bool:
@@ -170,6 +176,8 @@ class Checker(runner.Runner):
 
     def error(self, name: str, errors: list, log: bool = True, log_type: str = "error") -> int:
         """Record (and log) errors for a check type"""
+        if not errors:
+            return 0
         self.errors[name] = self.errors.get(name, [])
         self.errors[name].extend(errors)
         if not log:
@@ -178,7 +186,9 @@ class Checker(runner.Runner):
             getattr(self.log, log_type)(f"[{name}] {message}")
         return 1
 
-    def exit(self):
+    def exit(self) -> int:
+        self.log.handlers[0].setLevel(logging.FATAL)
+        self.stdout.handlers[0].setLevel(logging.FATAL)
         return self.error("exiting", ["Keyboard exit"], log_type="fatal")
 
     def get_checks(self) -> Sequence[str]:
@@ -188,10 +198,12 @@ class Checker(runner.Runner):
             [check for check in self.args.check if check in self.checks])
 
     def on_check_begin(self, check: str) -> None:
+        self._active_check = check
         self.log.notice(f"[{check}] Running check")
 
     def on_check_run(self, check: str) -> None:
         """Callback hook called after each check run"""
+        self._active_check = None
         if self.exiting:
             return
         elif check in self.errors:

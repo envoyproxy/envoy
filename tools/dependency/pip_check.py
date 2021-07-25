@@ -15,9 +15,7 @@ import os
 import sys
 from functools import cached_property
 
-import yaml
-
-from tools.base import checker
+from tools.base import checker, utils
 
 DEPENDABOT_CONFIG = ".github/dependabot.yml"
 REQUIREMENTS_FILENAME = "requirements.txt"
@@ -43,8 +41,7 @@ class PipChecker(checker.Checker):
     @cached_property
     def dependabot_config(self) -> dict:
         """Parsed dependabot config"""
-        with open(os.path.join(self.path, self.dependabot_config_path)) as f:
-            return yaml.safe_load(f.read())
+        return utils.from_yaml(os.path.join(self.path, self.dependabot_config_path))
 
     @property
     def dependabot_config_path(self) -> str:
