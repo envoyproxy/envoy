@@ -659,8 +659,7 @@ public:
       return absl::nullopt;
     }
 
-    const auto value =
-        field_extractor_(*stream_info.downstreamAddressProvider().sslConnection());
+    const auto value = field_extractor_(*stream_info.downstreamAddressProvider().sslConnection());
     if (value && value->empty()) {
       return absl::nullopt;
     }
@@ -673,8 +672,7 @@ public:
       return unspecifiedValue();
     }
 
-    const auto value =
-        field_extractor_(*stream_info.downstreamAddressProvider().sslConnection());
+    const auto value = field_extractor_(*stream_info.downstreamAddressProvider().sslConnection());
     if (value && value->empty()) {
       return unspecifiedValue();
     }

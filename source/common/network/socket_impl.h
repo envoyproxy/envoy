@@ -51,11 +51,8 @@ public:
   }
   absl::optional<uint64_t> connectionID() const override { return connection_id_; }
   void setConnectionID(uint64_t id) override { connection_id_ = id; }
-  Ssl::ConnectionInfoConstSharedPtr sslConnection() const override {
-    return ssl_info_;
-  }
-  void setSslConnection(
-      const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
+  Ssl::ConnectionInfoConstSharedPtr sslConnection() const override { return ssl_info_; }
+  void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
     ssl_info_ = ssl_connection_info;
   }
 

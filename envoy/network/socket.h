@@ -142,8 +142,7 @@ public:
   /**
    * @param connection_info sets the downstream ssl connection.
    */
-  virtual void
-  setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
+  virtual void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
 };
 
 using SocketAddressSetterSharedPtr = std::shared_ptr<SocketAddressSetter>;
