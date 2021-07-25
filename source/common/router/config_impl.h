@@ -133,6 +133,9 @@ public:
   const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override {
     return nullptr;
   }
+  void traversePerFilterConfig(
+      const std::string&,
+      std::function<void(const Router::RouteSpecificFilterConfig&)>) const override { }
 
 private:
   static const SslRedirector SSL_REDIRECTOR;
@@ -595,6 +598,9 @@ public:
     auto* config = perFilterConfig(name);
     return config ? config : virtualHost().perFilterConfig(name);
   }
+  void traversePerFilterConfig(
+      const std::string& filter_name,
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
 protected:
   const bool case_sensitive_;
@@ -748,6 +754,11 @@ private:
     mostSpecificPerFilterConfig(const std::string& name) const override {
       return parent_->mostSpecificPerFilterConfig(name);
     }
+    void traversePerFilterConfig(
+      const std::string& filter_name,
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override {
+      parent_->traversePerFilterConfig(filter_name, cb);
+    };
 
   private:
     const RouteEntryImplBase* parent_;
@@ -803,6 +814,10 @@ private:
       auto* config = per_filter_configs_.get(name);
       return config ? config : DynamicRouteEntry::mostSpecificPerFilterConfig(name);
     }
+  
+    void traversePerFilterConfig(
+      const std::string& filter_name,
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
   private:
     const std::string runtime_key_;

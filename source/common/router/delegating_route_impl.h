@@ -30,6 +30,11 @@ public:
   mostSpecificPerFilterConfig(const std::string& name) const override {
     return base_route_->mostSpecificPerFilterConfig(name);
   }
+  void traversePerFilterConfig(
+      const std::string& filter_name,
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override {
+    base_route_->traversePerFilterConfig(filter_name, cb);
+  }
 
 private:
   const Router::RouteConstSharedPtr base_route_;

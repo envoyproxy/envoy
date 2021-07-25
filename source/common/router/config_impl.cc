@@ -1006,6 +1006,31 @@ RouteEntryImplBase::perFilterConfig(const std::string& name) const {
   return per_filter_configs_.get(name);
 }
 
+void RouteEntryImplBase::traversePerFilterConfig(
+    const std::string& filter_name,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+  const Router::RouteEntry* route_entry = routeEntry();
+
+  if (route_entry != nullptr) {
+    auto maybe_vhost_config = route_entry->virtualHost().perFilterConfig(filter_name);
+    if (maybe_vhost_config != nullptr) {
+      cb(*maybe_vhost_config);
+    }
+  }
+
+  auto maybe_route_config = perFilterConfig(filter_name);
+  if (maybe_route_config != nullptr) {
+    cb(*maybe_route_config);
+  }
+
+  if (route_entry != nullptr) {
+    auto maybe_weighted_cluster_config = route_entry->perFilterConfig(filter_name);
+    if (maybe_weighted_cluster_config != nullptr) {
+      cb(*maybe_weighted_cluster_config);
+    }
+  }
+}
+
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     const RouteEntryImplBase* parent, const std::string& runtime_key,
     Server::Configuration::ServerFactoryContext& factory_context,
@@ -1050,6 +1075,17 @@ const RouteSpecificFilterConfig*
 RouteEntryImplBase::WeightedClusterEntry::perFilterConfig(const std::string& name) const {
   const auto cfg = per_filter_configs_.get(name);
   return cfg != nullptr ? cfg : DynamicRouteEntry::perFilterConfig(name);
+}
+
+void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
+      const std::string& filter_name,
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+  DynamicRouteEntry::traversePerFilterConfig(filter_name, cb);
+
+  const auto* cfg = per_filter_configs_.get(filter_name);
+  if (cfg) {
+    cb(*cfg);
+  }
 }
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(

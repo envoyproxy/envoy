@@ -456,6 +456,7 @@ public:
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (const std::string&),
               (const));
+  MOCK_METHOD(void, traversePerFilterConfig, (const std::string&, std::function<void(const Router::RouteSpecificFilterConfig&)>), (const));
 
   testing::NiceMock<MockRouteEntry> route_entry_;
   testing::NiceMock<MockDecorator> decorator_;
