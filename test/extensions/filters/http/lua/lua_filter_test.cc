@@ -1872,37 +1872,37 @@ TEST_F(LuaHttpFilterTest, CheckConnection) {
 TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      if request_handle:streamInfo():downstreamSslConnection() == nil then
+      if request_handle:streamInfo():sslConnection() == nil then
       else
-        if request_handle:streamInfo():downstreamSslConnection():peerCertificatePresented() then
+        if request_handle:streamInfo():sslConnection():peerCertificatePresented() then
           request_handle:logTrace("peerCertificatePresented")
         end
 
-        if request_handle:streamInfo():downstreamSslConnection():peerCertificateValidated() then
+        if request_handle:streamInfo():sslConnection():peerCertificateValidated() then
           request_handle:logTrace("peerCertificateValidated")
         end
 
-        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():uriSanPeerCertificate(), ","))
-        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():uriSanLocalCertificate(), ","))
-        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():dnsSansPeerCertificate(), ","))
-        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():dnsSansLocalCertificate(), ","))
+        request_handle:logTrace(table.concat(request_handle:streamInfo():sslConnection():uriSanPeerCertificate(), ","))
+        request_handle:logTrace(table.concat(request_handle:streamInfo():sslConnection():uriSanLocalCertificate(), ","))
+        request_handle:logTrace(table.concat(request_handle:streamInfo():sslConnection():dnsSansPeerCertificate(), ","))
+        request_handle:logTrace(table.concat(request_handle:streamInfo():sslConnection():dnsSansLocalCertificate(), ","))
 
-        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():ciphersuiteId())
+        request_handle:logTrace(request_handle:streamInfo():sslConnection():ciphersuiteId())
 
-        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():validFromPeerCertificate())
-        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():expirationPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():sslConnection():validFromPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():sslConnection():expirationPeerCertificate())
 
-        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():subjectLocalCertificate())
-        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():sha256PeerCertificateDigest())
-        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():serialNumberPeerCertificate())
-        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():issuerPeerCertificate())
-        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():subjectPeerCertificate())
-        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():ciphersuiteString())
-        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():tlsVersion())
-        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():urlEncodedPemEncodedPeerCertificate())
-        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():urlEncodedPemEncodedPeerCertificateChain())
+        request_handle:logTrace(request_handle:streamInfo():sslConnection():subjectLocalCertificate())
+        request_handle:logTrace(request_handle:streamInfo():sslConnection():sha256PeerCertificateDigest())
+        request_handle:logTrace(request_handle:streamInfo():sslConnection():serialNumberPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():sslConnection():issuerPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():sslConnection():subjectPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():sslConnection():ciphersuiteString())
+        request_handle:logTrace(request_handle:streamInfo():sslConnection():tlsVersion())
+        request_handle:logTrace(request_handle:streamInfo():sslConnection():urlEncodedPemEncodedPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():sslConnection():urlEncodedPemEncodedPeerCertificateChain())
 
-        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():sessionId())
+        request_handle:logTrace(request_handle:streamInfo():sslConnection():sessionId())
       end
     end
   )EOF"};
@@ -1913,7 +1913,7 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
 
   const auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  stream_info_.downstream_address_provider_->setDownstreamSslConnection(connection_info);
+  stream_info_.downstream_address_provider_->setSslConnection(connection_info);
 
   EXPECT_CALL(*connection_info, peerCertificatePresented()).WillOnce(Return(true));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("peerCertificatePresented")));
@@ -2002,7 +2002,7 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
 TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnectionOnPlainConnection) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      if request_handle:streamInfo():downstreamSslConnection() == nil then
+      if request_handle:streamInfo():sslConnection() == nil then
         request_handle:logTrace("downstreamSslConnection is nil")
       end
     end
@@ -2011,7 +2011,7 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnectionOnPlainConnecti
   setup(SCRIPT);
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  stream_info_.downstream_address_provider_->setDownstreamSslConnection(nullptr);
+  stream_info_.downstream_address_provider_->setSslConnection(nullptr);
 
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("downstreamSslConnection is nil")));
 
@@ -2019,12 +2019,12 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnectionOnPlainConnecti
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-// Should survive from multiple streamInfo():downstreamSslConnection() calls.
+// Should survive from multiple streamInfo():sslConnection() calls.
 // This is a regression test for #14091.
 TEST_F(LuaHttpFilterTest, SurviveMultipleDownstreamSslConnectionCalls) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      if request_handle:streamInfo():downstreamSslConnection() ~= nil then
+      if request_handle:streamInfo():sslConnection() ~= nil then
          request_handle:logTrace("downstreamSslConnection is present")
       end
     end
@@ -2034,7 +2034,7 @@ TEST_F(LuaHttpFilterTest, SurviveMultipleDownstreamSslConnectionCalls) {
 
   const auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  stream_info_.downstream_address_provider_->setDownstreamSslConnection(connection_info);
+  stream_info_.downstream_address_provider_->setSslConnection(connection_info);
 
   for (uint64_t i = 0; i < 200; i++) {
     EXPECT_CALL(*filter_,

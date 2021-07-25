@@ -626,8 +626,8 @@ public:
   absl::optional<uint64_t> connectionID() const override {
     return StreamInfoImpl::downstreamAddressProvider().connectionID();
   }
-  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
-    return StreamInfoImpl::downstreamAddressProvider().downstreamSslConnection();
+  Ssl::ConnectionInfoConstSharedPtr sslConnection() const override {
+    return StreamInfoImpl::downstreamAddressProvider().sslConnection();
   }
   Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
     return StreamInfoImpl::upstreamSslConnection();

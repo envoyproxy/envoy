@@ -73,7 +73,7 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
   filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRequestedServerName(
       server_name_);
   filter_callbacks_.connection_.stream_info_.downstream_address_provider_
-      ->setDownstreamSslConnection(ssl_connection_);
+      ->setSslConnection(ssl_connection_);
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
       *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
       overload_manager_, test_time_.timeSystem());

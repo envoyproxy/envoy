@@ -190,7 +190,7 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
                                  latched_data->connection()
                                      .streamInfo()
                                      .downstreamAddressProvider()
-                                     .downstreamSslConnection());
+                                     .sslConnection());
 }
 
 HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -237,7 +237,7 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
   upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
-      *this, host, info.downstreamAddressProvider().downstreamSslConnection()));
+      *this, host, info.downstreamAddressProvider().sslConnection()));
 }
 
 void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
