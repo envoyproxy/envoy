@@ -122,8 +122,8 @@ public:
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
-      filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setDownstreamSslConnection(
-          filter_callbacks_.connection_.ssl());
+      filter_callbacks_.connection_.stream_info_.downstream_address_provider_
+          ->setDownstreamSslConnection(filter_callbacks_.connection_.ssl());
     }
 
     if (connections > 0) {
@@ -225,8 +225,8 @@ TEST_F(TcpProxyTest, BadFactory) {
   EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setDownstreamSslConnection(
-      filter_callbacks_.connection_.ssl());
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_
+      ->setDownstreamSslConnection(filter_callbacks_.connection_.ssl());
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 }
 
@@ -1096,12 +1096,18 @@ TEST_F(TcpProxyTest, AccessDownstreamAndUpstreamProperties) {
   setup(1);
 
   raiseEventUpstreamConnected(0);
-  EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamAddressProvider().downstreamSslConnection(),
+  EXPECT_EQ(filter_callbacks_.connection()
+                .streamInfo()
+                .downstreamAddressProvider()
+                .downstreamSslConnection(),
             filter_callbacks_.connection().ssl());
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamLocalAddress(),
             upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().localAddress());
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamSslConnection(),
-            upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().downstreamSslConnection());
+            upstream_connections_.at(0)
+                ->streamInfo()
+                .downstreamAddressProvider()
+                .downstreamSslConnection());
 }
 } // namespace
 } // namespace TcpProxy
