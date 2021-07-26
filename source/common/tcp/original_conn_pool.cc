@@ -1,4 +1,4 @@
-#include "common/tcp/original_conn_pool.h"
+#include "source/common/tcp/original_conn_pool.h"
 
 #include <memory>
 
@@ -6,8 +6,8 @@
 #include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/stats/timespan_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Tcp {
@@ -15,7 +15,7 @@ namespace Tcp {
 OriginalConnPoolImpl::OriginalConnPoolImpl(
     Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
     Upstream::ResourcePriority priority, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options)
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options)
     : dispatcher_(dispatcher), host_(host), priority_(priority), socket_options_(options),
       transport_socket_options_(transport_socket_options),
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
@@ -128,7 +128,7 @@ OriginalConnPoolImpl::newConnection(ConnectionPool::Callbacks& callbacks) {
     return pending_requests_.front().get();
   } else {
     ENVOY_LOG(debug, "max pending requests overflow");
-    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
+    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, "", nullptr);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
     return nullptr;
   }
@@ -184,7 +184,7 @@ void OriginalConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::Connecti
         PendingRequestPtr request =
             pending_requests_to_purge.front()->removeFromList(pending_requests_to_purge);
         host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
-        request->callbacks_.onPoolFailure(reason, conn.real_host_description_);
+        request->callbacks_.onPoolFailure(reason, "", conn.real_host_description_);
       }
     }
 

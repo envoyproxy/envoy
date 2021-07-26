@@ -14,12 +14,12 @@
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/base64.h"
-#include "common/config/api_version.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_impl.h"
+#include "source/common/common/base64.h"
+#include "source/common/config/api_version.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/init/mocks.h"
@@ -41,9 +41,7 @@ using namespace std::chrono_literals;
 
 namespace Envoy {
 
-using testing::AllOf;
 using testing::HasSubstr;
-using testing::Property;
 
 class RuntimeStatsHelper : public TestScopedRuntime {
 public:
@@ -295,13 +293,67 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
       ->mutable_source_address()
       ->set_address("1.1.1.1");
 
+  // Test mixed case extension.
   const std::string filename =
-      TestEnvironment::writeStringToFileForTest("proto.pb", bootstrap.SerializeAsString());
+      TestEnvironment::writeStringToFileForTest("proto.pB", bootstrap.SerializeAsString());
 
   envoy::config::bootstrap::v3::Bootstrap proto_from_file;
   TestUtility::loadFromFile(filename, proto_from_file, *api_);
   EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
+}
+
+// Verify different YAML extensions using different cases.
+TEST_F(ProtobufUtilityTest, YamlExtensions) {
+  const std::string bootstrap_yaml = R"EOF(
+layered_runtime:
+  layers:
+  - name: static_layer
+    static_layer:
+      foo: true)EOF";
+
+  {
+    const std::string filename =
+        TestEnvironment::writeStringToFileForTest("proto.yAml", bootstrap_yaml);
+
+    envoy::config::bootstrap::v3::Bootstrap proto_from_file;
+    TestUtility::loadFromFile(filename, proto_from_file, *api_);
+    TestUtility::validate(proto_from_file);
+  }
+  {
+    const std::string filename =
+        TestEnvironment::writeStringToFileForTest("proto.yMl", bootstrap_yaml);
+
+    envoy::config::bootstrap::v3::Bootstrap proto_from_file;
+    TestUtility::loadFromFile(filename, proto_from_file, *api_);
+    TestUtility::validate(proto_from_file);
+  }
+}
+
+// Verify different JSON extensions using different cases.
+TEST_F(ProtobufUtilityTest, JsonExtensions) {
+  const std::string bootstrap_json = R"EOF(
+{
+   "layered_runtime": {
+      "layers": [
+         {
+            "name": "static_layer",
+            "static_layer": {
+               "foo": true
+            }
+         }
+      ]
+   }
+})EOF";
+
+  {
+    const std::string filename =
+        TestEnvironment::writeStringToFileForTest("proto.JSoN", bootstrap_json);
+
+    envoy::config::bootstrap::v3::Bootstrap proto_from_file;
+    TestUtility::loadFromFile(filename, proto_from_file, *api_);
+    TestUtility::validate(proto_from_file);
+  }
 }
 
 // Verify that a config with a deprecated field can be loaded with runtime global override.
@@ -366,8 +418,9 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile) {
 
   std::string bootstrap_text;
   ASSERT_TRUE(Protobuf::TextFormat::PrintToString(bootstrap, &bootstrap_text));
+  // Test mixed case extension.
   const std::string filename =
-      TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
+      TestEnvironment::writeStringToFileForTest("proto.pB_Text", bootstrap_text);
 
   envoy::config::bootstrap::v3::Bootstrap proto_from_file;
   TestUtility::loadFromFile(filename, proto_from_file, *api_);
@@ -988,6 +1041,19 @@ type_url: type.googleapis.com/envoy.test.Sensitive
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+TEST_F(ProtobufUtilityTest, RedactTypedStructWithNoTypeUrl) {
+  udpa::type::v1::TypedStruct actual;
+  TestUtility::loadFromYaml(R"EOF(
+value:
+  sensitive_string: This field is sensitive, but we have no way of knowing.
+)EOF",
+                            actual);
+
+  udpa::type::v1::TypedStruct expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
 // Messages packed into `TypedStruct` with unknown type URLs are skipped.
 TEST_F(ProtobufUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
   udpa::type::v1::TypedStruct actual;
@@ -1000,6 +1066,20 @@ value:
 
   udpa::type::v1::TypedStruct expected = actual;
   MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlTypedStruct) {
+  udpa::type::v1::TypedStruct actual;
+  udpa::type::v1::TypedStruct expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlAny) {
+  ProtobufWkt::Any actual;
+  MessageUtil::redact(actual);
+  ProtobufWkt::Any expected = actual;
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
@@ -1185,6 +1265,11 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
             "list_value { values { string_value: \"foo\" } values { string_value: \"bar\" } }");
   EXPECT_EQ(ValueUtil::loadFromYaml("foo: bar").ShortDebugString(),
             "struct_value { fields { key: \"foo\" value { string_value: \"bar\" } } }");
+}
+
+TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObjectWithIgnoredEntries) {
+  EXPECT_EQ(ValueUtil::loadFromYaml("!ignore foo: bar\nbaz: qux").ShortDebugString(),
+            "struct_value { fields { key: \"baz\" value { string_value: \"qux\" } } }");
 }
 
 TEST(LoadFromYamlExceptionTest, BadConversion) {
@@ -2000,13 +2085,13 @@ INSTANTIATE_TEST_SUITE_P(TimestampUtilTestAcrossRange, TimestampUtilTest,
                                            ));
 
 TEST(StatusCode, Strings) {
-  int last_code = static_cast<int>(ProtobufUtil::error::UNAUTHENTICATED);
+  int last_code = static_cast<int>(ProtobufUtil::StatusCode::kUnauthenticated);
   for (int i = 0; i < last_code; ++i) {
-    EXPECT_NE(MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(i)), "");
+    EXPECT_NE(MessageUtil::codeEnumToString(static_cast<ProtobufUtil::StatusCode>(i)), "");
   }
   ASSERT_EQ("UNKNOWN",
-            MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(last_code + 1)));
-  ASSERT_EQ("OK", MessageUtil::CodeEnumToString(ProtobufUtil::error::OK));
+            MessageUtil::codeEnumToString(static_cast<ProtobufUtil::StatusCode>(last_code + 1)));
+  ASSERT_EQ("OK", MessageUtil::codeEnumToString(ProtobufUtil::StatusCode::kOk));
 }
 
 TEST(TypeUtilTest, TypeUrlHelperFunction) {
@@ -2016,6 +2101,102 @@ TEST(TypeUtilTest, TypeUrlHelperFunction) {
   EXPECT_EQ(
       "type.googleapis.com/envoy.config.filter.http.ip_tagging.v2.IPTagging",
       TypeUtil::descriptorFullNameToTypeUrl("envoy.config.filter.http.ip_tagging.v2.IPTagging"));
+}
+
+class StructUtilTest : public ProtobufUtilityTest {
+protected:
+  ProtobufWkt::Struct updateSimpleStruct(const ProtobufWkt::Value& v0,
+                                         const ProtobufWkt::Value& v1) {
+    ProtobufWkt::Struct obj, with;
+    (*obj.mutable_fields())["key"] = v0;
+    (*with.mutable_fields())["key"] = v1;
+    StructUtil::update(obj, with);
+    EXPECT_EQ(obj.fields().size(), 1);
+    return obj;
+  }
+};
+
+TEST_F(StructUtilTest, StructUtilUpdateScalars) {
+  {
+    const auto obj = updateSimpleStruct(ValueUtil::stringValue("v0"), ValueUtil::stringValue("v1"));
+    EXPECT_EQ(obj.fields().at("key").string_value(), "v1");
+  }
+
+  {
+    const auto obj = updateSimpleStruct(ValueUtil::numberValue(0), ValueUtil::numberValue(1));
+    EXPECT_EQ(obj.fields().at("key").number_value(), 1);
+  }
+
+  {
+    const auto obj = updateSimpleStruct(ValueUtil::boolValue(false), ValueUtil::boolValue(true));
+    EXPECT_EQ(obj.fields().at("key").bool_value(), true);
+  }
+
+  {
+    const auto obj = updateSimpleStruct(ValueUtil::nullValue(), ValueUtil::nullValue());
+    EXPECT_EQ(obj.fields().at("key").kind_case(), ProtobufWkt::Value::KindCase::kNullValue);
+  }
+}
+
+TEST_F(StructUtilTest, StructUtilUpdateDifferentKind) {
+  {
+    const auto obj = updateSimpleStruct(ValueUtil::stringValue("v0"), ValueUtil::numberValue(1));
+    auto& val = obj.fields().at("key");
+    EXPECT_EQ(val.kind_case(), ProtobufWkt::Value::KindCase::kNumberValue);
+    EXPECT_EQ(val.number_value(), 1);
+  }
+
+  {
+    const auto obj =
+        updateSimpleStruct(ValueUtil::structValue(MessageUtil::keyValueStruct("subkey", "v0")),
+                           ValueUtil::stringValue("v1"));
+    auto& val = obj.fields().at("key");
+    EXPECT_EQ(val.kind_case(), ProtobufWkt::Value::KindCase::kStringValue);
+    EXPECT_EQ(val.string_value(), "v1");
+  }
+}
+
+TEST_F(StructUtilTest, StructUtilUpdateList) {
+  ProtobufWkt::Struct obj, with;
+  auto& list = *(*obj.mutable_fields())["key"].mutable_list_value();
+  list.add_values()->set_string_value("v0");
+
+  auto& with_list = *(*with.mutable_fields())["key"].mutable_list_value();
+  with_list.add_values()->set_number_value(1);
+  const auto v2 = MessageUtil::keyValueStruct("subkey", "str");
+  *with_list.add_values()->mutable_struct_value() = v2;
+
+  StructUtil::update(obj, with);
+  ASSERT_THAT(obj.fields().size(), 1);
+  const auto& list_vals = list.values();
+  EXPECT_TRUE(ValueUtil::equal(list_vals[0], ValueUtil::stringValue("v0")));
+  EXPECT_TRUE(ValueUtil::equal(list_vals[1], ValueUtil::numberValue(1)));
+  EXPECT_TRUE(ValueUtil::equal(list_vals[2], ValueUtil::structValue(v2)));
+}
+
+TEST_F(StructUtilTest, StructUtilUpdateNewKey) {
+  ProtobufWkt::Struct obj, with;
+  (*obj.mutable_fields())["key0"].set_number_value(1);
+  (*with.mutable_fields())["key1"].set_number_value(1);
+  StructUtil::update(obj, with);
+
+  const auto& fields = obj.fields();
+  EXPECT_TRUE(ValueUtil::equal(fields.at("key0"), ValueUtil::numberValue(1)));
+  EXPECT_TRUE(ValueUtil::equal(fields.at("key1"), ValueUtil::numberValue(1)));
+}
+
+TEST_F(StructUtilTest, StructUtilUpdateRecursiveStruct) {
+  ProtobufWkt::Struct obj, with;
+  *(*obj.mutable_fields())["tags"].mutable_struct_value() =
+      MessageUtil::keyValueStruct("tag0", "1");
+  *(*with.mutable_fields())["tags"].mutable_struct_value() =
+      MessageUtil::keyValueStruct("tag1", "1");
+  StructUtil::update(obj, with);
+
+  ASSERT_EQ(obj.fields().at("tags").kind_case(), ProtobufWkt::Value::KindCase::kStructValue);
+  const auto& tags = obj.fields().at("tags").struct_value().fields();
+  EXPECT_TRUE(ValueUtil::equal(tags.at("tag0"), ValueUtil::stringValue("1")));
+  EXPECT_TRUE(ValueUtil::equal(tags.at("tag1"), ValueUtil::stringValue("1")));
 }
 
 } // namespace Envoy

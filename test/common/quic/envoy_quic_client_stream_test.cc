@@ -1,8 +1,8 @@
-#include "common/quic/envoy_quic_alarm_factory.h"
-#include "common/quic/envoy_quic_client_connection.h"
-#include "common/quic/envoy_quic_client_stream.h"
-#include "common/quic/envoy_quic_connection_helper.h"
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_stream.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/http/mocks.h"
@@ -19,6 +19,11 @@ namespace Quic {
 using testing::_;
 using testing::Invoke;
 
+class MockDelegate : public PacketsToReadDelegate {
+public:
+  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, ());
+};
+
 class EnvoyQuicClientStreamTest : public testing::TestWithParam<bool> {
 public:
   EnvoyQuicClientStreamTest()
@@ -26,6 +31,7 @@ public:
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
+          SetQuicReloadableFlag(quic_disable_version_rfcv1, !GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -36,8 +42,10 @@ public:
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, &writer_,
             /*owns_writer=*/false, {quic_version_}, *dispatcher_,
             createConnectionSocket(peer_addr_, self_addr_, nullptr))),
-        quic_session_(quic_config_, {quic_version_}, quic_connection_, *dispatcher_,
-                      quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
+        quic_session_(quic_config_, {quic_version_},
+                      std::unique_ptr<EnvoyQuicClientConnection>(quic_connection_), *dispatcher_,
+                      quic_config_.GetInitialStreamFlowControlWindowToSend() * 2,
+                      crypto_stream_factory_),
         stream_id_(quic::VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
                                       POOL_GAUGE_PREFIX(scope_, "http3."))}),
@@ -45,6 +53,7 @@ public:
                                                stats_, http3_options_)),
         request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}},
         request_trailers_{{"trailer-key", "trailer-value"}} {
+    SetQuicReloadableFlag(quic_single_ack_in_packet2, false);
     quic_stream_->setResponseDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicClientStream>(quic_stream_));
@@ -67,7 +76,7 @@ public:
     quic_connection_->setEnvoyConnection(quic_session_);
     setQuicConfigWithDefaultValues(quic_session_.config());
     quic_session_.OnConfigNegotiated();
-    quic_connection_->setUpConnectionSocket();
+    quic_connection_->setUpConnectionSocket(delegate_);
     response_headers_.OnHeaderBlockStart();
     response_headers_.OnHeader(":status", "200");
     response_headers_.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0,
@@ -137,7 +146,9 @@ protected:
   quic::QuicConfig quic_config_;
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
+  MockDelegate delegate_;
   EnvoyQuicClientConnection* quic_connection_;
+  TestQuicCryptoClientStreamFactory crypto_stream_factory_;
   MockEnvoyQuicClientSession quic_session_;
   quic::QuicStreamId stream_id_;
   Stats::IsolatedStoreImpl scope_;

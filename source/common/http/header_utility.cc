@@ -1,13 +1,14 @@
-#include "common/http/header_utility.h"
+#include "source/common/http/header_utility.h"
 
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/common/regex.h"
-#include "common/common/utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/matchers.h"
+#include "source/common/common/regex.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "nghttp2/nghttp2.h"
@@ -41,12 +42,6 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     header_match_type_ = HeaderMatchType::Value;
     value_ = config.exact_match();
     break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
-      kHiddenEnvoyDeprecatedRegexMatch:
-    header_match_type_ = HeaderMatchType::Regex;
-    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
-        config.hidden_envoy_deprecated_regex_match());
-    break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
     regex_ = Regex::Utility::parseRegex(config.safe_regex_match());
@@ -58,6 +53,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
     header_match_type_ = HeaderMatchType::Present;
+    present_ = config.present_match();
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPrefixMatch:
     header_match_type_ = HeaderMatchType::Prefix;
@@ -71,11 +67,16 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     header_match_type_ = HeaderMatchType::Contains;
     value_ = config.contains_match();
     break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
+    header_match_type_ = HeaderMatchType::StringMatch;
+    string_match_ = std::make_unique<Matchers::StringMatcherImpl>(config.string_match());
+    break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:
     FALLTHRU;
   default:
     header_match_type_ = HeaderMatchType::Present;
+    present_ = true;
     break;
   }
 }
@@ -135,35 +136,43 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   const auto header_value = getAllOfHeaderAsString(request_headers, header_data.name_);
 
   if (!header_value.result().has_value()) {
-    return header_data.invert_match_ && header_data.header_match_type_ == HeaderMatchType::Present;
+    if (header_data.invert_match_) {
+      return header_data.header_match_type_ == HeaderMatchType::Present && header_data.present_;
+    } else {
+      return header_data.header_match_type_ == HeaderMatchType::Present && !header_data.present_;
+    }
   }
 
+  const auto value = header_value.result().value();
   bool match;
   switch (header_data.header_match_type_) {
   case HeaderMatchType::Value:
-    match = header_data.value_.empty() || header_value.result().value() == header_data.value_;
+    match = header_data.value_.empty() || value == header_data.value_;
     break;
   case HeaderMatchType::Regex:
-    match = header_data.regex_->match(header_value.result().value());
+    match = header_data.regex_->match(value);
     break;
   case HeaderMatchType::Range: {
     int64_t header_int_value = 0;
-    match = absl::SimpleAtoi(header_value.result().value(), &header_int_value) &&
+    match = absl::SimpleAtoi(value, &header_int_value) &&
             header_int_value >= header_data.range_.start() &&
             header_int_value < header_data.range_.end();
     break;
   }
   case HeaderMatchType::Present:
-    match = true;
+    match = header_data.present_;
     break;
   case HeaderMatchType::Prefix:
-    match = absl::StartsWith(header_value.result().value(), header_data.value_);
+    match = absl::StartsWith(value, header_data.value_);
     break;
   case HeaderMatchType::Suffix:
-    match = absl::EndsWith(header_value.result().value(), header_data.value_);
+    match = absl::EndsWith(value, header_data.value_);
     break;
   case HeaderMatchType::Contains:
-    match = absl::StrContains(header_value.result().value(), header_data.value_);
+    match = absl::StrContains(value, header_data.value_);
+    break;
+  case HeaderMatchType::StringMatch:
+    match = header_data.string_match_->match(value);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -210,21 +219,29 @@ bool HeaderUtility::requestShouldHaveNoBody(const RequestHeaderMap& headers) {
            headers.Method()->value() == Http::Headers::get().MethodValues.Connect));
 }
 
-void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {
-  headers_to_add.iterate([&headers](const HeaderEntry& header) -> HeaderMap::Iterate {
-    HeaderString k;
-    k.setCopy(header.key().getStringView());
-    HeaderString v;
-    v.setCopy(header.value().getStringView());
-    headers.addViaMove(std::move(k), std::move(v));
-    return HeaderMap::Iterate::Continue;
-  });
-}
-
 bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
   const HeaderEntry* internal_request_header = headers.EnvoyInternalRequest();
   return internal_request_header != nullptr &&
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
+}
+
+void HeaderUtility::stripTrailingHostDot(RequestHeaderMap& headers) {
+  auto host = headers.getHostValue();
+  // If the host ends in a period, remove it.
+  auto dot_index = host.rfind('.');
+  if (dot_index == std::string::npos) {
+    return;
+  } else if (dot_index == (host.size() - 1)) {
+    host.remove_suffix(1);
+    headers.setHost(host);
+    return;
+  }
+  // If the dot is just before a colon, it must be preceding the port number.
+  // IPv6 addresses may contain colons or dots, but the dot will never directly
+  // precede the colon, so this check should be sufficient to detect a trailing port number.
+  if (host[dot_index + 1] == ':') {
+    headers.setHost(absl::StrCat(host.substr(0, dot_index), host.substr(dot_index + 1)));
+  }
 }
 
 absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
@@ -308,7 +325,7 @@ bool HeaderUtility::shouldCloseConnection(Http::Protocol protocol,
   return false;
 }
 
-Http::Status HeaderUtility::checkRequiredHeaders(const Http::RequestHeaderMap& headers) {
+Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeaderMap& headers) {
   if (!headers.Method()) {
     return absl::InvalidArgumentError(
         absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Method.get()));
@@ -326,6 +343,15 @@ Http::Status HeaderUtility::checkRequiredHeaders(const Http::RequestHeaderMap& h
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Path.get()));
     }
+  }
+  return Http::okStatus();
+}
+
+Http::Status HeaderUtility::checkRequiredResponseHeaders(const Http::ResponseHeaderMap& headers) {
+  const absl::optional<uint64_t> status = Utility::getResponseStatusNoThrow(headers);
+  if (!status.has_value()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Status.get()));
   }
   return Http::okStatus();
 }

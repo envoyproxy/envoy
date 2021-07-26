@@ -16,7 +16,7 @@ filegroup(
     name = "server_xds_files",
     srcs = [
         "server_xds.bootstrap.udpa.yaml",
-        "server_xds.bootstrap.yaml",
+        "server_xds.bootstrap.yml",
         "server_xds.cds.with_unknown_field.yaml",
         "server_xds.cds.yaml",
         "server_xds.eds.ads_cluster.yaml",

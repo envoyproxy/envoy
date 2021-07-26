@@ -19,16 +19,16 @@
 #include "envoy/stats/tag_producer.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/backoff_strategy.h"
-#include "common/common/hash.h"
-#include "common/common/hex.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/backoff_strategy.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/singleton/const_singleton.h"
 
 #include "udpa/type/v1/typed_struct.pb.h"
 
@@ -249,21 +249,33 @@ public:
    * Get a Factory from the registry with a particular name (and templated type) with error checking
    * to ensure the name and factory are valid.
    * @param name string identifier for the particular implementation.
+   * @param is_optional exception will be throw when the value is false and no factory found.
    * @return factory the factory requested or nullptr if it does not exist.
    */
-  template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
+  template <class Factory>
+  static Factory* getAndCheckFactoryByName(const std::string& name, bool is_optional) {
     if (name.empty()) {
       ExceptionUtil::throwEnvoyException("Provided name for static registration lookup was empty.");
     }
 
     Factory* factory = Registry::FactoryRegistry<Factory>::getFactory(name);
 
-    if (factory == nullptr) {
+    if (factory == nullptr && !is_optional) {
       ExceptionUtil::throwEnvoyException(
           fmt::format("Didn't find a registered implementation for name: '{}'", name));
     }
 
-    return *factory;
+    return factory;
+  }
+
+  /**
+   * Get a Factory from the registry with a particular name (and templated type) with error checking
+   * to ensure the name and factory are valid.
+   * @param name string identifier for the particular implementation.
+   * @return factory the factory requested or nullptr if it does not exist.
+   */
+  template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
+    return *getAndCheckFactoryByName<Factory>(name, false);
   }
 
   /**
@@ -294,17 +306,29 @@ public:
 
   /**
    * Get a Factory from the registry with error checking to ensure the name and the factory are
+   * valid. And a flag to control return nullptr or throw an exception.
+   * @param message proto that contains fields 'name' and 'typed_config'.
+   * @param is_optional an exception will be throw when the value is true and no factory found.
+   * @return factory the factory requested or nullptr if it does not exist.
+   */
+  template <class Factory, class ProtoMessage>
+  static Factory* getAndCheckFactory(const ProtoMessage& message, bool is_optional) {
+    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
+    if (factory != nullptr) {
+      return factory;
+    }
+
+    return Utility::getAndCheckFactoryByName<Factory>(message.name(), is_optional);
+  }
+
+  /**
+   * Get a Factory from the registry with error checking to ensure the name and the factory are
    * valid.
    * @param message proto that contains fields 'name' and 'typed_config'.
    */
   template <class Factory, class ProtoMessage>
   static Factory& getAndCheckFactory(const ProtoMessage& message) {
-    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
-    if (factory != nullptr) {
-      return *factory;
-    }
-
-    return Utility::getAndCheckFactoryByName<Factory>(message.name());
+    return *getAndCheckFactory<Factory>(message, false);
   }
 
   /**
@@ -407,7 +431,8 @@ public:
    * Create StatsMatcher instance.
    */
   static Stats::StatsMatcherPtr
-  createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                     Stats::SymbolTable& symbol_table);
 
   /**
    * Create HistogramSettings instance.
@@ -426,14 +451,6 @@ public:
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
                                 Stats::Scope& scope, bool skip_cluster_check);
-
-  /**
-   * Translate a set of cluster's hosts into a load assignment configuration.
-   * @param hosts cluster's list of hosts.
-   * @return envoy::config::endpoint::v3::ClusterLoadAssignment a load assignment configuration.
-   */
-  static envoy::config::endpoint::v3::ClusterLoadAssignment
-  translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::config::core::v3::Address>& hosts);
 
   /**
    * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto

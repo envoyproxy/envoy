@@ -1,4 +1,4 @@
-#include "common/network/udp_listener_impl.h"
+#include "source/common/network/udp_listener_impl.h"
 
 #include <cerrno>
 #include <csetjmp>
@@ -10,13 +10,13 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/exception.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_error_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
 
 #include "absl/container/fixed_array.h"
 #include "event2/listener.h"
@@ -37,13 +37,6 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
   socket_->ioHandle().initializeFileEvent(
       dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);
-
-  if (!Network::Socket::applyOptions(socket_->options(), *socket_,
-                                     envoy::config::core::v3::SocketOption::STATE_BOUND)) {
-    throw CreateListenerException(
-        fmt::format("cannot set post-bound socket option on socket: {}",
-                    socket_->addressProvider().localAddress()->asString()));
-  }
 }
 
 UdpListenerImpl::~UdpListenerImpl() { socket_->ioHandle().resetFileEvents(); }
@@ -75,7 +68,12 @@ void UdpListenerImpl::handleReadCallback() {
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
       socket_->ioHandle(), *socket_->addressProvider().localAddress(), *this, time_source_,
       config_.prefer_gro_, packets_dropped_);
-  // TODO(mattklein123): Handle no error when we limit the number of packets read.
+  if (result == nullptr) {
+    // No error. The number of reads was limited by read rate. There are more packets to read.
+    // Register to read more in the next event loop.
+    socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+    return;
+  }
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
     // TODO(mattklein123): When rate limited logging is implemented log this at error level
     // on a periodic basis.

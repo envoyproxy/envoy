@@ -105,10 +105,10 @@ envoy_cc_test(
     }),
     external_deps = ["abseil_synchronization"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:dns_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/network:dns_interface",
         "//source/common/event:dispatcher_includes",
-        "//include/envoy/event:file_event_interface",
+        "//envoy/event:file_event_interface",
         "//source/common/stats:isolated_store_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
@@ -139,9 +139,9 @@ envoy_cc_test(
     # https://gist.github.com/wrowe/24fe5b93b58bb444bce7ecc134905395
     tags = ["fails_on_clang_cl"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:address_interface",
-        "//include/envoy/network:dns_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/network:address_interface",
+        "//envoy/network:dns_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",

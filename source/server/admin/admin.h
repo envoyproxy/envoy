@@ -18,38 +18,36 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/basic_resource_impl.h"
-#include "common/common/empty_string.h"
-#include "common/common/logger.h"
-#include "common/common/macros.h"
-#include "common/http/conn_manager_config.h"
-#include "common/http/conn_manager_impl.h"
-#include "common/http/date_provider_impl.h"
-#include "common/http/default_server_string.h"
-#include "common/http/http1/codec_stats.h"
-#include "common/http/http2/codec_stats.h"
-#include "common/http/request_id_extension_impl.h"
-#include "common/http/utility.h"
-#include "common/network/connection_balancer_impl.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/router/scoped_config_impl.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "server/admin/admin_filter.h"
-#include "server/admin/clusters_handler.h"
-#include "server/admin/config_dump_handler.h"
-#include "server/admin/config_tracker_impl.h"
-#include "server/admin/init_dump_handler.h"
-#include "server/admin/listeners_handler.h"
-#include "server/admin/logs_handler.h"
-#include "server/admin/profiling_handler.h"
-#include "server/admin/runtime_handler.h"
-#include "server/admin/server_cmd_handler.h"
-#include "server/admin/server_info_handler.h"
-#include "server/admin/stats_handler.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/basic_resource_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/common/http/conn_manager_config.h"
+#include "source/common/http/conn_manager_impl.h"
+#include "source/common/http/date_provider_impl.h"
+#include "source/common/http/default_server_string.h"
+#include "source/common/http/http1/codec_stats.h"
+#include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/request_id_extension_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/connection_balancer_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/router/scoped_config_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/server/admin/admin_filter.h"
+#include "source/server/admin/clusters_handler.h"
+#include "source/server/admin/config_dump_handler.h"
+#include "source/server/admin/config_tracker_impl.h"
+#include "source/server/admin/init_dump_handler.h"
+#include "source/server/admin/listeners_handler.h"
+#include "source/server/admin/logs_handler.h"
+#include "source/server/admin/profiling_handler.h"
+#include "source/server/admin/runtime_handler.h"
+#include "source/server/admin/server_cmd_handler.h"
+#include "source/server/admin/server_info_handler.h"
+#include "source/server/admin/stats_handler.h"
 
 #include "absl/strings/string_view.h"
 
@@ -148,6 +146,7 @@ public:
     return &scoped_route_config_provider_;
   }
   const std::string& serverName() const override { return Http::DefaultServerString::get(); }
+  const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
   serverHeaderTransformation() const override {
     return HttpConnectionManagerProto::OVERWRITE;
@@ -177,6 +176,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return true; }
   bool shouldMergeSlashes() const override { return true; }
+  bool shouldStripTrailingHostDot() const override { return false; }
   Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
@@ -188,6 +188,10 @@ public:
       pathWithEscapedSlashesAction() const override {
     return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         KEEP_UNCHANGED;
+  }
+  const std::vector<Http::OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const override {
+    return detection_extensions_;
   }
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
@@ -201,6 +205,7 @@ public:
       return runCallback(path_and_query, response_headers, response, filter);
     };
   }
+  uint64_t maxRequestsPerConnection() const override { return 0; }
 
 private:
   /**
@@ -313,19 +318,18 @@ private:
 
     // Network::ListenSocketFactory
     Network::Socket::Type socketType() const override { return socket_->socketType(); }
-
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
       return socket_->addressProvider().localAddress();
     }
-
-    Network::SocketSharedPtr getListenSocket() override {
+    Network::SocketSharedPtr getListenSocket(uint32_t) override {
       // This is only supposed to be called once.
       RELEASE_ASSERT(!socket_create_, "AdminListener's socket shouldn't be shared.");
       socket_create_ = true;
       return socket_;
     }
-
-    Network::SocketOptRef sharedSocket() const override { return absl::nullopt; }
+    Network::ListenSocketFactoryPtr clone() const override { return nullptr; }
+    void closeAllSockets() override {}
+    void doFinalPreWorkerInit() override {}
 
   private:
     Network::SocketSharedPtr socket_;
@@ -443,10 +447,12 @@ private:
   ConfigTrackerImpl config_tracker_;
   const Network::FilterChainSharedPtr admin_filter_chain_;
   Network::SocketSharedPtr socket_;
-  Network::ListenSocketFactorySharedPtr socket_factory_;
+  Network::ListenSocketFactoryPtr socket_factory_;
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
+  const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
+  const absl::optional<std::string> scheme_{};
 };
 
 } // namespace Server

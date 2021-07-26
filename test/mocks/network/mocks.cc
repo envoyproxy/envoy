@@ -5,10 +5,10 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/server/listener_manager.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/udp_listener_impl.h"
-#include "common/network/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/udp_listener_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/test_common/printers.h"
 
@@ -38,9 +38,7 @@ MockListenerConfig::MockListenerConfig()
   ON_CALL(*this, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
   ON_CALL(socket_factory_, localAddress())
       .WillByDefault(ReturnRef(socket_->addressProvider().localAddress()));
-  ON_CALL(socket_factory_, getListenSocket()).WillByDefault(Return(socket_));
-  ON_CALL(socket_factory_, sharedSocket())
-      .WillByDefault(Return(std::reference_wrapper<Socket>(*socket_)));
+  ON_CALL(socket_factory_, getListenSocket(_)).WillByDefault(Return(socket_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
 }
@@ -146,6 +144,9 @@ MockListenSocket::MockListenSocket()
   }));
   ON_CALL(*this, ipVersion())
       .WillByDefault(Return(address_provider_->localAddress()->ip()->version()));
+  ON_CALL(*this, duplicate()).WillByDefault(Invoke([]() {
+    return std::make_unique<NiceMock<MockListenSocket>>();
+  }));
 }
 
 MockSocketOption::MockSocketOption() {

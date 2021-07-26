@@ -7,14 +7,14 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/formatter/substitution_formatter.h"
-#include "common/http/header_map_impl.h"
-#include "common/json/json_loader.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/router/string_accessor_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 
 #include "test/common/formatter/command_extension.h"
 #include "test/mocks/api/mocks.h"
@@ -663,7 +663,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("CONNECTION_ID");
     uint64_t id = 123;
-    EXPECT_CALL(stream_info, connectionID()).WillRepeatedly(Return(id));
+    stream_info.downstream_address_provider_->setConnectionID(id);
     EXPECT_EQ("123", upstream_format.format(request_headers, response_headers, response_trailers,
                                             stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -674,8 +674,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
     std::string requested_server_name = "stub_server";
-    EXPECT_CALL(stream_info, requestedServerName())
-        .WillRepeatedly(ReturnRef(requested_server_name));
+    stream_info.downstream_address_provider_->setRequestedServerName(requested_server_name);
     EXPECT_EQ("stub_server", upstream_format.format(request_headers, response_headers,
                                                     response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -686,8 +685,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
     std::string requested_server_name;
-    EXPECT_CALL(stream_info, requestedServerName())
-        .WillRepeatedly(ReturnRef(requested_server_name));
+    stream_info.downstream_address_provider_->setRequestedServerName(requested_server_name);
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
                                                     response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -1403,6 +1401,18 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
   }
   {
     DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
+    EXPECT_EQ("test_value", formatter.format(request_headers, response_headers, response_trailers,
+                                             stream_info, body));
+    EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
+                                      stream_info, body),
+                ProtoEq(ValueUtil::stringValue("test_value")));
+  }
+  // Disable string value unquoting and expect the same result as above but quoted.
+  {
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.unquote_log_string_values", "false"}});
+    DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
     EXPECT_EQ("\"test_value\"", formatter.format(request_headers, response_headers,
                                                  response_trailers, stream_info, body));
     EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
@@ -1425,8 +1435,8 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
   {
     DynamicMetadataFormatter formatter("com.test", {"test_obj", "inner_key"},
                                        absl::optional<size_t>());
-    EXPECT_EQ("\"inner_value\"", formatter.format(request_headers, response_headers,
-                                                  response_trailers, stream_info, body));
+    EXPECT_EQ("inner_value", formatter.format(request_headers, response_headers, response_trailers,
+                                              stream_info, body));
     EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
                                       stream_info, body),
                 ProtoEq(ValueUtil::stringValue("inner_value")));
@@ -1462,8 +1472,8 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
   // size limit
   {
     DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>(5));
-    EXPECT_EQ("\"test", formatter.format(request_headers, response_headers, response_trailers,
-                                         stream_info, body));
+    EXPECT_EQ("test_", formatter.format(request_headers, response_headers, response_trailers,
+                                        stream_info, body));
 
     // N.B. Does not truncate.
     EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
@@ -2135,9 +2145,9 @@ TEST(SubstitutionFormatterTest, StructFormatterDynamicMetadataTest) {
   EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   absl::node_hash_map<std::string, std::string> expected_json_map = {
-      {"test_key", "\"test_value\""},
+      {"test_key", "test_value"},
       {"test_obj", "{\"inner_key\":\"inner_value\"}"},
-      {"test_obj.inner_key", "\"inner_value\""}};
+      {"test_obj.inner_key", "inner_value"}};
 
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
@@ -2200,9 +2210,9 @@ TEST(SubstitutionFormatterTest, StructFormatterClusterMetadataTest) {
   EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
 
   absl::node_hash_map<std::string, std::string> expected_json_map = {
-      {"test_key", "\"test_value\""},
+      {"test_key", "test_value"},
       {"test_obj", "{\"inner_key\":\"inner_value\"}"},
-      {"test_obj.inner_key", "\"inner_value\""},
+      {"test_obj.inner_key", "inner_value"},
       {"test_obj.non_existing_key", "-"},
   };
 
@@ -2648,7 +2658,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     FormatterImpl formatter(format, false);
 
     EXPECT_EQ(
-        "\"test_value\"|{\"inner_key\":\"inner_value\"}|\"inner_value\"",
+        "test_value|{\"inner_key\":\"inner_value\"}|inner_value",
         formatter.format(request_header, response_header, response_trailer, stream_info, body));
   }
 

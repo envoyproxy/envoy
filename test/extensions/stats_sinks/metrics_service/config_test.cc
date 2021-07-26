@@ -1,6 +1,6 @@
 #include "envoy/registry/registry.h"
 
-#include "extensions/stat_sinks/metrics_service/config.h"
+#include "source/extensions/stat_sinks/metrics_service/config.h"
 
 #include "test/test_common/utility.h"
 
@@ -14,10 +14,8 @@ namespace {
 
 // Test that the deprecated extension name still functions.
 TEST(MetricsServiceConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.metrics_service";
-
   ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
-                         deprecated_name));
+                         MetricsServiceName));
 }
 
 } // namespace

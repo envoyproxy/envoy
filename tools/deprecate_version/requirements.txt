@@ -4,9 +4,9 @@
 #
 #    pip-compile --generate-hashes tools/deprecate_version/requirements.txt
 #
-certifi==2020.12.5 \
-    --hash=sha256:1a4995114262bffbc2413b159f2a1a480c969de6e6eb13ee966d470af86af59c \
-    --hash=sha256:719a74fb9e33b9bd44cc7f3a8d94bc35e4049deebe19ba7d8e108280cfd59830
+certifi==2021.5.30 \
+    --hash=sha256:50b1e4f8446b06f41be7dd6338db18e0990601dce795c2b1686458aa7e8fa7d8 \
+    --hash=sha256:2bbf76fd432960138b3ef6dda3dde0544f27cbf8546c458e60baf371917ba9ee
     # via
     #   -r tools/deprecate_version/requirements.txt
     #   requests
@@ -67,9 +67,9 @@ gitdb==4.0.7 \
     # via
     #   -r tools/deprecate_version/requirements.txt
     #   gitpython
-gitpython==3.1.14 \
-    --hash=sha256:3283ae2fba31c913d857e12e5ba5f9a7772bbc064ae2bb09efafa71b0dd4939b \
-    --hash=sha256:be27633e7509e58391f10207cd32b2a6cf5b908f92d9cd30da2e514e1137af61
+gitpython==3.1.18 \
+    --hash=sha256:fce760879cd2aebd2991b3542876dc5c4a909b30c9d69dfc488e504a8db37ee8 \
+    --hash=sha256:b838a895977b45ab6f0cc926a9045c8d1c44e2b653c1fcc39fe91f42c6e8f05b
     # via -r tools/deprecate_version/requirements.txt
 idna==2.10 \
     --hash=sha256:b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6 \
@@ -125,9 +125,9 @@ smmap==4.0.0 \
     # via
     #   -r tools/deprecate_version/requirements.txt
     #   gitdb
-urllib3==1.26.4 \
-    --hash=sha256:2f4da4594db7e1e110a944bb1b551fdf4e6c136ad42e4234131391e21eb5b0df \
-    --hash=sha256:e7b021f7241115872f92f43c6508082facffbd1c048e3c6e2bb9c2a157e28937
+urllib3==1.26.6 \
+    --hash=sha256:39fb8672126159acb139a7718dd10806104dec1e2f0f6c88aab05d17df10c8d4 \
+    --hash=sha256:f57b4c16c62fa2760b7e3d97c35b255512fb6b59a259730f36ba32ce9f8e342f
     # via
     #   -r tools/deprecate_version/requirements.txt
     #   requests

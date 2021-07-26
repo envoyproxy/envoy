@@ -1,4 +1,4 @@
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include <limits>
 #include <numeric>
@@ -7,16 +7,16 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/documentation_url.h"
-#include "common/common/fmt.h"
-#include "common/config/api_type_oracle.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/visitor.h"
-#include "common/protobuf/well_known.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/documentation_url.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/api_type_oracle.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/visitor.h"
+#include "source/common/protobuf/well_known.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "udpa/annotations/sensitive.pb.h"
@@ -108,7 +108,9 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
   case YAML::NodeType::Map: {
     auto& struct_fields = *value.mutable_struct_value()->mutable_fields();
     for (const auto& it : node) {
-      struct_fields[it.first.as<std::string>()] = parseYamlNode(it.second);
+      if (it.first.Tag() != "!ignore") {
+        struct_fields[it.first.as<std::string>()] = parseYamlNode(it.second);
+      }
     }
     break;
   }
@@ -421,7 +423,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                                Api::Api& api, bool do_boosting) {
   const std::string contents = api.fileSystem().fileReadToEnd(path);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
-  if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
     auto read_proto_binary = [&contents, &validation_visitor](Protobuf::Message& message,
                                                               MessageVersion message_version) {
@@ -457,7 +459,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
 
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
-  if (absl::EndsWith(path, FileExtensions::get().ProtoText)) {
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoText)) {
     auto read_proto_text = [&contents, &path](Protobuf::Message& message,
                                               MessageVersion message_version) {
       if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
@@ -480,7 +482,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     }
     return;
   }
-  if (absl::EndsWith(path, FileExtensions::get().Yaml)) {
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
+      absl::EndsWithIgnoreCase(path, FileExtensions::get().Yml)) {
     loadFromYaml(contents, message, validation_visitor, do_boosting);
   } else {
     loadFromJson(contents, message, validation_visitor, do_boosting);
@@ -741,7 +744,7 @@ ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::map<std::string, std:
   return struct_obj;
 }
 
-std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
+std::string MessageUtil::codeEnumToString(ProtobufUtil::StatusCode code) {
   return ProtobufUtil::Status(code, "").ToString();
 }
 
@@ -772,10 +775,14 @@ bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
   const auto* reflection = message->GetReflection();
   const auto* type_url_field_descriptor = opaque_descriptor->FindFieldByName("type_url");
   const auto* value_field_descriptor = opaque_descriptor->FindFieldByName("value");
-  ASSERT(type_url_field_descriptor != nullptr && value_field_descriptor != nullptr &&
-         reflection->HasField(*message, type_url_field_descriptor));
-  if (!reflection->HasField(*message, value_field_descriptor)) {
+  ASSERT(type_url_field_descriptor != nullptr && value_field_descriptor != nullptr);
+  if (!reflection->HasField(*message, type_url_field_descriptor) &&
+      !reflection->HasField(*message, value_field_descriptor)) {
     return true;
+  }
+  if (!reflection->HasField(*message, type_url_field_descriptor) ||
+      !reflection->HasField(*message, value_field_descriptor)) {
+    return false;
   }
 
   // Try to find a descriptor for `type_url` in the pool and instantiate a new message of the
@@ -1054,6 +1061,45 @@ absl::string_view TypeUtil::typeUrlToDescriptorFullName(absl::string_view type_u
 
 std::string TypeUtil::descriptorFullNameToTypeUrl(absl::string_view type) {
   return "type.googleapis.com/" + std::string(type);
+}
+
+void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& with) {
+  auto& obj_fields = *obj.mutable_fields();
+
+  for (const auto& [key, val] : with.fields()) {
+    auto& obj_key = obj_fields[key];
+
+    // If the types are different, the last one wins.
+    const auto val_kind = val.kind_case();
+    if (val_kind != obj_key.kind_case()) {
+      obj_key = val;
+      continue;
+    }
+
+    // Otherwise, the strategy depends on the value kind.
+    switch (val.kind_case()) {
+    // For scalars, the last one wins.
+    case ProtobufWkt::Value::kNullValue:
+    case ProtobufWkt::Value::kNumberValue:
+    case ProtobufWkt::Value::kStringValue:
+    case ProtobufWkt::Value::kBoolValue:
+      obj_key = val;
+      break;
+    // If we got a structure, recursively update.
+    case ProtobufWkt::Value::kStructValue:
+      update(*obj_key.mutable_struct_value(), val.struct_value());
+      break;
+    // For lists, append the new values.
+    case ProtobufWkt::Value::kListValue: {
+      auto& obj_key_vec = *obj_key.mutable_list_value()->mutable_values();
+      const auto& vals = val.list_value().values();
+      obj_key_vec.MergeFrom(vals);
+      break;
+    }
+    case ProtobufWkt::Value::KIND_NOT_SET:
+      break;
+    }
+  }
 }
 
 } // namespace Envoy

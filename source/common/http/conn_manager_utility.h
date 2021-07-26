@@ -7,9 +7,9 @@
 #include "envoy/network/connection.h"
 #include "envoy/tracing/trace_reason.h"
 
-#include "common/http/conn_manager_impl.h"
-#include "common/http/http1/codec_stats.h"
-#include "common/http/http2/codec_stats.h"
+#include "source/common/http/conn_manager_impl.h"
+#include "source/common/http/http1/codec_stats.h"
+#include "source/common/http/http2/codec_stats.h"
 
 namespace Envoy {
 namespace Http {
@@ -47,25 +47,49 @@ public:
                   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                       headers_with_underscores_action);
 
+  /* The result after calling mutateRequestHeaders(), containing the final remote address. Note that
+   * an extension used for detecting the original IP of the request might decide it should be
+   * rejected if the detection failed. In this case, the reject_request optional will be set.
+   */
+  struct MutateRequestHeadersResult {
+    Network::Address::InstanceConstSharedPtr final_remote_address;
+    absl::optional<OriginalIPRejectRequestOptions> reject_request;
+  };
+
   /**
    * Mutates request headers in various ways. This functionality is broken out because of its
+   * complexity for ease of testing. See the method itself for detailed comments on what
+   * mutations are performed.
+   *
+   * @return MutateRequestHeadersResult containing the final trusted remote address if detected.
+   *         This depends on various settings and the existence of the x-forwarded-for header.
+   *         Note that an extension might also be used. If detection fails, the result may contain
+   *         options for rejecting the request.
+   */
+  static MutateRequestHeadersResult mutateRequestHeaders(RequestHeaderMap& request_headers,
+                                                         Network::Connection& connection,
+                                                         ConnectionManagerConfig& config,
+                                                         const Router::Config& route_config,
+                                                         const LocalInfo::LocalInfo& local_info);
+  /**
+   * Mutates response headers in various ways. This functionality is broken out because of its
    * complexity for ease of testing. See the method itself for detailed comments on what
    * mutations are performed.
    *
    * Note this function may be called twice on the response path if there are
    * 100-Continue headers.
    *
-   * @return the final trusted remote address. This depends on various settings and the
-   *         existence of the x-forwarded-for header. Again see the method for more details.
+   * @param response_headers the headers to mutate.
+   * @param request_headers the request headers.
+   * @param the configuration for the HCM, which affects request ID headers.
+   * @param via the via header to append, if any.
+   * @param clear_hop_by_hop_headers true if hop by hop headers should be
+   *        cleared. This should only ever be false for envoy-mobile.
    */
-  static Network::Address::InstanceConstSharedPtr
-  mutateRequestHeaders(RequestHeaderMap& request_headers, Network::Connection& connection,
-                       ConnectionManagerConfig& config, const Router::Config& route_config,
-                       const LocalInfo::LocalInfo& local_info);
-
   static void mutateResponseHeaders(ResponseHeaderMap& response_headers,
                                     const RequestHeaderMap* request_headers,
-                                    ConnectionManagerConfig& config, const std::string& via);
+                                    ConnectionManagerConfig& config, const std::string& via,
+                                    bool clear_hop_by_hop_headers = true);
 
   enum class NormalizePathAction {
     Continue = 0,
@@ -95,6 +119,8 @@ private:
   static void mutateXfccRequestHeader(RequestHeaderMap& request_headers,
                                       Network::Connection& connection,
                                       ConnectionManagerConfig& config);
+  static void cleanInternalHeaders(RequestHeaderMap& request_headers, bool edge_request,
+                                   const std::list<Http::LowerCaseString>& internal_only_headers);
 };
 
 } // namespace Http

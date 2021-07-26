@@ -1,4 +1,4 @@
-#include "extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
 
 #include <array>
 #include <chrono>
@@ -6,10 +6,9 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-
-#include "extensions/filters/http/cache/cache_custom_headers.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/extensions/filters/http/cache/cache_custom_headers.h"
 
 #include "absl/algorithm/container.h"
 #include "absl/strings/ascii.h"

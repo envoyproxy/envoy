@@ -1,18 +1,18 @@
-#include "common/config/subscription_factory_impl.h"
+#include "source/common/config/subscription_factory_impl.h"
 
 #include "envoy/config/core/v3/config_source.pb.h"
 
-#include "common/config/filesystem_subscription_impl.h"
-#include "common/config/grpc_mux_impl.h"
-#include "common/config/grpc_subscription_impl.h"
-#include "common/config/http_subscription_impl.h"
-#include "common/config/new_grpc_mux_impl.h"
-#include "common/config/type_to_endpoint.h"
-#include "common/config/utility.h"
-#include "common/config/xds_resource.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/filesystem_subscription_impl.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/config/grpc_subscription_impl.h"
+#include "source/common/config/http_subscription_impl.h"
+#include "source/common/config/new_grpc_mux_impl.h"
+#include "source/common/config/type_to_endpoint.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/xds_resource.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {
@@ -29,7 +29,6 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     Stats::Scope& scope, SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
     const SubscriptionOptions& options) {
   Config::Utility::checkLocalInfo(type_url, local_info_);
-  std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
 
   switch (config.config_source_specifier_case()) {
@@ -63,7 +62,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               local_info_,
               Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                      api_config_source, scope, true)
-                  ->create(),
+                  ->createUncachedRawAsyncClient(),
               dispatcher_, sotwGrpcMethod(type_url, transport_api_version), transport_api_version,
               api_.randomGenerator(), scope, Utility::parseRateLimitSettings(api_config_source),
               api_config_source.set_node_on_first_message_only()),
@@ -75,7 +74,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           std::make_shared<Config::NewGrpcMuxImpl>(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                              api_config_source, scope, true)
-                  ->create(),
+                  ->createUncachedRawAsyncClient(),
               dispatcher_, deltaGrpcMethod(type_url, transport_api_version), transport_api_version,
               api_.randomGenerator(), scope, Utility::parseRateLimitSettings(api_config_source),
               local_info_),
@@ -103,7 +102,6 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view resource_type,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoder& resource_decoder) {
-  std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
 
   switch (collection_locator.scheme()) {
@@ -135,7 +133,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
           std::make_shared<Config::NewGrpcMuxImpl>(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                              api_config_source, scope, true)
-                  ->create(),
+                  ->createUncachedRawAsyncClient(),
               dispatcher_, deltaGrpcMethod(type_url, envoy::config::core::v3::ApiVersion::V3),
               envoy::config::core::v3::ApiVersion::V3, api_.randomGenerator(), scope,
               Utility::parseRateLimitSettings(api_config_source), local_info_),

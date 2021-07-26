@@ -6,8 +6,8 @@
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/dump_state_utils.h"
-#include "common/common/linked_object.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/linked_object.h"
 
 #include "absl/strings/string_view.h"
 
@@ -34,7 +34,8 @@ public:
                uint32_t concurrent_stream_limit);
   ~ActiveClient() override;
 
-  void releaseResources();
+  virtual void releaseResources() { releaseResourcesBase(); }
+  void releaseResourcesBase();
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -139,7 +140,7 @@ public:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state);
   virtual ~ConnPoolImplBase();
 
@@ -215,7 +216,7 @@ public:
   Event::Dispatcher& dispatcher() { return dispatcher_; }
   Upstream::ResourcePriority priority() const { return priority_; }
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() { return socket_options_; }
-  const Network::TransportSocketOptionsSharedPtr& transportSocketOptions() {
+  const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() {
     return transport_socket_options_;
   }
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
@@ -248,6 +249,7 @@ protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
   enum class ConnectionResult {
+    FailedToCreateConnection,
     CreatedNewConnection,
     ShouldNotConnect,
     NoConnectionRateLimited,
@@ -295,7 +297,7 @@ protected:
 
   Event::Dispatcher& dispatcher_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
-  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 
   std::list<Instance::DrainedCb> drained_callbacks_;
 

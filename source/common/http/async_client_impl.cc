@@ -1,4 +1,4 @@
-#include "common/http/async_client_impl.h"
+#include "source/common/http/async_client_impl.h"
 
 #include <chrono>
 #include <map>
@@ -8,9 +8,9 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/grpc/common.h"
-#include "common/http/utility.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -19,7 +19,6 @@ const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
     AsyncStreamImpl::NullRateLimitPolicy::rate_limit_policy_entry_;
 const AsyncStreamImpl::NullHedgePolicy AsyncStreamImpl::RouteEntryImpl::hedge_policy_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::RouteEntryImpl::rate_limit_policy_;
-const AsyncStreamImpl::NullRetryPolicy AsyncStreamImpl::RouteEntryImpl::retry_policy_;
 const Router::InternalRedirectPolicyImpl AsyncStreamImpl::RouteEntryImpl::internal_redirect_policy_;
 const std::vector<Router::ShadowPolicyPtr> AsyncStreamImpl::RouteEntryImpl::shadow_policies_;
 const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
@@ -42,9 +41,10 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Random::RandomGenerator& random,
                                  Router::ShadowWriterPtr&& shadow_writer,
                                  Http::Context& http_context, Router::Context& router_context)
-    : cluster_(cluster), config_(http_context.asyncClientStatPrefix(), local_info, stats_store, cm,
-                                 runtime, random, std::move(shadow_writer), true, false, false,
-                                 false, {}, dispatcher.timeSource(), http_context, router_context),
+    : cluster_(cluster),
+      config_(http_context.asyncClientStatPrefix(), local_info, stats_store, cm, runtime, random,
+              std::move(shadow_writer), true, false, false, false, false, {},
+              dispatcher.timeSource(), http_context, router_context),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -85,7 +85,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
       tracing_config_(Tracing::EgressConfig::get()),
       route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), options.timeout,
-                                         options.hash_policy)),
+                                         options.hash_policy, options.retry_policy)),
       send_xff_(options.send_xff) {
 
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);

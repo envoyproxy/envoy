@@ -1,17 +1,16 @@
-#include "extensions/transport_sockets/alts/config.h"
+#include "source/extensions/transport_sockets/alts/config.h"
 
 #include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
 #include "envoy/extensions/transport_sockets/alts/v3/alts.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
-#include "common/common/assert.h"
-#include "common/grpc/google_grpc_context.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/transport_sockets/alts/grpc_tsi.h"
-#include "extensions/transport_sockets/alts/tsi_socket.h"
+#include "source/common/common/assert.h"
+#include "source/common/grpc/google_grpc_context.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/transport_sockets/alts/grpc_tsi.h"
+#include "source/extensions/transport_sockets/alts/tsi_socket.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"
@@ -39,13 +38,14 @@ void grpcAltsSetRpcProtocolVersions(grpc_gcp_rpc_protocol_versions* rpc_versions
 // Returns true if the peer's service account is found in peers, otherwise
 // returns false and fills out err with an error message.
 bool doValidate(const tsi_peer& peer, const absl::node_hash_set<std::string>& peers,
-                std::string& err) {
+                TsiInfo& tsi_info, std::string& err) {
   for (size_t i = 0; i < peer.property_count; ++i) {
     const std::string name = std::string(peer.properties[i].name);
     const std::string value =
         std::string(peer.properties[i].value.data, peer.properties[i].value.length);
     if (name.compare(TSI_ALTS_SERVICE_ACCOUNT_PEER_PROPERTY) == 0 &&
         peers.find(value) != peers.end()) {
+      tsi_info.name_ = value;
       return true;
     }
   }
@@ -63,8 +63,8 @@ createHandshakeValidator(const envoy::extensions::transport_sockets::alts::v3::A
   HandshakeValidator validator;
   // Skip validation if peers is empty.
   if (!peers.empty()) {
-    validator = [peers](const tsi_peer& peer, std::string& err) {
-      return doValidate(peer, peers, err);
+    validator = [peers](const tsi_peer& peer, TsiInfo& tsi_info, std::string& err) {
+      return doValidate(peer, peers, tsi_info, err);
     };
   }
   return validator;

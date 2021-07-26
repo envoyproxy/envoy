@@ -6,13 +6,12 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
-
-#include "server/config_validation/server.h"
-#include "server/configuration_impl.h"
-#include "server/options_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/server/config_validation/server.h"
+#include "source/server/configuration_impl.h"
+#include "source/server/options_impl.h"
 
 #include "test/integration/server.h"
 #include "test/mocks/server/instance.h"
@@ -100,7 +99,7 @@ public:
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(
         bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
-    Server::Configuration::InitialImpl initial_config(bootstrap, options, server_);
+    Server::Configuration::InitialImpl initial_config(bootstrap, options);
     Server::Configuration::MainImpl main_config;
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
@@ -108,7 +107,7 @@ public:
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
         server_.secretManager(), server_.messageValidationContext(), *api_, server_.httpContext(),
         server_.grpcContext(), server_.routerContext(), server_.accessLogManager(),
-        server_.singletonManager(), server_.options());
+        server_.singletonManager(), server_.options(), server_.quic_stat_names_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -161,8 +160,8 @@ public:
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Server::MockListenerComponentFactory> component_factory_;
   NiceMock<Server::MockWorkerFactory> worker_factory_;
-  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_,
-                                                false};
+  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_, false,
+                                                server_.quic_stat_names_};
   Random::RandomGeneratorImpl random_;
   std::shared_ptr<Runtime::MockSnapshot> snapshot_{
       std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
@@ -214,7 +213,7 @@ uint32_t run(const std::string& directory) {
     ENVOY_LOG_MISC(info, "testing {}.\n", filename);
     if (std::find_if(unsuported_win32_configs.begin(), unsuported_win32_configs.end(),
                      [filename](const absl::string_view& s) {
-                       return filename.find(s) != std::string::npos;
+                       return filename.find(std::string(s)) != std::string::npos;
                      }) == unsuported_win32_configs.end()) {
       OptionsImpl options(
           Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));

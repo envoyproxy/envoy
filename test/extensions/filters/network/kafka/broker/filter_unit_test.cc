@@ -1,7 +1,7 @@
 #include "envoy/event/timer.h"
 
-#include "extensions/filters/network/kafka/broker/filter.h"
-#include "extensions/filters/network/kafka/external/requests.h"
+#include "source/extensions/filters/network/kafka/broker/filter.h"
+#include "source/extensions/filters/network/kafka/external/requests.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"

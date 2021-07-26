@@ -36,7 +36,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 46]
+// [#next-free-field: 49]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -376,6 +376,11 @@ message HttpConnectionManager {
   ServerHeaderTransformation server_header_transformation = 34
       [(validate.rules).enum = {defined_only: true}];
 
+  // Allows for explicit transformation of the :scheme header on the request path.
+  // If not set, Envoy's default :ref:`scheme  <config_http_conn_man_headers_scheme>`
+  // handling applies.
+  config.core.v3.SchemeHeaderTransformation scheme_header_transformation = 48;
+
   // The maximum request headers size for incoming connections.
   // If unconfigured, the default max request headers allowed is 60 KiB.
   // Requests that exceed this limit will receive a 431 response.
@@ -501,7 +506,37 @@ message HttpConnectionManager {
   // determining the origin client's IP address. The default is zero if this option
   // is not specified. See the documentation for
   // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
-  uint32 xff_num_trusted_hops = 19;
+  //
+  // .. note::
+  //    This field is deprecated and instead :ref:`original_ip_detection_extensions
+  //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
+  //    should be used to configure the :ref:`xff extension <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
+  //    to configure IP detection using the :ref:`config_http_conn_man_headers_x-forwarded-for` header. To replace
+  //    this field use a config like the following:
+  //
+  // .. code-block:: yaml
+  //
+  //    original_ip_detection_extensions:
+  //    - name: envoy.http.original_ip_detection.xff
+  //      typed_config:
+  //        "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.xff.v3.XffConfig
+  //        xff_num_trusted_hops: 1
+  //
+  uint32 xff_num_trusted_hops = 19
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // The configuration for the original IP detection extensions.
+  //
+  // When configured the extensions will be called along with the request headers
+  // and information about the downstream connection, such as the directly connected address.
+  // Each extension will then use these parameters to decide the request's effective remote address.
+  // If an extension fails to detect the original IP address and isn't configured to reject
+  // the request, the HCM will try the remaining extensions until one succeeds or rejects
+  // the request. If the request isn't rejected nor any extension succeeds, the HCM will
+  // fallback to using the remote address.
+  //
+  // [#extension-category: envoy.http.original_ip_detection]
+  repeated config.core.v3.TypedExtensionConfig original_ip_detection_extensions = 46;
 
   // Configures what network addresses are considered internal for stats and header sanitation
   // purposes. If unspecified, only RFC1918 IP addresses will be considered internal.
@@ -678,6 +713,16 @@ message HttpConnectionManager {
   // <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.PathNormalizationOptions>`
   // for details.
   PathNormalizationOptions path_normalization_options = 43;
+
+  // Determines if trailing dot of the host should be removed from host/authority header before any
+  // processing of request by HTTP filters or routing.
+  // This affects the upstream host header.
+  // Without setting this option, incoming requests with host `example.com.` will not match against
+  // route with :ref:`domains<envoy_v3_api_field_config.route.v3.VirtualHost.domains>` match set to `example.com`. Defaults to `false`.
+  // When the incoming request contains a host/authority header that includes a port number,
+  // setting this option will strip a trailing dot, if present, from the host section,
+  // leaving the port as is (e.g. host value `example.com.:443` will be updated to `example.com:443`).
+  bool strip_trailing_host_dot = 47;
 
   google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11 [
     deprecated = true,
@@ -962,7 +1007,7 @@ message HttpFilter {
   // If true, clients that do not support this filter may ignore the
   // filter but otherwise accept the config.
   // Otherwise, clients that do not support this filter must reject the config.
-  // [#not-implemented-hide:]
+  // This is also same with typed per filter config.
   bool is_optional = 6;
 }
 
@@ -972,4 +1017,13 @@ message RequestIDExtension {
 
   // Request ID extension specific configuration.
   google.protobuf.Any typed_config = 1;
+}
+
+// [#protodoc-title: Envoy Mobile HTTP connection manager]
+// HTTP connection manager for use in Envoy mobile.
+// [#extension: envoy.filters.network.envoy_mobile_http_connection_manager]
+message EnvoyMobileHttpConnectionManager {
+  // The configuration for the underlying HttpConnectionManager which will be
+  // instantiated for Envoy mobile.
+  HttpConnectionManager config = 1;
 }

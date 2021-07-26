@@ -2,7 +2,7 @@
 #include "envoy/config/cluster/v4alpha/cluster.pb.validate.h"
 #include "envoy/protobuf/message_validator.h"
 
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 void foo(Envoy::ProtobufMessage::ValidationVisitor& validator) {
   envoy::config::cluster::v4alpha::Cluster msg;

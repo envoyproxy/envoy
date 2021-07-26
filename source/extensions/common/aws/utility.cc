@@ -1,7 +1,7 @@
-#include "extensions/common/aws/utility.h"
+#include "source/extensions/common/aws/utility.h"
 
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
 
 #include "absl/strings/str_join.h"
 #include "curl/curl.h"

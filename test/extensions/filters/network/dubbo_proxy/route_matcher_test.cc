@@ -3,10 +3,9 @@
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.validate.h"
 
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
-#include "extensions/filters/network/dubbo_proxy/router/route_matcher.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/route_matcher.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -680,9 +679,11 @@ routes:
           exact: "add"
       headers:
       - name: custom
-        exact_match: "123"
+        string_match:
+          exact: "123"
       - name: custom1
-        exact_match: "123"
+        string_match:
+          exact: "123"
         invert_match: true
     route:
         cluster: user_service_dubbo_server

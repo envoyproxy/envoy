@@ -1,4 +1,4 @@
-#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
+#include "source/extensions/filters/common/ratelimit/ratelimit_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -9,9 +9,9 @@
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,10 +19,10 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
+GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
                                envoy::config::core::v3::ApiVersion transport_api_version)
-    : async_client_(std::move(async_client)), timeout_(timeout),
+    : async_client_(async_client), timeout_(timeout),
       service_method_(
           Grpc::VersionedMethods("envoy.service.ratelimit.v3.RateLimitService.ShouldRateLimit",
                                  "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit")
@@ -128,11 +128,10 @@ ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
                           envoy::config::core::v3::ApiVersion transport_api_version) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
-  const auto async_client_factory =
-      context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-          grpc_service, context.scope(), true);
   return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(
-      async_client_factory->create(), timeout, transport_api_version);
+      context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+          grpc_service, context.scope(), true, Grpc::CacheOption::CacheWhenRuntimeEnabled),
+      timeout, transport_api_version);
 }
 
 } // namespace RateLimit

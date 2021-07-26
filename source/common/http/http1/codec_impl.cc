@@ -1,4 +1,4 @@
-#include "common/http/http1/codec_impl.h"
+#include "source/common/http/http1/codec_impl.h"
 
 #include <memory>
 #include <string>
@@ -9,20 +9,20 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
-#include "common/common/cleanup.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/scope_tracker.h"
-#include "common/common/statusor.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/http/exception.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/http1/header_formatter.h"
-#include "common/http/http1/legacy_parser_impl.h"
-#include "common/http/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/common/statusor.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/http1/header_formatter.h"
+#include "source/common/http/http1/legacy_parser_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/ascii.h"
@@ -176,6 +176,10 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
   } else {
     if (status && *status == 100) {
       // Make sure we don't serialize chunk information with 100-Continue headers.
+      chunk_encoding_ = false;
+    } else if (status && *status == 304 && connection_.noChunkedEncodingHeaderFor304()) {
+      // For 304 response, since it should never have a body, we should not need to chunk_encode at
+      // all.
       chunk_encoding_ = false;
     } else if (end_stream && !is_response_to_head_request_) {
       // If this is a headers-only stream, append an explicit "Content-Length: 0" unless it's a
@@ -402,7 +406,7 @@ static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
-  RETURN_IF_ERROR(HeaderUtility::checkRequiredHeaders(headers));
+  RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
 
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
@@ -463,10 +467,12 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           "envoy.reloadable_features.require_strict_1xx_and_204_response_headers")),
       send_strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.send_strict_1xx_and_204_response_headers")),
-      dispatching_(false), output_buffer_(connection.dispatcher().getWatermarkFactory().create(
-                               [&]() -> void { this->onBelowLowWatermark(); },
-                               [&]() -> void { this->onAboveHighWatermark(); },
-                               []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
+      dispatching_(false), no_chunked_encoding_header_for_304_(Runtime::runtimeFeatureEnabled(
+                               "envoy.reloadable_features.no_chunked_encoding_header_for_304")),
+      output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
+          [&]() -> void { this->onBelowLowWatermark(); },
+          [&]() -> void { this->onAboveHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   output_buffer_->setWatermarks(connection.bufferLimit());
   parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
@@ -858,7 +864,7 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
      << DUMP_MEMBER(handling_upgrade_) << DUMP_MEMBER(deferred_end_stream_headers_)
      << DUMP_MEMBER(require_strict_1xx_and_204_headers_)
      << DUMP_MEMBER(send_strict_1xx_and_204_headers_) << DUMP_MEMBER(processing_trailers_)
-     << DUMP_MEMBER(buffered_body_.length());
+     << DUMP_MEMBER(no_chunked_encoding_header_for_304_) << DUMP_MEMBER(buffered_body_.length());
 
   // Dump header parsing state, and any progress on headers.
   os << DUMP_MEMBER(header_parsing_state_);
@@ -893,11 +899,8 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
 
 void ServerConnectionImpl::dumpAdditionalState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
-  os << DUMP_MEMBER_AS(active_request_.request_url_,
-                       active_request_.has_value() &&
-                               !active_request_.value().request_url_.getStringView().empty()
-                           ? active_request_.value().request_url_.getStringView()
-                           : "null");
+
+  DUMP_DETAILS(active_request_);
   os << '\n';
 
   // Dump header map, it may be null if it was moved to the request, and
@@ -1176,17 +1179,8 @@ Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
 
   active_request_.value().response_encoder_.setDetails(details);
   if (!active_request_.value().response_encoder_.startedResponse()) {
-    // Note that the correctness of is_grpc_request and is_head_request is best-effort.
-    // If headers have not been fully parsed they may not be inferred correctly.
-    bool is_grpc_request = false;
-    if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_) &&
-        absl::get<RequestHeaderMapPtr>(headers_or_trailers_) != nullptr) {
-      is_grpc_request =
-          Grpc::Common::isGrpcRequestHeaders(*absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
-    }
-    active_request_->request_decoder_->sendLocalReply(is_grpc_request, error_code_,
-                                                      CodeUtility::toString(error_code_), nullptr,
-                                                      absl::nullopt, details);
+    active_request_->request_decoder_->sendLocalReply(
+        error_code_, CodeUtility::toString(error_code_), nullptr, absl::nullopt, details);
   }
   return okStatus();
 }
@@ -1229,6 +1223,13 @@ Status ServerConnectionImpl::checkHeaderNameForUnderscores() {
     }
   }
   return okStatus();
+}
+
+void ServerConnectionImpl::ActiveRequest::dumpState(std::ostream& os, int indent_level) const {
+  (void)indent_level;
+  os << DUMP_MEMBER_AS(
+      request_url_, !request_url_.getStringView().empty() ? request_url_.getStringView() : "null");
+  os << DUMP_MEMBER(response_encoder_.local_end_stream_);
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,

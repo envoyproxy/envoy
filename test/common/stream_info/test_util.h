@@ -3,12 +3,11 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/common/assert.h"
-#include "common/common/random_generator.h"
-#include "common/network/socket_impl.h"
-#include "common/stream_info/filter_state_impl.h"
-
-#include "extensions/request_id/uuid/config.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/extensions/request_id/uuid/config.h"
 
 #include "test/test_common/simulated_time_system.h"
 
@@ -179,12 +178,6 @@ public:
     upstream_filter_state_ = filter_state;
   }
 
-  void setRequestedServerName(const absl::string_view requested_server_name) override {
-    requested_server_name_ = std::string(requested_server_name);
-  }
-
-  const std::string& requestedServerName() const override { return requested_server_name_; }
-
   void setUpstreamTransportFailureReason(absl::string_view failure_reason) override {
     upstream_transport_failure_reason_ = std::string(failure_reason);
   }
@@ -220,12 +213,8 @@ public:
     return upstream_cluster_info_;
   }
 
-  void setConnectionID(uint64_t id) override { connection_id_ = id; }
-
-  absl::optional<uint64_t> connectionID() const override { return connection_id_; }
-
   void setFilterChainName(absl::string_view filter_chain_name) override {
-    filter_chain_name_ = filter_chain_name;
+    filter_chain_name_ = std::string(filter_chain_name);
   }
 
   const std::string& filterChainName() const override { return filter_chain_name_; }

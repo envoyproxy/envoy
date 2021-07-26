@@ -1,12 +1,11 @@
-#include "extensions/filters/http/jwt_authn/filter_factory.h"
+#include "source/extensions/filters/http/jwt_authn/filter_factory.h"
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/datasource.h"
-
-#include "extensions/filters/http/jwt_authn/filter.h"
+#include "source/common/config/datasource.h"
+#include "source/extensions/filters/http/jwt_authn/filter.h"
 
 #include "jwt_verify_lib/jwks.h"
 

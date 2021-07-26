@@ -1,4 +1,4 @@
-#include "common/tcp_proxy/tcp_proxy.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
 
 #include <cstdint>
 #include <memory>
@@ -13,22 +13,22 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/config/well_known_names.h"
-#include "common/network/application_protocol.h"
-#include "common/network/proxy_protocol_filter_state.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/network/upstream_server_name.h"
-#include "common/network/upstream_socket_options_filter_state.h"
-#include "common/router/metadatamatchcriteria_impl.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/network/application_protocol.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/upstream_server_name.h"
+#include "source/common/network/upstream_socket_options_filter_state.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -655,9 +655,9 @@ void Filter::onUpstreamConnection() {
   read_callbacks_->upstreamHost()->outlierDetector().putResult(
       Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
 
-  getStreamInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
   ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
-                 read_callbacks_->connection(), getStreamInfo().requestedServerName());
+                 read_callbacks_->connection(),
+                 getStreamInfo().downstreamAddressProvider().requestedServerName());
 
   if (config_->idleTimeout()) {
     // The idle_timer_ can be moved to a Drainer, so related callbacks call into

@@ -1,4 +1,4 @@
-#include "common/upstream/upstream_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -28,30 +28,28 @@
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/http/http1/codec_stats.h"
-#include "common/http/http2/codec_stats.h"
-#include "common/http/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/socket_option_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/router/config_utility.h"
-#include "common/runtime/runtime_features.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/upstream/eds.h"
-#include "common/upstream/health_checker_impl.h"
-#include "common/upstream/logical_dns_cluster.h"
-#include "common/upstream/original_dst_cluster.h"
-
-#include "server/transport_socket_config_impl.h"
-
-#include "extensions/filters/network/common/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/http1/codec_stats.h"
+#include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/config_utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/upstream/eds.h"
+#include "source/common/upstream/health_checker_impl.h"
+#include "source/common/upstream/logical_dns_cluster.h"
+#include "source/common/upstream/original_dst_cluster.h"
+#include "source/extensions/filters/network/common/utility.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_cat.h"
@@ -160,12 +158,6 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
 absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtocolOptions(
     const envoy::config::cluster::v3::Cluster& config,
     Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
-  if (!config.typed_extension_protocol_options().empty() &&
-      !config.hidden_envoy_deprecated_extension_protocol_options().empty()) {
-    throw EnvoyException("Only one of typed_extension_protocol_options or "
-                         "extension_protocol_options can be specified");
-  }
-
   absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
 
   for (const auto& it : config.typed_extension_protocol_options()) {
@@ -176,19 +168,6 @@ absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExten
 
     auto object = createProtocolOptionsConfig(
         name, it.second, ProtobufWkt::Struct::default_instance(), factory_context);
-    if (object != nullptr) {
-      options[name] = std::move(object);
-    }
-  }
-
-  for (const auto& it : config.hidden_envoy_deprecated_extension_protocol_options()) {
-    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
-    // We only handle deprecated network filter names here because no existing HTTP filter has
-    // protocol options.
-    auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
-
-    auto object = createProtocolOptionsConfig(name, ProtobufWkt::Any::default_instance(), it.second,
-                                              factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
@@ -282,7 +261,7 @@ Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFact
 
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
   return {createConnection(dispatcher, cluster(), address(), transportSocketFactory(), options,
                            transport_socket_options),
           shared_from_this()};
@@ -308,7 +287,7 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_sta
 
 Host::CreateConnectionData HostImpl::createHealthCheckConnection(
     Event::Dispatcher& dispatcher,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     const envoy::config::core::v3::Metadata* metadata) const {
 
   Network::TransportSocketFactory& factory =
@@ -324,7 +303,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
                            const Network::Address::InstanceConstSharedPtr& address,
                            Network::TransportSocketFactory& socket_factory,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           Network::TransportSocketOptionsSharedPtr transport_socket_options) {
+                           Network::TransportSocketOptionsConstSharedPtr transport_socket_options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
   if (cluster.clusterSocketOptions() != nullptr) {
     if (options) {
@@ -734,14 +713,15 @@ ClusterInfoImpl::ClusterInfoImpl(
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
                             "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
                         factory_context.messageValidationVisitor())),
-      max_requests_per_connection_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
+      max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          http_protocol_options_->common_http_protocol_options_, max_requests_per_connection,
+          config.max_requests_per_connection().value())),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http_protocol_options_->common_http_protocol_options_, max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
       connect_timeout_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, connect_timeout, 5000))),
       per_upstream_preconnect_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.preconnect_policy(), per_upstream_preconnect_ratio, 1.0)),
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
@@ -788,6 +768,12 @@ ClusterInfoImpl::ClusterInfoImpl(
               : absl::nullopt),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
+  if (config.has_max_requests_per_connection() &&
+      http_protocol_options_->common_http_protocol_options_.has_max_requests_per_connection()) {
+    throw EnvoyException("Only one of max_requests_per_connection from Cluster or "
+                         "HttpProtocolOptions can be specified");
+  }
+
   switch (config.lb_policy()) {
   case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
     lb_type_ = LoadBalancerType::RoundRobin;
@@ -800,22 +786,6 @@ ClusterInfoImpl::ClusterInfoImpl(
     break;
   case envoy::config::cluster::v3::Cluster::RING_HASH:
     lb_type_ = LoadBalancerType::RingHash;
-    break;
-  case envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB:
-    if (config.type() != envoy::config::cluster::v3::Cluster::ORIGINAL_DST) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} is not valid for Cluster type {}. 'ORIGINAL_DST_LB' "
-                      "is allowed only with cluster type 'ORIGINAL_DST'",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy()),
-                      envoy::config::cluster::v3::Cluster::DiscoveryType_Name(config.type())));
-    }
-    if (config.has_lb_subset_config()) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-    }
-
-    lb_type_ = LoadBalancerType::ClusterProvided;
     break;
   case envoy::config::cluster::v3::Cluster::MAGLEV:
     lb_type_ = LoadBalancerType::Maglev;
@@ -896,13 +866,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   // if necessary.
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
-    if (config.has_hidden_envoy_deprecated_tls_context()) {
-      transport_socket.set_name("envoy.transport_sockets.tls");
-      transport_socket.mutable_typed_config()->PackFrom(
-          config.hidden_envoy_deprecated_tls_context());
-    } else {
-      transport_socket.set_name("envoy.transport_sockets.raw_buffer");
-    }
+    transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
@@ -946,6 +910,7 @@ ClusterImplBase::ClusterImplBase(
     Stats::ScopePtr&& stats_scope, bool added_via_api, TimeSource& time_source)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
+      wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)),
       time_source_(time_source),
       local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
                      cluster.name()),

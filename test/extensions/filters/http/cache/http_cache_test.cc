@@ -1,8 +1,8 @@
 #include <chrono>
 #include <string>
 
-#include "extensions/filters/http/cache/cache_headers_utils.h"
-#include "extensions/filters/http/cache/http_cache.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/http_cache.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/mocks/http/mocks.h"
@@ -43,10 +43,8 @@ public:
   LookupRequestTest() : vary_allow_list_(getConfig().allowed_vary_headers()) {}
 
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
-  Http::TestRequestHeaderMapImpl request_headers_{{":path", "/"},
-                                                  {":method", "GET"},
-                                                  {"x-forwarded-proto", "https"},
-                                                  {":authority", "example.com"}};
+  Http::TestRequestHeaderMapImpl request_headers_{
+      {":path", "/"}, {":method", "GET"}, {":scheme", "https"}, {":authority", "example.com"}};
 
   VaryHeader vary_allow_list_;
 

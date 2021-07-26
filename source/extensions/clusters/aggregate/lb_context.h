@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -62,7 +62,7 @@ public:
   Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
     return context_->upstreamSocketOptions();
   }
-  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+  Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
     return context_->upstreamTransportSocketOptions();
   }
 

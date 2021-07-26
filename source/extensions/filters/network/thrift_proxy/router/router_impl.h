@@ -11,15 +11,14 @@
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/load_balancer.h"
 
-#include "common/common/logger.h"
-#include "common/http/header_utility.h"
-#include "common/upstream/load_balancer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/conn_manager.h"
-#include "extensions/filters/network/thrift_proxy/filters/filter.h"
-#include "extensions/filters/network/thrift_proxy/router/router.h"
-#include "extensions/filters/network/thrift_proxy/router/router_ratelimit_impl.h"
-#include "extensions/filters/network/thrift_proxy/thrift_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift_object.h"
 
 #include "absl/types/optional.h"
 
@@ -160,37 +159,15 @@ private:
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
 };
 
-#define ALL_THRIFT_ROUTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
-  COUNTER(route_missing)                                                                           \
-  COUNTER(unknown_cluster)                                                                         \
-  COUNTER(upstream_rq_maintenance_mode)                                                            \
-  COUNTER(no_healthy_upstream)
-
-struct RouterStats {
-  ALL_THRIFT_ROUTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
-};
-
 class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                public Upstream::LoadBalancerContextBase,
-               public ProtocolConverter,
+               public RequestOwner,
                public ThriftFilters::DecoderFilter,
                Logger::Loggable<Logger::Id::thrift> {
 public:
   Router(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
          Stats::Scope& scope)
-      : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)),
-        stat_name_set_(scope.symbolTable().makeSet("thrift_proxy")),
-        symbol_table_(scope.symbolTable()),
-        upstream_rq_call_(stat_name_set_->add("thrift.upstream_rq_call")),
-        upstream_rq_oneway_(stat_name_set_->add("thrift.upstream_rq_oneway")),
-        upstream_rq_invalid_type_(stat_name_set_->add("thrift.upstream_rq_invalid_type")),
-        upstream_resp_reply_(stat_name_set_->add("thrift.upstream_resp_reply")),
-        upstream_resp_reply_success_(stat_name_set_->add("thrift.upstream_resp_success")),
-        upstream_resp_reply_error_(stat_name_set_->add("thrift.upstream_resp_error")),
-        upstream_resp_exception_(stat_name_set_->add("thrift.upstream_resp_exception")),
-        upstream_resp_invalid_type_(stat_name_set_->add("thrift.upstream_resp_invalid_type")),
-        upstream_rq_time_(stat_name_set_->add("thrift.upstream_rq_time")),
-        passthrough_supported_(false) {}
+      : RequestOwner(cluster_manager, stat_prefix, scope), passthrough_supported_(false) {}
 
   ~Router() override = default;
 
@@ -199,7 +176,21 @@ public:
   void setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) override;
   bool passthroughSupported() const override { return passthrough_supported_; }
 
-  // ProtocolConverter
+  // RequestOwner
+  Tcp::ConnectionPool::UpstreamCallbacks& upstreamCallbacks() override { return *this; }
+  Buffer::OwnedImpl& buffer() override { return upstream_request_buffer_; }
+  Event::Dispatcher& dispatcher() override { return callbacks_->dispatcher(); }
+  void addSize(uint64_t size) override { request_size_ += size; }
+  void continueDecoding() override { callbacks_->continueDecoding(); }
+  void resetDownstreamConnection() override { callbacks_->resetDownstreamConnection(); }
+  void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) override {
+    callbacks_->sendLocalReply(response, end_stream);
+  }
+  void recordResponseDuration(uint64_t value, Stats::Histogram::Unit unit) override {
+    recordClusterResponseDuration(*cluster_, value, unit);
+  }
+
+  // RequestOwner::ProtocolConverter
   FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
   FilterStatus transportEnd() override;
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
@@ -208,10 +199,7 @@ public:
   // Upstream::LoadBalancerContext
   const Network::Connection* downstreamConnection() const override;
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    if (route_entry_) {
-      return route_entry_->metadataMatchCriteria();
-    }
-    return nullptr;
+    return route_entry_ ? route_entry_->metadataMatchCriteria() : nullptr;
   }
 
   // Tcp::ConnectionPool::UpstreamCallbacks
@@ -222,7 +210,7 @@ public:
 
 private:
   struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks {
-    UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
+    UpstreamRequest(RequestOwner& parent, Upstream::TcpPoolData& pool_data,
                     MessageMetadataSharedPtr& metadata, TransportType transport_type,
                     ProtocolType protocol_type);
     ~UpstreamRequest() override;
@@ -233,6 +221,7 @@ private:
 
     // Tcp::ConnectionPool::Callbacks
     void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                       absl::string_view transport_failure_reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
     void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                      Upstream::HostDescriptionConstSharedPtr host) override;
@@ -244,8 +233,8 @@ private:
     void onResetStream(ConnectionPool::PoolFailureReason reason);
     void chargeResponseTiming();
 
-    Router& parent_;
-    Tcp::ConnectionPool::Instance& conn_pool_;
+    RequestOwner& parent_;
+    Upstream::TcpPoolData& conn_pool_data_;
     MessageMetadataSharedPtr metadata_;
 
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
@@ -264,41 +253,7 @@ private:
     MonotonicTime downstream_request_complete_time_;
   };
 
-  // Stats
-  void incClusterScopeCounter(const Stats::StatNameVec& names) const {
-    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
-    cluster_->statsScope().counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
-  }
-
-  void recordClusterScopeHistogram(const Stats::StatNameVec& names, Stats::Histogram::Unit unit,
-                                   uint64_t count) const {
-    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
-    cluster_->statsScope()
-        .histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit)
-        .recordValue(count);
-  }
-
-  void convertMessageBegin(MessageMetadataSharedPtr metadata);
   void cleanup();
-  RouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return RouterStats{ALL_THRIFT_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
-                                               POOL_GAUGE_PREFIX(scope, prefix),
-                                               POOL_HISTOGRAM_PREFIX(scope, prefix))};
-  }
-
-  Upstream::ClusterManager& cluster_manager_;
-  RouterStats stats_;
-  Stats::StatNameSetPtr stat_name_set_;
-  Stats::SymbolTable& symbol_table_;
-  const Stats::StatName upstream_rq_call_;
-  const Stats::StatName upstream_rq_oneway_;
-  const Stats::StatName upstream_rq_invalid_type_;
-  const Stats::StatName upstream_resp_reply_;
-  const Stats::StatName upstream_resp_reply_success_;
-  const Stats::StatName upstream_resp_reply_error_;
-  const Stats::StatName upstream_resp_exception_;
-  const Stats::StatName upstream_resp_invalid_type_;
-  const Stats::StatName upstream_rq_time_;
 
   ThriftFilters::DecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_{};
@@ -309,6 +264,8 @@ private:
   Buffer::OwnedImpl upstream_request_buffer_;
 
   bool passthrough_supported_ : 1;
+  uint64_t request_size_{};
+  uint64_t response_size_{};
 };
 
 } // namespace Router

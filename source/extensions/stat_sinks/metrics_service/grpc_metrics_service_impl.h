@@ -12,8 +12,8 @@
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/grpc/typed_async_client.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/grpc/typed_async_client.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,7 +29,8 @@ using MetricsPtr =
 template <class RequestProto, class ResponseProto>
 class GrpcMetricsStreamer : public Grpc::AsyncStreamCallbacks<ResponseProto> {
 public:
-  explicit GrpcMetricsStreamer(Grpc::AsyncClientFactory& factory) : client_(factory.create()) {}
+  explicit GrpcMetricsStreamer(const Grpc::RawAsyncClientSharedPtr& raw_async_client)
+      : client_(raw_async_client) {}
   ~GrpcMetricsStreamer() override = default;
 
   /**
@@ -62,7 +63,7 @@ class GrpcMetricsStreamerImpl
       public GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
                                  envoy::service::metrics::v3::StreamMetricsResponse> {
 public:
-  GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
+  GrpcMetricsStreamerImpl(Grpc::RawAsyncClientSharedPtr raw_async_client,
                           const LocalInfo::LocalInfo& local_info,
                           envoy::config::core::v3::ApiVersion transport_api_version);
 
@@ -82,8 +83,12 @@ using GrpcMetricsStreamerImplPtr = std::unique_ptr<GrpcMetricsStreamerImpl>;
 
 class MetricsFlusher {
 public:
-  MetricsFlusher(bool report_counters_as_deltas, bool emit_labels)
-      : report_counters_as_deltas_(report_counters_as_deltas), emit_labels_(emit_labels) {}
+  MetricsFlusher(
+      bool report_counters_as_deltas, bool emit_labels,
+      std::function<bool(const Stats::Metric&)> predicate =
+          [](const auto& metric) { return metric.used(); })
+      : report_counters_as_deltas_(report_counters_as_deltas), emit_labels_(emit_labels),
+        predicate_(predicate) {}
 
   MetricsPtr flush(Stats::MetricSnapshot& snapshot) const;
 
@@ -105,6 +110,7 @@ private:
 
   const bool report_counters_as_deltas_;
   const bool emit_labels_;
+  const std::function<bool(const Stats::Metric&)> predicate_;
 };
 
 /**
@@ -112,13 +118,18 @@ private:
  */
 template <class RequestProto, class ResponseProto> class MetricsServiceSink : public Stats::Sink {
 public:
-  // MetricsService::Sink
   MetricsServiceSink(
       const GrpcMetricsStreamerSharedPtr<RequestProto, ResponseProto>& grpc_metrics_streamer,
       bool report_counters_as_deltas, bool emit_labels)
-      : flusher_(report_counters_as_deltas, emit_labels),
-        grpc_metrics_streamer_(grpc_metrics_streamer) {}
+      : MetricsServiceSink(grpc_metrics_streamer,
+                           MetricsFlusher(report_counters_as_deltas, emit_labels)) {}
 
+  MetricsServiceSink(
+      const GrpcMetricsStreamerSharedPtr<RequestProto, ResponseProto>& grpc_metrics_streamer,
+      MetricsFlusher&& flusher)
+      : flusher_(std::move(flusher)), grpc_metrics_streamer_(std::move(grpc_metrics_streamer)) {}
+
+  // MetricsService::Sink
   void flush(Stats::MetricSnapshot& snapshot) override {
     grpc_metrics_streamer_->send(flusher_.flush(snapshot));
   }

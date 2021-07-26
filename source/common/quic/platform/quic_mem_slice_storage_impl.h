@@ -6,7 +6,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "quiche/quic/core/quic_buffer_allocator.h"
 #include "quiche/quic/platform/api/quic_iovec.h"
@@ -34,9 +34,11 @@ public:
   QuicMemSliceStorageImpl(QuicMemSliceStorageImpl&& other) = default;
   QuicMemSliceStorageImpl& operator=(QuicMemSliceStorageImpl&& other) = default;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   QuicMemSliceSpan ToSpan() { return QuicMemSliceSpan(QuicMemSliceSpanImpl(buffer_)); }
 
-  void Append(QuicMemSliceImpl mem_slice) { buffer_.move(mem_slice.single_slice_buffer()); }
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  void Append(QuicMemSliceImpl mem_slice) { buffer_.move(mem_slice.getSingleSliceBuffer()); }
 
 private:
   Envoy::Buffer::OwnedImpl buffer_;

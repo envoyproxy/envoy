@@ -1,4 +1,4 @@
-#include "common/router/router.h"
+#include "source/common/router/router.h"
 
 #include <chrono>
 #include <cstdint>
@@ -15,34 +15,32 @@
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/assert.h"
-#include "common/common/cleanup.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/scope_tracker.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/grpc/common.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/network/application_protocol.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/network/upstream_server_name.h"
-#include "common/network/upstream_socket_options_filter_state.h"
-#include "common/network/upstream_subject_alt_names.h"
-#include "common/router/config_impl.h"
-#include "common/router/debug_config.h"
-#include "common/router/retry_state_impl.h"
-#include "common/router/upstream_request.h"
-#include "common/runtime/runtime_features.h"
-#include "common/stream_info/uint32_accessor_impl.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/application_protocol.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/upstream_server_name.h"
+#include "source/common/network/upstream_socket_options_filter_state.h"
+#include "source/common/network/upstream_subject_alt_names.h"
+#include "source/common/router/config_impl.h"
+#include "source/common/router/debug_config.h"
+#include "source/common/router/retry_state_impl.h"
+#include "source/common/router/upstream_request.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -53,7 +51,7 @@ uint32_t getLength(const Buffer::Instance* instance) { return instance ? instanc
 
 bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
                   const Network::Connection& connection) {
-  if (downstream_headers.getForwardedProtoValue() == Http::Headers::get().SchemeValues.Http) {
+  if (Http::Utility::getScheme(downstream_headers) == Http::Headers::get().SchemeValues.Http) {
     return true;
   }
   if (!connection.ssl()) {
@@ -85,8 +83,12 @@ void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool down
     if (Http::HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
       return;
     }
-    if (Http::HeaderUtility::schemeIsValid(headers.getForwardedProtoValue())) {
-      headers.setScheme(headers.getForwardedProtoValue());
+    // After all the changes in https://github.com/envoyproxy/envoy/issues/14587
+    // this path should only occur if a buggy filter has removed the :scheme
+    // header. In that case best-effort set from X-Forwarded-Proto.
+    absl::string_view xfp = headers.getForwardedProtoValue();
+    if (Http::HeaderUtility::schemeIsValid(xfp)) {
+      headers.setScheme(xfp);
       return;
     }
   }
@@ -314,7 +316,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                            is_canary};
 
     Http::CodeStats& code_stats = httpContext().codeStats();
-    code_stats.chargeResponseStat(info);
+    code_stats.chargeResponseStat(info, exclude_http_code_stats_);
 
     if (alt_stat_prefix_ != nullptr) {
       Http::CodeStats::ResponseStatInfo alt_info{config_.scope_,
@@ -327,7 +329,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                                  config_.zone_name_,
                                                  upstream_zone,
                                                  is_canary};
-      code_stats.chargeResponseStat(alt_info);
+      code_stats.chargeResponseStat(alt_info, exclude_http_code_stats_);
     }
 
     if (dropped) {
@@ -362,6 +364,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   // TODO: Maybe add a filter API for this.
   grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
+  exclude_http_code_stats_ = grpc_request_ && config_.suppress_grpc_request_failure_code_stats_;
 
   // Only increment rq total stat if we actually decode headers here. This does not count requests
   // that get handled by earlier filters.
@@ -1144,6 +1147,8 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::ResponseFlag::UpstreamRemoteReset;
   case Http::StreamResetReason::ProtocolError:
     return StreamInfo::ResponseFlag::UpstreamProtocolError;
+  case Http::StreamResetReason::OverloadManager:
+    return StreamInfo::ResponseFlag::OverloadManager;
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -1269,9 +1274,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         pending_retries_++;
         upstream_request.upstreamHost()->stats().rq_error_.inc();
         Http::CodeStats& code_stats = httpContext().codeStats();
-        code_stats.chargeBasicResponseStat(cluster_->statsScope(),
-                                           config_.stats_.stat_names_.retry_,
-                                           static_cast<Http::Code>(response_code));
+        code_stats.chargeBasicResponseStat(
+            cluster_->statsScope(), config_.stats_.stat_names_.retry_,
+            static_cast<Http::Code>(response_code), exclude_http_code_stats_);
 
         if (!end_stream || !upstream_request.encodeComplete()) {
           upstream_request.resetStream();
@@ -1515,7 +1520,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   }
 
   const auto& policy = route_entry_->internalRedirectPolicy();
-  // Don't allow serving TLS responses over plaintext unless allowed by policy.
+  // Don't change the scheme from the original request
   const bool scheme_is_http = schemeIsHttp(downstream_headers, *callbacks_->connection());
   const bool target_is_http = absolute_url.scheme() == Http::Headers::get().SchemeValues.Http;
   if (!policy.isCrossSchemeRedirectAllowed() && scheme_is_http != target_is_http) {

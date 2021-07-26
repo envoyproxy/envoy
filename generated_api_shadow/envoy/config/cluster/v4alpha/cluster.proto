@@ -11,6 +11,7 @@ import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/core/v4alpha/health_check.proto";
 import "envoy/config/core/v4alpha/protocol.proto";
+import "envoy/config/core/v4alpha/resolver.proto";
 import "envoy/config/endpoint/v3/endpoint.proto";
 import "envoy/type/v3/percent.proto";
 
@@ -44,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 53]
+// [#next-free-field: 56]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.cluster.v3.Cluster";
 
@@ -417,8 +418,8 @@ message Cluster {
     // The table size for Maglev hashing. The Maglev aims for ‘minimal disruption’ rather than an absolute guarantee.
     // Minimal disruption means that when the set of upstreams changes, a connection will likely be sent to the same
     // upstream as it was before. Increasing the table size reduces the amount of disruption.
-    // The table size must be prime number. If it is not specified, the default is 65537.
-    google.protobuf.UInt64Value table_size = 1;
+    // The table size must be prime number limited to 5000011. If it is not specified, the default is 65537.
+    google.protobuf.UInt64Value table_size = 1 [(validate.rules).uint64 = {lte: 5000011}];
   }
 
   // Specific configuration for the
@@ -718,6 +719,7 @@ message Cluster {
   EdsClusterConfig eds_cluster_config = 3;
 
   // The timeout for new network connections to hosts in the cluster.
+  // If not set, a default value of 5s will be used.
   google.protobuf.Duration connect_timeout = 4 [(validate.rules).duration = {gt {}}];
 
   // Soft limit on size of the cluster’s connections read and write buffers. If
@@ -753,7 +755,11 @@ message Cluster {
   // is respected by both the HTTP/1.1 and HTTP/2 connection pool
   // implementations. If not specified, there is no limit. Setting this
   // parameter to 1 will effectively disable keep alive.
-  google.protobuf.UInt32Value max_requests_per_connection = 9;
+  //
+  // .. attention::
+  //   This field has been deprecated in favor of the :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>` field.
+  google.protobuf.UInt32Value hidden_envoy_deprecated_max_requests_per_connection = 9
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   CircuitBreakers circuit_breakers = 10;
@@ -866,14 +872,46 @@ message Cluster {
   // Setting this value causes failure if the
   // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
   // server startup. Apple's API only allows overriding DNS resolvers via system settings.
-  repeated core.v4alpha.Address dns_resolvers = 18;
+  // This field is deprecated in favor of *dns_resolution_config*
+  // which aggregates all of the DNS resolver configuration in a single message.
+  repeated core.v4alpha.Address hidden_envoy_deprecated_dns_resolvers = 18
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // [#next-major-version: Reconcile DNS options in a single message.]
   // Always use TCP queries instead of UDP queries for DNS lookups.
   // Setting this value causes failure if the
   // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
   // server startup. Apple' API only uses UDP for DNS resolution.
-  bool use_tcp_for_dns_lookups = 45;
+  // This field is deprecated in favor of *dns_resolution_config*
+  // which aggregates all of the DNS resolver configuration in a single message.
+  bool hidden_envoy_deprecated_use_tcp_for_dns_lookups = 45
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // DNS resolution configuration which includes the underlying dns resolver addresses and options.
+  // *dns_resolution_config* will be deprecated once
+  // :ref:'typed_dns_resolver_config <envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>'
+  // is fully supported.
+  core.v4alpha.DnsResolutionConfig dns_resolution_config = 53;
+
+  // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
+  // or any other DNS resolver types and the related parameters.
+  // For example, an object of :ref:`DnsResolutionConfig <envoy_v3_api_msg_config.core.v3.DnsResolutionConfig>`
+  // can be packed into this *typed_dns_resolver_config*. This configuration will replace the
+  // :ref:'dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>'
+  // configuration eventually.
+  // TODO(yanjunxiang): Investigate the deprecation plan for *dns_resolution_config*.
+  // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
+  // this configuration is optional.
+  // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
+  // When *typed_dns_resolver_config* is missing, the default behavior is in place.
+  // [#not-implemented-hide:]
+  core.v4alpha.TypedExtensionConfig typed_dns_resolver_config = 55;
+
+  // Optional configuration for having cluster readiness block on warm-up. Currently, only applicable for
+  // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
+  // or :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`.
+  // If true, cluster readiness blocks on warm-up. If false, the cluster will complete
+  // initialization whether or not warm-up has completed. Defaults to true.
+  google.protobuf.BoolValue wait_for_warm_on_init = 54;
 
   // If specified, outlier detection will be enabled for this upstream cluster.
   // Each of the configuration values can be overridden via
@@ -929,7 +967,7 @@ message Cluster {
   CommonLbConfig common_lb_config = 27;
 
   // Optional custom transport socket implementation to use for upstream connections.
-  // To setup TLS, set a transport socket with name `tls` and
+  // To setup TLS, set a transport socket with name `envoy.transport_sockets.tls` and
   // :ref:`UpstreamTlsContexts <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>` in the `typed_config`.
   // If no transport socket configuration is specified, new connections
   // will be set up with plaintext.

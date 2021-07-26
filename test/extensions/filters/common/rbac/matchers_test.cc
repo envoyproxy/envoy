@@ -4,10 +4,9 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/type/matcher/v3/metadata.pb.h"
 
-#include "common/network/utility.h"
-
-#include "extensions/filters/common/expr/evaluator.h"
-#include "extensions/filters/common/rbac/matchers.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
+#include "source/extensions/filters/common/rbac/matchers.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -147,7 +146,7 @@ TEST(NotMatcher, Principal) {
 TEST(HeaderMatcher, HeaderMatcher) {
   envoy::config::route::v3::HeaderMatcher config;
   config.set_name("foo");
-  config.set_exact_match("bar");
+  config.mutable_string_match()->set_exact("bar");
 
   Envoy::Http::TestRequestHeaderMapImpl headers;
   Envoy::Http::LowerCaseString key("foo");
@@ -316,7 +315,7 @@ TEST(AuthenticatedMatcher, AnySSLSubject) {
   envoy::config::rbac::v3::Principal::Authenticated auth;
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 
-  auth.mutable_principal_name()->set_hidden_envoy_deprecated_regex(".*");
+  auth.mutable_principal_name()->MergeFrom(TestUtility::createRegexMatcher(".*"));
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 }
 

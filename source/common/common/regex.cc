@@ -1,45 +1,19 @@
-#include "common/common/regex.h"
+#include "source/common/common/regex.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "re2/re2.h"
 
 namespace Envoy {
 namespace Regex {
 namespace {
-
-class CompiledStdMatcher : public CompiledMatcher {
-public:
-  CompiledStdMatcher(std::regex&& regex) : regex_(std::move(regex)) {}
-
-  // CompiledMatcher
-  bool match(absl::string_view value) const override {
-    try {
-      return std::regex_match(value.begin(), value.end(), regex_);
-    } catch (const std::regex_error& e) {
-      return false;
-    }
-  }
-
-  // CompiledMatcher
-  std::string replaceAll(absl::string_view value, absl::string_view substitution) const override {
-    try {
-      return std::regex_replace(std::string(value), regex_, std::string(substitution));
-    } catch (const std::regex_error& e) {
-      return std::string(value);
-    }
-  }
-
-private:
-  const std::regex regex_;
-};
 
 class CompiledGoogleReMatcher : public CompiledMatcher {
 public:
@@ -125,11 +99,6 @@ CompiledMatcherPtr Utility::parseRegex(const envoy::type::matcher::v3::RegexMatc
   // Google Re is the only currently supported engine.
   ASSERT(matcher.has_google_re2());
   return std::make_unique<CompiledGoogleReMatcher>(matcher);
-}
-
-CompiledMatcherPtr Utility::parseStdRegexAsCompiledMatcher(const std::string& regex,
-                                                           std::regex::flag_type flags) {
-  return std::make_unique<CompiledStdMatcher>(parseStdRegex(regex, flags));
 }
 
 std::regex Utility::parseStdRegex(const std::string& regex, std::regex::flag_type flags) {

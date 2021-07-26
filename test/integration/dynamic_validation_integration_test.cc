@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 
-#include "extensions/filters/network/common/factory_base.h"
+#include "source/extensions/filters/network/common/factory_base.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
@@ -62,10 +62,10 @@ class DynamicValidationIntegrationTest
       public HttpIntegrationTest {
 public:
   DynamicValidationIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, std::get<0>(GetParam())),
+      : HttpIntegrationTest(Http::CodecType::HTTP2, std::get<0>(GetParam())),
         reject_unknown_dynamic_fields_(std::get<1>(GetParam())),
         ignore_unknown_dynamic_fields_(std::get<2>(GetParam())) {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
   }
 
   void createEnvoy() override {
@@ -96,7 +96,7 @@ INSTANTIATE_TEST_SUITE_P(
 // Protocol options in CDS with unknown fields are rejected if and only if strict.
 TEST_P(DynamicValidationIntegrationTest, CdsProtocolOptionsRejected) {
   api_filesystem_config_ = {
-      "test/config/integration/server_xds.bootstrap.yaml",
+      "test/config/integration/server_xds.bootstrap.yml",
       "test/config/integration/server_xds.cds.with_unknown_field.yaml",
       "test/config/integration/server_xds.eds.yaml",
       "test/config/integration/server_xds.lds.yaml",
@@ -122,7 +122,7 @@ TEST_P(DynamicValidationIntegrationTest, CdsProtocolOptionsRejected) {
 TEST_P(DynamicValidationIntegrationTest, LdsFilterRejected) {
   allow_lds_rejection_ = true;
   api_filesystem_config_ = {
-      "test/config/integration/server_xds.bootstrap.yaml",
+      "test/config/integration/server_xds.bootstrap.yml",
       "test/config/integration/server_xds.cds.yaml",
       "test/config/integration/server_xds.eds.yaml",
       "test/config/integration/server_xds.lds.with_unknown_field.yaml",
@@ -153,7 +153,7 @@ TEST_P(DynamicValidationIntegrationTest, LdsFilterRejected) {
 TEST_P(DynamicValidationIntegrationTest, LdsFilterRejectedTypedStruct) {
   allow_lds_rejection_ = true;
   api_filesystem_config_ = {
-      "test/config/integration/server_xds.bootstrap.yaml",
+      "test/config/integration/server_xds.bootstrap.yml",
       "test/config/integration/server_xds.cds.yaml",
       "test/config/integration/server_xds.eds.yaml",
       "test/config/integration/server_xds.lds.with_unknown_field.typed_struct.yaml",
@@ -182,7 +182,7 @@ TEST_P(DynamicValidationIntegrationTest, LdsFilterRejectedTypedStruct) {
 // Unknown fields in RDS cause config load failure if and only if strict.
 TEST_P(DynamicValidationIntegrationTest, RdsFailedBySubscription) {
   api_filesystem_config_ = {
-      "test/config/integration/server_xds.bootstrap.yaml",
+      "test/config/integration/server_xds.bootstrap.yml",
       "test/config/integration/server_xds.cds.yaml",
       "test/config/integration/server_xds.eds.yaml",
       "test/config/integration/server_xds.lds.yaml",
@@ -210,7 +210,7 @@ TEST_P(DynamicValidationIntegrationTest, RdsFailedBySubscription) {
 // Unknown fields in EDS cause config load failure if and only if strict.
 TEST_P(DynamicValidationIntegrationTest, EdsFailedBySubscription) {
   api_filesystem_config_ = {
-      "test/config/integration/server_xds.bootstrap.yaml",
+      "test/config/integration/server_xds.bootstrap.yml",
       "test/config/integration/server_xds.cds.yaml",
       "test/config/integration/server_xds.eds.with_unknown_field.yaml",
       "test/config/integration/server_xds.lds.yaml",

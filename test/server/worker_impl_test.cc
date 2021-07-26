@@ -1,9 +1,8 @@
 #include "envoy/network/exception.h"
 
-#include "common/api/api_impl.h"
-#include "common/event/dispatcher_impl.h"
-
-#include "server/worker_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/server/worker_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/guard_dog.h"
@@ -12,6 +11,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -25,6 +25,8 @@ using testing::Throw;
 namespace Envoy {
 namespace Server {
 namespace {
+
+Event::PostCb emptyCallback = []() {};
 
 class WorkerImplTest : public testing::Test {
 public:
@@ -71,13 +73,10 @@ TEST_F(WorkerImplTest, BasicFlow) {
             EXPECT_EQ(config.listenerTag(), 1UL);
             EXPECT_NE(current_thread_id, std::this_thread::get_id());
           }));
-  worker_.addListener(absl::nullopt, listener, [&ci](bool success) -> void {
-    EXPECT_TRUE(success);
-    ci.setReady();
-  });
+  worker_.addListener(absl::nullopt, listener, [&ci]() -> void { ci.setReady(); });
 
   NiceMock<Stats::MockStore> store;
-  worker_.start(guard_dog_);
+  worker_.start(guard_dog_, emptyCallback);
   worker_.initializeStats(store);
   ci.waitReady();
 
@@ -90,10 +89,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
             EXPECT_EQ(config.listenerTag(), 2UL);
             EXPECT_NE(current_thread_id, std::this_thread::get_id());
           }));
-  worker_.addListener(absl::nullopt, listener2, [&ci](bool success) -> void {
-    EXPECT_TRUE(success);
-    ci.setReady();
-  });
+  worker_.addListener(absl::nullopt, listener2, [&ci]() -> void { ci.setReady(); });
   ci.waitReady();
 
   EXPECT_CALL(*handler_, stopListeners(2))
@@ -130,10 +126,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
             EXPECT_EQ(config.listenerTag(), 3UL);
             EXPECT_NE(current_thread_id, std::this_thread::get_id());
           }));
-  worker_.addListener(absl::nullopt, listener3, [&ci](bool success) -> void {
-    EXPECT_TRUE(success);
-    ci.setReady();
-  });
+  worker_.addListener(absl::nullopt, listener3, [&ci]() -> void { ci.setReady(); });
   ci.waitReady();
 
   EXPECT_CALL(*handler_, removeListeners(3))
@@ -147,16 +140,12 @@ TEST_F(WorkerImplTest, BasicFlow) {
   worker_.stop();
 }
 
-TEST_F(WorkerImplTest, ListenerException) {
-  InSequence s;
+TEST_F(WorkerImplTest, WorkerInvokesProvidedCallback) {
+  absl::Notification callback_ran;
+  auto cb = [&callback_ran]() { callback_ran.Notify(); };
+  worker_.start(guard_dog_, cb);
 
-  NiceMock<Network::MockListenerConfig> listener;
-  ON_CALL(listener, listenerTag()).WillByDefault(Return(1UL));
-  EXPECT_CALL(*handler_, addListener(_, _))
-      .WillOnce(Throw(Network::CreateListenerException("failed")));
-  worker_.addListener(absl::nullopt, listener, [](bool success) -> void { EXPECT_FALSE(success); });
-
-  worker_.start(guard_dog_);
+  callback_ran.WaitForNotification();
   worker_.stop();
 }
 

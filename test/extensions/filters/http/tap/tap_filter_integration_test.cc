@@ -19,10 +19,10 @@ public:
       // HTTP/1 on OSX. In this test we close the admin /tap stream when we don't want any
       // more data, and without immediate close detection we can't have a flake free test.
       // Thus, we use HTTP/2 for everything here.
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
 
     // Also use HTTP/2 for upstream so that we can fully test trailers.
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
   }
 
   void initializeFilter(const std::string& filter_config) {
@@ -239,11 +239,13 @@ tap_config:
         - http_request_headers_match:
             headers:
               - name: foo
-                exact_match: bar
+                string_match:
+                  exact: bar
         - http_response_headers_match:
             headers:
               - name: bar
-                exact_match: baz
+                string_match:
+                  exact: baz
   output_config:
     sinks:
       - streaming_admin: {}
@@ -305,11 +307,13 @@ tap_config:
         - http_request_headers_match:
             headers:
               - name: foo
-                exact_match: bar
+                string_match:
+                  exact: bar
         - http_response_headers_match:
             headers:
               - name: bar
-                exact_match: baz
+                string_match:
+                  exact: baz
   output_config:
     sinks:
       - streaming_admin: {}
@@ -349,11 +353,13 @@ tap_config:
         - http_request_trailers_match:
             headers:
               - name: foo_trailer
-                exact_match: bar
+                string_match:
+                  exact: bar
         - http_response_trailers_match:
             headers:
               - name: bar_trailer
-                exact_match: baz
+                string_match:
+                  exact: baz
   output_config:
     sinks:
       - streaming_admin: {}
@@ -398,11 +404,13 @@ tap_config:
         - http_request_trailers_match:
             headers:
               - name: foo_trailer
-                exact_match: bar
+                string_match:
+                  exact: bar
         - http_response_trailers_match:
             headers:
               - name: bar_trailer
-                exact_match: baz
+                string_match:
+                  exact: baz
   output_config:
     sinks:
       - streaming_admin: {}
@@ -535,7 +543,8 @@ typed_config:
         http_request_headers_match:
           headers:
             - name: foo
-              exact_match: bar
+              string_match:
+                exact: bar
       output_config:
         streaming: true
         sinks:
@@ -581,7 +590,8 @@ typed_config:
         http_response_headers_match:
           headers:
             - name: bar
-              exact_match: baz
+              string_match:
+                exact: baz
       output_config:
         streaming: true
         sinks:

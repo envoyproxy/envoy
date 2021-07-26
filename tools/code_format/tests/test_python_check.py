@@ -223,7 +223,7 @@ def test_python_on_check_run(patches, results):
     else:
         assert (
             list(m_succeed.call_args)
-            == [(checkname, [f"[CHECKS:{m_name.return_value}] {checkname}: success"]), {}])
+            == [(checkname, [checkname]), {}])
 
 
 TEST_CHECKS_COMPLETE = (
@@ -321,7 +321,7 @@ def test_python_yapf_run(patches, fix, format_results):
     if not changed:
         assert (
             list(m_succeed.call_args)
-            == [('yapf', ['FILENAME: success']), {}])
+            == [('yapf', ['FILENAME']), {}])
         assert not m_warn.called
         assert not m_error.called
         assert not m_fix.called
@@ -339,7 +339,7 @@ def test_python_yapf_run(patches, fix, format_results):
         assert len(m_warn.call_args_list) == 1
         assert (
             list(m_warn.call_args)
-            == [('yapf', [reformat]), {}])
+            == [('yapf', [f'FILENAME: diff\n{reformat}']), {}])
         return
     assert not m_warn.called
     assert (

@@ -318,7 +318,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "callback_impl_test",
     srcs = ["callback_impl_test.cc"],
-    deps = ["//source/common/common:callback_impl_lib"],
+    deps = [
+        "//source/common/common:callback_impl_lib",
+        "//test/mocks/event:event_mocks",
+    ],
 )
 
 envoy_cc_benchmark_binary(
@@ -429,5 +432,14 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//test/mocks:common_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "scope_tracked_object_stack_test",
+    srcs = ["scope_tracked_object_stack_test.cc"],
+    deps = [
+        "//source/common/common:scope_tracked_object_stack",
+        "//source/common/common:utility_lib",
     ],
 )

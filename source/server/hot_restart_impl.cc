@@ -1,4 +1,4 @@
-#include "server/hot_restart_impl.h"
+#include "source/server/hot_restart_impl.h"
 
 #include <sys/prctl.h>
 #include <sys/types.h>
@@ -13,10 +13,10 @@
 #include "envoy/event/file_event.h"
 #include "envoy/server/instance.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/api/os_sys_calls_impl_hot_restart.h"
-#include "common/common/fmt.h"
-#include "common/common/lock_guard.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/api/os_sys_calls_impl_hot_restart.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/lock_guard.h"
 
 #include "absl/strings/string_view.h"
 
@@ -114,16 +114,16 @@ void HotRestartImpl::drainParentListeners() {
   shmem_->flags_ &= ~SHMEM_FLAGS_INITIALIZING;
 }
 
-int HotRestartImpl::duplicateParentListenSocket(const std::string& address) {
-  return as_child_.duplicateParentListenSocket(address);
+int HotRestartImpl::duplicateParentListenSocket(const std::string& address, uint32_t worker_index) {
+  return as_child_.duplicateParentListenSocket(address, worker_index);
 }
 
 void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
   as_parent_.initialize(dispatcher, server);
 }
 
-void HotRestartImpl::sendParentAdminShutdownRequest(time_t& original_start_time) {
-  as_child_.sendParentAdminShutdownRequest(original_start_time);
+absl::optional<HotRestart::AdminShutdownResponse> HotRestartImpl::sendParentAdminShutdownRequest() {
+  return as_child_.sendParentAdminShutdownRequest();
 }
 
 void HotRestartImpl::sendParentTerminateRequest() { as_child_.sendParentTerminateRequest(); }

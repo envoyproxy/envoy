@@ -6,16 +6,15 @@
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/fatal_action_config.h"
 
-#include "common/common/assert.h"
-#include "common/network/address_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/socket_option_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/thread_local/thread_local_impl.h"
-#include "common/version/version.h"
-
-#include "server/process_context_impl.h"
-#include "server/server.h"
+#include "source/common/common/assert.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/thread_local/thread_local_impl.h"
+#include "source/common/version/version.h"
+#include "source/server/process_context_impl.h"
+#include "source/server/server.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/stats/stat_test_utility.h"
@@ -36,6 +35,7 @@
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
+#include "openssl/crypto.h"
 
 using testing::_;
 using testing::Assign;
@@ -347,6 +347,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.state")->value());
   EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
 
+  EXPECT_TRUE(server_->enableReusePortDefault());
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
 }
@@ -377,6 +378,13 @@ TEST_P(ServerInstanceImplTest, ValidateFIPSModeStat) {
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
+}
+
+// Validate the the Envoy FIPS compilation flags are consistent with the FIPS
+// mode of the underlying BoringSSL build.
+TEST_P(ServerInstanceImplTest, ValidateFIPSModeConsistency) {
+  bool isFIPS = (FIPS_mode() != 0);
+  EXPECT_EQ(isFIPS, VersionInfo::sslFipsCompliant());
 }
 
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
@@ -866,6 +874,23 @@ TEST_P(ServerInstanceImplTest, ZoneStatNameFromOption) {
             stats_store_.symbolTable().toString(server_->localInfo().zoneStatName()));
 }
 
+// Validate user agent information from bootstrap Node.
+TEST_P(ServerInstanceImplTest, UserAgentOverrideFromNode) {
+  initialize("test/server/test_data/server/node_bootstrap_agent_override.yaml");
+  EXPECT_EQ("test-ci-user-agent", server_->localInfo().node().user_agent_name());
+  EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
+  EXPECT_EQ(9, server_->localInfo().node().user_agent_build_version().version().major_number());
+  EXPECT_EQ(8, server_->localInfo().node().user_agent_build_version().version().minor_number());
+  EXPECT_EQ(7, server_->localInfo().node().user_agent_build_version().version().patch());
+}
+
+// Validate deprecated user agent version field from bootstrap Node.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(UserAgentBuildDeprecatedOverrideFromNode)) {
+  initialize("test/server/test_data/server/node_bootstrap_agent_deprecated_override.yaml");
+  EXPECT_EQ("test-ci-user-agent", server_->localInfo().node().user_agent_name());
+  EXPECT_EQ("test", server_->localInfo().node().hidden_envoy_deprecated_build_version());
+}
+
 // Validate that bootstrap with v2 dynamic transport is rejected when --bootstrap-version is not
 // set.
 TEST_P(ServerInstanceImplTest,
@@ -1111,6 +1136,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
+  EXPECT_FALSE(server_->enableReusePortDefault());
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo").value().get());
   // This should access via the override/some_service overlay.
   EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz").value().get());
@@ -1692,6 +1718,12 @@ TEST_P(ServerInstanceImplTest, NullProcessContextTest) {
   initialize("test/server/test_data/server/empty_bootstrap.yaml");
   ProcessContextOptRef context = server_->processContext();
   EXPECT_FALSE(context.has_value());
+}
+
+TEST_P(ServerInstanceImplTest, AdminAccessLogFilter) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/access_log_filter_bootstrap.yaml"));
 }
 
 } // namespace

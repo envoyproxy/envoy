@@ -7,14 +7,15 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/filters/process_context_filter.h"
+#include "test/integration/filters/stop_and_continue_filter_config.pb.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -56,9 +57,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Verify that we gracefully handle an invalid pre-bind socket option when using reuse port.
+// Verify that we gracefully handle an invalid pre-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
-  // Reserve a port that we can then use on the integration listener with reuse port.
+  // Reserve a port that we can then use on the integration listener with reuse_port.
   auto addr_socket =
       Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
   // Do not wait for listeners to start as the listener will fail.
@@ -66,7 +67,6 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
         addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
@@ -78,9 +78,9 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
   test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
 }
 
-// Verify that we gracefully handle an invalid post-bind socket option when using reuse port.
+// Verify that we gracefully handle an invalid post-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
-  // Reserve a port that we can then use on the integration listener with reuse port.
+  // Reserve a port that we can then use on the integration listener with reuse_port.
   auto addr_socket =
       Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
   // Do not wait for listeners to start as the listener will fail.
@@ -88,11 +88,26 @@ TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
         addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_BOUND);
+    socket_option->set_level(10000);     // Invalid level.
+    socket_option->set_int_value(10000); // Invalid value.
+  });
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+}
+
+// Verify that we gracefully handle an invalid post-listen socket option.
+TEST_P(IntegrationTest, BadPostListenSocketOption) {
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto socket_option = listener->add_socket_options();
+    socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
     socket_option->set_level(10000);     // Invalid level.
     socket_option->set_int_value(10000); // Invalid value.
   });
@@ -360,7 +375,7 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
   config_helper_.addFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
+    "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
   )EOF");
   testEnvoyProxying1xx(true);
 }
@@ -368,7 +383,9 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
 // Verifies that we can construct a match tree with a filter, and that we are able to skip
 // filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
+  concurrency_ = 2;
   config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
+
   config_helper_.addFilter(R"EOF(
 name: matcher
 typed_config:
@@ -404,18 +421,30 @@ typed_config:
     EXPECT_THAT(response->headers(), HttpStatusIs("403"));
   }
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
+        {":authority", "host"}, {"match-header", "match"},   {"content-type", "application/grpc"}};
+    auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  }
+
+  auto second_codec = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
-      {":authority", "host"}, {"match-header", "match"},   {"content-type", "application/grpc"}};
-  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
+      {":method", "POST"},    {":path", "/test/long/url"},   {":scheme", "http"},
+      {":authority", "host"}, {"match-header", "not-match"}, {"content-type", "application/grpc"}};
+  auto response = second_codec->makeRequestWithBody(request_headers, 1024);
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
 
   codec_client_->close();
+  second_codec->close();
 }
 
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
@@ -425,9 +454,15 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
     // Ensure we only have one connection upstream, one request active at a time.
-    cluster->mutable_max_requests_per_connection()->set_value(1);
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_common_http_protocol_options()
+        ->mutable_max_requests_per_connection()
+        ->set_value(1);
+    protocol_options.mutable_use_downstream_protocol_config();
     auto* circuit_breakers = cluster->mutable_circuit_breakers();
     circuit_breakers->add_thresholds()->mutable_max_connections()->set_value(1);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
   initialize();
 
@@ -637,7 +672,7 @@ TEST_P(IntegrationTest, TestServerAllowChunkedLength) {
 TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
-    if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
       ConfigHelper::HttpProtocolOptions protocol_options;
       protocol_options.mutable_explicit_http_config()
           ->mutable_http_protocol_options()
@@ -1061,6 +1096,7 @@ TEST_P(IntegrationTest, AbsolutePathUsingHttpsDisallowedAtFrontline) {
 }
 
 TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
+  autonomous_upstream_ = true;
   // Sent an HTTPS request over non-TLS. It will be allowed for non-front-line Envoys
   // and match the configured redirect.
   auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
@@ -1396,40 +1432,6 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
   // close.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
   EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
-}
-
-// Test that delay closed connections are eventually force closed when the timeout triggers.
-TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
-  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
-  config_helper_.setBufferLimits(1024, 1024);
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        // 200ms.
-        hcm.mutable_delayed_close_timeout()->set_nanos(200000000);
-      });
-
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  // The delayed close timeout should trigger since client is not closing the connection.
-  EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(2000)));
-  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
-  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
-            1);
 }
 
 // Test that if the route cache is cleared, it doesn't cause problems.

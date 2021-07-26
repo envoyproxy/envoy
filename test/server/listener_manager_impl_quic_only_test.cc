@@ -2,7 +2,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
-#include "common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 #endif
 
 #include "test/server/listener_manager_impl_test.h"
@@ -54,7 +54,6 @@ filter_chains:
             match_subject_alt_names:
             - exact: localhost
             - exact: 127.0.0.1
-reuse_port: true
 udp_listener_config:
   quic_options: {}
   )EOF",
@@ -72,7 +71,7 @@ udp_listener_config:
                            /* expected_num_options */
                            Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
 #endif
-                           /* expected_creation_params */ {true, false});
+                           ListenerComponentFactory::BindType::ReusePort);
 
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
                    /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
@@ -105,7 +104,7 @@ udp_listener_config:
                    ->listenerFactory()
                    .isTransportConnectionless());
   Network::SocketSharedPtr listen_socket =
-      manager_->listeners().front().get().listenSocketFactory().getListenSocket();
+      manager_->listeners().front().get().listenSocketFactory().getListenSocket(0);
 
   Network::UdpPacketWriterPtr udp_packet_writer =
       manager_->listeners()
@@ -156,7 +155,6 @@ filter_chains:
           match_subject_alt_names:
           - exact: localhost
           - exact: 127.0.0.1
-reuse_port: true
 udp_listener_config:
   quic_options: {}
   )EOF",

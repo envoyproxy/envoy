@@ -1,7 +1,9 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -13,18 +15,18 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/grpc/common.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/matching/data_impl.h"
-#include "common/local_reply/local_reply.h"
-#include "common/matcher/matcher.h"
-#include "common/protobuf/utility.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/matching/data_impl.h"
+#include "source/common/local_reply/local_reply.h"
+#include "source/common/matcher/matcher.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -66,11 +68,12 @@ private:
 
 using FilterMatchStateSharedPtr = std::shared_ptr<FilterMatchState>;
 
-class SkipActionFactory : public Matcher::ActionFactory {
+class SkipActionFactory : public Matcher::ActionFactory<Matching::HttpFilterActionContext> {
 public:
   std::string name() const override { return "skip"; }
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&, const std::string&,
-                                                 Server::Configuration::FactoryContext&) override {
+  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&,
+                                                 Matching::HttpFilterActionContext&,
+                                                 ProtobufMessage::ValidationVisitor&) override {
     return []() { return std::make_unique<SkipAction>(); };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -141,6 +144,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   Tracing::Span& activeSpan() override;
   Tracing::Config& tracingConfig() override;
   const ScopeTrackedObject& scope() override;
+  void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
+  void resetIdleTimer() override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -275,6 +280,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
 
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override;
+  Buffer::BufferMemoryAccountSharedPtr account() const override;
 
   // Each decoder filter instance checks if the request passed to the filter is gRPC
   // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -614,7 +620,12 @@ public:
   const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
     return StreamInfoImpl::downstreamAddressProvider().directRemoteAddress();
   }
-
+  absl::string_view requestedServerName() const override {
+    return StreamInfoImpl::downstreamAddressProvider().requestedServerName();
+  }
+  absl::optional<uint64_t> connectionID() const override {
+    return StreamInfoImpl::downstreamAddressProvider().connectionID();
+  }
   void dumpState(std::ostream& os, int indent_level) const override {
     StreamInfoImpl::dumpState(os, indent_level);
 
@@ -638,15 +649,16 @@ class FilterManager : public ScopeTrackedObject,
                       Logger::Loggable<Logger::Id::http> {
 public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
-                const Network::Connection& connection, uint64_t stream_id, bool proxy_100_continue,
+                const Network::Connection& connection, uint64_t stream_id,
+                Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
                 uint32_t buffer_limit, FilterChainFactory& filter_chain_factory,
                 const LocalReply::LocalReply& local_reply, Http::Protocol protocol,
                 TimeSource& time_source, StreamInfo::FilterStateSharedPtr parent_filter_state,
                 StreamInfo::FilterState::LifeSpan filter_state_life_span)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
-        connection_(connection), stream_id_(stream_id), proxy_100_continue_(proxy_100_continue),
-        buffer_limit_(buffer_limit), filter_chain_factory_(filter_chain_factory),
-        local_reply_(local_reply),
+        connection_(connection), stream_id_(stream_id), account_(std::move(account)),
+        proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit),
+        filter_chain_factory_(filter_chain_factory), local_reply_(local_reply),
         stream_info_(protocol, time_source, connection.addressProviderSharedPtr(),
                      parent_filter_state, filter_state_life_span) {}
   ~FilterManager() override {
@@ -829,7 +841,7 @@ public:
    */
   void onLocalReply(StreamFilterBase::LocalReplyData& data);
 
-  void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
+  void sendLocalReply(Code code, absl::string_view body,
                       const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details);
@@ -911,12 +923,15 @@ public:
   const Network::Connection* connection() const { return &connection_; }
 
   uint64_t streamId() const { return stream_id_; }
+  Buffer::BufferMemoryAccountSharedPtr account() const { return account_; }
 
   Buffer::InstancePtr& bufferedRequestData() { return buffered_request_data_; }
 
   bool enableInternalRedirectsWithBody() const {
     return filter_manager_callbacks_.enableInternalRedirectsWithBody();
   }
+
+  void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 
 private:
   // Indicates which filter to start the iteration with.
@@ -982,6 +997,7 @@ private:
   Event::Dispatcher& dispatcher_;
   const Network::Connection& connection_;
   const uint64_t stream_id_;
+  Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
 
   std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;

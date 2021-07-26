@@ -46,8 +46,8 @@ public:
   // Router::ResponseEntry
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                const StreamInfo::StreamInfo& stream_info) const override;
-  Http::HeaderTransforms
-  responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const override;
+  Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                  bool do_formatting = true) const override;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;

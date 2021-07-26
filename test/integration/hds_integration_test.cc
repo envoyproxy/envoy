@@ -7,11 +7,11 @@
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/metadata.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/health_checker_impl.h"
-#include "common/upstream/health_discovery_service.h"
+#include "source/common/config/metadata.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/upstream/health_checker_impl.h"
+#include "source/common/upstream/health_discovery_service.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/config/utility.h"
@@ -30,10 +30,10 @@ namespace {
 class HdsIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                            public HttpIntegrationTest {
 public:
-  HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  HdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
     hds_upstream_ = fake_upstreams_.back().get();
     HttpIntegrationTest::createUpstreams();
   }
@@ -62,10 +62,10 @@ public:
 
     // Endpoint connections
     if (tls_hosts_) {
-      host_upstream_ =
-          &addFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
-      host2_upstream_ =
-          &addFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
+      host_upstream_ = &addFakeUpstream(
+          HttpIntegrationTest::createUpstreamTlsContext(upstreamConfig()), http_conn_type_);
+      host2_upstream_ = &addFakeUpstream(
+          HttpIntegrationTest::createUpstreamTlsContext(upstreamConfig()), http_conn_type_);
     } else {
       host_upstream_ = &addFakeUpstream(http_conn_type_);
       host2_upstream_ = &addFakeUpstream(http_conn_type_);
@@ -280,7 +280,7 @@ transport_socket_matches:
       EXPECT_EQ("POST", hds_stream_->headers().getMethodValue());
       EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.{1}.{0}.HealthDiscoveryService",
                                                     "StreamHealthCheck", apiVersion(),
-                                                    /*use_alpha=*/false, serviceNamespace()),
+                                                    serviceNamespace()),
                 hds_stream_->headers().getPathValue());
       EXPECT_EQ("application/grpc", hds_stream_->headers().getContentTypeValue());
     }
@@ -335,7 +335,7 @@ transport_socket_matches:
       EXPECT_EQ("POST", hds_stream_->headers().getMethodValue());
       EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.{1}.{0}.HealthDiscoveryService",
                                                     "StreamHealthCheck", apiVersion(),
-                                                    /*use_alpha=*/false, serviceNamespace()),
+                                                    serviceNamespace()),
                 hds_stream_->headers().getPathValue());
       EXPECT_EQ("application/grpc", hds_stream_->headers().getContentTypeValue());
     }
@@ -370,7 +370,7 @@ transport_socket_matches:
   FakeHttpConnectionPtr host_fake_connection_;
   FakeHttpConnectionPtr host2_fake_connection_;
   FakeRawConnectionPtr host_fake_raw_connection_;
-  FakeHttpConnection::Type http_conn_type_{FakeHttpConnection::Type::HTTP1};
+  Http::CodecType http_conn_type_{Http::CodecType::HTTP1};
   bool tls_hosts_{false};
 
   static constexpr int MaxTimeout = 100;
@@ -959,7 +959,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTlsHttp2) {
   tls_hosts_ = true;
 
   // Change hosts to operate over HTTP/2 instead of default HTTP.
-  http_conn_type_ = FakeHttpConnection::Type::HTTP2;
+  http_conn_type_ = Http::CodecType::HTTP2;
 
   initialize();
 
@@ -1273,6 +1273,61 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyHttpCustomPort) {
 
   // Receive updates until the one we expect arrives
   waitForEndpointHealthResponse(envoy::config::core::v3::UNHEALTHY);
+
+  // Clean up connections
+  cleanupHostConnections();
+  cleanupHdsConnection();
+}
+
+// Tests Envoy keeps sending EndpointHealthResponses after the HDS server reconnection
+TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttpHdsReconnect) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
+  initialize();
+
+  // Server <--> Envoy
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+  EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(0),
+            envoy::service::health::v3::Capability::HTTP);
+
+  // Server asks for health checking
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  // Envoy sends a health check message to an endpoint
+  healthcheckEndpoints();
+
+  // Endpoint responds to the health check
+  host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  host_stream_->encodeData(1024, true);
+
+  // Receive updates until the one we expect arrives
+  waitForEndpointHealthResponse(envoy::config::core::v3::HEALTHY);
+
+  checkCounters(1, 2, 1, 0);
+
+  // Simulate disconnection of HDS server
+  ASSERT_TRUE(hds_fake_connection_->close());
+  ASSERT_TRUE(hds_fake_connection_->waitForDisconnect());
+
+  // Server <--> Envoy, connect once again
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+  EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(0),
+            envoy::service::health::v3::Capability::HTTP);
+
+  // Server asks for health checking
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  // Receive updates until the one we expect arrives
+  waitForEndpointHealthResponse(envoy::config::core::v3::HEALTHY);
 
   // Clean up connections
   cleanupHostConnections();

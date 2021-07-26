@@ -11,16 +11,15 @@
 #include "envoy/server/process_context.h"
 #include "envoy/stats/stats.h"
 
-#include "common/common/assert.h"
-#include "common/common/lock_guard.h"
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/stats/allocator_impl.h"
-
-#include "server/drain_manager_impl.h"
-#include "server/listener_hooks.h"
-#include "server/options_impl.h"
-#include "server/server.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/server/drain_manager_impl.h"
+#include "source/server/listener_hooks.h"
+#include "source/server/options_impl.h"
+#include "source/server/server.h"
 
 #include "test/integration/server_stats.h"
 #include "test/integration/tcp_dump.h"
@@ -52,8 +51,8 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
 class TestComponentFactory : public ComponentFactory {
 public:
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
-    return Server::DrainManagerPtr{
-        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY)};
+    return Server::DrainManagerPtr{new Server::DrainManagerImpl(
+        server, envoy::config::listener::v3::Listener::MODIFY_ONLY, server.dispatcher())};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
                                    Server::Configuration::Initial& config) override {
@@ -431,7 +430,6 @@ public:
   void setOnServerReadyCb(std::function<void(IntegrationTestServer&)> on_server_ready) {
     on_server_ready_cb_ = std::move(on_server_ready);
   }
-  void onRuntimeCreated() override {}
   void onWorkersStarted() override {}
 
   void start(const Network::Address::IpVersion version,
@@ -442,32 +440,36 @@ public:
              Buffer::WatermarkFactorySharedPtr watermark_factory, bool v2_bootstrap);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
-                        std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
                         Event::Dispatcher* dispatcher = nullptr) override {
     ASSERT_TRUE(
         TestUtility::waitForCounterEq(statStore(), name, value, time_system_, timeout, dispatcher));
   }
 
-  void
-  waitForCounterGe(const std::string& name, uint64_t value,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+  void waitForCounterGe(const std::string& name, uint64_t value,
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
     ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
   }
 
-  void
-  waitForGaugeEq(const std::string& name, uint64_t value,
-                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+  void waitForGaugeEq(const std::string& name, uint64_t value,
+                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
     ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout));
   }
 
-  void
-  waitForGaugeGe(const std::string& name, uint64_t value,
-                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+  void waitForGaugeGe(const std::string& name, uint64_t value,
+                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
     ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout));
   }
 
   void waitForCounterExists(const std::string& name) override {
     notifyingStatsAllocator().waitForCounterExists(name);
+  }
+
+  void waitUntilHistogramHasSamples(
+      const std::string& name,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitUntilHistogramHasSamples(statStore(), name, time_system_,
+                                                          server().dispatcher(), timeout));
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {
@@ -486,14 +488,18 @@ public:
 
   std::vector<Stats::GaugeSharedPtr> gauges() override { return statStore().gauges(); }
 
+  std::vector<Stats::ParentHistogramSharedPtr> histograms() override {
+    return statStore().histograms();
+  }
+
   // ListenerHooks
   void onWorkerListenerAdded() override;
   void onWorkerListenerRemoved() override;
 
   // Server::ComponentFactory
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
-    drain_manager_ =
-        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY);
+    drain_manager_ = new Server::DrainManagerImpl(
+        server, envoy::config::listener::v3::Listener::MODIFY_ONLY, server.dispatcher());
     return Server::DrainManagerPtr{drain_manager_};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,

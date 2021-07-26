@@ -1,4 +1,4 @@
-#include "extensions/filters/network/http_connection_manager/config.h"
+#include "source/extensions/filters/network/http_connection_manager/config.h"
 
 #include <chrono>
 #include <memory>
@@ -8,6 +8,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
+#include "envoy/extensions/http/original_ip_detection/xff/v3/xff.pb.h"
 #include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/registry/registry.h"
@@ -16,31 +17,31 @@
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/common/fmt.h"
-#include "common/config/utility.h"
-#include "common/filter/http/filter_config_discovery_impl.h"
-#include "common/http/conn_manager_config.h"
-#include "common/http/conn_manager_utility.h"
-#include "common/http/default_server_string.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http1/settings.h"
-#include "common/http/http2/codec_impl.h"
-#include "common/http/request_id_extension_impl.h"
-#include "common/http/utility.h"
-#include "common/local_reply/local_reply.h"
-#include "common/protobuf/utility.h"
-#include "common/router/rds_impl.h"
-#include "common/router/scoped_rds.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/tracing/http_tracer_manager_impl.h"
-#include "common/tracing/tracer_config_impl.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
+#include "source/common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/http/conn_manager_config.h"
+#include "source/common/http/conn_manager_utility.h"
+#include "source/common/http/default_server_string.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http1/settings.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/request_id_extension_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/local_reply/local_reply.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/rds_impl.h"
+#include "source/common/router/scoped_rds.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/tracing/http_tracer_manager_impl.h"
+#include "source/common/tracing/tracer_config_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/codec_impl.h"
+#include "source/common/quic/codec_impl.h"
 #endif
 
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -202,6 +203,14 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
     Server::Configuration::FactoryContext& context) {
+  return createFilterFactoryFromProtoAndHopByHop(proto_config, context, true);
+}
+
+Network::FilterFactoryCb
+HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHop(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        proto_config,
+    Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers) {
   Utility::Singletons singletons = Utility::createSingletons(context);
 
   auto filter_config = Utility::createConfig(
@@ -213,12 +222,26 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
+  return [singletons, filter_config, &context,
+          clear_hop_by_hop_headers](Network::FilterManager& filter_manager) -> void {
+    auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
-        context.overloadManager(), context.dispatcher().timeSource())});
+        context.overloadManager(), context.dispatcher().timeSource());
+    if (!clear_hop_by_hop_headers) {
+      hcm->setClearHopByHopResponseHeaders(false);
+    }
+    filter_manager.addReadFilter(std::move(hcm));
   };
+}
+
+Network::FilterFactoryCb
+MobileHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::network::http_connection_manager::v3::
+        EnvoyMobileHttpConnectionManager& mobile_config,
+    Server::Configuration::FactoryContext& context) {
+  return HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHop(
+      mobile_config.config(), context, false);
 }
 
 /**
@@ -306,13 +329,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),
       local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)),
-      path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)) {
-  // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
-  // idle_timeout field.
-  // TODO(asraa): Remove when idle_timeout is removed.
-  if (!idle_timeout_) {
-    idle_timeout_ = PROTOBUF_GET_OPTIONAL_MS(config, hidden_envoy_deprecated_idle_timeout);
-  }
+      path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)),
+      strip_trailing_host_dot_(config.strip_trailing_host_dot()),
+      max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config.common_http_protocol_options(), max_requests_per_connection, 0)) {
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -343,6 +363,34 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig());
   }
   request_id_extension_ = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
+
+  // Check if IP detection extensions were configured, otherwise fall back to XFF.
+  auto ip_detection_extensions = config.original_ip_detection_extensions();
+  if (ip_detection_extensions.empty()) {
+    envoy::extensions::http::original_ip_detection::xff::v3::XffConfig xff_config;
+    xff_config.set_xff_num_trusted_hops(xff_num_trusted_hops_);
+
+    auto* extension = ip_detection_extensions.Add();
+    extension->set_name("envoy.http.original_ip_detection.xff");
+    extension->mutable_typed_config()->PackFrom(xff_config);
+  }
+
+  original_ip_detection_extensions_.reserve(ip_detection_extensions.size());
+  for (const auto& extension_config : ip_detection_extensions) {
+    auto* factory =
+        Envoy::Config::Utility::getFactory<Http::OriginalIPDetectionFactory>(extension_config);
+    if (!factory) {
+      throw EnvoyException(
+          fmt::format("Original IP detection extension not found: '{}'", extension_config.name()));
+    }
+
+    auto extension = factory->createExtension(extension_config.typed_config(), context_);
+    if (!extension) {
+      throw EnvoyException(fmt::format("Original IP detection extension could not be created: '{}'",
+                                       extension_config.name()));
+    }
+    original_ip_detection_extensions_.push_back(extension);
+  }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
@@ -468,8 +516,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     random_sampling.set_numerator(random_sampling_numerator);
     random_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
     envoy::type::v3::FractionalPercent overall_sampling;
-    overall_sampling.set_numerator(
-        tracing_config.has_overall_sampling() ? tracing_config.overall_sampling().value() : 100);
+    uint64_t overall_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+        tracing_config, overall_sampling, 10000, 10000)};
+    overall_sampling.set_numerator(overall_sampling_numerator);
+    overall_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
 
     const uint32_t max_path_tag_length = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
         tracing_config, max_path_tag_length, Tracing::DefaultMaxPathTagLength);
@@ -487,6 +537,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   server_transformation_ = config.server_header_transformation();
+
+  if (!config.scheme_header_transformation().scheme_to_overwrite().empty()) {
+    scheme_to_set_ = config.scheme_header_transformation().scheme_to_overwrite();
+  }
 
   if (!config.server_name().empty()) {
     server_name_ = config.server_name();
@@ -579,16 +633,22 @@ void HttpConnectionManagerConfig::processFilter(
   }
 
   // Now see if there is a factory that will accept the config.
-  auto& factory =
+  auto* factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-          proto_config);
+          proto_config, proto_config.is_optional());
+  // null pointer returned only when the filter is optional, then skip all the processes.
+  if (factory == nullptr) {
+    ENVOY_LOG(warn, "Didn't find a registered factory for the optional http filter {}",
+              proto_config.name());
+    return;
+  }
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      proto_config, context_.messageValidationVisitor(), factory);
+      proto_config, context_.messageValidationVisitor(), *factory);
   Http::FilterFactoryCb callback =
-      factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
-  dependency_manager.registerFilter(factory.name(), *factory.dependencies());
-  bool is_terminal = factory.isTerminalFilterByProto(*message, context_);
-  Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
+      factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
+  dependency_manager.registerFilter(factory->name(), *factory->dependencies());
+  bool is_terminal = factory->isTerminalFilterByProto(*message, context_);
+  Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);
   auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
       callback, proto_config.name());
@@ -740,7 +800,7 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
   if (config.tracing().has_provider()) {
     return &config.tracing().provider();
   }
-  // Otherwise, for the sake of backwards compatibility, fallback to using tracing provider
+  // Otherwise, for the sake of backwards compatibility, fall back to using tracing provider
   // configuration defined in the bootstrap config.
   if (context_.httpContext().defaultTracingConfig().has_http()) {
     return &context_.httpContext().defaultTracingConfig().http();
@@ -752,7 +812,8 @@ std::function<Http::ApiListenerPtr()>
 HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
-    Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks) {
+    Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
+    bool clear_hop_by_hop_headers) {
 
   Utility::Singletons singletons = Utility::createSingletons(context);
 
@@ -765,11 +826,15 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [singletons, filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
+  return [singletons, filter_config, &context, &read_callbacks,
+          clear_hop_by_hop_headers]() -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
         context.overloadManager(), context.dispatcher().timeSource());
+    if (!clear_hop_by_hop_headers) {
+      conn_manager->setClearHopByHopResponseHeaders(false);
+    }
 
     // This factory creates a new ConnectionManagerImpl in the absence of its usual environment as
     // an L4 filter, so this factory needs to take a few actions.

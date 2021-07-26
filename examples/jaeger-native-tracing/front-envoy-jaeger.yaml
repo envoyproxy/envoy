@@ -48,11 +48,9 @@ static_resources:
                   operation: checkAvailability
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
           use_remote_address: true
   clusters:
   - name: service1
-    connect_timeout: 0.250s
     type: strict_dns
     lb_policy: round_robin
     load_assignment:

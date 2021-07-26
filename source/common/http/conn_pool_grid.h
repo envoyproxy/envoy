@@ -1,8 +1,9 @@
 #pragma once
 
-#include "common/http/alternate_protocols_cache_impl.h"
-#include "common/http/conn_pool_base.h"
-#include "common/http/http3_status_tracker.h"
+#include "source/common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/conn_pool_base.h"
+#include "source/common/http/http3_status_tracker.h"
+#include "source/common/quic/quic_stat_names.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -130,11 +131,12 @@ public:
   ConnectivityGrid(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                    Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-                   OptRef<AlternateProtocolsCacheImpl> alternate_protocols,
+                   AlternateProtocolsCacheSharedPtr alternate_protocols,
                    std::chrono::milliseconds next_attempt_duration,
-                   ConnectivityOptions connectivity_options);
+                   ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
+                   Stats::Scope& scope);
   ~ConnectivityGrid() override;
 
   // Http::ConnPool::Instance
@@ -186,13 +188,13 @@ private:
   Upstream::HostConstSharedPtr host_;
   Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr options_;
-  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;
   Http3StatusTracker http3_status_tracker_;
   // TODO(RyanTheOptimist): Make the alternate_protocols_ member non-optional.
-  OptRef<AlternateProtocolsCacheImpl> alternate_protocols_;
+  AlternateProtocolsCacheSharedPtr alternate_protocols_;
 
   // Tracks how many drains are needed before calling drain callbacks. This is
   // set to the number of pools when the first drain callbacks are added, and
@@ -210,6 +212,9 @@ private:
 
   // Wrapped callbacks are stashed in the wrapped_callbacks_ for ownership.
   std::list<WrapperCallbacksPtr> wrapped_callbacks_;
+
+  Quic::QuicStatNames& quic_stat_names_;
+  Stats::Scope& scope_;
 };
 
 } // namespace Http

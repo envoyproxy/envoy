@@ -36,9 +36,7 @@ EXCLUDED_PREFIXES = (
     "./source/extensions/common/wasm/ext",
     "./examples/wasm-cc",
 )
-SUFFIXES = (
-    "BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto", ".rst")
-DOCS_SUFFIX = (".md", ".rst")
+SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".mm", ".proto")
 PROTO_SUFFIX = (".proto")
 
 # Files in these paths can make reference to protobuf stuff directly
@@ -117,10 +115,28 @@ MEMCPY_WHITELIST = (
 EXCEPTION_DENYLIST = (
     "./source/common/http/http2/codec_impl.h", "./source/common/http/http2/codec_impl.cc")
 
+# Files that are allowed to use try without main thread assertion.
 RAW_TRY_ALLOWLIST = (
-    "./source/common/common/regex.cc",
-    "./source/common/common/thread.h",
-    "./source/common/network/utility.cc",
+    "./source/common/common/regex.cc", "./source/common/common/thread.h",
+    "./source/common/network/utility.cc")
+
+# These are entire files that are allowed to use std::string_view vs. individual exclusions. Right
+# now this is just WASM which makes use of std::string_view heavily so we need to convert to
+# absl::string_view internally. Everywhere else should be using absl::string_view for additional
+# safety.
+STD_STRING_VIEW_ALLOWLIST = (
+    "./source/extensions/common/wasm/context.h",
+    "./source/extensions/common/wasm/context.cc",
+    "./source/extensions/common/wasm/foreign.cc",
+    "./source/extensions/common/wasm/wasm.h",
+    "./source/extensions/common/wasm/wasm.cc",
+    "./source/extensions/common/wasm/wasm_vm.h",
+    "./source/extensions/common/wasm/wasm_vm.cc",
+    "./test/extensions/bootstrap/wasm/wasm_speed_test.cc",
+    "./test/extensions/bootstrap/wasm/wasm_test.cc",
+    "./test/extensions/common/wasm/wasm_test.cc",
+    "./test/extensions/stats_sinks/wasm/wasm_stat_sink_test.cc",
+    "./test/test_common/wasm_base.h",
 )
 
 # Header files that can throw exceptions. These should be limited; the only
@@ -139,6 +155,7 @@ BUILD_URLS_ALLOWLIST = (
     "./generated_api_shadow/bazel/repository_locations.bzl",
     "./generated_api_shadow/bazel/envoy_http_archive.bzl",
     "./bazel/repository_locations.bzl",
+    "./bazel/external/cargo/crates.bzl",
     "./api/bazel/repository_locations.bzl",
     "./api/bazel/envoy_http_archive.bzl",
 )
@@ -162,16 +179,11 @@ EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
 COMMENT_REGEX = re.compile(r"//|\*")
 DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
-VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
-VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
-RELOADABLE_FLAG_REGEX = re.compile(".*(...)(envoy.reloadable_features.[^ ]*)\s.*")
-INVALID_REFLINK = re.compile(".* ref:.*")
 OLD_MOCK_METHOD_REGEX = re.compile("MOCK_METHOD\d")
 # C++17 feature, lacks sufficient support across various libraries / compilers.
 FOR_EACH_N_REGEX = re.compile("for_each_n\(")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
-REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
 DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
 FLAG_REGEX = re.compile("    \"(.*)\",")
 
@@ -256,7 +268,6 @@ UNSORTED_FLAGS = {
   "envoy.reloadable_features.activate_timers_next_event_loop",
   "envoy.reloadable_features.check_ocsp_policy",
   "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
-  "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
   "envoy.reloadable_features.upstream_http2_flood_checks",
   "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
 }
@@ -323,11 +334,15 @@ class FormatChecker:
     # look_path searches for the given executable in all directories in PATH
     # environment variable. If it cannot be found, empty string is returned.
     def look_path(self, executable):
+        if executable is None:
+            return ''
         return shutil.which(executable) or ''
 
     # path_exists checks whether the given path exists. This function assumes that
     # the path is absolute and evaluates environment variables.
     def path_exists(self, executable):
+        if executable is None:
+            return False
         return os.path.exists(os.path.expandvars(executable))
 
     # executable_by_others checks whether the given path has execute permission for
@@ -432,7 +447,10 @@ class FormatChecker:
         return any(file_path.startswith(prefix) for prefix in REGISTER_FACTORY_TEST_ALLOWLIST)
 
     def allow_listed_for_serialize_as_string(self, file_path):
-        return file_path in SERIALIZE_AS_STRING_ALLOWLIST or file_path.endswith(DOCS_SUFFIX)
+        return file_path in SERIALIZE_AS_STRING_ALLOWLIST
+
+    def allow_listed_for_std_string_view(self, file_path):
+        return file_path in STD_STRING_VIEW_ALLOWLIST
 
     def allow_listed_for_json_string_to_message(self, file_path):
         return file_path in JSON_STRING_TO_MESSAGE_ALLOWLIST
@@ -441,8 +459,7 @@ class FormatChecker:
         return name in HISTOGRAM_WITH_SI_SUFFIX_ALLOWLIST
 
     def allow_listed_for_std_regex(self, file_path):
-        return file_path.startswith(
-            "./test") or file_path in STD_REGEX_ALLOWLIST or file_path.endswith(DOCS_SUFFIX)
+        return file_path.startswith("./test") or file_path in STD_REGEX_ALLOWLIST
 
     def allow_listed_for_grpc_init(self, file_path):
         return file_path in GRPC_INIT_ALLOWLIST
@@ -459,8 +476,6 @@ class FormatChecker:
     def deny_listed_for_exceptions(self, file_path):
         # Returns true when it is a non test header file or the file_path is in DENYLIST or
         # it is under tools/testdata subdirectory.
-        if file_path.endswith(DOCS_SUFFIX):
-            return False
 
         return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in EXCEPTION_ALLOWLIST) or file_path in EXCEPTION_DENYLIST \
             or self.is_in_subdir(file_path, 'tools/testdata')
@@ -528,92 +543,8 @@ class FormatChecker:
                     error_messages.append("%s and %s are out of order\n" % (line, previous_flag))
             previous_flag = line
 
-    def check_current_release_notes(self, file_path, error_messages):
-        first_word_of_prior_line = ''
-        next_word_to_check = ''  # first word after :
-        prior_line = ''
-
-        def ends_with_period(prior_line):
-            if not prior_line:
-                return True  # Don't punctuation-check empty lines.
-            if prior_line.endswith('.'):
-                return True  # Actually ends with .
-            if prior_line.endswith('`') and REF_WITH_PUNCTUATION_REGEX.match(prior_line):
-                return True  # The text in the :ref ends with a .
-            return False
-
-        for line_number, line in enumerate(self.read_lines(file_path)):
-
-            def report_error(message):
-                error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
-
-            if VERSION_HISTORY_SECTION_NAME.match(line):
-                if line == "Deprecated":
-                    # The deprecations section is last, and does not have enforced formatting.
-                    break
-
-                # Reset all parsing at the start of a section.
-                first_word_of_prior_line = ''
-                next_word_to_check = ''  # first word after :
-                prior_line = ''
-
-            invalid_reflink_match = INVALID_REFLINK.match(line)
-            if invalid_reflink_match:
-                report_error("Found text \" ref:\". This should probably be \" :ref:\"\n%s" % line)
-
-            # make sure flags are surrounded by ``s (ie "inline literal")
-            flag_match = RELOADABLE_FLAG_REGEX.match(line)
-            if flag_match:
-                if not flag_match.groups()[0].startswith(' ``'):
-                    report_error(
-                        "Flag %s should be enclosed in double back ticks" % flag_match.groups()[1])
-
-            if line.startswith("* "):
-                if not ends_with_period(prior_line):
-                    report_error(
-                        "The following release note does not end with a '.'\n %s" % prior_line)
-
-                match = VERSION_HISTORY_NEW_LINE_REGEX.match(line)
-                if not match:
-                    report_error(
-                        "Version history line malformed. "
-                        "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s\n"
-                        "Please use messages in the form 'category: feature explanation.', "
-                        "starting with a lower-cased letter and ending with a period." % line)
-                else:
-                    first_word = match.groups()[0]
-                    next_word = match.groups()[1]
-                    # Do basic alphabetization checks of the first word on the line and the
-                    # first word after the :
-                    if first_word_of_prior_line and first_word_of_prior_line > first_word:
-                        report_error(
-                            "Version history not in alphabetical order (%s vs %s): please check placement of line\n %s. "
-                            % (first_word_of_prior_line, first_word, line))
-                    if first_word_of_prior_line == first_word and next_word_to_check and next_word_to_check > next_word:
-                        report_error(
-                            "Version history not in alphabetical order (%s vs %s): please check placement of line\n %s. "
-                            % (next_word_to_check, next_word, line))
-                    first_word_of_prior_line = first_word
-                    next_word_to_check = next_word
-
-                    prior_line = line
-            elif not line:
-                # If we hit the end of this release note block block, check the prior line.
-                if not ends_with_period(prior_line):
-                    report_error(
-                        "The following release note does not end with a '.'\n %s" % prior_line)
-                prior_line = ''
-            elif prior_line:
-                prior_line += line
-
     def check_file_contents(self, file_path, checker):
         error_messages = []
-
-        if file_path.endswith("version_history/current.rst"):
-            # Version file checking has enough special cased logic to merit its own checks.
-            # This only validates entries for the current release as very old release
-            # notes have a different format.
-            self.check_current_release_notes(file_path, error_messages)
         if file_path.endswith("source/common/runtime/runtime_features.cc"):
             # Do runtime alphabetical order checks.
             self.check_runtime_flags(file_path, error_messages)
@@ -820,8 +751,12 @@ class FormatChecker:
             report_error("Don't use std::monostate; use absl::monostate instead")
         if self.token_in_line("std::optional", line):
             report_error("Don't use std::optional; use absl::optional instead")
-        if self.token_in_line("std::string_view", line):
-            report_error("Don't use std::string_view; use absl::string_view instead")
+        if not self.allow_listed_for_std_string_view(
+                file_path) and not "NOLINT(std::string_view)" in line:
+            if self.token_in_line("std::string_view", line) or self.token_in_line("toStdStringView",
+                                                                                  line):
+                report_error(
+                    "Don't use std::string_view or toStdStringView; use absl::string_view instead")
         if self.token_in_line("std::variant", line):
             report_error("Don't use std::variant; use absl::variant instead")
         if self.token_in_line("std::visit", line):
@@ -831,12 +766,12 @@ class FormatChecker:
             report_error(
                 "Don't use raw try, use TRY_ASSERT_MAIN_THREAD if on the main thread otherwise don't use exceptions."
             )
-        if "__attribute__((packed))" in line and file_path != "./include/envoy/common/platform.h":
+        if "__attribute__((packed))" in line and file_path != "./envoy/common/platform.h":
             # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
             # can be used instead
             report_error(
                 "Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
-                "in include/envoy/common/platform.h instead")
+                "in envoy/common/platform.h instead")
         if DESIGNATED_INITIALIZER_REGEX.search(line):
             # Designated initializers are not part of the C++14 standard and are not supported
             # by MSVC
@@ -1009,10 +944,9 @@ class FormatChecker:
 
         error_messages = []
 
-        if not file_path.endswith(DOCS_SUFFIX):
-            if not file_path.endswith(PROTO_SUFFIX):
-                error_messages += self.fix_header_order(file_path)
-            error_messages += self.clang_format(file_path)
+        if not file_path.endswith(PROTO_SUFFIX):
+            error_messages += self.fix_header_order(file_path)
+        error_messages += self.clang_format(file_path)
         if file_path.endswith(PROTO_SUFFIX) and self.is_api_file(file_path):
             package_name, error_message = self.package_name_for_proto(file_path)
             if package_name is None:
@@ -1022,16 +956,15 @@ class FormatChecker:
     def check_source_path(self, file_path):
         error_messages = self.check_file_contents(file_path, self.check_source_line)
 
-        if not file_path.endswith(DOCS_SUFFIX):
-            if not file_path.endswith(PROTO_SUFFIX):
-                error_messages += self.check_namespace(file_path)
-                command = (
-                    "%s --include_dir_order %s --path %s | diff %s -" %
-                    (HEADER_ORDER_PATH, self.include_dir_order, file_path, file_path))
-                error_messages += self.execute_command(
-                    command, "header_order.py check failed", file_path)
-            command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
-            error_messages += self.execute_command(command, "clang-format check failed", file_path)
+        if not file_path.endswith(PROTO_SUFFIX):
+            error_messages += self.check_namespace(file_path)
+            command = (
+                "%s --include_dir_order %s --path %s | diff %s -" %
+                (HEADER_ORDER_PATH, self.include_dir_order, file_path, file_path))
+            error_messages += self.execute_command(
+                command, "header_order.py check failed", file_path)
+        command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
+        error_messages += self.execute_command(command, "clang-format check failed", file_path)
 
         if file_path.endswith(PROTO_SUFFIX) and self.is_api_file(file_path):
             package_name, error_message = self.package_name_for_proto(file_path)
@@ -1078,12 +1011,6 @@ class FormatChecker:
         return []
 
     def check_format(self, file_path):
-        if file_path.startswith(EXCLUDED_PREFIXES):
-            return []
-
-        if not file_path.endswith(SUFFIXES):
-            return []
-
         error_messages = []
         # Apply fixes first, if asked, and then run checks. If we wind up attempting to fix
         # an issue, but there's still an error, that's a problem.
@@ -1294,9 +1221,10 @@ if __name__ == "__main__":
     # Calculate the list of owned directories once per run.
     error_messages = []
     owned_directories = owned_directories(error_messages)
-
     if os.path.isfile(args.target_path):
-        error_messages += format_checker.check_format("./" + args.target_path)
+        if not args.target_path.startswith(EXCLUDED_PREFIXES) and args.target_path.endswith(
+                SUFFIXES):
+            error_messages += format_checker.check_format("./" + args.target_path)
     else:
         results = []
 
@@ -1305,9 +1233,18 @@ if __name__ == "__main__":
             # For each file in target_path, start a new task in the pool and collect the
             # results (results is passed by reference, and is used as an output).
             for root, _, files in os.walk(args.target_path):
+                _files = []
+                for filename in files:
+                    file_path = os.path.join(root, filename)
+                    check_file = (
+                        path_predicate(filename) and not file_path.startswith(EXCLUDED_PREFIXES)
+                        and file_path.endswith(SUFFIXES))
+                    if check_file:
+                        _files.append(filename)
+                if not _files:
+                    continue
                 format_checker.check_format_visitor(
-                    (pool, results, owned_directories, error_messages), root,
-                    [f for f in files if path_predicate(f)])
+                    (pool, results, owned_directories, error_messages), root, _files)
 
             # Close the pool to new tasks, wait for all of the running tasks to finish,
             # then collect the error messages.

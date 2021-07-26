@@ -1,4 +1,4 @@
-#include "extensions/tracers/skywalking/trace_segment_reporter.h"
+#include "source/extensions/tracers/skywalking/trace_segment_reporter.h"
 
 #include "envoy/http/header_map.h"
 
@@ -19,7 +19,7 @@ TraceSegmentReporter::TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory
                                            Random::RandomGenerator& random_generator,
                                            SkyWalkingTracerStats& stats,
                                            uint32_t delayed_buffer_size, const std::string& token)
-    : tracing_stats_(stats), client_(factory->create()),
+    : tracing_stats_(stats), client_(factory->createUncachedRawAsyncClient()),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "skywalking.v3.TraceSegmentReportService.collect")),
       random_generator_(random_generator), token_(token),

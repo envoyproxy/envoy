@@ -3,8 +3,8 @@
 #include "envoy/extensions/filters/network/rocketmq_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/network/rocketmq_proxy/v3/route.pb.validate.h"
 
-#include "extensions/filters/network/rocketmq_proxy/metadata.h"
-#include "extensions/filters/network/rocketmq_proxy/router/route_matcher.h"
+#include "source/extensions/filters/network/rocketmq_proxy/metadata.h"
+#include "source/extensions/filters/network/rocketmq_proxy/router/route_matcher.h"
 
 #include "test/test_common/utility.h"
 
@@ -36,7 +36,8 @@ routes:
         exact: test_topic
       headers:
         - name: code
-          exact_match: '310'
+          string_match:
+            exact: '310'
     route:
       cluster: fake_cluster
       metadata_match:

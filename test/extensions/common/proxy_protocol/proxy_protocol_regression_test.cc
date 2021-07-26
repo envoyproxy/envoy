@@ -1,15 +1,13 @@
 #include "envoy/network/address.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/basic_resource_impl.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/network/connection_balancer_impl.h"
-#include "common/network/listen_socket_impl.h"
-
-#include "server/connection_handler_impl.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
-#include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/basic_resource_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/connection_balancer_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
+#include "source/server/connection_handler_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -43,15 +41,15 @@ public:
   ProxyProtocolRegressionTest()
       : api_(Api::createApiForTest(stats_store_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        socket_(std::make_shared<Network::TcpListenSocket>(
-            Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
+        socket_(std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+            Network::Test::getCanonicalLoopbackAddress(GetParam()))),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
         init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
     EXPECT_CALL(socket_factory_, localAddress())
         .WillOnce(ReturnRef(socket_->addressProvider().localAddress()));
-    EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
+    EXPECT_CALL(socket_factory_, getListenSocket(_)).WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this);
     conn_ = dispatcher_->createClientConnection(socket_->addressProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),

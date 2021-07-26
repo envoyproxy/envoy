@@ -2,10 +2,9 @@
 
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/http/headers.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/common/expr/context.h"
+#include "source/common/http/headers.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/expr/context.h"
 
 #include "eval/public/cel_expression.h"
 #include "eval/public/cel_value.h"

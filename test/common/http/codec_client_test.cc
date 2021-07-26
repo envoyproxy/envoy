@@ -1,13 +1,13 @@
 #include <memory>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/http/codec_client.h"
-#include "common/http/exception.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/utility.h"
-#include "common/stream_info/stream_info_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/http/exception.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -34,7 +34,6 @@ using testing::Pointee;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Throw;
 
 namespace Envoy {
 namespace Http {
@@ -57,8 +56,8 @@ public:
 
     Network::ClientConnectionPtr connection{connection_};
     EXPECT_CALL(dispatcher_, createTimer_(_));
-    client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(connection),
-                                                   codec_, nullptr, host_, dispatcher_);
+    client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(connection), codec_,
+                                                   nullptr, host_, dispatcher_);
     ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   }
 
@@ -88,8 +87,8 @@ TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
   auto codec = new Http::MockClientConnection();
 
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP3, std::move(connection),
-                                                 codec, nullptr, host_, dispatcher_);
+  client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP3, std::move(connection), codec,
+                                                 nullptr, host_, dispatcher_);
 }
 
 TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
@@ -298,20 +297,18 @@ class CodecNetworkTest : public Event::TestUsingSimulatedTime,
 public:
   CodecNetworkTest() : api_(Api::createApiForTest()), stream_info_(api_->timeSource(), nullptr) {
     dispatcher_ = api_->allocateDispatcher("test_thread");
-    auto socket = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+    auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()));
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket->addressProvider().localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), nullptr);
-    upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_, true,
-                                                     ENVOY_TCP_BACKLOG_SIZE);
+    upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_, true);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
     codec_ = new Http::MockClientConnection();
-    client_ =
-        std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(client_connection),
-                                             codec_, nullptr, host_, *dispatcher_);
+    client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(client_connection),
+                                                   codec_, nullptr, host_, *dispatcher_);
 
     int expected_callbacks = 2;
     EXPECT_CALL(listener_callbacks_, onAccept_(_))

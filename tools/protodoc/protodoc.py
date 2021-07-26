@@ -6,8 +6,6 @@
 from collections import defaultdict
 import json
 import functools
-import os
-import pathlib
 import sys
 
 from google.protobuf import json_format
@@ -115,7 +113,10 @@ EXTENSION_STATUS_VALUES = {
         'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
 }
 
-EXTENSION_DB = json.loads(pathlib.Path(os.getenv('EXTENSION_DB_PATH')).read_text())
+r = runfiles.Create()
+
+with open(r.Rlocation("envoy/source/extensions/extensions_metadata.yaml")) as f:
+    EXTENSION_DB = yaml.safe_load(f.read())
 
 # create an index of extension categories from extension db
 EXTENSION_CATEGORIES = {}
@@ -168,6 +169,12 @@ def format_comment_with_annotations(comment, type_name=''):
     Returns:
         A string with additional RST from annotations.
     """
+    alpha_warning = ''
+    if annotations.ALPHA_ANNOTATION in comment.annotations:
+        experimental_warning = (
+            '.. warning::\n   This API is alpha and is not covered by the :ref:`threat model <arch_overview_threat_model>`.\n\n'
+        )
+
     formatted_extension = ''
     if annotations.EXTENSION_ANNOTATION in comment.annotations:
         extension = comment.annotations[annotations.EXTENSION_ANNOTATION]
@@ -177,7 +184,7 @@ def format_comment_with_annotations(comment, type_name=''):
         for category in comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION].split(","):
             formatted_extension_category += format_extension_category(category)
     comment = annotations.without_annotations(strip_leading_space(comment.raw) + '\n')
-    return comment + formatted_extension + formatted_extension_category
+    return alpha_warning + comment + formatted_extension + formatted_extension_category
 
 
 def map_lines(f, s):
@@ -235,13 +242,13 @@ def format_extension(extension):
     """
     try:
         extension_metadata = EXTENSION_DB[extension]
-        status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
+        status = EXTENSION_STATUS_VALUES.get(extension_metadata.get('status'), '')
         security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
         categories = extension_metadata["categories"]
     except KeyError as e:
         sys.stderr.write(
-            f"\n\nDid you forget to add '{extension}' to source/extensions/extensions_build_config.bzl?\n\n"
-        )
+            f"\n\nDid you forget to add '{extension}' to source/extensions/extensions_build_config.bzl "
+            "or source/extensions/extensions_metadata.yaml?\n\n")
         exit(1)  # Raising the error buries the above message in tracebacks.
 
     return EXTENSION_TEMPLATE.render(
@@ -656,8 +663,6 @@ class RstFormatVisitor(visitor.Visitor):
     """
 
     def __init__(self):
-        r = runfiles.Create()
-
         with open(r.Rlocation('envoy/docs/v2_mapping.json'), 'r') as f:
             self.v2_mapping = json.load(f)
 
@@ -672,7 +677,7 @@ class RstFormatVisitor(visitor.Visitor):
         normal_enum_type = normalize_type_context_name(type_context.name)
         anchor = format_anchor(enum_cross_ref_label(normal_enum_type))
         header = format_header('-', 'Enum %s' % normal_enum_type)
-        proto_link = github_url("f[{normal_enum_type} proto]", type_context) + '\n\n'
+        proto_link = github_url(f"[{normal_enum_type} proto]", type_context) + '\n\n'
         leading_comment = type_context.leading_comment
         formatted_leading_comment = format_comment_with_annotations(leading_comment, 'enum')
         if hide_not_implemented(leading_comment):

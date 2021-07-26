@@ -3,7 +3,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

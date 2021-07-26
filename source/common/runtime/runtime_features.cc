@@ -1,4 +1,4 @@
-#include "common/runtime/runtime_features.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 
@@ -56,12 +56,11 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.test_feature_true",
     // Begin alphabetically sorted section.
     "envoy.deprecated_features.allow_deprecated_extension_names",
-    "envoy.reloadable_features.activate_timers_next_event_loop",
     "envoy.reloadable_features.add_and_validate_scheme_header",
-    "envoy.reloadable_features.allow_preconnect",
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
     "envoy.reloadable_features.check_ocsp_policy",
+    "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     "envoy.reloadable_features.enable_compression_without_content_length_header",
@@ -71,11 +70,15 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.hash_multiple_header_values",
     "envoy.reloadable_features.health_check.graceful_goaway_handling",
     "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster",
-    "envoy.reloadable_features.http_transport_failure_reason_in_body",
-    "envoy.reloadable_features.http_upstream_wait_connect_response",
+    "envoy.reloadable_features.http2_consume_stream_refused_errors",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
+    "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.improved_stream_limit_handling",
     "envoy.reloadable_features.internal_redirects_with_body",
+    "envoy.reloadable_features.listener_reuse_port_default_enabled",
+    "envoy.reloadable_features.listener_wildcard_match_ip_family",
+    "envoy.reloadable_features.new_tcp_connection_pool",
+    "envoy.reloadable_features.no_chunked_encoding_header_for_304",
     "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing",
     "envoy.reloadable_features.preserve_downstream_scheme",
     "envoy.reloadable_features.remove_forked_chromium_url",
@@ -86,6 +89,8 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.strip_port_from_connect",
     "envoy.reloadable_features.treat_host_like_authority",
     "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure",
+    "envoy.reloadable_features.udp_per_event_loop_read_limit",
+    "envoy.reloadable_features.unquote_log_string_values",
     "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild",
     "envoy.reloadable_features.use_observable_cluster_name",
     "envoy.reloadable_features.vhds_heartbeats",
@@ -106,14 +111,18 @@ constexpr const char* runtime_features[] = {
 constexpr const char* disabled_runtime_features[] = {
     // v2 is fatal-by-default.
     "envoy.test_only.broken_in_production.enable_deprecated_v2_api",
-    // TODO(alyssawilk) flip true after the release.
-    "envoy.reloadable_features.new_tcp_connection_pool",
     // TODO(asraa) flip to true in a separate PR to enable the new JSON by default.
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
+    // TODO(kbaichoo): Remove when this is no longer test only.
+    "envoy.test_only.per_stream_buffer_accounting",
     // Allows the use of ExtensionWithMatcher to wrap a HTTP filter with a match tree.
     "envoy.reloadable_features.experimental_matching_api",
+    // When the runtime is flipped to true, use shared cache in getOrCreateRawAsyncClient method if
+    // CacheOption is CacheWhenRuntimeEnabled.
+    // Caller that use AlwaysCache option will always cache, unaffected by this runtime.
+    "envoy.reloadable_features.enable_grpc_async_client_cache",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

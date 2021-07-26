@@ -4,6 +4,7 @@ import subprocess
 import os
 import xml.etree.ElementTree as ET
 import slack
+from slack.errors import SlackApiError
 import sys
 import ssl
 
@@ -102,9 +103,15 @@ def parse_and_print_test_suite_error(testsuite, log_path):
             # parsed into the XML metadata. Here we attempt to extract those names from the log by
             # finding the last test case to run. The expected format of that is:
             #     "[ RUN      ] <TestParams>/<TestSuite>.<TestCase>\n".
+
             last_test_fullname = test_output.split('[ RUN      ]')[-1].splitlines()[0]
-            last_testsuite = last_test_fullname.split('/')[1].split('.')[0]
-            last_testcase = last_test_fullname.split('.')[1]
+            last_test_fullname_splitted_on_dot = last_test_fullname.split('.')
+            if len(last_test_fullname_splitted_on_dot) == 2:
+                last_testcase = last_test_fullname_splitted_on_dot[1]
+                last_testsuite = last_test_fullname_splitted_on_dot[0].split('/')[-1]
+            else:
+                last_testcase = "Could not retrieve last test case"
+                last_testsuite = "Could not retrieve last test suite"
 
     if error_msg != "":
         return print_test_suite_error(
@@ -267,8 +274,12 @@ if __name__ == "__main__":
             ssl_context.verify_mode = ssl.CERT_NONE
             # Due to a weird interaction between `websocket-client` and Slack client
             # we need to set the ssl context. See `slackapi/python-slack-sdk/issues/334`
-            client = slack.WebClient(token=SLACKTOKEN, ssl=ssl_context)
-            client.chat_postMessage(channel='test-flaky', text=output_msg, as_user="true")
+            try:
+                client = slack.WebClient(token=SLACKTOKEN, ssl=ssl_context)
+                client.chat_postMessage(channel='test-flaky', text=output_msg, as_user="true")
+            except SlackApiError as e:
+                print("Call to SlackApi failed:", e.response["error"])
+                print(output_msg)
         else:
             print(output_msg)
     else:

@@ -5,15 +5,15 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/network/address_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/network/socket_interface.h"
-#include "common/network/socket_option_factory.h"
-#include "common/runtime/runtime_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/runtime/runtime_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -211,6 +211,9 @@ struct SyncPacketProcessor : public Network::UdpPacketProcessor {
   }
   uint64_t maxDatagramSize() const override { return max_rx_datagram_size_; }
   void onDatagramsDropped(uint32_t) override {}
+  size_t numPacketsExpectedPerEventLoop() const override {
+    return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
+  }
 
   std::list<Network::UdpRecvData>& data_;
   const uint64_t max_rx_datagram_size_;

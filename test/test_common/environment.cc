@@ -9,20 +9,20 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/compiler_requirements.h"
-#include "common/common/logger.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/filesystem/directory.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/compiler_requirements.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/filesystem/directory.h"
 
 #include "absl/container/node_hash_map.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "common/signal/signal_action.h"
+#include "source/common/signal/signal_action.h"
 #endif
 
-#include "server/options_impl.h"
+#include "source/server/options_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/network_utility.h"
@@ -370,9 +370,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   out_json_string = substitute(out_json_string, version);
 
   auto name = Filesystem::fileSystemForTest().splitPathFromFilename(path).file_;
-  const std::string extension = absl::EndsWith(name, ".yaml")      ? ".yaml"
-                                : absl::EndsWith(name, ".pb_text") ? ".pb_text"
-                                                                   : ".json";
+  const std::string extension = std::string(name.substr(name.rfind('.')));
   const std::string out_json_path =
       TestEnvironment::temporaryPath(name) + ".with.ports" + extension;
   {

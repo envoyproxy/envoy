@@ -1,7 +1,7 @@
 #include <string>
 #include <vector>
 
-#include "extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"
@@ -42,7 +42,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameDNSMatched) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_hidden_envoy_deprecated_regex(".*.example.com");
+  matcher.MergeFrom(TestUtility::createRegexMatcher(".*.example.com"));
   std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
@@ -92,7 +92,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameURIMatched) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_hidden_envoy_deprecated_regex("spiffe://lyft.com/.*-team");
+  matcher.MergeFrom(TestUtility::createRegexMatcher("spiffe://lyft.com/.*-team"));
   std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
@@ -110,10 +110,59 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameNotMatched) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_hidden_envoy_deprecated_regex(".*.foo.com");
+  matcher.MergeFrom(TestUtility::createRegexMatcher(".*.foo.com"));
   std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
   EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(test_store);
+  // Create the default validator object.
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          /*CertificateValidationContextConfig=*/nullptr, stats,
+          Event::GlobalTimeSystem().timeSystem());
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(".*.example.com"));
+  std::vector<Matchers::StringMatcherImpl> san_matchers;
+  san_matchers.push_back(Matchers::StringMatcherImpl(matcher));
+  // Verify the certificate with correct SAN regex matcher.
+  EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{}, san_matchers),
+            Envoy::Ssl::ClientValidationStatus::Validated);
+  EXPECT_EQ(stats.fail_verify_san_.value(), 0);
+
+  matcher.MergeFrom(TestUtility::createExactMatcher("hello.example.com"));
+  std::vector<Matchers::StringMatcherImpl> invalid_san_matchers;
+  invalid_san_matchers.push_back(Matchers::StringMatcherImpl(matcher));
+  // Verify the certificate with incorrect SAN exact matcher.
+  EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{},
+                                                 invalid_san_matchers),
+            Envoy::Ssl::ClientValidationStatus::Failed);
+  EXPECT_EQ(stats.fail_verify_san_.value(), 1);
+}
+
+TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContext) {
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(test_store);
+  // Create the default validator object.
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          /*CertificateValidationContextConfig=*/nullptr, stats,
+          Event::GlobalTimeSystem().timeSystem());
+
+  EXPECT_EQ(default_validator->verifyCertificate(/*cert=*/nullptr, /*verify_san_list=*/{},
+                                                 /*subject_alt_name_matchers=*/{}),
+            Envoy::Ssl::ClientValidationStatus::NotValidated);
+  X509 cert = {};
+  EXPECT_EQ(default_validator->doVerifyCertChain(/*store_ctx=*/nullptr,
+                                                 /*ssl_extended_info=*/nullptr, /*leaf_cert=*/cert,
+                                                 /*transport_socket_options=*/nullptr),
+            0);
 }
 
 } // namespace Tls
