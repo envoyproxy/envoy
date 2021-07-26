@@ -231,14 +231,13 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
   if (end_stream) {
     endEncode();
   } else {
-    connection_.flushOutput();
+    flushOutput();
   }
 }
 
 void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   // end_stream may be indicated with a zero length data buffer. If that is the case, so not
   // actually write the zero length buffer out.
-  updateSentBytes(data.length());
   if (data.length() > 0) {
     if (chunk_encoding_) {
       connection_.buffer().add(absl::StrCat(absl::Hex(data.length()), CRLF));
@@ -254,9 +253,13 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   if (end_stream) {
     endEncode();
   } else {
-    connection_.flushOutput();
+    flushOutput();
   }
 }
+
+void StreamEncoderImpl::flushOutput() {
+    updateSentBytes(connection_.flushOutput());
+  }
 
 void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
   if (!connection_.enableTrailers()) {
@@ -275,11 +278,11 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
       return HeaderMap::Iterate::Continue;
     });
 
-    connection_.flushOutput();
+    flushOutput();
     connection_.buffer().add(CRLF);
   }
 
-  connection_.flushOutput();
+  flushOutput();
   connection_.onEncodeComplete();
 }
 
@@ -327,14 +330,16 @@ Status ServerConnectionImpl::doFloodProtectionChecks() const {
   return okStatus();
 }
 
-void ConnectionImpl::flushOutput(bool end_encode) {
+uint64_t ConnectionImpl::flushOutput(bool end_encode) {
   if (end_encode) {
     // If this is an HTTP response in ServerConnectionImpl, track outbound responses for flood
     // protection
     maybeAddSentinelBufferFragment(*output_buffer_);
   }
+  uint64_t bytes_encoded = output_buffer_->length();
   connection().write(*output_buffer_, false);
   ASSERT(0UL == output_buffer_->length());
+  return bytes_encoded;
 }
 
 void ConnectionImpl::addToBuffer(absl::string_view data) { output_buffer_->add(data); }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <bits/stdint-uintn.h>
 #include <cstdint>
 #include <list>
 #include <memory>
@@ -132,6 +133,8 @@ private:
   void encodeFormattedHeader(absl::string_view key, absl::string_view value,
                              HeaderKeyFormatterOptConstRef formatter);
 
+  void flushOutput();
+
   absl::string_view details_;
   uint64_t sent_bytes_{0};
   uint64_t received_bytes_{0};
@@ -212,7 +215,7 @@ public:
   /**
    * Flush all pending output from encoding.
    */
-  void flushOutput(bool end_encode = false);
+  uint64_t flushOutput(bool end_encode = false);
 
   void addToBuffer(absl::string_view data);
   void addCharToBuffer(char c);
