@@ -389,6 +389,14 @@ public:
    * @param the account to assign this stream.
    */
   virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
+
+  virtual uint64_t sentBytes() PURE;
+
+  virtual void updateSentBytes(size_t newly_sent_bytes) PURE;
+
+  virtual uint64_t receivedBytes() PURE;
+
+  virtual void updateReceivedBytes(size_t newly_sent_bytes) PURE;
 };
 
 /**

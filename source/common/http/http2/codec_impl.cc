@@ -781,7 +781,10 @@ Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
   ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}, stream_id={}", connection_,
                  static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags), hd->stream_id);
   current_stream_id_ = hd->stream_id;
-
+  StreamImpl* stream = getStream(hd->stream_id);
+  if (stream != nullptr) {
+    stream->updateReceivedBytes(hd->length + 9);
+  }
   // Track all the frames without padding here, since this is the only callback we receive
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
   // HEADERS frame is tracked in onBeginHeaders(), DATA frame is tracked in onFrameReceived().

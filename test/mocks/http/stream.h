@@ -38,6 +38,14 @@ public:
       callback->onBelowWriteBufferLowWatermark();
     }
   }
+
+  uint64_t sentBytes() override { return 0; }
+
+  void updateSentBytes(size_t) override {}
+
+  uint64_t receivedBytes() override { return 0; }
+
+  void updateReceivedBytes(size_t) override {}
 };
 
 } // namespace Http
