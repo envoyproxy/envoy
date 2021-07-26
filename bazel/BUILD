@@ -349,6 +349,11 @@ config_setting(
 )
 
 config_setting(
+    name = "enable_exported_lua_symbols",
+    values = {"define": "exported_lua_symbols=enabled"},
+)
+
+config_setting(
     name = "enable_log_debug_assert_in_release",
     values = {"define": "log_debug_assert_in_release=enabled"},
 )

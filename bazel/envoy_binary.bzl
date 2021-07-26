@@ -51,6 +51,13 @@ def _envoy_select_exported_symbols(xs):
         "//conditions:default": [],
     })
 
+# Select the given values if exporting lua symbols is enabled in the current build.
+def _envoy_select_exported_lua_symbols(xs):
+    return select({
+        "@envoy//bazel:enable_exported_lua_symbols": xs,
+        "//conditions:default": [],
+    })
+
 # Compute the final linkopts based on various options.
 def _envoy_linkopts():
     return select({
@@ -84,7 +91,7 @@ def _envoy_linkopts():
         "@envoy//bazel:boringssl_fips": [],
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": ["-pie"],
-    }) + _envoy_select_exported_symbols(["-Wl,-E"])
+    }) + _envoy_select_exported_symbols(["-Wl,-E"]) + _envoy_select_exported_lua_symbols(["-Wl,--dynamic-list=/source/lua_symbols.ldsym"])
 
 def _envoy_stamped_deps():
     return select({
