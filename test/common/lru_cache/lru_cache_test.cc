@@ -353,7 +353,7 @@ TEST_F(SimpleLRUCacheTest, OverfullEvictionPolicyWithIdleEvictionEnabled) {
 TEST_F(SimpleLRUCacheTest, OverfullEvictionPolicyWithAgeBasedEvictionEnabled) {
   cache_.reset(new TestCache(kCacheSize));
   // With age-based eviction usage is ignored and instead the oldest inserted
-  // element is evicted when cahce becomes overfull.
+  // element is evicted when cache becomes overfull.
   cache_->setAgeBasedEviction(2000);
 
   for (int i = 0; i < kCacheSize; i++) {
@@ -728,7 +728,7 @@ TEST_F(SimpleLRUCacheTest, UpdateSize) {
 
   // *** Okay, math works. Now try changing the sizes in mid-stream. ***
 
-  // Chane one item to have a size of two. The should bring the total
+  // Cache one item to have a size of two. The should bring the total
   // back up to kCacheSize.
   cache_->updateSize(1, nullptr, 2);
 
@@ -1003,7 +1003,7 @@ TEST_F(SimpleLRUCacheTest, GetInsertionTime) {
   ASSERT_GT(cache_->getInsertionTime(1), last);
   ASSERT_LT(cache_->getInsertionTime(1), now);
 
-  // Make sure next element > time of el. 1 and < now
+  // Make sure next element > insertion time of 1 and < now
   in_cache[2] = true;
   v = new TestValue(2);
   cache_->insert(2, v, 1);
@@ -1078,7 +1078,7 @@ TEST_F(SimpleLRUCacheTest, LookupWithoutEvictionOrderUpdateAndRemove) {
   no_update_options.set_update_eviction_order(false);
   TestValue* value = cache_->lookupWithOptions(1, no_update_options);
   // Remove the second element before calling releaseWithOptions. Since we used
-  // update_eviction_order = false for the LookupWithOptions call the value was
+  // update_eviction_order = false for the lookupWithOptions call the value was
   // not removed from the LRU. remove() is responsible for taking the value out
   // of the LRU.
   cache_->remove(1);

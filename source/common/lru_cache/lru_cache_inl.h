@@ -435,10 +435,10 @@ public:
 
   // Return a std::string that summarizes the contents of the cache.
   //
-  // The output of this function is not suitable for parsing by borgmon. For an
-  // example of exporting the summary information in a borgmon mapped-value
-  // format, see GFS_CS_BufferCache::ExportSummaryAsMap in
-  // file/gfs/chunkserver/gfs_chunkserver.{cc,h}
+  // The output of this function is not suitable for parsing by `borgmon`. For an
+  // example of exporting the summary information in a `borgmon` mapped-value
+  // format, see `GFS_CS_BufferCache::ExportSummaryAsMap` in
+  // file `/gfs/chunkserver/gfs_chunkserver.{cc,h}`
   std::string summary() const {
     std::stringstream ss;
     ss << pinnedSize() << "/" << deferredSize() << "/" << size() << " p/d/a";
@@ -459,7 +459,7 @@ public:
 protected:
   // Override this operation if you want to control how a value is
   // cleaned up. For example, if the value is a "File", you may want
-  // to "close" it instead of "delete"ing it.
+  // to "close" it instead of deleting it.
   //
   // Not actually implemented here because often value's destructor is
   // protected, and the derived SimpleLRUCache is declared a friend,

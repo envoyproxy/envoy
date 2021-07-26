@@ -1,5 +1,5 @@
 // For inclusion in .h files. The real class definition is in
-// lru_cache_inl.h.
+// `lru_cache_inl.h`.
 
 #pragma once
 

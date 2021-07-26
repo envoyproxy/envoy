@@ -528,6 +528,7 @@ cout
 coverity
 cplusplus
 cpuset
+cpufreq
 creds
 cRLSign
 crypto
@@ -731,6 +732,7 @@ interpretable
 intra
 ints
 invariance
+invariants
 iovec
 iovecs
 ips
@@ -818,6 +820,7 @@ mmsg
 mmsghdr
 mongo
 moveable
+mru
 msec
 msg
 msghdr
@@ -1018,6 +1021,7 @@ reperform
 repicked
 repo
 reproducibility
+representable
 requirepass
 reselecting
 reserialize
@@ -1092,8 +1096,11 @@ spanid
 spdlog
 splitter
 spoofable
+sudo
 src
 ssize
+sstable
+sstables
 stackdriver
 stacktrace
 starttls
