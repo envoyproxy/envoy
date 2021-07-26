@@ -240,6 +240,7 @@ TEST(PortMatcher, PortMatcher) {
   checkMatcher(PortMatcher(456), false, conn, headers, info);
 }
 
+// Test valid and invalid destination_port_range permission rule in RBAC.
 TEST(PortRangeMatcher, PortRangeMatcher) {
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
@@ -248,6 +249,8 @@ TEST(PortRangeMatcher, PortRangeMatcher) {
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
   info.downstream_address_provider_->setLocalAddress(addr);
 
+  // IP address with port 456 is in range [123, 789) and [456, 789), but not in range [123, 456) or
+  // [12, 34).
   envoy::type::v3::Int32Range range;
   range.set_start(123);
   range.set_end(789);
@@ -265,6 +268,7 @@ TEST(PortRangeMatcher, PortRangeMatcher) {
   range.set_end(34);
   checkMatcher(PortRangeMatcher(range), false, conn, headers, info);
 
+  // Only IP address is valid for the permission rule.
   NiceMock<StreamInfo::MockStreamInfo> info2;
   Envoy::Network::Address::InstanceConstSharedPtr addr2 =
       std::make_shared<const Envoy::Network::Address::PipeInstance>("test");
