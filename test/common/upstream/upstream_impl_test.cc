@@ -3368,34 +3368,6 @@ TEST_F(ClusterInfoImplTest, Http3Auto) {
       auto_h3->info()->http3Options().quic_protocol_options().max_concurrent_streams().value(), 2);
 }
 
-#else
-TEST_F(ClusterInfoImplTest, Http3BadConfig) {
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: MAGLEV
-    load_assignment:
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        use_downstream_protocol_config:
-          http3_protocol_options: {}
-        common_http_protocol_options:
-          idle_timeout: 1s
-  )EOF",
-                                                       Network::Address::IpVersion::v4);
-
-  EXPECT_THROW_WITH_REGEX(makeCluster(yaml), EnvoyException,
-                          "HTTP3 configured but not enabled in the build.");
-}
 TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
@@ -3431,6 +3403,34 @@ TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
 }
 
+#else
+TEST_F(ClusterInfoImplTest, Http3BadConfig) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        use_downstream_protocol_config:
+          http3_protocol_options: {}
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_REGEX(makeCluster(yaml), EnvoyException,
+                          "HTTP3 configured but not enabled in the build.");
+}
 #endif // ENVOY_ENABLE_QUIC
 
 // Validate empty singleton for HostsPerLocalityImpl.
