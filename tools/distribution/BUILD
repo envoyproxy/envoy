@@ -29,3 +29,11 @@ envoy_py_binary(
         "//tools/gpg:identity",
     ],
 )
+
+envoy_py_binary(
+    name = "tools.distribution.verify",
+    deps = [
+        ":distrotest",
+        "//tools/base:checker",
+    ],
+)
