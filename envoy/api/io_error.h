@@ -50,20 +50,21 @@ using IoErrorPtr = std::unique_ptr<IoError, IoErrorDeleterType>;
 /**
  * Basic type for return result which has a return code and error code defined
  * according to different implementations.
- * If the call succeeds, ok() should return true and |rc_| is valid. Otherwise |err_|
+ * If the call succeeds, ok() should return true and |return_value_| is valid. Otherwise |err_|
  * can be passed into IoError::getErrorCode() to extract the error. In this
- * case, |rc_| is invalid.
+ * case, |return_value_| is invalid.
  */
 template <typename ReturnValue> struct IoCallResult {
-  IoCallResult(ReturnValue rc, IoErrorPtr err) : rc_(rc), err_(std::move(err)) {}
+  IoCallResult(ReturnValue return_value, IoErrorPtr err)
+      : return_value_(return_value), err_(std::move(err)) {}
 
   IoCallResult(IoCallResult<ReturnValue>&& result) noexcept
-      : rc_(result.rc_), err_(std::move(result.err_)) {}
+      : return_value_(result.return_value_), err_(std::move(result.err_)) {}
 
   virtual ~IoCallResult() = default;
 
   IoCallResult& operator=(IoCallResult&& result) noexcept {
-    rc_ = result.rc_;
+    return_value_ = result.return_value_;
     err_ = std::move(result.err_);
     return *this;
   }
@@ -79,8 +80,7 @@ template <typename ReturnValue> struct IoCallResult {
    */
   bool wouldBlock() const { return !ok() && err_->getErrorCode() == IoError::IoErrorCode::Again; }
 
-  // TODO(danzh): rename it to be more meaningful, i.e. return_value_.
-  ReturnValue rc_;
+  ReturnValue return_value_;
   IoErrorPtr err_;
 };
 

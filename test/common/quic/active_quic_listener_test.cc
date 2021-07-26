@@ -219,7 +219,7 @@ protected:
     auto send_rc =
         Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(), slice.data(), 1,
                                         nullptr, *listen_socket_->addressProvider().localAddress());
-    ASSERT_EQ(slice[0].len_, send_rc.rc_);
+    ASSERT_EQ(slice[0].len_, send_rc.return_value_);
 
 #if defined(__APPLE__)
     // This sleep makes the tests pass more reliably. Some debugging showed that without this,
@@ -242,7 +242,7 @@ protected:
             client_socket->ioHandle().read(*result_buffer, bytes_to_read - bytes_read);
 
         if (result.ok()) {
-          bytes_read += result.rc_;
+          bytes_read += result.return_value_;
         } else if (retry == 10 || result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
           break;
         }
