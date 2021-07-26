@@ -39,7 +39,7 @@ protected:
 };
 
 TEST_F(BufferMemoryAccountTest, ManagesAccountBalance) {
-  auto account = factory_.createAccount(&mock_reset_handler_);
+  auto account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer(account);
   ASSERT_EQ(getBalance(account), 0);
 
@@ -86,7 +86,7 @@ TEST_F(BufferMemoryAccountTest, ManagesAccountBalance) {
 }
 
 TEST_F(BufferMemoryAccountTest, BufferAccountsForUnownedSliceMovedInto) {
-  auto account = factory_.createAccount(&mock_reset_handler_);
+  auto account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl accounted_buffer(account);
 
   Buffer::OwnedImpl unowned_buffer;
@@ -104,11 +104,11 @@ TEST_F(BufferMemoryAccountTest, BufferAccountsForUnownedSliceMovedInto) {
 }
 
 TEST_F(BufferMemoryAccountTest, BufferFragmentsShouldNotHaveAnAssociatedAccount) {
-  auto buffer_one_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_one_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer_one(buffer_one_account);
   ASSERT_EQ(getBalance(buffer_one_account), 0);
 
-  auto buffer_two_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_two_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer_two(buffer_two_account);
   ASSERT_EQ(getBalance(buffer_two_account), 0);
 
@@ -132,11 +132,11 @@ TEST_F(BufferMemoryAccountTest, BufferFragmentsShouldNotHaveAnAssociatedAccount)
 }
 
 TEST_F(BufferMemoryAccountTest, SliceRemainsAttachToOriginalAccountWhenMoved) {
-  auto buffer_one_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_one_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer_one(buffer_one_account);
   ASSERT_EQ(getBalance(buffer_one_account), 0);
 
-  auto buffer_two_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_two_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer_two(buffer_two_account);
   ASSERT_EQ(getBalance(buffer_two_account), 0);
 
@@ -159,11 +159,11 @@ TEST_F(BufferMemoryAccountTest, SliceRemainsAttachToOriginalAccountWhenMoved) {
 
 TEST_F(BufferMemoryAccountTest,
        SliceRemainsAttachToOriginalAccountWhenMovedUnlessCoalescedIntoExistingSlice) {
-  auto buffer_one_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_one_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer_one(buffer_one_account);
   ASSERT_EQ(getBalance(buffer_one_account), 0);
 
-  auto buffer_two_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_two_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer_two(buffer_two_account);
   ASSERT_EQ(getBalance(buffer_two_account), 0);
 
@@ -186,15 +186,15 @@ TEST_F(BufferMemoryAccountTest,
 }
 
 TEST_F(BufferMemoryAccountTest, SliceCanRemainAttachedToOriginalAccountWhenMovedAndCoalescedInto) {
-  auto buffer_one_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_one_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer_one(buffer_one_account);
   ASSERT_EQ(getBalance(buffer_one_account), 0);
 
-  auto buffer_two_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_two_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer_two(buffer_two_account);
   ASSERT_EQ(getBalance(buffer_two_account), 0);
 
-  auto buffer_three_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_three_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer_three(buffer_three_account);
   ASSERT_EQ(getBalance(buffer_three_account), 0);
 
@@ -219,15 +219,15 @@ TEST_F(BufferMemoryAccountTest, SliceCanRemainAttachedToOriginalAccountWhenMoved
 }
 
 TEST_F(BufferMemoryAccountTest, LinearizedBufferShouldChargeItsAssociatedAccount) {
-  auto buffer_one_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_one_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer_one(buffer_one_account);
   ASSERT_EQ(getBalance(buffer_one_account), 0);
 
-  auto buffer_two_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_two_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer_two(buffer_two_account);
   ASSERT_EQ(getBalance(buffer_two_account), 0);
 
-  auto buffer_three_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_three_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer_three(buffer_three_account);
   ASSERT_EQ(getBalance(buffer_three_account), 0);
 
@@ -256,11 +256,11 @@ TEST_F(BufferMemoryAccountTest, LinearizedBufferShouldChargeItsAssociatedAccount
 }
 
 TEST_F(BufferMemoryAccountTest, ManagesAccountBalanceWhenPrepending) {
-  auto prepend_to_account = factory_.createAccount(&mock_reset_handler_);
+  auto prepend_to_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer_to_prepend_to(prepend_to_account);
   ASSERT_EQ(getBalance(prepend_to_account), 0);
 
-  auto prepend_account = factory_.createAccount(&mock_reset_handler_);
+  auto prepend_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer_to_prepend(prepend_account);
   ASSERT_EQ(getBalance(prepend_account), 0);
 
@@ -287,7 +287,7 @@ TEST_F(BufferMemoryAccountTest, ManagesAccountBalanceWhenPrepending) {
 }
 
 TEST_F(BufferMemoryAccountTest, ExtractingSliceWithExistingStorageCreditsAccountOnce) {
-  auto buffer_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer(buffer_account);
   ASSERT_EQ(getBalance(buffer_account), 0);
 
@@ -308,7 +308,7 @@ TEST_F(BufferMemoryAccountTest, ExtractingSliceWithExistingStorageCreditsAccount
 }
 
 TEST_F(BufferMemoryAccountTest, NewReservationSlicesOnlyChargedAfterCommit) {
-  auto buffer_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_account = factory_.createAccount(mock_reset_handler_);
   Buffer::OwnedImpl buffer(buffer_account);
   ASSERT_EQ(getBalance(buffer_account), 0);
 
@@ -323,7 +323,7 @@ TEST_F(BufferMemoryAccountTest, NewReservationSlicesOnlyChargedAfterCommit) {
 }
 
 TEST_F(BufferMemoryAccountTest, ReservationShouldNotChargeForExistingSlice) {
-  auto buffer_account = factory_.createAccount(&mock_reset_handler_);
+  auto buffer_account = factory_.createAccount(mock_reset_handler_);
 
   Buffer::OwnedImpl buffer(buffer_account);
   ASSERT_EQ(getBalance(buffer_account), 0);
@@ -341,7 +341,7 @@ TEST_F(BufferMemoryAccountTest, ReservationShouldNotChargeForExistingSlice) {
 }
 
 TEST_F(BufferMemoryAccountTest, AccountShouldNotBeTrackedByFactoryUnlessAboveMinimumBalance) {
-  auto account = factory_.createAccount(&mock_reset_handler_);
+  auto account = factory_.createAccount(mock_reset_handler_);
 
   // Check not tracked
   factory_.inspectMemoryClasses(noAccountsTracked);
@@ -362,7 +362,7 @@ TEST_F(BufferMemoryAccountTest, AccountShouldNotBeTrackedByFactoryUnlessAboveMin
 }
 
 TEST_F(BufferMemoryAccountTest, ClearingDownstreamShouldUnregisterTrackedAccounts) {
-  auto account = factory_.createAccount(&mock_reset_handler_);
+  auto account = factory_.createAccount(mock_reset_handler_);
   account->charge(kMinimumBalanceToTrack);
 
   // Check tracked
@@ -379,7 +379,7 @@ TEST_F(BufferMemoryAccountTest, ClearingDownstreamShouldUnregisterTrackedAccount
 }
 
 TEST_F(BufferMemoryAccountTest, AccountCanResetStream) {
-  auto account = factory_.createAccount(&mock_reset_handler_);
+  auto account = factory_.createAccount(mock_reset_handler_);
 
   EXPECT_CALL(mock_reset_handler_, resetStream(_));
   account->resetDownstream();
@@ -387,7 +387,7 @@ TEST_F(BufferMemoryAccountTest, AccountCanResetStream) {
 }
 
 TEST_F(BufferMemoryAccountTest, FactoryTracksAccountCorrectlyAsBalanceIncreases) {
-  auto account = factory_.createAccount(&mock_reset_handler_);
+  auto account = factory_.createAccount(mock_reset_handler_);
   account->charge(kMinimumBalanceToTrack);
 
   factory_.inspectMemoryClasses([](MemoryClassesToAccountsSet& memory_classes_to_account) {
@@ -408,7 +408,7 @@ TEST_F(BufferMemoryAccountTest, FactoryTracksAccountCorrectlyAsBalanceIncreases)
 }
 
 TEST_F(BufferMemoryAccountTest, FactoryTracksAccountCorrectlyAsBalanceDecreases) {
-  auto account = factory_.createAccount(&mock_reset_handler_);
+  auto account = factory_.createAccount(mock_reset_handler_);
   account->charge(kThresholdForFinalBucket);
 
   factory_.inspectMemoryClasses([](MemoryClassesToAccountsSet& memory_classes_to_account) {
@@ -430,7 +430,7 @@ TEST_F(BufferMemoryAccountTest, FactoryTracksAccountCorrectlyAsBalanceDecreases)
 }
 
 TEST_F(BufferMemoryAccountTest, SizeSaturatesInLargestBucket) {
-  auto account = factory_.createAccount(&mock_reset_handler_);
+  auto account = factory_.createAccount(mock_reset_handler_);
   account->charge(kThresholdForFinalBucket);
 
   factory_.inspectMemoryClasses([](MemoryClassesToAccountsSet& memory_classes_to_account) {
@@ -451,7 +451,7 @@ TEST_F(BufferMemoryAccountTest, SizeSaturatesInLargestBucket) {
 }
 
 TEST_F(BufferMemoryAccountTest, RemainsInSameBucketIfChangesWithinThreshold) {
-  auto account = factory_.createAccount(&mock_reset_handler_);
+  auto account = factory_.createAccount(mock_reset_handler_);
   account->charge(kMinimumBalanceToTrack);
 
   factory_.inspectMemoryClasses([](MemoryClassesToAccountsSet& memory_classes_to_account) {

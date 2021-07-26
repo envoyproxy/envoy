@@ -67,7 +67,7 @@ public:
   Buffer::InstancePtr createBuffer(std::function<void()> below_low_watermark,
                                    std::function<void()> above_high_watermark,
                                    std::function<void()> above_overflow_watermark) override;
-  BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler* reset_handler) override;
+  BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) override;
   void unregisterAccount(const BufferMemoryAccountSharedPtr& account, int current_class) override;
 
   // Number of buffers created.

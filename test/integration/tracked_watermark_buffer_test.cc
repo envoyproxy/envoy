@@ -133,7 +133,7 @@ TEST_F(TrackedWatermarkBufferTest, TracksNumberOfBuffersActivelyBound) {
   auto buffer1 = factory_.createBuffer([]() {}, []() {}, []() {});
   auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
   auto buffer3 = factory_.createBuffer([]() {}, []() {}, []() {});
-  auto account = factory_.createAccount(&mock_reset_handler_);
+  auto account = factory_.createAccount(mock_reset_handler_);
   ASSERT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
 
   buffer1->bindAccount(account);
@@ -159,7 +159,7 @@ TEST_F(TrackedWatermarkBufferTest, TracksNumberOfAccountsActive) {
   auto buffer1 = factory_.createBuffer([]() {}, []() {}, []() {});
   auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
   auto buffer3 = factory_.createBuffer([]() {}, []() {}, []() {});
-  auto account1 = factory_.createAccount(&mock_reset_handler_);
+  auto account1 = factory_.createAccount(mock_reset_handler_);
   ASSERT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
 
   buffer1->bindAccount(account1);
@@ -171,7 +171,7 @@ TEST_F(TrackedWatermarkBufferTest, TracksNumberOfAccountsActive) {
   account1->clearDownstream();
   account1.reset();
 
-  auto account2 = factory_.createAccount(&mock_reset_handler_);
+  auto account2 = factory_.createAccount(mock_reset_handler_);
   buffer3->bindAccount(account2);
   EXPECT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(2, 3));
 
@@ -191,8 +191,8 @@ TEST_F(TrackedWatermarkBufferTest, TracksNumberOfAccountsActive) {
 TEST_F(TrackedWatermarkBufferTest, WaitForExpectedAccountBalanceShouldReturnTrueWhenConditionsMet) {
   auto buffer1 = factory_.createBuffer([]() {}, []() {}, []() {});
   auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
-  auto account1 = factory_.createAccount(&mock_reset_handler_);
-  auto account2 = factory_.createAccount(&mock_reset_handler_);
+  auto account1 = factory_.createAccount(mock_reset_handler_);
+  auto account2 = factory_.createAccount(mock_reset_handler_);
   buffer1->bindAccount(account1);
   buffer2->bindAccount(account2);
 

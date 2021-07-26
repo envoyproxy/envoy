@@ -520,7 +520,7 @@ public:
    * invoke to reset the stream.
    * @return a BufferMemoryAccountSharedPtr of the newly created account.
    */
-  virtual BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler* reset_handler) PURE;
+  virtual BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) PURE;
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;

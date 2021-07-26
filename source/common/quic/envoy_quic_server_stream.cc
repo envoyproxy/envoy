@@ -312,8 +312,6 @@ void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
 }
 
 void EnvoyQuicServerStream::CloseWriteSide() {
-  quic::QuicSpdyServerStreamBase::CloseWriteSide();
-
   // Clear the downstream since the stream should not write additional data
   // after this is called, e.g. cannot reset the stream.
   // Only the downstream stream should clear the downstream of the
@@ -325,6 +323,7 @@ void EnvoyQuicServerStream::CloseWriteSide() {
   if (buffer_memory_account_) {
     buffer_memory_account_->clearDownstream();
   }
+  quic::QuicSpdyServerStreamBase::CloseWriteSide();
 }
 
 void EnvoyQuicServerStream::OnClose() {

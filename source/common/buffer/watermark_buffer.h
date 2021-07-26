@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 
 #include "source/common/buffer/buffer_impl.h"
 
@@ -88,10 +89,10 @@ public:
   // Used to create the account, and complete wiring with the factory
   // and shared_this_.
   static BufferMemoryAccountSharedPtr createAccount(WatermarkBufferFactory* factory,
-                                                    Http::StreamResetHandler* reset_handler);
+                                                    Http::StreamResetHandler& reset_handler);
   ~BufferMemoryAccountImpl() override {
     ASSERT(buffer_memory_allocated_ == 0);
-    ASSERT(reset_handler_ == nullptr);
+    ASSERT(!reset_handler_.has_value());
   }
 
   // Make not copyable
@@ -111,22 +112,25 @@ public:
   void clearDownstream() override;
 
   void resetDownstream() override {
-    if (reset_handler_ != nullptr) {
+    if (reset_handler_.has_value()) {
       reset_handler_->resetStream(Http::StreamResetReason::OverloadManager);
     }
   }
 
-  // The number of memory classes the Account expects to exists.
+  // The number of memory classes the Account expects to exists. See
+  // *WatermarkBufferFactory* for details on the memory classes.
   static constexpr uint32_t NUM_MEMORY_CLASSES_ = 8;
 
 private:
-  BufferMemoryAccountImpl(WatermarkBufferFactory* factory, Http::StreamResetHandler* reset_handler)
+  BufferMemoryAccountImpl(WatermarkBufferFactory* factory, Http::StreamResetHandler& reset_handler)
       : factory_(factory), reset_handler_(reset_handler) {}
 
   // Returns the class index based off of the buffer_memory_allocated_
-  // This can differs with current_bucket_idx_ if buffer_memory_allocated_ was
+  // This can differ with current_bucket_idx_ if buffer_memory_allocated_ was
   // just modified.
-  // Returned class index range is [-1, NUM_MEMORY_CLASSES_).
+  // The class indexes returned are based on buckets of powers of two, if the
+  // account is above a minimum threshold. Returned class index range is [-1,
+  // NUM_MEMORY_CLASSES_).
   int balanceToClassIndex();
   void updateAccountClass();
 
@@ -136,7 +140,7 @@ private:
 
   WatermarkBufferFactory* factory_ = nullptr;
 
-  Http::StreamResetHandler* reset_handler_ = nullptr;
+  OptRef<Http::StreamResetHandler> reset_handler_;
   // Keep a copy of the shared_ptr pointing to this account. We opted to go this
   // route rather than enable_shared_from_this to avoid wasteful atomic
   // operations e.g. when updating the tracking of the account.
@@ -146,6 +150,27 @@ private:
   BufferMemoryAccountSharedPtr shared_this_ = nullptr;
 };
 
+/**
+ * The WatermarkBufferFactory creates *WatermarkBuffer*s and
+ * *BufferMemoryAccountImpl* that can be used to bind to the created buffers
+ * from a given downstream (and corresponding upstream, if one exists). The
+ * accounts can then be used to reset the underlying stream.
+ *
+ * Any account produced by this factory might tracked by the factory using the
+ * following scheme:
+ *
+ * 1) Is the account balance >= 1MB? If not don't track.
+ * 2) For all accounts above the minimum threshold for tracking, put the account
+ *    into one of the *BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_* buckets. As
+ *    the account balance changes, the account informs the Watermark Factory if
+ *    the bucket for that account has changed.
+ *    See *BufferMemoryAccountImpl::balanceToClassIndex()* for details on the
+ *    memory class for a given account balance.
+ *
+ * TODO(kbaichoo): Update this documentation when we make the minimum account
+ * threshold configurable.
+ *
+ */
 class WatermarkBufferFactory : public WatermarkFactory {
 public:
   // Buffer::WatermarkFactory
@@ -157,7 +182,7 @@ public:
                                              above_overflow_watermark);
   }
 
-  BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler* reset_handler) override;
+  BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) override;
 
   // Called by BufferMemoryAccountImpls created by the factory on account class
   // updated.

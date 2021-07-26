@@ -141,7 +141,7 @@ void WatermarkBuffer::checkHighAndOverflowWatermarks() {
 }
 
 BufferMemoryAccountSharedPtr
-WatermarkBufferFactory::createAccount(Http::StreamResetHandler* reset_handler) {
+WatermarkBufferFactory::createAccount(Http::StreamResetHandler& reset_handler) {
   return BufferMemoryAccountImpl::createAccount(this, reset_handler);
 }
 
@@ -183,8 +183,7 @@ WatermarkBufferFactory::~WatermarkBufferFactory() {
 
 BufferMemoryAccountSharedPtr
 BufferMemoryAccountImpl::createAccount(WatermarkBufferFactory* factory,
-                                       Http::StreamResetHandler* reset_handler) {
-  ASSERT(reset_handler != nullptr);
+                                       Http::StreamResetHandler& reset_handler) {
   // We use shared_ptr ctor directly rather than make shared since the
   // constructor being invoked is private as we want users to use this static
   // method to createAccounts.
@@ -228,8 +227,8 @@ void BufferMemoryAccountImpl::charge(uint64_t amount) {
 }
 
 void BufferMemoryAccountImpl::clearDownstream() {
-  if (reset_handler_) {
-    reset_handler_ = nullptr;
+  if (reset_handler_.has_value()) {
+    reset_handler_.reset();
     factory_->unregisterAccount(shared_this_, current_bucket_idx_);
     current_bucket_idx_ = -1;
     shared_this_ = nullptr;

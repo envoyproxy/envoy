@@ -75,7 +75,7 @@ TrackedWatermarkBufferFactory::createBuffer(std::function<void()> below_low_wate
 }
 
 BufferMemoryAccountSharedPtr
-TrackedWatermarkBufferFactory::createAccount(Http::StreamResetHandler* reset_handler) {
+TrackedWatermarkBufferFactory::createAccount(Http::StreamResetHandler& reset_handler) {
   auto account = WatermarkBufferFactory::createAccount(reset_handler);
   absl::MutexLock lock(&mutex_);
   ++total_accounts_created_;
