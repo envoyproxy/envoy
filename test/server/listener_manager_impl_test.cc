@@ -1760,7 +1760,7 @@ filter_chains:
   )EOF";
 
   auto syscall_result = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0);
-  ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
+  ASSERT_TRUE(SOCKET_VALID(syscall_result.return_value_));
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_,
@@ -1799,7 +1799,7 @@ filter_chains:
   )EOF";
 
   auto syscall_result = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0);
-  ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
+  ASSERT_TRUE(SOCKET_VALID(syscall_result.return_value_));
 
   // On Windows if the socket has not been bound to an address with bind
   // the call to getsockname fails with `WSAEINVAL`. To avoid that we make sure
@@ -1808,7 +1808,7 @@ filter_chains:
       .WillByDefault(Invoke(
           [&](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) -> Api::SysCallIntResult {
             Api::SysCallIntResult result = os_sys_calls_actual_.bind(sockfd, addr, addrlen);
-            ASSERT(result.rc_ >= 0);
+            ASSERT(result.return_value_ >= 0);
             return result;
           }));
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
