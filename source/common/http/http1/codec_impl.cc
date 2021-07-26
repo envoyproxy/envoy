@@ -238,6 +238,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
 void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   // end_stream may be indicated with a zero length data buffer. If that is the case, so not
   // actually write the zero length buffer out.
+  updateSentBytes(data.length());
   if (data.length() > 0) {
     if (chunk_encoding_) {
       connection_.buffer().add(absl::StrCat(absl::Hex(data.length()), CRLF));
@@ -554,6 +555,11 @@ Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
     // The HTTP/1.1 codec pauses dispatch after a single response is complete. Extraneous data
     // after a response is complete indicates an error.
     return codecProtocolError("http/1.1 protocol error: extraneous data after response complete");
+  }
+  if (pending_response_.has_value()) {
+    static_cast<StreamEncoder&>(pending_response_.value().encoder_)
+        .getStream()
+        .updateReceivedBytes(data.length());
   }
   return status;
 }

@@ -298,7 +298,9 @@ protected:
 
     uint64_t receivedBytes() override { return received_bytes_; }
 
-    void updateReceivedBytes(size_t newly_sent_bytes) override { sent_bytes_ += newly_sent_bytes; }
+    void updateReceivedBytes(size_t newly_received_bytes) override {
+      received_bytes_ += newly_received_bytes;
+    }
 
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};

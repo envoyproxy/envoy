@@ -79,13 +79,15 @@ public:
 
   void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
 
-  uint64_t sentBytes() override { return 0; }
+  uint64_t sentBytes() override { return sent_bytes_; }
 
-  void updateSentBytes(size_t) override {}
+  void updateSentBytes(size_t newly_sent_bytes) override { sent_bytes_ += newly_sent_bytes; }
 
-  uint64_t receivedBytes() override { return 0; }
+  uint64_t receivedBytes() override { return received_bytes_; }
 
-  void updateReceivedBytes(size_t) override {}
+  void updateReceivedBytes(size_t newly_received_bytes) override {
+    received_bytes_ += newly_received_bytes;
+  }
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection);
@@ -131,6 +133,8 @@ private:
                              HeaderKeyFormatterOptConstRef formatter);
 
   absl::string_view details_;
+  uint64_t sent_bytes_{0};
+  uint64_t received_bytes_{0};
 };
 
 /**

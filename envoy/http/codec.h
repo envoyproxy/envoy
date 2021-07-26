@@ -396,7 +396,7 @@ public:
 
   virtual uint64_t receivedBytes() PURE;
 
-  virtual void updateReceivedBytes(size_t newly_sent_bytes) PURE;
+  virtual void updateReceivedBytes(size_t newly_received_bytes) PURE;
 };
 
 /**
