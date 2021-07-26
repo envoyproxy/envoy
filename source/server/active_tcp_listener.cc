@@ -133,9 +133,9 @@ void ActiveTcpListener::newActiveConnection(const Network::FilterChain& filter_c
                                             Network::ServerConnectionPtr server_conn_ptr,
                                             std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
   auto& active_connections = getOrCreateActiveConnections(filter_chain);
-  auto active_connection = 
+  auto active_connection =
       std::make_unique<ActiveTcpConnection>(active_connections, std::move(server_conn_ptr),
-                              dispatcher().timeSource(), std::move(stream_info));
+                                            dispatcher().timeSource(), std::move(stream_info));
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
     ENVOY_CONN_LOG(debug, "new connection from {}", *active_connection->connection_,
