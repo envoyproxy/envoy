@@ -68,27 +68,19 @@ def test_sphinx_runner_colors(patches):
 def test_sphinx_runner_config_file(patches):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
-        "open",
-        "yaml",
+        "utils",
         ("SphinxRunner.config_file_path", dict(new_callable=PropertyMock)),
         ("SphinxRunner.configs", dict(new_callable=PropertyMock)),
         prefix="tools.docs.sphinx_runner")
 
-    with patched as (m_open, m_yaml, m_fpath,  m_configs):
+    with patched as (m_utils, m_fpath,  m_configs):
         assert (
             runner.config_file
-            == m_fpath.return_value)
+            == m_utils.to_yaml.return_value)
 
     assert (
-        list(m_open.call_args)
-        == [(m_fpath.return_value, 'w'), {}])
-    assert (
-        list(m_yaml.dump.call_args)
-        == [(m_configs.return_value,), {}])
-    assert (
-        m_open.return_value.__enter__.return_value.write.call_args
-        == [(m_yaml.dump.return_value,), {}])
-
+        list(m_utils.to_yaml.call_args)
+        == [(m_configs.return_value, m_fpath.return_value), {}])
     assert "config_file" in runner.__dict__
 
 
