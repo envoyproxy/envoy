@@ -134,7 +134,10 @@ class ExtensionsChecker(checker.Checker):
         missing_metadata = self.all_extensions - set(self.metadata.keys())
 
         for extension in only_metadata:
-            self.error("registered", [f"Metadata for unused extension found: {extension}"])
+            # Skip envoy_mobile_http_connection_manager as it is built with
+            # http_connection_manager
+            if extension != "envoy.filters.network.envoy_mobile_http_connection_manager":
+                self.error("registered", [f"Metadata for unused extension found: {extension}"])
 
         for extension in missing_metadata:
             self.error("registered", [f"Metadata missing for extension: {extension}"])

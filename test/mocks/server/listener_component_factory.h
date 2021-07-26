@@ -38,8 +38,8 @@ public:
                Configuration::ListenerFactoryContext& context));
   MOCK_METHOD(Network::SocketSharedPtr, createListenSocket,
               (Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
-               const Network::Socket::OptionsSharedPtr& options,
-               const ListenSocketCreationParams& params));
+               const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+               uint32_t worker_index));
   MOCK_METHOD(DrainManager*, createDrainManager_,
               (envoy::config::listener::v3::Listener::DrainType drain_type));
   MOCK_METHOD(uint64_t, nextListenerTag, ());
