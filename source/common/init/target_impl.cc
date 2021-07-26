@@ -49,8 +49,7 @@ bool TargetImpl::ready() {
     // calling ready() this target is destroyed. This is possible in practice, for example when
     // a listener is deleted as a result of a failure in the context of the ready() call.
     auto local_watcher_handle = std::move(watcher_handle_);
-    const bool result = local_watcher_handle->ready();
-    return result;
+    return local_watcher_handle->ready();
   }
   return false;
 }
