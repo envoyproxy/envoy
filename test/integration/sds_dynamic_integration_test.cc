@@ -303,7 +303,8 @@ resources:
       local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
     }
     return Quic::createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
-                                             Network::Utility::resolveUrl(url), local_address);
+                                             Network::Utility::resolveUrl(url), local_address,
+                                             quic_stat_names_, stats_store_);
 #else
     NOT_REACHED_GCOVR_EXCL_LINE;
 #endif
