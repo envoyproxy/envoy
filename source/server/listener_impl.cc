@@ -170,7 +170,7 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
 
   for (auto& socket : sockets_) {
     const auto rc = socket->ioHandle().listen(tcp_backlog_size_);
-    if (rc.rc_ != 0) {
+    if (rc.return_value_ != 0) {
       throw EnvoyException(fmt::format("cannot listen() errno={}", rc.errno_));
     }
 
