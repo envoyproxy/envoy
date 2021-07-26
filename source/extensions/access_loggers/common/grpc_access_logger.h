@@ -1,7 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
+// TODO(shikugagwa): extensions should not be placed here
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/service/accesslog/v3/als.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -141,6 +145,84 @@ public:
   const absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version_;
 };
 
+template <class RequestType> class FatalAccessLoggerGrpcClient {
+public:
+  using ResponseType = envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse;
+
+  FatalAccessLoggerGrpcClient(const Grpc::RawAsyncClientSharedPtr& client,
+                              const Protobuf::MethodDescriptor& method)
+      : FatalAccessLoggerGrpcClient(client, method, absl::nullopt) {}
+  FatalAccessLoggerGrpcClient(
+      const Grpc::RawAsyncClientSharedPtr& client, const Protobuf::MethodDescriptor& method,
+      absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version)
+      : client_(client), service_method_(method), transport_api_version_(transport_api_version) {}
+
+  void flush(const RequestType& message) {
+    active_stream_ = std::make_unique<ActiveStream>(*this, message);
+    active_stream_->stream_ =
+        client_.start(service_method_, *active_stream_, Http::AsyncClient::StreamOptions());
+
+    if (active_stream_->stream_ == nullptr ||
+        active_stream_->stream_.isAboveWriteBufferHighWatermark()) {
+      active_stream_.reset();
+      return;
+    }
+
+    if (transport_api_version_.has_value()) {
+      active_stream_->stream_->sendMessage(message, transport_api_version_.value(), false);
+    } else {
+      active_stream_->stream_->sendMessage(message, false);
+    }
+
+    // TODO(shikugawa): stream must be ended with response withing specified timeout,
+    // that must be defined to setup duration after last message transported.
+  }
+
+private:
+  struct ActiveStream : public Grpc::AsyncStreamCallbacks<ResponseType> {
+    ActiveStream(FatalAccessLoggerGrpcClient<RequestType>& parent,
+                 const RequestType& request_message)
+        : parent_(parent), request_message_(request_message) {}
+
+    // Grpc::AsyncStreamCallbacks
+    void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+    void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
+    void onReceiveMessage(std::unique_ptr<ResponseType>&& message) override {
+      switch (message->status()) {
+      case envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::ACK:
+        break;
+      case envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::NACK:
+        // TODO(shikugawa): After many NACK occurred, Buffer will be overwhelmed.
+        // To resolve this, Buffer should have size limit.
+        // TODO(shilugawa): Buffer failed message.
+        break;
+      default:
+        return;
+      }
+    }
+    void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
+    void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {
+      ASSERT(parent_.active_stream_ != nullptr);
+      if (parent_.active_stream_->stream_ != nullptr) {
+        parent_.active_stream_.reset();
+      }
+    }
+
+    // TODO(shikugawa): define buffer.
+    FatalAccessLoggerGrpcClient<RequestType>& parent_;
+    Grpc::AsyncStream<RequestType> stream_;
+    const RequestType& request_message_;
+  };
+
+  friend ActiveStream;
+
+  // absl::flat_hash_map<std::string, std::reference_wrapper<RequestType>> buffer_;
+  std::unique_ptr<ActiveStream> active_stream_;
+  Grpc::AsyncClient<RequestType, ResponseType> client_;
+  const Protobuf::MethodDescriptor& service_method_;
+  const absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version_;
+};
+
 } // namespace Detail
 
 /**
@@ -182,6 +264,10 @@ public:
                    const Protobuf::MethodDescriptor& service_method,
                    envoy::config::core::v3::ApiVersion transport_api_version)
       : client_(client, service_method, transport_api_version),
+        fatal_client_(client,
+                      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                          "envoy.service.accesslog.v3.AccessLogService.BufferedCriticalAccessLogs"),
+                      transport_api_version),
         buffer_flush_interval_msec_(buffer_flush_interval_msec),
         flush_timer_(dispatcher.createTimer([this]() {
           flush();
@@ -193,6 +279,11 @@ public:
   }
 
   void log(HttpLogProto&& entry) {
+    if (enable_fatal_log_ && shouldBuffer(entry)) {
+      addFatalEntry(std::move(entry));
+      return;
+    }
+
     if (!canLogMore()) {
       return;
     }
@@ -204,6 +295,11 @@ public:
   }
 
   void log(TcpLogProto&& entry) {
+    if (enable_fatal_log_ && shouldBuffer(entry)) {
+      addFatalEntry(std::move(entry));
+      return;
+    }
+
     approximate_message_size_bytes_ += entry.ByteSizeLong();
     addEntry(std::move(entry));
     if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
@@ -213,13 +309,19 @@ public:
 
 protected:
   Detail::GrpcAccessLogClient<LogRequest, LogResponse> client_;
+  Detail::FatalAccessLoggerGrpcClient<LogRequest> fatal_client_;
   LogRequest message_;
+  LogRequest fatal_message_;
 
 private:
   virtual bool isEmpty() PURE;
   virtual void initMessage() PURE;
   virtual void addEntry(HttpLogProto&& entry) PURE;
   virtual void addEntry(TcpLogProto&& entry) PURE;
+  virtual void addFatalEntry(HttpLogProto&& entry) PURE;
+  virtual void addFatalEntry(TcpLogProto&& entry) PURE;
+  virtual bool shouldBuffer(const HttpLogProto& entry) PURE;
+  virtual bool shouldBuffer(const TcpLogProto& entry) PURE;
   virtual void clearMessage() { message_.Clear(); }
 
   void flush() {
@@ -236,6 +338,10 @@ private:
       // Clear the message regardless of the success.
       approximate_message_size_bytes_ = 0;
       clearMessage();
+    }
+
+    if (enable_fatal_log_) {
+      fatal_client_.flush(fatal_message_);
     }
   }
 
@@ -258,6 +364,7 @@ private:
   const uint64_t max_buffer_size_bytes_;
   uint64_t approximate_message_size_bytes_ = 0;
   GrpcAccessLoggerStats stats_;
+  bool enable_fatal_log_ = true;
 };
 
 /**

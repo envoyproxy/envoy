@@ -37,6 +37,26 @@ void GrpcAccessLoggerImpl::addEntry(envoy::data::accesslog::v3::TCPAccessLogEntr
   message_.mutable_tcp_logs()->mutable_log_entry()->Add(std::move(entry));
 }
 
+void GrpcAccessLoggerImpl::addFatalEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
+  fatal_message_.mutable_http_logs()->mutable_log_entry()->Add(std::move(entry));
+}
+
+void GrpcAccessLoggerImpl::addFatalEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) {
+  fatal_message_.mutable_tcp_logs()->mutable_log_entry()->Add(std::move(entry));
+}
+
+bool GrpcAccessLoggerImpl::shouldBuffer(const envoy::data::accesslog::v3::HTTPAccessLogEntry&) {
+  // TODO(shikugawa): To buffer message it determined as critical message,
+  // by the trigger of configured thresholds. e.g. matched specific filter
+  // which describes https log message has >= 500 status code.
+  return true;
+}
+
+bool GrpcAccessLoggerImpl::shouldBuffer(const envoy::data::accesslog::v3::TCPAccessLogEntry&) {
+  // TODO(shikugawa): Not supported for TCP message.
+  return false;
+}
+
 bool GrpcAccessLoggerImpl::isEmpty() {
   return !message_.has_http_logs() && !message_.has_tcp_logs();
 }

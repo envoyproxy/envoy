@@ -27,12 +27,33 @@ service AccessLogService {
   // expectation that it might be lossy.
   rpc StreamAccessLogs(stream StreamAccessLogsMessage) returns (StreamAccessLogsResponse) {
   }
+
+  rpc BufferedCriticalAccessLogs(StreamAccessLogsMessage)
+      returns (BufferedCriticalAccessLogsResponse) {
+  }
 }
 
 // Empty response for the StreamAccessLogs API. Will never be sent. See below.
 message StreamAccessLogsResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.accesslog.v3.StreamAccessLogsResponse";
+}
+
+// Response received to identify undelivered or delivered messages in BufferedCriticalAccessLogs.
+message BufferedCriticalAccessLogsResponse {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.service.accesslog.v3.BufferedCriticalAccessLogsResponse";
+
+  enum Status {
+    // Indicates that the message has been received.
+    ACK = 0;
+
+    // Indicates that the message has not been received.
+    NACK = 1;
+  }
+
+  // This field is used to indicate the arrival status.
+  Status status = 1;
 }
 
 // Stream message for the StreamAccessLogs API. Envoy will open a stream to the server and stream

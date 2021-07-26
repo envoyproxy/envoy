@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.grpc.v4alpha;
 
+import "envoy/config/accesslog/v4alpha/accesslog.proto";
 import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/grpc_service.proto";
 
@@ -54,7 +55,7 @@ message TcpGrpcAccessLogConfig {
 }
 
 // Common configuration for gRPC access logs.
-// [#next-free-field: 7]
+// [#next-free-field: 9]
 message CommonGrpcAccessLogConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig";
@@ -86,4 +87,23 @@ message CommonGrpcAccessLogConfig {
   // <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.filter_state_objects>`.
   // Logger will call `FilterState::Object::serializeAsProto` to serialize the filter state object.
   repeated string filter_state_objects_to_log = 5;
+
+  // Define the log condition as a filter to ensure that the destination is reached.
+  // Logs that match the filter are not forwarded to the normal endpoint,
+  // but are sent to a special endpoint. This endpoint will return ACK/NACK as a response,
+  // and Envoy will perform buffering upon receiving a NACK. The buffered message is
+  // resend until it is reached. Failure to send here means that
+  //
+  // 1. when a NACK message corresponding to the message sent is received
+  // 2. when the ACK message corresponding to the sent message buffer could not be
+  //    received until the message_ack_timeout is reached.
+  //
+  // It is recommended to set a strict filter because setting a loose filter here may cause
+  // extreme pressure on the Envoy buffer in cases where the log aggregation cluster is repeatedly restarted.
+  config.accesslog.v4alpha.AccessLogFilter buffer_log_filter = 7
+      [(validate.rules).enum = {defined_only: true}];
+
+  // The time to wait for an ACK message. If no ACK message is returned after this time,
+  // the message is considered undeliverable and the failed transmission is buffered again.
+  google.protobuf.Duration message_ack_timeout = 8 [(validate.rules).duration = {gt {}}];
 }

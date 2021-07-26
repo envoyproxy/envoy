@@ -75,6 +75,16 @@ private:
                                                         1);
   }
 
+  void mockAddFatalEntry(const std::string& key) {
+    if (!fatal_message_.fields().contains(key)) {
+      ProtobufWkt::Value default_value;
+      default_value.set_number_value(0);
+      fatal_message_.mutable_fields()->insert({key, default_value});
+    }
+    fatal_message_.mutable_fields()->at(key).set_number_value(
+        fatal_message_.fields().at(key).number_value() + 1);
+  }
+
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   // For testing purposes, we don't really care how each of these virtual methods is implemented, as
   // it's up to each logger implementation. We test whether they were called in the regular flow of
@@ -90,6 +100,18 @@ private:
     mockAddEntry(MOCK_TCP_LOG_FIELD_NAME);
   }
 
+  void addFatalEntry(ProtobufWkt::Struct&& entry) override {
+    (void)entry;
+    mockAddFatalEntry(MOCK_HTTP_LOG_FIELD_NAME);
+  }
+
+  void addFatalEntry(ProtobufWkt::Empty&& entry) override {
+    (void)entry;
+    mockAddFatalEntry(MOCK_TCP_LOG_FIELD_NAME);
+  }
+  bool shouldBuffer(const ProtobufWkt::Struct&) override { return http_should_buffer_; }
+  bool shouldBuffer(const ProtobufWkt::Empty&) override { return tcp_should_buffer_; }
+
   bool isEmpty() override { return message_.fields().empty(); }
 
   void initMessage() override { ++num_inits_; }
@@ -99,6 +121,8 @@ private:
     num_clears_++;
   }
 
+  bool tcp_should_buffer_ = false;
+  bool http_should_buffer_ = false;
   int num_inits_ = 0;
   int num_clears_ = 0;
 };

@@ -33,6 +33,10 @@ private:
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   void addEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) override;
   void addEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) override;
+  void addFatalEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) override;
+  void addFatalEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) override;
+  bool shouldBuffer(const envoy::data::accesslog::v3::HTTPAccessLogEntry& entry) override;
+  bool shouldBuffer(const envoy::data::accesslog::v3::TCPAccessLogEntry& entry) override;
   bool isEmpty() override;
   void initMessage() override;
 
