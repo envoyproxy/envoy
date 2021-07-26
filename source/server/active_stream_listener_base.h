@@ -146,23 +146,6 @@ public:
   using ActiveConnectionPtr = std::unique_ptr<ActiveConnectionType>;
   using ActiveConnectionCollectionPtr = std::unique_ptr<ActiveConnectionCollectionType>;
 
-  void removeFilterChain(const Network::FilterChain* filter_chain) override {
-    auto iter = connections_by_context_.find(filter_chain);
-    if (iter == connections_by_context_.end()) {
-      // It is possible when listener is stopping.
-    } else {
-      auto& connections = iter->second->connections_;
-      while (!connections.empty()) {
-        connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
-      }
-      // Since is_deleting_ is on, we need to manually remove the map value and drive the
-      // iterator. Defer delete connection container to avoid race condition in destroying
-      // connection.
-      dispatcher().deferredDelete(std::move(iter->second));
-      connections_by_context_.erase(iter);
-    }
-  }
-
   /**
    * Remove and destroy an active connection.
    * @param connection supplies the connection to remove.
@@ -187,6 +170,23 @@ public:
   }
 
 protected:
+  void removeFilterChain(const Network::FilterChain* filter_chain) override {
+    auto iter = connections_by_context_.find(filter_chain);
+    if (iter == connections_by_context_.end()) {
+      // It is possible when listener is stopping.
+    } else {
+      auto& connections = iter->second->connections_;
+      while (!connections.empty()) {
+        connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+      }
+      // Since is_deleting_ is on, we need to manually remove the map value and drive the
+      // iterator. Defer delete connection container to avoid race condition in destroying
+      // connection.
+      dispatcher().deferredDelete(std::move(iter->second));
+      connections_by_context_.erase(iter);
+    }
+  }
+
   absl::flat_hash_map<const Network::FilterChain*, ActiveConnectionCollectionPtr>
       connections_by_context_;
 };
