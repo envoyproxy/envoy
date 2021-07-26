@@ -130,6 +130,10 @@ private:
   // Called by the wrapper when the wrapped connection raises the specified event.
   void onEvent(ConnectionEvent event, ConnectionCallbacksWrapper* wrapper);
 
+  // Called to bind the final connection. All other connections will be closed, and
+  // and deferred operations will be replayed.
+  void setUpFinalConnection(ConnectionEvent event, ConnectionCallbacksWrapper* wrapper);
+
   // Called by the wrapper when the wrapped connection is above the write buffer
   // high water mark.
   void onAboveWriteBufferHighWatermark(ConnectionCallbacksWrapper* wrapper);

@@ -217,8 +217,7 @@ void HappyEyeballsConnectionImpl::setBufferLimits(uint32_t limit) {
     ASSERT(!per_connection_state_.buffer_limits_.has_value());
     per_connection_state_.buffer_limits_ = limit;
     if (post_connect_state_.write_buffer_.has_value()) {
-      post_connect_state_.write_buffer_.value()->setWatermarks(
-          per_connection_state_.buffer_limits_.value());
+      post_connect_state_.write_buffer_.value()->setWatermarks(limit);
     }
   }
   for (auto& connection : connections_) {
@@ -448,6 +447,12 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
     ASSERT(connections_.size() == 1);
   }
 
+  // Close all other connections and configure the final connection.
+  setUpFinalConnection(event, wrapper);
+}
+
+void HappyEyeballsConnectionImpl::setUpFinalConnection(ConnectionEvent event,
+                                                       ConnectionCallbacksWrapper* wrapper) {
   connect_finished_ = true;
   next_attempt_timer_->disableTimer();
 
@@ -536,7 +541,14 @@ void HappyEyeballsConnectionImpl::onBelowWriteBufferLowWatermark(
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void HappyEyeballsConnectionImpl::onWriteBufferHighWatermark() { ASSERT(!connect_finished_); }
+void HappyEyeballsConnectionImpl::onWriteBufferHighWatermark() {
+  ASSERT(!connect_finished_);
+  for (auto callback : post_connect_state_.connection_callbacks_) {
+    if (callback) {
+      callback->onAboveWriteBufferHighWatermark();
+    }
+  }
+}
 
 } // namespace Network
 } // namespace Envoy

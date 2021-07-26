@@ -66,7 +66,7 @@ public:
     connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
   }
 
-  // First the failover timer and creates the next connection.
+  // Fires the failover timer and creates the next connection.
   void timeoutAndStartNextAttempt() {
     EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
     EXPECT_CALL(dispatcher_, createClientConnection_(address_list_[1], _, _, _))
@@ -116,7 +116,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeout) {
       .WillOnce(
           testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
   EXPECT_CALL(*next_connections_.back(), connect());
-  // Since there are no more address to connect to, the fallback timer will not
+  // Since there are no more addresses to connect to, the fallback timer will not
   // be rescheduled.
   failover_timer_->invokeCallback();
 }
@@ -620,6 +620,23 @@ TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeConnectOverLimit) {
         EXPECT_FALSE(end_stream);
       }));
   connectFirstAttempt();
+}
+
+TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeConnectOverLimitWithCallbacks) {
+  startConnect();
+
+  MockConnectionCallbacks callbacks;
+  // The filter will be captured by the impl and not passed to the connection until it is closed.
+  impl_->addConnectionCallbacks(callbacks);
+
+  Buffer::OwnedImpl data("hello world");
+  bool end_stream = false;
+
+  EXPECT_CALL(*created_connections_[0], setBufferLimits(data.length() - 1));
+  impl_->setBufferLimits(data.length() - 1);
+
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  impl_->write(data, end_stream);
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, AboveHighWatermark) {
