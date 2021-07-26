@@ -44,6 +44,11 @@ QuicMemSliceImpl::QuicMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length
   ASSERT(this->length() == length);
 }
 
+QuicMemSliceImpl::~QuicMemSliceImpl() {
+  ASSERT(fragment_ == nullptr || (firstSliceLength(single_slice_buffer_) == fragment_->size() &&
+                                  data() == fragment_->data()));
+}
+
 const char* QuicMemSliceImpl::data() const {
   return reinterpret_cast<const char*>(single_slice_buffer_.frontSlice().mem_);
 }

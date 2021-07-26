@@ -35,6 +35,8 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/router/config_impl.h"
 #include "source/common/router/router.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -83,11 +85,6 @@ class AsyncStreamImpl : public AsyncClient::Stream,
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const AsyncClient::StreamOptions& options);
-
-  // Http::StreamDecoderFilterCallbacks
-  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
 
   // Http::AsyncClient::Stream
   void sendHeaders(RequestHeaderMap& headers, bool end_stream) override;
@@ -216,10 +213,18 @@ private:
     RouteEntryImpl(
         const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout,
         const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
-            hash_policy)
+            hash_policy,
+        const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy)
         : cluster_name_(cluster_name), timeout_(timeout) {
       if (!hash_policy.empty()) {
         hash_policy_ = std::make_unique<HashPolicyImpl>(hash_policy);
+      }
+      if (retry_policy.has_value()) {
+        // ProtobufMessage::getStrictValidationVisitor() ?  how often do we do this?
+        retry_policy_ = std::make_unique<Router::RetryPolicyImpl>(
+            retry_policy.value(), ProtobufMessage::getNullValidationVisitor());
+      } else {
+        retry_policy_ = std::make_unique<NullRetryPolicy>();
       }
     }
 
@@ -248,7 +253,7 @@ private:
       return Upstream::ResourcePriority::Default;
     }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
-    const Router::RetryPolicy& retryPolicy() const override { return retry_policy_; }
+    const Router::RetryPolicy& retryPolicy() const override { return *retry_policy_; }
     const Router::InternalRedirectPolicy& internalRedirectPolicy() const override {
       return internal_redirect_policy_;
     }
@@ -312,9 +317,10 @@ private:
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
     const std::string& routeName() const override { return route_name_; }
     std::unique_ptr<const HashPolicyImpl> hash_policy_;
+    std::unique_ptr<Router::RetryPolicy> retry_policy_;
+
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
-    static const NullRetryPolicy retry_policy_;
     static const Router::InternalRedirectPolicyImpl internal_redirect_policy_;
     static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
@@ -335,8 +341,9 @@ private:
     RouteImpl(const std::string& cluster_name,
               const absl::optional<std::chrono::milliseconds>& timeout,
               const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
-                  hash_policy)
-        : route_entry_(cluster_name, timeout, hash_policy) {}
+                  hash_policy,
+              const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy)
+        : route_entry_(cluster_name, timeout, hash_policy, retry_policy) {}
 
     // Router::Route
     const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -436,6 +443,10 @@ private:
   }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
+  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  void resetIdleTimer() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override {

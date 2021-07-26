@@ -764,7 +764,9 @@ TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
-
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_completed")
+                .value());
   EXPECT_EQ(
       0U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_504").value());
@@ -834,6 +836,9 @@ TEST_F(RouterTestSupressGRPCStatsDisabled, IncludeHttpTimeoutStats) {
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_5xx").value());
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_completed")
+                .value());
 }
 
 } // namespace Router

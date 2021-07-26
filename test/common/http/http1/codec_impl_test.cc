@@ -2159,7 +2159,8 @@ TEST_F(Http1ServerConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   // Check dump contents
   EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 5, header_parsing_state_: "
                                             "Done, current_header_field_: , current_header_value_: "
-                                            "\n, active_request_.request_url_: null"));
+                                            "\nactive_request_: \n, request_url_: null"
+                                            ", response_encoder_.local_end_stream_: 0"));
   EXPECT_THAT(ostream.contents(),
               HasSubstr("current_dispatching_buffer_ front_slice length: 43 contents: \"POST / "
                         "HTTP/1.1\\r\\nContent-Length: 5\\r\\n\\r\\nHello\"\n"));

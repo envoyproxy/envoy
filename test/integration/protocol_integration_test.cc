@@ -2445,6 +2445,48 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeoutLegacy) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("max_duration_timeout"));
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionReached) {
+  config_helper_.setDownstreamMaxRequestsPerConnection(2);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Sending first request and waiting to complete the response.
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1, true);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_max_requests_reached")->value(),
+            0);
+
+  // Sending second request and waiting to complete the response.
+  auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder_2.first;
+  auto response_2 = std::move(encoder_decoder_2.second);
+  codec_client_->sendData(*request_encoder_, 1, true);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response_2->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_2->complete());
+  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_max_requests_reached")->value(),
+            1);
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    EXPECT_EQ(nullptr, response->headers().Connection());
+    EXPECT_EQ("close", response_2->headers().getConnectionValue());
+  } else {
+    EXPECT_TRUE(codec_client_->sawGoAway());
+  }
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 // Make sure that invalid authority headers get blocked at or before the HCM.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
   initialize();
@@ -2685,6 +2727,42 @@ TEST_P(ProtocolIntegrationTest, ReqRespSizeStats) {
 
   test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rq_headers_size");
   test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rs_headers_size");
+}
+
+TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions());
+  http2_options.mutable_initial_stream_window_size()->set_value(65535);
+  http2_options.mutable_initial_connection_window_size()->set_value(65535);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+
+  // The response is larger than the stream flow control window. So the reset of it will
+  // likely be buffered QUIC stream send buffer.
+  constexpr uint64_t response_size = 100 * 1024;
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-length", "10"},
+                                     {"response_size_bytes", absl::StrCat(response_size)}});
+  auto& encoder = encoder_decoder.first;
+  std::string data(10, 'a');
+  codec_client_->sendData(encoder, data, true);
+
+  auto response = std::move(encoder_decoder.second);
+  response->waitForHeaders();
+  // Reset stream while the quic server stream might have FIN buffered in its send buffer.
+  codec_client_->sendReset(encoder);
+  codec_client_->close();
 }
 
 } // namespace Envoy

@@ -423,7 +423,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                                Api::Api& api, bool do_boosting) {
   const std::string contents = api.fileSystem().fileReadToEnd(path);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
-  if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
     auto read_proto_binary = [&contents, &validation_visitor](Protobuf::Message& message,
                                                               MessageVersion message_version) {
@@ -459,7 +459,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
 
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
-  if (absl::EndsWith(path, FileExtensions::get().ProtoText)) {
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoText)) {
     auto read_proto_text = [&contents, &path](Protobuf::Message& message,
                                               MessageVersion message_version) {
       if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
@@ -482,7 +482,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     }
     return;
   }
-  if (absl::EndsWith(path, FileExtensions::get().Yaml)) {
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
+      absl::EndsWithIgnoreCase(path, FileExtensions::get().Yml)) {
     loadFromYaml(contents, message, validation_visitor, do_boosting);
   } else {
     loadFromJson(contents, message, validation_visitor, do_boosting);
@@ -774,10 +775,14 @@ bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
   const auto* reflection = message->GetReflection();
   const auto* type_url_field_descriptor = opaque_descriptor->FindFieldByName("type_url");
   const auto* value_field_descriptor = opaque_descriptor->FindFieldByName("value");
-  ASSERT(type_url_field_descriptor != nullptr && value_field_descriptor != nullptr &&
-         reflection->HasField(*message, type_url_field_descriptor));
-  if (!reflection->HasField(*message, value_field_descriptor)) {
+  ASSERT(type_url_field_descriptor != nullptr && value_field_descriptor != nullptr);
+  if (!reflection->HasField(*message, type_url_field_descriptor) &&
+      !reflection->HasField(*message, value_field_descriptor)) {
     return true;
+  }
+  if (!reflection->HasField(*message, type_url_field_descriptor) ||
+      !reflection->HasField(*message, value_field_descriptor)) {
+    return false;
   }
 
   // Try to find a descriptor for `type_url` in the pool and instantiate a new message of the

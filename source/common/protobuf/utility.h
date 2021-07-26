@@ -237,6 +237,7 @@ public:
     const std::string ProtoText = ".pb_text";
     const std::string Json = ".json";
     const std::string Yaml = ".yaml";
+    const std::string Yml = ".yml";
   };
 
   using FileExtensions = ConstSingleton<FileExtensionValues>;

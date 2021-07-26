@@ -114,23 +114,23 @@ public:
 
 Http::TestRequestHeaderMapImpl genPathlessHeaders(const std::string& host,
                                                   const std::string& method) {
-  return Http::TestRequestHeaderMapImpl{{":authority", host},         {":method", method},
-                                        {"x-safe", "safe"},           {"x-global-nope", "global"},
-                                        {"x-vhost-nope", "vhost"},    {"x-route-nope", "route"},
-                                        {"x-forwarded-proto", "http"}};
+  return Http::TestRequestHeaderMapImpl{
+      {":authority", host},          {":method", method},       {"x-safe", "safe"},
+      {"x-global-nope", "global"},   {"x-vhost-nope", "vhost"}, {"x-route-nope", "route"},
+      {"x-forwarded-proto", "http"}, {":scheme", "http"}};
 }
 
 Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
-                                          const std::string& method,
-                                          const std::string& forwarded_proto) {
-  auto hdrs = Http::TestRequestHeaderMapImpl{
-      {":authority", host},        {":path", path},
-      {":method", method},         {"x-safe", "safe"},
-      {"x-global-nope", "global"}, {"x-vhost-nope", "vhost"},
-      {"x-route-nope", "route"},   {"x-forwarded-proto", forwarded_proto}};
+                                          const std::string& method, const std::string& scheme) {
+  auto hdrs =
+      Http::TestRequestHeaderMapImpl{{":authority", host},         {":path", path},
+                                     {":method", method},          {"x-safe", "safe"},
+                                     {"x-global-nope", "global"},  {"x-vhost-nope", "vhost"},
+                                     {"x-route-nope", "route"},    {":scheme", scheme},
+                                     {"x-forwarded-proto", scheme}};
 
-  if (forwarded_proto.empty()) {
-    hdrs.remove("x-forwarded-proto");
+  if (scheme.empty()) {
+    hdrs.remove(":scheme");
   }
 
   return hdrs;
@@ -373,7 +373,8 @@ virtual_hosts:
         {}
       headers:
       - name: x-safe
-        exact_match: "safe"
+        string_match:
+          exact: "safe"
     route:
       cluster: connect_header_match
 - name: default
@@ -388,11 +389,13 @@ virtual_hosts:
   virtual_clusters:
   - headers:
     - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/users/\\d+/location$"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "^/users/\\d+/location$"
     - name: ":method"
-      exact_match: POST
+      string_match:
+        exact: POST
     name: ulu
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -677,51 +680,63 @@ virtual_hosts:
   virtual_clusters:
   - headers:
     - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/rides$"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "^/rides$"
     - name: ":method"
-      exact_match: POST
+      string_match:
+        exact: POST
     name: ride_request
   - headers:
     - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/rides/\\d+$"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "^/rides/\\d+$"
     - name: ":method"
-      exact_match: PUT
+      string_match:
+        exact: PUT
     name: update_ride
   - headers:
     - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/users/\\d+/chargeaccounts$"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "^/users/\\d+/chargeaccounts$"
     - name: ":method"
-      exact_match: POST
+      string_match:
+        exact: POST
     name: cc_add
   - headers:
     - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/users$"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "^/users$"
     - name: ":method"
-      exact_match: POST
+      string_match:
+        exact: POST
     name: create_user_login
   - headers:
     - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/users/\\d+$"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "^/users/\\d+$"
     - name: ":method"
-      exact_match: PUT
+      string_match:
+        exact: PUT
     name: update_user
   - headers:
     - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/users/\\d+/location$"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "^/users/\\d+/location$"
     - name: ":method"
-      exact_match: POST
+      string_match:
+        exact: POST
     name: ulu
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -731,7 +746,7 @@ virtual_hosts:
       {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  // No host header, no x-forwarded-proto and no path header testing.
+  // No host header, no scheme and no path header testing.
   EXPECT_EQ(nullptr,
             config.route(Http::TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, 0));
   EXPECT_EQ(nullptr, config.route(Http::TestRequestHeaderMapImpl{{":authority", "foo"},
@@ -740,7 +755,7 @@ virtual_hosts:
                                   0));
   EXPECT_EQ(nullptr, config.route(Http::TestRequestHeaderMapImpl{{":authority", "foo"},
                                                                  {":method", "CONNECT"},
-                                                                 {"x-forwarded-proto", "http"}},
+                                                                 {":scheme", "http"}},
                                   0));
 
   // Base routing testing.
@@ -1173,9 +1188,10 @@ virtual_hosts:
       name: "invalid"
       headers:
         name: "invalid"
-        safe_regex_match:
-          google_re2: {}
-          regex: "^/(+invalid)"
+        string_match:
+          safe_regex:
+            google_re2: {}
+            regex: "^/(+invalid)"
   )EOF";
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -1845,16 +1861,19 @@ virtual_hosts:
       prefix: "/"
       headers:
       - name: test_header
-        exact_match: test
+        string_match:
+          exact: test
     route:
       cluster: local_service_with_headers
   - match:
       prefix: "/"
       headers:
       - name: test_header_multiple1
-        exact_match: test1
+        string_match:
+          exact: test1
       - name: test_header_multiple2
-        exact_match: test2
+        string_match:
+          exact: test2
     route:
       cluster: local_service_with_multiple_headers
   - match:
@@ -1868,16 +1887,18 @@ virtual_hosts:
       prefix: "/"
       headers:
       - name: test_header_pattern
-        safe_regex_match:
-          google_re2: {}
-          regex: "^user=test-\\d+$"
+        string_match:
+          safe_regex:
+            google_re2: {}
+            regex: "^user=test-\\d+$"
     route:
       cluster: local_service_with_header_pattern_set_regex
   - match:
       prefix: "/"
       headers:
       - name: test_header_pattern
-        exact_match: "^customer=test-\\d+$"
+        string_match:
+          exact: "^customer=test-\\d+$"
     route:
       cluster: local_service_with_header_pattern_unset_regex
   - match:
@@ -1976,7 +1997,8 @@ virtual_hosts:
           prefix: "/"
           headers:
             - name: test_header
-              exact_match: "(+not a regex)"
+              string_match:
+                exact: "(+not a regex)"
         route: { cluster: "local_service" }
   )EOF";
 
@@ -1989,9 +2011,10 @@ virtual_hosts:
           prefix: "/"
           headers:
             - name: test_header
-              safe_regex_match:
-                google_re2: {}
-                regex: "(+invalid regex)"
+              string_match:
+                safe_regex:
+                  google_re2: {}
+                  regex: "(+invalid regex)"
         route: { cluster: "local_service" }
   )EOF";
 
@@ -2201,7 +2224,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeadersWithMultipleValues) {
     EXPECT_FALSE(generateHash({}));
     EXPECT_TRUE(generateHash({"bar"}));
 
-    EXPECT_NE(0UL, generateHash({"bar", "foo"}));
+    EXPECT_NE(0UL, generateHash({"bar", "foo"}).value());
     EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"bar", "foo"})); // deterministic
     EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"foo", "bar"})); // order independent
     EXPECT_NE(generateHash({"abcd", "ef"}), generateHash({"abc", "def"}));
@@ -2250,7 +2273,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeadersRegexSubstitutionWithMultipleValu
     EXPECT_FALSE(generateHash({}));
     EXPECT_TRUE(generateHash({"/bar"}));
 
-    EXPECT_NE(0UL, generateHash({"/bar", "/foo"}));
+    EXPECT_NE(0UL, generateHash({"/bar", "/foo"}).value());
     EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"/bar", "/foo"})); // deterministic
     EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"/foo", "/bar"})); // order independent
     EXPECT_NE(generateHash({"abcd", "ef"}), generateHash({"/abc", "/def"}));
@@ -2808,7 +2831,8 @@ virtual_hosts:
       prefix: "/"
       headers:
       - name: content-type
-        exact_match: application/grpc
+        string_match:
+          exact: application/grpc
     route:
       cluster: local_service_grpc
   - match:
@@ -4179,22 +4203,23 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"www"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  // route may be called early in some edge cases and "x-forwarded-proto" will not be set.
+  // route may be called early in some edge cases and ":scheme" will not be set.
   Http::TestRequestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/"}};
   EXPECT_EQ(nullptr, config.route(headers, 0));
 }
 
 /**
  * @brief  Generate headers for testing
- * @param ssl set true to insert "x-forwarded-proto: https", else "x-forwarded-proto: http"
+ * @param ssl set true to insert "":scheme: https", else ":scheme http"
  * @param internal nullopt for no such "x-envoy-internal" header, or explicit "true/false"
  * @return Http::TestRequestHeaderMapImpl
  */
 static Http::TestRequestHeaderMapImpl genRedirectHeaders(const std::string& host,
                                                          const std::string& path, bool ssl,
                                                          absl::optional<bool> internal) {
+  std::string scheme = ssl ? "https" : "http";
   Http::TestRequestHeaderMapImpl headers{
-      {":authority", host}, {":path", path}, {"x-forwarded-proto", ssl ? "https" : "http"}};
+      {":authority", host}, {":path", path}, {":scheme", scheme}, {"x-forwarded-proto", scheme}};
   if (internal.has_value()) {
     headers.addCopy("x-envoy-internal", internal.value() ? "true" : "false");
   }
@@ -6692,16 +6717,19 @@ virtual_hosts:
           prefix: "/"
           headers:
             - name: test_header
-              exact_match: test
+              string_match:
+                exact: test
         route:
           cluster: local_service_with_headers
       - match:
           prefix: "/"
           headers:
             - name: test_header_multiple1
-              exact_match: test1
+              string_match:
+                exact: test1
             - name: test_header_multiple2
-              exact_match: test2
+              string_match:
+                exact: test2
         route:
           cluster: local_service_with_multiple_headers
       - match:
@@ -6714,16 +6742,18 @@ virtual_hosts:
           prefix: "/"
           headers:
             - name: test_header_pattern
-              safe_regex_match:
-                google_re2: {}
-                regex: "^user=test-\\d+$"
+              string_match:
+                safe_regex:
+                  google_re2: {}
+                  regex: "^user=test-\\d+$"
         route:
           cluster: local_service_with_header_pattern_set_regex
       - match:
           prefix: "/"
           headers:
             - name: test_header_pattern
-              exact_match: "^customer=test-\\d+$"
+              string_match:
+                exact: "^customer=test-\\d+$"
         route:
           cluster: local_service_with_header_pattern_unset_regex
       - match:
@@ -6743,7 +6773,8 @@ virtual_hosts:
                  start: -10
                  end: 1
             - name: test_header_multiple_exact
-              exact_match: test
+              string_match:
+                exact: test
         route:
           cluster: local_service_with_header_range_test2
       - match:
@@ -6768,7 +6799,8 @@ virtual_hosts:
           prefix: "/"
           headers:
             - name: test_header_range
-              exact_match: "9223372036854775807"
+              string_match:
+                exact: "9223372036854775807"
         route:
           cluster: local_service_with_header_range_test5
       - match:
@@ -7172,7 +7204,8 @@ virtual_hosts:
           retry_policy:
             retriable_headers:
             - name: ":status"
-              exact_match: "500"
+              string_match:
+                exact: "500"
             - name: X-Upstream-Pushback
   )EOF";
 

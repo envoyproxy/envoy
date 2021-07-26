@@ -101,7 +101,7 @@ public:
     endpoint->set_cluster("auth.example.com");
     endpoint->set_uri("auth.example.com/_oauth");
     endpoint->mutable_timeout()->set_seconds(1);
-    p.set_redirect_uri("%REQ(x-forwarded-proto)%://%REQ(:authority)%" + TEST_CALLBACK);
+    p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
     p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
     p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
     p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
@@ -114,7 +114,7 @@ public:
     p.add_resources("https://example.com");
     auto* matcher = p.add_pass_through_matcher();
     matcher->set_name(":method");
-    matcher->set_exact_match("OPTIONS");
+    matcher->mutable_string_match()->set_exact("OPTIONS");
     auto credentials = p.mutable_credentials();
     credentials->set_client_id(TEST_CLIENT_ID);
     credentials->mutable_token_secret()->set_name("secret");
@@ -250,14 +250,14 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   endpoint->set_cluster("auth.example.com");
   endpoint->set_uri("auth.example.com/_oauth");
   endpoint->mutable_timeout()->set_seconds(1);
-  p.set_redirect_uri("%REQ(x-forwarded-proto)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
   p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
   p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
   p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
   p.set_forward_bearer_token(true);
   auto* matcher = p.add_pass_through_matcher();
   matcher->set_name(":method");
-  matcher->set_exact_match("OPTIONS");
+  matcher->mutable_string_match()->set_exact("OPTIONS");
 
   auto credentials = p.mutable_credentials();
   credentials->set_client_id(TEST_CLIENT_ID);
@@ -286,7 +286,6 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "http"},
-      {Http::Headers::get().ForwardedProto.get(), "http"},
   };
 
   Http::TestResponseHeaderMapImpl response_headers{
@@ -320,7 +319,7 @@ TEST_F(OAuth2Test, RequestSignout) {
       {Http::Headers::get().Path.get(), "/_signout"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
   };
 
   Http::TestResponseHeaderMapImpl response_headers{
@@ -350,7 +349,7 @@ TEST_F(OAuth2Test, OAuthOkPass) {
       {Http::Headers::get().Path.get(), "/anypath"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer injected_malice!"},
   };
 
@@ -358,7 +357,7 @@ TEST_F(OAuth2Test, OAuthOkPass) {
       {Http::Headers::get().Path.get(), "/anypath"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
   };
 
@@ -394,7 +393,6 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "http"},
-      {Http::Headers::get().ForwardedProto.get(), "http"},
   };
 
   Http::TestResponseHeaderMapImpl response_headers{
@@ -459,7 +457,7 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=https://asdf&method=GET"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
   };
 
@@ -704,7 +702,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
       {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
   };
 
   // This is the immediate response - a redirect to the auth cluster.
@@ -739,7 +737,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
                                         "2Ftest%3Fname%3Dadmin%26level%3Dtrace"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
   };
 
   // Deliberately fail the HMAC validation check.
@@ -783,7 +781,7 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
       {Http::Headers::get().Path.get(), "/test?role=bearer"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer xyz-header-token"},
   };
   // Expected decoded headers after the callback & validation of the bearer token is complete.
@@ -791,7 +789,7 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
       {Http::Headers::get().Path.get(), "/test?role=bearer"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer xyz-header-token"},
   };
 
@@ -811,13 +809,13 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromQueryParameters) {
       {Http::Headers::get().Path.get(), "/test?role=bearer&token=xyz-queryparam-token"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
   };
   Http::TestRequestHeaderMapImpl request_headers_after{
       {Http::Headers::get().Path.get(), "/test?role=bearer&token=xyz-queryparam-token"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer xyz-queryparam-token"},
   };
 

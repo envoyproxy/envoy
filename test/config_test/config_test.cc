@@ -99,7 +99,7 @@ public:
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(
         bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
-    Server::Configuration::InitialImpl initial_config(bootstrap, options, server_);
+    Server::Configuration::InitialImpl initial_config(bootstrap, options);
     Server::Configuration::MainImpl main_config;
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
@@ -107,7 +107,7 @@ public:
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
         server_.secretManager(), server_.messageValidationContext(), *api_, server_.httpContext(),
         server_.grpcContext(), server_.routerContext(), server_.accessLogManager(),
-        server_.singletonManager(), server_.options());
+        server_.singletonManager(), server_.options(), server_.quic_stat_names_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -160,8 +160,8 @@ public:
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Server::MockListenerComponentFactory> component_factory_;
   NiceMock<Server::MockWorkerFactory> worker_factory_;
-  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_,
-                                                false};
+  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_, false,
+                                                server_.quic_stat_names_};
   Random::RandomGeneratorImpl random_;
   std::shared_ptr<Runtime::MockSnapshot> snapshot_{
       std::make_shared<NiceMock<Runtime::MockSnapshot>>()};

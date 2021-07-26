@@ -512,6 +512,7 @@ message HttpConnectionManager {
   // .. code-block:: yaml
   //
   //    original_ip_detection_extensions:
+  //    - name: envoy.http.original_ip_detection.xff
   //      typed_config:
   //        "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.xff.v3.XffConfig
   //        xff_num_trusted_hops: 1
@@ -1004,4 +1005,13 @@ message RequestIDExtension {
 
   // Request ID extension specific configuration.
   google.protobuf.Any typed_config = 1;
+}
+
+// [#protodoc-title: Envoy Mobile HTTP connection manager]
+// HTTP connection manager for use in Envoy mobile.
+// [#extension: envoy.filters.network.envoy_mobile_http_connection_manager]
+message EnvoyMobileHttpConnectionManager {
+  // The configuration for the underlying HttpConnectionManager which will be
+  // instantiated for Envoy mobile.
+  HttpConnectionManager config = 1;
 }

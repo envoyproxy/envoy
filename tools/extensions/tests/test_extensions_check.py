@@ -91,24 +91,17 @@ def test_extensions_fuzzed_count(patches):
 def test_extensions_metadata(patches):
     checker = extensions_check.ExtensionsChecker()
     patched = patches(
-        "open",
-        "yaml",
+        "utils",
         prefix="tools.extensions.extensions_check")
 
-    with patched as (m_open, m_yaml):
+    with patched as (m_utils, ):
         assert (
             checker.metadata
-            == m_yaml.safe_load.return_value)
+            == m_utils.from_yaml.return_value)
 
     assert (
-        list(m_open.call_args)
+        list(m_utils.from_yaml.call_args)
         == [(extensions_check.METADATA_PATH,), {}])
-    assert (
-        list(m_open.return_value.__enter__.return_value.read.call_args)
-        == [(), {}])
-    assert (
-        list(m_yaml.safe_load.call_args)
-        == [(m_open.return_value.__enter__.return_value.read.return_value,), {}])
     assert "metadata" in checker.__dict__
 
 

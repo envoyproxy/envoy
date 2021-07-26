@@ -42,13 +42,15 @@ public:
         .Times(AnyNumber())
         .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
                                       socklen_t optlen) -> int {
-          return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen).rc_;
+          return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+              .return_value_;
         }));
     EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _))
         .Times(AnyNumber())
         .WillRepeatedly(Invoke(
             [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
-              return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+              return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
+                  .return_value_;
             }));
     EXPECT_CALL(os_sys_calls_, getsockname(_, _, _))
         .Times(AnyNumber())
