@@ -8,7 +8,6 @@
 
 #include "source/common/network/resolver_impl.h"
 #include "source/extensions/stat_sinks/common/statsd/statsd.h"
-#include "source/extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,7 +44,7 @@ ProtobufTypes::MessagePtr StatsdSinkFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::config::metrics::v3::StatsdSink>();
 }
 
-std::string StatsdSinkFactory::name() const { return StatsSinkNames::get().Statsd; }
+std::string StatsdSinkFactory::name() const { return StatsdName; }
 
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.

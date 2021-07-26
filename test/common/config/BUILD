@@ -21,7 +21,6 @@ envoy_cc_test(
     srcs = ["api_type_oracle_test.cc"],
     deps = [
         "//source/common/config:api_type_oracle_lib",
-        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3:pkg_cc_proto",
     ],
 )
@@ -207,6 +206,8 @@ envoy_cc_test(
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

@@ -55,7 +55,7 @@ FileType DirectoryIteratorImpl::fileType(const std::string& full_path,
   struct stat stat_buf;
 
   const Api::SysCallIntResult result = os_sys_calls.stat(full_path.c_str(), &stat_buf);
-  if (result.rc_ != 0) {
+  if (result.return_value_ != 0) {
     if (errno == ENOENT) {
       // Special case. This directory entity is likely to be a symlink,
       // but the reference is broken as the target could not be stat()'ed.

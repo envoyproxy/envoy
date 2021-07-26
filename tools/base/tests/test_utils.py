@@ -117,3 +117,78 @@ def test_util_coverage_with_data_file(patches):
     assert (
         list(m_config.return_value.write.call_args)
         == [(m_open.return_value.__enter__.return_value,), {}])
+
+
+def test_util_extract(patches):
+    patched = patches(
+        "tempfile.TemporaryDirectory",
+        "tarfile.open",
+        prefix="tools.base.utils")
+
+    with patched as (m_tmp, m_open):
+        assert utils.extract("TARBALL", "PATH") == "PATH"
+
+    assert (
+        list(m_open.call_args)
+        == [('TARBALL',), {}])
+    assert (
+        list(m_open.return_value.__enter__.return_value.extractall.call_args)
+        == [(), {'path': "PATH"}])
+
+
+def test_util_untar(patches):
+    patched = patches(
+        "tempfile.TemporaryDirectory",
+        "extract",
+        prefix="tools.base.utils")
+
+    with patched as (m_tmp, m_extract):
+        with utils.untar("PATH") as tmpdir:
+            assert tmpdir == m_extract.return_value
+
+    assert (
+        list(m_tmp.call_args)
+        == [(), {}])
+    assert (
+        list(m_extract.call_args)
+        == [('PATH', m_tmp.return_value.__enter__.return_value), {}])
+
+
+def test_util_from_yaml(patches):
+    patched = patches(
+        "open",
+        "yaml",
+        prefix="tools.base.utils")
+
+    with patched as (m_open, m_yaml):
+        assert utils.from_yaml("PATH") == m_yaml.safe_load.return_value
+
+    assert (
+        list(m_open.call_args)
+        == [("PATH", ), {}])
+    assert (
+        list(m_yaml.safe_load.call_args)
+        == [(m_open.return_value.__enter__.return_value.read.return_value, ), {}])
+    assert (
+        list(m_open.return_value.__enter__.return_value.read.call_args)
+        == [(), {}])
+
+
+def test_util_to_yaml(patches):
+    patched = patches(
+        "open",
+        "yaml",
+        prefix="tools.base.utils")
+
+    with patched as (m_open, m_yaml):
+        assert utils.to_yaml("DATA", "PATH") == "PATH"
+
+    assert (
+        list(m_open.call_args)
+        == [("PATH", "w"), {}])
+    assert (
+        list(m_yaml.dump.call_args)
+        == [("DATA", ), {}])
+    assert (
+        list(m_open.return_value.__enter__.return_value.write.call_args)
+        == [(m_yaml.dump.return_value, ), {}])

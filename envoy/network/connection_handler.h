@@ -218,6 +218,11 @@ public:
    * @return true if the UDP passing through listener doesn't form stateful connections.
    */
   virtual bool isTransportConnectionless() const PURE;
+
+  /**
+   * @return socket options specific to this factory that should be applied to all sockets.
+   */
+  virtual const Network::Socket::OptionsSharedPtr& socketOptions() const PURE;
 };
 
 using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;

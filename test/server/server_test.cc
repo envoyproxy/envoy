@@ -347,6 +347,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.state")->value());
   EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
 
+  EXPECT_TRUE(server_->enableReusePortDefault());
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
 }
@@ -1135,6 +1136,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
+  EXPECT_FALSE(server_->enableReusePortDefault());
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo").value().get());
   // This should access via the override/some_service overlay.
   EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz").value().get());
@@ -1269,7 +1271,7 @@ void bindAndListenTcpSocket(const Network::Address::InstanceConstSharedPtr& addr
   auto socket = std::make_unique<Network::TcpListenSocket>(address, options, true);
   // Some kernels erroneously allow `bind` without SO_REUSEPORT for addresses
   // with some other socket already listening on it, see #7636.
-  if (SOCKET_FAILURE(socket->ioHandle().listen(1).rc_)) {
+  if (SOCKET_FAILURE(socket->ioHandle().listen(1).return_value_)) {
     // Mimic bind exception for the test simplicity.
     throw Network::SocketBindException(fmt::format("cannot listen: {}", errorDetails(errno)),
                                        errno);
