@@ -98,6 +98,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.upstream_http2_flood_checks",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
     "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
+    "envoy.reloadable_features.sanitize_http_header_referer",
 };
 
 // This is a section for officially sanctioned runtime features which are too
@@ -123,7 +124,6 @@ constexpr const char* disabled_runtime_features[] = {
     // CacheOption is CacheWhenRuntimeEnabled.
     // Caller that use AlwaysCache option will always cache, unaffected by this runtime.
     "envoy.reloadable_features.enable_grpc_async_client_cache",
-    "envoy.reloadable_features.sanitize_http_header_referer",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

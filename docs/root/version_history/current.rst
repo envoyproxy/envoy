@@ -46,6 +46,7 @@ New Features
 ------------
 * http: added :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>` in the header matcher.
 * http: added support for :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>` for both upstream and downstream connections.
+* http: added :ref: `referer_sanitization <config_http_conn_man_headers_referer>` in connection manager. Guarded by default enabled ``envoy.reloadable_features.sanitize_http_header_referer`` flag.
 
 Deprecated
 ----------

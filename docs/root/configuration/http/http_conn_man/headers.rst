@@ -53,7 +53,7 @@ The *server* header will be set during encoding to the value in the :ref:`server
 referer
 -------
 
-The *referer* header will be sanitized during decoding.
+The *referer* header will be sanitized during decoding. The feature is guarded by *envoy.reloadable_features.sanitize_http_header_referer* runtime flag.
 
 .. _config_http_conn_man_headers_x-client-trace-id:
 
