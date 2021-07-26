@@ -103,9 +103,6 @@ TEST(OrMatcher, Permission_Set) {
   checkMatcher(RBAC::OrMatcher(set), false, conn, headers, info);
 
   perm = set.add_rules();
-  envoy::type::v3::Int32Range range;
-  range.set_start(123);
-  range.set_end(456);
   perm->mutable_destination_port_range()->set_start(123);
   perm->mutable_destination_port_range()->set_end(456);
 
