@@ -824,6 +824,8 @@ ClientConnectionImpl::ClientConnectionImpl(
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
                      std::move(transport_socket), stream_info_, false),
       stream_info_(dispatcher.timeSource(), socket_->addressProviderSharedPtr()) {
+
+  stream_info_.setUpstreamConnectionId(id());
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
   if (remote_address->ip() == nullptr) {

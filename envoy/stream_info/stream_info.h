@@ -244,7 +244,7 @@ public:
 
   virtual void setUpstreamConnectionId(uint64_t id) PURE;
 
-  virtual absl::optional<uint64_t> upstreamConnectionId() PURE;
+  virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
 
   /**
    * @param response_flag the response flag. Each filter can set independent response flags. The
