@@ -697,8 +697,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
     EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
-          EXPECT_EQ(default_route,
-                    decoder_filters_[0]->callbacks_->streamInfo().route());
+          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
           // Not clearing cached route returns cached route and doesn't invoke cb.
@@ -749,8 +748,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
 
           EXPECT_EQ(default_route, route);
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
-          EXPECT_EQ(default_route,
-                    decoder_filters_[0]->callbacks_->streamInfo().route());
+          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
           return FilterHeadersStatus::Continue;
@@ -778,8 +776,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
     EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
           EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->route());
-          EXPECT_EQ(default_route,
-                    decoder_filters_[1]->callbacks_->streamInfo().route());
+          EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
 
           int ctr = 0;
@@ -807,8 +804,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           decoder_filters_[1]->callbacks_->route(cb);
 
           EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->route());
-          EXPECT_EQ(foo_bar_route,
-                    decoder_filters_[1]->callbacks_->streamInfo().route());
+          EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->streamInfo().route());
           EXPECT_EQ(foo_bar_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
 
           return FilterHeadersStatus::Continue;
@@ -886,8 +882,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
         EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
         EXPECT_EQ(default_cluster_name,
                   decoder_filters_[0]->callbacks_->route()->routeEntry()->clusterName());
-        EXPECT_EQ(default_route,
-                  decoder_filters_[0]->callbacks_->streamInfo().route());
+        EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
         EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
         // Instantiate a DelegatingRoute child class object and invoke setRoute from
@@ -911,8 +906,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
         // clusterName() method.
         EXPECT_EQ(foo_cluster_name,
                   decoder_filters_[1]->callbacks_->route()->routeEntry()->clusterName());
-        EXPECT_EQ(foo_route_override,
-                  decoder_filters_[1]->callbacks_->streamInfo().route());
+        EXPECT_EQ(foo_route_override, decoder_filters_[1]->callbacks_->streamInfo().route());
         // Tests that setRoute correctly sets cached_cluster_info_
         EXPECT_EQ(foo_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
 

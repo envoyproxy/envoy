@@ -1190,7 +1190,8 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRoute(nullptr); }
 
 void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
-  if (!filter_manager_.streamInfo().route() || !filter_manager_.streamInfo().route()->routeEntry() || !request_headers_) {
+  if (!filter_manager_.streamInfo().route() ||
+      !filter_manager_.streamInfo().route()->routeEntry() || !request_headers_) {
     return;
   }
   const auto& route = filter_manager_.streamInfo().route()->routeEntry();
@@ -1610,7 +1611,8 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
 void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
   filter_manager_.streamInfo().route_ = route;
   cached_route_ = std::move(route);
-  if (nullptr == filter_manager_.streamInfo().route() || nullptr == filter_manager_.streamInfo().route()->routeEntry()) {
+  if (nullptr == filter_manager_.streamInfo().route() ||
+      nullptr == filter_manager_.streamInfo().route()->routeEntry()) {
     cached_cluster_info_ = nullptr;
   } else {
     Upstream::ThreadLocalCluster* local_cluster =

@@ -167,7 +167,8 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_TRUE(stream_info.healthCheck());
 
     EXPECT_EQ(nullptr, stream_info.route());
-    std::shared_ptr<NiceMock<Router::MockRoute>> route = std::make_shared<NiceMock<Router::MockRoute>>();
+    std::shared_ptr<NiceMock<Router::MockRoute>> route =
+        std::make_shared<NiceMock<Router::MockRoute>>();
     stream_info.route_ = route;
     EXPECT_EQ(route, stream_info.route());
 

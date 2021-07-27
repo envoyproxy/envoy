@@ -27,8 +27,12 @@ public:
   const Router::Decorator* decorator() const override;
   const Router::RouteTracing* tracingConfig() const override;
   const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
-  const envoy::config::core::v3::Metadata& metadata() const override { return base_route_->metadata(); }
-  const Envoy::Config::TypedMetadata& typedMetadata() const override { return base_route_->typedMetadata(); }
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    return base_route_->metadata();
+  }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return base_route_->typedMetadata();
+  }
 
 private:
   const Router::RouteConstSharedPtr base_route_;
