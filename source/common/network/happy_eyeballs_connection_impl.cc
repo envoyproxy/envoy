@@ -229,6 +229,7 @@ uint32_t HappyEyeballsConnectionImpl::bufferLimit() const { return connections_[
 
 bool HappyEyeballsConnectionImpl::aboveHighWatermark() const {
   if (!connect_finished_) {
+    // Writes are deferred, so return the watermark status from the deferred write buffer.
     return post_connect_state_.write_buffer_.has_value() &&
            post_connect_state_.write_buffer_.value()->highWatermarkTriggered();
   }

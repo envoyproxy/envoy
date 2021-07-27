@@ -67,7 +67,7 @@ public:
   }
 
   // Fires the failover timer and creates the next connection.
-  void timeoutAndStartNextAttempt() {
+  void timeOutAndStartNextAttempt() {
     EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
     EXPECT_CALL(dispatcher_, createClientConnection_(address_list_[1], _, _, _))
         .WillOnce(testing::InvokeWithoutArgs(
@@ -107,7 +107,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeout) {
   startConnect();
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   // Let the second attempt timeout to start the third and final attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
@@ -151,7 +151,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenFirstSuccess) {
   startConnect();
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   // Connect the first attempt and verify that the second is closed.
   EXPECT_CALL(*failover_timer_, disableTimer());
@@ -169,7 +169,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondSuccess) {
   startConnect();
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   // Connect the second attempt and verify that the first is closed.
   EXPECT_CALL(*failover_timer_, disableTimer());
@@ -187,7 +187,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondFailsAndFirstSuc
   startConnect();
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   // When the second attempt fails, the third and final attempt will be started.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
@@ -214,7 +214,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectThenAllTimeoutAndFail) {
   startConnect();
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   // After the second timeout the third and final attempt will be started.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
@@ -274,7 +274,7 @@ TEST_F(HappyEyeballsConnectionImplTest, NoDelay) {
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
   // noDelay() should be applied to the newly created connection.
   EXPECT_CALL(*next_connections_.back(), noDelay(true));
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   connectSecondAttempt();
 
@@ -292,7 +292,7 @@ TEST_F(HappyEyeballsConnectionImplTest, DetectEarlyCloseWhenReadDisabled) {
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
   // detectEarlyCloseWhenReadDisabled() should be applied to the newly created connection.
   EXPECT_CALL(*next_connections_.back(), detectEarlyCloseWhenReadDisabled(true));
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   connectSecondAttempt();
 
@@ -310,7 +310,7 @@ TEST_F(HappyEyeballsConnectionImplTest, SetDelayedCloseTimeout) {
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
   // setDelayedCloseTimeout() should be applied to the newly created connection.
   EXPECT_CALL(*next_connections_.back(), setDelayedCloseTimeout(std::chrono::milliseconds(5)));
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   connectSecondAttempt();
 
@@ -323,7 +323,7 @@ TEST_F(HappyEyeballsConnectionImplTest, CloseDuringAttempt) {
   startConnect();
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
@@ -341,7 +341,7 @@ TEST_F(HappyEyeballsConnectionImplTest, CloseDuringAttemptWithCallbacks) {
   impl_->addConnectionCallbacks(callbacks);
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
@@ -371,7 +371,7 @@ TEST_F(HappyEyeballsConnectionImplTest, AddReadFilter) {
   startConnect();
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   // addReadFilter() should be applied to the now final connection.
   EXPECT_CALL(*created_connections_[1], addReadFilter(filter));
@@ -413,7 +413,7 @@ TEST_F(HappyEyeballsConnectionImplTest, RemoveReadFilterBeforeConnectFinished) {
   impl_->removeReadFilter(filter);
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   // Verify that addReadFilter() calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[1], addReadFilter(filter2));
@@ -436,7 +436,7 @@ TEST_F(HappyEyeballsConnectionImplTest, InitializeReadFilters) {
   EXPECT_TRUE(impl_->initializeReadFilters());
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   // initializeReadFilters() should be applied to the now final connection.
   EXPECT_CALL(*created_connections_[1], addReadFilter(_));
@@ -468,7 +468,7 @@ TEST_F(HappyEyeballsConnectionImplTest, AddConnectionCallbacks) {
   startConnect();
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   // addConnectionCallbacks() should be applied to the now final connection.
   EXPECT_CALL(*created_connections_[1], addConnectionCallbacks(_))
@@ -570,7 +570,7 @@ TEST_F(HappyEyeballsConnectionImplTest, SetBufferLimits) {
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
   // setBufferLimits() should be applied to the newly created connection.
   EXPECT_CALL(*next_connections_.back(), setBufferLimits(42));
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   connectSecondAttempt();
 
@@ -671,7 +671,7 @@ TEST_F(HappyEyeballsConnectionImplTest, SetConnectionStats) {
   // setConnectionStats() should be applied to the newly created connection.
   EXPECT_CALL(*next_connections_.back(), setConnectionStats(_))
       .WillOnce(Invoke([&](const Connection::ConnectionStats& s) -> void { EXPECT_EQ(&s, &cs); }));
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   connectSecondAttempt();
 
@@ -717,7 +717,7 @@ TEST_F(HappyEyeballsConnectionImplTest, AddWriteFilter) {
   startConnect();
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   // addWriteFilter() should be applied to the now final connection.
   EXPECT_CALL(*created_connections_[1], addWriteFilter(filter));
@@ -752,7 +752,7 @@ TEST_F(HappyEyeballsConnectionImplTest, AddFilter) {
   startConnect();
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   // addFilter() should be applied to the now final connection.
   EXPECT_CALL(*created_connections_[1], addFilter(filter));
@@ -786,7 +786,7 @@ TEST_F(HappyEyeballsConnectionImplTest, AddBytesSentCallback) {
   startConnect();
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   // addBytesSentCallback() should be applied to the now final connection.
   EXPECT_CALL(*created_connections_[1], addBytesSentCallback(_));
@@ -815,7 +815,7 @@ TEST_F(HappyEyeballsConnectionImplTest, EnableHalfClose) {
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
   // enableHalfClose() should be applied to the newly created connection.
   EXPECT_CALL(*next_connections_.back(), enableHalfClose(true));
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   connectSecondAttempt();
 
@@ -855,7 +855,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ReadDisable) {
   startConnect();
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   // The disables will be captured by the impl and not passed to the connection until it completes.
   impl_->readDisable(true);
@@ -903,7 +903,7 @@ TEST_F(HappyEyeballsConnectionImplTest, StartSecureTransport) {
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
   // startSecureTransport() should be applied to the newly created connection.
   EXPECT_CALL(*next_connections_.back(), startSecureTransport()).WillOnce(Return(true));
-  timeoutAndStartNextAttempt();
+  timeOutAndStartNextAttempt();
 
   EXPECT_CALL(*created_connections_[0], startSecureTransport()).WillOnce(Return(false));
   EXPECT_CALL(*created_connections_[1], startSecureTransport()).WillOnce(Return(true));
