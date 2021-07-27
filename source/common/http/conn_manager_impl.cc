@@ -1425,11 +1425,13 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
       connection_manager_.random_generator_.bernoulli(
           connection_manager_.overload_disable_keepalive_ref_.value())) {
-    ENVOY_STREAM_LOG(debug, "disabling keepalive due ot envoy overload", *this);
+    ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
     drain_connection_due_to_overload = true;
     connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
   }
 
+  // See if we want to drain/close the connection. Send the go away frame prior to encoding the
+  // header block.
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
       (connection_manager_.drain_close_.drainClose() || drain_connection_due_to_overload)) {
 
