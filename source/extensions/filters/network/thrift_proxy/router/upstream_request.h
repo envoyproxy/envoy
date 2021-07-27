@@ -5,8 +5,8 @@
 
 #include "source/extensions/filters/network/thrift_proxy/decoder_events.h"
 #include "source/extensions/filters/network/thrift_proxy/metadata.h"
-#include "source/extensions/filters/network/thrift_proxy/thrift.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift.h"
 
 namespace Envoy {
 namespace Extensions {
