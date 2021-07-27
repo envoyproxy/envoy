@@ -930,18 +930,6 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
                                      "{}. \nUse QuicDownstreamTransport instead.",
                                      transport_socket.DebugString()));
   }
-  const std::string config_str =
-      filter_chain.filters_size() == 0 ? "" : filter_chain.filters(0).DebugString();
-  const std::string hcm_str =
-      "type.googleapis.com/"
-      "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
-  if (is_quic && (filter_chain.filters().size() != 1 ||
-                  filter_chain.filters(0).typed_config().type_url() != hcm_str ||
-                  !absl::StrContains(config_str, "codec_type: HTTP3"))) {
-    throw EnvoyException(fmt::format(
-        "error building network filter chain for quic listener: requires exactly one http_"
-        "connection_manager filter with an HTTP/3 codec."));
-  }
 #else
   // When QUIC is compiled out it should not be possible to configure either the QUIC transport
   // socket or the QUIC listener and get to this point.
