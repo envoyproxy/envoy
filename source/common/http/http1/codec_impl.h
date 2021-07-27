@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <bits/stdint-uintn.h>
 #include <cstdint>
 #include <list>
 #include <memory>
