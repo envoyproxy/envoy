@@ -1271,7 +1271,7 @@ void bindAndListenTcpSocket(const Network::Address::InstanceConstSharedPtr& addr
   auto socket = std::make_unique<Network::TcpListenSocket>(address, options, true);
   // Some kernels erroneously allow `bind` without SO_REUSEPORT for addresses
   // with some other socket already listening on it, see #7636.
-  if (SOCKET_FAILURE(socket->ioHandle().listen(1).rc_)) {
+  if (SOCKET_FAILURE(socket->ioHandle().listen(1).return_value_)) {
     // Mimic bind exception for the test simplicity.
     throw Network::SocketBindException(fmt::format("cannot listen: {}", errorDetails(errno)),
                                        errno);

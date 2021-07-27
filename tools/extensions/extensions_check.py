@@ -10,9 +10,7 @@ from importlib.util import spec_from_loader, module_from_spec
 from importlib.machinery import SourceFileLoader
 from typing import Iterator
 
-import yaml
-
-from tools.base import checker
+from tools.base import checker, utils
 
 BUILD_CONFIG_PATH = "source/extensions/extensions_build_config.bzl"
 
@@ -103,8 +101,7 @@ class ExtensionsChecker(checker.Checker):
 
     @cached_property
     def metadata(self) -> dict:
-        with open(METADATA_PATH) as f:
-            return yaml.safe_load(f.read())
+        return utils.from_yaml(METADATA_PATH)
 
     @property
     def robust_to_downstream_count(self) -> int:
@@ -134,7 +131,10 @@ class ExtensionsChecker(checker.Checker):
         missing_metadata = self.all_extensions - set(self.metadata.keys())
 
         for extension in only_metadata:
-            self.error("registered", [f"Metadata for unused extension found: {extension}"])
+            # Skip envoy_mobile_http_connection_manager as it is built with
+            # http_connection_manager
+            if extension != "envoy.filters.network.envoy_mobile_http_connection_manager":
+                self.error("registered", [f"Metadata for unused extension found: {extension}"])
 
         for extension in missing_metadata:
             self.error("registered", [f"Metadata missing for extension: {extension}"])
