@@ -22,7 +22,6 @@ constexpr absl::string_view RESERVED_CHARS = "-._~";
 constexpr absl::string_view S3_SERVICE_NAME = "s3";
 const std::string URI_ENCODE = "%{:02X}";
 const std::string URI_DOUBLE_ENCODE = "%25{:02X}";
-const absl::flat_hash_set<char> RESERVED_CHAR_SET{RESERVED_CHARS.begin(), RESERVED_CHARS.end()};
 
 std::map<std::string, std::string>
 Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers) {
@@ -130,7 +129,9 @@ std::string Utility::canonicalizePathString(absl::string_view path_string,
   return canonical_path_string;
 }
 
-bool isReservedChar(const char c) { return std::isalnum(c) || RESERVED_CHAR_SET.contains(c); }
+bool isReservedChar(const char c) {
+  return std::isalnum(c) || RESERVED_CHARS.find(c) != std::string::npos;
+}
 
 void encodeS3Path(std::string& encoded, const char& c) {
   // Do not encode '/' for S3
