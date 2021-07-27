@@ -3382,6 +3382,23 @@ TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
                   socket_address:
                     address: foo.bar.com
                     port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.quic
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+        upstream_tls_context:
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              private_key:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+            validation_context:
+              trusted_ca:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              match_subject_alt_names:
+              - exact: localhost
+              - exact: 127.0.0.1
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
