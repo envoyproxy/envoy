@@ -4,19 +4,17 @@ import XCTest
 
 final class StatFlushIntegrationTest: XCTestCase {
   func testLotsOfFlushesWithHistograms() throws {
-    let loggingExpectation = self.expectation(description: "Run used platform logger")
+    let engineExpectation = self.expectation(description: "Engine Running")
 
     let engine = EngineBuilder()
       .addLogLevel(.debug)
       .addStatsFlushSeconds(1)
-      .setLogger { msg in
-        if msg.contains("starting main dispatch loop") {
-          loggingExpectation.fulfill()
-        }
+      .setOnEngineRunning {
+        engineExpectation.fulfill()
       }
       .build()
 
-    XCTAssertEqual(XCTWaiter.wait(for: [loggingExpectation], timeout: 3), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 10), .completed)
 
     let pulseClient = engine.pulseClient()
     let distribution = pulseClient.distribution(elements: ["foo", "bar", "distribution"])
@@ -28,5 +26,7 @@ final class StatFlushIntegrationTest: XCTestCase {
     for _ in 0...100 {
         engine.flushStats()
     }
+
+    engine.terminate()
   }
 }
