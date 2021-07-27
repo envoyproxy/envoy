@@ -17,8 +17,7 @@ namespace Router {
  */
 class DelegatingRoute : public Router::Route {
 public:
-  explicit DelegatingRoute(Router::RouteConstSharedPtr route)
-      : base_route_(std::move(route)), typed_metadata_({}) {
+  explicit DelegatingRoute(Router::RouteConstSharedPtr route) : base_route_(std::move(route)) {
     ASSERT(base_route_ != nullptr);
   }
 
@@ -28,13 +27,11 @@ public:
   const Router::Decorator* decorator() const override;
   const Router::RouteTracing* tracingConfig() const override;
   const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
-  const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
-  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
+  const envoy::config::core::v3::Metadata& metadata() const override { return base_route_->metadata(); }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override { return base_route_->typedMetadata(); }
 
 private:
   const Router::RouteConstSharedPtr base_route_;
-  const envoy::config::core::v3::Metadata metadata_;
-  const Envoy::Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory> typed_metadata_;
 };
 
 /**

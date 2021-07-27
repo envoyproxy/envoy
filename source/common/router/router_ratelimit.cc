@@ -76,7 +76,10 @@ bool SourceClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descrip
 bool DestinationClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                                   const std::string&, const Http::RequestHeaderMap&,
                                                   const StreamInfo::StreamInfo& info) const {
-  descriptor_entry = {"destination_cluster", info.routeEntry()->clusterName()};
+  if (info.route() == nullptr || info.route()->routeEntry() == nullptr){
+    return false;
+  }
+  descriptor_entry = {"destination_cluster", info.route()->routeEntry()->clusterName()};
   return true;
 }
 

@@ -499,12 +499,6 @@ public:
   virtual Router::RouteConstSharedPtr route() const PURE;
 
   /**
-   * @return const Router::RouteEntry* Get the route entry selected for this request. Note: this
-   * will be nullptr if no route was selected.
-   */
-  virtual const Router::RouteEntry* routeEntry() const PURE;
-
-  /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
    * request
    */

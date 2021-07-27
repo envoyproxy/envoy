@@ -101,8 +101,6 @@ public:
 
   Router::RouteConstSharedPtr route() const override { return route_; }
 
-  const Router::RouteEntry* routeEntry() const override { return route_entry_; }
-
   absl::optional<std::chrono::nanoseconds>
   duration(const absl::optional<MonotonicTime>& time) const {
     if (!time) {
@@ -248,7 +246,6 @@ public:
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   Router::RouteConstSharedPtr route_;
-  const Router::RouteEntry* route_entry_{};
   envoy::config::core::v3::Metadata metadata_{};
   Envoy::StreamInfo::FilterStateSharedPtr filter_state_{
       std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
