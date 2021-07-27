@@ -68,13 +68,9 @@ struct StreamInfoImpl : public StreamInfo {
                                                                 start_time_monotonic_);
   }
 
-  void setUpstreamConnectionId(uint64_t id) override {
-    upstream_connection_id_ = id;
-  }
+  void setUpstreamConnectionId(uint64_t id) override { upstream_connection_id_ = id; }
 
-  absl::optional<uint64_t> upstreamConnectionId() const override {
-    return upstream_connection_id_;
-  }
+  absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
 
   absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const override {
     return duration(last_downstream_rx_byte_received);
