@@ -111,7 +111,7 @@ void ServiceBase::Stop(DWORD control) {
   char data[] = {'a'};
   Buffer::RawSlice buffer{data, 1};
   auto result = handler->writev(&buffer, 1);
-  RELEASE_ASSERT(result.rc_ == 1,
+  RELEASE_ASSERT(result.return_value_ == 1,
                  fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
 }
 

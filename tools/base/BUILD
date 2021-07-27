@@ -16,7 +16,12 @@ envoy_py_library(
     ],
 )
 
-envoy_py_library("tools.base.utils")
+envoy_py_library(
+    "tools.base.utils",
+    deps = [
+        requirement("pyyaml"),
+    ],
+)
 
 envoy_py_library(
     "tools.base.checker",

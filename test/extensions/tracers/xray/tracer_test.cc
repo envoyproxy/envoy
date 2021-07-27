@@ -276,6 +276,7 @@ TEST_F(XRayTracerTest, SerializeSpanTestWithStatusCodeNotANumber) {
   span->setTag(Tracing::Tags::get().UserAgent, expected_->user_agent);
   span->setTag(Tracing::Tags::get().HttpStatusCode, expected_status_code);
   span->setTag(Tracing::Tags::get().ResponseSize, expected_content_length);
+  span->setTag("", "");
   span->finishSpan();
 }
 
