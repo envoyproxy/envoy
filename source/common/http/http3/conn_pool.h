@@ -66,7 +66,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                 Upstream::ClusterConnectivityState& state, TimeSource& time_source);
+                 Upstream::ClusterConnectivityState& state, TimeSource& time_source,
+                 Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope);
 
 } // namespace Http3
 } // namespace Http

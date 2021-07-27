@@ -23,13 +23,13 @@ LOG_FMT = "%(name)s %(levelname)s %(message)s"
 LOG_LEVEL_STYLES = frozendict(
     critical=frozendict(bold=True, color="red"),
     debug=frozendict(color="green"),
-    error=frozendict(color="red"),
-    info=frozendict(),
+    error=frozendict(color="red", bold=True),
+    info=frozendict(color="white", bold=True),
     notice=frozendict(color="magenta", bold=True),
     spam=frozendict(color="green", faint=True),
     success=frozendict(bold=True, color="green"),
     verbose=frozendict(color="blue"),
-    warning=frozendict(color="yellow"))
+    warning=frozendict(color="yellow", bold=True))
 
 
 def catches(errors: Union[Tuple[Exception], Exception]) -> Callable:

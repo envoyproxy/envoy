@@ -55,7 +55,8 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(
 std::unique_ptr<Network::ClientConnection>
 createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& dispatcher,
                             Network::Address::InstanceConstSharedPtr server_addr,
-                            Network::Address::InstanceConstSharedPtr local_addr) {
+                            Network::Address::InstanceConstSharedPtr local_addr,
+                            QuicStatNames& quic_stat_names, Stats::Scope& scope) {
   // This flag fix a QUICHE issue which may crash Envoy during connection close.
   SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
@@ -74,7 +75,7 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
   auto ret = std::make_unique<EnvoyQuicClientSession>(
       info_impl->quic_config_, info_impl->supported_versions_, std::move(connection),
       info_impl->server_id_, std::move(config), &info_impl->push_promise_index_, dispatcher,
-      info_impl->buffer_limit_, info_impl->crypto_stream_factory_);
+      info_impl->buffer_limit_, info_impl->crypto_stream_factory_, quic_stat_names, scope);
   return ret;
 }
 

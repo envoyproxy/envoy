@@ -1,6 +1,7 @@
 import logging
 import os
 import pwd
+import shutil
 from functools import cached_property
 from email.utils import formataddr, parseaddr
 from typing import Optional
@@ -44,6 +45,10 @@ class GPGIdentity(object):
     @cached_property
     def gpg(self) -> gnupg.GPG:
         return gnupg.GPG()
+
+    @cached_property
+    def gpg_bin(self) -> str:
+        return shutil.which("gpg2") or shutil.which("gpg")
 
     @property
     def gnupg_home(self) -> str:

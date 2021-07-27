@@ -7,13 +7,11 @@ import tarfile
 import tempfile
 from functools import cached_property
 
-import yaml
-
 from colorama import Fore, Style
 
 from sphinx.cmd.build import main as sphinx_build
 
-from tools.base import runner
+from tools.base import runner, utils
 
 
 class SphinxBuildError(Exception):
@@ -51,9 +49,7 @@ class SphinxRunner(runner.Runner):
     @cached_property
     def config_file(self) -> str:
         """Populates a config file with self.configs and returns the file path"""
-        with open(self.config_file_path, "w") as f:
-            f.write(yaml.dump(self.configs))
-        return self.config_file_path
+        return utils.to_yaml(self.configs, self.config_file_path)
 
     @property
     def config_file_path(self) -> str:
