@@ -123,6 +123,20 @@ message ScaleTimersOverloadActionConfig {
   repeated ScaleTimer timer_scale_factors = 1 [(validate.rules).repeated = {min_items: 1}];
 }
 
+// Typed configuration for the "envoy.overload_actions.reset_streams" action.
+// TODO(kbaichoo): add docs here for how to configure this and how it's used.
+message ResetStreamsOverloadActionConfig {
+  // The lower limit at which the Reset Stream action should starting resetting
+  // streams tracked in the largest bucket.
+  double lower_limit = 1 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
+
+  // The upper limit at which the Reset Stream action should have reset all
+  // tracked streams. Increasing this limit is a trade off between efficiency and
+  // safety as we allow resources of the proxy to be used at the cost of higher
+  // probability of running out of memory.
+  double upper_limit = 2 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
+}
+
 message OverloadAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.OverloadAction";
