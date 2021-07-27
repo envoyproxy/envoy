@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "overload_manager_interface",
     hdrs = ["overload_manager.h"],
     deps = [
+        ":reset_streams_adapter",
         ":thread_local_overload_state",
         "//envoy/event:dispatcher_interface",
         "//envoy/thread_local:thread_local_interface",
@@ -27,5 +28,13 @@ envoy_cc_library(
         "//envoy/event:timer_interface",
         "//envoy/thread_local:thread_local_object",
         "//source/common/common:interval_value",
+    ],
+)
+
+envoy_cc_library(
+    name = "reset_streams_adapter",
+    hdrs = ["reset_streams_adapter.h"],
+    deps = [
+        ":thread_local_overload_state",
     ],
 )

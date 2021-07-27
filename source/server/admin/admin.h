@@ -288,6 +288,7 @@ private:
     }
 
     Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override { return nullptr; }
+    const ResetStreamAdapter* resetStreamAdapter() override { return nullptr; }
 
     bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
       // This method shouldn't be called by the admin listener

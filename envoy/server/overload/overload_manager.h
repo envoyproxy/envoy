@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/scaled_range_timer_manager.h"
+#include "envoy/server/overload/reset_streams_adapter.h"
 #include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "source/common/singleton/const_singleton.h"
@@ -78,6 +79,11 @@ public:
    * Get a factory for constructing scaled timer managers that respond to overload state.
    */
   virtual Event::ScaledRangeTimerManagerFactory scaledTimerFactory() PURE;
+
+  /**
+   * Returns an adapter for resetStream callbacks.
+   */
+  virtual const ResetStreamAdapter* resetStreamAdapter() PURE;
 };
 
 } // namespace Server

@@ -27,7 +27,7 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
                        Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler,
                        OverloadManager& overload_manager, Api::Api& api)
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
-      api_(api) {
+      overload_manager_(overload_manager), api_(api) {
   tls_.registerThread(*dispatcher_, false);
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
@@ -151,10 +151,13 @@ void WorkerImpl::rejectIncomingConnectionsCb(OverloadActionState state) {
   handler_->setListenerRejectFraction(state.value());
 }
 
-void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState /*state*/) {
-  // TODO(kbaichoo): Implement likely just forward to dispatcher's buffer
-  // factory, having it do the heavy lifting.
-  std::cout << "resetStreamsUsingExcessiveMemory called!\n";
+void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState state) {
+  auto buckets_to_reset = overload_manager_.resetStreamAdapter()->translateToBucketsToReset(state);
+
+  if (buckets_to_reset.has_value()) {
+    dispatcher_->getWatermarkFactory().resetAllAccountsInBucketsStartingWith(
+        buckets_to_reset.value());
+  }
 }
 
 } // namespace Server

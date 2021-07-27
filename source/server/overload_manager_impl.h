@@ -118,6 +118,7 @@ public:
                          OverloadActionCb callback) override;
   ThreadLocalOverloadState& getThreadLocalOverloadState() override;
   Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override;
+  const ResetStreamAdapter* resetStreamAdapter() override;
 
   // Stop the overload manager timer and wait for any pending resource updates to complete.
   // After this returns, overload manager clients should not receive any more callbacks
@@ -176,6 +177,7 @@ private:
   absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
 
   Event::ScaledTimerTypeMapConstSharedPtr timer_minimums_;
+  ResetStreamAdapterPtr reset_stream_adapter_;
 
   absl::flat_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadActionState>
       state_updates_to_flush_;
