@@ -582,6 +582,7 @@ envoy_cc_library(
         "//source/common/grpc:context_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:context_lib",
+        "//source/common/http:headers_lib",
         "//source/common/init:manager_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/memory:heap_shrinker_lib",
