@@ -242,6 +242,10 @@ class StreamInfo {
 public:
   virtual ~StreamInfo() = default;
 
+  virtual void setUpstreamConnectionId(uint64_t id) PURE;
+
+  virtual absl::optional<uint64_t> upstreamConnectionId() PURE;
+
   /**
    * @param response_flag the response flag. Each filter can set independent response flags. The
    * flags are accumulated.

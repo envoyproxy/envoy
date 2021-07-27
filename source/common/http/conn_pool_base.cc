@@ -84,6 +84,7 @@ void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& clie
   Http::ResponseDecoder& response_decoder = *http_context.decoder_;
   Http::ConnectionPool::Callbacks& callbacks = *http_context.callbacks_;
   Http::RequestEncoder& new_encoder = http_client->newStreamEncoder(response_decoder);
+  http_client->codec_client_->streamInfo().setUpstreamConnectionId(id());
   callbacks.onPoolReady(new_encoder, client.real_host_description_,
                         http_client->codec_client_->streamInfo(),
                         http_client->codec_client_->protocol());

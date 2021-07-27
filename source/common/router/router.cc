@@ -1231,7 +1231,7 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
 
 void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                                UpstreamRequest& upstream_request, bool end_stream) {
-  ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
+  ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={} upstream_conn={}", *callbacks_, end_stream, callbacks_->streamInfo().upstreamConnectionId().value_or(0));
 
   modify_headers_(*headers);
   // When grpc-status appears in response headers, convert grpc-status to HTTP status code

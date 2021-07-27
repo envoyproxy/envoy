@@ -68,6 +68,14 @@ struct StreamInfoImpl : public StreamInfo {
                                                                 start_time_monotonic_);
   }
 
+  void setUpstreamConnectionId(uint64_t id) override {
+    upstream_connection_id_ = id;
+  }
+
+  absl::optional<uint64_t> upstreamConnectionId() const override {
+    return upstream_connection_id_;
+  }
+
   absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const override {
     return duration(last_downstream_rx_byte_received);
   }
@@ -301,6 +309,7 @@ struct StreamInfoImpl : public StreamInfo {
   FilterStateSharedPtr filter_state_;
   FilterStateSharedPtr upstream_filter_state_;
   std::string route_name_;
+  absl::optional<uint64_t> upstream_connection_id_;
 
 private:
   static Network::SocketAddressProviderSharedPtr emptyDownstreamAddressProvider() {
