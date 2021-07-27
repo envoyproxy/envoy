@@ -13,6 +13,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/stats/utility.h"
@@ -164,15 +165,17 @@ void Filter::doSxg() {
       return;
     }
 
-    const absl::string_view output(reinterpret_cast<char*>(result.data), result.size);
+    auto output = new Buffer::BufferFragmentImpl(
+      result.data, result.size,
+      [result](const void*, size_t, const Buffer::BufferFragmentImpl*) {
+        sxg_buffer_release(const_cast<sxg_buffer_t *>(&result));
+      });
 
     enc_buf.drain(enc_buf.length());
-    enc_buf.add(output); // TODO(rgs): can we move this and avoid the copy?
+    enc_buf.addBufferFragment(*output); // TODO(rgs): can we move this and avoid the copy?
 
-    response_headers_->setContentLength(output.length());
+    response_headers_->setContentLength(result.size);
     response_headers_->setContentType(sxgContentType());
-
-    sxg_buffer_release(&result);
 
     config_->stats().total_signed_succeeded_.inc();
   });
