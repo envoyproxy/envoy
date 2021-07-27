@@ -553,8 +553,8 @@ void HappyEyeballsConnectionImpl::onBelowWriteBufferLowWatermark(
 }
 
 void HappyEyeballsConnectionImpl::onWriteBufferLowWatermark() {
-  // Only be called when moving write data from the deferred write buffer
-  // to the underlying connection. In this case, the connection callbacks must
+  // Only called when moving write data from the deferred write buffer to
+  // the underlying connection. In this case, the connection callbacks must
   // not be notified since this should be transparent to the callbacks.
 }
 
