@@ -9,6 +9,9 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* http: Connection draining is now proactive and does not require traffic to trigger graceful draining. This
+  feature is enabled by default, can be turned off by setting runtime guard
+  ``envoy.reloadable_features.http_conn_manager_proactive_drain`` to false.
 * config: configuration files ending in .yml now load as YAML.
 * config: configuration file extensions now ignore case when deciding the file type. E.g., .JSON file load as JSON.
 * config: reduced log level for "Unable to establish new stream" xDS logs to debug. The log level
