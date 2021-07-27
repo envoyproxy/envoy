@@ -76,7 +76,7 @@ public:
   Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) override;
   void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override;
   void readDisable(bool disable) override;
-  void resetStream() override;
+  void resetStream(StreamInfo::StreamInfo&) override;
   void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {}
 
   // Tcp::ConnectionPool::UpstreamCallbacks

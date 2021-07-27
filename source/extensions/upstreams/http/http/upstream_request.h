@@ -79,9 +79,12 @@ public:
 
   void readDisable(bool disable) override { request_encoder_->getStream().readDisable(disable); }
 
-  void resetStream() override {
-    request_encoder_->getStream().removeCallbacks(*this);
-    request_encoder_->getStream().resetStream(Envoy::Http::StreamResetReason::LocalReset);
+  void resetStream(StreamInfo::StreamInfo& stream_info) override {
+    ::Envoy::Http::Stream& stream = request_encoder_->getStream();
+    stream_info.addBytesReceived(stream.receivedBytes());
+    stream_info.addBytesSent(stream.sentBytes());
+    stream.removeCallbacks(*this);
+    stream.resetStream(Envoy::Http::StreamResetReason::LocalReset);
   }
 
   void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {

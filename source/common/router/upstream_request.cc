@@ -321,7 +321,7 @@ void UpstreamRequest::resetStream() {
 
   if (upstream_) {
     ENVOY_STREAM_LOG(debug, "resetting pool request", *parent_.callbacks());
-    upstream_->resetStream();
+    upstream_->resetStream(stream_info_);
     clearRequestEncoder();
   }
 }

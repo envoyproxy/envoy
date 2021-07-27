@@ -79,7 +79,7 @@ void TcpUpstream::readDisable(bool disable) {
   upstream_conn_data_->connection().readDisable(disable);
 }
 
-void TcpUpstream::resetStream() {
+void TcpUpstream::resetStream(StreamInfo::StreamInfo&) {
   upstream_request_ = nullptr;
   upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
 }

@@ -1328,7 +1328,7 @@ public:
    * Reset the stream. No events will fire beyond this point.
    * @param reason supplies the reset reason.
    */
-  virtual void resetStream() PURE;
+  virtual void resetStream(StreamInfo::StreamInfo&) PURE;
 
   /**
    * Sets the upstream to use the following account.
