@@ -61,7 +61,7 @@ int io_handle_read(BIO* b, char* out, int outl) {
     }
     return -1;
   }
-  return result.rc_;
+  return result.return_value_;
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
@@ -78,7 +78,7 @@ int io_handle_write(BIO* b, const char* in, int inl) {
     }
     return -1;
   }
-  return result.rc_;
+  return result.return_value_;
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
