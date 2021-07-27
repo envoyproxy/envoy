@@ -12,19 +12,20 @@ namespace Extensions {
 namespace StatSinks {
 namespace Wasm {
 
-using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtr;
+using Envoy::Extensions::Common::Wasm::PluginHandleManagerSharedPtr;
 using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
 
 class WasmStatSink : public Stats::Sink {
 public:
-  WasmStatSink(const PluginSharedPtr& plugin, PluginHandleSharedPtr singleton)
+  WasmStatSink(const PluginSharedPtr& plugin, PluginHandleManagerSharedPtr singleton)
       : plugin_(plugin), singleton_(singleton) {}
 
   void flush(Stats::MetricSnapshot& snapshot) override {
-    singleton_->wasmHandle()->wasm()->onStatsUpdate(plugin_, snapshot);
+    // TODO: try restarts.
+    singleton_->handle()->wasmHandle()->wasm()->onStatsUpdate(plugin_, snapshot);
   }
 
-  void setSingleton(PluginHandleSharedPtr singleton) {
+  void setSingleton(PluginHandleManagerSharedPtr singleton) {
     ASSERT(singleton != nullptr);
     singleton_ = singleton;
   }
@@ -36,7 +37,7 @@ public:
 
 private:
   PluginSharedPtr plugin_;
-  PluginHandleSharedPtr singleton_;
+  PluginHandleManagerSharedPtr singleton_;
 };
 
 } // namespace Wasm

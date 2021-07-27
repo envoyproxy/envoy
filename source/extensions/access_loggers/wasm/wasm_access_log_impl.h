@@ -10,13 +10,13 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace Wasm {
 
-using Common::Wasm::PluginHandleSharedPtrThreadLocal;
+using Common::Wasm::PluginHandleManager;
 using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
 
 class WasmAccessLog : public AccessLog::Instance {
 public:
   WasmAccessLog(const PluginSharedPtr& plugin,
-                ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal>&& tls_slot,
+                ThreadLocal::TypedSlotPtr<PluginHandleManager>&& tls_slot,
                 AccessLog::FilterPtr filter)
       : plugin_(plugin), tls_slot_(std::move(tls_slot)), filter_(std::move(filter)) {}
 
@@ -33,19 +33,20 @@ public:
 
     auto handle = tls_slot_->get()->handle();
     if (handle->wasmHandle()) {
+      // TODO: check failure.
       handle->wasmHandle()->wasm()->log(plugin_, request_headers, response_headers,
                                         response_trailers, stream_info);
     }
   }
 
-  void setTlsSlot(ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal>&& tls_slot) {
+  void setTlsSlot(ThreadLocal::TypedSlotPtr<PluginHandleManager>&& tls_slot) {
     ASSERT(tls_slot_ == nullptr);
     tls_slot_ = std::move(tls_slot);
   }
 
 private:
   PluginSharedPtr plugin_;
-  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> tls_slot_;
+  ThreadLocal::TypedSlotPtr<PluginHandleManager> tls_slot_;
   AccessLog::FilterPtr filter_;
 };
 

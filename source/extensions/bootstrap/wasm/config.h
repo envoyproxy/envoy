@@ -15,22 +15,22 @@ namespace Extensions {
 namespace Bootstrap {
 namespace Wasm {
 
-using Common::Wasm::PluginHandleSharedPtrThreadLocal;
-using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtr;
-using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
+using Common::Wasm::PluginHandleManager;
+using Common::Wasm::PluginHandleManagerSharedPtr;
+using Common::Wasm::PluginHandleSharedPtr;
+using Common::Wasm::PluginSharedPtr;
 
 class WasmService {
 public:
-  WasmService(PluginSharedPtr plugin, PluginHandleSharedPtr singleton)
+  WasmService(PluginSharedPtr plugin, PluginHandleManagerSharedPtr singleton)
       : plugin_(plugin), singleton_(std::move(singleton)) {}
-  WasmService(PluginSharedPtr plugin,
-              ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal>&& tls_slot)
+  WasmService(PluginSharedPtr plugin, ThreadLocal::TypedSlotPtr<PluginHandleManager>&& tls_slot)
       : plugin_(plugin), tls_slot_(std::move(tls_slot)) {}
 
 private:
   PluginSharedPtr plugin_;
-  PluginHandleSharedPtr singleton_;
-  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> tls_slot_;
+  PluginHandleManagerSharedPtr singleton_;
+  ThreadLocal::TypedSlotPtr<PluginHandleManager> tls_slot_;
 };
 
 using WasmServicePtr = std::unique_ptr<WasmService>;

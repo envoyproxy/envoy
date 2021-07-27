@@ -31,18 +31,17 @@ void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContex
     }
     if (config_.singleton()) {
       // Return a Wasm VM which will be stored as a singleton by the Server.
-      wasm_service_ = std::make_unique<WasmService>(
-          plugin, Common::Wasm::getPluginHandleThreadLocal(base_wasm, plugin, context.dispatcher())
-                      ->handle());
+      wasm_service_ =
+          std::make_unique<WasmService>(plugin, std::make_shared<Common::Wasm::PluginHandleManager>(
+                                                    base_wasm, plugin, context.dispatcher()));
       return;
     }
     // Per-thread WASM VM.
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
-    auto tls_slot =
-        ThreadLocal::TypedSlot<Common::Wasm::PluginHandleSharedPtrThreadLocal>::makeUnique(
-            context.threadLocal());
+    auto tls_slot = ThreadLocal::TypedSlot<Common::Wasm::PluginHandleManager>::makeUnique(
+        context.threadLocal());
     tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
-      return Common::Wasm::getPluginHandleThreadLocal(base_wasm, plugin, dispatcher);
+      return std::make_shared<Common::Wasm::PluginHandleManager>(base_wasm, plugin, dispatcher);
     });
     wasm_service_ = std::make_unique<WasmService>(plugin, std::move(tls_slot));
   };
@@ -56,6 +55,12 @@ void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContex
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm service {}", plugin->name_));
   }
+
+  // TODO(mathetake): Figure out how to restart WasmServices via PluginHandleManager so it can be
+  // ratelimited. This is a bit tricky compared to other Wasm extensions, because WasmService does
+  // not have any explicit "entrypoint" for the VM actions, e.g. "createFilter" for http/network
+  // filters, "flush" for stat sinks, and "log" for access loggers where we can try restarting VMs
+  // before calling into VMs.
 }
 
 Server::BootstrapExtensionPtr

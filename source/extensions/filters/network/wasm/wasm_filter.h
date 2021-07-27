@@ -16,8 +16,8 @@ namespace NetworkFilters {
 namespace Wasm {
 
 using Envoy::Extensions::Common::Wasm::Context;
+using Envoy::Extensions::Common::Wasm::PluginHandleManager;
 using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtr;
-using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtrThreadLocal;
 using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
 using Envoy::Extensions::Common::Wasm::Wasm;
 
@@ -33,6 +33,7 @@ public:
       wasm = handle->wasmHandle()->wasm().get();
     }
     if (!wasm || wasm->isFailed()) {
+      // TODO: Try restart plugin.
       if (handle->plugin()->fail_open_) {
         // Fail open skips adding this filter to callbacks.
         return nullptr;
@@ -47,7 +48,7 @@ public:
   Wasm* wasmForTest() { return tls_slot_->get()->handle()->wasmHandle()->wasm().get(); }
 
 private:
-  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> tls_slot_;
+  ThreadLocal::TypedSlotPtr<PluginHandleManager> tls_slot_;
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 

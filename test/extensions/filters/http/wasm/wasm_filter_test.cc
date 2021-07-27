@@ -918,7 +918,7 @@ TEST_P(WasmHttpFilterTest, AsyncCallAfterDestroyed) {
   // Destroy the Context, Plugin and VM.
   context_.reset();
   plugin_.reset();
-  plugin_handle_.reset();
+  plugin_handle_manager_.reset();
 
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
@@ -1328,7 +1328,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
     // Destroy the Context, Plugin and VM.
     context_.reset();
     plugin_.reset();
-    plugin_handle_.reset();
+    plugin_handle_manager_.reset();
 
     ProtobufWkt::Value value;
     value.set_string_value("response");
@@ -1660,7 +1660,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
     // Destroy the Context, Plugin and VM.
     context_.reset();
     plugin_.reset();
-    plugin_handle_.reset();
+    plugin_handle_manager_.reset();
   }
 }
 
@@ -1931,62 +1931,8 @@ TEST_P(WasmHttpFilterTest, PanicOnRequestHeaders) {
 
   // Create in-VM context.
   filter().onCreate();
-  // Cause panic in onRequestHeaders.
   EXPECT_EQ(proxy_wasm::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().onRequestHeaders(0, false));
-  EXPECT_TRUE(filter().wasm()->isFailed());
-
-  // Verify if the VM is in failed state for new contexts since the restart is not allowed in the
-  // config.
-  setupFilter();
-  EXPECT_TRUE(filter().wasm()->isFailed());
-}
-
-TEST_P(WasmHttpFilterTest, PanicOnRequestHeadersWithRestart) {
-  if (std::get<0>(GetParam()) == "null") {
-    return;
-  }
-  const auto restart_count = 10;
-  const auto num_contexts = restart_count + 10;
-  setMaxRestartCount(restart_count);
-  setupTest("panic");
-  auto headers = Http::TestResponseHeaderMapImpl{{":status", "503"}};
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&headers), true))
-      .Times(num_contexts);
-
-  // In the case of VM failure, failStream is called for both request and response stream types,
-  // so we need to make sure that we don't send the local reply twice.
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
-                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
-                             testing::Eq("wasm_fail_stream")))
-      .Times(num_contexts);
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
-
-  for (auto i = 0; i < num_contexts; i++) {
-    // Create new context.
-    setupFilter();
-    if (i <= restart_count) {
-      // Verify if the VM is NOT in failed state since the VM should be restarted.
-      EXPECT_FALSE(filter().wasm()->isFailed());
-      filter().onCreate();
-      EXPECT_EQ(proxy_wasm::FilterHeadersStatus::StopAllIterationAndWatermark,
-                filter().onRequestHeaders(0, false));
-      // VM should be in fail state for this context.
-      EXPECT_TRUE(filter().wasm()->isFailed());
-    } else {
-      // We used up restart count, so all the new contexts should be created with the failed VM.
-      EXPECT_TRUE(filter().wasm()->isFailed());
-      filter().onCreate();
-      EXPECT_EQ(proxy_wasm::FilterHeadersStatus::StopAllIterationAndWatermark,
-                filter().onRequestHeaders(0, false));
-    }
-  }
-
-  // Check the restart count metric.
-  EXPECT_EQ(restart_count, Common::Wasm::LifecycleStatsHandler(
-                               scope_, plugin_->wasmConfig().config().vm_config().runtime())
-                               .getRestartCountForTest());
 }
 
 TEST_P(WasmHttpFilterTest, PanicOnRequestBody) {

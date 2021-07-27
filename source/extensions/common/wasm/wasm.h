@@ -159,16 +159,38 @@ private:
 
 using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
-class PluginHandleSharedPtrThreadLocal : public ThreadLocal::ThreadLocalObject {
+// PluginHandleManager manages the information across multiple instances of the same plugin
+// configuration and base_wasm. Notably this class is responsible for restarting and rate-limit of
+// VM restarts in case of VM failures. tryRestartPlugin can be used to restart at callsites where
+// plugin's lifecycles vary.
+class PluginHandleManager : public ThreadLocal::ThreadLocalObject {
 public:
-  PluginHandleSharedPtrThreadLocal() = default;
+  PluginHandleManager(const WasmHandleSharedPtr base_wasm, const PluginSharedPtr& plugin,
+                      Event::Dispatcher& dispatcher,
+                      CreateContextFn create_root_context_for_testing = nullptr)
+      : base_wasm_(base_wasm), plugin_(plugin), dispatcher_(dispatcher),
+        create_root_context_for_testing_(create_root_context_for_testing) {
+    initializePluginHandle();
+  };
+
+  // Try to restart plugin and re-create plugin_handle_.
+  // Returns true if the restart succeeded, false otherwise.
+  bool tryRestartPlugin();
+
   PluginHandleSharedPtr& handle() { return handle_; }
 
 private:
+  bool initializePluginHandle();
   PluginHandleSharedPtr handle_{nullptr};
+
+  // Used for creating plugin handle instances.
+  const WasmHandleSharedPtr base_wasm_;
+  const PluginSharedPtr plugin_;
+  Event::Dispatcher& dispatcher_;
+  CreateContextFn create_root_context_for_testing_;
 };
 
-using PluginHandleThreadLocalSharedPtr = std::shared_ptr<PluginHandleSharedPtrThreadLocal>;
+using PluginHandleManagerSharedPtr = std::shared_ptr<PluginHandleManager>;
 
 using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 
@@ -183,11 +205,6 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                 Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
                 CreateWasmCallback&& callback,
                 CreateContextFn create_root_context_for_testing = nullptr);
-
-PluginHandleThreadLocalSharedPtr
-getPluginHandleThreadLocal(const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
-                           Event::Dispatcher& dispatcher,
-                           CreateContextFn create_root_context_for_testing = nullptr);
 
 void clearCodeCacheForTesting();
 void setTimeOffsetForCodeCacheForTesting(MonotonicTime::duration d);
