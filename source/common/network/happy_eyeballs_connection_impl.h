@@ -142,7 +142,7 @@ private:
   // high water mark.
   void onBelowWriteBufferLowWatermark(ConnectionCallbacksWrapper* wrapper);
 
-  // Called by the write buffer containing pending writes if it goes beloq the
+  // Called by the write buffer containing pending writes if it goes below the
   // low water mark.
   void onWriteBufferLowWatermark();
 

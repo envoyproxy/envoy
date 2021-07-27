@@ -506,8 +506,7 @@ void HappyEyeballsConnectionImpl::setUpFinalConnection(ConnectionEvent event,
       ASSERT(post_connect_state_.end_stream_.has_value());
       // If a buffer limit was set, ensure that it was applied to the connection.
       if (per_connection_state_.buffer_limits_.has_value()) {
-        ASSERT(connections_[0]->bufferLimit() ==
-               per_connection_state_.buffer_limits_.value());
+        ASSERT(connections_[0]->bufferLimit() == per_connection_state_.buffer_limits_.value());
       }
       connections_[0]->write(*post_connect_state_.write_buffer_.value(),
                              post_connect_state_.end_stream_.value());
@@ -551,7 +550,7 @@ void HappyEyeballsConnectionImpl::onBelowWriteBufferLowWatermark(
 }
 
 void HappyEyeballsConnectionImpl::onWriteBufferLowWatermark() {
-  // Oonly be called went moving write data from the deferred write buffer
+  // Only be called went moving write data from the deferred write buffer
   // to the underlying connection. In this case, the connection callbacks must
   // not be notified since this should be transparent to the callbacks.
 }
