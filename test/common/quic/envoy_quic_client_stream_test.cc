@@ -472,5 +472,25 @@ TEST_F(EnvoyQuicClientStreamTest, ReadDisabledBeforeClose) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
+TEST_F(EnvoyQuicClientStreamTest, MaxIncomingHeadersCount) {
+  quic_session_.setMaxIncomingHeadersCount(100);
+  const auto result = quic_stream_->encodeHeaders(request_headers_, false);
+  EXPECT_TRUE(result.ok());
+  quic_stream_->encodeData(request_body_, true);
+
+  // Receive more response headers than allowed. Such response headers shouldn't be delivered to
+  // stream decoder.
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, _)).Times(0u);
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
+  for (size_t i = 0; i < 101; ++i) {
+    spdy_response_headers_[absl::StrCat("key", i)] = absl::StrCat("value", i);
+  }
+  std::string data = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_response_headers_),
+                                  bodyToHttp3StreamPayload(response_body_),
+                                  spdyHeaderToHttp3StreamPayload(spdy_trailers_));
+  quic::QuicStreamFrame frame(stream_id_, true, 0, data);
+  quic_stream_->OnStreamFrame(frame);
+}
+
 } // namespace Quic
 } // namespace Envoy
