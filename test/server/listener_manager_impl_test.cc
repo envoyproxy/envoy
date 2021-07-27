@@ -1688,7 +1688,7 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplTest, UpdateBindToPortEqualToFalse) {
-  // InSequence s;
+  InSequence s;
   auto mock_interface = std::make_unique<Network::MockSocketInterface>(
       std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4});
   StackedScopedInjectableLoader<Network::SocketInterface> new_interface(std::move(mock_interface));
