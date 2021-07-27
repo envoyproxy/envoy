@@ -490,6 +490,45 @@ TEST(WatermarkBufferFactoryTest, DefaultsToEffectivelyNotTracking) {
   EXPECT_EQ(factory.bitshift(), 63); // Too large for any reasonable account size.
 }
 
+TEST(WatermarkBufferFactoryTest, ShouldOnlyResetAllStreamsGreatThanOrEqualToProvidedIndex) {
+  TrackedWatermarkBufferFactory factory(kMinimumBalanceToTrack);
+  Http::MockStreamResetHandler largest_stream_to_reset;
+  Http::MockStreamResetHandler stream_to_reset;
+  Http::MockStreamResetHandler stream_that_should_not_be_reset;
+
+  auto largest_account_to_reset = factory.createAccount(&largest_stream_to_reset);
+  auto account_to_reset = factory.createAccount(&stream_to_reset);
+  auto account_to_not_reset = factory.createAccount(&stream_that_should_not_be_reset);
+
+  largest_account_to_reset->charge(kThresholdForFinalBucket);
+  account_to_reset->charge(2 * kMinimumBalanceToTrack);
+  account_to_not_reset->charge(kMinimumBalanceToTrack);
+
+  // Check that all of the accounts are tracked
+  factory.inspectMemoryClasses([](MemoryClassesToAccountsSet& memory_classes_to_account) {
+    EXPECT_EQ(memory_classes_to_account[0].size(), 1);
+    EXPECT_EQ(memory_classes_to_account[1].size(), 1);
+    EXPECT_EQ(memory_classes_to_account[7].size(), 1);
+  });
+
+  EXPECT_CALL(largest_stream_to_reset, resetStream(_)).WillOnce(Invoke([&]() {
+    largest_account_to_reset->credit(getBalance(largest_account_to_reset));
+    largest_account_to_reset->clearDownstream();
+  }));
+
+  EXPECT_CALL(stream_to_reset, resetStream(_)).WillOnce(Invoke([&]() {
+    account_to_reset->credit(getBalance(account_to_reset));
+    account_to_reset->clearDownstream();
+  }));
+
+  EXPECT_CALL(stream_that_should_not_be_reset, resetStream(_)).Times(0);
+  // Should call resetStream on all streams in bucket >= 1.
+  factory.resetAllAccountsInBucketsStartingWith(1);
+
+  account_to_not_reset->credit(kMinimumBalanceToTrack);
+  account_to_not_reset->clearDownstream();
+}
+
 } // namespace
 } // namespace Buffer
 } // namespace Envoy

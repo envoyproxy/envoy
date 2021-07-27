@@ -89,6 +89,7 @@ public:
                std::function<void()> above_overflow));
 
   MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, createAccount, (Http::StreamResetHandler&));
+  MOCK_METHOD(void, resetAllAccountsInBucketsStartingWith, (uint32_t));
 };
 
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {

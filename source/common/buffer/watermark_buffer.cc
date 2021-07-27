@@ -1,5 +1,6 @@
 #include "source/common/buffer/watermark_buffer.h"
 
+#include <cstdint>
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
@@ -151,31 +152,52 @@ WatermarkBufferFactory::createAccount(Http::StreamResetHandler& reset_handler) {
 }
 
 void WatermarkBufferFactory::updateAccountClass(const BufferMemoryAccountSharedPtr& account,
-                                                int current_class, int new_class) {
+                                                absl::optional<uint32_t> current_class,
+                                                absl::optional<uint32_t> new_class) {
   ASSERT(current_class != new_class, "Expected the current_class and new_class to be different");
 
-  if (current_class == -1 && new_class >= 0) {
+  if (!current_class.has_value() && new_class >= 0u) {
     // Start tracking
-    ASSERT(!size_class_account_sets_[new_class].contains(account));
-    size_class_account_sets_[new_class].insert(account);
-  } else if (current_class >= 0 && new_class == -1) {
+    ASSERT(!size_class_account_sets_[new_class.value()].contains(account));
+    size_class_account_sets_[new_class.value()].insert(account);
+  } else if (current_class >= 0u && !new_class.has_value()) {
     // No longer track
-    ASSERT(size_class_account_sets_[current_class].contains(account));
-    size_class_account_sets_[current_class].erase(account);
+    ASSERT(size_class_account_sets_[current_class.value()].contains(account));
+    size_class_account_sets_[current_class.value()].erase(account);
   } else {
     // Moving between buckets
-    ASSERT(size_class_account_sets_[current_class].contains(account));
-    ASSERT(!size_class_account_sets_[new_class].contains(account));
-    size_class_account_sets_[new_class].insert(
-        std::move(size_class_account_sets_[current_class].extract(account).value()));
+    ASSERT(size_class_account_sets_[current_class.value()].contains(account));
+    ASSERT(!size_class_account_sets_[new_class.value()].contains(account));
+    size_class_account_sets_[new_class.value()].insert(
+        std::move(size_class_account_sets_[current_class.value()].extract(account).value()));
   }
 }
 
 void WatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPtr& account,
-                                               int current_class) {
-  if (current_class >= 0) {
-    ASSERT(size_class_account_sets_[current_class].contains(account));
-    size_class_account_sets_[current_class].erase(account);
+                                               absl::optional<uint32_t> current_class) {
+  if (current_class.has_value()) {
+    ASSERT(size_class_account_sets_[current_class.value()].contains(account));
+    size_class_account_sets_[current_class.value()].erase(account);
+  }
+}
+
+void WatermarkBufferFactory::resetAllAccountsInBucketsStartingWith(uint32_t bucket_idx) {
+  ASSERT(bucket_idx >= 0 && bucket_idx < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_,
+         "Provided bucket index is out of range.");
+  // TODO(kbaichoo): consider counting number of accounts reset, and logging it.
+  while (bucket_idx < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_) {
+
+    // Reset all downstreams for accounts in the given bucket.
+    auto it = size_class_account_sets_[bucket_idx].begin();
+    while (it != size_class_account_sets_[bucket_idx].end()) {
+      auto next = std::next(it);
+      // This will trigger an erase, which avoids rehashing and invalidates the
+      // iterator *it*. *next* is still valid.
+      (*it)->resetDownstream();
+      it = next;
+    }
+
+    ++bucket_idx;
   }
 }
 
@@ -205,19 +227,19 @@ BufferMemoryAccountImpl::createAccount(WatermarkBufferFactory* factory,
   return account;
 }
 
-int BufferMemoryAccountImpl::balanceToClassIndex() {
+absl::optional<uint32_t> BufferMemoryAccountImpl::balanceToClassIndex() {
   const uint64_t shifted_balance = buffer_memory_allocated_ >> factory_->bitshift();
 
   if (shifted_balance == 0) {
-    return -1; // Not worth tracking anything < configured minimum threshold
+    return {}; // Not worth tracking anything < configured minimum threshold
   }
 
   const int class_idx = absl::bit_width(shifted_balance) - 1;
-  return std::min<int>(class_idx, NUM_MEMORY_CLASSES_ - 1);
+  return std::min<uint32_t>(class_idx, NUM_MEMORY_CLASSES_ - 1);
 }
 
 void BufferMemoryAccountImpl::updateAccountClass() {
-  const int new_class = balanceToClassIndex();
+  auto new_class = balanceToClassIndex();
   if (shared_this_ && new_class != current_bucket_idx_) {
     factory_->updateAccountClass(shared_this_, current_bucket_idx_, new_class);
     current_bucket_idx_ = new_class;
@@ -241,7 +263,7 @@ void BufferMemoryAccountImpl::clearDownstream() {
   if (reset_handler_.has_value()) {
     reset_handler_.reset();
     factory_->unregisterAccount(shared_this_, current_bucket_idx_);
-    current_bucket_idx_ = -1;
+    current_bucket_idx_.reset();
     shared_this_ = nullptr;
   }
 }
