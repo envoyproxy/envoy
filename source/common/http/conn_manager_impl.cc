@@ -89,7 +89,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              const LocalInfo::LocalInfo& local_info,
                                              Upstream::ClusterManager& cluster_manager,
                                              Server::OverloadManager& overload_manager,
-                                             TimeSource& time_source)
+                                             TimeSource& time_source, bool use_proactive_draining)
     : config_(config), stats_(config_.stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           stats_.named_.downstream_cx_length_ms_, time_source)),
@@ -103,8 +103,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       overload_disable_keepalive_ref_(
           overload_state_.getState(Server::OverloadActionNames::get().DisableHttpKeepAlive)),
       time_source_(time_source),
-      enable_internal_redirects_with_body_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.internal_redirects_with_body")) {}
+      enable_internal_redirects_with_body_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_redirects_with_body")),
+      use_proactive_draining_(use_proactive_draining) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
   static const auto headers = createHeaderMap<ResponseHeaderMapImpl>(
@@ -157,13 +158,15 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
        nullptr, &stats_.named_.downstream_cx_delayed_close_timeout_});
 
   // register callback for drain-close events
-  start_drain_cb_ = drain_close_.addOnDrainCloseCb([this](std::chrono::milliseconds drain_delay) {
-    // de-register callback since we only want this to fire once
-    start_drain_cb_.reset();
+  if (use_proactive_draining_) {
+    start_drain_cb_ = drain_close_.addOnDrainCloseCb([this](std::chrono::milliseconds drain_delay) {
+      // de-register callback since we only want this to fire once
+      start_drain_cb_.reset();
 
-    // create timer to _begin_ draining
-    createStartDrainTimer(drain_delay);
-  });
+      // create timer to _begin_ draining
+      createStartDrainTimer(drain_delay);
+    });
+  }
 }
 
 ConnectionManagerImpl::~ConnectionManagerImpl() {
@@ -1418,18 +1421,23 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
       headers, request_headers_.get(), connection_manager_.config_,
       connection_manager_.config_.via(), connection_manager_.clear_hop_by_hop_response_headers_);
 
+  bool drain_connection_due_to_overload = false;
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
       connection_manager_.random_generator_.bernoulli(
           connection_manager_.overload_disable_keepalive_ref_.value())) {
-    ENVOY_STREAM_LOG(
-        debug, "disabling keepalive due to envoy overload and drain closing connection", *this);
+    ENVOY_STREAM_LOG(debug, "disabling keepalive due ot envoy overload", *this);
+    drain_connection_due_to_overload = true;
     connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
-    connection_manager_.stats_.named_.downstream_cx_drain_close_.inc();
+  }
+
+  if (connection_manager_.drain_state_ == DrainState::NotDraining &&
+      (connection_manager_.drain_close_.drainClose() || drain_connection_due_to_overload)) {
 
     // This doesn't really do anything for HTTP/1.1 other then give the connection another boost
     // of time to race with incoming requests. For HTTP/2 connections, send a GOAWAY frame to
     // prevent any new streams.
     connection_manager_.startDrainSequence();
+    connection_manager_.stats_.named_.downstream_cx_drain_close_.inc();
   }
 
   if (connection_manager_.codec_->protocol() == Protocol::Http10) {

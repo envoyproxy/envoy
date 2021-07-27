@@ -91,7 +91,7 @@ TEST_P(DrainCloseIntegrationTest, AdminDrain) { testAdminDrain(downstreamProtoco
 
 TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
   drain_strategy_ = Server::DrainStrategy::Immediate;
-  drain_time_ = std::chrono::seconds(10);
+  drain_time_ = std::chrono::seconds(999);
   initialize();
   uint32_t http_port = lookupPort("http");
   codec_client_ = makeHttpConnection(http_port);
@@ -110,7 +110,7 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
       lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_);
   EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
 
-  // With a 10s graceful drain period, the listener should still be open.
+  // With a 999s graceful drain period, the listener should still be open.
   EXPECT_EQ(test_server_->counter("listener_manager.listener_stopped")->value(), 0);
 
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -131,9 +131,13 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
   // New connections can still be made.
   auto second_codec_client_ = makeRawHttpConnection(makeClientConnection(http_port), absl::nullopt);
   EXPECT_TRUE(second_codec_client_->connected());
-  second_codec_client_->rawConnection().close(Network::ConnectionCloseType::NoFlush);
 
-  // Wait for the drain period to expire and shut down listeners
+  // Invoke /drain_listeners and shut down listeners
+  second_codec_client_->rawConnection().close(Network::ConnectionCloseType::NoFlush);
+  admin_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
+  EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
+
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
   ASSERT_TRUE(waitForPortAvailable(http_port));
 }
@@ -141,7 +145,7 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
 TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
   // Use the default gradual probabilistic DrainStrategy so drainClose()
   // behaviour isn't conflated with whether the drain sequence has started.
-  drain_time_ = std::chrono::seconds(10);
+  drain_time_ = std::chrono::seconds(999);
   initialize();
   uint32_t http_port = lookupPort("http");
   codec_client_ = makeHttpConnection(http_port);

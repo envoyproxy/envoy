@@ -67,7 +67,8 @@ public:
                         Random::RandomGenerator& random_generator, Http::Context& http_context,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
-                        Server::OverloadManager& overload_manager, TimeSource& time_system);
+                        Server::OverloadManager& overload_manager, TimeSource& time_system,
+                        bool use_proactive_draining = true);
   ~ConnectionManagerImpl() override;
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -464,6 +465,7 @@ private:
   bool clear_hop_by_hop_response_headers_{true};
   // The number of requests accumulated on the current connection.
   uint64_t accumulated_requests_{};
+  bool use_proactive_draining_;
 };
 
 } // namespace Http
