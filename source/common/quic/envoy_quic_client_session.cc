@@ -90,6 +90,7 @@ quic::QuicConnection* EnvoyQuicClientSession::quicConnection() {
 }
 
 void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
+  quic::QuicSpdyClientSession::OnTlsHandshakeComplete();
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 

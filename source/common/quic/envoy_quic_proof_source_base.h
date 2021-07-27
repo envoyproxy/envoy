@@ -68,33 +68,6 @@ protected:
                            const std::string& hostname, uint16_t signature_algorithm,
                            absl::string_view in,
                            std::unique_ptr<quic::ProofSource::SignatureCallback> callback) PURE;
-
-private:
-  // Used by GetProof() to get signature.
-  class SignatureCallback : public quic::ProofSource::SignatureCallback {
-  public:
-    // TODO(danzh) Pass in Details to retain the certs chain, and quic::ProofSource::Callback to be
-    // triggered in Run().
-    SignatureCallback(std::unique_ptr<quic::ProofSource::Callback> callback,
-                      quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain)
-        : callback_(std::move(callback)), chain_(chain) {}
-
-    // quic::ProofSource::SignatureCallback
-    void Run(bool ok, std::string signature, std::unique_ptr<Details> details) override {
-      quic::QuicCryptoProof proof;
-      if (!ok) {
-        callback_->Run(false, chain_, proof, nullptr);
-        return;
-      }
-      proof.signature = signature;
-      proof.leaf_cert_scts = "Fake timestamp";
-      callback_->Run(true, chain_, proof, std::move(details));
-    }
-
-  private:
-    std::unique_ptr<quic::ProofSource::Callback> callback_;
-    quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain_;
-  };
 };
 
 } // namespace Quic
