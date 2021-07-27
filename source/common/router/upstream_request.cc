@@ -420,8 +420,10 @@ void UpstreamRequest::onPoolReady(
   stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
   parent_.callbacks()->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
 
-  stream_info_.setUpstreamConnectionId(info.upstreamConnectionId().value_or(0));
-  parent_.callbacks()->streamInfo().setUpstreamConnectionId(info.upstreamConnectionId().value_or(0));
+  if (info.upstreamConnectionId().has_value()) {
+    stream_info_.setUpstreamConnectionId(info.upstreamConnectionId().value());
+    parent_.callbacks()->streamInfo().setUpstreamConnectionId(info.upstreamConnectionId().value());
+  }
 
   if (parent_.downstreamEndStream()) {
     setupPerTryTimeout();
