@@ -33,8 +33,6 @@ class EnvoyQuicProofSourceDetails : public quic::ProofSource::Details {
 public:
   explicit EnvoyQuicProofSourceDetails(const Network::FilterChain& filter_chain)
       : filter_chain_(filter_chain) {}
-  EnvoyQuicProofSourceDetails(const EnvoyQuicProofSourceDetails& other)
-      : filter_chain_(other.filter_chain_) {}
 
   const Network::FilterChain& filterChain() const { return filter_chain_; }
 
@@ -50,8 +48,6 @@ public:
   ~EnvoyQuicProofSourceBase() override = default;
 
   // quic::ProofSource
-  // Returns a certs chain and its fake SCT "Fake timestamp" and TLS signature wrapped
-  // in QuicCryptoProof.
   void GetProof(const quic::QuicSocketAddress& server_address,
                 const quic::QuicSocketAddress& client_address, const std::string& hostname,
                 const std::string& server_config, quic::QuicTransportVersion /*transport_version*/,

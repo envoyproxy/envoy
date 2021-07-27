@@ -24,12 +24,13 @@ public:
   MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, ());
 };
 
-class EnvoyQuicClientStreamTest : public testing::TestWithParam<quic::ParsedQuicVersion> {
+class EnvoyQuicClientStreamTest : public testing::Test {
 public:
   EnvoyQuicClientStreamTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_(GetParam()),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
+        quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
                                                         12345)),
         self_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -134,10 +135,7 @@ protected:
   std::string response_body_{"OK\n"};
 };
 
-INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientStreamTests, EnvoyQuicClientStreamTest,
-                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
-
-TEST_P(EnvoyQuicClientStreamTest, GetRequestAndHeaderOnlyResponse) {
+TEST_F(EnvoyQuicClientStreamTest, GetRequestAndHeaderOnlyResponse) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/true);
   EXPECT_TRUE(result.ok());
 
@@ -152,7 +150,7 @@ TEST_P(EnvoyQuicClientStreamTest, GetRequestAndHeaderOnlyResponse) {
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 }
 
-TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
+TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
@@ -179,7 +177,7 @@ TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
   quic_stream_->OnStreamFrame(frame);
 }
 
-TEST_P(EnvoyQuicClientStreamTest, PostRequestAnd100Continue) {
+TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd100Continue) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
 
@@ -211,7 +209,7 @@ TEST_P(EnvoyQuicClientStreamTest, PostRequestAnd100Continue) {
   receiveResponse(response_body_, true, offset);
 }
 
-TEST_P(EnvoyQuicClientStreamTest, ResetUpon101SwitchProtocol) {
+TEST_F(EnvoyQuicClientStreamTest, ResetUpon101SwitchProtocol) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
 
@@ -225,7 +223,7 @@ TEST_P(EnvoyQuicClientStreamTest, ResetUpon101SwitchProtocol) {
   quic_stream_->OnStreamFrame(frame);
 }
 
-TEST_P(EnvoyQuicClientStreamTest, WatermarkSendBuffer) {
+TEST_F(EnvoyQuicClientStreamTest, WatermarkSendBuffer) {
   // Bump connection flow control window large enough not to cause connection
   // level flow control blocked.
   quic::QuicWindowUpdateFrame window_update(
@@ -282,7 +280,7 @@ TEST_P(EnvoyQuicClientStreamTest, WatermarkSendBuffer) {
 
 // Tests that headers and trailers buffered in send buffer contribute towards buffer watermark
 // limits.
-TEST_P(EnvoyQuicClientStreamTest, HeadersContributeToWatermark) {
+TEST_F(EnvoyQuicClientStreamTest, HeadersContributeToWatermark) {
   // Bump connection flow control window large enough not to cause connection level flow control
   // blocked
   quic::QuicWindowUpdateFrame window_update(
@@ -351,20 +349,20 @@ TEST_P(EnvoyQuicClientStreamTest, HeadersContributeToWatermark) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
-TEST_P(EnvoyQuicClientStreamTest, ResetStream) {
+TEST_F(EnvoyQuicClientStreamTest, ResetStream) {
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
-TEST_P(EnvoyQuicClientStreamTest, ReceiveResetStream) {
+TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStream) {
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::RemoteReset, _));
   quic_stream_->OnStreamReset(quic::QuicRstStreamFrame(
       quic::kInvalidControlFrameId, quic_stream_->id(), quic::QUIC_STREAM_NO_ERROR, 0));
   EXPECT_TRUE(quic_stream_->rst_received());
 }
 
-TEST_P(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingHeader) {
+TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingHeader) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
   quic_stream_->encodeData(request_body_, true);
@@ -383,7 +381,7 @@ TEST_P(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingHeader) {
   quic_stream_->OnStreamFrame(frame);
 }
 
-TEST_P(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingDataWithEndStream) {
+TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingDataWithEndStream) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
   quic_stream_->encodeData(request_body_, true);
@@ -402,7 +400,7 @@ TEST_P(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingDataWithEndStream
   quic_stream_->OnStreamFrame(frame);
 }
 
-TEST_P(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingDataWithTrailer) {
+TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingDataWithTrailer) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
   quic_stream_->encodeData(request_body_, true);
@@ -424,7 +422,7 @@ TEST_P(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingDataWithTrailer) 
   quic_stream_->OnStreamFrame(frame);
 }
 
-TEST_P(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingTrailer) {
+TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingTrailer) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, true);
   EXPECT_TRUE(result.ok());
 
@@ -441,7 +439,7 @@ TEST_P(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingTrailer) {
   quic_stream_->OnStreamFrame(frame);
 }
 
-TEST_P(EnvoyQuicClientStreamTest, MetadataNotSupported) {
+TEST_F(EnvoyQuicClientStreamTest, MetadataNotSupported) {
   Http::MetadataMap metadata_map = {{"key", "value"}};
   Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
   Http::MetadataMapVector metadata_map_vector;
@@ -452,7 +450,7 @@ TEST_P(EnvoyQuicClientStreamTest, MetadataNotSupported) {
 }
 
 // Tests that posted stream block callback won't cause use-after-free crash.
-TEST_P(EnvoyQuicClientStreamTest, ReadDisabledBeforeClose) {
+TEST_F(EnvoyQuicClientStreamTest, ReadDisabledBeforeClose) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/true);
   EXPECT_TRUE(result.ok());
 

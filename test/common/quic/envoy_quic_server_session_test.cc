@@ -146,12 +146,13 @@ public:
   }
 };
 
-class EnvoyQuicServerSessionTest : public testing::TestWithParam<quic::ParsedQuicVersion> {
+class EnvoyQuicServerSessionTest : public testing::Test {
 public:
   EnvoyQuicServerSessionTest()
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_({GetParam()}),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
+        quic_version_({quic::CurrentSupportedHttp3Versions()[0]}),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()),
         quic_connection_(new MockEnvoyQuicServerConnection(
             connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_)),
@@ -275,10 +276,7 @@ protected:
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
 };
 
-INSTANTIATE_TEST_SUITE_P(EnvoyQuicServerSessionTests, EnvoyQuicServerSessionTest,
-                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
-
-TEST_P(EnvoyQuicServerSessionTest, NewStreamBeforeInitializingFilter) {
+TEST_F(EnvoyQuicServerSessionTest, NewStreamBeforeInitializingFilter) {
   quic::QuicStreamId stream_id = 4u;
   EXPECT_ENVOY_BUG(envoy_quic_session_.GetOrCreateStream(stream_id),
                    fmt::format("attempts to create stream", envoy_quic_session_.id(), stream_id));
@@ -290,7 +288,7 @@ TEST_P(EnvoyQuicServerSessionTest, NewStreamBeforeInitializingFilter) {
   envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
 }
 
-TEST_P(EnvoyQuicServerSessionTest, NewStream) {
+TEST_F(EnvoyQuicServerSessionTest, NewStream) {
   installReadFilter();
 
   Http::MockRequestDecoder request_decoder;
@@ -321,7 +319,7 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
   stream->OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }
 
-TEST_P(EnvoyQuicServerSessionTest, InvalidIncomingStreamId) {
+TEST_F(EnvoyQuicServerSessionTest, InvalidIncomingStreamId) {
   installReadFilter();
   Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
@@ -337,7 +335,7 @@ TEST_P(EnvoyQuicServerSessionTest, InvalidIncomingStreamId) {
   envoy_quic_session_.OnStreamFrame(stream_frame);
 }
 
-TEST_P(EnvoyQuicServerSessionTest, NoNewStreamForInvalidIncomingStream) {
+TEST_F(EnvoyQuicServerSessionTest, NoNewStreamForInvalidIncomingStream) {
   installReadFilter();
   Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
@@ -352,7 +350,7 @@ TEST_P(EnvoyQuicServerSessionTest, NoNewStreamForInvalidIncomingStream) {
   EXPECT_EQ(nullptr, envoy_quic_session_.GetOrCreateStream(stream_id));
 }
 
-TEST_P(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
+TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
   installReadFilter();
 
   Http::MockRequestDecoder request_decoder;
@@ -420,7 +418,7 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
                     ->value());
 }
 
-TEST_P(EnvoyQuicServerSessionTest, ConnectionClose) {
+TEST_F(EnvoyQuicServerSessionTest, ConnectionClose) {
   installReadFilter();
 
   std::string error_details("dummy details");
@@ -435,7 +433,7 @@ TEST_P(EnvoyQuicServerSessionTest, ConnectionClose) {
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
 }
 
-TEST_P(EnvoyQuicServerSessionTest, ConnectionCloseWithActiveStream) {
+TEST_F(EnvoyQuicServerSessionTest, ConnectionCloseWithActiveStream) {
   installReadFilter();
 
   Http::MockRequestDecoder request_decoder;
@@ -450,7 +448,7 @@ TEST_P(EnvoyQuicServerSessionTest, ConnectionCloseWithActiveStream) {
   EXPECT_TRUE(stream->write_side_closed() && stream->reading_stopped());
 }
 
-TEST_P(EnvoyQuicServerSessionTest, NoFlushWithDataToWrite) {
+TEST_F(EnvoyQuicServerSessionTest, NoFlushWithDataToWrite) {
   installReadFilter();
 
   Http::MockRequestDecoder request_decoder;
@@ -468,7 +466,7 @@ TEST_P(EnvoyQuicServerSessionTest, NoFlushWithDataToWrite) {
   EXPECT_TRUE(stream->write_side_closed() && stream->reading_stopped());
 }
 
-TEST_P(EnvoyQuicServerSessionTest, FlushCloseWithDataToWrite) {
+TEST_F(EnvoyQuicServerSessionTest, FlushCloseWithDataToWrite) {
   installReadFilter();
   Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
@@ -491,7 +489,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseWithDataToWrite) {
 
 // Tests that a write event after flush close should update the delay close
 // timer.
-TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
+TEST_F(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
   installReadFilter();
   // Drive congestion control manually.
   auto send_algorithm = new testing::NiceMock<quic::test::MockSendAlgorithm>;
@@ -576,7 +574,7 @@ TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
 
 // Tests that if delay close timeout is not configured, flush close will not act
 // based on timeout.
-TEST_P(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
+TEST_F(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   installReadFilter();
   // Switch to a encryption forward secure crypto stream.
   quic::test::QuicServerSessionBasePeer::SetCryptoStream(&envoy_quic_session_, nullptr);
@@ -663,7 +661,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
 }
 
-TEST_P(EnvoyQuicServerSessionTest, FlushCloseWithTimeout) {
+TEST_F(EnvoyQuicServerSessionTest, FlushCloseWithTimeout) {
   installReadFilter();
   envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(100));
   Http::MockRequestDecoder request_decoder;
@@ -694,7 +692,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseWithTimeout) {
   EXPECT_FALSE(quic_connection_->connected());
 }
 
-TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithTimeout) {
+TEST_F(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithTimeout) {
   installReadFilter();
   envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(100));
   Http::MockRequestDecoder request_decoder;
@@ -727,7 +725,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithTimeout) {
   EXPECT_FALSE(quic_connection_->connected());
 }
 
-TEST_P(EnvoyQuicServerSessionTest, FlusWriteTransitToFlushWriteWithDelay) {
+TEST_F(EnvoyQuicServerSessionTest, FlusWriteTransitToFlushWriteWithDelay) {
   installReadFilter();
   envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(100));
   Http::MockRequestDecoder request_decoder;
@@ -764,7 +762,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlusWriteTransitToFlushWriteWithDelay) {
   EXPECT_FALSE(quic_connection_->connected());
 }
 
-TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithNoPendingData) {
+TEST_F(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithNoPendingData) {
   installReadFilter();
   envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(100));
   // This close should be delayed as configured.
@@ -787,7 +785,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithNoPendingData) {
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
 }
 
-TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
+TEST_F(EnvoyQuicServerSessionTest, ShutdownNotice) {
   installReadFilter();
   testing::NiceMock<quic::test::MockHttp3DebugVisitor> debug_visitor;
   envoy_quic_session_.set_debug_visitor(&debug_visitor);
@@ -795,7 +793,7 @@ TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
   http_connection_->shutdownNotice();
 }
 
-TEST_P(EnvoyQuicServerSessionTest, GoAway) {
+TEST_F(EnvoyQuicServerSessionTest, GoAway) {
   installReadFilter();
   testing::NiceMock<quic::test::MockHttp3DebugVisitor> debug_visitor;
   envoy_quic_session_.set_debug_visitor(&debug_visitor);
@@ -803,7 +801,7 @@ TEST_P(EnvoyQuicServerSessionTest, GoAway) {
   http_connection_->goAway();
 }
 
-TEST_P(EnvoyQuicServerSessionTest, ConnectedAfterHandshake) {
+TEST_F(EnvoyQuicServerSessionTest, ConnectedAfterHandshake) {
   installReadFilter();
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
   if (!quic_version_[0].UsesTls()) {
@@ -818,13 +816,13 @@ TEST_P(EnvoyQuicServerSessionTest, ConnectedAfterHandshake) {
   EXPECT_FALSE(quic_connection_->connectionSocket()->ioHandle().isOpen());
 }
 
-TEST_P(EnvoyQuicServerSessionTest, NetworkConnectionInterface) {
+TEST_F(EnvoyQuicServerSessionTest, NetworkConnectionInterface) {
   installReadFilter();
   EXPECT_EQ(dispatcher_.get(), &envoy_quic_session_.dispatcher());
   EXPECT_TRUE(envoy_quic_session_.readEnabled());
 }
 
-TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
+TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   // Switch to a encryption forward secure crypto stream.
   quic::test::QuicServerSessionBasePeer::SetCryptoStream(&envoy_quic_session_, nullptr);
   quic::test::QuicServerSessionBasePeer::SetCryptoStream(

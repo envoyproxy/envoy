@@ -39,12 +39,13 @@ using testing::Invoke;
 namespace Envoy {
 namespace Quic {
 
-class EnvoyQuicServerStreamTest : public testing::TestWithParam<quic::ParsedQuicVersion> {
+class EnvoyQuicServerStreamTest : public testing::Test {
 public:
   EnvoyQuicServerStreamTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_(GetParam()),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
+        quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
@@ -157,10 +158,7 @@ protected:
   std::string request_body_{"Hello world"};
 };
 
-INSTANTIATE_TEST_SUITE_P(EnvoyQuicServerStreamTests, EnvoyQuicServerStreamTest,
-                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
-
-TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
+TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
         EXPECT_EQ(host_, headers->getHostValue());
@@ -188,14 +186,14 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
 }
 
-TEST_P(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
+TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   receiveRequest(request_body_, true, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
   quic_stream_->encodeTrailers(response_trailers_);
 }
 
-TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
+TEST_F(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
   size_t offset = receiveRequest(request_body_, false, request_body_.size() * 2);
 
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
@@ -209,7 +207,7 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
-TEST_P(EnvoyQuicServerStreamTest, ResetStreamByHCM) {
+TEST_F(EnvoyQuicServerStreamTest, ResetStreamByHCM) {
   receiveRequest(request_body_, false, request_body_.size() * 2);
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
@@ -218,7 +216,7 @@ TEST_P(EnvoyQuicServerStreamTest, ResetStreamByHCM) {
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
-TEST_P(EnvoyQuicServerStreamTest, EarlyResponseWithStopSending) {
+TEST_F(EnvoyQuicServerStreamTest, EarlyResponseWithStopSending) {
   receiveRequest(request_body_, false, request_body_.size() * 2);
   // Write response headers with FIN before finish receiving request.
   quic_stream_->encodeHeaders(response_headers_, true);
@@ -230,7 +228,7 @@ TEST_P(EnvoyQuicServerStreamTest, EarlyResponseWithStopSending) {
   EXPECT_EQ(quic::QUIC_STREAM_NO_ERROR, quic_stream_->stream_error());
 }
 
-TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
+TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   std::string large_request(1024, 'a');
   // Sending such large request will cause read to be disabled.
   size_t payload_offset = receiveRequest(large_request, false, 512);
@@ -279,7 +277,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
 }
 
 // Tests that readDisable() doesn't cause re-entry of OnBodyAvailable().
-TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
+TEST_F(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
   std::string payload(1024, 'a');
   size_t offset = receiveRequest(payload, false, 2048);
 
@@ -312,7 +310,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
-TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
+TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
   std::string payload(1024, 'a');
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke(
@@ -334,7 +332,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
-TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponTrailers) {
+TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponTrailers) {
   size_t payload_offset = receiveRequest(request_body_, false, request_body_.length() * 2);
   EXPECT_FALSE(quic_stream_->HasBytesToRead());
 
@@ -349,7 +347,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponTrailers) {
 
 // Tests that the stream with a send buffer whose high limit is 16k and low
 // limit is 8k sends over 32kB response.
-TEST_P(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
+TEST_F(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
   receiveRequest(request_body_, true, request_body_.size() * 2);
 
   // Bump connection flow control window large enough not to cause connection
@@ -406,7 +404,7 @@ TEST_P(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
   EXPECT_TRUE(quic_stream_->write_side_closed());
 }
 
-TEST_P(EnvoyQuicServerStreamTest, HeadersContributeToWatermarkIquic) {
+TEST_F(EnvoyQuicServerStreamTest, HeadersContributeToWatermarkIquic) {
   receiveRequest(request_body_, true, request_body_.size() * 2);
 
   // Bump connection flow control window large enough not to cause connection level flow control
@@ -474,7 +472,7 @@ TEST_P(EnvoyQuicServerStreamTest, HeadersContributeToWatermarkIquic) {
   quic_stream_->encodeTrailers(response_trailers_);
 }
 
-TEST_P(EnvoyQuicServerStreamTest, RequestHeaderTooLarge) {
+TEST_F(EnvoyQuicServerStreamTest, RequestHeaderTooLarge) {
   // Bump stream flow control window to allow request headers larger than 16K.
   quic::QuicWindowUpdateFrame window_update1(quic::kInvalidControlFrameId, quic_stream_->id(),
                                              32 * 1024);
@@ -496,7 +494,7 @@ TEST_P(EnvoyQuicServerStreamTest, RequestHeaderTooLarge) {
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
-TEST_P(EnvoyQuicServerStreamTest, RequestTrailerTooLarge) {
+TEST_F(EnvoyQuicServerStreamTest, RequestTrailerTooLarge) {
   // Bump stream flow control window to allow request headers larger than 16K.
   quic::QuicWindowUpdateFrame window_update1(quic::kInvalidControlFrameId, quic_stream_->id(),
                                              20 * 1024);
@@ -518,7 +516,7 @@ TEST_P(EnvoyQuicServerStreamTest, RequestTrailerTooLarge) {
 
 // Tests that closing connection is QUICHE write call stack doesn't mess up
 // watermark buffer accounting.
-TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncoding) {
+TEST_F(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncoding) {
   receiveRequest(request_body_, true, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
   std::string response(16 * 1024 + 1, 'a');
@@ -559,7 +557,7 @@ TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncoding) {
 
 // Tests that after end_stream is encoded, closing connection shouldn't call
 // onResetStream() callbacks.
-TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseAfterEndStreamEncoded) {
+TEST_F(EnvoyQuicServerStreamTest, ConnectionCloseAfterEndStreamEncoded) {
   receiveRequest(request_body_, true, request_body_.size() * 2);
   EXPECT_CALL(quic_connection_,
               SendConnectionClosePacket(_, quic::NO_IETF_QUIC_ERROR, "Closed in WriteHeaders"));
@@ -576,7 +574,7 @@ TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseAfterEndStreamEncoded) {
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
 }
 
-TEST_P(EnvoyQuicServerStreamTest, MetadataNotSupported) {
+TEST_F(EnvoyQuicServerStreamTest, MetadataNotSupported) {
   Http::MetadataMap metadata_map = {{"key", "value"}};
   Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
   Http::MetadataMapVector metadata_map_vector;

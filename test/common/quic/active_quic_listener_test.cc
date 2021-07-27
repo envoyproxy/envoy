@@ -73,13 +73,14 @@ public:
   }
 };
 
-class ActiveQuicListenerTest : public QuicMultiVersionTest {
+class ActiveQuicListenerTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   ActiveQuicListenerTest()
-      : version_(GetParam().first), api_(Api::createApiForTest(simulated_time_system_)),
+      : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
-        connection_handler_(*dispatcher_, absl::nullopt), quic_version_(GetParam().second),
+        connection_handler_(*dispatcher_, absl::nullopt),
+        quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
   template <typename A, typename B>
@@ -201,10 +202,8 @@ protected:
   void sendCHLO(quic::QuicConnectionId connection_id) {
     client_sockets_.push_back(std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram,
                                                                     local_address_, nullptr));
-    Buffer::OwnedImpl payload = generateChloPacketToSend(
-        quic_version_, quic_config_, ActiveQuicListenerPeer::cryptoConfig(*quic_listener_),
-        connection_id, clock_, envoyIpAddressToQuicSocketAddress(local_address_->ip()),
-        envoyIpAddressToQuicSocketAddress(local_address_->ip()), "test.example.org");
+    Buffer::OwnedImpl payload =
+        generateChloPacketToSend(quic_version_, quic_config_, connection_id);
     Buffer::RawSliceVector slice = payload.getRawSlices();
     ASSERT_EQ(1u, slice.size());
     // Send a full CHLO to finish 0-RTT handshake.
@@ -324,7 +323,8 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerTests, ActiveQuicListenerTest,
-                         testing::ValuesIn(generateTestParam()), testParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   initialize();
@@ -448,7 +448,8 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerEmptyFlagConfigTests,
                          ActiveQuicListenerEmptyFlagConfigTest,
-                         testing::ValuesIn(generateTestParam()), testParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Quic listener should be enabled by default, if not enabled explicitly in config.
 TEST_P(ActiveQuicListenerEmptyFlagConfigTest, ReceiveFullQuicCHLO) {

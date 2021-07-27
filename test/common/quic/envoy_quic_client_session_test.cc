@@ -64,12 +64,13 @@ public:
   using EnvoyQuicClientConnection::connectionStats;
 };
 
-class EnvoyQuicClientSessionTest : public testing::TestWithParam<quic::ParsedQuicVersion> {
+class EnvoyQuicClientSessionTest : public testing::Test {
 public:
   EnvoyQuicClientSessionTest()
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_({GetParam()}),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
+        quic_version_({quic::CurrentSupportedHttp3Versions()[0]}),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
                                                         12345)),
         self_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -159,10 +160,7 @@ protected:
   QuicHttpClientConnectionImpl http_connection_;
 };
 
-INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest,
-                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
-
-TEST_P(EnvoyQuicClientSessionTest, NewStream) {
+TEST_F(EnvoyQuicClientSessionTest, NewStream) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
@@ -179,7 +177,7 @@ TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   stream.OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }
 
-TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
+TEST_F(EnvoyQuicClientSessionTest, PacketLimits) {
   // We always allow for reading packets, even if there's no stream.
   EXPECT_EQ(0, envoy_quic_session_.GetNumActiveStreams());
   EXPECT_EQ(16, envoy_quic_session_.numPacketsExpectedPerEventLoop());
@@ -218,7 +216,7 @@ TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
   envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
 }
 
-TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
+TEST_F(EnvoyQuicClientSessionTest, OnResetFrame) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
@@ -231,7 +229,7 @@ TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
   stream.OnStreamReset(rst1);
 }
 
-TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
+TEST_F(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
 
@@ -239,7 +237,7 @@ TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
   envoy_quic_session_.OnHttp3GoAway(4u);
 }
 
-TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {
+TEST_F(EnvoyQuicClientSessionTest, ConnectionClose) {
   std::string error_details("dummy details");
   quic::QuicErrorCode error(quic::QUIC_INVALID_FRAME_DATA);
   quic::QuicConnectionCloseFrame frame(quic_version_[0].transport_version, error,
@@ -257,7 +255,7 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {
               ->value());
 }
 
-TEST_P(EnvoyQuicClientSessionTest, ConnectionCloseWithActiveStream) {
+TEST_F(EnvoyQuicClientSessionTest, ConnectionCloseWithActiveStream) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
@@ -270,10 +268,10 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionCloseWithActiveStream) {
   EXPECT_TRUE(stream.write_side_closed() && stream.reading_stopped());
 }
 
-TEST_P(EnvoyQuicClientSessionTest, ConnectionClosePopulatesQuicVersionStats) {
+TEST_F(EnvoyQuicClientSessionTest, ConnectionClosePopulatesQuicVersionStats) {
   std::string error_details("dummy details");
   quic::QuicErrorCode error(quic::QUIC_INVALID_FRAME_DATA);
-  quic::QuicConnectionCloseFrame frame(GetParam().transport_version, error,
+  quic::QuicConnectionCloseFrame frame(quic_version_[0].transport_version, error,
                                        quic::NO_IETF_QUIC_ERROR, error_details,
                                        /* transport_close_frame_type = */ 0);
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
@@ -281,20 +279,7 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionClosePopulatesQuicVersionStats) {
   EXPECT_EQ(absl::StrCat(quic::QuicErrorCodeToString(error), " with details: ", error_details),
             envoy_quic_session_.transportFailureReason());
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
-  std::string quic_version_stat_name;
-  switch (GetParam().transport_version) {
-  case quic::QUIC_VERSION_IETF_DRAFT_29:
-    quic_version_stat_name = "h3_29";
-    break;
-  case quic::QUIC_VERSION_IETF_RFC_V1:
-    quic_version_stat_name = "rfc_v1";
-    break;
-  default:
-    break;
-  }
-  EXPECT_EQ(1U, TestUtility::findCounter(
-                    store_, absl::StrCat("http3.quic_version_", quic_version_stat_name))
-                    ->value());
+  EXPECT_EQ(1U, TestUtility::findCounter(store_, "http3.quic_version_rfc_v1")->value());
 }
 
 } // namespace Quic

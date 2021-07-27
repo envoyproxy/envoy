@@ -63,12 +63,13 @@ public:
 };
 
 // A test that sets up its own client connection with customized quic version and connection ID.
-class QuicHttpIntegrationTest : public HttpIntegrationTest, public QuicMultiVersionTest {
+class QuicHttpIntegrationTest : public HttpIntegrationTest,
+                                public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   QuicHttpIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam().first,
+      : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam(),
                             ConfigHelper::quicHttpProxyConfig()),
-        supported_versions_({GetParam().second}), conn_helper_(*dispatcher_),
+        supported_versions_(quic::CurrentSupportedHttp3Versions()), conn_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
 
   ~QuicHttpIntegrationTest() override {
@@ -164,13 +165,13 @@ public:
     }
     constexpr auto timeout_first = std::chrono::seconds(15);
     constexpr auto timeout_subsequent = std::chrono::milliseconds(10);
-    if (GetParam().first == Network::Address::IpVersion::v4) {
+    if (GetParam() == Network::Address::IpVersion::v4) {
       test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 8u, timeout_first);
     } else {
       test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_total", 8u, timeout_first);
     }
     for (size_t i = 0; i < concurrency_; ++i) {
-      if (GetParam().first == Network::Address::IpVersion::v4) {
+      if (GetParam() == Network::Address::IpVersion::v4) {
         test_server_->waitForGaugeEq(
             fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), 1u,
             timeout_subsequent);
@@ -222,7 +223,8 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,
-                         testing::ValuesIn(generateTestParam()), testParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   testRouterHeaderOnlyRequestAndResponse();
@@ -256,7 +258,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
                   ->EarlyDataAccepted());
   // Close the second connection.
   codec_client_->close();
-  if (GetParam().first == Network::Address::IpVersion::v4) {
+  if (GetParam() == Network::Address::IpVersion::v4) {
     test_server_->waitForCounterEq(
         "listener.127.0.0.1_0.http3.downstream.rx.quic_connection_close_error_"
         "code_QUIC_NO_ERROR",
@@ -266,11 +268,8 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
                                    "error_code_QUIC_NO_ERROR",
                                    2u);
   }
-  if (GetParam().second.transport_version == quic::QUIC_VERSION_IETF_DRAFT_29) {
-    test_server_->waitForCounterEq("http3.quic_version_h3_29", 2u);
-  } else {
-    test_server_->waitForCounterEq("http3.quic_version_rfc_v1", 2u);
-  }
+
+  test_server_->waitForCounterEq("http3.quic_version_rfc_v1", 2u);
 }
 
 // Ensure multiple quic connections work, regardless of platform BPF support
@@ -376,7 +375,7 @@ TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
   EXPECT_FALSE(response->complete());
 
   // Verify stream error counters are correctly incremented.
-  std::string counter_scope = GetParam().first == Network::Address::IpVersion::v4
+  std::string counter_scope = GetParam() == Network::Address::IpVersion::v4
                                   ? "listener.127.0.0.1_0.http3.downstream.rx."
                                   : "listener.[__1]_0.http3.downstream.rx.";
   std::string error_code = "quic_reset_stream_error_code_QUIC_STREAM_GENERAL_PROTOCOL_ERROR";

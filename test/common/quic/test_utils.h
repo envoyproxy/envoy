@@ -210,44 +210,12 @@ protected:
   QuicStatNames quic_stat_names_{stats_store_.symbolTable()};
 };
 
-Buffer::OwnedImpl
-generateChloPacketToSend(quic::ParsedQuicVersion quic_version, quic::QuicConfig& quic_config,
-                         quic::QuicCryptoServerConfig& crypto_config,
-                         quic::QuicConnectionId connection_id, quic::QuicClock& clock,
-                         const quic::QuicSocketAddress& server_address,
-                         const quic::QuicSocketAddress& client_address, std::string sni) {
-  if (quic_version.UsesTls()) {
-    std::unique_ptr<quic::QuicReceivedPacket> packet =
-        std::move(quic::test::GetFirstFlightOfPackets(quic_version, quic_config, connection_id)[0]);
-    return Buffer::OwnedImpl(packet->data(), packet->length());
-  }
-  quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(
-      &clock, quic_version.transport_version, &crypto_config);
-  chlo.SetVector(quic::kCOPT, quic::QuicTagVector{quic::kREJ});
-  chlo.SetStringPiece(quic::kSNI, sni);
-  quic::CryptoHandshakeMessage full_chlo;
-  quic::QuicReferenceCountedPointer<quic::QuicSignedServerConfig> signed_config(
-      new quic::QuicSignedServerConfig);
-  quic::QuicCompressedCertsCache cache(
-      quic::QuicCompressedCertsCache::kQuicCompressedCertsCacheSize);
-  quic::test::crypto_test_utils::GenerateFullCHLO(chlo, &crypto_config, server_address,
-                                                  client_address, quic_version.transport_version,
-                                                  &clock, signed_config, &cache, &full_chlo);
-  // Overwrite version label to the version passed in.
-  full_chlo.SetVersion(quic::kVER, quic_version);
-  quic::QuicConfig quic_config_tmp;
-  quic_config_tmp.ToHandshakeMessage(&full_chlo, quic_version.transport_version);
-
-  std::string packet_content(full_chlo.GetSerialized().AsStringPiece());
-  quic::ParsedQuicVersionVector supported_versions{quic_version};
-  auto encrypted_packet =
-      std::unique_ptr<quic::QuicEncryptedPacket>(quic::test::ConstructEncryptedPacket(
-          connection_id, quic::EmptyQuicConnectionId(),
-          /*version_flag=*/true, /*reset_flag*/ false,
-          /*packet_number=*/1, packet_content, quic::CONNECTION_ID_PRESENT,
-          quic::CONNECTION_ID_ABSENT, quic::PACKET_4BYTE_PACKET_NUMBER, &supported_versions));
-
-  return Buffer::OwnedImpl(encrypted_packet->data(), encrypted_packet->length());
+Buffer::OwnedImpl generateChloPacketToSend(quic::ParsedQuicVersion quic_version,
+                                           quic::QuicConfig& quic_config,
+                                           quic::QuicConnectionId connection_id) {
+  std::unique_ptr<quic::QuicReceivedPacket> packet =
+      std::move(quic::test::GetFirstFlightOfPackets(quic_version, quic_config, connection_id)[0]);
+  return Buffer::OwnedImpl(packet->data(), packet->length());
 }
 
 void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
