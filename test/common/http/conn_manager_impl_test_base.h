@@ -49,6 +49,9 @@ public:
   void setupFilterChain(int num_decoder_filters, int num_encoder_filters, int num_requests = 1);
   void setUpBufferLimits();
 
+  // Call the registered on-drain-close callback
+  void invokeOnDrainClose();
+
   // If request_with_data_and_trailers is true, includes data and trailers in the request. If
   // decode_headers_stop_all is true, decoder_filters_[0]'s callback decodeHeaders() returns
   // StopAllIterationAndBuffer.
@@ -172,6 +175,8 @@ public:
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))};
   Event::MockTimer* drain_begin_timer_;
+  Network::DrainDecision::DrainCloseCb drain_close_func_;
+  bool drain_close_func_set_{false};
   NiceMock<Network::MockDrainDecision> drain_close_;
   std::unique_ptr<ConnectionManagerImpl> conn_manager_;
   std::string server_name_;

@@ -2261,6 +2261,7 @@ TEST_F(HttpConnectionManagerImplTest, SendGoAwayOnDrainBegin) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
+  invokeOnDrainClose();
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
   drain_begin_timer_->invokeCallback();
@@ -2295,6 +2296,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseFireAfterTimeoutDrainBegin) {
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
+  invokeOnDrainClose();
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
   idle_timer->invokeCallback();
@@ -2425,6 +2427,7 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
         decoder_->decodeHeaders(std::move(headers), true);
 
         // Initiate draining before sending the response headers
+        invokeOnDrainClose();
         Event::MockTimer* drain_timer = setUpTimer();
         EXPECT_CALL(*drain_timer, enableTimer(_, _));
         drain_begin_timer_->invokeCallback();

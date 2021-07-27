@@ -3577,6 +3577,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
   Buffer::OwnedImpl fake_input;
   conn_manager_->onData(fake_input, false);
 
+  invokeOnDrainClose();
   EXPECT_CALL(*codec_, shutdownNotice());
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
@@ -3686,6 +3687,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   EXPECT_CALL(*codec_, shutdownNotice());
 
   // Begin the drain process in the connection manager
+  invokeOnDrainClose();
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
   drain_begin_timer_->invokeCallback();
