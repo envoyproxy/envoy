@@ -17,6 +17,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .addConnectTimeoutSeconds(123)
       .addDnsRefreshSeconds(456)
       .addDnsFailureRefreshSeconds(789, 987)
+      .addDnsQueryTimeoutSeconds(321)
       .addDnsPreresolveHostnames("[hostname]")
       .addStatsFlushSeconds(654)
       .addVirtualClusters("[virtual-clusters]")
@@ -31,6 +32,7 @@ TEST(TestConfig, ConfigIsApplied) {
       "- &dns_refresh_rate 456s",
       "- &dns_fail_base_interval 789s",
       "- &dns_fail_max_interval 987s",
+      "- &dns_query_timeout 321s",
       "- &dns_preresolve_hostnames [hostname]",
       "- &stats_flush_interval 654s",
       "- &virtual_clusters [virtual-clusters]",

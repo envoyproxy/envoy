@@ -266,6 +266,7 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsBase;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsMax;
+@property (nonatomic, assign) UInt32 dnsQueryTimeoutSeconds;
 @property (nonatomic, strong) NSString *dnsPreresolveHostnames;
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
 @property (nonatomic, assign) UInt32 streamIdleTimeoutSeconds;
@@ -287,6 +288,7 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
                dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
     dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
      dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
+          dnsQueryTimeoutSeconds:(UInt32)dnsQueryTimeoutSeconds
           dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
                statsFlushSeconds:(UInt32)statsFlushSeconds
         streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds

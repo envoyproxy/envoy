@@ -22,6 +22,7 @@ public:
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
+  EngineBuilder& addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds);
   EngineBuilder& addDnsPreresolveHostnames(const std::string& dns_preresolve_hostnames);
   EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
   EngineBuilder& addVirtualClusters(const std::string& virtual_clusters);
@@ -50,6 +51,7 @@ private:
   int dns_refresh_seconds_ = 60;
   int dns_failure_refresh_seconds_base_ = 2;
   int dns_failure_refresh_seconds_max_ = 10;
+  int dns_query_timeout_seconds_ = 25;
   std::string dns_preresolve_hostnames_ = "[]";
   int stats_flush_seconds_ = 60;
   std::string app_version_ = "unspecified";

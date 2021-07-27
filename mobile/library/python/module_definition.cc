@@ -57,6 +57,7 @@ PYBIND11_MODULE(envoy_engine, m) {
       .def("add_connect_timeout_seconds", &EngineBuilder::addConnectTimeoutSeconds)
       .def("add_dns_refresh_seconds", &EngineBuilder::addDnsRefreshSeconds)
       .def("add_dns_failure_refresh_seconds", &EngineBuilder::addDnsFailureRefreshSeconds)
+      .def("add_dns_query_timeout_seconds", &EngineBuilder::addDnsQueryTimeoutSeconds)
       .def("add_dns_preresolve_hostnames", &EngineBuilder::addDnsPreresolveHostnames)
       .def("add_stats_flush_seconds", &EngineBuilder::addStatsFlushSeconds)
       .def("set_app_version", &EngineBuilder::setAppVersion)
