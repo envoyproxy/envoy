@@ -84,19 +84,31 @@ Specify the interval at which Envoy should forcefully refresh DNS.
   builder.addDNSRefreshSeconds(60)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addDNSQueryTimeoutSeconds``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify the interval at which Envoy should timeout a DNS query.
+
+**Example**::
+
+  // Kotlin
+  builder.addDNSQueryTimeoutSeconds(60L)
+
+  // Swift
+  builder.addDNSQueryTimeoutSeconds(60)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``addDNSPreresolveHostnames``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Add a list of hostnames to preresolve on Engine startup.
-The configuration is expected as a JSON list.
-
 .. attention::
 
-    This API is non-ideal as it exposes lower-level internals of Envoy than desired by this
-    project.
-    :issue:`#1581 <1581>` tracks enhancing this API.
+  This API is non-ideal as it exposes lower-level internals of Envoy than desired by this
+  project.
+  :issue:`#1581 <1581>` tracks enhancing this API.
 
-**Example**::
+Add a list of hostnames to preresolve on Engine startup.
+The configuration is expected as a JSON list.
 
   // Kotlin
   builder.addDNSPreresolveHostnames("[{\"address\": \"foo.com", \"port_value\": 443}]")

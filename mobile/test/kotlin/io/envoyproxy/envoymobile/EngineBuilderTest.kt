@@ -61,6 +61,16 @@ class EngineBuilderTest {
   }
 
   @Test
+  fun `specifying DNS query timeout overrides default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.addDNSQueryTimeoutSeconds(1234)
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration!!.dnsQueryTimeoutSeconds).isEqualTo(1234)
+  }
+
+  @Test
   fun `specifying stats flush overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }

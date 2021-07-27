@@ -29,6 +29,7 @@ open class EngineBuilder(
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
   private var dnsFailureRefreshSecondsMax = 10
+  private var dnsQueryTimeoutSeconds = 25
   private var dnsPreresolveHostnames = "[]"
   private var statsFlushSeconds = 60
   private var streamIdleTimeoutSeconds = 15
@@ -106,18 +107,6 @@ open class EngineBuilder(
   }
 
   /**
-   * Add a list of hostnames to preresolve on Engine startup.
-   *
-   * @param dnsPreresolveHostnames hostnames to preresolve.
-   *
-   * @return this builder.
-   */
-  fun addDNSPreresolveHostnames(dnsPreresolveHostnames: String): EngineBuilder {
-    this.dnsPreresolveHostnames = dnsPreresolveHostnames
-    return this
-  }
-
-  /**
    * Add a rate at which to refresh DNS in case of DNS failure.
    *
    * @param base rate in seconds.
@@ -128,6 +117,30 @@ open class EngineBuilder(
   fun addDNSFailureRefreshSeconds(base: Int, max: Int): EngineBuilder {
     this.dnsFailureRefreshSecondsBase = base
     this.dnsFailureRefreshSecondsMax = max
+    return this
+  }
+
+  /**
+   * Add a rate at which to timeout DNS queries.
+   *
+   * @param dnsQueryTimeoutSeconds rate in seconds to timeout DNS queries.
+   *
+   * @return this builder.
+   */
+  fun addDNSQueryTimeoutSeconds(dnsQueryTimeoutSeconds: Int): EngineBuilder {
+    this.dnsQueryTimeoutSeconds = dnsQueryTimeoutSeconds
+    return this
+  }
+
+  /**
+   * Add a list of hostnames to preresolve on Engine startup.
+   *
+   * @param dnsPreresolveHostnames hostnames to preresolve.
+   *
+   * @return this builder.
+   */
+  fun addDNSPreresolveHostnames(dnsPreresolveHostnames: String): EngineBuilder {
+    this.dnsPreresolveHostnames = dnsPreresolveHostnames
     return this
   }
 
@@ -285,6 +298,7 @@ open class EngineBuilder(
           EnvoyConfiguration(
             grpcStatsDomain, statsDPort, connectTimeoutSeconds,
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
+            dnsQueryTimeoutSeconds,
             dnsPreresolveHostnames, statsFlushSeconds, streamIdleTimeoutSeconds, appVersion, appId,
             virtualClusters, nativeFilterChain, platformFilterChain, stringAccessors
           ),
@@ -298,6 +312,7 @@ open class EngineBuilder(
           EnvoyConfiguration(
             grpcStatsDomain, statsDPort, connectTimeoutSeconds,
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
+            dnsQueryTimeoutSeconds,
             dnsPreresolveHostnames, statsFlushSeconds, streamIdleTimeoutSeconds, appVersion, appId,
             virtualClusters, nativeFilterChain, platformFilterChain, stringAccessors
           ),

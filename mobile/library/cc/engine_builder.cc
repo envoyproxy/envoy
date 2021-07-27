@@ -43,6 +43,11 @@ EngineBuilder& EngineBuilder::addDnsFailureRefreshSeconds(int base, int max) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds) {
+  this->dns_query_timeout_seconds_ = dns_query_timeout_seconds;
+  return *this;
+}
+
 EngineBuilder&
 EngineBuilder::addDnsPreresolveHostnames(const std::string& dns_preresolve_hostnames) {
   this->dns_preresolve_hostnames_ = dns_preresolve_hostnames;
@@ -81,6 +86,7 @@ std::string EngineBuilder::generateConfigStr() {
       {"dns_fail_max_interval", fmt::format("{}s", this->dns_failure_refresh_seconds_max_)},
       {"dns_preresolve_hostnames", this->dns_preresolve_hostnames_},
       {"dns_refresh_rate", fmt::format("{}s", this->dns_refresh_seconds_)},
+      {"dns_query_timeout", fmt::format("{}s", this->dns_query_timeout_seconds_)},
       {
           "metadata",
           fmt::format("{{ device_os: {}, app_version: {}, app_id: {} }}", this->device_os_,

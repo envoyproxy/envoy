@@ -19,6 +19,7 @@ fixture_template:
 
 private struct TestFilter: Filter {}
 
+// swiftlint:disable:next type_body_length
 final class EngineBuilderTests: XCTestCase {
   override func tearDown() {
     super.tearDown()
@@ -91,6 +92,20 @@ final class EngineBuilderTests: XCTestCase {
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addDNSRefreshSeconds(23)
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
+  func testAddingDNSQueryTimeoutSecondsAddsToConfigurationWhenRunningEnvoy() {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertEqual(234, config.dnsQueryTimeoutSeconds)
+      expectation.fulfill()
+    }
+
+    _ = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .addDNSQueryTimeoutSeconds(234)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
@@ -229,6 +244,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsRefreshSeconds: 300,
       dnsFailureRefreshSecondsBase: 400,
       dnsFailureRefreshSecondsMax: 500,
+      dnsQueryTimeoutSeconds: 800,
       dnsPreresolveHostnames: "[test]",
       statsFlushSeconds: 600,
       streamIdleTimeoutSeconds: 700,
@@ -250,6 +266,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_refresh_rate 300s"))
     XCTAssertTrue(resolvedYAML.contains("&dns_fail_base_interval 400s"))
     XCTAssertTrue(resolvedYAML.contains("&dns_fail_max_interval 500s"))
+    XCTAssertTrue(resolvedYAML.contains("&dns_query_timeout 800s"))
     XCTAssertTrue(resolvedYAML.contains("&dns_preresolve_hostnames [test]"))
 
     XCTAssertTrue(resolvedYAML.contains("&stream_idle_timeout 700s"))
@@ -278,6 +295,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsRefreshSeconds: 300,
       dnsFailureRefreshSecondsBase: 400,
       dnsFailureRefreshSecondsMax: 500,
+      dnsQueryTimeoutSeconds: 800,
       dnsPreresolveHostnames: "[test]",
       statsFlushSeconds: 600,
       streamIdleTimeoutSeconds: 700,
