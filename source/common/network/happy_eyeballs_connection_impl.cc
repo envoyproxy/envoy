@@ -513,6 +513,9 @@ void HappyEyeballsConnectionImpl::setUpFinalConnection(ConnectionEvent event,
     }
   }
 
+  // Add connection callbacks after moving data from the deferred write buffer so that
+  // any high watermark notification is swallowed and not conveyed to the callbacks, since
+  // that was already delivered to the callbacks when the data was written to the buffer.
   for (auto cb : post_connect_state_.connection_callbacks_) {
     if (cb) {
       connections_[0]->addConnectionCallbacks(*cb);

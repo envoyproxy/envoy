@@ -643,8 +643,10 @@ TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeConnectOverLimitWithCallbacks
   impl_->write(data, end_stream);
 
   {
+    // The call to write() will be replayed on the underlying connection, but it will be done
+    // after the temporary callbacks are removed and before the final callbacks are added.
+    // This causes the underlying connection's high watermark notification to be swallowed.
     testing::InSequence s;
-    // The call to write() will be replayed on the underlying connection.
     EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
     EXPECT_CALL(*failover_timer_, disableTimer());
     EXPECT_CALL(*created_connections_[0], bufferLimit()).WillRepeatedly(Return(length - 1));
