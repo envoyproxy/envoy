@@ -135,9 +135,11 @@ private:
   Event::Dispatcher& dispatcher_;
 };
 
+// The listener that handles the composition type ActiveConnectionCollection. This mixin-ish class 
+// provides the connection removal helper and the filter chain removal helper. Meanwhile the derived
+// class can use the concrete type.
 template <typename ActiveConnectionType>
 class TypedActiveStreamListenerBase : public ActiveStreamListenerBase {
-
 public:
   using ActiveConnectionCollectionType = typename ActiveConnectionType::CollectionType;
   TypedActiveStreamListenerBase(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
