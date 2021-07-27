@@ -199,8 +199,11 @@ void HappyEyeballsConnectionImpl::write(Buffer::Instance& data, bool end_stream)
   if (!post_connect_state_.write_buffer_.has_value()) {
     post_connect_state_.end_stream_ = false;
     post_connect_state_.write_buffer_ = dispatcher_.getWatermarkFactory().createBuffer(
-        []() -> void { ASSERT(false); }, [this]() -> void { this->onWriteBufferHighWatermark(); },
-        []() -> void { ASSERT(false); });
+        [this]() -> void { this->onWriteBufferLowWatermark(); },
+        [this]() -> void { this->onWriteBufferHighWatermark(); },
+        // ConnectionCallbacks do not have a method to receive overflow watermark
+        // notification. So this class, like ConnectionImpl, has a no-op handler.
+        []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
     if (per_connection_state_.buffer_limits_.has_value()) {
       post_connect_state_.write_buffer_.value()->setWatermarks(
           per_connection_state_.buffer_limits_.value());
@@ -472,12 +475,6 @@ void HappyEyeballsConnectionImpl::setUpFinalConnection(ConnectionEvent event,
   callbacks_wrappers_.clear();
 
   // Apply post-connect state to the final socket.
-  for (auto cb : post_connect_state_.connection_callbacks_) {
-    if (cb) {
-      connections_[0]->addConnectionCallbacks(*cb);
-    }
-  }
-
   for (const auto& cb : post_connect_state_.bytes_sent_callbacks_) {
     connections_[0]->addBytesSentCallback(cb);
   }
@@ -507,8 +504,19 @@ void HappyEyeballsConnectionImpl::setUpFinalConnection(ConnectionEvent event,
     if (post_connect_state_.write_buffer_.has_value()) {
       // write_buffer_ and end_stream_ are both set together in write().
       ASSERT(post_connect_state_.end_stream_.has_value());
+      // If a buffer limit was set, ensure that it was applied to the connection.
+      if (per_connection_state_.buffer_limits_.has_value()) {
+        ASSERT(connections_[0]->bufferLimit() ==
+               per_connection_state_.buffer_limits_.value());
+      }
       connections_[0]->write(*post_connect_state_.write_buffer_.value(),
                              post_connect_state_.end_stream_.value());
+    }
+  }
+
+  for (auto cb : post_connect_state_.connection_callbacks_) {
+    if (cb) {
+      connections_[0]->addConnectionCallbacks(*cb);
     }
   }
 }
@@ -540,6 +548,12 @@ void HappyEyeballsConnectionImpl::onAboveWriteBufferHighWatermark(
 void HappyEyeballsConnectionImpl::onBelowWriteBufferLowWatermark(
     ConnectionCallbacksWrapper* /*wrapper*/) {
   NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+void HappyEyeballsConnectionImpl::onWriteBufferLowWatermark() {
+  // Oonly be called went moving write data from the deferred write buffer
+  // to the underlying connection. In this case, the connection callbacks must
+  // not be notified since this should be transparent to the callbacks.
 }
 
 void HappyEyeballsConnectionImpl::onWriteBufferHighWatermark() {

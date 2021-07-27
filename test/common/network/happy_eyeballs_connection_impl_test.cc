@@ -599,6 +599,7 @@ TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeLimit) {
         EXPECT_EQ("hello world", data.toString());
         EXPECT_FALSE(end_stream);
       }));
+  EXPECT_CALL(*created_connections_[0], bufferLimit()).WillRepeatedly(Return(length - 1));
   connectFirstAttempt();
 }
 
@@ -606,13 +607,15 @@ TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeConnectOverLimit) {
   startConnect();
 
   Buffer::OwnedImpl data("hello world");
+  size_t length = data.length();
   bool end_stream = false;
 
-  EXPECT_CALL(*created_connections_[0], setBufferLimits(data.length() - 1));
+  EXPECT_CALL(*created_connections_[0], setBufferLimits(length - 1));
   impl_->setBufferLimits(data.length() - 1);
 
   impl_->write(data, end_stream);
 
+  EXPECT_CALL(*created_connections_[0], bufferLimit()).WillRepeatedly(Return(length - 1));
   // The call to write() will be replayed on the underlying connection.
   EXPECT_CALL(*created_connections_[0], write(_, _))
       .WillOnce(Invoke([](Buffer::Instance& data, bool end_stream) -> void {
@@ -630,13 +633,25 @@ TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeConnectOverLimitWithCallbacks
   impl_->addConnectionCallbacks(callbacks);
 
   Buffer::OwnedImpl data("hello world");
+  size_t length = data.length();
   bool end_stream = false;
 
-  EXPECT_CALL(*created_connections_[0], setBufferLimits(data.length() - 1));
+  EXPECT_CALL(*created_connections_[0], setBufferLimits(length - 1));
   impl_->setBufferLimits(data.length() - 1);
 
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
   impl_->write(data, end_stream);
+
+  {
+    testing::InSequence s;
+    // The call to write() will be replayed on the underlying connection.
+    EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
+    EXPECT_CALL(*failover_timer_, disableTimer());
+    EXPECT_CALL(*created_connections_[0], bufferLimit()).WillRepeatedly(Return(length - 1));
+    EXPECT_CALL(*created_connections_[0], write(_, _));
+    EXPECT_CALL(*created_connections_[0], addConnectionCallbacks(_));
+    connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  }
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, AboveHighWatermark) {
