@@ -749,7 +749,7 @@ void FakeUpstream::sendUdpDatagram(const std::string& buffer,
   dispatcher_->post([this, buffer, peer] {
     const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
                                                     nullptr, *peer);
-    EXPECT_TRUE(rc.rc_ == buffer.length());
+    EXPECT_TRUE(rc.return_value_ == buffer.length());
   });
 }
 
@@ -770,7 +770,7 @@ testing::AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const 
 
 void FakeUpstream::FakeListenSocketFactory::doFinalPreWorkerInit() {
   if (socket_->socketType() == Network::Socket::Type::Stream) {
-    ASSERT_EQ(0, socket_->ioHandle().listen(ENVOY_TCP_BACKLOG_SIZE).rc_);
+    ASSERT_EQ(0, socket_->ioHandle().listen(ENVOY_TCP_BACKLOG_SIZE).return_value_);
   } else {
     ASSERT(socket_->socketType() == Network::Socket::Type::Datagram);
     ASSERT_TRUE(Network::Socket::applyOptions(socket_->options(), *socket_,

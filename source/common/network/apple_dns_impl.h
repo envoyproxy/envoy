@@ -44,8 +44,11 @@ using DnsServiceSingleton = ThreadSafeSingleton<DnsService>;
  */
 #define ALL_APPLE_DNS_RESOLVER_STATS(COUNTER)                                                      \
   COUNTER(connection_failure)                                                                      \
+  COUNTER(get_addr_failure)                                                                        \
+  COUNTER(network_failure)                                                                         \
+  COUNTER(processing_failure)                                                                      \
   COUNTER(socket_failure)                                                                          \
-  COUNTER(processing_failure)
+  COUNTER(timeout)
 
 /**
  * Struct definition for all DNS resolver stats. @see stats_macros.h
@@ -69,6 +72,8 @@ public:
                           ResolveCb callback) override;
 
 private:
+  void chargeGetAddrInfoErrorStats(DNSServiceErrorType error_code);
+
   struct PendingResolution : public ActiveDnsQuery {
     PendingResolution(AppleDnsResolverImpl& parent, ResolveCb callback,
                       Event::Dispatcher& dispatcher, const std::string& dns_name);

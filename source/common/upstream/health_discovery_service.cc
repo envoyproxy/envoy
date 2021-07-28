@@ -330,6 +330,7 @@ void HdsDelegate::onRemoteClose(Grpc::Status::GrpcStatus status, const std::stri
   hds_stream_response_timer_->disableTimer();
   stream_ = nullptr;
   server_response_ms_ = 0;
+  specifier_hash_ = 0;
   handleFailure();
 }
 

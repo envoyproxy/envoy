@@ -123,7 +123,7 @@ protected:
   Event::SimulatedTimeSystem time_source_;
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   Http::TestRequestHeaderMapImpl request_headers_{
-      {":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}};
+      {":path", "/"}, {":method", "GET"}, {":scheme", "https"}};
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
                                                     {"cache-control", "public,max-age=3600"}};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
