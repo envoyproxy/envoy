@@ -98,6 +98,31 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
   EXPECT_EQ("404", response->headers().getStatusValue());
 }
 
+// Add a route that uses unknown cluster (expect 404 Not Found).
+TEST_P(DownstreamProtocolIntegrationTest, RouterClusterUsedRegardlessOfWhitespace) {
+  config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
+  auto host = config_helper_.createVirtualHost("foo.com", "/unknown", "unknown_cluster");
+  host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
+      envoy::config::route::v3::RouteAction::NOT_FOUND);
+  config_helper_.addVirtualHost(host);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", " foo.com "}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("400", response->headers().getStatusValue());
+    EXPECT_TRUE(response->complete());
+  } else {
+    ASSERT_TRUE(response->waitForReset());
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  }
+}
+
 // Add a route that uses unknown cluster (expect 503 Service Unavailable).
 TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
   config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
