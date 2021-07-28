@@ -192,7 +192,7 @@ public:
                    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                    Stats::Scope& scope, std::string access_log_prefix,
                    const Protobuf::MethodDescriptor& service_method,
-                   const absl::optional<envoy::config::core::v3::RetryPolicy> retry_policy)
+                   const envoy::config::core::v3::RetryPolicy& retry_policy)
       : GrpcAccessLogger(client, buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher,
                          scope, access_log_prefix, service_method, retry_policy, absl::nullopt) {}
   GrpcAccessLogger(const Grpc::RawAsyncClientSharedPtr& client,
@@ -200,7 +200,7 @@ public:
                    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                    Stats::Scope& scope, std::string access_log_prefix,
                    const Protobuf::MethodDescriptor& service_method,
-                   const absl::optional<envoy::config::core::v3::RetryPolicy> retry_policy,
+                   const envoy::config::core::v3::RetryPolicy& retry_policy,
                    envoy::config::core::v3::ApiVersion transport_api_version)
       : client_(client, service_method, retry_policy, transport_api_version),
         buffer_flush_interval_msec_(buffer_flush_interval_msec),

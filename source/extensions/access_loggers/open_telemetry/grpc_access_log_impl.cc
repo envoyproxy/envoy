@@ -32,10 +32,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
           Grpc::VersionedMethods("opentelemetry.proto.collector.logs.v1.LogsService.Export",
                                  "opentelemetry.proto.collector.logs.v1.LogsService.Export")
               .getMethodDescriptorForVersion(transport_api_version),
-          config.has_grpc_stream_retry_policy()
-              ? absl::make_optional(config.grpc_stream_retry_policy())
-              : absl::nullopt,
-          transport_api_version) {
+          config.grpc_stream_retry_policy(), transport_api_version) {
   initMessageRoot(config.log_name(), local_info);
 }
 

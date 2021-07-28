@@ -27,10 +27,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
           Grpc::VersionedMethods("envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs",
                                  "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs")
               .getMethodDescriptorForVersion(transport_api_version),
-          config.has_grpc_stream_retry_policy()
-              ? absl::make_optional(config.grpc_stream_retry_policy())
-              : absl::nullopt,
-          transport_api_version),
+          config.grpc_stream_retry_policy(), transport_api_version),
       log_name_(config.log_name()), local_info_(local_info) {}
 
 void GrpcAccessLoggerImpl::addEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {

@@ -59,10 +59,7 @@ public:
       envoy::config::core::v3::ApiVersion transport_api_version)
       : GrpcAccessLogger(std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes,
                          dispatcher, scope, access_log_prefix, service_method,
-                         config.has_grpc_stream_retry_policy()
-                             ? absl::make_optional(config.grpc_stream_retry_policy())
-                             : absl::nullopt,
-                         transport_api_version) {}
+                         config.grpc_stream_retry_policy(), transport_api_version) {}
 
   int numInits() const { return num_inits_; }
 
