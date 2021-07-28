@@ -155,7 +155,7 @@ public:
           EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
                     *connection_socket.addressProvider().remoteAddress());
           EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
-          EXPECT_EQ("h3-29", connection_socket.requestedApplicationProtocols()[0]);
+          EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
           return &filter_chain_;
         }));
     EXPECT_CALL(filter_chain_, transportSocketFactory())
@@ -211,7 +211,7 @@ TEST_F(EnvoyQuicProofSourceTest, TestGetCerChainAndSignatureAndVerify) {
   verifier.verifyCertsAndSignature(chain, "payload", signature);
 }
 
-TEST_F(EnvoyQuicProofSourceTest, GetProofFailBadConfig) {
+TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailBadConfig) {
   // No filter chain.
   EXPECT_CALL(listen_socket_, ioHandle()).Times(3);
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
@@ -234,7 +234,7 @@ TEST_F(EnvoyQuicProofSourceTest, GetProofFailBadConfig) {
         EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
                   *connection_socket.addressProvider().remoteAddress());
         EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
-        EXPECT_EQ("h3-29", connection_socket.requestedApplicationProtocols()[0]);
+        EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
         return &filter_chain_;
       }));
   EXPECT_CALL(filter_chain_, transportSocketFactory())
@@ -245,7 +245,7 @@ TEST_F(EnvoyQuicProofSourceTest, GetProofFailBadConfig) {
   EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_));
 }
 
-TEST_F(EnvoyQuicProofSourceTest, GetProofFailInvalidCert) {
+TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailInvalidCert) {
   std::string invalid_cert{R"(-----BEGIN CERTIFICATE-----
     invalid certificate
     -----END CERTIFICATE-----)"};
@@ -253,7 +253,7 @@ TEST_F(EnvoyQuicProofSourceTest, GetProofFailInvalidCert) {
   EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_));
 }
 
-TEST_F(EnvoyQuicProofSourceTest, GetProofFailInvalidPublicKeyInCert) {
+TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailInvalidPublicKeyInCert) {
   // This is a valid cert with RSA public key. But we don't support RSA key with
   // length < 1024.
   std::string cert_with_rsa_1024{R"(-----BEGIN CERTIFICATE-----
@@ -276,6 +276,17 @@ GUy+n0vQNB0cXGzgcGI=
 -----END CERTIFICATE-----)"};
   expectCertChainAndPrivateKey(cert_with_rsa_1024, false);
   EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_));
+}
+
+TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailNoFilterChain) {
+  EXPECT_CALL(listen_socket_, ioHandle());
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
+      .WillOnce(Invoke([&](const Network::ConnectionSocket&) { return nullptr; }));
+
+  std::string signature;
+  proof_source_.ComputeTlsSignature(
+      server_address_, client_address_, hostname_, SSL_SIGN_RSA_PSS_RSAE_SHA256, "payload",
+      std::make_unique<TestSignatureCallback>(false, filter_chain_, signature));
 }
 
 TEST_F(EnvoyQuicProofSourceTest, UnexpectedPrivateKey) {
