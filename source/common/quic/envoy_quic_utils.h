@@ -105,12 +105,13 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
 }
 
 template <class T>
-std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block,
-                                                 uint32_t max_headers_allowed,
-                                                 HeaderValidator& validator,
-                                                 absl::string_view& details) {
+std::unique_ptr<T> spdyHeaderBlockToEnvoyTrailers(const spdy::SpdyHeaderBlock& header_block,
+                                                  uint32_t max_headers_allowed,
+                                                  HeaderValidator& validator,
+                                                  absl::string_view& details) {
   auto headers = T::create();
   if (header_block.size() > max_headers_allowed) {
+    details = Http3ResponseCodeDetailValues::too_many_trailers;
     return nullptr;
   }
   for (auto entry : header_block) {
@@ -120,7 +121,7 @@ std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& he
     std::vector<absl::string_view> values = absl::StrSplit(entry.second, '\0');
     for (const absl::string_view& value : values) {
       if (max_headers_allowed == 0) {
-        details = Http3ResponseCodeDetailValues::invalid_http_header;
+        details = Http3ResponseCodeDetailValues::too_many_trailers;
         return nullptr;
       }
       max_headers_allowed--;
@@ -128,7 +129,6 @@ std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& he
           validator.validateHeader(entry.first, value);
       switch (result) {
       case Http::HeaderUtility::HeaderValidationResult::REJECT:
-        // The validator sets the details to Http3ResponseCodeDetailValues::invalid_underscore
         return nullptr;
       case Http::HeaderUtility::HeaderValidationResult::DROP:
         continue;

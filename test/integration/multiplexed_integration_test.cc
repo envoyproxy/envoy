@@ -1818,6 +1818,7 @@ TEST_P(Http2IntegrationTest, OnLocalReply) {
 }
 
 TEST_P(Http2IntegrationTest, InvalidTrailers) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
   autonomous_upstream_ = true;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1832,6 +1833,8 @@ TEST_P(Http2IntegrationTest, InvalidTrailers) {
   codec_client_->sendTrailers(*request_encoder_,
                               Http::TestRequestTrailerMapImpl{{"trailer", value}});
   ASSERT_TRUE(response->waitForReset());
+  // http2.invalid.header.field or http3.invalid_header_field
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
 }
 
 } // namespace Envoy
