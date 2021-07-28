@@ -263,18 +263,6 @@ bool WasmHandle::restartAllowed() {
   const double prev_weight = static_cast<double>(prev_restart_window_.count_) * prev_window_ratio;
   const auto allowed = current_weight + prev_weight <= static_cast<double>(max_restart_per_minute_);
 
-  ENVOY_LOG_TO_LOGGER(
-      Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), warn,
-      "minutes={}, now={}, current_window_key={}, current_count={}, current_ratio={}, "
-      "current_weight={}, "
-      "prev_window_key={}, prev_count={}, prev_ratio={}, prev_weight={}, sum={}, max={},",
-      MonotonicTime(std::chrono::minutes(1)).time_since_epoch().count(),
-      now.time_since_epoch().count(),
-      current_restart_window_.window_key_.time_since_epoch().count(),
-      current_restart_window_.count_ + 1, current_window_ratio, current_weight,
-      prev_restart_window_.window_key_.time_since_epoch().count(), prev_restart_window_.count_,
-      prev_window_ratio, prev_weight, current_weight + prev_weight, max_restart_per_minute_);
-
   if (allowed) {
     // Assume that the new VM will be created right after this function at call sites.
     current_restart_window_.count_++;
