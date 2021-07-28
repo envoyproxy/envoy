@@ -77,6 +77,20 @@ void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {
   }
 }
 
+void EnvoyQuicClientSession::MaybeSendRstStreamFrame(quic::QuicStreamId id,
+                                                     quic::QuicRstStreamErrorCode error,
+                                                     quic::QuicStreamOffset bytes_written) {
+  QuicSpdyClientSession::MaybeSendRstStreamFrame(id, error, bytes_written);
+  quic_stat_names_.chargeQuicResetStreamErrorStats(scope_, error, /*from_self*/ true,
+                                                   /*is_upstream*/ true);
+}
+
+void EnvoyQuicClientSession::OnRstStream(const quic::QuicRstStreamFrame& frame) {
+  QuicSpdyClientSession::OnRstStream(frame);
+  quic_stat_names_.chargeQuicResetStreamErrorStats(scope_, frame.error_code,
+                                                   /*from_self*/ false, /*is_upstream*/ true);
+}
+
 void EnvoyQuicClientSession::SetDefaultEncryptionLevel(quic::EncryptionLevel level) {
   quic::QuicSpdyClientSession::SetDefaultEncryptionLevel(level);
   if (level == quic::ENCRYPTION_FORWARD_SECURE) {
