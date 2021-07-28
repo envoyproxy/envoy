@@ -172,14 +172,16 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
       const Http::HeaderEntry* header_timeout_entry =
           request_headers.EnvoyUpstreamRequestTimeoutMs();
 
-      if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
+      if (header_timeout_entry) {
+        trySetGlobalTimeout(header_timeout_entry, timeout);
         request_headers.removeEnvoyUpstreamRequestTimeoutMs();
       }
     }
   } else {
     const Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
 
-    if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
+    if (header_timeout_entry) {
+      trySetGlobalTimeout(header_timeout_entry, timeout);
       request_headers.removeEnvoyUpstreamRequestTimeoutMs();
     }
   }
