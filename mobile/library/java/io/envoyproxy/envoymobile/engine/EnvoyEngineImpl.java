@@ -95,6 +95,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   }
 
   private int runWithResolvedYAML(String configurationYAML, String logLevel) {
+    JniLibrary.registerEventTracker();
     try {
       return JniLibrary.runEngine(this.engineHandle, configurationYAML, logLevel);
     } catch (Throwable throwable) {
