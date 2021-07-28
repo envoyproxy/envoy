@@ -25,21 +25,11 @@ constexpr uint32_t RetryMaxDelayMs = 30000; // Do not cross more than 30s
 
 template <class ResponseProto> using ResponseProtoPtr = std::unique_ptr<ResponseProto>;
 
-class GrpcStreamBase {
-public:
-  virtual ~GrpcStreamBase() = default;
-  virtual void establishNewStream() PURE;
-  virtual void maybeUpdateQueueSizeStat(uint64_t size) PURE;
-  virtual bool grpcStreamAvailable() const PURE;
-  virtual bool checkRateLimitAllowsDrain() PURE;
-};
-
 // Oversees communication for gRPC xDS implementations (parent to both regular xDS and delta
 // xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of
 // requests.
 template <class RequestProto, class ResponseProto>
-class GrpcStream : public GrpcStreamBase,
-                   public Grpc::AsyncStreamCallbacks<ResponseProto>,
+class GrpcStream : public Grpc::AsyncStreamCallbacks<ResponseProto>,
                    public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::RawAsyncClientPtr async_client,
@@ -67,7 +57,7 @@ public:
         RetryInitialDelayMs, RetryMaxDelayMs, random_);
   }
 
-  void establishNewStream() override {
+  void establishNewStream() {
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
     if (stream_ != nullptr) {
       ENVOY_LOG(warn, "gRPC bidi stream for {} already exists!", service_method_.DebugString());
@@ -84,7 +74,7 @@ public:
     callbacks_->onStreamEstablished();
   }
 
-  bool grpcStreamAvailable() const override { return stream_ != nullptr; }
+  bool grpcStreamAvailable() const { return stream_ != nullptr; }
 
   void sendMessage(const RequestProto& request) { stream_->sendMessage(request, false); }
 
@@ -122,7 +112,7 @@ public:
     setRetryTimer();
   }
 
-  void maybeUpdateQueueSizeStat(uint64_t size) override {
+  void maybeUpdateQueueSizeStat(uint64_t size) {
     // Although request_queue_.push() happens elsewhere, the only time the queue is non-transiently
     // non-empty is when it remains non-empty after a drain attempt. (The push() doesn't matter
     // because we always attempt this drain immediately after the push). Basically, a change in
@@ -135,7 +125,7 @@ public:
     }
   }
 
-  bool checkRateLimitAllowsDrain() override {
+  bool checkRateLimitAllowsDrain() {
     if (!rate_limiting_enabled_ || limit_request_->consume(1, false)) {
       return true;
     }
