@@ -1439,8 +1439,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
             parent_.parent_.time_source_, parent_.cluster_manager_state_);
 
-        pool->addIdleCallback(
-            [this, host, priority, hash_key]() { httpConnPoolIsIdle(host, priority, hash_key); });
+        pool->addIdleCallback([&parent = parent_, host, priority, hash_key]() {
+          parent.httpConnPoolIsIdle(host, priority, hash_key);
+        });
 
         return pool;
       });
@@ -1452,15 +1453,15 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   }
 }
 
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolIsIdle(
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
     HostConstSharedPtr host, ResourcePriority priority, const std::vector<uint8_t>& hash_key) {
-  if (parent_.destroying_) {
+  if (destroying_) {
     // If the Cluster is being destroyed, this pool will be cleaned up by that
     // process.
     return;
   }
 
-  ConnPoolsContainer* container = parent_.getHttpConnPoolsContainer(host);
+  ConnPoolsContainer* container = getHttpConnPoolsContainer(host);
   if (container == nullptr) {
     // This could happen if we have cleaned out the host before iterating through every
     // connection pool. Handle it by just continuing.
@@ -1478,7 +1479,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPo
     // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
     if (!container->do_not_delete_ && container->pools_->size() == 0) {
       ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
-      parent_.host_http_conn_pool_map_.erase(
+      host_http_conn_pool_map_.erase(
           host); // NOTE: `container` is erased after this point in the lambda.
     }
   }
@@ -1533,21 +1534,21 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
             parent_.cluster_manager_state_));
     ASSERT(inserted);
     pool_iter->second->addIdleCallback(
-        [this, host, hash_key]() { tcpConnPoolIsIdle(host, hash_key); });
+        [&parent = parent_, host, hash_key]() { parent.tcpConnPoolIsIdle(host, hash_key); });
   }
 
   return pool_iter->second.get();
 }
 
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolIsIdle(
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
     HostConstSharedPtr host, const std::vector<uint8_t>& hash_key) {
-  if (parent_.destroying_) {
+  if (destroying_) {
     // If the Cluster is being destroyed, this pool will be cleaned up by that process.
     return;
   }
 
-  auto it = parent_.host_tcp_conn_pool_map_.find(host);
-  if (it != parent_.host_tcp_conn_pool_map_.end()) {
+  auto it = host_tcp_conn_pool_map_.find(host);
+  if (it != host_tcp_conn_pool_map_.end()) {
     TcpConnPoolsContainer& container = it->second;
 
     auto erase_iter = container.pools_.find(hash_key);
@@ -1555,13 +1556,13 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoo
       if (container.draining_ ||
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_delete_when_idle")) {
         ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", host);
-        parent_.thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
+        thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
         container.pools_.erase(erase_iter);
       }
     }
 
     if (container.pools_.empty()) {
-      parent_.host_tcp_conn_pool_map_.erase(
+      host_tcp_conn_pool_map_.erase(
           host); // NOTE: `container` is erased after this point in the lambda.
     }
   }
