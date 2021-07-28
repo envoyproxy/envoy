@@ -995,14 +995,13 @@ TEST_F(FilterTest, LoadHeadersFailure) {
   testFallbackToHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_client_can_accept_sxg_key("x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_client_can_accept_sxg_key).empty());
-  EXPECT_EQ("true",
-  request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_client_can_accept_sxg").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_should_sign").value()); EXPECT_EQ(0UL,
-  scope_.counter("sxg.total_exceeded_max_payload_size").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_signed_attempts").value()); EXPECT_EQ(0UL,
-  scope_.counter("sxg.total_signed_succeeded").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_signed_failed").value());
+  EXPECT_EQ("true", request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_exceeded_max_payload_size").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_attempts").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_succeeded").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_failed").value());
 }
 
 TEST_F(FilterTest, LoadContentFailure) {
@@ -1024,14 +1023,13 @@ TEST_F(FilterTest, LoadContentFailure) {
   testFallbackToHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_client_can_accept_sxg_key("x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_client_can_accept_sxg_key).empty());
-  EXPECT_EQ("true",
-  request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_client_can_accept_sxg").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_should_sign").value()); EXPECT_EQ(0UL,
-  scope_.counter("sxg.total_exceeded_max_payload_size").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_signed_attempts").value()); EXPECT_EQ(0UL,
-  scope_.counter("sxg.total_signed_succeeded").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_signed_failed").value());
+  EXPECT_EQ("true", request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_exceeded_max_payload_size").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_attempts").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_succeeded").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_failed").value());
 }
 
 TEST_F(FilterTest, GetEncodedResponseFailure) {
@@ -1054,14 +1052,13 @@ TEST_F(FilterTest, GetEncodedResponseFailure) {
   testFallbackToHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_client_can_accept_sxg_key("x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_client_can_accept_sxg_key).empty());
-  EXPECT_EQ("true",
-  request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_client_can_accept_sxg").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_should_sign").value()); EXPECT_EQ(0UL,
-  scope_.counter("sxg.total_exceeded_max_payload_size").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_signed_attempts").value()); EXPECT_EQ(0UL,
-  scope_.counter("sxg.total_signed_succeeded").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_signed_failed").value());
+  EXPECT_EQ("true", request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_exceeded_max_payload_size").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_attempts").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_succeeded").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_failed").value());
 }
 
 TEST_F(FilterTest, LoadSignerFailure) {
@@ -1085,14 +1082,13 @@ TEST_F(FilterTest, LoadSignerFailure) {
   testFallbackToHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_client_can_accept_sxg_key("x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_client_can_accept_sxg_key).empty());
-  EXPECT_EQ("true",
-  request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_client_can_accept_sxg").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_should_sign").value()); EXPECT_EQ(0UL,
-  scope_.counter("sxg.total_exceeded_max_payload_size").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_signed_attempts").value()); EXPECT_EQ(0UL,
-  scope_.counter("sxg.total_signed_succeeded").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_signed_failed").value());
+  EXPECT_EQ("true", request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_exceeded_max_payload_size").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_attempts").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_succeeded").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_failed").value());
 }
 
 TEST_F(FilterTest, WriteSxgFailure) {
@@ -1117,14 +1113,13 @@ TEST_F(FilterTest, WriteSxgFailure) {
   testFallbackToHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_client_can_accept_sxg_key("x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_client_can_accept_sxg_key).empty());
-  EXPECT_EQ("true",
-  request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_client_can_accept_sxg").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_should_sign").value()); EXPECT_EQ(0UL,
-  scope_.counter("sxg.total_exceeded_max_payload_size").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_signed_attempts").value()); EXPECT_EQ(0UL,
-  scope_.counter("sxg.total_signed_succeeded").value()); EXPECT_EQ(1UL,
-  scope_.counter("sxg.total_signed_failed").value());
+  EXPECT_EQ("true", request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_exceeded_max_payload_size").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_attempts").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_succeeded").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_failed").value());
 }
 
 // MyCombinedCertKeyId

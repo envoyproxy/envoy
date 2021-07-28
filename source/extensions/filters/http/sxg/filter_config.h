@@ -6,8 +6,8 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/config/datasource.h"
-
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+
 // #include "source/extensions/filters/http/sxg/encoder.h"
 
 namespace Envoy {

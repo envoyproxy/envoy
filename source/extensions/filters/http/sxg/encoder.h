@@ -2,7 +2,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/config/datasource.h"
-
 #include "source/extensions/filters/http/sxg/filter_config.h"
 
 #include "libsxg.h"

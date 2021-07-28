@@ -10,8 +10,8 @@
 #include "envoy/secret/secret_provider.h"
 
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/http/sxg/filter.h"
 #include "source/extensions/filters/http/sxg/encoder.h"
+#include "source/extensions/filters/http/sxg/filter.h"
 
 namespace Envoy {
 namespace Extensions {

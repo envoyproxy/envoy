@@ -4,8 +4,8 @@
 #include "envoy/stats/scope.h"
 
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-#include "source/extensions/filters/http/sxg/filter_config.h"
 #include "source/extensions/filters/http/sxg/encoder.h"
+#include "source/extensions/filters/http/sxg/filter_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,7 +22,8 @@ namespace SXG {
  */
 class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(const FilterConfigSharedPtr& config, const EncoderPtr& encoder) : config_(config), encoder_(encoder) {}
+  Filter(const FilterConfigSharedPtr& config, const EncoderPtr& encoder)
+      : config_(config), encoder_(encoder) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;

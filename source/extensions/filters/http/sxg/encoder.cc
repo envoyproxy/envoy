@@ -9,7 +9,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/headers.h"
-
 #include "source/extensions/filters/http/sxg/filter_config.h"
 
 #include "absl/strings/escaping.h"
@@ -35,7 +34,7 @@ bool EncoderImpl::loadHeaders(Http::ResponseHeaderMap* headers) {
   const auto& filtered_headers = filteredResponseHeaders();
   bool retval = true;
   headers->iterate([this, filtered_headers,
-                   &retval](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+                    &retval](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     const auto& header_key = header.key().getStringView();
 
     // filter out all headers that should not be encoded in the SXG document
