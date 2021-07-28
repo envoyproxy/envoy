@@ -32,7 +32,7 @@ public:
   virtual Buffer::BufferFragment* writeSxg() PURE;
 };
 
-using EncoderPtr = std::shared_ptr<Encoder>;
+using EncoderPtr = std::unique_ptr<Encoder>;
 
 class EncoderImpl : public Encoder, Logger::Loggable<Logger::Id::filter> {
 public:

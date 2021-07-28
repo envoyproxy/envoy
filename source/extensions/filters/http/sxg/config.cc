@@ -57,7 +57,7 @@ Http::FilterFactoryCb FilterFactory::createFilterFactoryFromProtoTyped(
   auto config = std::make_shared<FilterConfig>(proto_config, context.timeSource(), secret_reader,
                                                stat_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    const EncoderPtr encoder = std::make_shared<EncoderImpl>(config);
+    const EncoderPtr encoder = std::make_unique<EncoderImpl>(config);
     callbacks.addStreamFilter(std::make_shared<Filter>(config, encoder));
   };
 }
