@@ -1,12 +1,13 @@
-#include "source/extensions/filters/http/squash/config.h"
+#include "contrib/filters/http/squash/source/config.h"
 
-#include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
-#include "envoy/extensions/filters/http/squash/v3/squash.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/http/squash/squash_filter.h"
+
+#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.h"
+#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.validate.h"
+#include "contrib/filters/http/squash/source/squash_filter.h"
 
 namespace Envoy {
 namespace Extensions {

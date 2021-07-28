@@ -1,11 +1,9 @@
-#include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
-#include "envoy/extensions/filters/http/squash/v3/squash.pb.validate.h"
-
-#include "source/extensions/filters/http/squash/config.h"
-
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
+#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.h"
+#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.validate.h"
+#include "contrib/filters/http/squash/source/config.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

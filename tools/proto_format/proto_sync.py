@@ -162,8 +162,13 @@ def get_destination_path(src):
     if len(matches) != 1:
         raise RequiresReformatError(
             "Expect {} has only one package declaration but has {}".format(src, len(matches)))
-    return pathlib.Path(get_directory_from_package(
+    dst_path = pathlib.Path(get_directory_from_package(
         matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
+    # contrib API files have the standard namespace but are in a contrib folder for clarity.
+    # The following prepends contrib for contrib packages so we wind up with the real final path.
+    if 'contrib' in src:
+        dst_path = pathlib.Path('contrib').joinpath(dst_path)
+    return dst_path
 
 
 def get_abs_rel_destination_path(dst_root, src):
@@ -395,6 +400,9 @@ def generate_current_api_dir(api_dir, dst_dir):
         api_dir: the original api directory
         dst_dir: the api directory to be compared in temporary directory
     """
+    contrib_dst = dst_dir.joinpath("contrib")
+    shutil.copytree(str(api_dir.joinpath("contrib")), str(contrib_dst))
+
     dst = dst_dir.joinpath("envoy")
     shutil.copytree(str(api_dir.joinpath("envoy")), str(dst))
 

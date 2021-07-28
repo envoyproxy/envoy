@@ -1,8 +1,7 @@
-#include "source/extensions/filters/http/squash/squash_filter.h"
+#include "contrib/filters/http/squash/source/squash_filter.h"
 
 #include <memory>
 
-#include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
 #include "envoy/http/codes.h"
 
 #include "source/common/common/empty_string.h"
@@ -16,6 +15,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/fixed_array.h"
+#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.h"
 
 namespace Envoy {
 namespace Extensions {
