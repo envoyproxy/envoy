@@ -10,6 +10,8 @@ from configparser import ConfigParser
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from typing import Callable, Iterator, List, Optional, Union
 
+import yaml
+
 
 # this is testing specific - consider moving to tools.testing.utils
 @contextmanager
@@ -72,6 +74,12 @@ def buffered(
         stderr.extend(mangle(_stderr.read().strip().split("\n")))
 
 
+def extract(tarball: str, path: str) -> str:
+    with tarfile.open(tarball) as tarfiles:
+        tarfiles.extractall(path=path)
+        return path
+
+
 @contextmanager
 def untar(tarball: str) -> Iterator[str]:
     """Untar a tarball into a temporary directory
@@ -94,6 +102,20 @@ def untar(tarball: str) -> Iterator[str]:
 
     """
     with tempfile.TemporaryDirectory() as tmpdir:
-        with tarfile.open(tarball) as tarfiles:
-            tarfiles.extractall(path=tmpdir)
-            yield tmpdir
+        yield extract(tarball, tmpdir)
+
+
+def from_yaml(path: str) -> Union[dict, list, str, int]:
+    """Returns the loaded python object from a yaml file given by `path`"""
+    with open(path) as f:
+        return yaml.safe_load(f.read())
+
+
+def to_yaml(data: Union[dict, list, str, int], path: str) -> str:
+    """For given `data` dumps as yaml to provided `path`.
+
+    Returns `path`
+    """
+    with open(path, "w") as f:
+        f.write(yaml.dump(data))
+    return path
