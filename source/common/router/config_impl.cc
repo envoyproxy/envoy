@@ -1006,6 +1006,8 @@ void RouteEntryImplBase::traversePerFilterConfig(
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
   const Router::RouteEntry* route_entry = routeEntry();
 
+  // TODO(soulxu): This has similar bug with https://github.com/envoyproxy/envoy/issues/17377
+  // it should be fixed.
   if (route_entry != nullptr) {
     auto maybe_vhost_config = vhost_.perFilterConfig(filter_name);
     if (maybe_vhost_config != nullptr) {
