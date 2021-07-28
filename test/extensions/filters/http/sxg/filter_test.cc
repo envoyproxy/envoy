@@ -163,10 +163,10 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
     config_ = std::make_shared<FilterConfig>(proto, time_system_, secret_reader, "", scope_);
   }
 
-  void setFilter() { 
+  void setFilter() {
     if (encoder_ == nullptr) {
       encoder_ = std::make_shared<EncoderImpl>(config_);
-    } 
+    }
     setFilter(std::make_shared<Filter>(config_, encoder_));
   }
 
@@ -985,7 +985,7 @@ TEST_F(FilterTest, LoadHeadersFailure) {
   EXPECT_CALL(*encoder, setOrigin);
   EXPECT_CALL(*encoder, setUrl);
   EXPECT_CALL(*encoder, loadHeaders).WillOnce(Return(false));
-  
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"host", "example.org"},
       {"accept", "application/signed-exchange;v=b3;q=0.9,text/html;q=0.8"},
