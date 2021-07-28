@@ -31,9 +31,15 @@ public:
     PluginHandleSharedPtr handle = tls_slot_->get()->handle();
     if (handle->wasmHandle()) {
       wasm = handle->wasmHandle()->wasm().get();
+      if (wasm->isFailed()) {
+        // Try to restart.
+        if (tls_slot_->get()->tryRestartPlugin()) {
+          handle = tls_slot_->get()->handle();
+          wasm = handle->wasmHandle()->wasm().get();
+        }
+      }
     }
     if (!wasm || wasm->isFailed()) {
-      // TODO: Try restart plugin.
       if (handle->plugin()->fail_open_) {
         // Fail open skips adding this filter to callbacks.
         return nullptr;

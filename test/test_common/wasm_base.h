@@ -75,7 +75,6 @@ public:
     vm_configuration_string.set_value(vm_configuration_);
     vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
     vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
-    vm_config->set_max_restart_count(max_restart_count_);
 
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
         plugin_config, envoy::config::core::v3::TrafficDirection::INBOUND, local_info_,
@@ -126,7 +125,6 @@ public:
     allowed_capabilities_ = allowed_capabilities;
   }
   void setEnvs(envoy::extensions::wasm::v3::EnvironmentVariables envs) { envs_ = envs; }
-  void setMaxRestartCount(uint32_t count) { max_restart_count_ = count; }
 
 private:
   std::string root_id_ = "";
@@ -135,7 +133,6 @@ private:
   std::string plugin_configuration_ = "";
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_ = {};
   envoy::extensions::wasm::v3::EnvironmentVariables envs_ = {};
-  uint32_t max_restart_count_ = 0;
 };
 
 template <typename Base = testing::Test> class WasmHttpFilterTestBase : public WasmTestBase<Base> {

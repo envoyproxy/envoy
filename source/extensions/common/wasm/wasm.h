@@ -89,14 +89,7 @@ public:
   }
   void setFailStateForTesting(proxy_wasm::FailState fail_state) { failed_ = fail_state; }
 
-  // Called via failCallback in case of restarting VM from multiple plugins with the same vm_key.
-  void incRestartCount() {
-    if (!restart_count_incremented_) {
-      ENVOY_LOG(error, "Restarting Thread-local Wasm");
-      restart_count_incremented_ = true;
-      lifecycle_stats_handler_.onEvent(WasmEvent::VmRestart);
-    }
-  }
+  LifecycleStatsHandler& lifecycleStatsHandler() { return lifecycle_stats_handler_; }
 
 protected:
   friend class Context;
@@ -115,7 +108,6 @@ protected:
 
   // Lifecycle stats
   LifecycleStatsHandler lifecycle_stats_handler_;
-  bool restart_count_incremented_{false};
 
   // Plugin stats
   absl::flat_hash_map<uint32_t, Stats::Counter*> counters_;
@@ -129,15 +121,40 @@ protected:
 };
 using WasmSharedPtr = std::shared_ptr<Wasm>;
 
-class WasmHandle : public WasmHandleBase, public ThreadLocal::ThreadLocalObject {
+class WasmHandle : public WasmHandleBase {
 public:
+  // Base Wasm.
+  explicit WasmHandle(WasmConfig& wasm_config, const WasmSharedPtr& wasm)
+      : WasmHandleBase(std::static_pointer_cast<WasmBase>(wasm)), wasm_(wasm), is_base_wasm_(true),
+        max_restart_per_minute_(
+            wasm_config.config().vm_config().has_restart_config()
+                ? wasm_config.config().vm_config().restart_config().max_restart_per_minute()
+                : 0) {}
+
+  // Thread-local Wasm.
   explicit WasmHandle(const WasmSharedPtr& wasm)
       : WasmHandleBase(std::static_pointer_cast<WasmBase>(wasm)), wasm_(wasm) {}
+
+  // Returns true if restart is allowed now for the given max_restart_per_minute in RestartConfig
+  // and the previous restart counts *from this base wasm*. We adopt the simple sliding window
+  // counters algorithm in the implementation.
+  bool restartAllowed();
 
   WasmSharedPtr& wasm() { return wasm_; }
 
 private:
   WasmSharedPtr wasm_;
+  bool is_base_wasm_{false};
+
+  // For restarts. Used only when is_base_wasm_ is true.
+  absl::Mutex restart_counter_mutext_;
+  uint32_t max_restart_per_minute_ = 0;
+  struct RestartCountPerMinuteWindow {
+    MonotonicTime window_key_;
+    uint32_t count_ = 0;
+  };
+  RestartCountPerMinuteWindow current_restart_window_;
+  RestartCountPerMinuteWindow prev_restart_window_;
 };
 
 using WasmHandleSharedPtr = std::shared_ptr<WasmHandle>;
@@ -159,16 +176,16 @@ private:
 
 using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
-// PluginHandleManager manages the information across multiple instances of the same plugin
-// configuration and base_wasm. Notably this class is responsible for restarting and rate-limit of
-// VM restarts in case of VM failures. tryRestartPlugin can be used to restart at callsites where
-// plugin's lifecycles vary.
-class PluginHandleManager : public ThreadLocal::ThreadLocalObject {
+// PluginHandleManager is responsible for recreating a plugin instance in case of VM failures for
+// the same plugin configuration and base_wasm. tryRestartPlugin can be  used to restart at
+// callsites where plugin's lifecycles vary.
+class PluginHandleManager : public ThreadLocal::ThreadLocalObject,
+                            Logger::Loggable<Logger::Id::wasm> {
 public:
-  PluginHandleManager(const WasmHandleSharedPtr base_wasm, const PluginSharedPtr& plugin,
+  PluginHandleManager(const WasmHandleSharedPtr base_wasm_handle, const PluginSharedPtr& plugin,
                       Event::Dispatcher& dispatcher,
                       CreateContextFn create_root_context_for_testing = nullptr)
-      : base_wasm_(base_wasm), plugin_(plugin), dispatcher_(dispatcher),
+      : base_wasm_handle_(base_wasm_handle), plugin_(plugin), dispatcher_(dispatcher),
         create_root_context_for_testing_(create_root_context_for_testing) {
     initializePluginHandle();
   };
@@ -183,8 +200,8 @@ private:
   bool initializePluginHandle();
   PluginHandleSharedPtr handle_{nullptr};
 
-  // Used for creating plugin handle instances.
-  const WasmHandleSharedPtr base_wasm_;
+  // For creating plugin handle instances.
+  const WasmHandleSharedPtr base_wasm_handle_;
   const PluginSharedPtr plugin_;
   Event::Dispatcher& dispatcher_;
   CreateContextFn create_root_context_for_testing_;

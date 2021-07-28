@@ -235,6 +235,53 @@ void Wasm::onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnap
   context->onStatsUpdate(snapshot);
 }
 
+bool WasmHandle::restartAllowed() {
+  ASSERT(is_base_wasm_); // restartAllowed must be called on base Wasm handle.
+  const auto now = wasm()->dispatcher().timeSource().monotonicTime();
+  const auto current_window_key = std::chrono::floor<std::chrono::minutes>(now);
+  const auto prev_window_key = current_window_key - std::chrono::minutes(1);
+
+  // Take write lock since this might be called from any thread.
+  absl::WriterMutexLock lock(&restart_counter_mutext_);
+  if (current_restart_window_.window_key_ != current_window_key) {
+    if (current_restart_window_.window_key_ == prev_window_key) {
+      prev_restart_window_ = current_restart_window_;
+    }
+    current_restart_window_ = WasmHandle::RestartCountPerMinuteWindow{current_window_key, 0};
+  }
+
+  if (prev_restart_window_.window_key_ != prev_window_key) {
+    prev_restart_window_ = WasmHandle::RestartCountPerMinuteWindow{prev_window_key, 0};
+  }
+
+  const double current_window_ratio =
+      static_cast<double>((now - current_window_key).count()) /
+      MonotonicTime(std::chrono::minutes(1)).time_since_epoch().count();
+  const double prev_window_ratio = 1.0 - current_window_ratio;
+  const double current_weight =
+      static_cast<double>(current_restart_window_.count_ + 1) * current_window_ratio;
+  const double prev_weight = static_cast<double>(prev_restart_window_.count_) * prev_window_ratio;
+  const auto allowed = current_weight + prev_weight <= static_cast<double>(max_restart_per_minute_);
+
+  ENVOY_LOG_TO_LOGGER(
+      Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), warn,
+      "minutes={}, now={}, current_window_key={}, current_count={}, current_ratio={}, "
+      "current_weight={}, "
+      "prev_window_key={}, prev_count={}, prev_ratio={}, prev_weight={}, sum={}, max={},",
+      MonotonicTime(std::chrono::minutes(1)).time_since_epoch().count(),
+      now.time_since_epoch().count(),
+      current_restart_window_.window_key_.time_since_epoch().count(),
+      current_restart_window_.count_ + 1, current_window_ratio, current_weight,
+      prev_restart_window_.window_key_.time_since_epoch().count(), prev_restart_window_.count_,
+      prev_window_ratio, prev_weight, current_weight + prev_weight, max_restart_per_minute_);
+
+  if (allowed) {
+    // Assume that the new VM will be created right after this function at call sites.
+    current_restart_window_.count_++;
+  }
+  return allowed;
+}
+
 void clearCodeCacheForTesting() {
   std::lock_guard<std::mutex> guard(code_cache_mutex);
   if (code_cache) {
@@ -258,7 +305,8 @@ getWasmHandleFactory(WasmConfig& wasm_config, const Stats::ScopeSharedPtr& scope
     auto wasm = std::make_shared<Wasm>(wasm_config, toAbslStringView(vm_key), scope,
                                        cluster_manager, dispatcher);
     wasm->initializeLifecycle(lifecycle_notifier);
-    return std::static_pointer_cast<WasmHandleBase>(std::make_shared<WasmHandle>(std::move(wasm)));
+    return std::static_pointer_cast<WasmHandleBase>(
+        std::make_shared<WasmHandle>(wasm_config, std::move(wasm)));
   };
 }
 
@@ -274,11 +322,10 @@ getWasmHandleCloneFactory(Event::Dispatcher& dispatcher,
 }
 
 static proxy_wasm::PluginHandleFactory getPluginHandleFactory() {
-  return [](WasmHandleBaseSharedPtr base_wasm,
-            PluginBaseSharedPtr base_plugin) -> std::shared_ptr<PluginHandleBase> {
-    return std::static_pointer_cast<PluginHandleBase>(
-        std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(base_wasm),
-                                       std::static_pointer_cast<Plugin>(base_plugin)));
+  return [](WasmHandleBaseSharedPtr wasm,
+            PluginBaseSharedPtr plugin) -> std::shared_ptr<PluginHandleBase> {
+    return std::static_pointer_cast<PluginHandleBase>(std::make_shared<PluginHandle>(
+        std::static_pointer_cast<WasmHandle>(wasm), std::static_pointer_cast<Plugin>(plugin)));
   };
 }
 
@@ -457,27 +504,50 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
 }
 
 bool PluginHandleManager::initializePluginHandle() {
-  if (!base_wasm_) {
+  if (!base_wasm_handle_) {
     if (!plugin_->fail_open_) {
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), critical,
                           "Plugin configured to fail closed failed to load");
     }
     // To handle the case when failed to create VMs and fail-open/close properly,
-    // we still create PluginHandle with null WasmBase.
+    // we still create PluginHandle with null WasmHandle.
     handle_ = std::make_shared<PluginHandle>(nullptr, plugin_);
     return false;
   } else {
     handle_ = std::static_pointer_cast<PluginHandle>(proxy_wasm::getOrCreateThreadLocalPlugin(
-        std::static_pointer_cast<WasmHandle>(base_wasm_), plugin_,
+        std::static_pointer_cast<WasmHandle>(base_wasm_handle_), plugin_,
         getWasmHandleCloneFactory(dispatcher_, create_root_context_for_testing_),
         getPluginHandleFactory()));
-    return true;
+    return handle_->wasmHandle() != nullptr;
   }
 }
 
 bool PluginHandleManager::tryRestartPlugin() {
-  // TODO: rate limits.
-  return initializePluginHandle();
+  // If the base_wasm is not created, then we have no way to restart thread-local one.
+  if (!base_wasm_handle_) {
+    return false;
+  }
+  const auto base_wasm = base_wasm_handle_->wasm();
+
+  // Check if the VM is already restarted for the vm_key.
+  const bool should_vm_restart = !proxy_wasm::getThreadLocalWasm(base_wasm->vm_key());
+  if (should_vm_restart) {
+    // This case we have to resrat VM (i.e. recreate a new thread-local Wasm).
+    // So we check if the restart is not rate limited.
+    if (!base_wasm_handle_->restartAllowed()) {
+      ENVOY_LOG(error, "Could not restart Thread-local Wasm due to rate-limit");
+      // Rate-limited.
+      return false;
+    }
+  }
+
+  // Now restart the thread-local plugin.
+  const auto result = initializePluginHandle();
+  if (result && should_vm_restart) {
+    ENVOY_LOG(error, "Thread-local Wasm restarted");
+    base_wasm->lifecycleStatsHandler().onEvent(WasmEvent::VmRestart);
+  }
+  return result;
 }
 
 } // namespace Wasm

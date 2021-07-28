@@ -14,6 +14,7 @@ namespace Wasm {
 
 using Envoy::Extensions::Common::Wasm::PluginHandleManagerSharedPtr;
 using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
+using Envoy::Extensions::Common::Wasm::Wasm;
 
 class WasmStatSink : public Stats::Sink {
 public:
@@ -21,8 +22,21 @@ public:
       : plugin_(plugin), singleton_(singleton) {}
 
   void flush(Stats::MetricSnapshot& snapshot) override {
-    // TODO: try restarts.
-    singleton_->handle()->wasmHandle()->wasm()->onStatsUpdate(plugin_, snapshot);
+    Wasm* wasm = nullptr;
+    auto handle = singleton_->handle();
+    if (handle->wasmHandle()) {
+      wasm = handle->wasmHandle()->wasm().get();
+      if (wasm->isFailed()) {
+        // Try to restart.
+        if (singleton_->tryRestartPlugin()) {
+          handle = singleton_->handle();
+          wasm = handle->wasmHandle()->wasm().get();
+        }
+      }
+    }
+    if (wasm && !wasm->isFailed()) {
+      wasm->onStatsUpdate(plugin_, snapshot);
+    }
   }
 
   void setSingleton(PluginHandleManagerSharedPtr singleton) {

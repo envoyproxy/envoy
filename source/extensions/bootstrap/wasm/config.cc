@@ -58,9 +58,9 @@ void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContex
 
   // TODO(mathetake): Figure out how to restart WasmServices via PluginHandleManager so it can be
   // ratelimited. This is a bit tricky compared to other Wasm extensions, because WasmService does
-  // not have any explicit "entrypoint" for the VM actions, e.g. "createFilter" for http/network
-  // filters, "flush" for stat sinks, and "log" for access loggers where we can try restarting VMs
-  // before calling into VMs.
+  // not have any explicit asynchronus "entrypoint" for the VM actions, e.g. "createFilter" for
+  // http/network filters, "flush" for stat sinks, and "log" for access loggers where we can try
+  // restarting VMs before calling into VMs.
 }
 
 Server::BootstrapExtensionPtr

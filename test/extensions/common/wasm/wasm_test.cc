@@ -1,3 +1,6 @@
+#include <chrono>
+#include <ratio>
+
 #include "envoy/server/lifecycle_notifier.h"
 
 #include "source/common/common/hex.h"
@@ -234,6 +237,262 @@ TEST_P(WasmCommonTest, Logging) {
   wasm_weak.lock()->tickHandler(root_context->id());
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   dispatcher->clearDeferredDeleteList();
+}
+
+TEST_P(WasmCommonTest, PluginHandleManagerTryRestart) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  return;
+#endif
+  if (GetParam() == "null") {
+    // Restarts cannot be done with NullVm.
+    return;
+  }
+  std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_panic_cpp.wasm")));
+  EXPECT_FALSE(code.empty());
+
+  Stats::IsolatedStoreImpl stats_store;
+  Event::SimulatedTimeSystem time_system;
+  Api::ApiPtr api = Api::createApiForTest(stats_store, time_system);
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Server::MockServerLifecycleNotifier2> lifecycle_notifier;
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
+  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider;
+  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  *plugin_config.mutable_vm_config()->mutable_runtime() =
+      absl::StrCat("envoy.wasm.runtime.", GetParam());
+  plugin_config.mutable_vm_config()->mutable_code()->mutable_local()->set_inline_bytes(code);
+  // Allow restart once per minute.
+  const auto max_restart_per_minute = 1;
+  plugin_config.mutable_vm_config()->mutable_restart_config()->set_max_restart_per_minute(
+      max_restart_per_minute);
+
+  ServerLifecycleNotifier::StageCallbackWithCompletion lifecycle_callback;
+  EXPECT_CALL(lifecycle_notifier, registerCallback2(_, _))
+      .WillRepeatedly(
+          Invoke([&](ServerLifecycleNotifier::Stage,
+                     StageCallbackWithCompletion callback) -> ServerLifecycleNotifier::HandlePtr {
+            lifecycle_callback = callback;
+            return nullptr;
+          }));
+
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+
+  WasmHandleSharedPtr base_wasm_handle;
+  createWasm(plugin, scope, cluster_manager, init_manager, *dispatcher, *api, lifecycle_notifier,
+             remote_data_provider,
+             [&base_wasm_handle](const WasmHandleSharedPtr& w) { base_wasm_handle = w; });
+  EXPECT_NE(base_wasm_handle, nullptr);
+  Event::PostCb post_cb = [] {};
+  lifecycle_callback(post_cb);
+
+  PluginHandleManager plugin_handle_manager{base_wasm_handle, plugin, *dispatcher};
+  // PluginHnalde must be initialized in the constructor.
+  EXPECT_NE(plugin_handle_manager.handle(), nullptr);
+
+  // Cause panic.
+  auto context = std::make_unique<Context>(
+      plugin_handle_manager.handle()->wasmHandle()->wasm().get(),
+      plugin_handle_manager.handle()->rootContextId(), plugin_handle_manager.handle());
+  context->onTick(0);
+  EXPECT_TRUE(plugin_handle_manager.handle()->wasmHandle()->wasm()->isFailed());
+  // Restart without being rate limited.
+  time_system.setMonotonicTime(std::chrono::seconds(30)); // at 0m30s
+  EXPECT_TRUE(plugin_handle_manager.tryRestartPlugin());
+  EXPECT_FALSE(plugin_handle_manager.handle()->wasmHandle()->wasm()->isFailed());
+  // Cause panic again.
+  context = std::make_unique<Context>(plugin_handle_manager.handle()->wasmHandle()->wasm().get(),
+                                      plugin_handle_manager.handle()->rootContextId(),
+                                      plugin_handle_manager.handle());
+  context->onTick(0);
+  EXPECT_TRUE(plugin_handle_manager.handle()->wasmHandle()->wasm()->isFailed());
+  // Cannot restart since we've reached the limit - rate limited.
+  time_system.setMonotonicTime(std::chrono::seconds(40)); // at 0m40s
+  EXPECT_FALSE(plugin_handle_manager.tryRestartPlugin());
+  EXPECT_TRUE(plugin_handle_manager.handle()->wasmHandle()->wasm()->isFailed());
+  // In the near future time (approximately one minute later), rate-limit is removed.
+  time_system.setMonotonicTime(std::chrono::seconds(80)); // at 1m20
+  EXPECT_TRUE(plugin_handle_manager.tryRestartPlugin());
+  EXPECT_FALSE(plugin_handle_manager.handle()->wasmHandle()->wasm()->isFailed());
+
+  // Check metrics.
+  EXPECT_EQ(plugin_handle_manager.handle()
+                ->wasmHandle()
+                ->wasm()
+                ->lifecycleStatsHandler()
+                .getRestartCountForTest(),
+            2);
+}
+
+TEST_P(WasmCommonTest, PluginHandleManagerTryRestartForMultiplePlugin) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  return;
+#endif
+  if (GetParam() == "null") {
+    // Restarts cannot be done with NullVm.
+    return;
+  }
+  Stats::IsolatedStoreImpl stats_store;
+  Event::SimulatedTimeSystem time_system;
+  Api::ApiPtr api = Api::createApiForTest(stats_store, time_system);
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Server::MockServerLifecycleNotifier2> lifecycle_notifier;
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
+  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider;
+  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+
+  std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_panic_cpp.wasm")));
+  EXPECT_FALSE(code.empty());
+
+  // Create two plugin configs with different configuration - which means they share VM.
+  envoy::extensions::wasm::v3::PluginConfig plugin_config1;
+  *plugin_config1.mutable_vm_config()->mutable_runtime() =
+      absl::StrCat("envoy.wasm.runtime.", GetParam());
+  plugin_config1.mutable_configuration()->set_value("foo");
+  plugin_config1.mutable_vm_config()->mutable_code()->mutable_local()->set_inline_bytes(code);
+  envoy::extensions::wasm::v3::PluginConfig plugin_config2;
+  *plugin_config2.mutable_vm_config()->mutable_runtime() =
+      absl::StrCat("envoy.wasm.runtime.", GetParam());
+  plugin_config2.mutable_vm_config()->mutable_code()->mutable_local()->set_inline_bytes(code);
+  plugin_config2.mutable_configuration()->set_value("bar");
+  // Allow restart once per minute.
+  // Note that restart_config is not included in vm_key so the first value wins.
+  // That is, we don't need to set the value to plugin_config2.
+  const auto max_restart_per_minute = 1;
+  plugin_config1.mutable_vm_config()->mutable_restart_config()->set_max_restart_per_minute(
+      max_restart_per_minute);
+
+  ServerLifecycleNotifier::StageCallbackWithCompletion lifecycle_callback;
+  EXPECT_CALL(lifecycle_notifier, registerCallback2(_, _))
+      .WillRepeatedly(
+          Invoke([&](ServerLifecycleNotifier::Stage,
+                     StageCallbackWithCompletion callback) -> ServerLifecycleNotifier::HandlePtr {
+            lifecycle_callback = callback;
+            return nullptr;
+          }));
+
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config1, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+
+  WasmHandleSharedPtr base_wasm_handle;
+  createWasm(plugin, scope, cluster_manager, init_manager, *dispatcher, *api, lifecycle_notifier,
+             remote_data_provider,
+             [&base_wasm_handle](const WasmHandleSharedPtr& w) { base_wasm_handle = w; });
+  EXPECT_NE(base_wasm_handle, nullptr);
+  Event::PostCb post_cb = [] {};
+  lifecycle_callback(post_cb);
+
+  // Create two plugin handle managers for different plugin configuration.
+  PluginHandleManager plugin_handle_manager1{base_wasm_handle, plugin, *dispatcher};
+  EXPECT_NE(plugin_handle_manager1.handle(), nullptr);
+  PluginHandleManager plugin_handle_manager2{base_wasm_handle, plugin, *dispatcher};
+  EXPECT_NE(plugin_handle_manager2.handle(), nullptr);
+
+  auto lifecycle_stats =
+      plugin_handle_manager1.handle()->wasmHandle()->wasm()->lifecycleStatsHandler();
+
+  // Cause panic.
+  auto context = std::make_unique<Context>(
+      plugin_handle_manager1.handle()->wasmHandle()->wasm().get(),
+      plugin_handle_manager1.handle()->rootContextId(), plugin_handle_manager1.handle());
+  context->onTick(0);
+  EXPECT_TRUE(plugin_handle_manager1.handle()->wasmHandle()->wasm()->isFailed());
+  EXPECT_TRUE(plugin_handle_manager2.handle()->wasmHandle()->wasm()->isFailed());
+  // Restsrt.
+  EXPECT_TRUE(plugin_handle_manager1.tryRestartPlugin());
+  EXPECT_TRUE(plugin_handle_manager2.tryRestartPlugin());
+  // Check if the metric is only incremented once because the VM is shared.
+  EXPECT_EQ(lifecycle_stats.getRestartCountForTest(), 1);
+
+  // Cause panic again.
+  context = std::make_unique<Context>(plugin_handle_manager1.handle()->wasmHandle()->wasm().get(),
+                                      plugin_handle_manager1.handle()->rootContextId(),
+                                      plugin_handle_manager1.handle());
+  context->onTick(0);
+  EXPECT_TRUE(plugin_handle_manager1.handle()->wasmHandle()->wasm()->isFailed());
+  EXPECT_TRUE(plugin_handle_manager2.handle()->wasmHandle()->wasm()->isFailed());
+
+  // Cannot restart since we've reached the limit - rate limited.
+  time_system.setMonotonicTime(std::chrono::seconds(40)); // at 0m40s
+  EXPECT_FALSE(plugin_handle_manager1.tryRestartPlugin());
+  EXPECT_FALSE(plugin_handle_manager2.tryRestartPlugin());
+
+  // In the near future time (approximately one minute later), rate-limit is removed.
+  time_system.setMonotonicTime(std::chrono::seconds(80)); // at 1m20
+  EXPECT_TRUE(plugin_handle_manager1.tryRestartPlugin());
+  EXPECT_TRUE(plugin_handle_manager2.tryRestartPlugin());
+
+  // Check if the metric is only incremented once because the VM is shared.
+  EXPECT_EQ(lifecycle_stats.getRestartCountForTest(), 2);
+}
+
+TEST(PluginHandleManager, tryRestartPluginInvalidBaseWasm) {
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
+
+  auto manager = std::make_unique<PluginHandleManager>(nullptr, plugin, *dispatcher);
+  EXPECT_FALSE(manager->tryRestartPlugin());
+}
+
+TEST(WasmHandle, RestartAllowed) {
+  Logger::Registry::getLog(Logger::Id::wasm).set_level(spdlog::level::debug);
+
+  Event::SimulatedTimeSystem time_system;
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store, time_system);
+  Upstream::MockClusterManager cluster_manager;
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
+  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  {
+    // Restart never allowed since restart_config is not given.
+    auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+        plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+    auto wasm = std::make_shared<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), "", scope,
+                                                                 cluster_manager, *dispatcher);
+    auto handle = std::make_unique<WasmHandle>(plugin->wasmConfig(), wasm);
+    time_system.setMonotonicTime(std::chrono::seconds(30)); // at 0m30s
+    EXPECT_FALSE(handle->restartAllowed());
+  }
+  {
+    // Set max restarts
+    plugin_config.mutable_vm_config()->mutable_restart_config()->set_max_restart_per_minute(2);
+    auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+        plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+    auto wasm = std::make_shared<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), "", scope,
+                                                                 cluster_manager, *dispatcher);
+    auto handle = std::make_unique<WasmHandle>(plugin->wasmConfig(), wasm);
+    // Check on the first window.
+    time_system.setMonotonicTime(std::chrono::seconds(30)); // at 0m30s
+    EXPECT_TRUE(handle->restartAllowed());
+    time_system.setMonotonicTime(std::chrono::seconds(40)); // at 0m40s
+    EXPECT_TRUE(handle->restartAllowed());
+    time_system.setMonotonicTime(std::chrono::seconds(50)); // at 0m50s
+    EXPECT_FALSE(handle->restartAllowed());
+    // Move to next window.
+    time_system.setMonotonicTime(std::chrono::seconds(70)); // at 1m10s
+    EXPECT_TRUE(handle->restartAllowed());
+    time_system.setMonotonicTime(std::chrono::seconds(80)); // at 1m20s
+    EXPECT_TRUE(handle->restartAllowed());
+    time_system.setMonotonicTime(std::chrono::seconds(110)); // at 1m50s
+    EXPECT_FALSE(handle->restartAllowed());
+  }
 }
 
 TEST_P(WasmCommonTest, BadSignature) {

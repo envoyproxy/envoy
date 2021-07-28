@@ -87,3 +87,8 @@ envoy_wasm_cc_binary(
     name = "bad_signature_cpp.wasm",
     srcs = ["bad_signature_cpp.cc"],
 )
+
+envoy_wasm_cc_binary(
+    name = "test_panic_cpp.wasm",
+    srcs = ["test_panic_cpp.cc"],
+)

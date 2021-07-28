@@ -106,9 +106,24 @@ message VmConfig {
   // Warning: Envoy rejects the configuration if there's conflict of key space.
   EnvironmentVariables environment_variables = 7;
 
-  // Specifies the number of restarting this VM when it fails due to runtime errors, or bugs.
-  // If not configured, the value defaults to 0, meaning that Envoy does not restart VM.
-  uint32 max_restart_count = 8;
+  // The configuration for VM recovery restarts when it fails due to runtime errors.
+  // More precisely, runtime errors occur when trap instruction is executed in VM,
+  // and that is when, for example, panic function is called in some languages, or
+  // null pointer exception happens inside VMs. If not configured, Envoy does not try to restart VM.
+  // Note that for http/network Wasm filters, existing streams handled by the failed VM are never rescued, and
+  // the restarted VM is only used by the future streams. Also, the timing of restart depends on
+  // the type of Wasm extensions. For http/network Wasm filters, Envoy tries to restart when
+  // a new filter chain is created for a new stream after the failure. For access loggers,
+  // that is when a new http stream enters the logging phase. For stats sinks, restart is tried
+  // when we enter the new flush phase after failure.
+  VmRestartConfig restart_config = 8;
+}
+
+message VmRestartConfig {
+  // Specifies the upper bound on the number of VM recovery restart allowed per minute.
+  // If this is set to 0, there's no limit for the number of restarts per minutes,
+  // which means that Envoy tries to restart indefinitely and never rate limits.
+  uint32 max_restart_per_minute = 1;
 }
 
 message EnvironmentVariables {
