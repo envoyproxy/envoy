@@ -127,9 +127,6 @@ public:
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
   const RouteTracing* tracingConfig() const override { return nullptr; }
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
-    return nullptr;
-  }
   const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override {
     return nullptr;
   }
@@ -592,7 +589,6 @@ public:
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
   const RouteTracing* tracingConfig() const override { return route_tracing_.get(); }
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
   const RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(const std::string& name) const override {
     auto* config = per_filter_configs_.get(name);
@@ -746,10 +742,6 @@ private:
     const RouteEntry* routeEntry() const override { return this; }
     const Decorator* decorator() const override { return parent_->decorator(); }
     const RouteTracing* tracingConfig() const override { return parent_->tracingConfig(); }
-
-    const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override {
-      return parent_->perFilterConfig(name);
-    };
     const RouteSpecificFilterConfig*
     mostSpecificPerFilterConfig(const std::string& name) const override {
       return parent_->mostSpecificPerFilterConfig(name);
@@ -806,8 +798,6 @@ private:
     }
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                     bool do_formatting = true) const override;
-
-    const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
 
     const RouteSpecificFilterConfig*
     mostSpecificPerFilterConfig(const std::string& name) const override {

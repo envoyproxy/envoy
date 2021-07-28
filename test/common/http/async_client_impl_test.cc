@@ -1571,7 +1571,6 @@ TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
 
   EXPECT_EQ(nullptr, route_impl_->decorator());
   EXPECT_EQ(nullptr, route_impl_->tracingConfig());
-  EXPECT_EQ(nullptr, route_impl_->perFilterConfig(""));
   EXPECT_EQ(Code::InternalServerError, route_entry.clusterNotFoundResponseCode());
   EXPECT_EQ(nullptr, route_entry.corsPolicy());
   EXPECT_EQ(nullptr, route_entry.hashPolicy());
@@ -1587,7 +1586,6 @@ TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
   EXPECT_TRUE(route_entry.includeVirtualHostRateLimits());
   EXPECT_TRUE(route_entry.metadata().filter_metadata().empty());
   EXPECT_EQ(nullptr, route_entry.typedMetadata().get<Config::TypedMetadata::Object>("bar"));
-  EXPECT_EQ(nullptr, route_entry.perFilterConfig("bar"));
   EXPECT_TRUE(route_entry.upgradeMap().empty());
   EXPECT_EQ(false, route_entry.internalRedirectPolicy().enabled());
   EXPECT_TRUE(route_entry.shadowPolicies().empty());

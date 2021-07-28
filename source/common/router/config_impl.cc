@@ -1001,11 +1001,6 @@ void RouteEntryImplBase::validateClusters(
   }
 }
 
-const RouteSpecificFilterConfig*
-RouteEntryImplBase::perFilterConfig(const std::string& name) const {
-  return per_filter_configs_.get(name);
-}
-
 void RouteEntryImplBase::traversePerFilterConfig(
     const std::string& filter_name,
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
@@ -1062,12 +1057,6 @@ Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderT
   mergeTransforms(transforms,
                   DynamicRouteEntry::responseHeaderTransforms(stream_info, do_formatting));
   return transforms;
-}
-
-const RouteSpecificFilterConfig*
-RouteEntryImplBase::WeightedClusterEntry::perFilterConfig(const std::string& name) const {
-  const auto cfg = per_filter_configs_.get(name);
-  return cfg != nullptr ? cfg : DynamicRouteEntry::perFilterConfig(name);
 }
 
 void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(

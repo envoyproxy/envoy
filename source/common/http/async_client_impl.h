@@ -302,9 +302,6 @@ private:
       return path_match_criterion_;
     }
 
-    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
-      return nullptr;
-    }
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return connect_config_nullopt_;
     }
@@ -347,9 +344,6 @@ private:
     const Router::RouteEntry* routeEntry() const override { return &route_entry_; }
     const Router::Decorator* decorator() const override { return nullptr; }
     const Router::RouteTracing* tracingConfig() const override { return nullptr; }
-    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
-      return nullptr;
-    }
     const Router::RouteSpecificFilterConfig*
     mostSpecificPerFilterConfig(const std::string&) const override {
       return nullptr;
