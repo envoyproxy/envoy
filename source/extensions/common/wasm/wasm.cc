@@ -520,7 +520,7 @@ bool PluginHandleManager::tryRestartPlugin() {
   // Check if the VM is already restarted for the vm_key.
   const bool should_vm_restart = !proxy_wasm::getThreadLocalWasm(base_wasm->vm_key());
   if (should_vm_restart) {
-    // This case we have to resrat VM (i.e. recreate a new thread-local Wasm).
+    // This case we have to restart VM (i.e. recreate a new thread-local Wasm).
     // So we check if the restart is not rate limited.
     if (!base_wasm_handle_->restartAllowed()) {
       ENVOY_LOG(error, "Could not restart Thread-local Wasm due to rate-limit");

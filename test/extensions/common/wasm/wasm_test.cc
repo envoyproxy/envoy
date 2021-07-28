@@ -293,7 +293,7 @@ TEST_P(WasmCommonTest, PluginHandleManagerTryRestart) {
   lifecycle_callback(post_cb);
 
   PluginHandleManager plugin_handle_manager{base_wasm_handle, plugin, *dispatcher};
-  // PluginHnalde must be initialized in the constructor.
+  // PluginHandle must be initialized in the constructor.
   EXPECT_NE(plugin_handle_manager.handle(), nullptr);
 
   // Cause panic.
@@ -408,7 +408,7 @@ TEST_P(WasmCommonTest, PluginHandleManagerTryRestartForMultiplePlugin) {
   context->onTick(0);
   EXPECT_TRUE(plugin_handle_manager1.handle()->wasmHandle()->wasm()->isFailed());
   EXPECT_TRUE(plugin_handle_manager2.handle()->wasmHandle()->wasm()->isFailed());
-  // Restsrt.
+  // Restart.
   EXPECT_TRUE(plugin_handle_manager1.tryRestartPlugin());
   EXPECT_TRUE(plugin_handle_manager2.tryRestartPlugin());
   // Check if the metric is only incremented once because the VM is shared.

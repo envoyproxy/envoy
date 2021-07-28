@@ -178,7 +178,7 @@ using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
 // PluginHandleManager is responsible for recreating a plugin instance in case of VM failures for
 // the same plugin configuration and base_wasm. tryRestartPlugin can be  used to restart at
-// callsites where plugin's lifecycles vary.
+// callsites where plugin's lifecycle varies.
 class PluginHandleManager : public ThreadLocal::ThreadLocalObject,
                             Logger::Loggable<Logger::Id::wasm> {
 public:
