@@ -5,10 +5,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "source/common/config/datasource.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-
-#include "libsxg.h"
+#include "source/extensions/filters/http/sxg/encoder.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -115,14 +113,6 @@ private:
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 /**
- * Helper type to facilitate comparing an absl::string_view key to a std::string.
- */
-struct StringCmp {
-  using IsTransparent = void;
-  bool operator()(absl::string_view a, absl::string_view b) const { return a < b; }
-};
-
-/**
  * Transaction flow:
  * 1. check accept request header for whether client can accept sxg
  * 2. check x-envoy-should-encode-sxg from response headers
@@ -132,7 +122,7 @@ struct StringCmp {
  */
 class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(const std::shared_ptr<FilterConfig>& config) : config_(config) {}
+  Filter(const std::shared_ptr<FilterConfig>&); // config) : config_(config) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
@@ -149,32 +139,20 @@ private:
 
   bool client_accept_sxg_{false};
   bool should_encode_sxg_{false};
-  std::string origin_;
-  std::string url_;
   std::shared_ptr<FilterConfig> config_;
   Http::ResponseHeaderMap* response_headers_;
   uint64_t data_total_{0};
   bool finished_{false};
+  EncoderPtr encoder_;
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_;
 
-  virtual bool loadSigner(const uint64_t, sxg_signer_list_t*);
-  virtual bool loadContent(Buffer::Instance& data, sxg_buffer_t* buf);
-  virtual bool getEncodedResponse(Buffer::Instance& data, sxg_encoded_response_t* encoded);
-  virtual bool writeSxg(const sxg_signer_list_t* signers, const std::string url,
-                        const sxg_encoded_response_t* encoded, sxg_buffer_t* output);
+  EncoderPtr createEncoder(const std::shared_ptr<FilterConfig>&);
 
   void doSxg();
 
-  X509* loadX09Cert();
-  EVP_PKEY* loadPrivateKey();
-  const std::string toAbsolute(const std::string& url_or_relative_path) const;
   const absl::string_view urlStripQueryFragment(absl::string_view path) const;
-  const std::string generateCertDigest(X509* cert) const;
-  const std::string getCborUrl(const std::string& cert_digest) const;
-  const std::string getValidityUrl() const;
-  uint64_t getTimestamp();
 
   bool clientAcceptSXG(const Http::RequestHeaderMap& headers);
   bool shouldEncodeSXG(const Http::ResponseHeaderMap& headers);
@@ -184,12 +162,8 @@ private:
   const Http::LowerCaseString& xShouldEncodeSxgKey() const;
   const std::string& htmlContentType() const;
   const std::string& sxgContentTypeUnversioned() const;
-  const std::string& sxgSigLabel() const;
   const std::string& acceptedSxgVersion() const;
   const std::string& sxgContentType() const;
-
-  using HeaderFilterSet = std::set<absl::string_view, StringCmp>;
-  const HeaderFilterSet& filteredResponseHeaders() const;
 };
 
 } // namespace SXG

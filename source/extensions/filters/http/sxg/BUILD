@@ -11,8 +11,14 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "sxg_lib",
-    srcs = ["filter.cc"],
-    hdrs = ["filter.h"],
+    srcs = [
+        "encoder.cc",
+        "filter.cc",
+    ],
+    hdrs = [
+        "encoder.h",
+        "filter.h",
+    ],
     external_deps = ["libsxg"],
     deps = [
         "//envoy/server:filter_config_interface",
