@@ -10,6 +10,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/listener.h"
+#include "envoy/stats/timespan.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/linked_object.h"
@@ -135,26 +136,65 @@ private:
   Event::Dispatcher& dispatcher_;
 };
 
-// The listener that handles the composition type ActiveConnectionCollection. This mixin-ish class
-// provides the connection removal helper and the filter chain removal helper. Meanwhile, the
-// derived class can use the concrete active connection type.
-template <typename ActiveConnectionType>
-class TypedActiveStreamListenerBase : public ActiveStreamListenerBase {
+struct ActiveTcpConnection;
+class OwnedActiveStreamListenerBase;
+
+/**
+ * Wrapper for a group of active connections which are attached to the same filter chain context.
+ */
+class ActiveConnections : public Event::DeferredDeletable {
 public:
-  using ActiveConnectionCollectionType = typename ActiveConnectionType::CollectionType;
-  TypedActiveStreamListenerBase(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
+  ActiveConnections(OwnedActiveStreamListenerBase& listener,
+                    const Network::FilterChain& filter_chain);
+  ~ActiveConnections() override;
+
+  // listener filter chain pair is the owner of the connections
+  OwnedActiveStreamListenerBase& listener_;
+  const Network::FilterChain& filter_chain_;
+  // Owned connections
+  std::list<std::unique_ptr<ActiveTcpConnection>> connections_;
+};
+
+/**
+ * Wrapper for an active TCP connection owned by this handler.
+ */
+struct ActiveTcpConnection : LinkedObject<ActiveTcpConnection>,
+                             public Event::DeferredDeletable,
+                             public Network::ConnectionCallbacks,
+                             Logger::Loggable<Logger::Id::conn_handler> {
+  ActiveTcpConnection(ActiveConnections& active_connections,
+                      Network::ConnectionPtr&& new_connection, TimeSource& time_system,
+                      std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
+  ~ActiveTcpConnection() override;
+  // Network::ConnectionCallbacks
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
+  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
+  ActiveConnections& active_connections_;
+  Network::ConnectionPtr connection_;
+  Stats::TimespanPtr conn_length_;
+};
+
+using ActiveConnectionPtr = std::unique_ptr<ActiveTcpConnection>;
+using ActiveConnectionCollectionPtr = std::unique_ptr<ActiveConnections>;
+
+// The mixin that handles the composition type ActiveConnectionCollection. This mixin
+// provides the connection removal helper and the filter chain removal helper.
+class OwnedActiveStreamListenerBase : public ActiveStreamListenerBase {
+public:
+  OwnedActiveStreamListenerBase(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
                                 Network::ListenerPtr&& listener, Network::ListenerConfig& config)
       : ActiveStreamListenerBase(parent, dispatcher, std::move(listener), config) {}
-  using ActiveConnectionPtr = std::unique_ptr<ActiveConnectionType>;
-  using ActiveConnectionCollectionPtr = std::unique_ptr<ActiveConnectionCollectionType>;
 
   /**
    * Remove and destroy an active connection.
    * @param connection supplies the connection to remove.
    */
-  void removeConnection(ActiveConnectionType& connection) {
+  void removeConnection(ActiveTcpConnection& connection) {
     ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
-    ActiveConnectionCollectionType& active_connections = connection.active_connections_;
+    ActiveConnections& active_connections = connection.active_connections_;
     ActiveConnectionPtr removed = connection.removeFromList(active_connections.connections_);
     dispatcher().deferredDelete(std::move(removed));
     // Delete map entry only iff connections becomes empty.
