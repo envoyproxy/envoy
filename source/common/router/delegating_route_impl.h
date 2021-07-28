@@ -24,6 +24,7 @@ public:
   const Router::RouteEntry* routeEntry() const override;
   const Router::Decorator* decorator() const override;
   const Router::RouteTracing* tracingConfig() const override;
+  const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
 
   const RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(const std::string& name) const override {
@@ -36,8 +37,6 @@ public:
   }
 
 private:
-  const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
-
   const Router::RouteConstSharedPtr base_route_;
 };
 
@@ -95,6 +94,7 @@ public:
   const envoy::config::core::v3::Metadata& metadata() const override;
   const TlsContextMatchCriteria* tlsContextMatchCriteria() const override;
   const PathMatchCriterion& pathMatchCriterion() const override;
+  const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
   bool includeAttemptCountInRequest() const override;
   bool includeAttemptCountInResponse() const override;
   const UpgradeMap& upgradeMap() const override;
@@ -102,8 +102,6 @@ public:
   const std::string& routeName() const override;
 
 private:
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
-
   const Router::RouteConstSharedPtr base_route_;
 };
 

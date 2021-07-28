@@ -127,6 +127,9 @@ public:
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
   const RouteTracing* tracingConfig() const override { return nullptr; }
+  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
+    return nullptr;
+  }
   const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override {
     return nullptr;
   }
@@ -135,10 +138,6 @@ public:
       std::function<void(const Router::RouteSpecificFilterConfig&)>) const override { }
 
 private:
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
-    return nullptr;
-  }
-
   static const SslRedirector SSL_REDIRECTOR;
 };
 
@@ -214,6 +213,7 @@ public:
   Stats::StatName statName() const override { return stat_name_storage_.statName(); }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
+  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
   const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() const {
@@ -225,8 +225,6 @@ public:
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
 
 private:
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
-
   enum class SslRequirements { None, ExternalOnly, All };
 
   struct StatNameProvider {
@@ -594,6 +592,7 @@ public:
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
   const RouteTracing* tracingConfig() const override { return route_tracing_.get(); }
+  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
   const RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(const std::string& name) const override {
     auto* config = perFilterConfig(name);
@@ -633,8 +632,6 @@ protected:
                                             absl::string_view matched_path) const;
 
 private:
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
-
   struct RuntimeData {
     std::string fractional_runtime_key_{};
     envoy::type::v3::FractionalPercent fractional_runtime_default_{};
@@ -750,6 +747,9 @@ private:
     const Decorator* decorator() const override { return parent_->decorator(); }
     const RouteTracing* tracingConfig() const override { return parent_->tracingConfig(); }
 
+    const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override {
+      return parent_->perFilterConfig(name);
+    };
     const RouteSpecificFilterConfig*
     mostSpecificPerFilterConfig(const std::string& name) const override {
       return parent_->mostSpecificPerFilterConfig(name);
@@ -758,11 +758,6 @@ private:
       const std::string& filter_name,
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override {
       parent_->traversePerFilterConfig(filter_name, cb);
-    };
-
-  protected:
-    const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override {
-      return parent_->perFilterConfig(name);
     };
 
   private:
@@ -812,6 +807,8 @@ private:
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                     bool do_formatting = true) const override;
 
+    const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
+
     const RouteSpecificFilterConfig*
     mostSpecificPerFilterConfig(const std::string& name) const override {
       auto* config = per_filter_configs_.get(name);
@@ -823,8 +820,6 @@ private:
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
   private:
-    const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
-  
     const std::string runtime_key_;
     Runtime::Loader& loader_;
     const uint64_t cluster_weight_;

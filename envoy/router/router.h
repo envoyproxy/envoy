@@ -548,6 +548,13 @@ public:
   virtual const Config& routeConfig() const PURE;
 
   /**
+   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
+   *  the given filter name. If there is not per-filter config, or the filter factory returns
+   *  nullptr, nullptr is returned.
+   */
+  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
+
+  /**
    * @return bool whether to include the request count header in upstream requests.
    */
   virtual bool includeAttemptCountInRequest() const PURE;
@@ -566,16 +573,6 @@ public:
    *         rather than no limit applies.
    */
   virtual uint32_t retryShadowBufferLimit() const PURE;
-
-private:
-  friend class RouteEntryImplBase;
-
-  /**
-   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
-   *  the given filter name. If there is not per-filter config, or the filter factory returns
-   *  nullptr, nullptr is returned.
-   */
-  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
 };
 
 /**
@@ -910,6 +907,13 @@ public:
   virtual const PathMatchCriterion& pathMatchCriterion() const PURE;
 
   /**
+   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
+   *  the given filter name. If there is not per-filter config, or the filter factory returns
+   *  nullptr, nullptr is returned.
+   */
+  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
+
+  /**
    * True if the virtual host this RouteEntry belongs to is configured to include the attempt
    * count header.
    * @return bool whether x-envoy-attempt-count should be included on the upstream request.
@@ -939,17 +943,6 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
-
-private:
-  friend class RouteEntryImplBase;
-  friend class DelegatingRouteEntry;
-
-  /**
-   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
-   *  the given filter name. If there is not per-filter config, or the filter factory returns
-   *  nullptr, nullptr is returned.
-   */
-  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
 };
 
 /**
@@ -1043,6 +1036,13 @@ public:
   virtual const RouteTracing* tracingConfig() const PURE;
 
   /**
+   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
+   *  the given filter name. If there is not per-filter config, or the filter factory returns
+   *  nullptr, nullptr is returned.
+   */
+  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
+
+  /**
    * This is a helper to get the route's per-filter config if it exists, otherwise the virtual
    * host's. Or nullptr if none of them exist.
    */
@@ -1058,16 +1058,6 @@ public:
   virtual void traversePerFilterConfig(
       const std::string& filter_name,
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
-
-private:
-  friend class DelegatingRoute;
-
-  /**
-   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
-   *  the given filter name. If there is not per-filter config, or the filter factory returns
-   *  nullptr, nullptr is returned.
-   */
-  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
