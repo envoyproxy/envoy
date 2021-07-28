@@ -98,8 +98,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
   EXPECT_EQ("404", response->headers().getStatusValue());
 }
 
-// Add a route that uses unknown cluster (expect 404 Not Found).
-TEST_P(DownstreamProtocolIntegrationTest, RouterClusterUsedRegardlessOfWhitespace) {
+TEST_P(DownstreamProtocolIntegrationTest, TestHostWhitespacee) {
   config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
   auto host = config_helper_.createVirtualHost("foo.com", "/unknown", "unknown_cluster");
   host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
@@ -108,16 +107,18 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterUsedRegardlessOfWhitespac
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", " foo.com "}});
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":authority", " foo.com "}, {":path", "/unknown"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
+  // For HTTP/1 the whitespace will be stripped, and 404 returned as above.
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_EQ("400", response->headers().getStatusValue());
+    EXPECT_EQ("404", response->headers().getStatusValue());
     EXPECT_TRUE(response->complete());
   } else {
+    // For HTTP/2 and above, the whitespace is illegal.
     ASSERT_TRUE(response->waitForReset());
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
