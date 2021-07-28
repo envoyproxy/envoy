@@ -4,9 +4,10 @@ import unittest
 from detector import BufWrapper, ChangeDetectorInitializeError
 
 
-class BufTests(unittest.TestCase):
+class BreakingChangeDetectorTests(object):
+    detector_type = None
 
-    def run_buf_test(self, testname, is_breaking, expects_changes, additional_args=None):
+    def run_detector_test(self, testname, is_breaking, expects_changes, additional_args=None):
         tests_path = Path(
             Path(__file__).absolute().parent.parent, "testdata",
             "api_proto_breaking_change_detector", "breaking" if is_breaking else "allowed")
@@ -14,17 +15,18 @@ class BufTests(unittest.TestCase):
         current = Path(tests_path, f"{testname}_current")
         changed = Path(tests_path, f"{testname}_next")
 
-        breaking_response = BufWrapper.is_breaking(current, changed, additional_args)
+        breaking_response = self.detector_type.is_breaking(current, changed, additional_args)
         self.assertEqual(breaking_response, is_breaking)
 
-        lock_file_changed_response = BufWrapper.lock_file_changed(current, changed, additional_args)
+        lock_file_changed_response = self.detector_type.lock_file_changed(
+            current, changed, additional_args)
         self.assertEqual(lock_file_changed_response, expects_changes)
 
 
-class TestBreakingChanges(BufTests):
+class TestBreakingChanges(BreakingChangeDetectorTests):
 
     def run_breaking_test(self, testname):
-        self.run_buf_test(testname, is_breaking=True, expects_changes=False)
+        self.run_detector_test(testname, is_breaking=True, expects_changes=False)
 
     def test_change_field_id(self):
         self.run_breaking_test(self.test_change_field_id.__name__)
@@ -47,23 +49,20 @@ class TestBreakingChanges(BufTests):
     def test_change_field_to_oneof(self):
         self.run_breaking_test(self.test_change_field_to_oneof.__name__)
 
-    @unittest.skip("PGV field support not yet added to buf")
     def test_change_pgv_field(self):
         self.run_breaking_test(self.test_change_pgv_field.__name__)
 
-    @unittest.skip("PGV message option support not yet added to buf")
     def test_change_pgv_message(self):
         self.run_breaking_test(self.test_change_pgv_message.__name__)
 
-    @unittest.skip("PGV oneof option support not yet added to buf")
     def test_change_pgv_oneof(self):
         self.run_breaking_test(self.test_change_pgv_oneof.__name__)
 
 
-class TestAllowedChanges(BufTests):
+class TestAllowedChanges(BreakingChangeDetectorTests):
 
     def run_allowed_test(self, testname, additional_args=None):
-        self.run_buf_test(testname, is_breaking=False, expects_changes=True)
+        self.run_detector_test(testname, is_breaking=False, expects_changes=True)
 
     def test_add_comment(self):
         self.run_allowed_test(self.test_add_comment.__name__)
@@ -80,13 +79,32 @@ class TestAllowedChanges(BufTests):
     def test_remove_and_reserve_field(self):
         self.run_allowed_test(self.test_remove_and_reserve_field.__name__)
 
+    def test_force_breaking_change(self):
+        self.run_allowed_test(self.test_force_breaking_change.__name__, additional_args=["--force"])
+
+
+class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
+    detector_type = BufWrapper
+
+    @unittest.skip("PGV field support not yet added to buf")
+    def test_change_pgv_field(self):
+        pass
+
+    @unittest.skip("PGV message option support not yet added to buf")
+    def test_change_pgv_message(self):
+        pass
+
+    @unittest.skip("PGV oneof option support not yet added to buf")
+    def test_change_pgv_oneof(self):
+        pass
+
     # copied from protolock tests but might remove
     # It doesn't make sense to evaluate 'forcing' a breaking change in buf because by default,
     # buf lets you re-build without checking for breaking changes
     # Buf does not require forcing breaking changes into the lock file like protolock does
     @unittest.skip("'forcing' a breaking change does not make sense for buf")
     def test_force_breaking_change(self):
-        self.run_allowed_test(self.test_force_breaking_change.__name__, additional_args=["--force"])
+        pass
 
 
 if __name__ == '__main__':
