@@ -529,15 +529,15 @@ getMergedPerFilterConfig(const std::string& filter_name, const Router::RouteCons
   absl::optional<ConfigType> merged;
 
   if (route) {
-    route->traversePerFilterConfig(
-        filter_name, [&reduce, &merged](const Router::RouteSpecificFilterConfig& cfg) {
-          const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
-          if (!merged) {
-            merged.emplace(*typed_cfg);
-          } else {
-            reduce(merged.value(), *typed_cfg);
-          }
-        });
+    route->traversePerFilterConfig(filter_name,
+      [&reduce, &merged](const Router::RouteSpecificFilterConfig& cfg) {
+        const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
+        if (!merged) {
+          merged.emplace(*typed_cfg);
+        } else {
+          reduce(merged.value(), *typed_cfg);
+        }
+      });
   }
 
   return merged;

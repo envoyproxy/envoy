@@ -1495,12 +1495,10 @@ TEST_P(HttpFilterTestParam, ContextExtensions) {
   // Initialize the route's per filter config.
   FilterConfigPerRoute auth_per_route(settingsroute);
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
       .WillOnce(Return(&auth_per_route));
   EXPECT_CALL(*filter_callbacks_.route_, traversePerFilterConfig("envoy.filters.http.ext_authz", _))
-      .WillOnce(Invoke([&](const std::string&,
-                           std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+      .WillOnce(Invoke([&](const std::string&, std::function<void(const Router::RouteSpecificFilterConfig&)> cb){
         cb(auth_per_vhost);
         cb(auth_per_route);
       }));

@@ -1078,8 +1078,8 @@ RouteEntryImplBase::WeightedClusterEntry::perFilterConfig(const std::string& nam
 }
 
 void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
-    const std::string& filter_name,
-    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+      const std::string& filter_name,
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
   DynamicRouteEntry::traversePerFilterConfig(filter_name, cb);
 
   const auto* cfg = per_filter_configs_.get(filter_name);
