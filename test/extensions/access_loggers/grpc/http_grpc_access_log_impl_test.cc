@@ -12,6 +12,7 @@
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -36,8 +37,9 @@ using envoy::data::accesslog::v3::HTTPAccessLogEntry;
 class MockGrpcAccessLogger : public GrpcCommon::GrpcAccessLogger {
 public:
   // GrpcAccessLogger
-  MOCK_METHOD(void, log, (HTTPAccessLogEntry && entry));
-  MOCK_METHOD(void, log, (envoy::data::accesslog::v3::TCPAccessLogEntry && entry));
+  MOCK_METHOD(void, log, (HTTPAccessLogEntry && entry, bool is_critical));
+  MOCK_METHOD(void, log,
+              (envoy::data::accesslog::v3::TCPAccessLogEntry && entry, bool is_critical));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcCommon::GrpcAccessLoggerCache {
@@ -70,7 +72,7 @@ public:
               return logger_;
             });
     access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,
-                                                      logger_cache_, scope_);
+                                                      logger_cache_, scope_, factory_context_);
   }
 
   void expectLog(const std::string& expected_log_entry_yaml) {
@@ -80,9 +82,9 @@ public:
 
     HTTPAccessLogEntry expected_log_entry;
     TestUtility::loadFromYaml(expected_log_entry_yaml, expected_log_entry);
-    EXPECT_CALL(*logger_, log(An<HTTPAccessLogEntry&&>()))
-        .WillOnce(
-            Invoke([expected_log_entry](envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
+    EXPECT_CALL(*logger_, log(An<HTTPAccessLogEntry&&>(), _))
+        .WillOnce(Invoke(
+            [expected_log_entry](envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry, bool) {
               EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
             }));
   }
@@ -128,6 +130,7 @@ response: {{}}
   std::shared_ptr<MockGrpcAccessLogger> logger_{new MockGrpcAccessLogger()};
   std::shared_ptr<MockGrpcAccessLoggerCache> logger_cache_{new MockGrpcAccessLoggerCache()};
   HttpGrpcAccessLogPtr access_log_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 };
 
 class TestSerializedFilterState : public StreamInfo::FilterState::Object {

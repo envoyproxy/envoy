@@ -100,10 +100,10 @@ message CommonGrpcAccessLogConfig {
   //
   // It is recommended to set a strict filter because setting a loose filter here may cause
   // extreme pressure on the Envoy buffer in cases where the log aggregation cluster is repeatedly restarted.
-  config.accesslog.v3.AccessLogFilter buffer_log_filter = 7
-      [(validate.rules).enum = {defined_only: true}];
+  config.accesslog.v3.AccessLogFilter buffer_log_filter = 7;
 
   // The time to wait for an ACK message. If no ACK message is returned after this time,
   // the message is considered undeliverable and the failed transmission is buffered again.
-  google.protobuf.Duration message_ack_timeout = 8 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration message_ack_timeout = 8
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 }

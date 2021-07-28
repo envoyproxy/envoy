@@ -109,11 +109,10 @@ private:
     (void)entry;
     mockAddFatalEntry(MOCK_TCP_LOG_FIELD_NAME);
   }
-  bool shouldBuffer(const ProtobufWkt::Struct&) override { return http_should_buffer_; }
-  bool shouldBuffer(const ProtobufWkt::Empty&) override { return tcp_should_buffer_; }
 
   bool isEmpty() override { return message_.fields().empty(); }
-
+  bool isFatalEmpty() override { return fatal_message_.fields().empty(); }
+  void initFatalMessage() override { ++num_fatal_inits_; }
   void initMessage() override { ++num_inits_; }
 
   void clearMessage() override {
@@ -121,9 +120,8 @@ private:
     num_clears_++;
   }
 
-  bool tcp_should_buffer_ = false;
-  bool http_should_buffer_ = false;
   int num_inits_ = 0;
+  int num_fatal_inits_ = 0;
   int num_clears_ = 0;
 };
 
@@ -189,7 +187,7 @@ TEST_F(GrpcAccessLogTest, BasicFlow) {
   expectStreamStart(stream, &callbacks);
   // Log an HTTP entry.
   expectFlushedLogEntriesCount(stream, MOCK_HTTP_LOG_FIELD_NAME, 1);
-  logger_->log(mockHttpEntry());
+  logger_->log(mockHttpEntry(), false);
   EXPECT_EQ(1, logger_->numInits());
   // Messages should be cleared after each flush.
   EXPECT_EQ(1, logger_->numClears());
@@ -198,7 +196,7 @@ TEST_F(GrpcAccessLogTest, BasicFlow) {
 
   // Log a TCP entry.
   expectFlushedLogEntriesCount(stream, MOCK_TCP_LOG_FIELD_NAME, 1);
-  logger_->log(ProtobufWkt::Empty());
+  logger_->log(ProtobufWkt::Empty(), false);
   EXPECT_EQ(2, logger_->numClears());
   // TCP logging doesn't change the logs_written counter.
   EXPECT_EQ(1,
@@ -213,7 +211,7 @@ TEST_F(GrpcAccessLogTest, BasicFlow) {
   expectStreamStart(stream, &callbacks);
   // Log an HTTP entry.
   expectFlushedLogEntriesCount(stream, MOCK_HTTP_LOG_FIELD_NAME, 1);
-  logger_->log(mockHttpEntry());
+  logger_->log(mockHttpEntry(), false);
   // Message should be initialized again.
   EXPECT_EQ(2, logger_->numInits());
   EXPECT_EQ(3, logger_->numClears());
@@ -235,7 +233,7 @@ TEST_F(GrpcAccessLogTest, WatermarksOverrun) {
   // Fail to flush, so the log stays buffered up.
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(true));
   EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(0);
-  logger_->log(mockHttpEntry());
+  logger_->log(mockHttpEntry(), false);
   // No entry was logged so no clear expected.
   EXPECT_EQ(0, logger_->numClears());
   EXPECT_EQ(1,
@@ -246,7 +244,7 @@ TEST_F(GrpcAccessLogTest, WatermarksOverrun) {
   // Now canLogMore will fail, and the next log will be dropped.
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(true));
   EXPECT_CALL(stream, sendMessageRaw_(_, _)).Times(0);
-  logger_->log(mockHttpEntry());
+  logger_->log(mockHttpEntry(), false);
   EXPECT_EQ(1, logger_->numInits());
   // Still no entry was logged so no clear expected.
   EXPECT_EQ(0, logger_->numClears());
@@ -261,7 +259,7 @@ TEST_F(GrpcAccessLogTest, WatermarksOverrun) {
   EXPECT_CALL(stream, sendMessageRaw_(_, _));
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
   EXPECT_CALL(stream, sendMessageRaw_(_, _));
-  logger_->log(mockHttpEntry());
+  logger_->log(mockHttpEntry(), false);
   // Now both entries were logged separately so we expect 2 clears.
   EXPECT_EQ(2, logger_->numClears());
   EXPECT_EQ(2,
@@ -281,7 +279,7 @@ TEST_F(GrpcAccessLogTest, StreamFailure) {
             callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
             return nullptr;
           }));
-  logger_->log(mockHttpEntry());
+  logger_->log(mockHttpEntry(), false);
   EXPECT_EQ(1, logger_->numInits());
 }
 
@@ -296,9 +294,9 @@ TEST_F(GrpcAccessLogTest, Batching) {
   expectStreamStart(stream, &callbacks);
 
   expectFlushedLogEntriesCount(stream, MOCK_HTTP_LOG_FIELD_NAME, 3);
-  logger_->log(mockHttpEntry());
-  logger_->log(mockHttpEntry());
-  logger_->log(mockHttpEntry());
+  logger_->log(mockHttpEntry(), false);
+  logger_->log(mockHttpEntry(), false);
+  logger_->log(mockHttpEntry(), false);
   EXPECT_EQ(1, logger_->numInits());
   // The entries were batched and logged together so we expect a single clear.
   EXPECT_EQ(1, logger_->numClears());
@@ -308,7 +306,7 @@ TEST_F(GrpcAccessLogTest, Batching) {
   ProtobufWkt::Struct big_entry = mockHttpEntry();
   const std::string big_key(max_buffer_size, 'a');
   big_entry.mutable_fields()->insert({big_key, ProtobufWkt::Value()});
-  logger_->log(std::move(big_entry));
+  logger_->log(std::move(big_entry), false);
   EXPECT_EQ(2, logger_->numClears());
 }
 
@@ -321,7 +319,7 @@ TEST_F(GrpcAccessLogTest, Flushing) {
   timer_->invokeCallback();
 
   // Not enough data yet to trigger flush on batch size.
-  logger_->log(mockHttpEntry());
+  logger_->log(mockHttpEntry(), false);
 
   MockAccessLogStream stream;
   AccessLogCallbacks* callbacks;

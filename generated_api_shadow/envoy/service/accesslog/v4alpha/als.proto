@@ -28,8 +28,8 @@ service AccessLogService {
   rpc StreamAccessLogs(stream StreamAccessLogsMessage) returns (StreamAccessLogsResponse) {
   }
 
-  rpc BufferedCriticalAccessLogs(StreamAccessLogsMessage)
-      returns (BufferedCriticalAccessLogsResponse) {
+  rpc BufferedCriticalAccessLogs(stream StreamAccessLogsMessage)
+      returns (stream BufferedCriticalAccessLogsResponse) {
   }
 }
 
@@ -54,6 +54,9 @@ message BufferedCriticalAccessLogsResponse {
 
   // This field is used to indicate the arrival status.
   Status status = 1;
+
+  // Message ID that identifies a message.
+  uint32 id = 2;
 }
 
 // Stream message for the StreamAccessLogs API. Envoy will open a stream to the server and stream

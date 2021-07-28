@@ -75,7 +75,7 @@ void AccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
                            attributes);
   *log_entry.mutable_attributes() = attributes.values();
 
-  tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));
+  tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry), false);
 }
 
 } // namespace OpenTelemetry

@@ -100,7 +100,7 @@ http_logs:
 )EOF");
   envoy::data::accesslog::v3::HTTPAccessLogEntry entry;
   entry.mutable_request()->set_path("/test/path1");
-  logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
+  logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry), false);
 }
 
 TEST_F(GrpcAccessLoggerImplTest, LogTcp) {
@@ -119,7 +119,7 @@ tcp_logs:
 )EOF");
   envoy::data::accesslog::v3::TCPAccessLogEntry tcp_entry;
   tcp_entry.mutable_common_properties()->set_sample_rate(1);
-  logger_->log(envoy::data::accesslog::v3::TCPAccessLogEntry(tcp_entry));
+  logger_->log(envoy::data::accesslog::v3::TCPAccessLogEntry(tcp_entry), false);
 }
 
 class GrpcAccessLoggerCacheImplTest : public testing::Test {
@@ -173,7 +173,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   )EOF");
   envoy::data::accesslog::v3::HTTPAccessLogEntry entry;
   entry.mutable_request()->set_path("/test/path1");
-  logger->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
+  logger->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry), false);
 }
 
 } // namespace

@@ -116,7 +116,7 @@ TEST_F(GrpcAccessLoggerImplTest, LogHttp) {
   )EOF");
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
-  logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry), false);
 }
 
 TEST_F(GrpcAccessLoggerImplTest, LogTcp) {
@@ -142,7 +142,7 @@ TEST_F(GrpcAccessLoggerImplTest, LogTcp) {
   )EOF");
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
-  logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry), false);
 }
 
 class GrpcAccessLoggerCacheImplTest : public testing::Test {
@@ -202,7 +202,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   )EOF");
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
-  logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  logger->log(opentelemetry::proto::logs::v1::LogRecord(entry), false);
 }
 
 } // namespace

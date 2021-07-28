@@ -27,7 +27,13 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
                                  "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs")
               .getMethodDescriptorForVersion(transport_api_version),
           transport_api_version),
-      log_name_(log_name), local_info_(local_info) {}
+      log_name_(log_name), local_info_(local_info) {
+  initFatalLoggerClient(
+      client,
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.accesslog.v3.AccessLogService.BufferedCriticalAccessLogs"),
+      transport_api_version);
+}
 
 void GrpcAccessLoggerImpl::addEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
   message_.mutable_http_logs()->mutable_log_entry()->Add(std::move(entry));
@@ -45,24 +51,22 @@ void GrpcAccessLoggerImpl::addFatalEntry(envoy::data::accesslog::v3::TCPAccessLo
   fatal_message_.mutable_tcp_logs()->mutable_log_entry()->Add(std::move(entry));
 }
 
-bool GrpcAccessLoggerImpl::shouldBuffer(const envoy::data::accesslog::v3::HTTPAccessLogEntry&) {
-  // TODO(shikugawa): To buffer message it determined as critical message,
-  // by the trigger of configured thresholds. e.g. matched specific filter
-  // which describes https log message has >= 500 status code.
-  return true;
-}
-
-bool GrpcAccessLoggerImpl::shouldBuffer(const envoy::data::accesslog::v3::TCPAccessLogEntry&) {
-  // TODO(shikugawa): Not supported for TCP message.
-  return false;
-}
-
 bool GrpcAccessLoggerImpl::isEmpty() {
   return !message_.has_http_logs() && !message_.has_tcp_logs();
 }
 
+bool GrpcAccessLoggerImpl::isFatalEmpty() {
+  return !fatal_message_.has_http_logs() && !fatal_message_.has_tcp_logs();
+}
+
 void GrpcAccessLoggerImpl::initMessage() {
   auto* identifier = message_.mutable_identifier();
+  *identifier->mutable_node() = local_info_.node();
+  identifier->set_log_name(log_name_);
+}
+
+void GrpcAccessLoggerImpl::initFatalMessage() {
+  auto* identifier = fatal_message_.mutable_identifier();
   *identifier->mutable_node() = local_info_.node();
   identifier->set_log_name(log_name_);
 }

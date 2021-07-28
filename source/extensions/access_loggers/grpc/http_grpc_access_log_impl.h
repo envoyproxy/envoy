@@ -30,7 +30,7 @@ public:
                     envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config,
                     ThreadLocal::SlotAllocator& tls,
                     GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-                    Stats::Scope& scope);
+                    Stats::Scope& scope, Server::Configuration::CommonFactoryContext& context);
 
 private:
   /**
@@ -56,6 +56,7 @@ private:
   std::vector<Http::LowerCaseString> response_headers_to_log_;
   std::vector<Http::LowerCaseString> response_trailers_to_log_;
   std::vector<std::string> filter_states_to_log_;
+  AccessLog::FilterPtr critical_log_filter_;
 };
 
 using HttpGrpcAccessLogPtr = std::unique_ptr<HttpGrpcAccessLog>;

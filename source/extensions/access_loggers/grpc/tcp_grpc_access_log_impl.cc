@@ -45,7 +45,8 @@ void TcpGrpcAccessLog::emitLog(const Http::RequestHeaderMap&, const Http::Respon
   connection_properties.set_sent_bytes(stream_info.bytesSent());
 
   // request_properties->set_request_body_bytes(stream_info.bytesReceived());
-  tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));
+  // TODO(shikugawa): implement TCP gRPC access critical message buffering.
+  tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry), false);
 }
 
 } // namespace TcpGrpc

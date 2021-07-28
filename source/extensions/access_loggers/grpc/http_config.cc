@@ -29,7 +29,7 @@ AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
 
   return std::make_shared<HttpGrpcAccessLog>(std::move(filter), proto_config, context.threadLocal(),
                                              GrpcCommon::getGrpcAccessLoggerCacheSingleton(context),
-                                             context.scope());
+                                             context.scope(), context);
 }
 
 ProtobufTypes::MessagePtr HttpGrpcAccessLogFactory::createEmptyConfigProto() {

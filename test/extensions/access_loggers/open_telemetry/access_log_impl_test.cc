@@ -29,6 +29,7 @@ using ::Envoy::AccessLog::MockFilter;
 using opentelemetry::proto::logs::v1::LogRecord;
 using testing::_;
 using testing::An;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -43,8 +44,8 @@ namespace {
 class MockGrpcAccessLogger : public GrpcAccessLogger {
 public:
   // GrpcAccessLogger
-  MOCK_METHOD(void, log, (LogRecord && entry));
-  MOCK_METHOD(void, log, (ProtobufWkt::Empty && entry));
+  MOCK_METHOD(void, log, (LogRecord && entry, bool));
+  MOCK_METHOD(void, log, (ProtobufWkt::Empty && entry, bool));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcAccessLoggerCache {
@@ -104,8 +105,8 @@ values:
 
     LogRecord expected_log_entry;
     TestUtility::loadFromYaml(expected_log_entry_yaml, expected_log_entry);
-    EXPECT_CALL(*logger_, log(An<LogRecord&&>()))
-        .WillOnce(Invoke([expected_log_entry](LogRecord&& entry) {
+    EXPECT_CALL(*logger_, log(An<LogRecord&&>(), Eq(false)))
+        .WillOnce(Invoke([expected_log_entry](LogRecord&& entry, bool) {
           EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
         }));
   }

@@ -49,11 +49,11 @@ private:
   void addEntry(ProtobufWkt::Empty&& entry) override { (void)entry; };
   void addFatalEntry(opentelemetry::proto::logs::v1::LogRecord&&) override {}
   void addFatalEntry(ProtobufWkt::Empty&&) override{};
-  bool shouldBuffer(const opentelemetry::proto::logs::v1::LogRecord&) override { return false; }
-  bool shouldBuffer(const ProtobufWkt::Empty&) override { return false; }
   bool isEmpty() override;
+  bool isFatalEmpty() override;
   void initMessage() override;
   void clearMessage() override;
+  void initFatalMessage() override {}
 
   opentelemetry::proto::logs::v1::InstrumentationLibraryLogs* root_;
 };
