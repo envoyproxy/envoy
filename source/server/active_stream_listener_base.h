@@ -192,46 +192,18 @@ public:
    * Remove and destroy an active connection.
    * @param connection supplies the connection to remove.
    */
-  void removeConnection(ActiveTcpConnection& connection) {
-    ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
-    ActiveConnections& active_connections = connection.active_connections_;
-    ActiveConnectionPtr removed = connection.removeFromList(active_connections.connections_);
-    dispatcher().deferredDelete(std::move(removed));
-    // Delete map entry only iff connections becomes empty.
-    if (active_connections.connections_.empty()) {
-      auto iter = connections_by_context_.find(&active_connections.filter_chain_);
-      ASSERT(iter != connections_by_context_.end());
-      // To cover the lifetime of every single connection, Connections need to be deferred deleted
-      // because the previously contained connection is deferred deleted.
-      dispatcher().deferredDelete(std::move(iter->second));
-      // The erase will break the iteration over the connections_by_context_ during the deletion.
-      if (!is_deleting_) {
-        connections_by_context_.erase(iter);
-      }
-    }
-  }
+  void removeConnection(ActiveTcpConnection& connection);
 
 protected:
-  void removeFilterChain(const Network::FilterChain* filter_chain) override {
-    auto iter = connections_by_context_.find(filter_chain);
-    if (iter == connections_by_context_.end()) {
-      // It is possible when listener is stopping.
-    } else {
-      auto& connections = iter->second->connections_;
-      while (!connections.empty()) {
-        connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
-      }
-      // Since is_deleting_ is on, we need to manually remove the map value and drive the
-      // iterator. Defer delete connection container to avoid race condition in destroying
-      // connection.
-      dispatcher().deferredDelete(std::move(iter->second));
-      connections_by_context_.erase(iter);
-    }
-  }
+  /**
+   * Return the active connections container attached with the given filter chain.
+   */
+  ActiveConnections& getOrCreateActiveConnections(const Network::FilterChain& filter_chain);
+
+  void removeFilterChain(const Network::FilterChain* filter_chain) override;
 
   absl::flat_hash_map<const Network::FilterChain*, ActiveConnectionCollectionPtr>
       connections_by_context_;
 };
-
 } // namespace Server
 } // namespace Envoy

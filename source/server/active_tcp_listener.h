@@ -72,11 +72,6 @@ public:
                            std::unique_ptr<StreamInfo::StreamInfo> stream_info) override;
 
   /**
-   * Return the active connections container attached with the given filter chain.
-   */
-  ActiveConnections& getOrCreateActiveConnections(const Network::FilterChain& filter_chain);
-
-  /**
    * Update the listener config. The follow up connections will see the new config. The existing
    * connections are not impacted.
    */

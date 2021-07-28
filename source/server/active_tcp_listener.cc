@@ -142,15 +142,6 @@ void ActiveTcpListener::newActiveConnection(const Network::FilterChain& filter_c
   }
 }
 
-ActiveConnections&
-ActiveTcpListener::getOrCreateActiveConnections(const Network::FilterChain& filter_chain) {
-  ActiveConnectionCollectionPtr& connections = connections_by_context_[&filter_chain];
-  if (connections == nullptr) {
-    connections = std::make_unique<ActiveConnections>(*this, filter_chain);
-  }
-  return *connections;
-}
-
 void ActiveTcpListener::post(Network::ConnectionSocketPtr&& socket) {
   // It is not possible to capture a unique_ptr because the post() API copies the lambda, so we must
   // bundle the socket inside a shared_ptr that can be captured.
