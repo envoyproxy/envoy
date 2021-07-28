@@ -66,6 +66,11 @@ public:
   void OnCanWrite() override;
   void OnHttp3GoAway(uint64_t stream_id) override;
   void OnTlsHandshakeComplete() override;
+  void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicRstStreamErrorCode error,
+                               quic::QuicStreamOffset bytes_written) override;
+  void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
+  // quic::QuicSpdyClientSessionBase
+  void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 
   // PacketsToReadDelegate
   size_t numPacketsExpectedPerEventLoop() override {
