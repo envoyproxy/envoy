@@ -1373,8 +1373,10 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationTimerDisarmedWithDynamicValue) 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_max_duration_reached", 0);
+  // 1 sec is large enough to wait configured stream duration 200ms.
+  absl::SleepFor(absl::Seconds(1));
 
+  // Check that stream is not disconnected after 1 sec.
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, true);
 
@@ -1383,6 +1385,7 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationTimerDisarmedWithDynamicValue) 
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 0);
 }
 
 TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicy) {
