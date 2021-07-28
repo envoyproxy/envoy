@@ -448,6 +448,23 @@ TEST_F(EnvoyQuicServerSessionTest, ConnectionCloseWithActiveStream) {
   EXPECT_TRUE(stream->write_side_closed() && stream->reading_stopped());
 }
 
+TEST_F(EnvoyQuicServerSessionTest, RemoteConnectionCloseWithActiveStream) {
+  installReadFilter();
+
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  quic::QuicStream* stream = createNewStream(request_decoder, stream_callbacks);
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
+  quic::QuicConnectionCloseFrame frame(quic_version_[0].transport_version,
+                                       quic::QUIC_HANDSHAKE_TIMEOUT, quic::NO_IETF_QUIC_ERROR,
+                                       "dummy details",
+                                       /* transport_close_frame_type = */ 0);
+  quic_connection_->OnConnectionCloseFrame(frame);
+  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
+  EXPECT_TRUE(stream->write_side_closed() && stream->reading_stopped());
+}
+
 TEST_F(EnvoyQuicServerSessionTest, NoFlushWithDataToWrite) {
   installReadFilter();
 

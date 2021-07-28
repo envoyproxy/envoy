@@ -211,8 +211,9 @@ TEST_F(EnvoyQuicServerStreamTest, ResetStreamByHCM) {
   receiveRequest(request_body_, false, request_body_.size() * 2);
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
-  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
-  quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_CALL(stream_callbacks_,
+              onResetStream(Http::StreamResetReason::LocalRefusedStreamReset, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
