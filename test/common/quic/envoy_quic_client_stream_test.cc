@@ -350,8 +350,8 @@ TEST_F(EnvoyQuicClientStreamTest, HeadersContributeToWatermark) {
 }
 
 TEST_F(EnvoyQuicClientStreamTest, ResetStream) {
-  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
-  quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
+  quic_stream_->resetStream(Http::StreamResetReason::ConnectionFailure);
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 

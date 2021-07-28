@@ -329,6 +329,22 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
+
+  // Switch to a socket with bad socket options.
+  auto option = std::make_shared<Network::MockSocketOption>();
+  EXPECT_CALL(*option, setOption(_, _))
+      .WillRepeatedly(
+          Invoke([](Network::Socket&, envoy::config::core::v3::SocketOption::SocketState state) {
+            if (state == envoy::config::core::v3::SocketOption::STATE_LISTENING) {
+              return false;
+            }
+            return true;
+          }));
+  auto options = std::make_shared<Network::Socket::Options>();
+  options->push_back(option);
+  quic_connection_->switchConnectionSocket(
+      createConnectionSocket(server_addr_, local_addr, options));
+  EXPECT_TRUE(codec_client_->disconnected());
   cleanupUpstreamAndDownstream();
 }
 

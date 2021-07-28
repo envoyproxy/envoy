@@ -293,6 +293,23 @@ TEST_F(EnvoyQuicClientSessionTest, ConnectionCloseWithActiveStream) {
                     ->value());
 }
 
+TEST_F(EnvoyQuicClientSessionTest, HandshakeTimesOutWithActiveStream) {
+  Http::MockResponseDecoder response_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
+  EXPECT_CALL(*quic_connection_,
+              SendConnectionClosePacket(quic::QUIC_HANDSHAKE_FAILED, _, "fake handshake time out"));
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
+  envoy_quic_session_.OnStreamError(quic::QUIC_HANDSHAKE_FAILED, "fake handshake time out");
+  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
+  EXPECT_TRUE(stream.write_side_closed() && stream.reading_stopped());
+  EXPECT_EQ(1U,
+            TestUtility::findCounter(
+                store_, "http3.upstream.tx.quic_connection_close_error_code_QUIC_HANDSHAKE_FAILED")
+                ->value());
+}
+
 TEST_F(EnvoyQuicClientSessionTest, ConnectionClosePopulatesQuicVersionStats) {
   std::string error_details("dummy details");
   quic::QuicErrorCode error(quic::QUIC_INVALID_FRAME_DATA);
