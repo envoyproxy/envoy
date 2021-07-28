@@ -10,6 +10,8 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/headers.h"
 
+#include "source/extensions/filters/http/sxg/filter_config.h"
+
 #include "absl/strings/escaping.h"
 
 namespace Envoy {
@@ -18,8 +20,9 @@ namespace HttpFilters {
 namespace SXG {
 
 EncoderImpl::~EncoderImpl() {
-  sxg_signer_list_release(&signer_list_);
   sxg_header_release(&headers_);
+  sxg_raw_response_release(&raw_response_);
+  sxg_signer_list_release(&signer_list_);
   sxg_encoded_response_release(&encoded_response_);
 }
 
@@ -27,11 +30,11 @@ void EncoderImpl::setOrigin(const std::string origin) { origin_ = origin; };
 
 void EncoderImpl::setUrl(const std::string url) { url_ = url; };
 
-bool EncoderImpl::loadHeaders(Http::ResponseHeaderMap& headers) {
+bool EncoderImpl::loadHeaders(Http::ResponseHeaderMap* headers) {
   // Pass response headers to the signed doc.
   const auto& filtered_headers = filteredResponseHeaders();
   bool retval = true;
-  headers.iterate([this, filtered_headers,
+  headers->iterate([this, filtered_headers,
                    &retval](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     const auto& header_key = header.key().getStringView();
 
@@ -39,10 +42,10 @@ bool EncoderImpl::loadHeaders(Http::ResponseHeaderMap& headers) {
     if (absl::StartsWith(header_key, ThreadSafeSingleton<Http::PrefixValue>::get().prefix())) {
       return Http::HeaderMap::Iterate::Continue;
     }
-    if (should_encode_sxg_header_.get() == header_key) {
+    if (config_->shouldEncodeSXGHeader().get() == header_key) {
       return Http::HeaderMap::Iterate::Continue;
     }
-    for (const auto& prefix_filter : header_prefix_filters_) {
+    for (const auto& prefix_filter : config_->headerPrefixFilters()) {
       if (absl::StartsWith(header_key, prefix_filter)) {
         return Http::HeaderMap::Iterate::Continue;
       }
@@ -64,13 +67,13 @@ bool EncoderImpl::loadHeaders(Http::ResponseHeaderMap& headers) {
   return retval;
 }
 
-bool EncoderImpl::loadContent(Buffer::Instance& data, sxg_buffer_t* buf) {
+bool EncoderImpl::loadContent(Buffer::Instance& data) {
   const size_t size = data.length();
-  if (!sxg_buffer_resize(size, buf)) {
+  if (!sxg_buffer_resize(size, &raw_response_.payload)) {
     return false;
   }
 
-  data.copyOut(0, size, buf->data);
+  data.copyOut(0, size, raw_response_.payload.data);
 
   return true;
 }
@@ -81,7 +84,7 @@ bool EncoderImpl::loadSigner() {
   // backdate timestamp by 1 day, to account for clock skew
   const uint64_t date = getTimestamp() - ONE_DAY_IN_SECONDS;
 
-  const uint64_t expires = date + static_cast<uint64_t>(duration_);
+  const uint64_t expires = date + static_cast<uint64_t>(config_->duration());
   const auto validity_url = getValidityUrl();
 
   X509* cert = loadX09Cert();
@@ -104,19 +107,14 @@ bool EncoderImpl::loadSigner() {
   return retval;
 }
 
-bool EncoderImpl::getEncodedResponse(Buffer::Instance& data) {
-  sxg_raw_response_t raw = sxg_empty_raw_response();
+bool EncoderImpl::getEncodedResponse() {
   bool retval = true;
-  if (!loadContent(data, &raw.payload)) {
+  if (retval && !sxg_header_copy(&headers_, &raw_response_.header)) {
     retval = false;
   }
-  if (retval && !sxg_header_copy(&headers_, &raw.header)) {
+  if (retval && !sxg_encode_response(config_->miRecordSize(), &raw_response_, &encoded_response_)) {
     retval = false;
   }
-  if (retval && !sxg_encode_response(mi_record_size_, &raw, &encoded_response_)) {
-    retval = false;
-  }
-  sxg_raw_response_release(&raw);
   return retval;
 }
 
@@ -134,7 +132,7 @@ Buffer::BufferFragment* EncoderImpl::writeSxg() {
 }
 
 uint64_t EncoderImpl::getTimestamp() {
-  const auto now = time_source_.systemTime();
+  const auto now = config_->timeSource().systemTime();
   const auto ts = std::abs(static_cast<int>(
       std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count()));
 
@@ -149,16 +147,16 @@ const std::string EncoderImpl::toAbsolute(const std::string& url_or_relative_pat
   }
 }
 
-const std::string EncoderImpl::getValidityUrl() const { return toAbsolute(validity_url_); }
+const std::string EncoderImpl::getValidityUrl() const { return toAbsolute(config_->validityUrl()); }
 
 const std::string EncoderImpl::getCborUrl(const std::string& cert_digest) const {
-  return fmt::format("{}?d={}", toAbsolute(cbor_url_), cert_digest);
+  return fmt::format("{}?d={}", toAbsolute(config_->cborUrl()), cert_digest);
 }
 
 X509* EncoderImpl::loadX09Cert() {
   BIO* bio = BIO_new(BIO_s_mem());
   RELEASE_ASSERT(bio != nullptr, "");
-  if (BIO_puts(bio, certificate_.c_str()) < 0) {
+  if (BIO_puts(bio, config_->certificate().c_str()) < 0) {
     BIO_vfree(bio);
     return nullptr;
   }
@@ -172,7 +170,7 @@ X509* EncoderImpl::loadX09Cert() {
 EVP_PKEY* EncoderImpl::loadPrivateKey() {
   BIO* bio = BIO_new(BIO_s_mem());
   RELEASE_ASSERT(bio != nullptr, "");
-  if (BIO_puts(bio, private_key_.c_str()) < 0) {
+  if (BIO_puts(bio, config_->privateKey().c_str()) < 0) {
     BIO_vfree(bio);
     return nullptr;
   }

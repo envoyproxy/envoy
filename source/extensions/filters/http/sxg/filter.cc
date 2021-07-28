@@ -3,7 +3,6 @@
 #include <string>
 
 #include "envoy/http/codes.h"
-#include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/utility.h"
@@ -17,34 +16,6 @@ namespace SXG {
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     accept_handle(Http::CustomHeaders::get().Accept);
-
-template <class T>
-const std::vector<std::string> initializeHeaderPrefixFilters(const T& filters_proto) {
-  std::vector<std::string> filters;
-  filters.reserve(filters_proto.size());
-
-  for (const auto& filter : filters_proto) {
-    filters.emplace_back(filter);
-  }
-
-  return filters;
-}
-
-FilterConfig::FilterConfig(const envoy::extensions::filters::http::sxg::v3alpha::SXG& proto_config,
-                           TimeSource& time_source, std::shared_ptr<SecretReader> secret_reader,
-                           const std::string& stat_prefix, Stats::Scope& scope)
-    : stats_(generateStats(stat_prefix + "sxg.", scope)),
-      duration_(proto_config.has_duration() ? proto_config.duration().seconds() : 604800UL),
-      cbor_url_(proto_config.cbor_url()), validity_url_(proto_config.validity_url()),
-      mi_record_size_(proto_config.mi_record_size() ? proto_config.mi_record_size() : 4096L),
-      client_can_accept_sxg_header_(proto_config.client_can_accept_sxg_header().length() > 0
-                                        ? proto_config.client_can_accept_sxg_header()
-                                        : "x-client-can-accept-sxg"),
-      should_encode_sxg_header_(proto_config.should_encode_sxg_header().length() > 0
-                                    ? proto_config.should_encode_sxg_header()
-                                    : "x-should-encode-sxg"),
-      header_prefix_filters_(initializeHeaderPrefixFilters(proto_config.header_prefix_filters())),
-      time_source_(time_source), secret_reader_(secret_reader) {}
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   ENVOY_LOG(debug, "sxg filter from decodeHeaders: {}", headers);
@@ -60,16 +31,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::Continue;
 }
 
-Filter::Filter(const std::shared_ptr<FilterConfig>& config)
-    : config_(config), encoder_(createEncoder(config)) {}
-
-EncoderPtr Filter::createEncoder(const std::shared_ptr<FilterConfig>& config) {
-  return std::make_unique<EncoderImpl>(
-      config->certificate(), config->privateKey(), config->duration(), config->miRecordSize(),
-      config->cborUrl(), config->validityUrl(), config->shouldEncodeSXGHeader(),
-      config_->headerPrefixFilters(), config->timeSource());
-}
-
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
 }
@@ -78,9 +39,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   ENVOY_LOG(debug, "sxg filter from Filter::encodeHeaders");
 
   if (client_accept_sxg_ && shouldEncodeSXG(headers)) {
-    should_encode_sxg_ = true;
     response_headers_ = &headers;
-    encoder_->loadHeaders(headers);
+    should_encode_sxg_ = true;
     config_->stats().total_should_sign_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -128,7 +88,17 @@ void Filter::doSxg() {
   encoder_callbacks_->modifyEncodingBuffer([this](Buffer::Instance& enc_buf) {
     config_->stats().total_signed_attempts_.inc();
 
-    if (!encoder_->getEncodedResponse(enc_buf)) {
+    if (!encoder_->loadHeaders(response_headers_)) {
+      config_->stats().total_signed_failed_.inc();
+      return;
+    }
+
+    if (!encoder_->loadContent(enc_buf)) {
+      config_->stats().total_signed_failed_.inc();
+      return;
+    }
+
+    if (!encoder_->getEncodedResponse()) {
       config_->stats().total_signed_failed_.inc();
       return;
     }

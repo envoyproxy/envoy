@@ -11,6 +11,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/sxg/filter.h"
+#include "source/extensions/filters/http/sxg/encoder.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -55,9 +56,9 @@ Http::FilterFactoryCb FilterFactory::createFilterFactoryFromProtoTyped(
       secret_provider_certificate, secret_provider_private_key, context.api());
   auto config = std::make_shared<FilterConfig>(proto_config, context.timeSource(), secret_reader,
                                                stat_prefix, context.scope());
-
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<Filter>(config));
+    const EncoderPtr encoder = std::make_shared<EncoderImpl>(config);
+    callbacks.addStreamFilter(std::make_shared<Filter>(config, encoder));
   };
 }
 

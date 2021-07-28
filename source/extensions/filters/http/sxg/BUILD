@@ -14,10 +14,12 @@ envoy_cc_library(
     srcs = [
         "encoder.cc",
         "filter.cc",
+        "filter_config.cc",
     ],
     hdrs = [
         "encoder.h",
         "filter.h",
+        "filter_config.h",
     ],
     external_deps = ["libsxg"],
     deps = [
