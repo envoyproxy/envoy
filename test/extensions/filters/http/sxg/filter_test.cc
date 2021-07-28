@@ -1038,7 +1038,8 @@ TEST_F(FilterTest, GetEncodedResponseFailure) {
   EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), setUrl);
   EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), loadHeaders).WillOnce(Return(true));
   EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), loadContent).WillOnce(Return(true));
-  EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), getEncodedResponse).WillOnce(Return(false));
+  EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), getEncodedResponse)
+      .WillOnce(Return(false));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"host", "example.org"},
@@ -1066,7 +1067,8 @@ TEST_F(FilterTest, LoadSignerFailure) {
   EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), setUrl);
   EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), loadHeaders).WillOnce(Return(true));
   EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), loadContent).WillOnce(Return(true));
-  EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), getEncodedResponse).WillOnce(Return(true));
+  EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), getEncodedResponse)
+      .WillOnce(Return(true));
   EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), loadSigner).WillOnce(Return(false));
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -1095,7 +1097,8 @@ TEST_F(FilterTest, WriteSxgFailure) {
   EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), setUrl);
   EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), loadHeaders).WillOnce(Return(true));
   EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), loadContent).WillOnce(Return(true));
-  EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), getEncodedResponse).WillOnce(Return(true));
+  EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), getEncodedResponse)
+      .WillOnce(Return(true));
   EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), loadSigner).WillOnce(Return(true));
   EXPECT_CALL(*static_cast<MockEncoder*>(encoder_.get()), writeSxg).WillOnce(Return(nullptr));
 
