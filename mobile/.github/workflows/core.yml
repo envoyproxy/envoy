@@ -10,7 +10,7 @@ jobs:
   unittests:
     name: unit_tests
     runs-on: macOS-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
         with:
