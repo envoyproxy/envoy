@@ -320,6 +320,7 @@ envoy_cc_test(
     deps = [
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:xds_resource_lib",
+        "//test/config:v2_link_hacks",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
