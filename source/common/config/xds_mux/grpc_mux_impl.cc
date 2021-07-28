@@ -21,8 +21,15 @@ template <class S, class F, class RQ, class RS>
 GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory,
                                        bool skip_subsequent_node,
                                        const LocalInfo::LocalInfo& local_info,
-                                       envoy::config::core::v3::ApiVersion transport_api_version)
-    : subscription_state_factory_(std::move(subscription_state_factory)),
+                                       envoy::config::core::v3::ApiVersion transport_api_version,
+                                       Grpc::RawAsyncClientPtr&& async_client,
+                                       Event::Dispatcher& dispatcher,
+                                       const Protobuf::MethodDescriptor& service_method,
+                                       Random::RandomGenerator& random, Stats::Scope& scope,
+                                       const RateLimitSettings& rate_limit_settings)
+    : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
+                   rate_limit_settings),
+      subscription_state_factory_(std::move(subscription_state_factory)),
       skip_subsequent_node_(skip_subsequent_node), local_info_(local_info),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
           [this](absl::string_view resource_type_url) {
@@ -335,9 +342,8 @@ GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispat
                            const RateLimitSettings& rate_limit_settings,
                            const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
     : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
-                  local_info, transport_api_version),
-      grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                   rate_limit_settings) {}
+                  local_info, transport_api_version, std::move(async_client), dispatcher,
+                  service_method, random, scope, rate_limit_settings) {}
 
 // GrpcStreamCallbacks for GrpcMuxDelta
 void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url,
@@ -357,9 +363,8 @@ GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatch
                          const RateLimitSettings& rate_limit_settings,
                          const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
     : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
-                  local_info, transport_api_version),
-      grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                   rate_limit_settings) {}
+                  local_info, transport_api_version, std::move(async_client), dispatcher,
+                  service_method, random, scope, rate_limit_settings) {}
 
 Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   const absl::flat_hash_set<std::string>&,

@@ -50,7 +50,10 @@ class GrpcMuxImpl : public GrpcStreamCallbacks<RS>,
 public:
   GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, bool skip_subsequent_node,
               const LocalInfo::LocalInfo& local_info,
-              envoy::config::core::v3::ApiVersion transport_api_version);
+              envoy::config::core::v3::ApiVersion transport_api_version,
+              Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
+              const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
+              Stats::Scope& scope, const RateLimitSettings& rate_limit_settings);
 
   // TODO (dmitri-d) return a naked pointer instead of the wrapper once the legacy mux has been
   // removed and the mux interface can be changed
@@ -82,14 +85,15 @@ public:
     genericHandleResponse(message->type_url(), *message, control_plane_stats);
   }
 
+  GrpcStream<RQ, RS>& grpcStreamForTest() { return grpc_stream_; }
+
 protected:
-  virtual GrpcStreamBase& grpcStream() PURE;
-  void establishGrpcStream() { grpcStream().establishNewStream(); }
+  void establishGrpcStream() { grpc_stream_.establishNewStream(); }
   void sendGrpcMessage(RQ& msg_proto, S& sub_state);
-  void maybeUpdateQueueSizeStat(uint64_t size) { grpcStream().maybeUpdateQueueSizeStat(size); }
-  bool grpcStreamAvailable() { return grpcStream().grpcStreamAvailable(); }
-  bool rateLimitAllowsDrain() { return grpcStream().checkRateLimitAllowsDrain(); }
-  virtual void sendMessage(RQ& msg_proto) PURE;
+  void maybeUpdateQueueSizeStat(uint64_t size) { grpc_stream_.maybeUpdateQueueSizeStat(size); }
+  bool grpcStreamAvailable() { return grpc_stream_.grpcStreamAvailable(); }
+  bool rateLimitAllowsDrain() { return grpc_stream_.checkRateLimitAllowsDrain(); }
+  void sendMessage(RQ& msg_proto) { grpc_stream_.sendMessage(msg_proto); }
 
   S& subscriptionStateFor(const std::string& type_url);
   WatchMap& watchMapFor(const std::string& type_url);
@@ -107,6 +111,8 @@ protected:
   const envoy::config::core::v3::ApiVersion& transportApiVersion() const {
     return transport_api_version_;
   }
+
+  GrpcStream<RQ, RS> grpc_stream_;
 
 private:
   // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
@@ -173,23 +179,6 @@ public:
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
                              const absl::flat_hash_set<std::string>& for_update) override;
-
-  GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
-             envoy::service::discovery::v3::DeltaDiscoveryResponse>&
-  grpcStreamForTest() {
-    return grpc_stream_;
-  }
-
-protected:
-  GrpcStreamBase& grpcStream() override { return grpc_stream_; }
-  void sendMessage(envoy::service::discovery::v3::DeltaDiscoveryRequest& msg_proto) override {
-    grpc_stream_.sendMessage(msg_proto);
-  }
-
-private:
-  GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
-             envoy::service::discovery::v3::DeltaDiscoveryResponse>
-      grpc_stream_;
 };
 
 class GrpcMuxSotw : public GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionStateFactory,
@@ -207,23 +196,6 @@ public:
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-
-  GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
-             envoy::service::discovery::v3::DiscoveryResponse>&
-  grpcStreamForTest() {
-    return grpc_stream_;
-  }
-
-protected:
-  GrpcStreamBase& grpcStream() override { return grpc_stream_; }
-  void sendMessage(envoy::service::discovery::v3::DiscoveryRequest& msg_proto) override {
-    grpc_stream_.sendMessage(msg_proto);
-  }
-
-private:
-  GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
-             envoy::service::discovery::v3::DiscoveryResponse>
-      grpc_stream_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {
