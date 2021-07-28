@@ -232,7 +232,29 @@ TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
   quic::QuicRstStreamFrame rst1(/*control_frame_id=*/1u, stream_id,
                                 quic::QUIC_ERROR_PROCESSING_STREAM, /*bytes_written=*/0u);
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteReset, _));
-  stream.OnStreamReset(rst1);
+  envoy_quic_session_.OnRstStream(rst1);
+
+  EXPECT_EQ(
+      1U, TestUtility::findCounter(
+              store_, "http3.upstream.rx.quic_reset_stream_error_code_QUIC_ERROR_PROCESSING_STREAM")
+              ->value());
+}
+
+TEST_P(EnvoyQuicClientSessionTest, SendResetFrame) {
+  Http::MockResponseDecoder response_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
+
+  // G-QUIC or IETF bi-directional stream.
+  quic::QuicStreamId stream_id = stream.id();
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  envoy_quic_session_.ResetStream(stream_id, quic::QUIC_ERROR_PROCESSING_STREAM);
+
+  EXPECT_EQ(
+      1U, TestUtility::findCounter(
+              store_, "http3.upstream.tx.quic_reset_stream_error_code_QUIC_ERROR_PROCESSING_STREAM")
+              ->value());
 }
 
 TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
@@ -277,6 +299,9 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionCloseWithActiveStream) {
   envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_TRUE(stream.write_side_closed() && stream.reading_stopped());
+  EXPECT_EQ(1U, TestUtility::findCounter(
+                    store_, "http3.upstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR")
+                    ->value());
 }
 
 class EnvoyQuicClientSessionAllQuicVersionTest

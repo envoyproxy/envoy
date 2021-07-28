@@ -565,12 +565,18 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     codec_type_ = CodecType::HTTP3;
+    if (!context_.isQuicListener()) {
+      throw EnvoyException("HTTP/3 codec configured on non-QUIC listener.");
+    }
 #else
     throw EnvoyException("HTTP3 configured but not enabled in the build.");
 #endif
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+  if (codec_type_ != CodecType::HTTP3 && context_.isQuicListener()) {
+    throw EnvoyException("Non-HTTP/3 codec configured on QUIC listener.");
   }
 
   const auto& filters = config.http_filters();

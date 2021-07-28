@@ -62,7 +62,9 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
       clearWatermark();
 
     } else {
-      if (body_mode_ == ProcessingMode::BUFFERED) {
+      if (no_body_) {
+        // Fall through if there was never a body in the first place.
+      } else if (body_mode_ == ProcessingMode::BUFFERED) {
         if (complete_body_available_) {
           // If we get here, then all the body data came in before the header message
           // was complete, and the server wants the body. So, don't continue filter
