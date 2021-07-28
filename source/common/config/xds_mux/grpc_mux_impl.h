@@ -49,6 +49,15 @@ public:
 // This class owns the GrpcStream used to talk to the server, maintains queuing
 // logic to properly order the subscription(s)' various messages, and allows
 // starting/stopping/pausing of the subscriptions.
+//
+// @tparam S SubscriptionState state type, either SotwSubscriptionState or DeltaSubscriptionState
+// @tparam F SubscriptionStateFactory type, either SotwSubscriptionStateFactory or
+// DeltaSubscriptionStateFactory
+// @tparam RQ Xds request type, either envoy::service::discovery::v3::DiscoveryRequest or
+// envoy::service::discovery::v3::DeltaDiscoveryRequest
+// @tparam RS Xds response type, either envoy::service::discovery::v3::DiscoveryResponse or
+// envoy::service::discovery::v3::DeltaDiscoveryResponse
+//
 template <class S, class F, class RQ, class RS>
 class GrpcMuxImpl : public GrpcStreamCallbacks<RS>,
                     public GrpcMux,
