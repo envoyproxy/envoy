@@ -192,9 +192,6 @@ private:
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     const Router::Config& routeConfig() const override { return route_configuration_; }
-    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
-      return nullptr;
-    }
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
     uint32_t retryShadowBufferLimit() const override {

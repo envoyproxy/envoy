@@ -1012,22 +1012,15 @@ void RouteEntryImplBase::traversePerFilterConfig(
   const Router::RouteEntry* route_entry = routeEntry();
 
   if (route_entry != nullptr) {
-    auto maybe_vhost_config = route_entry->virtualHost().perFilterConfig(filter_name);
+    auto maybe_vhost_config = vhost_.perFilterConfig(filter_name);
     if (maybe_vhost_config != nullptr) {
       cb(*maybe_vhost_config);
     }
   }
 
-  auto maybe_route_config = perFilterConfig(filter_name);
+  auto maybe_route_config = per_filter_configs_.get(filter_name);
   if (maybe_route_config != nullptr) {
     cb(*maybe_route_config);
-  }
-
-  if (route_entry != nullptr) {
-    auto maybe_weighted_cluster_config = route_entry->perFilterConfig(filter_name);
-    if (maybe_weighted_cluster_config != nullptr) {
-      cb(*maybe_weighted_cluster_config);
-    }
   }
 }
 

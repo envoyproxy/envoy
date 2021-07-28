@@ -7958,7 +7958,7 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  absl::InlinedVector<uint32_t, 3> expected_traveled_config({456, 123, 123});
+  absl::InlinedVector<uint32_t, 3> expected_traveled_config({456, 123});
   checkEach(yaml, 123, expected_traveled_config);
 }
 
@@ -7983,7 +7983,7 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  absl::InlinedVector<uint32_t, 3> expected_traveled_config({456, 123, 123});
+  absl::InlinedVector<uint32_t, 3> expected_traveled_config({456, 123});
   checkEach(yaml, 123, expected_traveled_config);
 }
 
@@ -8056,7 +8056,7 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  absl::InlinedVector<uint32_t, 3> expected_traveled_config({1415, 1213, 1213});
+  absl::InlinedVector<uint32_t, 3> expected_traveled_config({1415, 1213});
   checkEach(yaml, 1213, expected_traveled_config);
 }
 
@@ -8085,7 +8085,7 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  absl::InlinedVector<uint32_t, 3> expected_traveled_config({1415, 1213, 1213});
+  absl::InlinedVector<uint32_t, 3> expected_traveled_config({1415, 1213});
   checkEach(yaml, 1213, expected_traveled_config);
 }
 

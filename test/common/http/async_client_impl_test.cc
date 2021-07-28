@@ -1593,7 +1593,6 @@ TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
   EXPECT_TRUE(route_entry.shadowPolicies().empty());
   EXPECT_TRUE(route_entry.virtualHost().rateLimitPolicy().empty());
   EXPECT_EQ(nullptr, route_entry.virtualHost().corsPolicy());
-  EXPECT_EQ(nullptr, route_entry.virtualHost().perFilterConfig("bar"));
   EXPECT_FALSE(route_entry.virtualHost().includeAttemptCountInRequest());
   EXPECT_FALSE(route_entry.virtualHost().includeAttemptCountInResponse());
   EXPECT_FALSE(route_entry.virtualHost().routeConfig().usesVhds());

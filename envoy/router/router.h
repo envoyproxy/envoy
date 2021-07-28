@@ -548,13 +548,6 @@ public:
   virtual const Config& routeConfig() const PURE;
 
   /**
-   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
-   *  the given filter name. If there is not per-filter config, or the filter factory returns
-   *  nullptr, nullptr is returned.
-   */
-  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
-
-  /**
    * @return bool whether to include the request count header in upstream requests.
    */
   virtual bool includeAttemptCountInRequest() const PURE;

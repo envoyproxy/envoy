@@ -213,7 +213,7 @@ public:
   Stats::StatName statName() const override { return stat_name_storage_.statName(); }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
+  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const;
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
   const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() const {
@@ -595,8 +595,8 @@ public:
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
   const RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(const std::string& name) const override {
-    auto* config = perFilterConfig(name);
-    return config ? config : virtualHost().perFilterConfig(name);
+    auto* config = per_filter_configs_.get(name);
+    return config ? config : vhost_.perFilterConfig(name);
   }
   void traversePerFilterConfig(
       const std::string& filter_name,
