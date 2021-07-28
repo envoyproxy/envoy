@@ -560,9 +560,7 @@ Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
     return codecProtocolError("http/1.1 protocol error: extraneous data after response complete");
   }
   if (pending_response_.has_value()) {
-    static_cast<StreamEncoder&>(pending_response_.value().encoder_)
-        .getStream()
-        .updateReceivedBytes(data.length());
+    pending_response_.value().encoder_.getStream().updateReceivedBytes(data.length());
   }
   return status;
 }
