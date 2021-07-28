@@ -11,8 +11,17 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
+/**
+ * Contains information about whether the cache entry is usable.
+ */
 struct CacheEntryUsability {
+  /**
+   * Whether the cache entry is usable, additional checks are required to be usable, or unusable.
+   */
   CacheEntryStatus status = CacheEntryStatus::Unusable;
+  /**
+   * Value to be put in the Age header for cache responses.
+   */
   Seconds age = Seconds::max();
 };
 
@@ -37,7 +46,7 @@ public:
   virtual Key createCacheKey(const Http::RequestHeaderMap& request_headers) PURE;
 
   /**
-   * Modifies the cacheability of the response during decoding.
+   * Determines the cacheability of the response during decoding.
    * @param request_headers - headers from the request the CacheFilter is currently processing.
    * @param request_cache_control - the result of parsing the request's Cache-Control header, parsed
    * by the caller.
@@ -47,7 +56,7 @@ public:
                                 const RequestCacheControl& request_cache_control) PURE;
 
   /**
-   * Modifies the cacheability of the response during encoding.
+   * Determines the cacheability of the response during encoding.
    * @param request_headers - headers from the request the CacheFilter is currently processing.
    * @param response_headers - headers from the upstream response the CacheFilter is currently
    * processing.
@@ -63,9 +72,9 @@ public:
                                  const VaryHeader& vary_allow_list) PURE;
 
   /**
-   * Calculates whether the cached entry may be used directly or must be validated with upstream.
-   * @param request_headers - headers from the request the CacheFilter is currently processing.
-   * @param response_headers - headers from the cached response the CacheFilter has retrieved.
+   * Determines whether the cached entry may be used directly or must be validated with upstream.
+   * @param request_headers - request headers associated with the response_headers.
+   * @param response_headers - headers from the cached response.
    * @param request_cache_control - the parsed result of the request's Cache-Control header, parsed
    * by the caller.
    * @param cached_response_cache_control - the parsed result of the response's Cache-Control
@@ -84,7 +93,7 @@ public:
                              SystemTime now) PURE;
 
   /**
-   * Perform actions when StreamInfo and FilterState become available, for
+   * Performs actions when StreamInfo and FilterState become available, for
    * example for logging and observability, or to adapt CacheFilter behavior based on
    * route-specific CacheFilter config.
    * @param callbacks - Gives access to StreamInfo and FilterState
