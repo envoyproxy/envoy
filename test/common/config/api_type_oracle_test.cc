@@ -1,4 +1,3 @@
-#include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 
 #include "source/common/config/api_type_oracle.h"
@@ -12,19 +11,12 @@ namespace Config {
 namespace {
 
 TEST(ApiTypeOracleTest, All) {
-  envoy::config::filter::http::ip_tagging::v2::IPTagging v2_config;
   envoy::extensions::filters::http::ip_tagging::v3::IPTagging v3_config;
   ProtobufWkt::Any non_api_type;
 
   EXPECT_EQ(nullptr,
             ApiTypeOracle::getEarlierVersionDescriptor(non_api_type.GetDescriptor()->full_name()));
-  EXPECT_EQ(nullptr,
-            ApiTypeOracle::getEarlierVersionDescriptor(v2_config.GetDescriptor()->full_name()));
-  const auto* desc =
-      ApiTypeOracle::getEarlierVersionDescriptor(v3_config.GetDescriptor()->full_name());
-  EXPECT_EQ(envoy::config::filter::http::ip_tagging::v2::IPTagging::descriptor()->full_name(),
-            desc->full_name());
-  EXPECT_EQ(envoy::config::filter::http::ip_tagging::v2::IPTagging::descriptor()->full_name(),
+  EXPECT_NE(envoy::extensions::filters::http::ip_tagging::v3::IPTagging::descriptor()->full_name(),
             ApiTypeOracle::getEarlierVersionMessageTypeName(v3_config.GetDescriptor()->full_name())
                 .value());
 }

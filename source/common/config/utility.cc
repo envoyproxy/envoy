@@ -223,8 +223,9 @@ Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootst
 }
 
 Stats::StatsMatcherPtr
-Utility::createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-  return std::make_unique<Stats::StatsMatcherImpl>(bootstrap.stats_config());
+Utility::createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                            Stats::SymbolTable& symbol_table) {
+  return std::make_unique<Stats::StatsMatcherImpl>(bootstrap.stats_config(), symbol_table);
 }
 
 Stats::HistogramSettingsConstPtr

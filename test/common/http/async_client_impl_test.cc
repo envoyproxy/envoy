@@ -1304,7 +1304,8 @@ TEST_F(AsyncClientImplTest, StreamTimeoutHeadReply) {
       }));
 
   RequestMessagePtr message{new RequestMessageImpl()};
-  HttpTestUtility::addDefaultHeaders(message->headers(), "HEAD");
+  message->headers().setMethod("HEAD");
+  HttpTestUtility::addDefaultHeaders(message->headers(), false);
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message->headers()), true));
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40), _));
@@ -1545,45 +1546,84 @@ TEST_F(AsyncClientImplTest, DumpState) {
 // Must not be in anonymous namespace for friend to work.
 class AsyncClientImplUnitTest : public testing::Test {
 public:
-  AsyncStreamImpl::RouteImpl route_impl_{
+  std::unique_ptr<AsyncStreamImpl::RouteImpl> route_impl_{new AsyncStreamImpl::RouteImpl(
       "foo", absl::nullopt,
-      Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>()};
+      Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
+      absl::nullopt)};
   AsyncStreamImpl::NullVirtualHost vhost_;
   AsyncStreamImpl::NullConfig config_;
+
+  void setupRouteImpl(const std::string& yaml_config) {
+    envoy::config::route::v3::RetryPolicy retry_policy;
+
+    TestUtility::loadFromYaml(yaml_config, retry_policy);
+
+    route_impl_ = std::make_unique<AsyncStreamImpl::RouteImpl>(
+        "foo", absl::nullopt,
+        Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
+        std::move(retry_policy));
+  }
 };
 
 // Test the extended fake route that AsyncClient uses.
-TEST_F(AsyncClientImplUnitTest, RouteImplInitTest) {
-  EXPECT_EQ(nullptr, route_impl_.decorator());
-  EXPECT_EQ(nullptr, route_impl_.tracingConfig());
-  EXPECT_EQ(nullptr, route_impl_.perFilterConfig(""));
-  EXPECT_EQ(Code::InternalServerError, route_impl_.routeEntry()->clusterNotFoundResponseCode());
-  EXPECT_EQ(nullptr, route_impl_.routeEntry()->corsPolicy());
-  EXPECT_EQ(nullptr, route_impl_.routeEntry()->hashPolicy());
-  EXPECT_EQ(1, route_impl_.routeEntry()->hedgePolicy().initialRequests());
-  EXPECT_EQ(0, route_impl_.routeEntry()->hedgePolicy().additionalRequestChance().numerator());
-  EXPECT_FALSE(route_impl_.routeEntry()->hedgePolicy().hedgeOnPerTryTimeout());
-  EXPECT_EQ(nullptr, route_impl_.routeEntry()->metadataMatchCriteria());
-  EXPECT_TRUE(route_impl_.routeEntry()->rateLimitPolicy().empty());
-  EXPECT_TRUE(route_impl_.routeEntry()->rateLimitPolicy().getApplicableRateLimit(0).empty());
-  EXPECT_EQ(absl::nullopt, route_impl_.routeEntry()->idleTimeout());
-  EXPECT_EQ(absl::nullopt, route_impl_.routeEntry()->grpcTimeoutOffset());
-  EXPECT_TRUE(route_impl_.routeEntry()->opaqueConfig().empty());
-  EXPECT_TRUE(route_impl_.routeEntry()->includeVirtualHostRateLimits());
-  EXPECT_TRUE(route_impl_.routeEntry()->metadata().filter_metadata().empty());
-  EXPECT_EQ(nullptr,
-            route_impl_.routeEntry()->typedMetadata().get<Config::TypedMetadata::Object>("bar"));
-  EXPECT_EQ(nullptr, route_impl_.routeEntry()->perFilterConfig("bar"));
-  EXPECT_TRUE(route_impl_.routeEntry()->upgradeMap().empty());
-  EXPECT_EQ(false, route_impl_.routeEntry()->internalRedirectPolicy().enabled());
-  EXPECT_TRUE(route_impl_.routeEntry()->shadowPolicies().empty());
-  EXPECT_TRUE(route_impl_.routeEntry()->virtualHost().rateLimitPolicy().empty());
-  EXPECT_EQ(nullptr, route_impl_.routeEntry()->virtualHost().corsPolicy());
-  EXPECT_EQ(nullptr, route_impl_.routeEntry()->virtualHost().perFilterConfig("bar"));
-  EXPECT_FALSE(route_impl_.routeEntry()->virtualHost().includeAttemptCountInRequest());
-  EXPECT_FALSE(route_impl_.routeEntry()->virtualHost().includeAttemptCountInResponse());
-  EXPECT_FALSE(route_impl_.routeEntry()->virtualHost().routeConfig().usesVhds());
-  EXPECT_EQ(nullptr, route_impl_.routeEntry()->tlsContextMatchCriteria());
+TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
+
+  auto& route_entry = *(route_impl_->routeEntry());
+
+  EXPECT_EQ(nullptr, route_impl_->decorator());
+  EXPECT_EQ(nullptr, route_impl_->tracingConfig());
+  EXPECT_EQ(nullptr, route_impl_->perFilterConfig(""));
+  EXPECT_EQ(Code::InternalServerError, route_entry.clusterNotFoundResponseCode());
+  EXPECT_EQ(nullptr, route_entry.corsPolicy());
+  EXPECT_EQ(nullptr, route_entry.hashPolicy());
+  EXPECT_EQ(1, route_entry.hedgePolicy().initialRequests());
+  EXPECT_EQ(0, route_entry.hedgePolicy().additionalRequestChance().numerator());
+  EXPECT_FALSE(route_entry.hedgePolicy().hedgeOnPerTryTimeout());
+  EXPECT_EQ(nullptr, route_entry.metadataMatchCriteria());
+  EXPECT_TRUE(route_entry.rateLimitPolicy().empty());
+  EXPECT_TRUE(route_entry.rateLimitPolicy().getApplicableRateLimit(0).empty());
+  EXPECT_EQ(absl::nullopt, route_entry.idleTimeout());
+  EXPECT_EQ(absl::nullopt, route_entry.grpcTimeoutOffset());
+  EXPECT_TRUE(route_entry.opaqueConfig().empty());
+  EXPECT_TRUE(route_entry.includeVirtualHostRateLimits());
+  EXPECT_TRUE(route_entry.metadata().filter_metadata().empty());
+  EXPECT_EQ(nullptr, route_entry.typedMetadata().get<Config::TypedMetadata::Object>("bar"));
+  EXPECT_EQ(nullptr, route_entry.perFilterConfig("bar"));
+  EXPECT_TRUE(route_entry.upgradeMap().empty());
+  EXPECT_EQ(false, route_entry.internalRedirectPolicy().enabled());
+  EXPECT_TRUE(route_entry.shadowPolicies().empty());
+  EXPECT_TRUE(route_entry.virtualHost().rateLimitPolicy().empty());
+  EXPECT_EQ(nullptr, route_entry.virtualHost().corsPolicy());
+  EXPECT_EQ(nullptr, route_entry.virtualHost().perFilterConfig("bar"));
+  EXPECT_FALSE(route_entry.virtualHost().includeAttemptCountInRequest());
+  EXPECT_FALSE(route_entry.virtualHost().includeAttemptCountInResponse());
+  EXPECT_FALSE(route_entry.virtualHost().routeConfig().usesVhds());
+  EXPECT_EQ(nullptr, route_entry.tlsContextMatchCriteria());
+}
+
+TEST_F(AsyncClientImplUnitTest, RouteImplInitTestWithRetryPolicy) {
+
+  const std::string yaml = R"EOF(
+per_try_timeout: 30s
+num_retries: 10
+retry_on: 5xx,gateway-error,connect-failure,reset
+retry_back_off:
+  base_interval: 0.01s
+  max_interval: 30s
+)EOF";
+
+  setupRouteImpl(yaml);
+
+  auto& route_entry = *(route_impl_->routeEntry());
+
+  EXPECT_EQ(route_entry.retryPolicy().numRetries(), 10);
+  EXPECT_EQ(route_entry.retryPolicy().perTryTimeout(), std::chrono::seconds(30));
+  EXPECT_EQ(Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE | Router::RetryPolicy::RETRY_ON_5XX |
+                Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR | Router::RetryPolicy::RETRY_ON_RESET,
+            route_entry.retryPolicy().retryOn());
+
+  EXPECT_EQ(route_entry.retryPolicy().baseInterval(), std::chrono::milliseconds(10));
+  EXPECT_EQ(route_entry.retryPolicy().maxInterval(), std::chrono::seconds(30));
 }
 
 TEST_F(AsyncClientImplUnitTest, NullConfig) {

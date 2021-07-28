@@ -203,6 +203,14 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
     Server::Configuration::FactoryContext& context) {
+  return createFilterFactoryFromProtoAndHopByHop(proto_config, context, true);
+}
+
+Network::FilterFactoryCb
+HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHop(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        proto_config,
+    Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers) {
   Utility::Singletons singletons = Utility::createSingletons(context);
 
   auto filter_config = Utility::createConfig(
@@ -214,12 +222,26 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
+  return [singletons, filter_config, &context,
+          clear_hop_by_hop_headers](Network::FilterManager& filter_manager) -> void {
+    auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
-        context.overloadManager(), context.dispatcher().timeSource())});
+        context.overloadManager(), context.dispatcher().timeSource());
+    if (!clear_hop_by_hop_headers) {
+      hcm->setClearHopByHopResponseHeaders(false);
+    }
+    filter_manager.addReadFilter(std::move(hcm));
   };
+}
+
+Network::FilterFactoryCb
+MobileHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::network::http_connection_manager::v3::
+        EnvoyMobileHttpConnectionManager& mobile_config,
+    Server::Configuration::FactoryContext& context) {
+  return HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHop(
+      mobile_config.config(), context, false);
 }
 
 /**
@@ -308,13 +330,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.common_http_protocol_options().headers_with_underscores_action()),
       local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)),
       path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)),
-      strip_trailing_host_dot_(config.strip_trailing_host_dot()) {
-  // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
-  // idle_timeout field.
-  // TODO(asraa): Remove when idle_timeout is removed.
-  if (!idle_timeout_) {
-    idle_timeout_ = PROTOBUF_GET_OPTIONAL_MS(config, hidden_envoy_deprecated_idle_timeout);
-  }
+      strip_trailing_host_dot_(config.strip_trailing_host_dot()),
+      max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config.common_http_protocol_options(), max_requests_per_connection, 0)) {
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -498,8 +516,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     random_sampling.set_numerator(random_sampling_numerator);
     random_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
     envoy::type::v3::FractionalPercent overall_sampling;
-    overall_sampling.set_numerator(
-        tracing_config.has_overall_sampling() ? tracing_config.overall_sampling().value() : 100);
+    uint64_t overall_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+        tracing_config, overall_sampling, 10000, 10000)};
+    overall_sampling.set_numerator(overall_sampling_numerator);
+    overall_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
 
     const uint32_t max_path_tag_length = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
         tracing_config, max_path_tag_length, Tracing::DefaultMaxPathTagLength);
@@ -545,12 +565,18 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     codec_type_ = CodecType::HTTP3;
+    if (!context_.isQuicListener()) {
+      throw EnvoyException("HTTP/3 codec configured on non-QUIC listener.");
+    }
 #else
     throw EnvoyException("HTTP3 configured but not enabled in the build.");
 #endif
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+  if (codec_type_ != CodecType::HTTP3 && context_.isQuicListener()) {
+    throw EnvoyException("Non-HTTP/3 codec configured on QUIC listener.");
   }
 
   const auto& filters = config.http_filters();
@@ -792,7 +818,8 @@ std::function<Http::ApiListenerPtr()>
 HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
-    Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks) {
+    Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
+    bool clear_hop_by_hop_headers) {
 
   Utility::Singletons singletons = Utility::createSingletons(context);
 
@@ -805,11 +832,15 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [singletons, filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
+  return [singletons, filter_config, &context, &read_callbacks,
+          clear_hop_by_hop_headers]() -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
         context.overloadManager(), context.dispatcher().timeSource());
+    if (!clear_hop_by_hop_headers) {
+      conn_manager->setClearHopByHopResponseHeaders(false);
+    }
 
     // This factory creates a new ConnectionManagerImpl in the absence of its usual environment as
     // an L4 filter, so this factory needs to take a few actions.

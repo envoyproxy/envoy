@@ -94,7 +94,7 @@ class PythonChecker(checker.ForkingChecker):
 
     def on_check_run(self, check: str) -> None:
         if check not in self.failed and check not in self.warned:
-            self.succeed(check, [f"[CHECKS:{self.name}] {check}: success"])
+            self.succeed(check, [check])
 
     def on_checks_complete(self) -> int:
         if self.diff_file_path and self.has_failed:
@@ -113,11 +113,11 @@ class PythonChecker(checker.ForkingChecker):
     def yapf_run(self, python_file: str) -> None:
         reformatted_source, encoding, changed = self.yapf_format(python_file)
         if not changed:
-            return self.succeed("yapf", [f"{python_file}: success"])
+            return self.succeed("yapf", [python_file])
         if self.fix:
             return self.warn("yapf", [f"{python_file}: reformatted"])
         if reformatted_source:
-            return self.warn("yapf", [reformatted_source])
+            return self.warn("yapf", [f"{python_file}: diff\n{reformatted_source}"])
         self.error("yapf", [python_file])
 
     def _strip_line(self, line) -> str:

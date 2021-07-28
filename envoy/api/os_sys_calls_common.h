@@ -15,7 +15,7 @@ template <typename T> struct SysCallResult {
   /**
    * The return code from the system call.
    */
-  T rc_;
+  T return_value_;
 
   /**
    * The errno value as captured after the system call.

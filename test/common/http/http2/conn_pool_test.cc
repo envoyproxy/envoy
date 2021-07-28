@@ -23,6 +23,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -1089,7 +1090,8 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
   ReadyWatcher drained;
-  pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(drained, ready());
@@ -1125,7 +1127,8 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectDrainingWithActiveRequest) {
           .ok());
 
   ReadyWatcher drained;
-  pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
@@ -1168,7 +1171,8 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
           .ok());
 
   ReadyWatcher drained;
-  pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
@@ -1178,7 +1182,7 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
   dispatcher_.clearDeferredDeleteList();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  EXPECT_CALL(drained, ready());
+  EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
   r1.inner_decoder_->decodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
@@ -1223,7 +1227,8 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
 
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready());
-  pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
@@ -1429,88 +1434,8 @@ TEST_F(Http2ConnPoolImplTest, PreconnectWithoutMultiplexing) {
   closeAllClients();
 }
 
-TEST_F(Http2ConnPoolImplTest, PreconnectOff) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.allow_preconnect", "false"}});
-  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
-  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
-
-  // Despite the preconnect ratio, no preconnect will happen due to the runtime
-  // disable.
-  expectClientsCreate(1);
-  ActiveTestRequest r1(*this, 0, false);
-  CHECK_STATE(0 /*active*/, 1 /*pending*/, 1 /*capacity*/);
-
-  // Clean up.
-  r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
-  pool_->drainConnections();
-  closeAllClients();
-}
-
-TEST_F(Http2ConnPoolImplTest, PreconnectOffWithSettings) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.allow_preconnect", "false"}});
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.improved_stream_limit_handling", "true"}});
-  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(2);
-  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
-
-  // One stream results in one connection. Two streams result in two connections.
-  expectClientsCreate(1);
-  ActiveTestRequest r1(*this, 0, false);
-  CHECK_STATE(0 /*active*/, 1 /*pending*/, 2 /*capacity*/);
-  ActiveTestRequest r2(*this, 0, false);
-  CHECK_STATE(0 /*active*/, 2 /*pending*/, 2 /*capacity*/);
-
-  // When the connection connects, there is zero spare capacity in this pool.
-  EXPECT_CALL(*test_clients_[0].codec_, newStream(_))
-      .WillOnce(DoAll(SaveArgAddress(&r1.inner_decoder_), ReturnRef(r1.inner_encoder_)))
-      .WillOnce(DoAll(SaveArgAddress(&r2.inner_decoder_), ReturnRef(r2.inner_encoder_)));
-  EXPECT_CALL(r1.callbacks_.pool_ready_, ready());
-  EXPECT_CALL(r2.callbacks_.pool_ready_, ready());
-  expectClientConnect(0);
-  CHECK_STATE(2 /*active*/, 0 /*pending*/, 0 /*capacity*/);
-
-  // Settings frame without max_concurrent_streams_ is a no-op.
-  NiceMock<MockReceivedSettings> settings;
-  test_clients_[0].codec_client_->onSettings(settings);
-  CHECK_STATE(2 /*active*/, 0 /*pending*/, 0 /*capacity*/);
-
-  // Settings frame reducing capacity to one stream per connection results in -1 capacity.
-  settings.max_concurrent_streams_ = 1;
-  test_clients_[0].codec_client_->onSettings(settings);
-  CHECK_STATE(2 /*active*/, 0 /*pending*/, -1 /*capacity*/);
-
-  // Getting the same settings again should not affect capacity.
-  test_clients_[0].codec_client_->onSettings(settings);
-  CHECK_STATE(2 /*active*/, 0 /*pending*/, -1 /*capacity*/);
-
-  // As the first request completes, capacity returns to 0.
-  completeRequest(r1);
-  CHECK_STATE(1 /*active*/, 0 /*pending*/, 0 /*capacity*/);
-  // As the second request completes, capacity returns to 1.
-  completeRequest(r2);
-  CHECK_STATE(0 /*active*/, 0 /*pending*/, 1 /*capacity*/);
-
-  // Increased limits are (currently) ignored: capacity will remain 1.
-  settings.max_concurrent_streams_ = 3;
-  test_clients_[0].codec_client_->onSettings(settings);
-  CHECK_STATE(0 /*active*/, 0 /*pending*/, 1 /*capacity*/);
-
-  // Now set the limit to 0. This could result in the connection being drained.
-  settings.max_concurrent_streams_ = 0;
-  test_clients_[0].codec_client_->onSettings(settings);
-  CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
-
-  closeAllClients();
-}
-
 TEST_F(Http2ConnPoolImplTest, DisconnectWithNegativeCapacity) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.allow_preconnect", "false"}});
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(2);
   ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
 
