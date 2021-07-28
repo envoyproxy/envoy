@@ -44,8 +44,6 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
-using testing::GTEST_FLAG(random_seed);
-
 namespace Envoy {
 
 // The purpose of using the static seed here is to use --test_arg=--gtest_random_seed=[seed]
@@ -58,7 +56,8 @@ int32_t getSeed() {
 }
 
 TestRandomGenerator::TestRandomGenerator()
-    : seed_(GTEST_FLAG(random_seed) == 0 ? getSeed() : GTEST_FLAG(random_seed)), generator_(seed_) {
+    : seed_(GTEST_FLAG_GET(random_seed) == 0 ? getSeed() : GTEST_FLAG_GET(random_seed)),
+      generator_(seed_) {
   std::cerr << "TestRandomGenerator running with seed " << seed_ << "\n";
 }
 
