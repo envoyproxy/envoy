@@ -554,9 +554,7 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
 
 Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
   if (pending_response_.has_value()) {
-    pending_response_.value().encoder_
-        .getStream()
-        .updateReceivedBytes(data.length());
+    pending_response_.value().encoder_.getStream().updateReceivedBytes(data.length());
   }
   Http::Status status = ConnectionImpl::dispatch(data);
   if (status.ok() && data.length() > 0) {
