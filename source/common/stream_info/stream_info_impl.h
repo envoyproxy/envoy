@@ -128,6 +128,12 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
+  void setWireBytesReceived(uint64_t wire_bytes_received) override {
+    wire_bytes_received_ = wire_bytes_received;
+  }
+
+  uint64_t wireBytesReceived() const override { return wire_bytes_received_; }
+
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
 
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
@@ -155,6 +161,10 @@ struct StreamInfoImpl : public StreamInfo {
   void addBytesSent(uint64_t bytes_sent) override { bytes_sent_ += bytes_sent; }
 
   uint64_t bytesSent() const override { return bytes_sent_; }
+
+  void setWireBytesSent(uint64_t wire_bytes_sent) override { wire_bytes_sent_ = wire_bytes_sent; }
+
+  uint64_t wireBytesSent() const override { return wire_bytes_sent_; }
 
   void setResponseFlag(ResponseFlag response_flag) override { response_flags_ |= response_flag; }
 
@@ -322,6 +332,8 @@ private:
 
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
+  uint64_t wire_bytes_received_{0};
+  uint64_t wire_bytes_sent_{0};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   const Network::SocketAddressProviderSharedPtr downstream_address_provider_;
   Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;

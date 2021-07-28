@@ -79,10 +79,8 @@ public:
 
   void readDisable(bool disable) override { request_encoder_->getStream().readDisable(disable); }
 
-  void resetStream(StreamInfo::StreamInfo& stream_info) override {
+  void resetStream() override {
     ::Envoy::Http::Stream& stream = request_encoder_->getStream();
-    stream_info.addBytesReceived(stream.receivedBytes());
-    stream_info.addBytesSent(stream.sentBytes());
     stream.removeCallbacks(*this);
     stream.resetStream(Envoy::Http::StreamResetReason::LocalReset);
   }
@@ -103,6 +101,15 @@ public:
 
   void onBelowWriteBufferLowWatermark() override {
     upstream_request_.onBelowWriteBufferLowWatermark();
+  }
+
+  void getStreamInfomation(StreamInfo::StreamInfo& stream_info) override {
+    if (!request_encoder_) {
+      return;
+    }
+    ::Envoy::Http::Stream& stream = request_encoder_->getStream();
+    stream_info.setWireBytesReceived(stream.receivedBytes());
+    stream_info.setWireBytesSent(stream.sentBytes());
   }
 
 private:

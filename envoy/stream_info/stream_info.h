@@ -291,11 +291,13 @@ public:
    * @param bytes_received denotes number of bytes to add to total received bytes.
    */
   virtual void addBytesReceived(uint64_t bytes_received) PURE;
+  virtual void setWireBytesReceived(uint64_t wire_bytes_received) PURE;
 
   /**
    * @return the number of body bytes received in the request.
    */
   virtual uint64_t bytesReceived() const PURE;
+  virtual uint64_t wireBytesReceived() const PURE;
 
   /**
    * @return the protocol of the request.
@@ -415,10 +417,14 @@ public:
    */
   virtual void addBytesSent(uint64_t bytes_sent) PURE;
 
+  virtual void setWireBytesSent(uint64_t wire_bytes_sent) PURE;
+
   /**
    * @return the number of body bytes sent in the response.
    */
   virtual uint64_t bytesSent() const PURE;
+
+  virtual uint64_t wireBytesSent() const PURE;
 
   /**
    * @return whether response flag is set or not.

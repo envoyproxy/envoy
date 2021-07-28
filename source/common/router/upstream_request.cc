@@ -78,6 +78,9 @@ UpstreamRequest::~UpstreamRequest() {
   if (max_stream_duration_timer_ != nullptr) {
     max_stream_duration_timer_->disableTimer();
   }
+  if (upstream_) {
+    upstream_->getStreamInfomation(stream_info_);
+  }
   clearRequestEncoder();
 
   // If desired, fire the per-try histogram when the UpstreamRequest
@@ -292,6 +295,9 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
     span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
   }
+  if (upstream_) {
+    upstream_->getStreamInfomation(stream_info_);
+  }
 
   clearRequestEncoder();
   awaiting_headers_ = false;
@@ -321,7 +327,8 @@ void UpstreamRequest::resetStream() {
 
   if (upstream_) {
     ENVOY_STREAM_LOG(debug, "resetting pool request", *parent_.callbacks());
-    upstream_->resetStream(stream_info_);
+    upstream_->getStreamInfomation(stream_info_);
+    upstream_->resetStream();
     clearRequestEncoder();
   }
 }

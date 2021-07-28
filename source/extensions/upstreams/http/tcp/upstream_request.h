@@ -76,7 +76,7 @@ public:
   Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) override;
   void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override;
   void readDisable(bool disable) override;
-  void resetStream(StreamInfo::StreamInfo&) override;
+  void resetStream() override;
   void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {}
 
   // Tcp::ConnectionPool::UpstreamCallbacks
@@ -84,6 +84,7 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
+  void getStreamInfomation(StreamInfo::StreamInfo&) override {}
 
 private:
   Router::UpstreamToDownstream* upstream_request_;

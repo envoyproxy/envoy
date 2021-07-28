@@ -1326,15 +1326,16 @@ public:
   virtual void readDisable(bool disable) PURE;
   /**
    * Reset the stream. No events will fire beyond this point.
-   * @param reason supplies the reset reason.
    */
-  virtual void resetStream(StreamInfo::StreamInfo&) PURE;
+  virtual void resetStream() PURE;
 
   /**
    * Sets the upstream to use the following account.
    * @param the account to assign the generic upstream.
    */
   virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
+
+  virtual void getStreamInfomation(StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;

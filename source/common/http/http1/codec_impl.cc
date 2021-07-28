@@ -257,9 +257,7 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void StreamEncoderImpl::flushOutput() {
-    updateSentBytes(connection_.flushOutput());
-  }
+void StreamEncoderImpl::flushOutput() { updateSentBytes(connection_.flushOutput()); }
 
 void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
   if (!connection_.enableTrailers()) {

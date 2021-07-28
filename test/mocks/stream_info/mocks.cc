@@ -84,11 +84,19 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, addBytesReceived(_)).WillByDefault(Invoke([this](uint64_t bytes_received) {
     bytes_received_ += bytes_received;
   }));
+  ON_CALL(*this, setWireBytesReceived(_))
+      .WillByDefault(Invoke(
+          [this](uint64_t wire_bytes_received) { wire_bytes_received_ = wire_bytes_received; }));
   ON_CALL(*this, bytesReceived()).WillByDefault(ReturnPointee(&bytes_received_));
+  ON_CALL(*this, wireBytesReceived()).WillByDefault(ReturnPointee(&wire_bytes_received_));
   ON_CALL(*this, addBytesSent(_)).WillByDefault(Invoke([this](uint64_t bytes_sent) {
     bytes_sent_ += bytes_sent;
   }));
+  ON_CALL(*this, setWireBytesSent(_)).WillByDefault(Invoke([this](uint64_t wire_bytes_sent) {
+    wire_bytes_sent_ = wire_bytes_sent;
+  }));
   ON_CALL(*this, bytesSent()).WillByDefault(ReturnPointee(&bytes_sent_));
+  ON_CALL(*this, wireBytesSent()).WillByDefault(ReturnPointee(&wire_bytes_sent_));
   ON_CALL(*this, hasResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag flag) {
     return response_flags_ & flag;
   }));
