@@ -41,6 +41,7 @@ public:
       return absl::nullopt;
     }
     ConnectionPool::MockInstance* instance = new NiceMock<ConnectionPool::MockInstance>();
+    setupPool(*instance);
     pools_.push_back(ConnectionPool::InstancePtr{instance});
     ON_CALL(*instance, newStream(_, _))
         .WillByDefault(
@@ -101,10 +102,12 @@ public:
   ConnectivityGridTestBase(bool use_alternate_protocols)
       : options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
         alternate_protocols_(maybeCreateAlternateProtocolsCacheImpl(use_alternate_protocols)),
+        quic_stat_names_(store_.symbolTable()),
         grid_(dispatcher_, random_,
               Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
               Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_,
-              state_, simTime(), alternate_protocols_, std::chrono::milliseconds(300), options_),
+              state_, simTime(), alternate_protocols_, std::chrono::milliseconds(300), options_,
+              quic_stat_names_, store_),
         host_(grid_.host()) {
     grid_.info_ = &info_;
     grid_.encoder_ = &encoder_;
@@ -134,6 +137,8 @@ public:
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Random::MockRandomGenerator> random_;
   AlternateProtocolsCacheSharedPtr alternate_protocols_;
+  Stats::IsolatedStoreImpl store_;
+  Quic::QuicStatNames quic_stat_names_;
   ConnectivityGridForTest grid_;
   Upstream::HostDescriptionConstSharedPtr host_;
 
@@ -401,32 +406,28 @@ TEST_F(ConnectivityGridTest, DrainCallbacks) {
   grid_.createNextPool();
 
   bool drain_received = false;
-  bool second_drain_received = false;
 
-  ConnectionPool::Instance::DrainedCb pool1_cb;
-  ConnectionPool::Instance::DrainedCb pool2_cb;
-  // The first time a drained callback is added, the Grid's callback should be
-  // added to both pools.
+  grid_.addIdleCallback([&]() { drain_received = true; });
+
+  // The first time a drain is started, both pools should start draining.
   {
-    EXPECT_CALL(*grid_.first(), addDrainedCallback(_))
-        .WillOnce(Invoke(Invoke([&](ConnectionPool::Instance::DrainedCb cb) { pool1_cb = cb; })));
-    EXPECT_CALL(*grid_.second(), addDrainedCallback(_))
-        .WillOnce(Invoke(Invoke([&](ConnectionPool::Instance::DrainedCb cb) { pool2_cb = cb; })));
-    grid_.addDrainedCallback([&drain_received]() -> void { drain_received = true; });
+    EXPECT_CALL(*grid_.first(), startDrain());
+    EXPECT_CALL(*grid_.second(), startDrain());
+    grid_.startDrain();
   }
 
-  // The second time a drained callback is added, the pools will not see any
-  // change.
+  // The second time, the pools will not see any change.
   {
-    EXPECT_CALL(*grid_.first(), addDrainedCallback(_)).Times(0);
-    EXPECT_CALL(*grid_.second(), addDrainedCallback(_)).Times(0);
-    grid_.addDrainedCallback([&second_drain_received]() -> void { second_drain_received = true; });
+    EXPECT_CALL(*grid_.first(), startDrain()).Times(0);
+    EXPECT_CALL(*grid_.second(), startDrain()).Times(0);
+    grid_.startDrain();
   }
   {
     // Notify the grid the second pool has been drained. This should not be
     // passed up to the original callers.
     EXPECT_FALSE(drain_received);
-    (pool2_cb)();
+    EXPECT_CALL(*grid_.second(), isIdle()).WillRepeatedly(Return(true));
+    grid_.second()->idle_cb_();
     EXPECT_FALSE(drain_received);
   }
 
@@ -434,10 +435,42 @@ TEST_F(ConnectivityGridTest, DrainCallbacks) {
     // Notify the grid that another pool has been drained. Now that all pools are
     // drained, the original callers should be informed.
     EXPECT_FALSE(drain_received);
-    (pool1_cb)();
+    EXPECT_CALL(*grid_.first(), isIdle()).WillRepeatedly(Return(true));
+    grid_.first()->idle_cb_();
     EXPECT_TRUE(drain_received);
-    EXPECT_TRUE(second_drain_received);
   }
+}
+
+// Make sure idle callbacks work as expected.
+TEST_F(ConnectivityGridTest, IdleCallbacks) {
+  // Synthetically create both pools.
+  grid_.createNextPool();
+  grid_.createNextPool();
+
+  bool idle_received = false;
+
+  grid_.addIdleCallback([&]() { idle_received = true; });
+  EXPECT_FALSE(idle_received);
+
+  // Notify the grid the second pool is idle. This should not be
+  // passed up to the original callers.
+  EXPECT_CALL(*grid_.second(), isIdle()).WillOnce(Return(true));
+  EXPECT_CALL(*grid_.first(), isIdle()).WillOnce(Return(false));
+  grid_.second()->idle_cb_();
+  EXPECT_FALSE(idle_received);
+
+  // Notify the grid that the first pool is idle, the but second no longer is.
+  EXPECT_CALL(*grid_.first(), isIdle()).WillOnce(Return(true));
+  EXPECT_CALL(*grid_.second(), isIdle()).WillOnce(Return(false));
+  grid_.first()->idle_cb_();
+  EXPECT_FALSE(idle_received);
+
+  // Notify the grid that both are now idle. This should be passed up
+  // to the original caller.
+  EXPECT_CALL(*grid_.first(), isIdle()).WillOnce(Return(true));
+  EXPECT_CALL(*grid_.second(), isIdle()).WillOnce(Return(true));
+  grid_.first()->idle_cb_();
+  EXPECT_TRUE(idle_received);
 }
 
 // Ensure drain callbacks aren't called during grid teardown.
@@ -445,16 +478,14 @@ TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
   grid_.createNextPool();
 
   bool drain_received = false;
-  ConnectionPool::Instance::DrainedCb pool1_cb;
 
   {
-    EXPECT_CALL(*grid_.first(), addDrainedCallback(_))
-        .WillOnce(Invoke(Invoke([&](ConnectionPool::Instance::DrainedCb cb) { pool1_cb = cb; })));
-    grid_.addDrainedCallback([&drain_received]() -> void { drain_received = true; });
+    grid_.addIdleCallback([&drain_received]() -> void { drain_received = true; });
+    grid_.startDrain();
   }
 
   grid_.setDestroying(); // Fake being in the destructor.
-  (pool1_cb)();
+  grid_.first()->idle_cb_();
   EXPECT_FALSE(drain_received);
 }
 
@@ -620,10 +651,11 @@ TEST_F(ConnectivityGridTest, RealGrid) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
-      simTime(), alternate_protocols_, std::chrono::milliseconds(300), options_);
+  ConnectivityGrid grid(dispatcher_, random_,
+                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+                        Upstream::ResourcePriority::Default, socket_options_,
+                        transport_socket_options_, state_, simTime(), alternate_protocols_,
+                        std::chrono::milliseconds(300), options_, quic_stat_names_, store_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);

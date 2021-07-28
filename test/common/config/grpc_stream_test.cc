@@ -8,6 +8,8 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -38,6 +40,7 @@ protected:
   NiceMock<MockGrpcStreamCallbacks> callbacks_;
   std::unique_ptr<Grpc::MockAsyncClient> async_client_owner_;
   Grpc::MockAsyncClient* async_client_;
+  Event::SimulatedTimeSystem time_system_;
 
   GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
              envoy::service::discovery::v3::DiscoveryResponse>
@@ -70,6 +73,96 @@ TEST_F(GrpcStreamTest, EstablishStream) {
     EXPECT_CALL(callbacks_, onStreamEstablished());
     grpc_stream_.establishNewStream();
     EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
+  }
+}
+
+// Tests reducing log level depending on remote close status.
+TEST_F(GrpcStreamTest, LogClose) {
+  // Failures with statuses that do not need special handling. They are always logged in the same
+  // way and so never saved.
+  {
+    EXPECT_FALSE(grpc_stream_.getCloseStatus().has_value());
+
+    // Benign status: debug.
+    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_LOG_CONTAINS("debug", "gRPC config stream closed", {
+      grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Ok, "Ok");
+    });
+    EXPECT_FALSE(grpc_stream_.getCloseStatus().has_value());
+
+    // Non-retriable failure: warn.
+    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_LOG_CONTAINS("warn", "gRPC config stream closed", {
+      grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::NotFound, "Not Found");
+    });
+    EXPECT_FALSE(grpc_stream_.getCloseStatus().has_value());
+  }
+  // Repeated failures that warn after enough time.
+  {
+    // Retriable failure: debug.
+    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_LOG_CONTAINS("debug", "gRPC config stream closed", {
+      grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Unavailable, "Unavailable");
+    });
+    EXPECT_EQ(grpc_stream_.getCloseStatus().value(),
+              Grpc::Status::WellKnownGrpcStatus::Unavailable);
+
+    // Different retriable failure: warn.
+    time_system_.advanceTimeWait(std::chrono::milliseconds(1000));
+    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_LOG_CONTAINS(
+        "warn", "stream closed: 4, Deadline Exceeded (previously 14, Unavailable since 1000ms ago)",
+        {
+          grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
+                                     "Deadline Exceeded");
+        });
+    EXPECT_EQ(grpc_stream_.getCloseStatus().value(),
+              Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
+
+    // Same retriable failure after a short amount of time: debug.
+    time_system_.advanceTimeWait(std::chrono::milliseconds(1000));
+    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_LOG_CONTAINS("debug", "gRPC config stream closed", {
+      grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
+                                 "Deadline Exceeded");
+    });
+    EXPECT_EQ(grpc_stream_.getCloseStatus().value(),
+              Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
+
+    // Same retriable failure after a long time: warn.
+    time_system_.advanceTimeWait(std::chrono::milliseconds(100000));
+    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_LOG_CONTAINS("warn", "gRPC config stream closed since 101000ms ago", {
+      grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
+                                 "Deadline Exceeded");
+    });
+    EXPECT_EQ(grpc_stream_.getCloseStatus().value(),
+              Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
+
+    // Warn again.
+    time_system_.advanceTimeWait(std::chrono::milliseconds(1000));
+    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_LOG_CONTAINS("warn", "gRPC config stream closed since 102000ms ago", {
+      grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
+                                 "Deadline Exceeded");
+    });
+    EXPECT_EQ(grpc_stream_.getCloseStatus().value(),
+              Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
+  }
+
+  // Successfully receiving a message clears close status.
+  {
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(callbacks_, onStreamEstablished());
+    grpc_stream_.establishNewStream();
+    EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
+    // Status isn't cleared yet.
+    EXPECT_EQ(grpc_stream_.getCloseStatus().value(),
+              Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
+
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+    grpc_stream_.onReceiveMessage(std::move(response));
+    EXPECT_FALSE(grpc_stream_.getCloseStatus().has_value());
   }
 }
 
