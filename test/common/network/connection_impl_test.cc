@@ -411,7 +411,7 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
   EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(3 * 1000), _));
   Stats::MockCounter timeout_counter;
   EXPECT_CALL(timeout_counter, inc());
-  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3), &timeout_counter);
+  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3), timeout_counter);
   EXPECT_CALL(*transport_socket, closeSocket(ConnectionEvent::LocalClose));
   mock_timer->invokeCallback();
   EXPECT_THAT(stream_info_.connectionTerminationDetails(),
@@ -433,7 +433,7 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeoutAfterConnect) {
   EXPECT_CALL(*mocks.dispatcher_, createTimer_(_)).Times(0);
   Stats::MockCounter timeout_counter;
   EXPECT_CALL(timeout_counter, inc()).Times(0);
-  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3), &timeout_counter);
+  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3), timeout_counter);
 
   server_connection->close(ConnectionCloseType::NoFlush);
 }
@@ -458,7 +458,7 @@ TEST_P(ConnectionImplTest, ServerTransportSocketTimeoutDisabledOnConnect) {
 
   Stats::MockCounter timeout_counter;
   EXPECT_CALL(timeout_counter, inc()).Times(0);
-  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3), &timeout_counter);
+  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3), timeout_counter);
 
   transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
   EXPECT_TRUE(timer_destroyed);

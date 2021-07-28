@@ -789,12 +789,12 @@ ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
                      connected) {}
 
 void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
-                                                            Stats::Counter* timeout_stat) {
+                                                            Stats::Counter& timeout_stat) {
   if (!transport_connect_pending_) {
     return;
   }
 
-  transport_socket_timeout_stat_ = timeout_stat;
+  transport_socket_timeout_stat_ = &timeout_stat;
   if (transport_socket_connect_timer_ == nullptr) {
     transport_socket_connect_timer_ =
         dispatcher_.createScaledTimer(Event::ScaledTimerType::TransportSocketConnectTimeout,
@@ -817,9 +817,7 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
 void ServerConnectionImpl::onTransportSocketConnectTimeout() {
   stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
   closeConnectionImmediately();
-  if (transport_socket_timeout_stat_ != nullptr) {
-    transport_socket_timeout_stat_->inc();
-  }
+  transport_socket_timeout_stat_->inc();
 }
 
 ClientConnectionImpl::ClientConnectionImpl(

@@ -218,7 +218,7 @@ public:
 
   // ServerConnection impl
   void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
-                                        Stats::Counter* timeout_stat) override;
+                                        Stats::Counter& timeout_stat) override;
   void raiseEvent(ConnectionEvent event) override;
 
 private:
