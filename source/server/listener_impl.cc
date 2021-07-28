@@ -193,7 +193,8 @@ ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
                       !config.stat_prefix().empty()
                           ? config.stat_prefix()
                           : Network::Address::resolveProtoAddress(config.address())->asString()))),
-      validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)) {}
+      validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)),
+      is_quic_(config.udp_listener_config().has_quic_options()) {}
 
 AccessLog::AccessLogManager& ListenerFactoryContextBaseImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -251,6 +252,7 @@ ListenerFactoryContextBaseImpl::getTransportSocketFactoryContext() const {
   return server_.transportSocketFactoryContext();
 }
 Stats::Scope& ListenerFactoryContextBaseImpl::listenerScope() { return *listener_scope_; }
+bool ListenerFactoryContextBaseImpl::isQuicListener() const { return is_quic_; }
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
 Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }
 
@@ -660,6 +662,9 @@ PerListenerFactoryContextImpl::getTransportSocketFactoryContext() const {
 }
 Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
   return listener_factory_context_base_->listenerScope();
+}
+bool PerListenerFactoryContextImpl::isQuicListener() const {
+  return listener_factory_context_base_->isQuicListener();
 }
 Init::Manager& PerListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 
