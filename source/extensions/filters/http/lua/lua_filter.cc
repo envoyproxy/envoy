@@ -11,7 +11,6 @@
 #include "source/common/config/datasource.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
-#include "source/common/router/config_impl.h"
 
 #include "absl/strings/escaping.h"
 
