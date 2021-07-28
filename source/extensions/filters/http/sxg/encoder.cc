@@ -18,6 +18,7 @@ namespace HttpFilters {
 namespace SXG {
 
 EncoderImpl::~EncoderImpl() {
+  sxg_signer_list_release(&signer_list_);
   sxg_header_release(&headers_);
   sxg_encoded_response_release(&encoded_response_);
 }
