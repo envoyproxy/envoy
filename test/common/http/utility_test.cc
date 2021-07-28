@@ -923,12 +923,12 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
-  EXPECT_CALL(*filter_callbacks.route_, traversePerFilterConfig(filter_name, _)).WillOnce(Invoke(
-    [&](const std::string&, std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-      cb(baseTestConfig);
-      cb(routeTestConfig);
-    }
-  ));
+  EXPECT_CALL(*filter_callbacks.route_, traversePerFilterConfig(filter_name, _))
+      .WillOnce(Invoke([&](const std::string&,
+                           std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+        cb(baseTestConfig);
+        cb(routeTestConfig);
+      }));
 
   // merge the configs
   auto merged_cfg = Utility::getMergedPerFilterConfig<TestConfig>(

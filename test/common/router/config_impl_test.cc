@@ -7531,7 +7531,7 @@ public:
   };
 
   void checkEach(const std::string& yaml, uint32_t expected_most_specific_config,
-                 absl::InlinedVector<uint32_t, 3> &expected_traveled_config) {
+                 absl::InlinedVector<uint32_t, 3>& expected_traveled_config) {
     const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
@@ -7540,11 +7540,11 @@ public:
     check(dynamic_cast<const DerivedFilterConfig*>(
               route->mostSpecificPerFilterConfig(factory_.name())),
           expected_most_specific_config, "most specific config");
-    route->traversePerFilterConfig(factory_.name(),
-      [&](const Router::RouteSpecificFilterConfig &cfg) {
-        auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(&cfg);
-        traveled_cfg.push_back(typed_cfg->config_.seconds());
-      });
+    route->traversePerFilterConfig(
+        factory_.name(), [&](const Router::RouteSpecificFilterConfig& cfg) {
+          auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(&cfg);
+          traveled_cfg.push_back(typed_cfg->config_.seconds());
+        });
     ASSERT_EQ(expected_traveled_config, traveled_cfg);
   }
 
@@ -7562,13 +7562,13 @@ public:
 
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
     absl::InlinedVector<uint32_t, 3> traveled_cfg;
-  
-    EXPECT_EQ(nullptr,  route->mostSpecificPerFilterConfig(factory_.name()));
-    route->traversePerFilterConfig(factory_.name(),
-      [&](const Router::RouteSpecificFilterConfig &cfg) {
-        auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(&cfg);
-        traveled_cfg.push_back(typed_cfg->config_.seconds());
-      });
+
+    EXPECT_EQ(nullptr, route->mostSpecificPerFilterConfig(factory_.name()));
+    route->traversePerFilterConfig(
+        factory_.name(), [&](const Router::RouteSpecificFilterConfig& cfg) {
+          auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(&cfg);
+          traveled_cfg.push_back(typed_cfg->config_.seconds());
+        });
     EXPECT_EQ(0, traveled_cfg.size());
   }
 

@@ -349,8 +349,8 @@ private:
       return nullptr;
     }
     void traversePerFilterConfig(
-      const std::string&,
-      std::function<void(const Router::RouteSpecificFilterConfig&)>) const override { }
+        const std::string&,
+        std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
 
     RouteEntryImpl route_entry_;
   };

@@ -132,7 +132,7 @@ public:
   }
   void traversePerFilterConfig(
       const std::string&,
-      std::function<void(const Router::RouteSpecificFilterConfig&)>) const override { }
+      std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
 
 private:
   static const SslRedirector SSL_REDIRECTOR;
@@ -747,8 +747,8 @@ private:
       return parent_->mostSpecificPerFilterConfig(name);
     }
     void traversePerFilterConfig(
-      const std::string& filter_name,
-      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override {
+        const std::string& filter_name,
+        std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override {
       parent_->traversePerFilterConfig(filter_name, cb);
     };
 
@@ -804,10 +804,10 @@ private:
       auto* config = per_filter_configs_.get(name);
       return config ? config : DynamicRouteEntry::mostSpecificPerFilterConfig(name);
     }
-  
+
     void traversePerFilterConfig(
-      const std::string& filter_name,
-      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
+        const std::string& filter_name,
+        std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
   private:
     const std::string runtime_key_;
