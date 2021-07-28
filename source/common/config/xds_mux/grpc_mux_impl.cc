@@ -146,11 +146,6 @@ ScopedResume GrpcMuxImpl<S, F, RQ, RS>::pause(const std::vector<std::string> typ
 }
 
 template <class S, class F, class RQ, class RS>
-bool GrpcMuxImpl<S, F, RQ, RS>::paused(const std::string& type_url) const {
-  return pausable_ack_queue_.paused(type_url);
-}
-
-template <class S, class F, class RQ, class RS>
 void GrpcMuxImpl<S, F, RQ, RS>::sendGrpcMessage(RQ& msg_proto, S& sub_state) {
   if (sub_state.dynamicContextChanged() || !anyRequestSentYetInCurrentStream() ||
       !skipSubsequentNode()) {

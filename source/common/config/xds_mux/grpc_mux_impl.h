@@ -69,7 +69,6 @@ public:
 
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
-  bool paused(const std::string& type_url) const override;
   void start() override;
   const absl::flat_hash_map<std::string, std::unique_ptr<S>>& subscriptions() const {
     return subscriptions_;
@@ -208,7 +207,6 @@ public:
   ScopedResume pause(const std::vector<std::string>) override {
     return std::make_unique<Cleanup>([]() {});
   }
-  bool paused(const std::string&) const override { return false; }
 
   void updateWatch(const std::string&, Watch*, const absl::flat_hash_set<std::string>&,
                    const SubscriptionOptions&) override;

@@ -76,10 +76,6 @@ public:
   // TODO(fredlas) remove this from the GrpcMux interface.
   void start() override;
 
-  bool paused(const std::string& type_url) const override {
-    return !pausable_ack_queue_.paused(type_url);
-  }
-
   GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
              envoy::service::discovery::v3::DeltaDiscoveryResponse>&
   grpcStreamForTest() {
