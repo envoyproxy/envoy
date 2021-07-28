@@ -28,6 +28,7 @@ final class ViewController: UITableViewController {
       .addNativeFilter(name: "envoy.filters.http.test_accessor", typedConfig: "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.test_accessor.TestAccessor\",\"accessor_name\":\"demo-accessor\",\"expected_string\":\"PlatformString\"}")
       .setOnEngineRunning { NSLog("Envoy async internal setup completed") }
       .addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
+      .setEventTracker { NSLog("Envoy event emitted: \($0)") }
       .build()
     self.streamClient = engine.streamClient()
     self.pulseClient = engine.pulseClient()
