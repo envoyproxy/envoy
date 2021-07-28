@@ -124,6 +124,14 @@ public:
         ->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
 
+  void shutdownMux() {
+    if (isUnifiedMuxTest()) {
+      dynamic_cast<XdsMux::GrpcMuxDelta*>(grpc_mux_.get())->shutdown();
+      return;
+    }
+    dynamic_cast<NewGrpcMuxImpl*>(grpc_mux_.get())->shutdown();
+  }
+
   // the code is duplicated here, but all calls other than the check in return statement, return
   // different types.
   bool subscriptionExists(const std::string& type_url) const {
@@ -544,6 +552,20 @@ TEST_P(NewGrpcMuxImplTest, RequestOnDemandUpdate) {
     // request.
     expectSendMessage("foo", {}, {"x", "y"});
   }
+}
+
+TEST_P(NewGrpcMuxImplTest, Shutdown) {
+  setup();
+  InSequence s;
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage("foo", {"x", "y"}, {});
+  grpc_mux_->start();
+
+  shutdownMux();
+  auto bar_sub = grpc_mux_->addWatch("bar", {"z"}, callbacks_, resource_decoder_, {});
+  // We do not expect any messages to be sent here as the mux has been shutdown
+  // There won't be any unsubscribe messages for the legacy mux either for the same reason
 }
 
 } // namespace
