@@ -83,7 +83,7 @@ class BufWrapper(ProtoBreakingChangeDetector):
             ' '.join([buf_path, f"build -o {Path(temp_dir.name, BUF_LOCK_FILE)}", *buf_args]))
         initial_out, initial_err = ''.join(initial_out), ''.join(initial_err)
 
-        if len(initial_out) > 0 or len(initial_err) > 0:
+        if initial_code != 0 or len(initial_out) > 0 or len(initial_err) > 0:
             raise ChangeDetectorInitializeError("Unexpected error during init")
 
         lock_location = Path(temp_dir.name, BUF_LOCK_FILE)
@@ -99,7 +99,7 @@ class BufWrapper(ProtoBreakingChangeDetector):
 
         # new with buf: lock must be manually re-built
         # but here we only re-build if there weren't any detected breaking changes
-        if len(final_out) == len(final_err) == 0:
+        if len(final_out) == len(final_err) == final_code == 0:
             _, _, _ = run_command(
                 ' '.join([buf_path, f"build -o {Path(temp_dir.name, BUF_LOCK_FILE)}", *buf_args]))
         with open(lock_location) as f:
@@ -114,13 +114,14 @@ class BufWrapper(ProtoBreakingChangeDetector):
     def is_breaking(path_to_before, path_to_after, additional_args=None):
         _, final_result, _, _ = BufWrapper._run_buf(path_to_before, path_to_after, additional_args)
 
-        _, final_out, final_err = final_result
+        final_code, final_out, final_err = final_result
 
         # Ways buf output could be indicative of a breaking change:
-        # 1) stdout/stderr is nonempty
-        # 2) stdout/stderr contains "Failure"
+        # 1) run_command code is not 0 (e.g. it's 100)
+        # 2) stdout/stderr is nonempty
+        # 3) stdout/stderr contains "Failure"
         break_condition = lambda inp: len(inp) > 0 or bool(re.match(r"Failure", inp))
-        return break_condition(final_out) or break_condition(final_err)
+        return final_code != 0 or break_condition(final_out) or break_condition(final_err)
 
     @staticmethod
     def lock_file_changed(path_to_before, path_to_after, additional_args=None):
