@@ -6,6 +6,17 @@ from shutil import copyfile
 import re
 from pathlib import Path
 import os
+"""
+This tool is used to detect "breaking changes" in protobuf files, to ensure proper backwards-compatibility in protobuf API updates.
+The tool can check for breaking changes of a single API by taking 2 .proto file paths as input (before and after) and outputting a bool `is_breaking`.
+
+The breaking change detector creates a temporary directory, copies in each file to compute a protobuf "state",
+computes a diff of the "before" and "after" states, and runs the diff against a set of rules to determine if there was a breaking change.
+
+The tool is currently implemented with buf (https://buf.build/)
+
+In future iterations the tool will support the comparison of multiple files, by taking git commits as input and evaluating the diff against the ruleset
+"""
 
 
 # generic breaking change detector for protos, extended by a wrapper class for a breaking change detector
