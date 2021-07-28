@@ -66,7 +66,7 @@ class HeaderValidator {
 public:
   virtual ~HeaderValidator() = default;
   virtual Http::HeaderUtility::HeaderValidationResult
-  validateHeader(const std::string& header_name, absl::string_view header_value) = 0;
+  validateHeader(absl::string_view name, absl::string_view header_value) = 0;
 };
 
 // The returned header map has all keys in lower case.
@@ -106,7 +106,9 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
 
 template <class T>
 std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block,
-                                                 uint32_t max_headers_allowed) {
+                                                 uint32_t max_headers_allowed,
+                                                 HeaderValidator& validator,
+                                                 absl::string_view& details) {
   auto headers = T::create();
   if (header_block.size() > max_headers_allowed) {
     return nullptr;
@@ -118,10 +120,21 @@ std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& he
     std::vector<absl::string_view> values = absl::StrSplit(entry.second, '\0');
     for (const absl::string_view& value : values) {
       if (max_headers_allowed == 0) {
+        details = Http3ResponseCodeDetailValues::invalid_http_header;
         return nullptr;
       }
       max_headers_allowed--;
-      headers->addCopy(Http::LowerCaseString(key), value);
+      Http::HeaderUtility::HeaderValidationResult result =
+          validator.validateHeader(entry.first, value);
+      switch (result) {
+      case Http::HeaderUtility::HeaderValidationResult::REJECT:
+        // The validator sets the details to Http3ResponseCodeDetailValues::invalid_underscore
+        return nullptr;
+      case Http::HeaderUtility::HeaderValidationResult::DROP:
+        continue;
+      case Http::HeaderUtility::HeaderValidationResult::ACCEPT:
+        headers->addCopy(Http::LowerCaseString(key), value);
+      }
     }
   }
   return headers;

@@ -1817,4 +1817,21 @@ TEST_P(Http2IntegrationTest, OnLocalReply) {
   }
 }
 
+TEST_P(Http2IntegrationTest, InvalidTrailers) {
+  autonomous_upstream_ = true;
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto response = std::move(encoder_decoder.second);
+  request_encoder_ = &encoder_decoder.first;
+
+  std::string value = std::string(1, 2);
+  EXPECT_FALSE(Http::HeaderUtility::headerValueIsValid(value));
+  codec_client_->sendTrailers(*request_encoder_,
+                              Http::TestRequestTrailerMapImpl{{"trailer", value}});
+  ASSERT_TRUE(response->waitForReset());
+}
+
 } // namespace Envoy
