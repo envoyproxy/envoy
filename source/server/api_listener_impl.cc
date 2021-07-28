@@ -32,13 +32,28 @@ void ApiListenerImplBase::SyntheticReadCallbacks::SyntheticConnection::raiseConn
 HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& config,
                                  ListenerManagerImpl& parent, const std::string& name)
     : ApiListenerImplBase(config, parent, name) {
-  auto typed_config = MessageUtil::anyConvertAndValidate<
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
-      config.api_listener().api_listener(), factory_context_.messageValidationVisitor());
+  if (config.api_listener().api_listener().type_url() ==
+      absl::StrCat("type.googleapis.com/",
+                   envoy::extensions::filters::network::http_connection_manager::v3::
+                       EnvoyMobileHttpConnectionManager::descriptor()
+                           ->full_name())) {
+    auto typed_config = MessageUtil::anyConvertAndValidate<
+        envoy::extensions::filters::network::http_connection_manager::v3::
+            EnvoyMobileHttpConnectionManager>(config.api_listener().api_listener(),
+                                              factory_context_.messageValidationVisitor());
 
-  http_connection_manager_factory_ = Envoy::Extensions::NetworkFilters::HttpConnectionManager::
-      HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
-          typed_config, factory_context_, read_callbacks_);
+    http_connection_manager_factory_ = Envoy::Extensions::NetworkFilters::HttpConnectionManager::
+        HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
+            typed_config.config(), factory_context_, read_callbacks_, false);
+  } else {
+    auto typed_config = MessageUtil::anyConvertAndValidate<
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
+        config.api_listener().api_listener(), factory_context_.messageValidationVisitor());
+
+    http_connection_manager_factory_ = Envoy::Extensions::NetworkFilters::HttpConnectionManager::
+        HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
+            typed_config, factory_context_, read_callbacks_, true);
+  }
 }
 
 Http::ApiListenerOptRef HttpApiListener::http() {

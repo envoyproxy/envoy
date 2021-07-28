@@ -71,8 +71,11 @@ actions:
 
 static Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
                                                  const std::string& method) {
-  return Http::TestRequestHeaderMapImpl{
-      {":authority", host}, {":path", path}, {":method", method}, {"x-forwarded-proto", "http"}};
+  return Http::TestRequestHeaderMapImpl{{":authority", host},
+                                        {":path", path},
+                                        {":method", method},
+                                        {"x-forwarded-proto", "http"},
+                                        {":scheme", "http"}};
 }
 
 class RateLimitConfiguration : public testing::Test {

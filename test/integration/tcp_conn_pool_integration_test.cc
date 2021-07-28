@@ -109,11 +109,34 @@ public:
 
 } // namespace
 
-class TcpConnPoolIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+struct TcpConnPoolIntegrationTestParams {
+  Network::Address::IpVersion version;
+  bool test_original_version;
+};
+
+std::vector<TcpConnPoolIntegrationTestParams> getProtocolTestParams() {
+  std::vector<TcpConnPoolIntegrationTestParams> ret;
+
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    ret.push_back(TcpConnPoolIntegrationTestParams{ip_version, true});
+    ret.push_back(TcpConnPoolIntegrationTestParams{ip_version, false});
+  }
+  return ret;
+}
+
+std::string protocolTestParamsToString(
+    const ::testing::TestParamInfo<TcpConnPoolIntegrationTestParams>& params) {
+  return absl::StrCat(
+      (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+      (params.param.test_original_version == true ? "OriginalConnPool" : "NewConnPool"));
+}
+
+class TcpConnPoolIntegrationTest : public testing::TestWithParam<TcpConnPoolIntegrationTestParams>,
                                    public BaseIntegrationTest {
 public:
   TcpConnPoolIntegrationTest()
-      : BaseIntegrationTest(GetParam(), tcp_conn_pool_config), filter_resolver_(config_factory_) {}
+      : BaseIntegrationTest(GetParam().version, tcp_conn_pool_config),
+        filter_resolver_(config_factory_) {}
 
   // Called once by the gtest framework before any tests are run.
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
@@ -126,7 +149,15 @@ public:
   }
 
   // Initializer for individual tests.
-  void SetUp() override { BaseIntegrationTest::initialize(); }
+  void SetUp() override {
+    if (GetParam().test_original_version) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool",
+                                        "false");
+    } else {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool",
+                                        "true");
+    }
+  }
 
 private:
   TestFilterConfigFactory config_factory_;
@@ -134,10 +165,11 @@ private:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpConnPoolIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
 
 TEST_P(TcpConnPoolIntegrationTest, SingleRequest) {
+  initialize();
+
   std::string request("request");
   std::string response("response");
 
@@ -154,6 +186,8 @@ TEST_P(TcpConnPoolIntegrationTest, SingleRequest) {
 }
 
 TEST_P(TcpConnPoolIntegrationTest, MultipleRequests) {
+  initialize();
+
   std::string request1("request1");
   std::string request2("request2");
   std::string response1("response1");
@@ -185,6 +219,96 @@ TEST_P(TcpConnPoolIntegrationTest, MultipleRequests) {
   tcp_client->waitForData(response1, false);
 
   tcp_client->close();
+}
+
+TEST_P(TcpConnPoolIntegrationTest, PoolCleanupEnabled) {
+  // The test first does two requests concurrently, resulting in a single pool (it is never idle
+  // between the first two), followed by going idle, then another request, which should create a
+  // second pool, which is why the log message is expected 2 times. If the initial pool was not
+  // cleaned up, only 1 pool would be created.
+  EXPECT_LOG_CONTAINS_N_TIMES("debug", "Allocating TCP conn pool", 2, {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.conn_pool_delete_when_idle",
+                                      "true");
+    initialize();
+
+    std::string request1("request1");
+    std::string request2("request2");
+    std::string request3("request3");
+    std::string response1("response1");
+    std::string response2("response2");
+    std::string response3("response3");
+
+    IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+
+    // Send request 1.
+    ASSERT_TRUE(tcp_client->write(request1));
+    FakeRawConnectionPtr fake_upstream_connection1;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection1));
+    std::string data;
+    ASSERT_TRUE(fake_upstream_connection1->waitForData(request1.size(), &data));
+    EXPECT_EQ(request1, data);
+
+    // Send request 2.
+    ASSERT_TRUE(tcp_client->write(request2));
+    FakeRawConnectionPtr fake_upstream_connection2;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+    ASSERT_TRUE(fake_upstream_connection2->waitForData(request2.size(), &data));
+    EXPECT_EQ(request2, data);
+
+    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 2);
+
+    // Send response 2.
+    ASSERT_TRUE(fake_upstream_connection2->write(response2));
+    ASSERT_TRUE(fake_upstream_connection2->close());
+    tcp_client->waitForData(response2);
+
+    // Send response 1.
+    ASSERT_TRUE(fake_upstream_connection1->write(response1));
+    ASSERT_TRUE(fake_upstream_connection1->close());
+    tcp_client->waitForData(response1, false);
+    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+
+    // After both requests were completed, the pool went idle and was cleaned up. Request 3 causes a
+    // new pool to be created. Seeing a new pool created is a proxy for directly observing that an
+    // old pool was cleaned up.
+    //
+    // TODO(ggreenway): if pool circuit breakers are implemented for tcp pools, verify cleanup by
+    // looking at stats such as `cluster.cluster_0.circuit_breakers.default.cx_pool_open`.
+
+    // Send request 3.
+    ASSERT_TRUE(tcp_client->write(request3));
+    FakeRawConnectionPtr fake_upstream_connection3;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection3));
+    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
+    ASSERT_TRUE(fake_upstream_connection3->waitForData(request3.size(), &data));
+    EXPECT_EQ(request3, data);
+
+    ASSERT_TRUE(fake_upstream_connection3->write(response3));
+    ASSERT_TRUE(fake_upstream_connection3->close());
+    tcp_client->waitForData(response3, false);
+
+    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+
+    tcp_client->close();
+  });
+}
+
+TEST_P(TcpConnPoolIntegrationTest, ShutdownWithOpenConnections) {
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+
+  // Establish downstream and upstream connections.
+  ASSERT_TRUE(tcp_client->write("hello"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  test_server_.reset();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForDisconnect();
+
+  // Success criteria is that no ASSERTs fire and there are no leaks.
 }
 
 } // namespace Envoy
