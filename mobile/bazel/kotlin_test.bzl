@@ -2,15 +2,15 @@ load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library", "kt_jvm_
 load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
 load("//bazel:kotlin_lib.bzl", "native_lib_name")
 
-def _internal_kt_test(name, srcs, deps = [], data = [], jvm_flags = []):
+def _internal_kt_test(name, srcs, deps = [], data = [], jvm_flags = [], repository = ""):
     # This is to work around the issue where we have specific implementation functionality which
     # we want to avoid consumers to use but we want to unit test
     dep_srcs = []
     for dep in deps:
         # We'll resolve only the targets in `//library/kotlin/io/envoyproxy/envoymobile`
-        if dep.startswith("//library/kotlin/io/envoyproxy/envoymobile"):
+        if dep.startswith(repository + "//library/kotlin/io/envoyproxy/envoymobile"):
             dep_srcs.append(dep + "_srcs")
-        elif dep.startswith("//library/java/io/envoyproxy/envoymobile"):
+        elif dep.startswith(repository + "//library/java/io/envoyproxy/envoymobile"):
             dep_srcs.append(dep + "_srcs")
 
     kt_jvm_test(
@@ -18,7 +18,7 @@ def _internal_kt_test(name, srcs, deps = [], data = [], jvm_flags = []):
         test_class = "io.envoyproxy.envoymobile.bazel.EnvoyMobileTestSuite",
         srcs = srcs + dep_srcs,
         deps = [
-            "//bazel:envoy_mobile_test_suite",
+            repository + "//bazel:envoy_mobile_test_suite",
             "@maven//:org_assertj_assertj_core",
             "@maven//:junit_junit",
             "@maven//:org_mockito_mockito_inline",
@@ -30,7 +30,7 @@ def _internal_kt_test(name, srcs, deps = [], data = [], jvm_flags = []):
 
 # A basic macro to make it easier to declare and run kotlin tests which depend on a JNI lib
 # This will create the native .so binary (for linux) and a .jnilib (for OS X) look up
-def envoy_mobile_jni_kt_test(name, srcs, native_deps = [], deps = []):
+def envoy_mobile_jni_kt_test(name, srcs, native_deps = [], deps = [], library_path = "library/common/jni", repository = ""):
     lib_name = native_lib_name(native_deps[0])[3:]
     _internal_kt_test(
         name,
@@ -38,9 +38,10 @@ def envoy_mobile_jni_kt_test(name, srcs, native_deps = [], deps = []):
         deps,
         data = native_deps,
         jvm_flags = [
-            "-Djava.library.path=library/common/jni",
+            "-Djava.library.path={}".format(library_path),
             "-Denvoy_jni_library_name={}".format(lib_name),
         ],
+        repository = repository,
     )
 
 # A basic macro to make it easier to declare and run kotlin tests
@@ -59,11 +60,11 @@ def envoy_mobile_jni_kt_test(name, srcs, native_deps = [], deps = []):
 #         "ExampleTest.kt",
 #     ],
 # )
-def envoy_mobile_kt_test(name, srcs, deps = []):
-    _internal_kt_test(name, srcs, deps)
+def envoy_mobile_kt_test(name, srcs, deps = [], repository = ""):
+    _internal_kt_test(name, srcs, deps, repository = repository)
 
 # A basic macro to run android based (robolectric) tests with native dependencies
-def envoy_mobile_android_test(name, srcs, deps = [], native_deps = []):
+def envoy_mobile_android_test(name, srcs, deps = [], native_deps = [], repository = ""):
     lib_name = native_lib_name(native_deps[0])[3:]
     native.android_library(
         name = name + "_test_lib",
@@ -79,7 +80,7 @@ def envoy_mobile_android_test(name, srcs, deps = [], native_deps = []):
         srcs = srcs,
         data = native_deps,
         deps = deps + [
-            "//bazel:envoy_mobile_test_suite",
+            repository + "//bazel:envoy_mobile_test_suite",
             "@maven//:androidx_annotation_annotation",
             "@maven//:androidx_test_core",
             "@maven//:androidx_test_ext_junit",
@@ -98,7 +99,7 @@ def envoy_mobile_android_test(name, srcs, deps = [], native_deps = []):
             "@maven//:org_hamcrest_hamcrest",
             "@maven//:com_google_truth_truth",
         ],
-        manifest = "//bazel:test_manifest.xml",
+        manifest = repository + "//bazel:test_manifest.xml",
         custom_package = "io.envoyproxy.envoymobile.tests",
         test_class = "io.envoyproxy.envoymobile.bazel.EnvoyMobileTestSuite",
         jvm_flags = [
