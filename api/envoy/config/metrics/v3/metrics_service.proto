@@ -22,11 +22,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <envoy_v3_api_msg_config.metrics.v3.StatsSink>`. This opaque configuration will be used to create
 // Metrics Service.
 //
-// For example, with the following configurations (in YAML):
+// Example:
 //
 // MetricsService Config
 //
-// .. code::
+// .. code-block:: yaml
 //
 //   ...
 //  stats_sinks:
@@ -34,9 +34,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //      typed_config:
 //        "@type": type.googleapis.com/envoy.config.metrics.v3.MetricsServiceConfig
 //        transport_api_version: V3
-//        grpc_service:
-//          envoy_grpc:
-//            cluster_name: ...
 //
 // [#extension: envoy.stat_sinks.metrics_service]
 message MetricsServiceConfig {
