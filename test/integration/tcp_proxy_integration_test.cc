@@ -419,7 +419,8 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
         "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% "
-        "sent=%BYTES_SENT% received=%BYTES_RECEIVED%\n");
+        "bytes_sent=%BYTES_SENT% bytes_received=%BYTES_RECEIVED% wire_bytes_sent=%WIRE_BYTES_SENT% "
+        "wire_bytes_received=%WIRE_BYTES_RECEIVED%\n");
     access_log->mutable_typed_config()->PackFrom(access_log_config);
     auto* runtime_filter = access_log->mutable_filter()->mutable_runtime_filter();
     runtime_filter->set_runtime_key("unused-key");
@@ -466,10 +467,10 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
 
   // Test that all three addresses were populated correctly. Only check the first line of
   // log output for simplicity.
-  EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format(
-                  "upstreamlocal={0} upstreamhost={0} downstream={1} sent=5 received=0\r?\n.*",
-                  ip_port_regex, ip_regex)));
+  EXPECT_THAT(log_result, MatchesRegex(fmt::format(
+                              "upstreamlocal={0} upstreamhost={0} downstream={1} bytes_sent=5 "
+                              "bytes_received=0 wire_bytes_sent=0 wire_bytes_received=0\r?\n.*",
+                              ip_port_regex, ip_regex)));
 }
 
 // Test that the server shuts down without crashing when connections are open.

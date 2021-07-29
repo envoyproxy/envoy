@@ -390,10 +390,16 @@ public:
    */
   virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
 
+  /**
+   * The number of wire bytes encoded by this stream.
+   */
   virtual uint64_t sentBytes() PURE;
 
   virtual void updateSentBytes(size_t newly_sent_bytes) PURE;
 
+  /**
+   * The number of wire bytes decoded by this stream.
+   */
   virtual uint64_t receivedBytes() PURE;
 
   virtual void updateReceivedBytes(size_t newly_received_bytes) PURE;

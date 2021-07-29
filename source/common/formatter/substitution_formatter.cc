@@ -716,7 +716,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "BYTES_RECEIVED") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesReceived(); });
-  } else if (field_name == "PROTOCOL") {
+  }else if (field_name == "WIRE_BYTES_RECEIVED") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) { return stream_info.wireBytesReceived(); });
+  } 
+  else if (field_name == "PROTOCOL") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           return SubstitutionFormatUtils::protocolToString(stream_info.protocol());
@@ -739,6 +743,9 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "BYTES_SENT") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesSent(); });
+  } else if (field_name == "WIRE_BYTES_SENT") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) { return stream_info.wireBytesSent(); });
   } else if (field_name == "DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) { return stream_info.requestComplete(); });

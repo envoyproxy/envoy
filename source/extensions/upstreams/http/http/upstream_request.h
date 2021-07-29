@@ -80,7 +80,7 @@ public:
   void readDisable(bool disable) override { request_encoder_->getStream().readDisable(disable); }
 
   void resetStream() override {
-    ::Envoy::Http::Stream& stream = request_encoder_->getStream();
+    auto& stream = request_encoder_->getStream();
     stream.removeCallbacks(*this);
     stream.resetStream(Envoy::Http::StreamResetReason::LocalReset);
   }
@@ -107,7 +107,7 @@ public:
     if (!request_encoder_) {
       return;
     }
-    ::Envoy::Http::Stream& stream = request_encoder_->getStream();
+    auto& stream = request_encoder_->getStream();
     stream_info.setWireBytesReceived(stream.receivedBytes());
     stream_info.setWireBytesSent(stream.sentBytes());
   }
