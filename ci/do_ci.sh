@@ -144,8 +144,7 @@ function bazel_binary_build() {
 }
 
 function run_process_test_result() {
-  [[ -n "$CI_SKIP_PROCESS_TEST_RESULTS" ]] && return 
-  if [[ $(find "$TEST_TMPDIR" -name "*_attempt.xml" 2> /dev/null) ]]; then
+  if [[ -z "$CI_SKIP_PROCESS_TEST_RESULTS" ]] && [[ $(find "$TEST_TMPDIR" -name "*_attempt.xml" 2> /dev/null) ]]; then
       echo "running flaky test reporting script"
       "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
   else
