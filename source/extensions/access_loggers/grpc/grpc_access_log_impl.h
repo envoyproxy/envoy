@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
@@ -25,12 +26,16 @@ public:
   using ResponseType = envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse;
 
   CriticalAccessLoggerGrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& client,
-                                     const Protobuf::MethodDescriptor& method)
-      : CriticalAccessLoggerGrpcClientImpl(client, method, absl::nullopt) {}
+                                     const Protobuf::MethodDescriptor& method,
+                                     Event::Dispatcher& dispatcher, uint64_t message_ack_timeout)
+      : CriticalAccessLoggerGrpcClientImpl(client, method, dispatcher, message_ack_timeout,
+                                           absl::nullopt) {}
   CriticalAccessLoggerGrpcClientImpl(
       const Grpc::RawAsyncClientSharedPtr& client, const Protobuf::MethodDescriptor& method,
+      Event::Dispatcher& dispatcher, uint64_t message_ack_timeout,
       absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version)
-      : client_(client), service_method_(method), transport_api_version_(transport_api_version) {}
+      : client_(client), service_method_(method), dispatcher_(dispatcher),
+        message_ack_timeout_(message_ack_timeout), transport_api_version_(transport_api_version) {}
 
   struct BufferedMessage {
     enum class State {
@@ -38,6 +43,7 @@ public:
       Pending,
     };
 
+    Event::TimerPtr timer_;
     State state_{State::Initial};
     RequestType message_;
   };
@@ -52,6 +58,11 @@ public:
       const auto& id = message->id();
 
       if (parent_.buffered_messages_.find(id) != parent_.buffered_messages_.end()) {
+        // After response wait time exceeded, the state should be Initial.
+        if (parent_.buffered_messages_.at(id).state_ != BufferedMessage::State::Pending) {
+          return;
+        }
+
         switch (message->status()) {
         case envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::ACK:
           parent_.buffered_messages_.erase(id);
@@ -96,15 +107,22 @@ public:
     }
 
     uint32_t id = MessageUtil::hash(message);
-    buffered_messages_[id] = BufferedMessage{BufferedMessage::State::Initial, message};
+    buffered_messages_[id] = BufferedMessage{nullptr, BufferedMessage::State::Initial, message};
 
     for (auto&& buffered_message : buffered_messages_) {
       uint32_t id = buffered_message.first;
       buffered_message.second.message_.set_id(id);
       buffered_message.second.state_ = BufferedMessage::State::Pending;
 
-      // TODO(shikugawa): stream must be ended with response withing specified timeout,
-      // that must be defined to setup duration after last message transported.
+      buffered_message.second.timer_ = dispatcher_.createTimer([&buffered_message]() {
+        if (buffered_message.second.state_ == BufferedMessage::State::Pending) {
+          buffered_message.second.state_ = BufferedMessage::State::Initial;
+          buffered_message.second.timer_->disableTimer();
+          buffered_message.second.timer_.reset();
+        }
+      });
+      buffered_message.second.timer_->enableTimer(message_ack_timeout_);
+
       if (transport_api_version_.has_value()) {
         active_stream_->stream_->sendMessage(buffered_message.second.message_,
                                              transport_api_version_.value(), false);
@@ -125,6 +143,8 @@ private:
   std::unique_ptr<ActiveStream> active_stream_;
   Grpc::AsyncClient<RequestType, ResponseType> client_;
   const Protobuf::MethodDescriptor& service_method_;
+  Event::Dispatcher& dispatcher_;
+  std::chrono::milliseconds message_ack_timeout_;
   const absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version_;
 };
 
@@ -134,11 +154,12 @@ class GrpcAccessLoggerImpl
                                       envoy::service::accesslog::v3::StreamAccessLogsMessage,
                                       envoy::service::accesslog::v3::StreamAccessLogsResponse> {
 public:
-  GrpcAccessLoggerImpl(const Grpc::RawAsyncClientSharedPtr& client, std::string log_name,
-                       std::chrono::milliseconds buffer_flush_interval_msec,
-                       uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
-                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                       envoy::config::core::v3::ApiVersion transport_api_version);
+  GrpcAccessLoggerImpl(
+      const Grpc::RawAsyncClientSharedPtr& client,
+      const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+      std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
+      Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+      envoy::config::core::v3::ApiVersion transport_api_version);
 
 private:
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger

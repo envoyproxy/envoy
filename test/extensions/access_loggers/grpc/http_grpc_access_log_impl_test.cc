@@ -71,8 +71,8 @@ public:
               EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;
             });
-    access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,
-                                                      logger_cache_, scope_, factory_context_);
+    access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_,
+                                                      logger_cache_, factory_context_);
   }
 
   void expectLog(const std::string& expected_log_entry_yaml) {

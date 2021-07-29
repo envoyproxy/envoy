@@ -28,10 +28,11 @@ HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(
 HttpGrpcAccessLog::HttpGrpcAccessLog(
     AccessLog::FilterPtr&& filter,
     envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config,
-    ThreadLocal::SlotAllocator& tls, GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-    Stats::Scope& scope, Server::Configuration::CommonFactoryContext& context)
-    : Common::ImplBase(std::move(filter)), scope_(scope), config_(std::move(config)),
-      tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
+    GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+    Server::Configuration::CommonFactoryContext& context)
+    : Common::ImplBase(std::move(filter)), scope_(context.scope()), config_(std::move(config)),
+      tls_slot_(context.threadLocal().allocateSlot()),
+      access_logger_cache_(std::move(access_logger_cache)) {
   for (const auto& header : config_.additional_request_headers_to_log()) {
     request_headers_to_log_.emplace_back(header);
   }
@@ -50,9 +51,9 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
         config_.common_config(), transport_version, Common::GrpcAccessLoggerType::HTTP, scope_));
   });
 
-  if (config.has_common_config() && config.common_config().has_buffer_log_filter()) {
+  if (config_.has_common_config() && config_.common_config().has_buffer_log_filter()) {
     critical_log_filter_ = AccessLog::FilterFactory::fromProto(
-        config.common_config().buffer_log_filter(), context.runtime(),
+        config_.common_config().buffer_log_filter(), context.runtime(),
         context.api().randomGenerator(), context.messageValidationVisitor());
   }
 }

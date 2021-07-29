@@ -28,9 +28,8 @@ class HttpGrpcAccessLog : public Common::ImplBase {
 public:
   HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
                     envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config,
-                    ThreadLocal::SlotAllocator& tls,
                     GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-                    Stats::Scope& scope, Server::Configuration::CommonFactoryContext& context);
+                    Server::Configuration::CommonFactoryContext& context);
 
 private:
   /**

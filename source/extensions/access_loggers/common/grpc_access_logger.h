@@ -1,16 +1,11 @@
 #pragma once
 
-#include <bits/stdint-uintn.h>
-
 #include <memory>
-#include <string>
 
-// TODO(shikugagwa): extensions should not be placed here
-#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
-#include "envoy/service/accesslog/v3/als.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/async_client_manager.h"
+#include "envoy/service/accesslog/v3/als.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
