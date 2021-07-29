@@ -53,6 +53,8 @@ jobs:
       - env:
           CREDENTIALS: ${{ secrets.ENGFLOW_CREDENTIALS }}
         run: |
+          echo "Skipping for backend update"
+          exit 0
           if [[ -z $CREDENTIALS ]]; then echo "Empty CREDENTIALS"; exit 0; fi
           echo "$CREDENTIALS" > .credentials
           export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.credentials
