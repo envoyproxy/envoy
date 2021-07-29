@@ -28,11 +28,6 @@ def test_config_constructor(config_path):
 
     assert config._config_path == config_path
 
-    assert config.install_dir == "/tmp/install"
-    assert "install_dir" in config.__dict__
-    assert config.key_path == "/tmp/gpg/signing.key"
-    assert "key_path" in config.__dict__
-
 
 def test_config_dunder_getitem(patches):
     config = distrotest.DistroTestConfig(
@@ -103,16 +98,16 @@ def test_config_ctx_keyfile(patches):
     assert "ctx_keyfile" in config.__dict__
 
 
-def test_config_ctx_packages():
+def test_config_rel_ctx_packages():
     path = MagicMock()
     config = distrotest.DistroTestConfig(
         "DOCKER", path, "TARBALL", "KEYFILE", "TESTFILE", "MAINTAINER", "VERSION")
 
-    assert config.ctx_packages == path.joinpath.return_value
+    assert config.rel_ctx_packages == path.joinpath.return_value
     assert (
         list(path.joinpath.call_args)
         == [(config.packages_name, ), {}])
-    assert "ctx_packages" in config.__dict__
+    assert "rel_ctx_packages" in config.__dict__
 
 
 def test_config_ctx_testfile():
@@ -153,6 +148,22 @@ def test_config_images(patches, items):
     assert "images" in config.__dict__
 
 
+def test_config_install_img_path(patches):
+    config = distrotest.DistroTestConfig(
+        "DOCKER", "PATH", "TARBALL", "INSTALL", "INSTALL", "MAINTAINER", "VERSION")
+    patched = patches(
+        "pathlib",
+        prefix="tools.distribution.distrotest")
+
+    with patched as (m_plib, ):
+        assert config.install_img_path == m_plib.PurePosixPath.return_value
+
+    assert (
+        list(m_plib.PurePosixPath.call_args)
+        == [("/tmp/install",), {}])
+    assert "install_img_path" in config.__dict__
+
+
 def test_config_keyfile(patches):
     config = distrotest.DistroTestConfig(
         "DOCKER", "PATH", "TARBALL", "KEYFILE", "TESTFILE", "MAINTAINER", "VERSION")
@@ -170,12 +181,28 @@ def test_config_keyfile(patches):
     assert "keyfile" in config.__dict__
 
 
+def test_config_keyfile_img_path(patches):
+    config = distrotest.DistroTestConfig(
+        "DOCKER", "PATH", "TARBALL", "KEYFILE", "KEYFILE", "MAINTAINER", "VERSION")
+    patched = patches(
+        "pathlib",
+        prefix="tools.distribution.distrotest")
+
+    with patched as (m_plib, ):
+        assert config.keyfile_img_path == m_plib.PurePosixPath.return_value
+
+    assert (
+        list(m_plib.PurePosixPath.call_args)
+        == [("/tmp/gpg/signing.key",), {}])
+    assert "keyfile_img_path" in config.__dict__
+
+
 def test_config_packages_dir(patches):
     config = distrotest.DistroTestConfig(
         "DOCKER", "PATH", "TARBALL", "KEYFILE", "TESTFILE", "MAINTAINER", "VERSION")
     patched = patches(
         "utils",
-        ("DistroTestConfig.ctx_packages", dict(new_callable=PropertyMock)),
+        ("DistroTestConfig.rel_ctx_packages", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.distrotest")
 
     with patched as (m_utils, m_packages):
@@ -183,7 +210,7 @@ def test_config_packages_dir(patches):
 
     assert (
         list(m_utils.extract.call_args)
-        == [("TARBALL", m_packages.return_value,), {}])
+        == [(m_packages.return_value, "TARBALL"), {}])
     assert "packages_dir" in config.__dict__
 
 
@@ -204,16 +231,24 @@ def test_config_testfile(patches):
     assert "testfile" in config.__dict__
 
 
-def test_config_testfile_path(patches):
+def test_config_testfile_img_path(patches):
     config = distrotest.DistroTestConfig(
         "DOCKER", "PATH", "TARBALL", "KEYFILE", "TESTFILE", "MAINTAINER", "VERSION")
     patched = patches(
+        "pathlib",
         ("DistroTestConfig.testfile", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.distrotest")
 
-    with patched as (m_name, ):
-        assert config.testfile_path == f"/tmp/{m_name.return_value.name}"
-    assert "testfile_path" in config.__dict__
+    with patched as (m_plib, m_name):
+        assert config.testfile_img_path == m_plib.PurePosixPath.return_value.joinpath.return_value
+
+    assert (
+        list(m_plib.PurePosixPath.call_args)
+        == [("/tmp",), {}])
+    assert (
+        list(m_plib.PurePosixPath.return_value.joinpath.call_args)
+        == [(m_name.return_value.name,), {}])
+    assert "testfile_img_path" in config.__dict__
 
 
 # methods
@@ -349,13 +384,13 @@ def _check_image_config_property(patches, prop, arg=None):
     "prop",
     [("ctx_dockerfile",),
      ("docker",),
-     ("install_dir",),
-     ("key_path", ),
+     ("install_img_path",),
+     ("keyfile_img_path", ),
      ("keyfile", ),
      ("path", ),
      ("packages_name", ),
      ("testfile", ),
-     ("testfile_path", )])
+     ("testfile_img_path", )])
 def test_image_config_props(patches, prop):
     _check_image_config_property(patches, *prop)
 
@@ -430,10 +465,10 @@ def test_image_dockerfile(patches):
         ("DistroTestImage.dockerfile_template", dict(new_callable=PropertyMock)),
         ("DistroTestImage.ctx_install_dir", dict(new_callable=PropertyMock)),
         ("DistroTestImage.keyfile", dict(new_callable=PropertyMock)),
-        ("DistroTestImage.key_path", dict(new_callable=PropertyMock)),
-        ("DistroTestImage.install_dir", dict(new_callable=PropertyMock)),
+        ("DistroTestImage.keyfile_img_path", dict(new_callable=PropertyMock)),
+        ("DistroTestImage.install_img_path", dict(new_callable=PropertyMock)),
         ("DistroTestImage.testfile", dict(new_callable=PropertyMock)),
-        ("DistroTestImage.testfile_path", dict(new_callable=PropertyMock)),
+        ("DistroTestImage.testfile_img_path", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.distrotest")
 
     with patched as patchy:
@@ -589,7 +624,7 @@ def test_image_get_environment(patches, items):
     patched = patches(
         "dict",
         "DistroTestImage.get_install_binary",
-        "DistroTestImage.installable_path",
+        "DistroTestImage.installable_img_path",
         ("DistroTestImage.config", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.distrotest")
 
@@ -699,14 +734,18 @@ async def test_image_images(patches, images):
         == [(expected,), {}])
 
 
-def test_image_installable_path(patches):
+def test_image_installable_img_path(patches):
     image = distrotest.DistroTestImage("CONFIG", "BUILD_IMAGE", "NAME", "STREAM")
     patched = patches(
-        ("DistroTestImage.install_dir", dict(new_callable=PropertyMock)),
+        ("DistroTestImage.install_img_path", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.distrotest")
 
     with patched as (m_dir, ):
-        assert image.installable_path("INSTALLABLE") == f"{m_dir.return_value}/INSTALLABLE"
+        assert image.installable_img_path("INSTALLABLE") == m_dir.return_value.joinpath.return_value
+
+    assert (
+        list(m_dir.return_value.joinpath.call_args)
+        == [("INSTALLABLE",), {}])
 
 
 @pytest.mark.parametrize("stream", [True, None])
@@ -869,7 +908,7 @@ def test_distrotest_test_cmd(patches):
     check = checker.AsyncChecker()
     config = MagicMock()
     dtest = distrotest.DistroTest(check, config, "NAME", "IMAGE", "INSTALLABLE")
-    assert dtest.test_cmd == (config.testfile_path, )
+    assert dtest.test_cmd == (str(config.testfile_img_path), )
 
 
 # methods
@@ -1022,6 +1061,7 @@ async def test_distrotest_exec(patches, failed, returns, msgs):
     _log_error = (msgs > 0) and (returns and not failed)
 
     if _log_error:
+        assert dtest._failures == ['container-start']
         assert (
             list(m_error.call_args)
             == [([f"[NAME] Error executing test in container\n{_tracker._outs[-1].data.decode.return_value.strip.return_value}"],), {}])
@@ -1029,6 +1069,7 @@ async def test_distrotest_exec(patches, failed, returns, msgs):
             list(list(c) for c in m_out.call_args_list)
             == [[(_out.data.decode.return_value.strip.return_value,), {}] for _out in _tracker._outs[:-1]])
     else:
+        assert dtest._failures == []
         assert not m_error.called
         assert (
             list(list(c) for c in m_out.call_args_list)

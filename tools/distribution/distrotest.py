@@ -109,7 +109,7 @@ class DistroTestConfig(object):
         return self.path.joinpath(self._keyfile.name)
 
     @cached_property
-    def ctx_packages(self) -> pathlib.Path:
+    def rel_ctx_packages(self) -> pathlib.Path:
         """Path to the directory (in the Docker context) containing packages to
         test
         """
@@ -138,16 +138,9 @@ class DistroTestConfig(object):
                                 for k, v in self.items()))
 
     @cached_property
-    def install_dir(self) -> str:
+    def install_img_path(self) -> pathlib.PurePosixPath:
         """Path to the install directory within the image/container"""
-        return "/tmp/install"
-
-    @cached_property
-    def key_path(self) -> str:
-        """Path to the public key of the key used to sign the packages, inside
-        the Docker image/container
-        """
-        return "/tmp/gpg/signing.key"
+        return pathlib.PurePosixPath("/tmp/install")
 
     @cached_property
     def keyfile(self) -> pathlib.Path:
@@ -159,12 +152,19 @@ class DistroTestConfig(object):
         return shutil.copyfile(self._keyfile, self.ctx_keyfile)
 
     @cached_property
+    def keyfile_img_path(self) -> pathlib.PurePosixPath:
+        """Path to the public key of the key used to sign the packages, inside
+        the Docker image/container
+        """
+        return pathlib.PurePosixPath("/tmp/gpg/signing.key")
+
+    @cached_property
     def packages_dir(self) -> pathlib.Path:
         """The directory containing packages.
 
         Packages are extracted on first access
         """
-        return utils.extract(self.tarball, self.ctx_packages)
+        return utils.extract(self.rel_ctx_packages, self.tarball)
 
     @cached_property
     def testfile(self) -> pathlib.Path:
@@ -176,10 +176,9 @@ class DistroTestConfig(object):
         return shutil.copyfile(self._testfile, self.ctx_testfile)
 
     @cached_property
-    def testfile_path(self) -> str:
+    def testfile_img_path(self) -> pathlib.PurePosixPath:
         """Path to the testfile within the image/container"""
-        # As this is a path inside the linux container - dont use `os`
-        return f"/tmp/{self.testfile.name}"
+        return pathlib.PurePosixPath("/tmp").joinpath(self.testfile.name)
 
     def get_config(self, image: str) -> dict:
         """Return the type/ext config for a particular image
@@ -283,11 +282,11 @@ class DistroTestImage(object):
             env=self.env,
             build_command=self.build_command,
             install_dir=self.ctx_install_dir,
-            install_mount_path=self.install_dir,
+            install_mount_path=self.install_img_path,
             testfile_name=self.testfile.name,
-            test_mount_path=self.testfile_path,
+            test_mount_path=self.testfile_img_path,
             keyfile_name=self.keyfile.name,
-            key_mount_path=self.key_path)
+            key_mount_path=self.keyfile_img_path)
 
     @property
     def dockerfile_template(self) -> str:
@@ -301,12 +300,12 @@ class DistroTestImage(object):
         return f"ENV {_env}" if _env else ""
 
     @property
-    def install_dir(self) -> str:
-        return self.test_config.install_dir
+    def install_img_path(self) -> pathlib.PurePosixPath:
+        return self.test_config.install_img_path
 
     @property
-    def key_path(self) -> str:
-        return self.test_config.key_path
+    def keyfile_img_path(self) -> pathlib.PurePosixPath:
+        return self.test_config.keyfile_img_path
 
     @property
     def keyfile(self) -> pathlib.Path:
@@ -339,8 +338,8 @@ class DistroTestImage(object):
         return self.test_config.testfile
 
     @property
-    def testfile_path(self) -> str:
-        return self.test_config.testfile_path
+    def testfile_img_path(self) -> pathlib.PurePosixPath:
+        return self.test_config.testfile_img_path
 
     def add_dockerfile(self) -> None:
         """Add the Dockerfile for the test Docker image"""
@@ -374,8 +373,9 @@ class DistroTestImage(object):
         env = dict(
             ENVOY_MAINTAINER=self.test_config.maintainer,
             ENVOY_VERSION=self.test_config.version,
-            ENVOY_INSTALL_BINARY=self.installable_path(self.get_install_binary(package_filename)),
-            ENVOY_INSTALLABLE=self.installable_path(package_filename),
+            ENVOY_INSTALL_BINARY=self.installable_img_path(
+                self.get_install_binary(package_filename)),
+            ENVOY_INSTALLABLE=self.installable_img_path(package_filename),
             PACKAGE=package_name,
             DISTRO=name)
         for k, v in self.config["test"].items():
@@ -398,10 +398,9 @@ class DistroTestImage(object):
         """The currently built Docker image tag names"""
         return chain.from_iterable([image["RepoTags"] for image in await self.docker.images.list()])
 
-    def installable_path(self, package_filename: str) -> str:
+    def installable_img_path(self, package_filename: str) -> pathlib.PurePosixPath:
         """Path to a package inside the container"""
-        # As this is a path inside the linux container - dont use `os`
-        return f"{self.install_dir}/{package_filename}"
+        return self.install_img_path.joinpath(package_filename)
 
     def stream(self, msg: str) -> None:
         if self._stream:
@@ -519,7 +518,7 @@ class DistroTest(object):
     @property
     def test_cmd(self) -> tuple:
         """The test command to run inside the test container"""
-        return (self.test_config.testfile_path,)
+        return (str(self.test_config.testfile_img_path),)
 
     @property
     def testfile(self) -> pathlib.Path:
@@ -569,6 +568,7 @@ class DistroTest(object):
         return_code = (await execute.inspect())["ExitCode"]
         _log_error = _out and return_code and not self.failed
         if _log_error:
+            self._failures.append("container-start")
             self.error([f"[{self.distro}] Error executing test in container\n{_out}"])
         elif _out:
             self.handle_test_output(_out)
