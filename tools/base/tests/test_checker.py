@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
@@ -48,6 +49,9 @@ def test_checker_constructor():
         list(m_super.call_args)
         == [('path1', 'path2', 'path3'), {}])
     assert checker.summary_class == CheckerSummary
+
+    assert checker.active_check is None
+    assert "active_check" not in checker.__dict__
 
 
 def test_checker_diff():
@@ -352,20 +356,27 @@ TEST_ERRORS = (
 @pytest.mark.parametrize("log", [True, False])
 @pytest.mark.parametrize("log_type", [None, "fatal"])
 @pytest.mark.parametrize("errors", TEST_ERRORS)
-def test_checker_error(log, log_type, errors):
+@pytest.mark.parametrize("newerrors", [[], ["err1", "err2", "err3"]])
+def test_checker_error(log, log_type, errors, newerrors):
     checker = Checker("path1", "path2", "path3")
     log_mock = patch(
         "tools.base.checker.Checker.log",
         new_callable=PropertyMock)
     checker.errors = errors.copy()
+    result = 1 if newerrors else 0
 
     with log_mock as m_log:
         if log_type:
-            assert checker.error("mycheck", ["err1", "err2", "err3"], log, log_type=log_type) == 1
+            assert checker.error("mycheck", newerrors, log, log_type=log_type) == result
         else:
-            assert checker.error("mycheck", ["err1", "err2", "err3"], log) == 1
+            assert checker.error("mycheck", newerrors, log) == result
 
-    assert checker.errors["mycheck"] == errors.get("mycheck", []) + ["err1", "err2", "err3"]
+    if not newerrors:
+        assert not m_log.called
+        assert "mycheck" not in checker.errors
+        return
+
+    assert checker.errors["mycheck"] == errors.get("mycheck", []) + newerrors
     for k, v in errors.items():
         if k != "mycheck":
             assert checker.errors[k] == v
@@ -381,11 +392,25 @@ def test_checker_exit(patches):
     checker = Checker("path1", "path2", "path3")
     patched = patches(
         "Checker.error",
+        ("Checker.log", dict(new_callable=PropertyMock)),
+        ("Checker.stdout", dict(new_callable=PropertyMock)),
         prefix="tools.base.checker")
 
-    with patched as (m_error, ):
+    with patched as (m_error, m_log, m_stdout):
         assert checker.exit() == m_error.return_value
 
+    assert (
+        list(m_log.return_value.handlers.__getitem__.call_args)
+        == [(0,), {}])
+    assert (
+        list(m_log.return_value.handlers.__getitem__.return_value.setLevel.call_args)
+        == [(logging.FATAL,), {}])
+    assert (
+        list(m_stdout.return_value.handlers.__getitem__.call_args)
+        == [(0,), {}])
+    assert (
+        list(m_stdout.return_value.handlers.__getitem__.return_value.setLevel.call_args)
+        == [(logging.FATAL,), {}])
     assert (
         list(m_error.call_args)
         == [('exiting', ['Keyboard exit']), {'log_type': 'fatal'}])
@@ -427,6 +452,7 @@ def test_checker_on_check_begin(patches):
     with patched as (m_log, ):
         assert not checker.on_check_begin("checkname")
 
+    assert checker.active_check == "checkname"
     assert (
         list(m_log.return_value.notice.call_args)
         == [('[checkname] Running check',), {}])
@@ -445,10 +471,13 @@ def test_checker_on_check_run(patches, errors, warnings, exiting):
     check = "CHECK1"
     checker.errors = errors
     checker.warnings = warnings
+    checker._active_check = check
 
     with patched as (m_exit, m_log):
         m_exit.return_value = exiting
         assert not checker.on_check_run(check)
+
+    assert checker.active_check is None
 
     if exiting:
         assert not m_log.called

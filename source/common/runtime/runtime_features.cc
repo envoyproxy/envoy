@@ -111,6 +111,9 @@ constexpr const char* runtime_features[] = {
 constexpr const char* disabled_runtime_features[] = {
     // v2 is fatal-by-default.
     "envoy.test_only.broken_in_production.enable_deprecated_v2_api",
+    // Defaulting to off due to high risk.
+    // TODO(ggreenway): Move this to default-on during 1.20 release cycle.
+    "envoy.reloadable_features.conn_pool_delete_when_idle",
     // TODO(asraa) flip to true in a separate PR to enable the new JSON by default.
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
