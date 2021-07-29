@@ -163,7 +163,7 @@ public class CronetUrlRequestTest {
     assertEquals(callback.mResponseStep, ResponseStep.ON_SUCCEEDED);
     UrlResponseInfo urlResponseInfo =
         createUrlResponseInfo(new String[] {url}, "OK", 200, 86, "connection", "close",
-                              "content-length", "3", "content-type", "text/plain");
+                              "Content-Length", "3", "Content-Type", "text/plain");
     mTestRule.assertResponseEquals(urlResponseInfo, callback.mResponseInfo);
     checkResponseInfo(callback.mResponseInfo, NativeTestServer.getEchoMethodURL(), 200, "OK");
   }
@@ -200,7 +200,7 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1426")
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1540")
   public void testRedirectAsync() throws Exception {
     // Start the request and wait to see the redirect.
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
@@ -222,8 +222,8 @@ public class CronetUrlRequestTest {
                             "header-value");
 
     UrlResponseInfo expected = createUrlResponseInfo(
-        new String[] {NativeTestServer.getRedirectURL()}, "Found", 302, 73, "content-length", "92",
-        "location", "/success.txt", "redirect-header", "header-value");
+        new String[] {NativeTestServer.getRedirectURL()}, "Found", 302, 73, "Content-Length", "92",
+        "Location", "/success.txt", "redirect-header", "header-value");
     mTestRule.assertResponseEquals(expected, callback.mRedirectResponseInfoList.get(0));
 
     // Wait for an unrelated request to finish. The request should not
@@ -643,11 +643,11 @@ public class CronetUrlRequestTest {
     assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
     List<Map.Entry<String, String>> responseHeaders = callback.mResponseInfo.getAllHeadersAsList();
 
-    assertEquals(responseHeaders.get(0), new AbstractMap.SimpleEntry<>("content-length", "20"));
+    assertEquals(responseHeaders.get(0), new AbstractMap.SimpleEntry<>("Content-Length", "20"));
     assertEquals(responseHeaders.get(1),
-                 new AbstractMap.SimpleEntry<>("content-type", "text/plain"));
+                 new AbstractMap.SimpleEntry<>("Content-Type", "text/plain"));
     assertEquals(responseHeaders.get(2),
-                 new AbstractMap.SimpleEntry<>("access-control-allow-origin", "*"));
+                 new AbstractMap.SimpleEntry<>("Access-Control-Allow-Origin", "*"));
     assertEquals(responseHeaders.get(3),
                  new AbstractMap.SimpleEntry<>("header-name", "header-value"));
     assertEquals(responseHeaders.get(4),
@@ -659,7 +659,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1426")
   public void testMockMultiRedirect() throws Exception {
     TestUrlRequestCallback callback =
         startAndWaitForComplete(NativeTestServer.getMultiRedirectURL());
@@ -670,8 +669,8 @@ public class CronetUrlRequestTest {
 
     // Check first redirect (multiredirect.html -> redirect.html)
     UrlResponseInfo firstExpectedResponseInfo = createUrlResponseInfo(
-        new String[] {NativeTestServer.getMultiRedirectURL()}, "Found", 302, 76, "content-length",
-        "92", "location", "/redirect.html", "redirect-header0", "header-value");
+        new String[] {NativeTestServer.getMultiRedirectURL()}, "Found", 302, 76, "Content-Length",
+        "92", "Location", "/redirect.html", "redirect-header0", "header-value");
     UrlResponseInfo firstRedirectResponseInfo = callback.mRedirectResponseInfoList.get(0);
     mTestRule.assertResponseEquals(firstExpectedResponseInfo, firstRedirectResponseInfo);
 
@@ -679,8 +678,8 @@ public class CronetUrlRequestTest {
     UrlResponseInfo secondExpectedResponseInfo = createUrlResponseInfo(
         new String[] {NativeTestServer.getMultiRedirectURL(), NativeTestServer.getRedirectURL(),
                       NativeTestServer.getSuccessURL()},
-        "OK", 200, 334, "content-length", "20", "content-type", "text/plain",
-        "access-control-allow-origin", "*", "header-name", "header-value", "multi-header-name",
+        "OK", 200, 334, "Content-Length", "20", "Content-Type", "text/plain",
+        "Access-Control-Allow-Origin", "*", "header-name", "header-value", "multi-header-name",
         "header-value1", "multi-header-name", "header-value2");
 
     mTestRule.assertResponseEquals(secondExpectedResponseInfo, mResponseInfo);
@@ -692,12 +691,11 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1426")
   public void testMockNotFound() throws Exception {
     TestUrlRequestCallback callback = startAndWaitForComplete(NativeTestServer.getNotFoundURL());
     UrlResponseInfo expected =
         createUrlResponseInfo(new String[] {NativeTestServer.getNotFoundURL()}, "Not Found", 404,
-                              140, "content-length", "96");
+                              140, "Content-Length", "96");
     mTestRule.assertResponseEquals(expected, callback.mResponseInfo);
     assertTrue(callback.mHttpResponseDataLength != 0);
     assertEquals(0, callback.mRedirectCount);

@@ -451,7 +451,7 @@ final class JavaUrlRequest extends UrlRequestBase {
               selectedTransport = headerValue;
             }
             if (!headerKey.startsWith(X_ANDROID)) {
-              headerList.add(new SimpleEntry<>(headerKey.toLowerCase(), headerValue));
+              headerList.add(new SimpleEntry<>(headerKey, headerValue));
             }
           }
         }
