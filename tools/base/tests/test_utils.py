@@ -134,13 +134,12 @@ def test_util_extract(patches, tarballs):
         _extractions = [MagicMock(), MagicMock()]
         m_nested.return_value.__enter__.return_value = _extractions
 
-        if not tarballs:
+        if tarballs:
+            assert utils.extract("PATH", *tarballs) == "PATH"
+        else:
 
             with pytest.raises(utils.ExtractError) as e:
                 utils.extract("PATH", *tarballs) == "PATH"
-
-        else:
-            assert utils.extract("PATH", *tarballs) == "PATH"
 
     if not tarballs:
         assert (

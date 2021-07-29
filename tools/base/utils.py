@@ -84,9 +84,10 @@ def extract(path: Union[pathlib.Path, str], *tarballs: Union[pathlib.Path,
     if not tarballs:
         raise ExtractError(f"No tarballs specified for extraction to {path}")
     openers = nested(*tuple(tarfile.open(tarball) for tarball in tarballs))
+
     with openers as tarfiles:
-        for _tarfile in tarfiles:
-            _tarfile.extractall(path=path)
+        for tar in tarfiles:
+            tar.extractall(path=path)
     return path
 
 
