@@ -116,6 +116,7 @@ void Filter::doSxg() {
 
     // Make sure that the resulting SXG isn't too big before adding it to the encoding buffer
     if (encoderBufferLimitReached(output->size() + 100)) {
+      output->done();
       config_->stats().total_signed_failed_.inc();
       return;
     }

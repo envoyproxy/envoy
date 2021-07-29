@@ -125,7 +125,8 @@ Buffer::BufferFragment* EncoderImpl::writeSxg() {
   }
 
   return new Buffer::BufferFragmentImpl(
-      result.data, result.size, [result](const void*, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
+      result.data, result.size,
+      [result](const void*, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
         sxg_buffer_release(const_cast<sxg_buffer_t*>(&result));
         delete this_fragment;
       });
