@@ -369,10 +369,8 @@ const QueuedChunk& ChunkQueue::consolidate(bool delivered) {
   new_chunk->end_stream = false;
   new_chunk->delivered = delivered;
 
-  for (auto it = queue_.begin(); it != queue_.end();) {
-    auto& buf = (*it)->data;
-    new_chunk->data.move(buf);
-    it = queue_.erase(it);
+  for (auto it = queue_.begin(); it != queue_.end(); it = queue_.erase(it)) {
+    new_chunk->data.move((*it)->data);
   }
   ENVOY_BUG(queue_.empty(), "Did not empty all chunks");
   queue_.push_front(std::move(new_chunk));
