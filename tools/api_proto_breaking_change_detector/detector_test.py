@@ -15,11 +15,13 @@ class BreakingChangeDetectorTests(object):
         current = Path(tests_path, f"{testname}_current")
         changed = Path(tests_path, f"{testname}_next")
 
-        breaking_response = self.detector_type.is_breaking(current, changed, additional_args)
+        detector_obj = self.detector_type(current, changed, additional_args)
+        detector_obj.run_detector()
+
+        breaking_response = detector_obj.is_breaking()
         self.assertEqual(breaking_response, is_breaking)
 
-        lock_file_changed_response = self.detector_type.lock_file_changed(
-            current, changed, additional_args)
+        lock_file_changed_response = detector_obj.lock_file_changed()
         self.assertEqual(lock_file_changed_response, expects_changes)
 
 
