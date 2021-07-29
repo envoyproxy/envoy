@@ -618,9 +618,7 @@ void MainPrioritySetImpl::updateMutableAllHostMap(const HostVector& hosts_added,
   // cannot directly modify read_only_all_host_map_.
   if (mutable_all_host_map_ == nullptr) {
     // Copy old read only host map to mutable host map.
-    mutable_all_host_map_ = read_only_all_host_map_ != nullptr
-                                ? std::make_shared<HostMap>(*read_only_all_host_map_)
-                                : std::make_shared<HostMap>();
+    mutable_all_host_map_ = std::make_shared<HostMap>(*read_only_all_host_map_);
   }
 
   for (const auto& host : hosts_removed) {
@@ -1483,8 +1481,7 @@ void PriorityStateManager::updateClusterPrioritySet(
 bool BaseDynamicClusterImpl::updateDynamicHostList(
     const HostVector& new_hosts, HostVector& current_priority_hosts,
     HostVector& hosts_added_to_current_priority, HostVector& hosts_removed_from_current_priority,
-    HostMap& updated_hosts, const HostMap& all_hosts,
-    const absl::flat_hash_set<std::string>& all_new_hosts) {
+    const HostMap& all_hosts, const absl::flat_hash_set<std::string>& all_new_hosts) {
   uint64_t max_host_weight = 1;
 
   // Did hosts change?
@@ -1513,10 +1510,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   absl::flat_hash_set<std::string> new_hosts_for_current_priority(new_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
-    if (updated_hosts.count(host->address()->asString())) {
-      continue;
-    }
-
     // To match a new host with an existing host means comparing their addresses.
     auto existing_host = all_hosts.find(host->address()->asString());
     const bool existing_host_found = existing_host != all_hosts.end();
@@ -1592,7 +1585,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       }
 
       final_hosts.push_back(existing_host->second);
-      updated_hosts[existing_host->second->address()->asString()] = existing_host->second;
     } else {
       new_hosts_for_current_priority.emplace(host->address()->asString());
       if (host->weight() > max_host_weight) {
@@ -1610,7 +1602,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
         }
       }
 
-      updated_hosts[host->address()->asString()] = host;
       final_hosts.push_back(host);
       hosts_added_to_current_priority.push_back(host);
     }
@@ -1651,8 +1642,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
     erase_from =
         std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
-                       [&all_new_hosts, &new_hosts_for_current_priority, &updated_hosts,
-                        &final_hosts, &max_host_weight](const HostSharedPtr& p) {
+                       [&all_new_hosts, &new_hosts_for_current_priority, &final_hosts,
+                        &max_host_weight](const HostSharedPtr& p) {
                          if (all_new_hosts.contains(p->address()->asString()) &&
                              !new_hosts_for_current_priority.contains(p->address()->asString())) {
                            // If the address is being completely deleted from this priority, but is
@@ -1670,7 +1661,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
                            }
 
                            final_hosts.push_back(p);
-                           updated_hosts[p->address()->asString()] = p;
                            p->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
                            return true;
                          }

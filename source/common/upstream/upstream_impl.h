@@ -512,7 +512,8 @@ protected:
   // avoid any potential lifetime issues.
   std::vector<std::unique_ptr<HostSet>> host_sets_;
 
-  HostMapConstSharedPtr read_only_all_host_map_;
+  // Read only all host map for fast host searching. This will never be null.
+  mutable HostMapConstSharedPtr read_only_all_host_map_{std::make_shared<HostMap>()};
 
 private:
   // This is a matching vector to store the callback handles for host_sets_. It is kept separately
@@ -567,6 +568,7 @@ public:
     // Check if the host set in the main thread PrioritySet has been updated.
     if (mutable_all_host_map_ != nullptr) {
       read_only_all_host_map_ = std::move(mutable_all_host_map_);
+      ASSERT(mutable_all_host_map_ == nullptr);
     }
     return read_only_all_host_map_;
   }
@@ -581,7 +583,7 @@ public:
 protected:
   void updateMutableAllHostMap(const HostVector& hosts_added, const HostVector& hosts_removed);
 
-  HostMapSharedPtr mutable_all_host_map_;
+  mutable HostMapSharedPtr mutable_all_host_map_;
   Common::CallbackHandlePtr all_host_map_update_handle_;
 };
 
@@ -1004,8 +1006,6 @@ protected:
    * @param hosts_added_to_current_priority will be populated with hosts added to the priority.
    * @param hosts_removed_from_current_priority will be populated with hosts removed from the
    * priority.
-   * @param updated_hosts is used to aggregate the new state of all hosts across priority, and will
-   * be updated with the hosts that remain in this priority after the update.
    * @param all_hosts all known hosts prior to this host update across all priorities.
    * @param all_new_hosts addresses of all hosts in the new configuration across all priorities.
    * @return whether the hosts for the priority changed.
@@ -1013,7 +1013,7 @@ protected:
   bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_priority_hosts,
                              HostVector& hosts_added_to_current_priority,
                              HostVector& hosts_removed_from_current_priority,
-                             HostMap& updated_hosts, const HostMap& all_hosts,
+                             const HostMap& all_hosts,
                              const absl::flat_hash_set<std::string>& all_new_hosts);
 };
 

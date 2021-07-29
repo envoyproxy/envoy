@@ -2191,7 +2191,7 @@ TEST(PrioritySet, Extend) {
   auto member_update_cb = priority_set.addMemberUpdateCb(
       [&](const HostVector&, const HostVector&) -> void { ++membership_changes; });
 
-  // The initial priority set starts with priority level 0..
+  // The initial priority set starts with priority level 0.
   EXPECT_EQ(1, priority_set.hostSetsPerPriority().size());
   EXPECT_EQ(0, priority_set.hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0, priority_set.hostSetsPerPriority()[0]->priority());
@@ -2252,6 +2252,80 @@ TEST(PrioritySet, Extend) {
   // We expect to see two priority changes, but only one membership change.
   EXPECT_EQ(3, priority_changes);
   EXPECT_EQ(2, membership_changes);
+
+  // Simply verify the set and get the read only all host map is working properly in the priority
+  // set.
+  HostMapSharedPtr test_host_map = std::make_shared<HostMap>();
+  priority_set.setReadOnlyAllHostMap(test_host_map);
+  EXPECT_EQ(test_host_map.get(), priority_set.readOnlyAllHostMap().get());
+}
+
+// Helper class used to test MainPrioritySetImpl.
+class TestMainPrioritySetImpl : public MainPrioritySetImpl {
+public:
+  auto readOnlyAllHostMapForTest() { return read_only_all_host_map_; }
+  auto mutableAllHostMapForTest() { return mutable_all_host_map_; }
+};
+
+// Test that the priority set in the main thread can work correctly.
+TEST(PrioritySet, MainPrioritySetTest) {
+  TestMainPrioritySetImpl priority_set;
+  priority_set.getOrCreateHostSet(0);
+
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
+  HostVectorSharedPtr hosts(
+      new HostVector({makeTestHost(info, "tcp://127.0.0.1:80", *time_source)}));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+
+  // The host map is initially empty or null.
+  EXPECT_TRUE(priority_set.readOnlyAllHostMapForTest()->empty());
+  EXPECT_EQ(nullptr, priority_set.mutableAllHostMapForTest());
+
+  {
+    HostVector hosts_added{hosts->front()};
+    HostVector hosts_removed{};
+
+    priority_set.updateHosts(1,
+                             updateHostsParams(hosts, hosts_per_locality,
+                                               std::make_shared<const HealthyHostVector>(*hosts),
+                                               hosts_per_locality),
+                             {}, hosts_added, hosts_removed, absl::nullopt);
+  }
+
+  // Only mutable host map can be updated directly. Read only host map will not be updated before
+  // 'readOnlyAllHostMap' is called.
+  EXPECT_TRUE(priority_set.readOnlyAllHostMapForTest()->empty());
+  EXPECT_NE(nullptr, priority_set.mutableAllHostMapForTest());
+  EXPECT_FALSE(priority_set.mutableAllHostMapForTest()->empty());
+
+  // Mutable host map will be moved to read only host map after 'readOnlyAllHostMap' is called.
+  auto host_map = priority_set.mutableAllHostMapForTest();
+  EXPECT_EQ(host_map, priority_set.readOnlyAllHostMap());
+  EXPECT_EQ(nullptr, priority_set.mutableAllHostMapForTest());
+
+  {
+    HostVector hosts_added{};
+    HostVector hosts_removed{hosts->front()};
+
+    priority_set.updateHosts(1,
+                             updateHostsParams(hosts, hosts_per_locality,
+                                               std::make_shared<const HealthyHostVector>(*hosts),
+                                               hosts_per_locality),
+                             {}, hosts_added, hosts_removed, absl::nullopt);
+  }
+
+  // New mutable host map will be created and all update will be applied to new mutable host map.
+  // Read only host map will not be updated before 'readOnlyAllHostMap' is called.
+  EXPECT_EQ(host_map, priority_set.readOnlyAllHostMapForTest());
+  EXPECT_NE(nullptr, priority_set.mutableAllHostMapForTest());
+  EXPECT_NE(host_map, priority_set.mutableAllHostMapForTest());
+
+  // Again, mutable host map will be moved to read only host map after 'readOnlyAllHostMap' is
+  // called.
+  host_map = priority_set.mutableAllHostMapForTest();
+  EXPECT_EQ(host_map, priority_set.readOnlyAllHostMap());
+  EXPECT_EQ(nullptr, priority_set.mutableAllHostMapForTest());
 }
 
 class ClusterInfoImplTest : public testing::Test {

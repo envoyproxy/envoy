@@ -453,7 +453,8 @@ private:
                                  PrioritySet::UpdateHostsParams update_hosts_params,
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
-                                 uint64_t overprovisioning_factor);
+                                 uint64_t overprovisioning_factor,
+                                 const HostMapConstSharedPtr& read_only_host_map);
     void onHostHealthFailure(const HostSharedPtr& host);
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,

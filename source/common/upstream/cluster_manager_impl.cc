@@ -1000,11 +1000,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
       cluster_manager->updateClusterMembership(
           info->name(), per_priority.priority_, per_priority.update_hosts_params_,
           per_priority.locality_weights_, per_priority.hosts_added_, per_priority.hosts_removed_,
-          per_priority.overprovisioning_factor_);
+          per_priority.overprovisioning_factor_, map);
     }
-
-    // Update read only all host map in worker threads.
-    cluster_manager->thread_local_clusters_[info->name()]->priority_set_.setReadOnlyAllHostMap(map);
 
     if (new_cluster != nullptr) {
       for (auto& cb : cluster_manager->update_callbacks_) {
@@ -1248,7 +1245,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority, PrioritySet::UpdateHostsParams update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, uint64_t overprovisioning_factor) {
+    const HostVector& hosts_removed, uint64_t overprovisioning_factor,
+    const HostMapConstSharedPtr& read_only_host_map) {
   ASSERT(thread_local_clusters_.find(name) != thread_local_clusters_.end());
   const auto& cluster_entry = thread_local_clusters_[name];
   ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
@@ -1256,6 +1254,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
   cluster_entry->priority_set_.updateHosts(priority, std::move(update_hosts_params),
                                            std::move(locality_weights), hosts_added, hosts_removed,
                                            overprovisioning_factor);
+
+  // Update read only all host map in worker threads.
+  cluster_entry->priority_set_.setReadOnlyAllHostMap(read_only_host_map);
 
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (cluster_entry->lb_factory_ != nullptr) {
