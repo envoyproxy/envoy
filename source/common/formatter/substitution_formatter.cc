@@ -93,7 +93,7 @@ const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
   const Api::SysCallIntResult result = os_sys_calls.gethostname(name, len);
 
   absl::optional<std::string> hostname;
-  if (result.rc_ == 0) {
+  if (result.return_value_ == 0) {
     hostname = name;
   }
 
@@ -814,7 +814,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "CONNECTION_ID") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.connectionID().value_or(0);
+          return stream_info.downstreamAddressProvider().connectionID().value_or(0);
         });
   } else if (field_name == "REQUESTED_SERVER_NAME") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(

@@ -34,7 +34,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 48]
+// [#next-free-field: 49]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
@@ -374,6 +374,11 @@ message HttpConnectionManager {
   ServerHeaderTransformation server_header_transformation = 34
       [(validate.rules).enum = {defined_only: true}];
 
+  // Allows for explicit transformation of the :scheme header on the request path.
+  // If not set, Envoy's default :ref:`scheme  <config_http_conn_man_headers_scheme>`
+  // handling applies.
+  config.core.v4alpha.SchemeHeaderTransformation scheme_header_transformation = 48;
+
   // The maximum request headers size for incoming connections.
   // If unconfigured, the default max request headers allowed is 60 KiB.
   // Requests that exceed this limit will receive a 431 response.
@@ -510,6 +515,7 @@ message HttpConnectionManager {
   // .. code-block:: yaml
   //
   //    original_ip_detection_extensions:
+  //    - name: envoy.http.original_ip_detection.xff
   //      typed_config:
   //        "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.xff.v3.XffConfig
   //        xff_num_trusted_hops: 1
@@ -1008,4 +1014,17 @@ message RequestIDExtension {
 
   // Request ID extension specific configuration.
   google.protobuf.Any typed_config = 1;
+}
+
+// [#protodoc-title: Envoy Mobile HTTP connection manager]
+// HTTP connection manager for use in Envoy mobile.
+// [#extension: envoy.filters.network.envoy_mobile_http_connection_manager]
+message EnvoyMobileHttpConnectionManager {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.filters.network.http_connection_manager.v3."
+      "EnvoyMobileHttpConnectionManager";
+
+  // The configuration for the underlying HttpConnectionManager which will be
+  // instantiated for Envoy mobile.
+  HttpConnectionManager config = 1;
 }

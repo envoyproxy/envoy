@@ -97,7 +97,7 @@ public:
   MockAsyncClientFactory();
   ~MockAsyncClientFactory() override;
 
-  MOCK_METHOD(RawAsyncClientPtr, create, ());
+  MOCK_METHOD(RawAsyncClientPtr, createUncachedRawAsyncClient, ());
 };
 
 class MockAsyncClientManager : public AsyncClientManager {
@@ -108,6 +108,10 @@ public:
   MOCK_METHOD(AsyncClientFactoryPtr, factoryForGrpcService,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
                bool skip_cluster_check));
+
+  MOCK_METHOD(RawAsyncClientSharedPtr, getOrCreateRawAsyncClient,
+              (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
+               bool skip_cluster_check, Grpc::CacheOption cache_option));
 };
 
 MATCHER_P(ProtoBufferEq, expected, "") {

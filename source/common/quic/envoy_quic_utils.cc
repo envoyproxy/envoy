@@ -125,15 +125,6 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
   }
 }
 
-Http::GoAwayErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept {
-  switch (error) {
-  case quic::QUIC_NO_ERROR:
-    return Http::GoAwayErrorCode::NoError;
-  default:
-    return Http::GoAwayErrorCode::Other;
-  }
-}
-
 Network::ConnectionSocketPtr
 createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,

@@ -30,7 +30,7 @@ protected:
                              address_provider_->localAddress()));
   }
 
-  void setupSocket(const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
+  void setupSocket(const Network::Socket::OptionsSharedPtr& options);
   void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options);
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;
 };
@@ -58,18 +58,17 @@ public:
     if (bind_to_port) {
       RELEASE_ASSERT(io_handle_->isOpen(), "");
       setPrebindSocketOptions();
+      setupSocket(options);
     } else {
       // If the tcp listener does not bind to port, we test that the ip family is supported.
       if (auto ip = address->ip(); ip != nullptr) {
         RELEASE_ASSERT(
             Network::SocketInterfaceSingleton::get().ipFamilySupported(ip->ipv4() ? AF_INET
                                                                                   : AF_INET6),
-            fmt::format(
-                "Creating listen socket address {} but the address familiy is not supported",
-                address->asStringView()));
+            fmt::format("Creating listen socket address {} but the address family is not supported",
+                        address->asStringView()));
       }
     }
-    setupSocket(options, bind_to_port);
   }
 
   NetworkListenSocket(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address,
@@ -80,14 +79,36 @@ public:
 
   Socket::Type socketType() const override { return T::type; }
 
+  // These four overrides are introduced to perform check. A null io handle is possible only if the
+  // the owner socket is a listen socket that does not bind to port.
+  IoHandle& ioHandle() override {
+    ASSERT(io_handle_ != nullptr);
+    return *io_handle_;
+  }
+  const IoHandle& ioHandle() const override {
+    ASSERT(io_handle_ != nullptr);
+    return *io_handle_;
+  }
+  void close() override {
+    if (io_handle_ != nullptr) {
+      if (io_handle_->isOpen()) {
+        io_handle_->close();
+      }
+    }
+  }
+  bool isOpen() const override {
+    ASSERT(io_handle_ != nullptr);
+    return io_handle_->isOpen();
+  }
+
 protected:
   void setPrebindSocketOptions() {
     // On Windows, SO_REUSEADDR does not restrict subsequent bind calls when there is a listener as
-    // on Linux and later BSD socket stacks
+    // on Linux and later BSD socket stacks.
 #ifndef WIN32
     int on = 1;
     auto status = setSocketOption(SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-    RELEASE_ASSERT(status.rc_ != -1, "failed to set SO_REUSEADDR socket option");
+    RELEASE_ASSERT(status.return_value_ != -1, "failed to set SO_REUSEADDR socket option");
 #endif
   }
 };
@@ -95,12 +116,6 @@ protected:
 template <>
 inline void
 NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::setPrebindSocketOptions() {}
-
-// UDP listen socket desires io handle regardless bind_to_port is true or false.
-template <>
-NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::NetworkListenSocket(
-    const Address::InstanceConstSharedPtr& address,
-    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
 
 template class NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>;
 template class NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>;

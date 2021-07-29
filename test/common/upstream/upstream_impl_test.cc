@@ -506,8 +506,10 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   resolver2.expectResolve(*dns_resolver_);
   resolver2.timer_->invokeCallback();
 
-  EXPECT_CALL(resolver1.active_dns_query_, cancel());
-  EXPECT_CALL(resolver2.active_dns_query_, cancel());
+  EXPECT_CALL(resolver1.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver2.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
 }
 
 // Verifies that host removal works correctly when hosts are being health checked
@@ -903,9 +905,12 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   resolver3.expectResolve(*dns_resolver_);
   resolver3.timer_->invokeCallback();
 
-  EXPECT_CALL(resolver1.active_dns_query_, cancel());
-  EXPECT_CALL(resolver2.active_dns_query_, cancel());
-  EXPECT_CALL(resolver3.active_dns_query_, cancel());
+  EXPECT_CALL(resolver1.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver2.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver3.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
 }
 
 TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
@@ -1042,9 +1047,12 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   resolver3.expectResolve(*dns_resolver_);
   resolver3.timer_->invokeCallback();
 
-  EXPECT_CALL(resolver1.active_dns_query_, cancel());
-  EXPECT_CALL(resolver2.active_dns_query_, cancel());
-  EXPECT_CALL(resolver3.active_dns_query_, cancel());
+  EXPECT_CALL(resolver1.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver2.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver3.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
 }
 
 // Verifies that specifying a custom resolver when using STRICT_DNS fails
@@ -2542,28 +2550,6 @@ TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
                             "protocol options implementation for name: 'no_such_filter'");
 }
 
-// This test case can't be converted for V3 API as it is specific for extension_protocol_options
-TEST_F(ClusterInfoImplTest,
-       DEPRECATED_FEATURE_TEST(OneofExtensionProtocolOptionsForUnknownFilter)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
-    extension_protocol_options:
-      no_such_filter: { option: value }
-    typed_extension_protocol_options:
-      no_such_filter:
-        "@type": type.googleapis.com/google.protobuf.Struct
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml, false), EnvoyException,
-                            "Only one of typed_extension_protocol_options or "
-                            "extension_protocol_options can be specified");
-}
-
 TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
   const std::string yaml_disabled = R"EOF(
     name: name
@@ -3145,7 +3131,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   }
 }
 
-TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocol) {
+TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithDowngrade) {
   const std::string yaml = R"EOF(
   name: name
   connect_timeout: 0.25s
@@ -3162,7 +3148,8 @@ TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocol) {
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
   EXPECT_EQ(Http::Protocol::Http2,
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
-  EXPECT_EQ(Http::Protocol::Http3,
+  // This will get downgraded because the cluster does not support HTTP/3
+  EXPECT_EQ(Http::Protocol::Http2,
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
 }
 
@@ -3379,6 +3366,58 @@ TEST_F(ClusterInfoImplTest, Http3Auto) {
             auto_h3->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
   EXPECT_EQ(
       auto_h3->info()->http3Options().quic_protocol_options().max_concurrent_streams().value(), 2);
+}
+
+TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.quic
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+        upstream_tls_context:
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              private_key:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+            validation_context:
+              trusted_ca:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              match_subject_alt_names:
+              - exact: localhost
+              - exact: 127.0.0.1
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        use_downstream_protocol_config:
+          http3_protocol_options: {}
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+  auto cluster = makeCluster(yaml);
+
+  EXPECT_EQ(Http::Protocol::Http10,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+  EXPECT_EQ(Http::Protocol::Http11,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
+  EXPECT_EQ(Http::Protocol::Http3,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
 }
 
 #else
@@ -3806,6 +3845,38 @@ TEST(HostPartitionTest, PartitionHostsImmediateFailureExcludeDisabled) {
   EXPECT_EQ(0, update_hosts_params.excluded_hosts_per_locality->get()[0].size());
   EXPECT_EQ(1, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
   EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts_per_locality->get()[1][0]);
+}
+
+TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  max_requests_per_connection: 3
+  typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        common_http_protocol_options:
+          max_requests_per_connection: 3
+        use_downstream_protocol_config: {}
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Only one of max_requests_per_connection from Cluster or "
+                            "HttpProtocolOptions can be specified");
+}
+
+TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  max_requests_per_connection: 3
+)EOF";
+
+  auto cluster = makeCluster(yaml);
+
+  EXPECT_EQ(3U, cluster->info()->maxRequestsPerConnection());
 }
 
 } // namespace
