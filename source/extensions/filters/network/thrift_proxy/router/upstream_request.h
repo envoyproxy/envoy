@@ -16,6 +16,16 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace Router {
 
+class UpstreamResponseCallbacks {
+public:
+  virtual ~UpstreamResponseCallbacks() = default;
+
+  virtual void startUpstreamResponse(Transport& transport, Protocol& protocol) PURE;
+  virtual ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) PURE;
+  virtual MessageMetadataSharedPtr responseMetadata() PURE;
+  virtual bool responseSuccess() PURE;
+};
+
 struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
                          Logger::Loggable<Logger::Id::thrift> {
   UpstreamRequest(RequestOwner& parent, Upstream::TcpPoolData& pool_data,
@@ -35,11 +45,10 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
   bool handleUpstreamData(Buffer::Instance& data, bool end_stream, RequestOwner& owner,
-                          ThriftFilters::DecoderFilterCallbacks* callbacks);
+                          UpstreamResponseCallbacks& callbacks);
   void handleUpgradeResponse(Buffer::Instance& data);
-  ThriftFilters::ResponseStatus
-  handleRegularResponse(Buffer::Instance& data, RequestOwner& owner,
-                        ThriftFilters::DecoderFilterCallbacks* callbacks);
+  ThriftFilters::ResponseStatus handleRegularResponse(Buffer::Instance& data, RequestOwner& owner,
+                                                      UpstreamResponseCallbacks& callbacks);
   uint64_t encodeAndWrite(Buffer::OwnedImpl& request_buffer);
   void onEvent(Network::ConnectionEvent event);
   void onRequestStart(bool continue_decoding);

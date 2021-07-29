@@ -191,6 +191,7 @@ void Router::onDestroy() {
 
 void Router::setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
+  upstream_response_callbacks_ = std::make_unique<UpstreamResponseCallbacksImpl>(callbacks_);
 
   // TODO(zuercher): handle buffer limits
 }
@@ -258,7 +259,8 @@ FilterStatus Router::messageEnd() {
 }
 
 void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
-  const bool done = upstream_request_->handleUpstreamData(data, end_stream, *this, callbacks_);
+  const bool done =
+      upstream_request_->handleUpstreamData(data, end_stream, *this, *upstream_response_callbacks_);
   if (done) {
     cleanup();
   }

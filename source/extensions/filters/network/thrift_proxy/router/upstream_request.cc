@@ -115,26 +115,26 @@ void UpstreamRequest::handleUpgradeResponse(Buffer::Instance& data) {
 
 ThriftFilters::ResponseStatus
 UpstreamRequest::handleRegularResponse(Buffer::Instance& data, RequestOwner& owner,
-                                       ThriftFilters::DecoderFilterCallbacks* callbacks) {
+                                       UpstreamResponseCallbacks& callbacks) {
   ENVOY_LOG(trace, "reading response: {} bytes", data.length());
 
   if (!response_started_) {
-    callbacks->startUpstreamResponse(*transport_, *protocol_);
+    callbacks.startUpstreamResponse(*transport_, *protocol_);
     response_started_ = true;
   }
 
   const auto& cluster = owner.cluster();
 
-  const auto status = callbacks->upstreamData(data);
+  const auto status = callbacks.upstreamData(data);
   if (status == ThriftFilters::ResponseStatus::Complete) {
     ENVOY_LOG(debug, "response complete");
 
     owner.recordUpstreamResponseSize(cluster, response_size_);
 
-    switch (callbacks->responseMetadata()->messageType()) {
+    switch (callbacks.responseMetadata()->messageType()) {
     case MessageType::Reply:
       owner.incResponseReply(cluster);
-      if (callbacks->responseSuccess()) {
+      if (callbacks.responseSuccess()) {
         upstream_host_->outlierDetector().putResult(
             Upstream::Outlier::Result::ExtOriginRequestSuccess);
         owner.incResponseReplySuccess(cluster);
@@ -168,7 +168,7 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data, RequestOwner& own
 
 bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream,
                                          RequestOwner& owner,
-                                         ThriftFilters::DecoderFilterCallbacks* callbacks) {
+                                         UpstreamResponseCallbacks& callbacks) {
   ASSERT(!response_complete_);
 
   response_size_ += data.length();
