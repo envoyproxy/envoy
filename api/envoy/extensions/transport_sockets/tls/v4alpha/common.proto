@@ -306,8 +306,7 @@ message CertificateValidationContext {
     // applies to dynamic secrets, when the *CertificateValidationContext* is
     // delivered via SDS.
     //
-    // Only one of *trusted_ca*, *ca_certificate_provider*, and *ca_certificate_provider_instance*
-    // may be specified.
+    // Only one of *trusted_ca* and *ca_certificate_provider_instance* may be specified.
     //
     // [#next-major-version: This field and watched_directory below should ideally be moved into a
     // separate sub-message, since there's no point in specifying the latter field without this one.]
@@ -315,8 +314,7 @@ message CertificateValidationContext {
 
     // Certificate provider instance for fetching TLS certificates.
     //
-    // Only one of *trusted_ca*, *ca_certificate_provider*, and *ca_certificate_provider_instance*
-    // may be specified.
+    // Only one of *trusted_ca* and *ca_certificate_provider_instance* may be specified.
     // [#not-implemented-hide:]
     CertificateProviderPluginInstance ca_certificate_provider_instance = 13;
   }

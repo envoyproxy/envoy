@@ -132,8 +132,9 @@ message CommonTlsContext {
   // Config for Certificate provider to get certificates. This provider should allow certificates to be
   // fetched/refreshed over the network asynchronously with respect to the TLS handshake.
   //
-  // DEPRECATED: This message was moved outside of CommonTlsContext
-  // and now lives in common.proto.
+  // DEPRECATED: This message is not currently used, but if we ever do need it, we will want to
+  // move it out of CommonTlsContext and into common.proto, similar to the existing
+  // CertificateProviderPluginInstance message.
   //
   // [#not-implemented-hide:]
   message CertificateProvider {
