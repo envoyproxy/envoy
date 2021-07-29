@@ -26,7 +26,6 @@ namespace Envoy {
 
 namespace Router {
 class Route;
-class RouteEntry;
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
 } // namespace Router
 
