@@ -31,7 +31,6 @@ public:
                OverloadActionCb callback));
   MOCK_METHOD(Event::ScaledRangeTimerManagerFactory, scaledTimerFactory, (), (override));
   MOCK_METHOD(ThreadLocalOverloadState&, getThreadLocalOverloadState, ());
-  MOCK_METHOD(const ResetStreamAdapter*, resetStreamAdapter, ());
 
   testing::NiceMock<MockThreadLocalOverloadState> overload_state_;
 };

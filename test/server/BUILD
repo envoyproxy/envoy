@@ -234,14 +234,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "reset_streams_adapter_impl_test",
-    srcs = ["reset_streams_adapter_impl_test.cc"],
-    deps = [
-        "//source/server:reset_streams_adapter_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "lds_api_test",
     srcs = ["lds_api_test.cc"],
     data = [

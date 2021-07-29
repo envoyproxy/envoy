@@ -152,7 +152,10 @@ void WorkerImpl::rejectIncomingConnectionsCb(OverloadActionState state) {
 }
 
 void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState state) {
-  auto buckets_to_reset = overload_manager_.resetStreamAdapter()->translateToBucketsToReset(state);
+  // TODO(kbaichoo): can just use the knowledge here [0.0, 1] in state (scaled
+  // for lower, saturation here for our buckets) with a simple function.
+  // implement!
+  auto buckets_to_reset = 0;
 
   // TODO(kbaichoo) error -> info
   ENVOY_LOG(error, "resetStreamsUsingExcessiveMemory Invoked with State: {}",

@@ -393,20 +393,10 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "reset_streams_adapter_lib",
-    srcs = ["reset_streams_adapter_impl.cc"],
-    hdrs = ["reset_streams_adapter_impl.h"],
-    deps = [
-        "//envoy/server/overload:reset_streams_adapter",
-    ],
-)
-
-envoy_cc_library(
     name = "overload_manager_lib",
     srcs = ["overload_manager_impl.cc"],
     hdrs = ["overload_manager_impl.h"],
     deps = [
-        ":reset_streams_adapter_lib",
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/stats:stats_interface",
         "//envoy/thread_local:thread_local_interface",

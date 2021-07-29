@@ -1,7 +1,6 @@
 #include "source/server/overload_manager_impl.h"
 
 #include <chrono>
-#include <memory>
 
 #include "envoy/common/exception.h"
 #include "envoy/config/overload/v3/overload.pb.h"
@@ -167,26 +166,6 @@ parseTimerMinimums(const ProtobufWkt::Any& typed_config,
   return timer_map;
 }
 
-std::pair<double, double>
-parseResetStreamConfig(const ProtobufWkt::Any& typed_config,
-                       ProtobufMessage::ValidationVisitor& validation_visitor) {
-  using Config = envoy::config::overload::v3::ResetStreamsOverloadActionConfig;
-  const Config action_config =
-      MessageUtil::anyConvertAndValidate<Config>(typed_config, validation_visitor);
-
-  const double lower_limit = action_config.lower_limit();
-  const double upper_limit = action_config.upper_limit();
-
-  // Validate config (pgv check values are bounded by [0, 1].
-  if (lower_limit >= upper_limit) {
-    throw EnvoyException(
-        fmt::format("lower_limit ({}) >= upper_limit ({}). Expected upper_limit >= lower_limit.",
-                    lower_limit, upper_limit));
-  }
-
-  // Remap to [0,100].
-  return std::make_pair(lower_limit * 100, upper_limit * 100);
-}
 } // namespace
 
 NamedOverloadActionSymbolTable::Symbol
@@ -321,10 +300,6 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     if (name == OverloadActionNames::get().ReduceTimeouts) {
       timer_minimums_ = std::make_shared<const Event::ScaledTimerTypeMap>(
           parseTimerMinimums(action.typed_config(), validation_visitor));
-    } else if (name == OverloadActionNames::get().ResetStreams) {
-      auto [lower_limit, upper_limit] =
-          parseResetStreamConfig(action.typed_config(), validation_visitor);
-      reset_stream_adapter_ = std::make_unique<ResetStreamAdapterImpl>(lower_limit, upper_limit);
     } else if (action.has_typed_config()) {
       throw EnvoyException(fmt::format(
           "Overload action \"{}\" has an unexpected value for the typed_config field", name));
@@ -514,10 +489,6 @@ void OverloadManagerImpl::Resource::onFailure(const EnvoyException& error) {
   pending_update_ = false;
   ENVOY_LOG(info, "Failed to update resource {}: {}", name_, error.what());
   failed_updates_counter_.inc();
-}
-
-const ResetStreamAdapter* OverloadManagerImpl::resetStreamAdapter() {
-  return reset_stream_adapter_.get();
 }
 
 } // namespace Server

@@ -79,11 +79,6 @@ public:
    * Get a factory for constructing scaled timer managers that respond to overload state.
    */
   virtual Event::ScaledRangeTimerManagerFactory scaledTimerFactory() PURE;
-
-  /**
-   * Returns an adapter for resetStream callbacks.
-   */
-  virtual const ResetStreamAdapter* resetStreamAdapter() PURE;
 };
 
 } // namespace Server
