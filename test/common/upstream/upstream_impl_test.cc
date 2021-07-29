@@ -2263,8 +2263,8 @@ TEST(PrioritySet, Extend) {
 // Helper class used to test MainPrioritySetImpl.
 class TestMainPrioritySetImpl : public MainPrioritySetImpl {
 public:
-  auto readOnlyAllHostMapForTest() { return read_only_all_host_map_; }
-  auto mutableAllHostMapForTest() { return mutable_all_host_map_; }
+  HostMapConstSharedPtr readOnlyAllHostMapForTest() { return read_only_all_host_map_; }
+  HostMapSharedPtr mutableAllHostMapForTest() { return mutable_all_host_map_; }
 };
 
 // Test that the priority set in the main thread can work correctly.
@@ -2296,7 +2296,6 @@ TEST(PrioritySet, MainPrioritySetTest) {
   // Only mutable host map can be updated directly. Read only host map will not be updated before
   // 'readOnlyAllHostMap' is called.
   EXPECT_TRUE(priority_set.readOnlyAllHostMapForTest()->empty());
-  EXPECT_NE(nullptr, priority_set.mutableAllHostMapForTest());
   EXPECT_FALSE(priority_set.mutableAllHostMapForTest()->empty());
 
   // Mutable host map will be moved to read only host map after 'readOnlyAllHostMap' is called.
@@ -2318,8 +2317,8 @@ TEST(PrioritySet, MainPrioritySetTest) {
   // New mutable host map will be created and all update will be applied to new mutable host map.
   // Read only host map will not be updated before 'readOnlyAllHostMap' is called.
   EXPECT_EQ(host_map, priority_set.readOnlyAllHostMapForTest());
-  EXPECT_NE(nullptr, priority_set.mutableAllHostMapForTest());
-  EXPECT_NE(host_map, priority_set.mutableAllHostMapForTest());
+  EXPECT_TRUE((priority_set.mutableAllHostMapForTest() != nullptr &&
+               priority_set.mutableAllHostMapForTest() != host_map));
 
   // Again, mutable host map will be moved to read only host map after 'readOnlyAllHostMap' is
   // called.
