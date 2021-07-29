@@ -2,6 +2,11 @@ from pathlib import Path
 import unittest
 
 from detector import BufWrapper, ChangeDetectorInitializeError
+"""
+Tests breaking change detectors (e.g. buf) against different proto changes to ensure proper behavior in
+`allowed` and `breaking` circumstances. Although the dependency likely already tests for these circumstances,
+these specify Envoy's requirements and ensure that tool behavior is consistent across dependency updates.
+"""
 
 
 class BreakingChangeDetectorTests(object):
