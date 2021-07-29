@@ -50,7 +50,7 @@ bool EncoderImpl::loadHeaders(Http::ResponseHeaderMap* headers) {
         return Http::HeaderMap::Iterate::Continue;
       }
     }
-    // filter out headers that are not allowed to bbe encoded in the SXG document
+    // filter out headers that are not allowed to be encoded in the SXG document
     if (filtered_headers.find(header_key) != filtered_headers.end()) {
       return Http::HeaderMap::Iterate::Continue;
     }
