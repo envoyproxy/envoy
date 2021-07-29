@@ -64,13 +64,8 @@ public:
                           quic::ConnectionCloseSource source) override;
   void Initialize() override;
   void OnCanWrite() override;
-  void OnGoAway(const quic::QuicGoAwayFrame& frame) override;
   void OnHttp3GoAway(uint64_t stream_id) override;
   void OnTlsHandshakeComplete() override;
-  size_t WriteHeadersOnHeadersStream(
-      quic::QuicStreamId id, spdy::SpdyHeaderBlock headers, bool fin,
-      const spdy::SpdyStreamPrecedence& precedence,
-      quic::QuicReferenceCountedPointer<quic::QuicAckListenerInterface> ack_listener) override;
   void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicRstStreamErrorCode error,
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
