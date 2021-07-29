@@ -1190,10 +1190,11 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRoute(nullptr); }
 
 void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
-  if (!filter_manager_.streamInfo().route_entry_ || !request_headers_) {
+  if (!filter_manager_.streamInfo().route() ||
+      !filter_manager_.streamInfo().route()->routeEntry() || !request_headers_) {
     return;
   }
-  auto& route = filter_manager_.streamInfo().route_entry_;
+  const auto& route = filter_manager_.streamInfo().route()->routeEntry();
 
   auto grpc_timeout = Grpc::Common::getGrpcTimeout(*request_headers_);
   std::chrono::milliseconds timeout;
@@ -1608,14 +1609,15 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
  * functions as a helper to refreshCachedRoute(const Router::RouteCallback& cb).
  */
 void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
-  filter_manager_.streamInfo().route_entry_ = route ? route->routeEntry() : nullptr;
+  filter_manager_.streamInfo().route_ = route;
   cached_route_ = std::move(route);
-  if (nullptr == filter_manager_.streamInfo().route_entry_) {
+  if (nullptr == filter_manager_.streamInfo().route() ||
+      nullptr == filter_manager_.streamInfo().route()->routeEntry()) {
     cached_cluster_info_ = nullptr;
   } else {
     Upstream::ThreadLocalCluster* local_cluster =
         connection_manager_.cluster_manager_.getThreadLocalCluster(
-            filter_manager_.streamInfo().route_entry_->clusterName());
+            filter_manager_.streamInfo().route()->routeEntry()->clusterName());
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
 

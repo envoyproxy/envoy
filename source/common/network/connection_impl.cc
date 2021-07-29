@@ -288,13 +288,13 @@ void ConnectionImpl::noDelay(bool enable) {
   Api::SysCallIntResult result =
       socket_->setSocketOption(IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
 #if defined(__APPLE__)
-  if (SOCKET_FAILURE(result.rc_) && result.errno_ == SOCKET_ERROR_INVAL) {
+  if (SOCKET_FAILURE(result.return_value_) && result.errno_ == SOCKET_ERROR_INVAL) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
     // enabled despite this result.
     return;
   }
 #elif defined(WIN32)
-  if (SOCKET_FAILURE(result.rc_) &&
+  if (SOCKET_FAILURE(result.return_value_) &&
       (result.errno_ == SOCKET_ERROR_AGAIN || result.errno_ == SOCKET_ERROR_INVAL)) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
     // enabled despite this result.
@@ -302,8 +302,9 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 #endif
 
-  RELEASE_ASSERT(result.rc_ == 0, fmt::format("Failed to set TCP_NODELAY with error {}, {}",
-                                              result.errno_, errorDetails(result.errno_)));
+  RELEASE_ASSERT(result.return_value_ == 0,
+                 fmt::format("Failed to set TCP_NODELAY with error {}, {}", result.errno_,
+                             errorDetails(result.errno_)));
 }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
@@ -648,7 +649,7 @@ ConnectionImpl::unixSocketPeerCredentials() const {
 #else
   struct ucred ucred;
   socklen_t ucred_size = sizeof(ucred);
-  int rc = socket_->getSocketOption(SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size).rc_;
+  int rc = socket_->getSocketOption(SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size).return_value_;
   if (SOCKET_FAILURE(rc)) {
     return absl::nullopt;
   }
@@ -663,8 +664,8 @@ void ConnectionImpl::onWriteReady() {
   if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
-    RELEASE_ASSERT(socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).rc_ == 0,
-                   "");
+    RELEASE_ASSERT(
+        socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).return_value_ == 0, "");
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
@@ -846,7 +847,7 @@ ClientConnectionImpl::ClientConnectionImpl(
 
   if (*source != nullptr) {
     Api::SysCallIntResult result = socket_->bind(*source);
-    if (result.rc_ < 0) {
+    if (result.return_value_ < 0) {
       // TODO(lizan): consider add this error into transportFailureReason.
       ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source->get()->asString(),
                      errorDetails(result.errno_));
@@ -865,13 +866,13 @@ void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this,
                  socket_->addressProvider().remoteAddress()->asString());
   const Api::SysCallIntResult result = socket_->connect(socket_->addressProvider().remoteAddress());
-  if (result.rc_ == 0) {
+  if (result.return_value_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
     return;
   }
 
-  ASSERT(SOCKET_FAILURE(result.rc_));
+  ASSERT(SOCKET_FAILURE(result.return_value_));
 #ifdef WIN32
   // winsock2 connect returns EWOULDBLOCK if the socket is non-blocking and the connection
   // cannot be completed immediately. We do not check for `EINPROGRESS` as that error is for

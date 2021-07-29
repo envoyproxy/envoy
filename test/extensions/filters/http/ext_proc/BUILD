@@ -106,11 +106,13 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.ext_proc"],
     deps = [
         ":test_processor_lib",
+        ":utils_lib",
         "//source/common/network:address_lib",
         "//source/extensions/filters/http/ext_proc:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
     ],

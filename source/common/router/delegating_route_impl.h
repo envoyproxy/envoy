@@ -2,6 +2,8 @@
 
 #include "envoy/router/router.h"
 
+#include "source/common/config/metadata.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -33,6 +35,13 @@ public:
       const std::string& filter_name,
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override {
     base_route_->traversePerFilterConfig(filter_name, cb);
+  }
+
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    return base_route_->metadata();
+  }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return base_route_->typedMetadata();
   }
 
 private:
@@ -89,8 +98,6 @@ public:
   const MetadataMatchCriteria* metadataMatchCriteria() const override;
   const std::multimap<std::string, std::string>& opaqueConfig() const override;
   bool includeVirtualHostRateLimits() const override;
-  const Envoy::Config::TypedMetadata& typedMetadata() const override;
-  const envoy::config::core::v3::Metadata& metadata() const override;
   const TlsContextMatchCriteria* tlsContextMatchCriteria() const override;
   const PathMatchCriterion& pathMatchCriterion() const override;
   bool includeAttemptCountInRequest() const override;

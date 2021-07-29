@@ -333,12 +333,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       strip_trailing_host_dot_(config.strip_trailing_host_dot()),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_requests_per_connection, 0)) {
-  // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
-  // idle_timeout field.
-  // TODO(asraa): Remove when idle_timeout is removed.
-  if (!idle_timeout_) {
-    idle_timeout_ = PROTOBUF_GET_OPTIONAL_MS(config, hidden_envoy_deprecated_idle_timeout);
-  }
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -571,12 +565,18 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     codec_type_ = CodecType::HTTP3;
+    if (!context_.isQuicListener()) {
+      throw EnvoyException("HTTP/3 codec configured on non-QUIC listener.");
+    }
 #else
     throw EnvoyException("HTTP3 configured but not enabled in the build.");
 #endif
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+  if (codec_type_ != CodecType::HTTP3 && context_.isQuicListener()) {
+    throw EnvoyException("Non-HTTP/3 codec configured on QUIC listener.");
   }
 
   const auto& filters = config.http_filters();
@@ -818,7 +818,8 @@ std::function<Http::ApiListenerPtr()>
 HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
-    Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks) {
+    Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
+    bool clear_hop_by_hop_headers) {
 
   Utility::Singletons singletons = Utility::createSingletons(context);
 
@@ -831,11 +832,15 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [singletons, filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
+  return [singletons, filter_config, &context, &read_callbacks,
+          clear_hop_by_hop_headers]() -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
         context.overloadManager(), context.dispatcher().timeSource());
+    if (!clear_hop_by_hop_headers) {
+      conn_manager->setClearHopByHopResponseHeaders(false);
+    }
 
     // This factory creates a new ConnectionManagerImpl in the absence of its usual environment as
     // an L4 filter, so this factory needs to take a few actions.

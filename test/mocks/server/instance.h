@@ -4,6 +4,7 @@
 
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/context_impl.h"
+#include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/stats/symbol_table_impl.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
@@ -122,6 +123,7 @@ public:
   Http::ContextImpl http_context_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Router::ContextImpl router_context_;
+  Quic::QuicStatNames quic_stat_names_;
   testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::shared_ptr<testing::NiceMock<Configuration::MockStatsConfig>> stats_config_;
   std::shared_ptr<testing::NiceMock<Configuration::MockServerFactoryContext>>

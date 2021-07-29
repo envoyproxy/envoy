@@ -1164,7 +1164,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedHost) {
   EXPECT_EQ(sanitized_headers, request_headers);
 }
 
-TEST(HttpUtility, TestRejectNominatedXForwardedProto) {
+TEST(HttpUtility, TestRejectNominatedForwardedProto) {
   Http::TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"},
       {":path", "/"},
@@ -1248,7 +1248,7 @@ TEST(HttpUtility, TestRejectTeHeaderTooLong) {
 
 TEST(HttpUtility, TestRejectUriWithNoPath) {
   Http::TestRequestHeaderMapImpl request_headers_no_path = {
-      {":method", "GET"}, {":authority", "example.com"}, {"x-forwarded-proto", "http"}};
+      {":method", "GET"}, {":authority", "example.com"}, {":scheme", "http"}};
   EXPECT_EQ(Utility::buildOriginalUri(request_headers_no_path, {}), "");
 }
 
@@ -1256,7 +1256,7 @@ TEST(HttpUtility, TestTruncateUri) {
   Http::TestRequestHeaderMapImpl request_headers_truncated_path = {{":method", "GET"},
                                                                    {":path", "/hello_world"},
                                                                    {":authority", "example.com"},
-                                                                   {"x-forwarded-proto", "http"}};
+                                                                   {":scheme", "http"}};
   EXPECT_EQ(Utility::buildOriginalUri(request_headers_truncated_path, 2), "http://example.com/h");
 }
 
@@ -1265,7 +1265,7 @@ TEST(HttpUtility, TestUriUsesOriginalPath) {
       {":method", "GET"},
       {":path", "/hello_world"},
       {":authority", "example.com"},
-      {"x-forwarded-proto", "http"},
+      {":scheme", "http"},
       {"x-envoy-original-path", "/goodbye_world"}};
   EXPECT_EQ(Utility::buildOriginalUri(request_headers_truncated_path, {}),
             "http://example.com/goodbye_world");
