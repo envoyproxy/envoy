@@ -54,9 +54,18 @@ def _failing_runner(errors):
                 raise self.raises("AN ERROR OCCURRED")
             return result
 
+        @runner.catches(errors)
+        async def run_async(self, *args, **kwargs):
+            result = self._runner(*args, **kwargs)
+            if self.raises:
+                raise self.raises("AN ERROR OCCURRED")
+            return result
+
     return DummyFailingRunner
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("async_fun", [True, False])
 @pytest.mark.parametrize(
     "errors",
     [Error1, (Error1, Error2)])
@@ -69,7 +78,7 @@ def _failing_runner(errors):
 @pytest.mark.parametrize(
     "kwargs",
     [{}, dict(key1="VAL1", key2="VAL2")])
-def test_catches(errors, raises, args, kwargs):
+async def test_catches(errors, async_fun, raises, args, kwargs):
     run = _failing_runner(errors)(raises)
     should_fail = (
         raises
@@ -81,9 +90,9 @@ def test_catches(errors, raises, args, kwargs):
     if should_fail:
         result = 1
         with pytest.raises(raises):
-            run.run(*args, **kwargs)
+            run.run(*args, **kwargs) if not async_fun else await run.run_async(*args, **kwargs)
     else:
-        result = run.run(*args, **kwargs)
+        result = run.run(*args, **kwargs) if not async_fun else await run.run_async(*args, **kwargs)
 
     assert (
         list(run._runner.call_args)

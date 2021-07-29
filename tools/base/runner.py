@@ -3,6 +3,7 @@
 #
 
 import argparse
+import inspect
 import logging
 import os
 import subprocess
@@ -48,6 +49,7 @@ def catches(errors: Union[Tuple[Exception], Exception]) -> Callable:
             self.myrun()
     ```
 
+    Can work with `async` methods too.
     """
 
     def wrapper(fun: Callable) -> Callable:
@@ -60,7 +62,15 @@ def catches(errors: Union[Tuple[Exception], Exception]) -> Callable:
                 self.log.error(str(e) or repr(e))
                 return 1
 
-        return wrapped
+        @wraps(fun)
+        async def async_wrapped(self, *args, **kwargs) -> Optional[int]:
+            try:
+                return await fun(self, *args, **kwargs)
+            except errors as e:
+                self.log.error(str(e) or repr(e))
+                return 1
+
+        return async_wrapped if inspect.iscoroutinefunction(fun) else wrapped
 
     return wrapper
 
