@@ -28,7 +28,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
               .getMethodDescriptorForVersion(transport_api_version),
           transport_api_version),
       log_name_(log_name), local_info_(local_info) {
-  initFatalLoggerClient(
+  fatal_client_ = std::make_unique<CriticalAccessLoggerGrpcClientImpl>(
       client,
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.accesslog.v3.AccessLogService.BufferedCriticalAccessLogs"),

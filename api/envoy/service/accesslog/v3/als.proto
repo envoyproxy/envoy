@@ -105,4 +105,8 @@ message StreamAccessLogsMessage {
 
     TCPAccessLogEntries tcp_logs = 3;
   }
+
+  // This is an ID to identify the message, and can be added to the Critical Endpoint
+  // response message to uniquely identify the message being buffered in the Envoy.
+  uint32 id = 4;
 }

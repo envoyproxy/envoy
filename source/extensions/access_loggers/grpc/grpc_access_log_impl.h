@@ -17,6 +17,117 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace GrpcCommon {
 
+class CriticalAccessLoggerGrpcClientImpl
+    : public Common::CriticalAccessLoggerGrpcClient<
+          envoy::service::accesslog::v3::StreamAccessLogsMessage> {
+public:
+  using RequestType = envoy::service::accesslog::v3::StreamAccessLogsMessage;
+  using ResponseType = envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse;
+
+  CriticalAccessLoggerGrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& client,
+                                     const Protobuf::MethodDescriptor& method)
+      : CriticalAccessLoggerGrpcClientImpl(client, method, absl::nullopt) {}
+  CriticalAccessLoggerGrpcClientImpl(
+      const Grpc::RawAsyncClientSharedPtr& client, const Protobuf::MethodDescriptor& method,
+      absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version)
+      : client_(client), service_method_(method), transport_api_version_(transport_api_version) {}
+
+  struct BufferedMessage {
+    enum class State {
+      Initial,
+      Pending,
+    };
+
+    State state_{State::Initial};
+    RequestType message_;
+  };
+
+  struct ActiveStream : public Grpc::AsyncStreamCallbacks<ResponseType> {
+    ActiveStream(CriticalAccessLoggerGrpcClientImpl& parent) : parent_(parent) {}
+
+    // Grpc::AsyncStreamCallbacks
+    void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+    void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
+    void onReceiveMessage(std::unique_ptr<ResponseType>&& message) override {
+      const auto& id = message->id();
+
+      if (parent_.buffered_messages_.find(id) != parent_.buffered_messages_.end()) {
+        switch (message->status()) {
+        case envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::ACK:
+          parent_.buffered_messages_.erase(id);
+          break;
+        case envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::NACK:
+          parent_.buffered_messages_.at(id).state_ = BufferedMessage::State::Initial;
+          // TODO(shikugawa): After many NACK occurred, Buffer will be overwhelmed.
+          // To resolve this, Buffer should have size limit.
+          break;
+        default:
+          return;
+        }
+      }
+    }
+    void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
+    void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {
+      ASSERT(parent_.active_stream_ != nullptr);
+      if (parent_.active_stream_->stream_ != nullptr) {
+        parent_.active_stream_.reset();
+      }
+    }
+
+    CriticalAccessLoggerGrpcClientImpl& parent_;
+    Grpc::AsyncStream<RequestType> stream_;
+  };
+
+  // Copy messages in the buffer. Take care about memory pressure.
+  void flush(RequestType message) override {
+    if (!active_stream_) {
+      active_stream_ = std::make_unique<ActiveStream>(*this);
+    }
+
+    if (active_stream_->stream_ == nullptr) {
+      active_stream_->stream_ =
+          client_.start(service_method_, *active_stream_, Http::AsyncClient::StreamOptions());
+    }
+
+    if (active_stream_->stream_ == nullptr ||
+        active_stream_->stream_.isAboveWriteBufferHighWatermark()) {
+      active_stream_.reset();
+      return;
+    }
+
+    uint32_t id = MessageUtil::hash(message);
+    buffered_messages_[id] = BufferedMessage{BufferedMessage::State::Initial, message};
+
+    for (auto&& buffered_message : buffered_messages_) {
+      uint32_t id = buffered_message.first;
+      buffered_message.second.message_.set_id(id);
+      buffered_message.second.state_ = BufferedMessage::State::Pending;
+
+      // TODO(shikugawa): stream must be ended with response withing specified timeout,
+      // that must be defined to setup duration after last message transported.
+      if (transport_api_version_.has_value()) {
+        active_stream_->stream_->sendMessage(buffered_message.second.message_,
+                                             transport_api_version_.value(), false);
+      } else {
+        active_stream_->stream_->sendMessage(buffered_message.second.message_, false);
+      }
+    }
+  }
+
+  bool isStreamStarted() override {
+    return active_stream_ != nullptr && active_stream_->stream_ != nullptr;
+  }
+
+private:
+  friend ActiveStream;
+
+  absl::flat_hash_map<uint32_t, BufferedMessage> buffered_messages_;
+  std::unique_ptr<ActiveStream> active_stream_;
+  Grpc::AsyncClient<RequestType, ResponseType> client_;
+  const Protobuf::MethodDescriptor& service_method_;
+  const absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version_;
+};
+
 class GrpcAccessLoggerImpl
     : public Common::GrpcAccessLogger<envoy::data::accesslog::v3::HTTPAccessLogEntry,
                                       envoy::data::accesslog::v3::TCPAccessLogEntry,

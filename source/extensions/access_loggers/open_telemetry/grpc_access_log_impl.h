@@ -53,6 +53,7 @@ private:
   bool isFatalEmpty() override;
   void initMessage() override;
   void clearMessage() override;
+  void clearFatalMessage() override {}
   void initFatalMessage() override {}
 
   opentelemetry::proto::logs::v1::InstrumentationLibraryLogs* root_;

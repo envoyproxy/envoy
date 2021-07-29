@@ -120,9 +120,15 @@ private:
     num_clears_++;
   }
 
+  void clearFatalMessage() override {
+    fatal_message_.Clear();
+    num_fatal_clears_++;
+  }
+
   int num_inits_ = 0;
   int num_fatal_inits_ = 0;
   int num_clears_ = 0;
+  int num_fatal_clears_ = 0;
 };
 
 class GrpcAccessLogTest : public testing::Test {

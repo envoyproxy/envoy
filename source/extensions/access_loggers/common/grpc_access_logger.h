@@ -150,108 +150,6 @@ public:
   const absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version_;
 };
 
-template <class RequestType> class FatalAccessLoggerGrpcClient {
-public:
-  using ResponseType = envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse;
-
-  FatalAccessLoggerGrpcClient(const Grpc::RawAsyncClientSharedPtr& client,
-                              const Protobuf::MethodDescriptor& method)
-      : FatalAccessLoggerGrpcClient(client, method, absl::nullopt) {}
-  FatalAccessLoggerGrpcClient(
-      const Grpc::RawAsyncClientSharedPtr& client, const Protobuf::MethodDescriptor& method,
-      absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version)
-      : client_(client), service_method_(method), transport_api_version_(transport_api_version) {}
-
-  struct BufferedMessage {
-    enum class State {
-      Initial,
-      Pending,
-    };
-
-    State state_{State::Initial};
-    ResponseType& message_;
-  };
-
-  struct ActiveStream : public Grpc::AsyncStreamCallbacks<ResponseType> {
-    ActiveStream(FatalAccessLoggerGrpcClient<RequestType>& parent) : parent_(parent) {}
-
-    // Grpc::AsyncStreamCallbacks
-    void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
-    void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
-    void onReceiveMessage(std::unique_ptr<ResponseType>&& message) override {
-      const auto& id = message->id();
-
-      if (parent_.buffered_messages_.find(id) != parent_.buffered_messages_.end()) {
-        switch (message->status()) {
-        case envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::ACK:
-          parent_.buffered_messages_.erase(id);
-          break;
-        case envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::NACK:
-          parent_.buffered_messages_.at(id).state_ = BufferedMessage::State::Initial;
-          // TODO(shikugawa): After many NACK occurred, Buffer will be overwhelmed.
-          // To resolve this, Buffer should have size limit.
-          break;
-        default:
-          return;
-        }
-      }
-    }
-    void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
-    void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {
-      ASSERT(parent_.active_stream_ != nullptr);
-      if (parent_.active_stream_->stream_ != nullptr) {
-        parent_.active_stream_.reset();
-      }
-    }
-
-    FatalAccessLoggerGrpcClient<RequestType>& parent_;
-    Grpc::AsyncStream<RequestType> stream_;
-  };
-
-  void flush() {
-    if (!active_stream_) {
-      active_stream_ = std::make_unique<ActiveStream>(*this);
-    }
-
-    if (active_stream_->stream_ == nullptr) {
-      active_stream_->stream_ =
-          client_.start(service_method_, *active_stream_, Http::AsyncClient::StreamOptions());
-    }
-
-    if (active_stream_->stream_ == nullptr ||
-        active_stream_->stream_.isAboveWriteBufferHighWatermark()) {
-      active_stream_.reset();
-      return;
-    }
-
-    for (auto&& buffered_message : buffered_messages_) {
-      uint32_t id = buffered_message.first;
-      buffered_message.second.message_.set_id(id);
-      buffered_message.second.state_ = BufferedMessage::State::Pending;
-
-      // TODO(shikugawa): stream must be ended with response withing specified timeout,
-      // that must be defined to setup duration after last message transported.
-      if (transport_api_version_.has_value()) {
-        active_stream_->stream_->sendMessage(buffered_message.second.message_,
-                                             transport_api_version_.value(), false);
-      } else {
-        active_stream_->stream_->sendMessage(buffered_message.second.message_, false);
-      }
-    }
-  }
-
-  bool isStreamStarted() { return active_stream_ != nullptr && active_stream_->stream_ != nullptr; }
-
-private:
-  friend ActiveStream;
-
-  absl::flat_hash_map<uint32_t, BufferedMessage> buffered_messages_;
-  std::unique_ptr<ActiveStream> active_stream_;
-  Grpc::AsyncClient<RequestType, ResponseType> client_;
-  const Protobuf::MethodDescriptor& service_method_;
-  const absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version_;
-};
-
 } // namespace Detail
 
 /**
@@ -260,12 +158,28 @@ private:
 #define ALL_GRPC_ACCESS_LOGGER_STATS(COUNTER)                                                      \
   COUNTER(logs_written)                                                                            \
   COUNTER(logs_dropped)
+// TODO(shikugawa): implement critical message related stats.
 
 /**
  * Wrapper struct for the access log stats. @see stats_macros.h
  */
 struct GrpcAccessLoggerStats {
   ALL_GRPC_ACCESS_LOGGER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+template <class RequestType> class CriticalAccessLoggerGrpcClient {
+public:
+  virtual ~CriticalAccessLoggerGrpcClient() = default;
+
+  /**
+   * Flush critical messages.
+   */
+  virtual void flush(RequestType message) PURE;
+
+  /**
+   * Whether this client has active stream or not.
+   */
+  virtual bool isStreamStarted() PURE;
 };
 
 /**
@@ -340,15 +254,8 @@ public:
   }
 
 protected:
-  void initFatalLoggerClient(const Grpc::RawAsyncClientSharedPtr& client,
-                             const Protobuf::MethodDescriptor& service_method,
-                             envoy::config::core::v3::ApiVersion transport_api_version) {
-    fatal_client_ = std::make_unique<Detail::FatalAccessLoggerGrpcClient<LogRequest>>(
-        client, service_method, transport_api_version);
-  }
-
   Detail::GrpcAccessLogClient<LogRequest, LogResponse> client_;
-  std::unique_ptr<Detail::FatalAccessLoggerGrpcClient<LogRequest>> fatal_client_;
+  std::unique_ptr<CriticalAccessLoggerGrpcClient<LogRequest>> fatal_client_;
   LogRequest message_;
   LogRequest fatal_message_;
 
@@ -362,6 +269,7 @@ private:
   virtual void addFatalEntry(HttpLogProto&& entry) PURE;
   virtual void addFatalEntry(TcpLogProto&& entry) PURE;
   virtual void clearMessage() { message_.Clear(); }
+  virtual void clearFatalMessage() { fatal_message_.Clear(); }
 
   void flush() {
     if (isEmpty()) {
@@ -381,15 +289,15 @@ private:
   }
 
   void flushFatal() {
-    if (isFatalEmpty() || fatal_client_ == nullptr) {
+    if (fatal_client_ == nullptr || isFatalEmpty()) {
       return;
     }
     if (fatal_client_->isStreamStarted()) {
       initFatalMessage();
     }
 
-    fatal_client_->flush();
-    // TODO(shikugawa): consider message and buffer lifecycle.
+    fatal_client_->flush(fatal_message_);
+    clearFatalMessage();
   }
 
   bool canLogMore() {
