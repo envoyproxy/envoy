@@ -10,8 +10,6 @@
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/time.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/event/dispatcher.h"
@@ -290,8 +288,6 @@ void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
     load_function(bootstrap, true);
   } else if (*bootstrap_version == 3) {
     load_function(bootstrap, false);
-  } else if (*bootstrap_version == 2) {
-    throw EnvoyException("v2 bootstrap is deprecated and no longer supported.");
   } else {
     throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
   }
