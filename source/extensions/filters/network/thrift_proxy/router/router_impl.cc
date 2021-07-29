@@ -252,19 +252,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 
 FilterStatus Router::messageEnd() {
   ProtocolConverter::messageEnd();
-
-  Buffer::OwnedImpl transport_buffer;
-
-  upstream_request_->metadata_->setProtocol(upstream_request_->protocol_->type());
-
-  upstream_request_->transport_->encodeFrame(transport_buffer, *upstream_request_->metadata_,
-                                             upstream_request_buffer_);
-
-  request_size_ += transport_buffer.length();
+  request_size_ += upstream_request_->encodeAndWrite(upstream_request_buffer_);
   recordUpstreamRequestSize(*cluster_, request_size_);
-
-  upstream_request_->conn_data_->connection().write(transport_buffer, false);
-  upstream_request_->onRequestComplete();
   return FilterStatus::Continue;
 }
 
@@ -275,25 +264,7 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void Router::onEvent(Network::ConnectionEvent event) {
-  ASSERT(upstream_request_ && !upstream_request_->response_complete_);
-
-  switch (event) {
-  case Network::ConnectionEvent::RemoteClose:
-    ENVOY_STREAM_LOG(debug, "upstream remote close", *callbacks_);
-    upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
-    break;
-  case Network::ConnectionEvent::LocalClose:
-    ENVOY_STREAM_LOG(debug, "upstream local close", *callbacks_);
-    upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
-    break;
-  default:
-    // Connected is consumed by the connection pool.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-
-  upstream_request_->releaseConnection(false);
-}
+void Router::onEvent(Network::ConnectionEvent event) { upstream_request_->onEvent(event); }
 
 const Network::Connection* Router::downstreamConnection() const {
   if (callbacks_ != nullptr) {

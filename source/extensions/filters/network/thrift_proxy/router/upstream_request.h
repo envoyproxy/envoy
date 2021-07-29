@@ -40,6 +40,8 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
   ThriftFilters::ResponseStatus
   handleRegularResponse(Buffer::Instance& data, RequestOwner& owner,
                         ThriftFilters::DecoderFilterCallbacks* callbacks);
+  uint64_t encodeAndWrite(Buffer::OwnedImpl& request_buffer);
+  void onEvent(Network::ConnectionEvent event);
   void onRequestStart(bool continue_decoding);
   void onRequestComplete();
   void onResponseComplete();

@@ -193,6 +193,40 @@ bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream
   return false;
 }
 
+void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
+  ASSERT(!response_complete_);
+
+  switch (event) {
+  case Network::ConnectionEvent::RemoteClose:
+    ENVOY_LOG(debug, "upstream remote close");
+    onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+    break;
+  case Network::ConnectionEvent::LocalClose:
+    ENVOY_LOG(debug, "upstream local close");
+    onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+    break;
+  default:
+    // Connected is consumed by the connection pool.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
+  releaseConnection(false);
+}
+
+uint64_t UpstreamRequest::encodeAndWrite(Buffer::OwnedImpl& request_buffer) {
+  Buffer::OwnedImpl transport_buffer;
+
+  metadata_->setProtocol(protocol_->type());
+  transport_->encodeFrame(transport_buffer, *metadata_, request_buffer);
+
+  uint64_t size = transport_buffer.length();
+
+  conn_data_->connection().write(transport_buffer, false);
+  onRequestComplete();
+
+  return size;
+}
+
 void UpstreamRequest::onRequestStart(bool continue_decoding) {
   auto& buffer = parent_.buffer();
   parent_.initProtocolConverter(*protocol_, buffer);
