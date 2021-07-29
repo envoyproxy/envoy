@@ -100,6 +100,133 @@ void UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_
   onRequestStart(continue_decoding);
 }
 
+void UpstreamRequest::handleUpgradeResponse(Buffer::Instance& data) {
+  ENVOY_LOG(trace, "reading upgrade response: {} bytes", data.length());
+  if (!upgrade_response_->onData(data)) {
+    // Wait for more data.
+    return;
+  }
+
+  ENVOY_LOG(debug, "upgrade response complete");
+  protocol_->completeUpgrade(*conn_state_, *upgrade_response_);
+  upgrade_response_.reset();
+  onRequestStart(true);
+}
+
+ThriftFilters::ResponseStatus
+UpstreamRequest::handleRegularResponse(Buffer::Instance& data, RequestOwner& owner,
+                                       UpstreamResponseCallbacks& callbacks) {
+  ENVOY_LOG(trace, "reading response: {} bytes", data.length());
+
+  if (!response_started_) {
+    callbacks.startUpstreamResponse(*transport_, *protocol_);
+    response_started_ = true;
+  }
+
+  const auto& cluster = owner.cluster();
+
+  const auto status = callbacks.upstreamData(data);
+  if (status == ThriftFilters::ResponseStatus::Complete) {
+    ENVOY_LOG(debug, "response complete");
+
+    owner.recordUpstreamResponseSize(cluster, response_size_);
+
+    switch (callbacks.responseMetadata()->messageType()) {
+    case MessageType::Reply:
+      owner.incResponseReply(cluster);
+      if (callbacks.responseSuccess()) {
+        upstream_host_->outlierDetector().putResult(
+            Upstream::Outlier::Result::ExtOriginRequestSuccess);
+        owner.incResponseReplySuccess(cluster);
+      } else {
+        upstream_host_->outlierDetector().putResult(
+            Upstream::Outlier::Result::ExtOriginRequestFailed);
+        owner.incResponseReplyError(cluster);
+      }
+      break;
+
+    case MessageType::Exception:
+      upstream_host_->outlierDetector().putResult(
+          Upstream::Outlier::Result::ExtOriginRequestFailed);
+      owner.incResponseException(cluster);
+      break;
+
+    default:
+      owner.incResponseInvalidType(cluster);
+      break;
+    }
+    onResponseComplete();
+  } else if (status == ThriftFilters::ResponseStatus::Reset) {
+    // Note: invalid responses are not accounted in the response size histogram.
+    ENVOY_LOG(debug, "upstream reset");
+    upstream_host_->outlierDetector().putResult(Upstream::Outlier::Result::ExtOriginRequestFailed);
+    resetStream();
+  }
+
+  return status;
+}
+
+bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream,
+                                         RequestOwner& owner,
+                                         UpstreamResponseCallbacks& callbacks) {
+  ASSERT(!response_complete_);
+
+  response_size_ += data.length();
+
+  if (upgrade_response_ != nullptr) {
+    handleUpgradeResponse(data);
+  } else {
+    const auto status = handleRegularResponse(data, owner, callbacks);
+    if (status != ThriftFilters::ResponseStatus::MoreData) {
+      return true;
+    }
+  }
+
+  if (end_stream) {
+    // Response is incomplete, but no more data is coming.
+    ENVOY_LOG(debug, "response underflow");
+    onResponseComplete();
+    onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+    return true;
+  }
+
+  return false;
+}
+
+void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
+  ASSERT(!response_complete_);
+
+  switch (event) {
+  case Network::ConnectionEvent::RemoteClose:
+    ENVOY_LOG(debug, "upstream remote close");
+    onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+    break;
+  case Network::ConnectionEvent::LocalClose:
+    ENVOY_LOG(debug, "upstream local close");
+    onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+    break;
+  default:
+    // Connected is consumed by the connection pool.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
+  releaseConnection(false);
+}
+
+uint64_t UpstreamRequest::encodeAndWrite(Buffer::OwnedImpl& request_buffer) {
+  Buffer::OwnedImpl transport_buffer;
+
+  metadata_->setProtocol(protocol_->type());
+  transport_->encodeFrame(transport_buffer, *metadata_, request_buffer);
+
+  uint64_t size = transport_buffer.length();
+
+  conn_data_->connection().write(transport_buffer, false);
+  onRequestComplete();
+
+  return size;
+}
+
 void UpstreamRequest::onRequestStart(bool continue_decoding) {
   auto& buffer = parent_.buffer();
   parent_.initProtocolConverter(*protocol_, buffer);
