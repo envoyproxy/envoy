@@ -195,7 +195,7 @@ BufferMemoryAccountImpl::createAccount(WatermarkBufferFactory* factory,
 }
 
 int BufferMemoryAccountImpl::balanceToClassIndex() {
-  uint64_t shifted_balance = buffer_memory_allocated_ >> 20; // shift by 1MB.
+  const uint64_t shifted_balance = buffer_memory_allocated_ >> 20; // shift by 1MB.
 
   if (shifted_balance == 0) {
     return -1; // Not worth tracking anything < 1MB.

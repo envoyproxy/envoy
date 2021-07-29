@@ -156,16 +156,25 @@ private:
  * from a given downstream (and corresponding upstream, if one exists). The
  * accounts can then be used to reset the underlying stream.
  *
- * Any account produced by this factory might tracked by the factory using the
+ * Any account produced by this factory might be tracked by the factory using the
  * following scheme:
  *
  * 1) Is the account balance >= 1MB? If not don't track.
  * 2) For all accounts above the minimum threshold for tracking, put the account
- *    into one of the *BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_* buckets. As
- *    the account balance changes, the account informs the Watermark Factory if
- *    the bucket for that account has changed.
- *    See *BufferMemoryAccountImpl::balanceToClassIndex()* for details on the
- *    memory class for a given account balance.
+ *    into one of the *BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_* buckets.
+ *
+ *    We keep buckets containing accounts within a "memory class", which are
+ *    power of two buckets. For example, with a minimum threshold of 1MB, our
+ *    first bucket contains [1MB, 2MB) accounts, the second bucket contains
+ *    [2MB, 4MB), and so forth for
+ *    *BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_* buckets. These buckets
+ *    allow us to coarsely track accounts, and if overloaded we can easily
+ *    target more expensive streams.
+ *
+ *    As the account balance changes, the account informs the Watermark Factory
+ *    if the bucket for that account has changed. See
+ *    *BufferMemoryAccountImpl::balanceToClassIndex()* for details on the memory
+ *    class for a given account balance.
  *
  * TODO(kbaichoo): Update this documentation when we make the minimum account
  * threshold configurable.
