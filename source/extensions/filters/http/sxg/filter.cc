@@ -85,6 +85,7 @@ void Filter::doSxg() {
   }
 
   finished_ = true;
+
   encoder_callbacks_->modifyEncodingBuffer([this](Buffer::Instance& enc_buf) {
     config_->stats().total_signed_attempts_.inc();
 
@@ -114,7 +115,9 @@ void Filter::doSxg() {
       return;
     }
 
-    // Make sure that the resulting SXG isn't too big before adding it to the encoding buffer
+    // Make sure that the resulting SXG isn't too big before adding it to the encoding
+    // buffer. Note that since the buffer fragment hasn't been added to the enc_buf
+    // yet, we need to call done() directly.
     if (encoderBufferLimitReached(output->size() + 100)) {
       output->done();
       config_->stats().total_signed_failed_.inc();

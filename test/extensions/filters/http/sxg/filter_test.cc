@@ -298,6 +298,8 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
     EXPECT_EQ(sxg.toString(), result);
   }
 
+  void callDoSxgAgain() { filter_->doSxg(); }
+
   Stats::TestUtil::TestStore scope_;
   Event::SimulatedTimeSystem time_system_;
   std::shared_ptr<FilterConfig> config_;
@@ -966,6 +968,28 @@ TEST_F(FilterTest, ExtraHeaders) {
       506);
 
   testEncodeSignedExchange(request_headers, response_headers, expected_sxg);
+  const Envoy::Http::LowerCaseString x_client_can_accept_sxg_key("x-client-can-accept-sxg");
+  EXPECT_FALSE(request_headers.get(x_client_can_accept_sxg_key).empty());
+  EXPECT_EQ("true", request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_exceeded_max_payload_size").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_attempts").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_succeeded").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_failed").value());
+}
+
+TEST_F(FilterTest, TestDoubleDoSxg) {
+  setConfiguration();
+  setFilter();
+
+  Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/signed-exchange;v=b3"},
+                                                 {"host", "example.org"},
+                                                 {":path", "/hello.html"}};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
+  testEncodeSignedExchange(request_headers, response_headers);
+  callDoSxgAgain();
   const Envoy::Http::LowerCaseString x_client_can_accept_sxg_key("x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_client_can_accept_sxg_key).empty());
   EXPECT_EQ("true", request_headers.get(x_client_can_accept_sxg_key)[0]->value().getStringView());

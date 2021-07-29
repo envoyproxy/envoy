@@ -30,33 +30,34 @@ void EncoderImpl::setOrigin(const std::string origin) { origin_ = origin; };
 void EncoderImpl::setUrl(const std::string url) { url_ = url; };
 
 bool EncoderImpl::loadHeaders(Http::ResponseHeaderMap* headers) {
-  // Pass response headers to the signed doc.
   const auto& filtered_headers = filteredResponseHeaders();
   bool retval = true;
   headers->iterate([this, filtered_headers,
                     &retval](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     const auto& header_key = header.key().getStringView();
 
-    // filter out all headers that should not be encoded in the SXG document
+    // filter x-envoy-* headers
     if (absl::StartsWith(header_key, ThreadSafeSingleton<Http::PrefixValue>::get().prefix())) {
       return Http::HeaderMap::Iterate::Continue;
     }
+    // filter out the header that we use as a flag to trigger encoding
     if (config_->shouldEncodeSXGHeader().get() == header_key) {
       return Http::HeaderMap::Iterate::Continue;
     }
+    // filter out other headers by prefix
     for (const auto& prefix_filter : config_->headerPrefixFilters()) {
       if (absl::StartsWith(header_key, prefix_filter)) {
         return Http::HeaderMap::Iterate::Continue;
       }
     }
+    // filter out headers that are not allowed to bbe encoded in the SXG document
     if (filtered_headers.find(header_key) != filtered_headers.end()) {
       return Http::HeaderMap::Iterate::Continue;
     }
 
     const auto header_value = header.value().getStringView();
     if (!sxg_header_append_string(std::string(header_key).c_str(),
-                                  std::string(header_value).c_str(),
-                                  const_cast<sxg_header_t*>(&headers_))) {
+                                  std::string(header_value).c_str(), &headers_)) {
       retval = false;
       return Http::HeaderMap::Iterate::Break;
     }
@@ -71,7 +72,6 @@ bool EncoderImpl::loadContent(Buffer::Instance& data) {
   if (!sxg_buffer_resize(size, &raw_response_.payload)) {
     return false;
   }
-
   data.copyOut(0, size, raw_response_.payload.data);
 
   return true;
@@ -107,14 +107,14 @@ bool EncoderImpl::loadSigner() {
 }
 
 bool EncoderImpl::getEncodedResponse() {
-  bool retval = true;
-  if (retval && !sxg_header_copy(&headers_, &raw_response_.header)) {
-    retval = false;
+  // Pass response headers to the response before encoding
+  if (!sxg_header_copy(&headers_, &raw_response_.header)) {
+    return false;
   }
-  if (retval && !sxg_encode_response(config_->miRecordSize(), &raw_response_, &encoded_response_)) {
-    retval = false;
+  if (!sxg_encode_response(config_->miRecordSize(), &raw_response_, &encoded_response_)) {
+    return false;
   }
-  return retval;
+  return true;
 }
 
 Buffer::BufferFragment* EncoderImpl::writeSxg() {
@@ -127,6 +127,9 @@ Buffer::BufferFragment* EncoderImpl::writeSxg() {
   return new Buffer::BufferFragmentImpl(
       result.data, result.size,
       [result](const void*, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
+        // Capture of result by value passes a const, but sxg_buffer_release does not accept
+        // a const buffer_t*, so we have to cast it back. This is OK since the important
+        // operation performed by sxg_buffer_release is to release the data buffer.
         sxg_buffer_release(const_cast<sxg_buffer_t*>(&result));
         delete this_fragment;
       });
@@ -155,30 +158,28 @@ const std::string EncoderImpl::getCborUrl(const std::string& cert_digest) const 
 }
 
 X509* EncoderImpl::loadX09Cert() {
+  X509* cert = nullptr;
   BIO* bio = BIO_new(BIO_s_mem());
   RELEASE_ASSERT(bio != nullptr, "");
-  if (BIO_puts(bio, config_->certificate().c_str()) < 0) {
-    BIO_vfree(bio);
-    return nullptr;
+
+  if (BIO_puts(bio, config_->certificate().c_str()) >= 0) {
+    cert = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
   }
 
-  X509* cert = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
   BIO_vfree(bio);
-
   return cert;
 }
 
 EVP_PKEY* EncoderImpl::loadPrivateKey() {
+  EVP_PKEY* pri_key = nullptr;
   BIO* bio = BIO_new(BIO_s_mem());
   RELEASE_ASSERT(bio != nullptr, "");
-  if (BIO_puts(bio, config_->privateKey().c_str()) < 0) {
-    BIO_vfree(bio);
-    return nullptr;
+
+  if (BIO_puts(bio, config_->privateKey().c_str()) >= 0) {
+    pri_key = PEM_read_bio_PrivateKey(bio, nullptr, nullptr, nullptr);
   }
 
-  EVP_PKEY* pri_key = PEM_read_bio_PrivateKey(bio, nullptr, nullptr, nullptr);
   BIO_vfree(bio);
-
   return pri_key;
 }
 
@@ -196,6 +197,7 @@ const std::string EncoderImpl::generateCertDigest(X509* cert) const {
 }
 
 const std::string& EncoderImpl::sxgSigLabel() const {
+  // this is currently ignored, so an arbitrary string is safe to use
   CONSTRUCT_ON_FIRST_USE(std::string, "label");
 }
 

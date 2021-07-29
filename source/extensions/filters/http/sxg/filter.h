@@ -15,7 +15,7 @@ namespace SXG {
 /**
  * Transaction flow:
  * 1. check accept request header for whether client can accept sxg
- * 2. check x-envoy-should-encode-sxg from response headers
+ * 2. check response headers for flag to indicate whether downstream wants SXG encoding
  * 3. if both true, buffer response body until stream end and then run through the libsxg encoder
  * thingy
  *
@@ -48,8 +48,6 @@ private:
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_;
-
-  EncoderPtr createEncoder();
 
   void doSxg();
 
