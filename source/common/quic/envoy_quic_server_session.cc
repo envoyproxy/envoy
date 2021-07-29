@@ -56,18 +56,32 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
   }
   auto stream = new EnvoyQuicServerStream(id, this, quic::BIDIRECTIONAL, codec_stats_.value(),
                                           http3_options_.value(), headers_with_underscores_action_);
+  initializeStream(stream);
+  return stream;
+}
+
+void EnvoyQuicServerSession::initializeStream(EnvoyQuicServerStream* stream) {
   ActivateStream(absl::WrapUnique(stream));
   if (aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }
   setUpRequestDecoder(*stream);
-  return stream;
 }
 
 quic::QuicSpdyStream*
-EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
+EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* pending) {
   // Only client side server push stream should trigger this call.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  if (!codec_stats_.has_value() || !http3_options_.has_value()) {
+    ENVOY_BUG(false,
+              fmt::format(
+                  "Quic session {} attempts to create stream {} before HCM filter is initialized.",
+                  this->id(), pending->id()));
+    return nullptr;
+  }
+  auto stream = new EnvoyQuicServerStream(pending, this, quic::BIDIRECTIONAL, codec_stats_.value(),
+                                          http3_options_.value(), headers_with_underscores_action_);
+  initializeStream(stream);
+  return stream;
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {

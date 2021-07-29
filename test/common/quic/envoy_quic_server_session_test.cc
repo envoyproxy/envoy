@@ -1296,5 +1296,31 @@ TEST_P(EnvoyQuicServerSessionTest, OnCanWriteUpdateWatermarkGquic) {
   EXPECT_TRUE(stream1->IsFlowControlBlocked());
 }
 
+TEST_P(EnvoyQuicServerSessionTest, IncomingUnidirectionalReadStream) {
+  installReadFilter();
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  // IETF stream 5 and G-Quic stream 2 are server initiated.
+  quic::QuicStreamId stream_id =
+      quic::VersionUsesHttp3(quic_version_[0].transport_version) ? 2u : 3u;
+  auto payload = std::make_unique<char[]>(8);
+  quic::QuicDataWriter payload_writer(8, payload.get());
+  EXPECT_TRUE(payload_writer.WriteVarInt62(1ul));
+  EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
+      .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::ResponseEncoder& encoder,
+                                                             bool) -> Http::RequestDecoder& {
+        encoder.getStream().addCallbacks(stream_callbacks);
+        return request_decoder;
+      }));
+
+  quic::QuicStreamFrame stream_frame(stream_id, false, 0, absl::string_view(payload.get(), 1));
+  envoy_quic_session_.OnStreamFrame(stream_frame);
+  quic::QuicRstStreamFrame rst(/*control_frame_id=*/1u, stream_id,
+                                quic::QUIC_REFUSED_STREAM, /*bytes_written=*/0u);
+EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteRefusedStreamReset, _));
+  envoy_quic_session_.OnRstStream(rst);
+}
+
+
 } // namespace Quic
 } // namespace Envoy
