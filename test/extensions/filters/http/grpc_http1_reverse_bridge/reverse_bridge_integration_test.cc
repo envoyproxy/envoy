@@ -275,5 +275,53 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamResponse) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
+
+// Verifies that we can stream the response and proxy a reset.
+TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamWithholdResponse) {
+  upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
+
+  initialize(absl::make_optional("custom-response-size-header"));
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers({{":scheme", "http"},
+                                                  {":method", "POST"},
+                                                  {":authority", "foo"},
+                                                  {":path", "/testing.ExampleService/Print"},
+                                                  {"content-type", "application/grpc"}});
+
+  auto response = codec_client_->makeRequestWithBody(request_headers, "abcdef");
+
+  // Wait for upstream to finish the request.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Ensure that we stripped the length prefix and set the appropriate headers.
+  EXPECT_EQ("f", upstream_request_->body().toString());
+
+  EXPECT_THAT(upstream_request_->headers(),
+              HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+  EXPECT_THAT(upstream_request_->headers(),
+              HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
+
+  // Respond to the request.
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/x-protobuf");
+  const uint32_t upstream_response_size = 10;
+  response_headers.addCopy(Http::LowerCaseString("custom-response-size-header"),
+                           std::to_string(upstream_response_size));
+  upstream_request_->encodeHeaders(response_headers, false);
+
+  Buffer::OwnedImpl response_data{"helloworld"};
+  upstream_request_->encodeData(response_data, false);
+  response->waitForBodyData(10);
+
+  // If the upstream sends the full payload and also a reset, it should result in a reset rather
+  // than stream complete.
+  upstream_request_->encodeResetStream();
+  ASSERT_TRUE(response->waitForReset());
+}
 } // namespace
 } // namespace Envoy

@@ -191,6 +191,13 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
     return Http::FilterDataStatus::Continue;
   }
 
+  // If we're getting the response size from an upstream header, we can stream the response. The
+  // first chunk of data we encode needs the gRPC frame header prepended.
+  if (withhold_grpc_frames_ && response_size_header_ && !frame_header_added_) {
+    buildGrpcFrameHeader(buffer, response_message_length_);
+    frame_header_added_ = true;
+  }
+
   if (end_stream) {
     // Insert grpc-status trailers to communicate the error code.
     auto& trailers = encoder_callbacks_->addEncodedTrailers();
@@ -216,13 +223,6 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
 
   if (withhold_grpc_frames_) {
     if (response_size_header_) {
-      // If we're getting the response size from an upstream header, we can stream the response. The
-      // first chunk of data we encode needs the gRPC frame header prepended.
-      if (!frame_header_added_) {
-        buildGrpcFrameHeader(buffer, response_message_length_);
-        frame_header_added_ = true;
-      }
-
       return Http::FilterDataStatus::Continue;
     }
 
