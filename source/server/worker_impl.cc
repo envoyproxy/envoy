@@ -154,7 +154,12 @@ void WorkerImpl::rejectIncomingConnectionsCb(OverloadActionState state) {
 void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState state) {
   auto buckets_to_reset = overload_manager_.resetStreamAdapter()->translateToBucketsToReset(state);
 
+  // TODO(kbaichoo) error -> info
+  ENVOY_LOG(error, "resetStreamsUsingExcessiveMemory Invoked with State: {}",
+            state.value().value());
   if (buckets_to_reset.has_value()) {
+    // TODO(kbaichoo) error -> info
+    ENVOY_LOG(error, "resetting streams in buckets >= {}", buckets_to_reset.value());
     dispatcher_->getWatermarkFactory().resetAllAccountsInBucketsStartingWith(
         buckets_to_reset.value());
   }

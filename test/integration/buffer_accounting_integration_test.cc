@@ -1,5 +1,6 @@
 #include <sstream>
 
+#include "test/integration/base_overload_integration_test.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -21,6 +22,9 @@
 
 namespace Envoy {
 namespace {
+
+using testing::HasSubstr;
+
 std::string protocolTestParamsAndBoolToString(
     const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool>>& params) {
   return fmt::format("{}_{}",
@@ -96,9 +100,9 @@ public:
   }
 
 protected:
+  // For testing purposes, track >= 4096B accounts.
   std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_ =
-      std::make_shared<Buffer::TrackedWatermarkBufferFactory>(
-          absl::bit_width(1024u * 1024u)); // Track >= 1MB
+      std::make_shared<Buffer::TrackedWatermarkBufferFactory>(absl::bit_width(4096u));
 
   bool streamBufferAccounting() { return std::get<1>(GetParam()); }
 
@@ -394,6 +398,118 @@ TEST_P(ProtocolsBufferWatermarksTest, ResettingStreamUnregistersAccount) {
   } else {
     EXPECT_TRUE(buffer_factory_->waitForExpectedAccountUnregistered(0));
   }
+}
+
+class Http2OverloadManagerIntegrationTest : public Http2BufferWatermarksTest,
+                                            public Envoy::BaseOverloadIntegrationTest {
+protected:
+  void initializeOverloadManagerInBootstrap(
+      const envoy::config::overload::v3::OverloadAction& overload_action) {
+    setupOverloadManagerConfig(overload_action);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+  }
+};
+
+// Run the tests using HTTP2 only since its the only protocol that's fully
+// supported.
+// TODO(kbaichoo): Instantiate with H3 and H1 as well when their buffers are
+// bounded to accounts.
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, Http2OverloadManagerIntegrationTest,
+    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                         {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                     testing::Bool()),
+    protocolTestParamsAndBoolToString);
+
+TEST_P(Http2OverloadManagerIntegrationTest, ResetsExpensiveStreamsWhenOverloaded) {
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initializeOverloadManagerInBootstrap(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.reset_streams"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          scaled:
+            scaling_threshold: 0.0
+            saturation_threshold: 1.0
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ResetStreamsOverloadActionConfig
+        upper_limit: 0.98
+        lower_limit: 0.90
+    )EOF"));
+  initialize();
+
+  // Makes us have Envoy's writes to upstream return EAGAIN
+  writev_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  writev_matcher_->setWritevReturnsEgain();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // TODO(kbaichoo): might need to tune these numbers when adjusting the
+  // calculation...
+  auto largest_request_response = std::move(sendRequests(1, 4096 * 4, 4096)[0]);
+  auto medium_request_response = std::move(sendRequests(1, 4096 * 2, 4096)[0]);
+  auto smallest_request_response = std::move(sendRequests(1, 4096, 4096)[0]);
+
+  // Wait for requests to come into Envoy.
+  EXPECT_TRUE(buffer_factory_->waitUntilTotalBufferedExceeds(7 * 4096));
+
+  std::cout << "\nACCOUNTS: " << printAccounts() << std::endl;
+
+  // Set the pressure so the overload action kicks in
+  updateResource(0.95);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reset_streams.scale_percent", 95);
+
+  std::cout << "First resource update sent!\n";
+
+  // Wait for the proxy to notice and take action for the overload by only
+  // resetting the largest stream.
+  if (streamBufferAccounting()) {
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 1);
+    EXPECT_TRUE(largest_request_response->waitForReset());
+    EXPECT_TRUE(largest_request_response->reset());
+
+    ASSERT_FALSE(medium_request_response->complete());
+  }
+
+  std::cout << "second resource update sent!\n";
+
+  // Increase resource pressure to reset the medium request
+  updateResource(0.96);
+
+  // Wait for the proxy to notice and take action for the overload.
+  if (streamBufferAccounting()) {
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 2);
+    EXPECT_TRUE(medium_request_response->waitForReset());
+    EXPECT_TRUE(medium_request_response->reset());
+
+    ASSERT_FALSE(smallest_request_response->complete());
+  }
+
+  // Reduce resource pressure
+  std::cout << "third resource update sent!\n";
+  updateResource(0.80);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reset_streams.scale_percent", 80);
+
+  // Resume writes to upstream, any request streams that survive can go through.
+  writev_matcher_->setResumeWrites();
+
+  if (!streamBufferAccounting()) {
+    // If we're not doing the accounting, we didn't end up resetting these
+    // streams.
+    ASSERT_TRUE(largest_request_response->waitForEndStream());
+    ASSERT_TRUE(largest_request_response->complete());
+    EXPECT_EQ(largest_request_response->headers().getStatusValue(), "200");
+
+    ASSERT_TRUE(medium_request_response->waitForEndStream());
+    ASSERT_TRUE(medium_request_response->complete());
+    EXPECT_EQ(medium_request_response->headers().getStatusValue(), "200");
+  }
+
+  ASSERT_TRUE(smallest_request_response->waitForEndStream());
+  ASSERT_TRUE(smallest_request_response->complete());
+  EXPECT_EQ(smallest_request_response->headers().getStatusValue(), "200");
 }
 
 } // namespace Envoy

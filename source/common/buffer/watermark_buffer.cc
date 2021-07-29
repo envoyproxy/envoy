@@ -6,6 +6,7 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -184,10 +185,11 @@ void WatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPt
 void WatermarkBufferFactory::resetAllAccountsInBucketsStartingWith(uint32_t bucket_idx) {
   ASSERT(bucket_idx >= 0 && bucket_idx < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_,
          "Provided bucket index is out of range.");
-  // TODO(kbaichoo): consider counting number of accounts reset, and logging it.
   while (bucket_idx < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_) {
+    // TODO(kbaichoo): error -> info; error rn for debug purposes.
+    ENVOY_LOG_MISC(error, "resetting {} streams in bucket {}.",
+                   size_class_account_sets_[bucket_idx].size(), bucket_idx);
 
-    // Reset all downstreams for accounts in the given bucket.
     auto it = size_class_account_sets_[bucket_idx].begin();
     while (it != size_class_account_sets_[bucket_idx].end()) {
       auto next = std::next(it);
