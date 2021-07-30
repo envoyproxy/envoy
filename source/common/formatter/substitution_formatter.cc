@@ -716,11 +716,10 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "BYTES_RECEIVED") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesReceived(); });
-  }else if (field_name == "WIRE_BYTES_RECEIVED") {
+  } else if (field_name == "WIRE_BYTES_RECEIVED") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) { return stream_info.wireBytesReceived(); });
-  } 
-  else if (field_name == "PROTOCOL") {
+  } else if (field_name == "PROTOCOL") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           return SubstitutionFormatUtils::protocolToString(stream_info.protocol());

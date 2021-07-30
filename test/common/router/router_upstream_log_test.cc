@@ -44,7 +44,7 @@ typed_config:
   log_format:
     text_format_source:
       inline_string: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE%
-      %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %REQ(:AUTHORITY)% %UPSTREAM_HOST%
+      %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %WIRE_BYTES_RECEIVED% %WIRE_BYTES_SENT% %REQ(:AUTHORITY)% %UPSTREAM_HOST%
       %UPSTREAM_LOCAL_ADDRESS% %RESP(X-UPSTREAM-HEADER)% %TRAILER(X-TRAILER)%\n"
   path: "/dev/null"
   )EOF";
@@ -260,7 +260,8 @@ TEST_F(RouterUpstreamLogTest, LogSingleTry) {
   run();
 
   EXPECT_EQ(output_.size(), 1U);
-  EXPECT_EQ(output_.front(), "GET / HTTP/1.0 200 - 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
+  EXPECT_EQ(output_.front(),
+            "GET / HTTP/1.0 200 - 0 0 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
 }
 
 TEST_F(RouterUpstreamLogTest, LogRetries) {
@@ -268,8 +269,8 @@ TEST_F(RouterUpstreamLogTest, LogRetries) {
   runWithRetry();
 
   EXPECT_EQ(output_.size(), 2U);
-  EXPECT_EQ(output_.front(), "GET / HTTP/1.0 0 UT 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
-  EXPECT_EQ(output_.back(), "GET / HTTP/1.0 200 - 0 0 host 10.0.0.5:9211 10.0.0.5:10212 - -\n");
+  EXPECT_EQ(output_.front(), "GET / HTTP/1.0 0 UT 0 0 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
+  EXPECT_EQ(output_.back(), "GET / HTTP/1.0 200 - 0 0 0 0 host 10.0.0.5:9211 10.0.0.5:10212 - -\n");
 }
 
 TEST_F(RouterUpstreamLogTest, LogFailure) {
@@ -277,7 +278,8 @@ TEST_F(RouterUpstreamLogTest, LogFailure) {
   run(503, {}, {}, {});
 
   EXPECT_EQ(output_.size(), 1U);
-  EXPECT_EQ(output_.front(), "GET / HTTP/1.0 503 - 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
+  EXPECT_EQ(output_.front(),
+            "GET / HTTP/1.0 503 - 0 0 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
 }
 
 TEST_F(RouterUpstreamLogTest, LogHeaders) {
@@ -287,7 +289,7 @@ TEST_F(RouterUpstreamLogTest, LogHeaders) {
 
   EXPECT_EQ(output_.size(), 1U);
   EXPECT_EQ(output_.front(),
-            "GET /foo HTTP/1.0 200 - 0 0 host 10.0.0.5:9211 10.0.0.5:10211 abcdef value\n");
+            "GET /foo HTTP/1.0 200 - 0 0 0 0 host 10.0.0.5:9211 10.0.0.5:10211 abcdef value\n");
 }
 
 // Test timestamps and durations are emitted.

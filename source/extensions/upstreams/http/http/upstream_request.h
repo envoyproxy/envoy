@@ -104,7 +104,7 @@ public:
   }
 
   void getStreamInfomation(StreamInfo::StreamInfo& stream_info) override {
-    if (!request_encoder_) {
+    if (request_encoder_ == nullptr) {
       return;
     }
     auto& stream = request_encoder_->getStream();

@@ -2220,7 +2220,6 @@ void Http1ClientConnectionImplTest::testClientAllowChunkedContentLength(uint32_t
                   "0\r\n\r\n",
                   content_length));
   auto status = codec_->dispatch(buffer);
-
   if (allow_chunked_length) {
     EXPECT_TRUE(status.ok());
   } else {
@@ -2896,7 +2895,6 @@ TEST_F(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   Http::MockStreamCallbacks stream_callbacks;
   request_encoder.getStream().addCallbacks(stream_callbacks);
-
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
