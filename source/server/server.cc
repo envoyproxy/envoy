@@ -10,8 +10,6 @@
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/time.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/event/dispatcher.h"
@@ -29,10 +27,13 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/version_converter.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
+#include "source/common/http/headers.h"
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/memory/stats.h"
 #include "source/common/network/address_impl.h"
@@ -287,12 +288,50 @@ void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
     load_function(bootstrap, true);
   } else if (*bootstrap_version == 3) {
     load_function(bootstrap, false);
-  } else if (*bootstrap_version == 2) {
-    throw EnvoyException("v2 bootstrap is deprecated and no longer supported.");
   } else {
     throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
   }
 }
+
+bool canBeRegisteredAsInlineHeader(const Http::LowerCaseString& header_name) {
+  // 'set-cookie' cannot currently be registered as an inline header.
+  if (header_name == Http::Headers::get().SetCookie) {
+    return false;
+  }
+  return true;
+}
+
+void registerCustomInlineHeadersFromBootstrap(
+    const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  for (const auto& inline_header : bootstrap.inline_headers()) {
+    const Http::LowerCaseString lower_case_name(inline_header.inline_header_name());
+    if (!canBeRegisteredAsInlineHeader(lower_case_name)) {
+      throw EnvoyException(fmt::format("Header {} cannot be registered as an inline header.",
+                                       inline_header.inline_header_name()));
+    }
+    switch (inline_header.inline_header_type()) {
+    case envoy::config::bootstrap::v3::CustomInlineHeader::REQUEST_HEADER:
+      Http::CustomInlineHeaderRegistry::registerInlineHeader<
+          Http::RequestHeaderMap::header_map_type>(lower_case_name);
+      break;
+    case envoy::config::bootstrap::v3::CustomInlineHeader::REQUEST_TRAILER:
+      Http::CustomInlineHeaderRegistry::registerInlineHeader<
+          Http::RequestTrailerMap::header_map_type>(lower_case_name);
+      break;
+    case envoy::config::bootstrap::v3::CustomInlineHeader::RESPONSE_HEADER:
+      Http::CustomInlineHeaderRegistry::registerInlineHeader<
+          Http::ResponseHeaderMap::header_map_type>(lower_case_name);
+      break;
+    case envoy::config::bootstrap::v3::CustomInlineHeader::RESPONSE_TRAILER:
+      Http::CustomInlineHeaderRegistry::registerInlineHeader<
+          Http::ResponseTrailerMap::header_map_type>(lower_case_name);
+      break;
+    default:
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
+  }
+}
+
 } // namespace
 
 void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
@@ -354,8 +393,10 @@ void InstanceImpl::initialize(const Options& options,
     // setPrefix has a release assert verifying that setPrefix() is not called after prefix()
     ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix(bootstrap_.header_prefix().c_str());
   }
-  // TODO(mattklein123): Custom O(1) headers can be registered at this point for creating/finalizing
-  // any header maps.
+
+  // Register Custom O(1) headers from bootstrap.
+  registerCustomInlineHeadersFromBootstrap(bootstrap_);
+
   ENVOY_LOG(info, "HTTP header map info:");
   for (const auto& info : Http::HeaderMapImplUtility::getAllHeaderMapImplInfo()) {
     ENVOY_LOG(info, "  {}: {} bytes: {}", info.name_, info.size_,
@@ -836,6 +877,10 @@ void InstanceImpl::terminate() {
 
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
+
+  // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
+  Config::GrpcMuxImpl::shutdownAll();
+  Config::NewGrpcMuxImpl::shutdownAll();
 
   if (overload_manager_) {
     overload_manager_->stop();

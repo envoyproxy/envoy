@@ -54,7 +54,7 @@ public:
   };
 
   explicit ProcessorState(Filter& filter)
-      : filter_(filter), watermark_requested_(false), paused_(false),
+      : filter_(filter), watermark_requested_(false), paused_(false), no_body_(false),
         complete_body_available_(false), trailers_available_(false), body_replaced_(false),
         bytes_enqueued_(0) {}
   ProcessorState(const ProcessorState&) = delete;
@@ -67,6 +67,7 @@ public:
 
   bool completeBodyAvailable() const { return complete_body_available_; }
   void setCompleteBodyAvailable(bool d) { complete_body_available_ = d; }
+  void setHasNoBody(bool b) { no_body_ = b; }
   void setTrailersAvailable(bool d) { trailers_available_ = d; }
   bool bodyReplaced() const { return body_replaced_; }
 
@@ -132,6 +133,8 @@ protected:
   // a "continue."
   bool paused_ : 1;
 
+  // If true, then there is not going to be a body
+  bool no_body_ : 1;
   // If true, then the filter received the complete body
   bool complete_body_available_ : 1;
   // If true, then the filter received the trailers

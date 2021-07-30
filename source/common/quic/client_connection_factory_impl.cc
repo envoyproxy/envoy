@@ -64,18 +64,17 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
   if (config == nullptr) {
     return nullptr; // no secrets available yet.
   }
-
+  quic::ParsedQuicVersionVector quic_versions = quic::CurrentSupportedHttp3Versions();
+  ASSERT(!quic_versions.empty());
   auto connection = std::make_unique<EnvoyQuicClientConnection>(
       quic::QuicUtils::CreateRandomConnectionId(), server_addr, info_impl->conn_helper_,
-      info_impl->alarm_factory_, quic::ParsedQuicVersionVector{info_impl->supported_versions_[0]},
-      local_addr, dispatcher, nullptr);
+      info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, nullptr);
 
-  ASSERT(!info_impl->supported_versions_.empty());
   // QUICHE client session always use the 1st version to start handshake.
   auto ret = std::make_unique<EnvoyQuicClientSession>(
-      info_impl->quic_config_, info_impl->supported_versions_, std::move(connection),
-      info_impl->server_id_, std::move(config), &info_impl->push_promise_index_, dispatcher,
-      info_impl->buffer_limit_, info_impl->crypto_stream_factory_, quic_stat_names, scope);
+      info_impl->quic_config_, quic_versions, std::move(connection), info_impl->server_id_,
+      std::move(config), &info_impl->push_promise_index_, dispatcher, info_impl->buffer_limit_,
+      info_impl->crypto_stream_factory_, quic_stat_names, scope);
   return ret;
 }
 

@@ -28,9 +28,13 @@ ConnPoolImplBase::ConnPoolImplBase(
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
-  ASSERT(ready_clients_.empty());
-  ASSERT(busy_clients_.empty());
-  ASSERT(connecting_clients_.empty());
+  ASSERT(isIdleImpl());
+  ASSERT(connecting_stream_capacity_ == 0);
+}
+
+void ConnPoolImplBase::deleteIsPendingImpl() {
+  deferred_deleting_ = true;
+  ASSERT(isIdleImpl());
   ASSERT(connecting_stream_capacity_ == 0);
 }
 
@@ -225,6 +229,8 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
 }
 
 ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context) {
+  ASSERT(!deferred_deleting_);
+
   ASSERT(static_cast<ssize_t>(connecting_stream_capacity_) ==
          connectingCapacity(connecting_clients_)); // O(n) debug check.
   if (!ready_clients_.empty()) {
@@ -272,6 +278,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
 }
 
 bool ConnPoolImplBase::maybePreconnect(float global_preconnect_ratio) {
+  ASSERT(!deferred_deleting_);
   return tryCreateNewConnection(global_preconnect_ratio) == ConnectionResult::CreatedNewConnection;
 }
 
@@ -322,9 +329,11 @@ void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
   }
 }
 
-void ConnPoolImplBase::addDrainedCallbackImpl(Instance::DrainedCb cb) {
-  drained_callbacks_.push_back(cb);
-  checkForDrained();
+void ConnPoolImplBase::addIdleCallbackImpl(Instance::IdleCb cb) { idle_callbacks_.push_back(cb); }
+
+void ConnPoolImplBase::startDrainImpl() {
+  is_draining_ = true;
+  checkForIdleAndCloseIdleConnsIfDraining();
 }
 
 void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
@@ -366,17 +375,19 @@ void ConnPoolImplBase::drainConnectionsImpl() {
   }
 }
 
-void ConnPoolImplBase::checkForDrained() {
-  if (drained_callbacks_.empty()) {
-    return;
+bool ConnPoolImplBase::isIdleImpl() const {
+  return pending_streams_.empty() && ready_clients_.empty() && busy_clients_.empty() &&
+         connecting_clients_.empty();
+}
+
+void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
+  if (is_draining_) {
+    closeIdleConnectionsForDrainingPool();
   }
 
-  closeIdleConnectionsForDrainingPool();
-
-  if (pending_streams_.empty() && ready_clients_.empty() && busy_clients_.empty() &&
-      connecting_clients_.empty()) {
-    ENVOY_LOG(debug, "invoking drained callbacks");
-    for (const Instance::DrainedCb& cb : drained_callbacks_) {
+  if (isIdleImpl()) {
+    ENVOY_LOG(debug, "invoking idle callbacks - is_draining_={}", is_draining_);
+    for (const Instance::IdleCb& cb : idle_callbacks_) {
       cb();
     }
   }
@@ -439,9 +450,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     client.releaseResources();
 
     dispatcher_.deferredDelete(client.removeFromList(owningList(client.state())));
-    if (incomplete_stream) {
-      checkForDrained();
-    }
+
+    checkForIdleAndCloseIdleConnsIfDraining();
 
     client.setState(ActiveClient::State::CLOSED);
 
@@ -459,7 +469,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     // refer to client after this point.
     onConnected(client);
     onUpstreamReady();
-    checkForDrained();
+    checkForIdleAndCloseIdleConnsIfDraining();
   }
 }
 
@@ -529,7 +539,7 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
   }
 
   host_->cluster().stats().upstream_rq_cancelled_.inc();
-  checkForDrained();
+  checkForIdleAndCloseIdleConnsIfDraining();
 }
 
 namespace {

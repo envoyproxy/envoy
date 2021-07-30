@@ -423,7 +423,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                                Api::Api& api, bool do_boosting) {
   const std::string contents = api.fileSystem().fileReadToEnd(path);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
-  if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
     auto read_proto_binary = [&contents, &validation_visitor](Protobuf::Message& message,
                                                               MessageVersion message_version) {
@@ -459,7 +459,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
 
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
-  if (absl::EndsWith(path, FileExtensions::get().ProtoText)) {
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoText)) {
     auto read_proto_text = [&contents, &path](Protobuf::Message& message,
                                               MessageVersion message_version) {
       if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
@@ -482,7 +482,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     }
     return;
   }
-  if (absl::EndsWith(path, FileExtensions::get().Yaml)) {
+  if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
+      absl::EndsWithIgnoreCase(path, FileExtensions::get().Yml)) {
     loadFromYaml(contents, message, validation_visitor, do_boosting);
   } else {
     loadFromJson(contents, message, validation_visitor, do_boosting);
