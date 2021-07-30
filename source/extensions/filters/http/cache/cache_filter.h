@@ -53,17 +53,18 @@ class CacheFilter : public Http::PassThroughFilter,
 public:
   CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
               const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
-              HttpCache& http_cache);
+              HttpCacheSharedPtr http_cache, CachePolicyPtr cache_policy);
   // Http::StreamFilterBase
   void onDestroy() override;
   void onStreamComplete() override;
   // Http::StreamDecoderFilter
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
-  Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
   static LookupStatus resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_status,
@@ -80,18 +81,19 @@ private:
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
-  // Set required state in the CacheFilter for handling a cache hit.
-  void handleCacheHit();
-
   // Set up the required state in the CacheFilter for handling a range
   // request.
   void handleCacheHitWithRangeRequest();
 
+  // Set required state in the CacheFilter for handling a cache hit.
+  void handleCacheHit();
+
   // Set required state in the CacheFilter for handling a cache hit when
   // validation is required.
-  void handleCacheHitWithValidation(Envoy::Http::RequestHeaderMap& request_headers);
+  void handleCacheHitWithValidation(Http::RequestHeaderMap& request_headers);
 
-  // Precondition: lookup_result_ points to a cache lookup result that requires validation.
+  // Precondition: lookup_result_ points to a cache lookup result that requires
+  // validation.
   //               filter_state_ is ValidatingCachedResponse.
   // Serves a validated cached response after updating it with a 304 response.
   void processSuccessfulValidation(Http::ResponseHeaderMap& response_headers);
@@ -126,7 +128,9 @@ private:
   InsertStatus insertStatus() const;
 
   TimeSource& time_source_;
-  HttpCache& cache_;
+  HttpCacheSharedPtr cache_;
+  CachePolicyPtr cache_policy_;
+  CachePolicyCallbacksPtr cache_policy_callbacks_;
   LookupContextPtr lookup_;
   InsertContextPtr insert_;
   LookupResultPtr lookup_result_;
@@ -142,20 +146,26 @@ private:
   // Stores the allow list rules that decide if a header can be varied upon.
   VaryAllowList vary_allow_list_;
 
+  // Max body size of responses that can be inserted into cache.
+  absl::optional<uint32_t> max_body_bytes_;
+
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.
   bool response_has_trailers_ = false;
 
-  // True if a request allows cache inserts according to:
+  // True if a request allows caching according to:
   // https://httpwg.org/specs/rfc7234.html#response.cacheability
-  bool request_allows_inserts_ = false;
+  bool request_allows_caching_ = false;
 
-  FilterState filter_state_ = FilterState::Initial;
-
+  // True if the request has the method HEAD.
   bool is_head_request_ = false;
+
   // The status of the insert operation or header update, or decision not to insert or update.
   // If it's too early to determine the final status, this is empty.
   absl::optional<InsertStatus> insert_status_;
+
+  // Tracks the state of the filter for reporting request status to metrics collection.
+  FilterState filter_state_ = FilterState::Initial;
 };
 
 using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;

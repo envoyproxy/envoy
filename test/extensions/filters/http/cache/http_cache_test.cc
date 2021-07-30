@@ -41,13 +41,20 @@ envoy::extensions::filters::http::cache::v3::CacheConfig getConfig() {
 
 class LookupRequestTest : public testing::TestWithParam<LookupRequestTestCase> {
 public:
-  LookupRequestTest() : vary_allow_list_(getConfig().allowed_vary_headers()) {}
+  LookupRequestTest()
+      : vary_allow_list_(getConfig().allowed_vary_headers()),
+        cache_policy_(std::make_unique<CachePolicyImpl>()) {}
+
+  RequestCacheControl requestCacheControl() { return RequestCacheControl(request_headers_); }
 
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
-  Http::TestRequestHeaderMapImpl request_headers_{
-      {":path", "/"}, {":method", "GET"}, {":scheme", "https"}, {":authority", "example.com"}};
+  Http::TestRequestHeaderMapImpl request_headers_{{":path", "/"},
+                                                  {":method", "GET"},
+                                                  {"x-forwarded-proto", "https"},
+                                                  {":authority", "example.com"}};
 
   VaryAllowList vary_allow_list_;
+  std::unique_ptr<CachePolicy> cache_policy_;
 
   static const SystemTime& currentTime() {
     CONSTRUCT_ON_FIRST_USE(SystemTime, Event::SimulatedTimeSystem().systemTime());
@@ -178,7 +185,7 @@ LookupResult makeLookupResult(const LookupRequest& lookup_request,
   // For the purpose of the test, set the response_time to the date header value.
   ResponseMetadata metadata = {CacheHeadersUtils::httpTime(response_headers.Date())};
   return lookup_request.makeLookupResult(
-      std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers), std::move(metadata),
+      std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers), metadata,
       content_length, has_trailers);
 }
 
@@ -190,7 +197,8 @@ TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
                                    GetParam().request_cache_control);
   const SystemTime request_time = GetParam().request_time, response_date = GetParam().response_date;
-  const LookupRequest lookup_request(request_headers_, request_time, vary_allow_list_);
+  const LookupRequest lookup_request(request_headers_, requestCacheControl(), *cache_policy_,
+                                     request_time, vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"cache-control", GetParam().response_cache_control},
        {"date", formatter_.fromTime(response_date)}});
@@ -209,13 +217,14 @@ TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
                                    GetParam().request_cache_control);
   const SystemTime request_time = GetParam().request_time, response_date = GetParam().response_date;
-  const LookupRequest lookup_request(request_headers_, request_time, vary_allow_list_);
+  const LookupRequest lookup_request(request_headers_, requestCacheControl(), *cache_policy_,
+                                     request_time, vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"cache-control", GetParam().response_cache_control},
        {"date", formatter_.fromTime(response_date)}});
   const uint64_t content_length = 5;
   const LookupResult lookup_response =
-      makeLookupResult(lookup_request, response_headers, content_length);
+      makeLookupResult(lookup_request, response_headers, content_length, /*has_trailers=*/true);
 
   EXPECT_EQ(GetParam().expected_cache_entry_status, lookup_response.cache_entry_status_);
   ASSERT_TRUE(lookup_response.headers_);
@@ -223,11 +232,12 @@ TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
   EXPECT_THAT(*lookup_response.headers_,
               HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, content_length);
-  EXPECT_FALSE(lookup_response.has_trailers_);
+  EXPECT_TRUE(lookup_response.has_trailers_);
 }
 
 TEST_F(LookupRequestTest, ExpiredViaFallbackheader) {
-  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
+  const LookupRequest lookup_request(request_headers_, requestCacheControl(), *cache_policy_,
+                                     currentTime(), vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"expires", formatter_.fromTime(currentTime() - Seconds(5))},
        {"date", formatter_.fromTime(currentTime())}});
@@ -237,7 +247,8 @@ TEST_F(LookupRequestTest, ExpiredViaFallbackheader) {
 }
 
 TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
-  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
+  const LookupRequest lookup_request(request_headers_, requestCacheControl(), *cache_policy_,
+                                     currentTime(), vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"expires", formatter_.fromTime(currentTime() + Seconds(5))},
        {"date", formatter_.fromTime(currentTime())}});
@@ -250,7 +261,8 @@ TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
 // https://httpwg.org/specs/rfc7234.html#header.pragma
 TEST_F(LookupRequestTest, PragmaNoCacheFallback) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "no-cache");
-  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
+  const LookupRequest lookup_request(request_headers_, requestCacheControl(), *cache_policy_,
+                                     currentTime(), vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -262,7 +274,8 @@ TEST_F(LookupRequestTest, PragmaNoCacheFallback) {
 TEST_F(LookupRequestTest, PragmaNoCacheFallbackExtraDirectivesIgnored) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma,
                                    "no-cache, custom-directive=custom-value");
-  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
+  const LookupRequest lookup_request(request_headers_, requestCacheControl(), *cache_policy_,
+                                     currentTime(), vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -273,8 +286,8 @@ TEST_F(LookupRequestTest, PragmaNoCacheFallbackExtraDirectivesIgnored) {
 
 TEST_F(LookupRequestTest, PragmaFallbackOtherValuesIgnored) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "max-age=0");
-  const LookupRequest lookup_request(request_headers_, currentTime() + Seconds(5),
-                                     vary_allow_list_);
+  const LookupRequest lookup_request(request_headers_, requestCacheControl(), *cache_policy_,
+                                     currentTime() + Seconds(5), vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -286,8 +299,8 @@ TEST_F(LookupRequestTest, PragmaFallbackOtherValuesIgnored) {
 TEST_F(LookupRequestTest, PragmaNoFallback) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "no-cache");
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-age=10");
-  const LookupRequest lookup_request(request_headers_, currentTime() + Seconds(5),
-                                     vary_allow_list_);
+  const LookupRequest lookup_request(request_headers_, requestCacheControl(), *cache_policy_,
+                                     currentTime() + Seconds(5), vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -305,7 +318,8 @@ TEST_P(LookupRequestTest, ResultWithBodyAndTrailersMatchesExpectation) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
                                    GetParam().request_cache_control);
   const SystemTime request_time = GetParam().request_time, response_date = GetParam().response_date;
-  const LookupRequest lookup_request(request_headers_, request_time, vary_allow_list_);
+  const LookupRequest lookup_request(request_headers_, requestCacheControl(), *cache_policy_,
+                                     request_time, vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"cache-control", GetParam().response_cache_control},
        {"date", formatter_.fromTime(response_date)}});
@@ -324,16 +338,24 @@ TEST_P(LookupRequestTest, ResultWithBodyAndTrailersMatchesExpectation) {
 }
 
 TEST_F(LookupRequestTest, HttpScheme) {
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":path", "/"}, {":method", "GET"}, {":scheme", "http"}, {":authority", "example.com"}};
-  const LookupRequest lookup_request(request_headers, currentTime(), vary_allow_list_);
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
+                                                 {":method", "GET"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "example.com"},
+                                                 {"x-forwarded-proto", "http"}};
+  const LookupRequest lookup_request(request_headers, requestCacheControl(), *cache_policy_,
+                                     currentTime(), vary_allow_list_);
   EXPECT_EQ(lookup_request.key().scheme(), Key::HTTP);
 }
 
 TEST_F(LookupRequestTest, HttpsScheme) {
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":path", "/"}, {":method", "GET"}, {":scheme", "https"}, {":authority", "example.com"}};
-  const LookupRequest lookup_request(request_headers, currentTime(), vary_allow_list_);
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
+                                                 {":method", "GET"},
+                                                 {":scheme", "https"},
+                                                 {":authority", "example.com"},
+                                                 {"x-forwarded-proto", "https"}};
+  const LookupRequest lookup_request(request_headers, requestCacheControl(), *cache_policy_,
+                                     currentTime(), vary_allow_list_);
   EXPECT_EQ(lookup_request.key().scheme(), Key::HTTPS);
 }
 

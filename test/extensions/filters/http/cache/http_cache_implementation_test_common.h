@@ -81,7 +81,7 @@ protected:
                      const Http::TestResponseHeaderMapImpl& response_headers,
                      const ResponseMetadata& metadata);
 
-  LookupRequest makeLookupRequest(absl::string_view request_path);
+  LookupRequestPtr makeLookupRequest(absl::string_view request_path);
 
   testing::AssertionResult
   expectLookupSuccessWithHeaders(LookupContext* lookup_context,
@@ -94,8 +94,9 @@ protected:
   VaryAllowList vary_allow_list_;
   LookupResult lookup_result_;
   Http::TestRequestHeaderMapImpl request_headers_;
-  Event::SimulatedTimeSystem time_system_;
+  Event::SimulatedTimeSystem time_source_;
   Event::MockDispatcher dispatcher_;
+  std::unique_ptr<CachePolicy> cache_policy_;
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;

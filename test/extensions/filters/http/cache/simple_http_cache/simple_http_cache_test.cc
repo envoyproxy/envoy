@@ -34,18 +34,6 @@ INSTANTIATE_TEST_SUITE_P(SimpleHttpCacheTest, HttpCacheImplementationTest,
                          [](const testing::TestParamInfo<HttpCacheImplementationTest::ParamType>&) {
                            return "SimpleHttpCache";
                          });
-
-TEST(Registration, GetFactory) {
-  HttpCacheFactory* factory = Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(
-      "envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig");
-  ASSERT_NE(factory, nullptr);
-  envoy::extensions::filters::http::cache::v3::CacheConfig config;
-  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  config.mutable_typed_config()->PackFrom(*factory->createEmptyConfigProto());
-  EXPECT_EQ(factory->getCache(config, factory_context)->cacheInfo().name_,
-            "envoy.extensions.http.cache.simple");
-}
-
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters

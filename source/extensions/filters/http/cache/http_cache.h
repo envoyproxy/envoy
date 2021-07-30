@@ -15,6 +15,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/cache_policy.h"
 #include "source/extensions/filters/http/cache/key.pb.h"
 #include "source/extensions/filters/http/cache/range_utils.h"
 
@@ -79,8 +80,10 @@ size_t stableHashKey(const Key& key);
 class LookupRequest {
 public:
   // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
-  LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
-                const VaryAllowList& vary_allow_list);
+  // vary_allow_list must outlive this LookupRequest
+  LookupRequest(const Http::RequestHeaderMap& request_headers,
+                RequestCacheControl&& request_cache_control, CachePolicy& cache_policy,
+                SystemTime timestamp, const VaryAllowList& vary_allow_list);
 
   const RequestCacheControl& requestCacheControl() const { return request_cache_control_; }
 
@@ -98,25 +101,24 @@ public:
   // - LookupResult::response_ranges_ entries are satisfiable (as documented
   // there).
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
-                                ResponseMetadata&& metadata, uint64_t content_length,
+                                ResponseMetadata& metadata, uint64_t content_length,
                                 bool has_trailers) const;
-
   const Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
   const VaryAllowList& varyAllowList() const { return vary_allow_list_; }
 
 private:
-  void initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers);
-  bool requiresValidation(const Http::ResponseHeaderMap& response_headers,
-                          SystemTime::duration age) const;
-
-  Key key_;
   std::vector<RawByteRange> request_range_spec_;
+
   Http::RequestHeaderMapPtr request_headers_;
+  RequestCacheControl request_cache_control_;
+  // Not owned.
+  CachePolicy& cache_policy_;
+  const Key key_;
   const VaryAllowList& vary_allow_list_;
   // Time when this LookupRequest was created (in response to an HTTP request).
   SystemTime timestamp_;
-  RequestCacheControl request_cache_control_;
 };
+using LookupRequestPtr = std::unique_ptr<LookupRequest>;
 
 // Statically known information about a cache.
 struct CacheInfo {
@@ -134,7 +136,7 @@ class InsertContext {
 public:
   // Accepts response_headers for caching. Only called once.
   virtual void insertHeaders(const Http::ResponseHeaderMap& response_headers,
-                             const ResponseMetadata& metadata, bool end_stream) PURE;
+                             ResponseMetadataPtr&& metadata, bool end_stream) PURE;
 
   // The insertion is streamed into the cache in chunks whose size is determined
   // by the client, but with a pace determined by the cache. To avoid streaming
@@ -220,6 +222,9 @@ public:
   // callbacks to the CacheFilter after having onDestroy() invoked.
   virtual void onDestroy() PURE;
 
+  // Retrieve the headers from the request that initiated cache interactions.
+  const virtual Http::RequestHeaderMap& requestHeaders() const PURE;
+
   virtual ~LookupContext() = default;
 };
 using LookupContextPtr = std::unique_ptr<LookupContext>;
@@ -230,14 +235,12 @@ class HttpCache {
 public:
   // Returns a LookupContextPtr to manage the state of a cache lookup. On a cache
   // miss, the returned LookupContext will be given to the insert call (if any).
-  virtual LookupContextPtr makeLookupContext(LookupRequest&& request,
-                                             Http::StreamDecoderFilterCallbacks& callbacks) PURE;
+  virtual LookupContextPtr makeLookupContext(LookupRequestPtr&& request) PURE;
 
   // Returns an InsertContextPtr to manage the state of a cache insertion.
   // Responses with a chunked transfer-encoding must be dechunked before
   // insertion.
-  virtual InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
-                                             Http::StreamEncoderFilterCallbacks& callbacks) PURE;
+  virtual InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) PURE;
 
   // Precondition: lookup_context represents a prior cache lookup that required
   // validation.
@@ -256,6 +259,7 @@ public:
 
   virtual ~HttpCache() = default;
 };
+using HttpCacheSharedPtr = std::shared_ptr<HttpCache>;
 
 // Factory interface for cache implementations to implement and register.
 class HttpCacheFactory : public Config::TypedFactory {
@@ -268,7 +272,7 @@ public:
   //
   // Pass factory context to allow HttpCache to use async client, stats scope
   // etc.
-  virtual std::shared_ptr<HttpCache>
+  virtual HttpCacheSharedPtr
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
            Server::Configuration::FactoryContext& context) PURE;
   ~HttpCacheFactory() override = default;

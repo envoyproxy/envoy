@@ -21,6 +21,24 @@ envoy_cc_test_library(
 )
 
 envoy_extension_cc_test(
+    name = "cache_policy_test",
+    srcs = ["cache_policy_test.cc"],
+    extension_names = ["envoy.filters.http.cache"],
+    deps = [
+        "//envoy/common:time_interface",
+        "//envoy/http:header_map_interface",
+        "//source/common/http:headers_lib",
+        "//source/common/protobuf",
+        "//source/extensions/filters/http/cache:cache_custom_headers",
+        "//source/extensions/filters/http/cache:cache_entry_utils_lib",
+        "//source/extensions/filters/http/cache:cache_policy_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/cache/simple_http_cache/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/cache/cache_policy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "cache_headers_utils_test",
     srcs = ["cache_headers_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
@@ -83,6 +101,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.cache"],
     deps = [
         ":common",
+        ":mocks",
         "//source/extensions/filters/http/cache:cache_filter_lib",
         "//source/extensions/filters/http/cache:cache_filter_logging_info_lib",
         "//source/extensions/filters/http/cache/simple_http_cache:config",
@@ -116,6 +135,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/cache/simple_http_cache/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/cache/cache_policy/v3:pkg_cc_proto",
     ],
 )
 
@@ -161,5 +181,20 @@ envoy_extension_cc_test_library(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/extensions/cache/simple_http_cache/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "mocks",
+    hdrs = ["mocks.h"],
+    deps = [
+        "//envoy/common:time_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/stream_info:filter_state_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/extensions/filters/http/cache:cache_entry_utils_lib",
+        "//source/extensions/filters/http/cache:cache_headers_utils_lib",
+        "//source/extensions/filters/http/cache:cache_policy_lib",
+        "//source/extensions/filters/http/cache:key_cc_proto",
     ],
 )

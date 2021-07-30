@@ -55,6 +55,8 @@ RangeUtils::getRangeHeader(const Envoy::Http::RequestHeaderMap& headers) {
   if (range_header.size() == 1) {
     return range_header[0]->value().getStringView();
   } else {
+    // Multiple instances of range headers are invalid.
+    // https://tools.ietf.org/html/rfc7230#section-3.2.2
     return absl::nullopt;
   }
 }
