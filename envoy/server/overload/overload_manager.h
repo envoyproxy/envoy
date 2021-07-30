@@ -5,7 +5,6 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/scaled_range_timer_manager.h"
-#include "envoy/server/overload/reset_streams_adapter.h"
 #include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "source/common/singleton/const_singleton.h"

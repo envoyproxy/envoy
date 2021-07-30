@@ -1,4 +1,6 @@
 #include "envoy/config/overload/v3/overload.pb.h"
+
+#include <memory>
 #include "envoy/http/codec.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -523,10 +525,52 @@ TEST(WatermarkBufferFactoryTest, ShouldOnlyResetAllStreamsGreatThanOrEqualToProv
 
   EXPECT_CALL(stream_that_should_not_be_reset, resetStream(_)).Times(0);
   // Should call resetStream on all streams in bucket >= 1.
-  factory.resetAllAccountsInBucketsStartingWith(1);
+  factory.resetAccountsGivenPressure(0.85);
 
   account_to_not_reset->credit(kMinimumBalanceToTrack);
   account_to_not_reset->clearDownstream();
+}
+
+TEST(WatermarkBufferFactoryTest, ComputesBucketToResetCorrectly) {
+  TrackedWatermarkBufferFactory factory(kMinimumBalanceToTrack);
+
+  // Create vector of accounts and handlers
+  std::vector<std::unique_ptr<Http::MockStreamResetHandler>> reset_handlers;
+  std::vector<BufferMemoryAccountSharedPtr> accounts;
+  uint32_t seed_account_balance = kMinimumBalanceToTrack;
+
+  for (uint32_t i = 0; i < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_; ++i) {
+    reset_handlers.emplace_back(std::make_unique<Http::MockStreamResetHandler>());
+    accounts.emplace_back(factory.createAccount(reset_handlers.back().get()));
+    accounts.back()->charge(seed_account_balance);
+    seed_account_balance *= 2;
+  }
+
+  // Check that all memory classes have a corresponding account
+  factory.inspectMemoryClasses([](MemoryClassesToAccountsSet& memory_classes_to_account) {
+    for (auto& account_set : memory_classes_to_account) {
+      EXPECT_EQ(account_set.size(), 1);
+    }
+  });
+
+  // Reset accounts checking correct threshold
+  float pressure = 0.0;
+  const float pressure_gradation = 1.0 / BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_;
+  for (uint32_t i = 0; i < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_; ++i) {
+    EXPECT_CALL(*reset_handlers.back(), resetStream(_)).WillOnce(Invoke([&]() {
+      auto current_account = accounts.back();
+      current_account->credit(getBalance(current_account));
+      current_account->clearDownstream();
+    }));
+
+    factory.resetAccountsGivenPressure(pressure);
+
+    // Move onto next reset handler and account
+    accounts.pop_back();
+    reset_handlers.pop_back();
+
+    pressure += pressure_gradation;
+  }
 }
 
 } // namespace

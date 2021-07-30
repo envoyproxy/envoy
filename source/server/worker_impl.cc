@@ -27,7 +27,7 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
                        Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler,
                        OverloadManager& overload_manager, Api::Api& api)
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
-      overload_manager_(overload_manager), api_(api) {
+      api_(api) {
   tls_.registerThread(*dispatcher_, false);
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
@@ -152,20 +152,7 @@ void WorkerImpl::rejectIncomingConnectionsCb(OverloadActionState state) {
 }
 
 void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState state) {
-  // TODO(kbaichoo): can just use the knowledge here [0.0, 1] in state (scaled
-  // for lower, saturation here for our buckets) with a simple function.
-  // implement!
-  auto buckets_to_reset = 0;
-
-  // TODO(kbaichoo) error -> info
-  ENVOY_LOG(error, "resetStreamsUsingExcessiveMemory Invoked with State: {}",
-            state.value().value());
-  if (buckets_to_reset.has_value()) {
-    // TODO(kbaichoo) error -> info
-    ENVOY_LOG(error, "resetting streams in buckets >= {}", buckets_to_reset.value());
-    dispatcher_->getWatermarkFactory().resetAllAccountsInBucketsStartingWith(
-        buckets_to_reset.value());
-  }
+  dispatcher_->getWatermarkFactory().resetAccountsGivenPressure(state.value().value());
 }
 
 } // namespace Server

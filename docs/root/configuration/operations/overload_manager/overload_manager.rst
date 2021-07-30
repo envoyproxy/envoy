@@ -96,6 +96,10 @@ The following overload actions are supported:
     - Envoy will reduce the waiting period for a configured set of timeouts. See
       :ref:`below <config_overload_manager_reducing_timeouts>` for details on configuration.
 
+  * - envoy.overload_actions.reset_streams
+    - Envoy will reset expensive streams to terminate them. See
+      :ref:`below <config_overload_manager_reset_streams>` for details on configuration.
+
 .. _config_overload_manager_reducing_timeouts:
 
 Reducing timeouts
@@ -162,6 +166,47 @@ limit for that specific listener and allow the global limit to enforce resource 
 all listeners.
 
 An example configuration can be found in the :ref:`edge best practices document <best_practices_edge>`.
+
+.. _config_overload_manager_reset_streams:
+
+Reset Streams
+^^^^^^^^^^^^^^^^^
+
+The ``envoy.overload_actions.reset_streams`` overload action will reset
+expensive streams. This works in conjuction with the
+``envoy.reloadable_features.per_stream_buffer_accounting`` flag which enables
+per stream buffer accounting.
+
+As an example, here is a single overload action entry that enables reset streams:
+
+.. code-block:: yaml
+
+  name: "envoy.overload_actions.reset_streams"
+  triggers:
+    - name: "envoy.resource_monitors.fixed_heap"
+      scaled:
+        scaling_threshold: 0.85
+        saturation_threshold: 0.95
+
+It configures the overload manager to reset certain streams depending on the
+heap size.  When the heap usage is less than 85%, no streams will be reset.
+When heap usage is at or above 85%, we start to reset certain memory classes
+(e.g. streams using memory within a power of two range). There are 8 buckets,
+with the last bucket capturing all of the streams using :math:`>= 128 *
+minimum_threshold_for_tracking`.  The `minimum_threshold_for_tracking` can be
+configured via :ref:`buffer_factory_config
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.buffer_factory_config>`.
+
+Given that there are only 8 buckets, we partition the space with a gradation of
+:math:`gradation = (saturation_threshold - scaling_threshold)/8`. Hence at 85%
+we reset streams in the last bucket. At :math:`85% + 1 * gradation` we reset
+streams in the second to last, and last bucket. And so forth as memory pressure
+is higher.
+
+It's expected that the first few gradations shouldn't trigger anything, unless
+there's something seriously wrong e.g. the existence of streams using :math:`>=
+128 * minimum_threshold_for_tracking`.
+
 
 Statistics
 ----------

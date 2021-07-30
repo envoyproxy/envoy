@@ -198,7 +198,7 @@ public:
   }
 
   BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) override;
-  void resetAllAccountsInBucketsStartingWith(uint32_t bucket_idx) override;
+  void resetAccountsGivenPressure(float pressure) override;
 
   // Called by BufferMemoryAccountImpls created by the factory on account class
   // updated.

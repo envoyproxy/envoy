@@ -1,4 +1,5 @@
 #include "source/common/buffer/watermark_buffer.h"
+#include "watermark_buffer.h"
 
 #include <cstdint>
 #include <memory>
@@ -182,12 +183,19 @@ void WatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPt
   }
 }
 
-void WatermarkBufferFactory::resetAllAccountsInBucketsStartingWith(uint32_t bucket_idx) {
-  ASSERT(bucket_idx >= 0 && bucket_idx < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_,
-         "Provided bucket index is out of range.");
+void WatermarkBufferFactory::resetAccountsGivenPressure(float pressure) {
+  ASSERT(pressure >= 0.0 && pressure <= 1.0, "Provided pressure is out of range [0, 1].");
+
+  // Compute buckets to clear
+  const uint32_t buckets_to_clear = std::min<uint32_t>(
+      std::floor(pressure * BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_) + 1, 8);
+  uint32_t bucket_idx = BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - buckets_to_clear;
+
+  ENVOY_LOG_MISC(warn, "resetting streams in buckets >= {}", bucket_idx);
+
+  // Clear buckets
   while (bucket_idx < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_) {
-    // TODO(kbaichoo): error -> info; error rn for debug purposes.
-    ENVOY_LOG_MISC(error, "resetting {} streams in bucket {}.",
+    ENVOY_LOG_MISC(warn, "resetting {} streams in bucket {}.",
                    size_class_account_sets_[bucket_idx].size(), bucket_idx);
 
     auto it = size_class_account_sets_[bucket_idx].begin();

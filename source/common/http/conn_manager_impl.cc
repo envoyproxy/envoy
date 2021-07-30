@@ -277,7 +277,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   // work-in-progress, and will be removed when other features using the
   // accounting are implemented.
   Buffer::BufferMemoryAccountSharedPtr downstream_stream_account;
-  if (Runtime::runtimeFeatureEnabled("envoy.test_only.per_stream_buffer_accounting")) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.per_stream_buffer_accounting")) {
     // Create account, wiring the stream to use it.
     auto& buffer_factory = read_callbacks_->connection().dispatcher().getWatermarkFactory();
     downstream_stream_account = buffer_factory.createAccount(response_encoder.getStream());

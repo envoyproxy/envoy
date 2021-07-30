@@ -523,13 +523,13 @@ public:
   virtual BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) PURE;
 
   /**
-   * Goes through the tracked accounts, resetting the accounts (and their
-   * corresponding stream) that are >= bucket_idx.
+   * Goes through the tracked accounts, resetting the accounts and their
+   * corresponding stream depending on the pressure.
    *
-   * @param bucket_idx reset all accounts in buckets >= bucket_idx.
+   * @param pressure scaled threshold pressure used to compute the buckets to
+   *  reset internally.
    */
-  virtual void resetAllAccountsInBucketsStartingWith(uint32_t bucket_idx) PURE;
->>>>>>> ef0e16e10 (Buffer resetAllStreamsInBuckets, improve buffer interface to use)
+  virtual void resetAccountsGivenPressure(float pressure) PURE;
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;

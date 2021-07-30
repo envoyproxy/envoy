@@ -115,8 +115,8 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
-    // TODO(kbaichoo): Remove when this is no longer test only.
-    "envoy.test_only.per_stream_buffer_accounting",
+    // TODO(kbaichoo): flip to true in a separate PR if we want to do accounting by default.
+    "envoy.reloadable_features.per_stream_buffer_accounting",
     // Allows the use of ExtensionWithMatcher to wrap a HTTP filter with a match tree.
     "envoy.reloadable_features.experimental_matching_api",
     // When the runtime is flipped to true, use shared cache in getOrCreateRawAsyncClient method if

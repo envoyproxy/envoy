@@ -64,7 +64,6 @@ private:
   ListenerHooks& hooks_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
-  OverloadManager& overload_manager_;
   Api::Api& api_;
   Thread::ThreadPtr thread_;
   WatchDogSharedPtr watch_dog_;
