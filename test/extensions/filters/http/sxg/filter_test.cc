@@ -253,7 +253,7 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
     EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
     EXPECT_EQ(exceeded_max_payload_size ? 1UL : 0UL,
               scope_.counter("sxg.total_exceeded_max_payload_size").value());
-    EXPECT_EQ(attempted_encode ? 1UL: 0L, scope_.counter("sxg.total_signed_attempts").value());
+    EXPECT_EQ(attempted_encode ? 1UL : 0L, scope_.counter("sxg.total_signed_attempts").value());
     EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_succeeded").value());
     EXPECT_EQ(attempted_encode ? 1UL : 0UL, scope_.counter("sxg.total_signed_failed").value());
   }
