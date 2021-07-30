@@ -10,6 +10,8 @@ import io.envoyproxy.envoymobile.ResponseFilterCallbacks
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
 import java.nio.ByteBuffer
+import java.util.Timer
+import kotlin.concurrent.schedule
 
 /**
  * Example of a more complex HTTP filter that pauses processing on the response filter chain,
@@ -23,6 +25,12 @@ class AsyncDemoFilter : AsyncResponseFilter {
     headers: ResponseHeaders,
     endStream: Boolean
   ): FilterHeadersStatus<ResponseHeaders> {
+    // If this is the end of the stream, asynchronously resume response processing via callback.
+    if (endStream) {
+      Timer("AsyncResume", false).schedule(100) {
+        callbacks.resumeResponse()
+      }
+    }
     return FilterHeadersStatus.StopIteration()
   }
 
@@ -32,7 +40,9 @@ class AsyncDemoFilter : AsyncResponseFilter {
   ): FilterDataStatus<ResponseHeaders> {
     // If this is the end of the stream, asynchronously resume response processing via callback.
     if (endStream) {
-      callbacks.resumeResponse()
+      Timer("AsyncResume", false).schedule(100) {
+        callbacks.resumeResponse()
+      }
     }
     return FilterDataStatus.StopIterationAndBuffer()
   }
@@ -41,8 +51,9 @@ class AsyncDemoFilter : AsyncResponseFilter {
     trailers: ResponseTrailers
   ): FilterTrailersStatus<ResponseHeaders, ResponseTrailers> {
     // Trailers imply end of stream, so asynchronously resume response processing via callbacka
-    // Note this call is re-entrant (but legal/safe).
-    callbacks.resumeResponse()
+    Timer("AsyncResume", false).schedule(100) {
+      callbacks.resumeResponse()
+    }
     return FilterTrailersStatus.StopIteration()
   }
 
