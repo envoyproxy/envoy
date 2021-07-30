@@ -11,7 +11,7 @@ StreamPrototype::StreamPrototype(EngineSharedPtr engine) : engine_(engine) {
 
 StreamSharedPtr StreamPrototype::start() {
   auto envoy_stream = init_stream(this->engine_->engine_);
-  start_stream(envoy_stream, this->callbacks_->asEnvoyHttpCallbacks());
+  start_stream(envoy_stream, this->callbacks_->asEnvoyHttpCallbacks(), false);
   return std::make_shared<Stream>(envoy_stream);
 }
 

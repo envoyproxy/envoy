@@ -59,10 +59,13 @@ public class JniLibrary {
    * @param stream,  handle to the stream to be started.
    * @param context, context that contains dispatch logic to fire callbacks
    *                 callbacks.
+   * @param explicitFlowControl, whether explicit flow control should be enabled
+   *                             for the stream.
    * @return envoy_stream, with a stream handle and a success status, or a failure
    * status.
    */
-  protected static native int startStream(long stream, JvmCallbackContext context);
+  protected static native int startStream(long stream, JvmCallbackContext context,
+                                          boolean explicitFlowControl);
 
   /**
    * Send headers over an open HTTP stream. This method can be invoked once and
@@ -96,6 +99,16 @@ public class JniLibrary {
    * @return int, the resulting status of the operation.
    */
   protected static native int sendData(long stream, ByteBuffer data, boolean endStream);
+
+  /**
+   * Read data from the response stream. Returns immediately.
+   * Has no effect if explicit flow control is not enabled.
+   *
+   * @param stream,    the stream.
+   * @param byteCount, Maximum number of bytes that may be be passed by the next data callback.
+   * @return int, the resulting status of the operation.
+   */
+  protected static native int readData(long stream, long byteCount);
 
   /**
    * Send trailers over an open HTTP stream. This method can only be invoked once

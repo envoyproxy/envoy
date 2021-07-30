@@ -23,8 +23,8 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks) {
-    return envoyEngine.startStream(callbacks);
+  public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl) {
+    return envoyEngine.startStream(callbacks, explicitFlowControl);
   }
 
   public int runWithTemplate(String configurationYAML, EnvoyConfiguration envoyConfiguration,

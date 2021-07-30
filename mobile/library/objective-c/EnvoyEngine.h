@@ -187,8 +187,11 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 
  @param handle Underlying handle of the HTTP stream owned by an Envoy engine.
  @param callbacks The callbacks for the stream.
+ @param explicitFlowControl Whether explicit flow control will be enabled for this stream.
  */
-- (instancetype)initWithHandle:(intptr_t)handle callbacks:(EnvoyHTTPCallbacks *)callbacks;
+- (instancetype)initWithHandle:(intptr_t)handle
+                     callbacks:(EnvoyHTTPCallbacks *)callbacks
+           explicitFlowControl:(BOOL)explicitFlowControl;
 
 /**
  Send headers over the provided stream.
@@ -197,6 +200,14 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
  @param close True if the stream should be closed after sending.
  */
 - (void)sendHeaders:(EnvoyHeaders *)headers close:(BOOL)close;
+
+/**
+ Read data from the response stream. Returns immediately.
+ Has no effect if explicit flow control is not enabled.
+
+ @param byteCount Maximum number of bytes that may be be passed by the next data callback.
+ */
+- (void)readData:(size_t)byteCount;
 
 /**
  Send data over the provided stream.
@@ -371,8 +382,10 @@ extern const int kEnvoyFailure;
  Opens a new HTTP stream attached to this engine.
 
  @param callbacks Handler for observing stream events.
+ @param explicitFlowControl Whether explicit flow control will be enabled for the stream.
  */
-- (id<EnvoyHTTPStream>)startStreamWithCallbacks:(EnvoyHTTPCallbacks *)callbacks;
+- (id<EnvoyHTTPStream>)startStreamWithCallbacks:(EnvoyHTTPCallbacks *)callbacks
+                            explicitFlowControl:(BOOL)explicitFlowControl;
 
 /**
  Increments a counter with the given count.

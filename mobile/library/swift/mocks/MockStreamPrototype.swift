@@ -18,7 +18,9 @@ public final class MockStreamPrototype: StreamPrototype {
 
   public override func start(queue: DispatchQueue = .main) -> Stream {
     let callbacks = self.createCallbacks(queue: queue)
-    let stream = MockStream(mockStream: MockEnvoyHTTPStream(handle: 0, callbacks: callbacks))
+    let underlyingStream = MockEnvoyHTTPStream(handle: 0, callbacks: callbacks,
+                                               explicitFlowControl: false)
+    let stream = MockStream(mockStream: underlyingStream)
     self.onStart?(stream)
     return stream
   }

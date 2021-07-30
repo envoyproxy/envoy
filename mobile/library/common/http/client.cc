@@ -28,7 +28,7 @@ Client::DirectStreamCallbacks::DirectStreamCallbacks(DirectStream& direct_stream
                                                      envoy_http_callbacks bridge_callbacks,
                                                      Client& http_client)
     : direct_stream_(direct_stream), bridge_callbacks_(bridge_callbacks), http_client_(http_client),
-      explicit_flow_control_(http_client_.explicit_flow_control_) {}
+      explicit_flow_control_(direct_stream_.explicit_flow_control_) {}
 
 void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& headers,
                                                   bool end_stream) {
@@ -306,9 +306,11 @@ void Client::DirectStream::dumpState(std::ostream&, int indent_level) const {
   ENVOY_LOG(error, "\n{}", ss.str());
 }
 
-void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks bridge_callbacks) {
+void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks bridge_callbacks,
+                         bool explicit_flow_control) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream{new DirectStream(new_stream_handle, *this)};
+  direct_stream->explicit_flow_control_ = explicit_flow_control;
   direct_stream->callbacks_ =
       std::make_unique<DirectStreamCallbacks>(*direct_stream, bridge_callbacks, *this);
 
@@ -356,6 +358,18 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
     ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
               *internal_headers);
     direct_stream->request_decoder_->decodeHeaders(std::move(internal_headers), end_stream);
+  }
+}
+
+void Client::readData(envoy_stream_t stream, size_t bytes_to_read) {
+  ASSERT(dispatcher_.isThreadSafe());
+  Client::DirectStreamSharedPtr direct_stream =
+      getStream(stream, GetStreamFilters::ALLOW_FOR_ALL_STREAMS);
+  // If direct_stream is not found, it means the stream has already closed or been reset
+  // and the appropriate callback has been issued to the caller. There's nothing to do here
+  // except silently swallow this.
+  if (direct_stream) {
+    direct_stream->callbacks_->resumeData(bytes_to_read);
   }
 }
 

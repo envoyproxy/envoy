@@ -10,6 +10,7 @@ import Foundation
 public class StreamPrototype: NSObject {
   private let engine: EnvoyEngine
   private let callbacks = StreamCallbacks()
+  private var explicitFlowControl = false
 
   /// Initialize a new instance of the stream prototype.
   ///
@@ -36,8 +37,25 @@ public class StreamPrototype: NSObject {
   ///
   /// - returns: The new stream.
   public func start(queue: DispatchQueue = .main) -> Stream {
-    let engineStream = self.engine.startStream(with: self.createCallbacks(queue: queue))
+    let engineStream = self.engine.startStream(
+      with: self.createCallbacks(queue: queue),
+      explicitFlowControl: explicitFlowControl
+    )
     return Stream(underlyingStream: engineStream)
+  }
+
+  /// Allows explicit flow control to be enabled. When explicit flow control is enabled, the owner
+  /// of a stream is responsible for providing a buffer to receive response body data. If the buffer
+  /// is smaller than the amount of data available, response callbacks will halt, and the underlying
+  /// network protocol may signal for the server to stop sending data, until more space is
+  /// available. This can limit the memory consumed by a server response, but may also result in
+  /// reduced overall throughput, depending on usage.
+  ///
+  /// - parameter enabled: Whether explicit flow control will be enabled for the stream.
+  /// - returns:  This stream, for chaining syntax.
+  public func setExplicitFlowControl(enabled: Bool) -> StreamPrototype {
+    self.explicitFlowControl = enabled
+    return self
   }
 
   /// Specify a callback for when response headers are received by the stream.

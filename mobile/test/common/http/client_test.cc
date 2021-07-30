@@ -121,7 +121,7 @@ public:
           response_encoder_ = &encoder;
           return request_decoder_;
         }));
-    http_client_.startStream(stream_, bridge_callbacks_);
+    http_client_.startStream(stream_, bridge_callbacks_, explicit_flow_control_);
   }
 
   void resumeDataIfExplicitFlowControl(int32_t bytes) {
@@ -142,8 +142,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   bool explicit_flow_control_{GetParam()};
-  Client http_client_{api_listener_,      dispatcher_, stats_store_,
-                      preferred_network_, random_,     explicit_flow_control_};
+  Client http_client_{api_listener_, dispatcher_, stats_store_, preferred_network_, random_};
   envoy_stream_t stream_ = 1;
 };
 
@@ -595,7 +594,7 @@ TEST_P(ClientTest, MultipleStreams) {
         response_encoder2 = &encoder;
         return request_decoder2;
       }));
-  http_client_.startStream(stream2, bridge_callbacks_2);
+  http_client_.startStream(stream2, bridge_callbacks_2, explicit_flow_control_);
 
   // Send request headers.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -906,7 +905,7 @@ TEST_P(ClientTest, NullAccessors) {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
-  http_client_.startStream(stream, bridge_callbacks);
+  http_client_.startStream(stream, bridge_callbacks, explicit_flow_control_);
 
   EXPECT_FALSE(response_encoder_->http1StreamEncoderOptions().has_value());
   EXPECT_FALSE(response_encoder_->streamErrorOnInvalidHttpMessage());

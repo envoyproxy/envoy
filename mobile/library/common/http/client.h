@@ -43,13 +43,11 @@ struct HttpClientStats {
 class Client : public Logger::Loggable<Logger::Id::http> {
 public:
   Client(ApiListener& api_listener, Event::ProvisionalDispatcher& dispatcher, Stats::Scope& scope,
-         std::atomic<envoy_network_t>& preferred_network, Random::RandomGenerator& random,
-         bool explicit_flow_control = false)
+         std::atomic<envoy_network_t>& preferred_network, Random::RandomGenerator& random)
       : api_listener_(api_listener), dispatcher_(dispatcher),
         stats_(HttpClientStats{ALL_HTTP_CLIENT_STATS(POOL_COUNTER_PREFIX(scope, "http.client."))}),
         preferred_network_(preferred_network),
-        address_(std::make_shared<Network::Address::SyntheticAddressImpl>()), random_(random),
-        explicit_flow_control_(explicit_flow_control) {}
+        address_(std::make_shared<Network::Address::SyntheticAddressImpl>()), random_(random) {}
 
   /**
    * Attempts to open a new stream to the remote. Note that this function is asynchronous and
@@ -57,8 +55,10 @@ public:
    * there is no guarantee it will ever functionally represent an open stream.
    * @param stream, the stream to start.
    * @param bridge_callbacks, wrapper for callbacks for events on this stream.
+   * @param explicit_flow_control, whether the stream will require explicit flow control.
    */
-  void startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks);
+  void startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
+                   bool explicit_flow_control);
 
   /**
    * Send headers over an open HTTP stream. This method can be invoked once and needs to be called
@@ -68,6 +68,13 @@ public:
    * @param end_stream, indicates whether to close the stream locally after sending this frame.
    */
   void sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream);
+
+  /**
+   * Notify the stream that the caller is ready to receive more data from the response stream. Only
+   * used in explicit flow control mode.
+   * @param bytes_to_read, the quantity of data the caller is prepared to process.
+   */
+  void readData(envoy_stream_t stream, size_t bytes_to_read);
 
   /**
    * Send data over an open HTTP stream. This method can be invoked multiple times.
@@ -234,6 +241,15 @@ private:
     Client& parent_;
     // Response details used by the connection manager.
     absl::string_view response_details_;
+    // True if the bridge should operate in explicit flow control mode.
+    //
+    // In this mode only one callback can be sent to the bridge until more is
+    // asked for. When a response is started this will either allow headers or an
+    // error to be sent up. Body, trailers, or further errors will not be sent
+    // until resumeData is called. This, combined with standard Envoy flow control push
+    // back, avoids excessive buffering of response bodies if the response body is
+    // read faster than the mobile caller can process it.
+    bool explicit_flow_control_ = false;
   };
 
   using DirectStreamSharedPtr = std::shared_ptr<DirectStream>;
@@ -283,16 +299,6 @@ private:
   // Shared synthetic address across DirectStreams.
   Network::Address::InstanceConstSharedPtr address_;
   Random::RandomGenerator& random_;
-
-  // True if the bridge should operate in explicit flow control mode.
-  //
-  // In this mode only one callback can be sent to the bridge until more is
-  // asked for. When a response is started this will either allow headers or an
-  // error to be sent up. Body, trailers, or further errors will not be sent
-  // until resumeData is called. This, combined with standard Envoy flow control push
-  // back, avoids excessive buffering of response bodies if the response body is
-  // read faster than the mobile caller can process it.
-  bool explicit_flow_control_;
 };
 
 using ClientPtr = std::unique_ptr<Client>;
