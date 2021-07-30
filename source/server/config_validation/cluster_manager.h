@@ -28,11 +28,11 @@ public:
       ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
       Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
       AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager,
-      const Server::Options& options)
-      : ProdClusterManagerFactory(admin, runtime, stats, tls, dns_resolver, ssl_context_manager,
-                                  main_thread_dispatcher, local_info, secret_manager,
-                                  validation_context, api, http_context, grpc_context,
-                                  router_context, log_manager, singleton_manager, options),
+      const Server::Options& options, Quic::QuicStatNames& quic_stat_names)
+      : ProdClusterManagerFactory(
+            admin, runtime, stats, tls, dns_resolver, ssl_context_manager, main_thread_dispatcher,
+            local_info, secret_manager, validation_context, api, http_context, grpc_context,
+            router_context, log_manager, singleton_manager, options, quic_stat_names),
         grpc_context_(grpc_context), router_context_(router_context) {}
 
   ClusterManagerPtr

@@ -8,7 +8,7 @@ import pathlib
 import sys
 import tarfile
 
-import yaml
+from tools.base import utils
 
 
 def format_item(extension, metadata):
@@ -26,9 +26,7 @@ def main():
     output_filename = sys.argv[2]
     generated_rst_dir = os.path.dirname(output_filename)
     security_rst_root = os.path.join(generated_rst_dir, "intro/arch_overview/security")
-
-    with open(metadata_filepath) as f:
-        extension_db = yaml.safe_load(f.read())
+    extension_db = utils.from_yaml(metadata_filepath)
 
     pathlib.Path(security_rst_root).mkdir(parents=True, exist_ok=True)
 

@@ -203,10 +203,10 @@ public:
     EXPECT_EQ(nullptr, router_->downstreamHeaders());
 
     EXPECT_CALL(callbacks_, downstreamTransportType())
-        .Times(2)
+        .Times(1)
         .WillRepeatedly(Return(TransportType::Framed));
     EXPECT_CALL(callbacks_, downstreamProtocolType())
-        .Times(2)
+        .Times(1)
         .WillRepeatedly(Return(ProtocolType::Binary));
 
     mock_protocol_cb_ = [&](MockProtocol* protocol) -> void {
