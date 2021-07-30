@@ -47,6 +47,17 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "range_utils_test",
+    srcs = ["range_utils_test.cc"],
+    extension_names = ["envoy.filters.http.cache"],
+    deps = [
+        ":common",
+        "//source/extensions/filters/http/cache:range_utils_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "cache_filter_test",
     srcs = ["cache_filter_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
