@@ -68,8 +68,7 @@ void EnvoyQuicServerSession::initializeStream(EnvoyQuicServerStream* stream) {
   setUpRequestDecoder(*stream);
 }
 
-quic::QuicSpdyStream*
-EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* pending) {
+quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* pending) {
   // Only client side server push stream should trigger this call.
   if (!codec_stats_.has_value() || !http3_options_.has_value()) {
     ENVOY_BUG(false,

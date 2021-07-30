@@ -1042,9 +1042,10 @@ TEST_F(EnvoyQuicServerSessionTest, IncomingUnidirectionalReadStream) {
 
   quic::QuicStreamFrame stream_frame(stream_id, false, 0, absl::string_view(payload.get(), 1));
   envoy_quic_session_.OnStreamFrame(stream_frame);
-  quic::QuicRstStreamFrame rst(/*control_frame_id=*/1u, stream_id,
-                                quic::QUIC_REFUSED_STREAM, /*bytes_written=*/0u);
-EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteRefusedStreamReset, _));
+  quic::QuicRstStreamFrame rst(/*control_frame_id=*/1u, stream_id, quic::QUIC_REFUSED_STREAM,
+                               /*bytes_written=*/0u);
+  EXPECT_CALL(stream_callbacks,
+              onResetStream(Http::StreamResetReason::RemoteRefusedStreamReset, _));
   envoy_quic_session_.OnRstStream(rst);
 }
 
