@@ -72,14 +72,6 @@ void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderM
 
 void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders (end_stream={}) {}.", *this, end_stream, headers);
-  // QUICHE guarantees to take all the headers. This could cause infinite data to
-  // be buffered on headers stream in Google QUIC implementation because
-  // headers stream doesn't have upper bound for its send buffer. But in IETF
-  // QUIC implementation this is safe as headers are sent on data stream which
-  // is bounded by max concurrent streams limited.
-  // Same vulnerability exists in crypto stream which can infinitely buffer data
-  // if handshake implementation goes wrong.
-  // TODO(#8826) Modify QUICHE to have an upper bound for header stream send buffer.
   // This is counting not serialized bytes in the send buffer.
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
@@ -276,8 +268,7 @@ void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
   ENVOY_STREAM_LOG(debug, "received RESET_STREAM with reset code={}", *this, frame.error_code);
   stats_.rx_reset_.inc();
   bool end_stream_decoded_and_encoded = read_side_closed() && local_end_stream_;
-  // This closes read side in both Google Quic and IETF Quic, but doesn't close write side in IETF
-  // Quic.
+  // This closes read side in IETF Quic, but doesn't close write side.
   quic::QuicSpdyServerStreamBase::OnStreamReset(frame);
   ASSERT(read_side_closed());
   if (write_side_closed() && !end_stream_decoded_and_encoded) {
