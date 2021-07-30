@@ -242,10 +242,6 @@ class StreamInfo {
 public:
   virtual ~StreamInfo() = default;
 
-  virtual void setUpstreamConnectionId(uint64_t id) PURE;
-
-  virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
-
   /**
    * @param response_flag the response flag. Each filter can set independent response flags. The
    * flags are accumulated.
@@ -597,6 +593,16 @@ public:
    * @return Network filter chain name of the downstream connection.
    */
   virtual const std::string& filterChainName() const PURE;
+
+  /**
+   * @param connection ID of the upstream connection.
+   */
+  virtual void setUpstreamConnectionId(uint64_t id) PURE;
+
+  /**
+   * @return the ID of the upstream connection, nullopt if not available.
+   */
+  virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
 };
 
 } // namespace StreamInfo

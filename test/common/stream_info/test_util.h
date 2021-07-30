@@ -219,6 +219,10 @@ public:
 
   const std::string& filterChainName() const override { return filter_chain_name_; }
 
+  void setUpstreamConnectionId(uint64_t id) override { upstream_connection_id_ = id; }
+
+  absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
+
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -258,9 +262,9 @@ public:
   Envoy::Event::SimulatedTimeSystem test_time_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_{};
   Http::RequestIdStreamInfoProviderSharedPtr request_id_provider_;
-  absl::optional<uint64_t> connection_id_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_{Tracing::Reason::NotTraceable};
+  absl::optional<uint64_t> upstream_connection_id_;
 };
 
 } // namespace Envoy
