@@ -21,7 +21,7 @@ namespace Network {
  * Implementation of ClientConnection which transparently attempts connections to
  * multiple different IP addresses, and uses the first connection that succeeds.
  * After a connection is established, all methods simply delegate to the
- * underlying connection. Before the connection is established, however
+ * underlying connection. However, before the connection is established
  * their behavior depends on their semantics. For anything which can result
  * in up-call (e.g. filter registration) or which must only happen once (e.g.
  * writing data) the context is saved in until the connection completes, at
@@ -68,12 +68,16 @@ public:
   bool startSecureTransport() override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
 
-  // Simple getters which always delegate to the first connection.
+  // Simple getters which always delegate to the first connection in connections_.
   bool isHalfCloseEnabled() override;
   std::string nextProtocol() const override;
+  // Note, this might change before connect finishes.
   const SocketAddressProvider& addressProvider() const override;
+  // Note, this might change before connect finishes.
   SocketAddressProviderSharedPtr addressProviderSharedPtr() const override;
+  // Note, this might change before connect finishes.
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
+  // Note, this might change before connect finishes.
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   State state() const override;
   bool connecting() const override;
@@ -84,7 +88,7 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override;
   absl::string_view transportFailureReason() const override;
 
-  // Methods implemented largely but this class itself.
+  // Methods implemented largely by this class itself.
   uint64_t id() const override;
   Event::Dispatcher& dispatcher() override;
   void close(ConnectionCloseType type) override;
@@ -104,10 +108,16 @@ private:
     void onEvent(ConnectionEvent event) override { parent_.onEvent(event, this); }
 
     void onAboveWriteBufferHighWatermark() override {
-      parent_.onAboveWriteBufferHighWatermark(this);
+      // No data will be written to the connection while the wrapper is assocaited with it,
+      // so the write buffer should never hit the high watermark.
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
-    void onBelowWriteBufferLowWatermark() override { parent_.onBelowWriteBufferLowWatermark(this); }
+    void onBelowWriteBufferLowWatermark() override {
+      // No data will be written to the connection while the wrapper is assocaited with it,
+      // so the write buffer should never hit the high watermark.
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
 
     ClientConnection& connection() { return connection_; }
 
@@ -133,14 +143,6 @@ private:
   // Called to bind the final connection. All other connections will be closed, and
   // and deferred operations will be replayed.
   void setUpFinalConnection(ConnectionEvent event, ConnectionCallbacksWrapper* wrapper);
-
-  // Called by the wrapper when the wrapped connection is above the write buffer
-  // high water mark.
-  void onAboveWriteBufferHighWatermark(ConnectionCallbacksWrapper* wrapper);
-
-  // Called by the wrapper when the wrapped connection is above the write buffer
-  // high water mark.
-  void onBelowWriteBufferLowWatermark(ConnectionCallbacksWrapper* wrapper);
 
   // Called by the write buffer containing pending writes if it goes below the
   // low water mark.

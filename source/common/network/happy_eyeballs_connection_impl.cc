@@ -156,23 +156,19 @@ bool HappyEyeballsConnectionImpl::readEnabled() const {
 }
 
 const SocketAddressProvider& HappyEyeballsConnectionImpl::addressProvider() const {
-  // Note, this might change before connect finishes.
   return connections_[0]->addressProvider();
 }
 
 SocketAddressProviderSharedPtr HappyEyeballsConnectionImpl::addressProviderSharedPtr() const {
-  // Note, this might change before connect finishes.
   return connections_[0]->addressProviderSharedPtr();
 }
 
 absl::optional<Connection::UnixDomainSocketPeerCredentials>
 HappyEyeballsConnectionImpl::unixSocketPeerCredentials() const {
-  // Note, this might change before connect finishes.
   return connections_[0]->unixSocketPeerCredentials();
 }
 
 Ssl::ConnectionInfoConstSharedPtr HappyEyeballsConnectionImpl::ssl() const {
-  // Note, this might change before connect finishes.
   return connections_[0]->ssl();
 }
 
@@ -446,9 +442,9 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
       cleanupWrapperAndConnection(wrapper);
       return;
     }
-    // This connection attempt failed but there are no more attempts to be made, so pass
-    // the failure up.
     ASSERT(connections_.size() == 1);
+    // This connection attempt failed but there are no more attempts to be made, so pass
+    // the failure up by setting up this connection as the final one.
   }
 
   // Close all other connections and configure the final connection.
@@ -492,6 +488,11 @@ void HappyEyeballsConnectionImpl::setUpFinalConnection(ConnectionEvent event,
     }
     if (post_connect_state_.initialize_read_filters_.has_value() &&
         post_connect_state_.initialize_read_filters_.value()) {
+      // initialize_read_filters_ is set to true in initializeReadFilters() only when
+      // there are read filters installed. The underlying connection's initializeReadFilters()
+      // will always return true when read filters are installed so this should always
+      // return true.
+      ASSERT(!post_connect_state_.read_filters_.empty());
       bool initialized = connections_[0]->initializeReadFilters();
       ASSERT(initialized);
     }
@@ -540,16 +541,6 @@ void HappyEyeballsConnectionImpl::cleanupWrapperAndConnection(ConnectionCallback
       ++it;
     }
   }
-}
-
-void HappyEyeballsConnectionImpl::onAboveWriteBufferHighWatermark(
-    ConnectionCallbacksWrapper* /*wrapper*/) {
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
-void HappyEyeballsConnectionImpl::onBelowWriteBufferLowWatermark(
-    ConnectionCallbacksWrapper* /*wrapper*/) {
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void HappyEyeballsConnectionImpl::onWriteBufferLowWatermark() {
