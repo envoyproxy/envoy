@@ -1,6 +1,7 @@
 import importlib
 import sys
 from contextlib import contextmanager
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -119,31 +120,61 @@ def test_util_coverage_with_data_file(patches):
         == [(m_open.return_value.__enter__.return_value,), {}])
 
 
-def test_util_extract(patches):
+
+@pytest.mark.parametrize(
+    "tarballs",
+    [(), tuple("TARB{i}" for i in range(0, 3))])
+def test_util_extract(patches, tarballs):
     patched = patches(
-        "tempfile.TemporaryDirectory",
+        "nested",
         "tarfile.open",
         prefix="tools.base.utils")
 
-    with patched as (m_tmp, m_open):
-        assert utils.extract("TARBALL", "PATH") == "PATH"
+    with patched as (m_nested, m_open):
+        _extractions = [MagicMock(), MagicMock()]
+        m_nested.return_value.__enter__.return_value = _extractions
+
+        if tarballs:
+            assert utils.extract("PATH", *tarballs) == "PATH"
+        else:
+
+            with pytest.raises(utils.ExtractError) as e:
+                utils.extract("PATH", *tarballs) == "PATH"
+
+    if not tarballs:
+        assert (
+            e.value.args[0]
+            == 'No tarballs specified for extraction to PATH')
+        assert not m_nested.called
+        assert not m_open.called
+        for _extract in _extractions:
+            assert not _extract.extractall.called
+        return
+
+    for _extract in _extractions:
+        assert (
+            list(_extract.extractall.call_args)
+            == [(), dict(path="PATH")])
 
     assert (
-        list(m_open.call_args)
-        == [('TARBALL',), {}])
+        list(m_open.call_args_list)
+        == [[(tarb, ), {}] for tarb in tarballs])
     assert (
-        list(m_open.return_value.__enter__.return_value.extractall.call_args)
-        == [(), {'path': "PATH"}])
+        list(m_nested.call_args)
+        == [tuple(m_open.return_value for x in tarballs), {}])
 
 
-def test_util_untar(patches):
+@pytest.mark.parametrize(
+    "tarballs",
+    [(), tuple("TARB{i}" for i in range(0, 3))])
+def test_util_untar(patches, tarballs):
     patched = patches(
         "tempfile.TemporaryDirectory",
         "extract",
         prefix="tools.base.utils")
 
     with patched as (m_tmp, m_extract):
-        with utils.untar("PATH") as tmpdir:
+        with utils.untar(*tarballs) as tmpdir:
             assert tmpdir == m_extract.return_value
 
     assert (
@@ -151,7 +182,7 @@ def test_util_untar(patches):
         == [(), {}])
     assert (
         list(m_extract.call_args)
-        == [('PATH', m_tmp.return_value.__enter__.return_value), {}])
+        == [(m_tmp.return_value.__enter__.return_value, ) + tarballs, {}])
 
 
 def test_util_from_yaml(patches):

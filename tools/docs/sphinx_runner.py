@@ -113,8 +113,7 @@ class SphinxRunner(runner.Runner):
         """
         rst_dir = os.path.join(self.build_dir, "generated/rst")
         if self.rst_tar:
-            with tarfile.open(self.rst_tar) as tarfiles:
-                tarfiles.extractall(path=rst_dir)
+            utils.extract(rst_dir, self.rst_tar)
         return rst_dir
 
     @property
