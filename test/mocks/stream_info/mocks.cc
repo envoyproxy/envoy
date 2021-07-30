@@ -126,9 +126,9 @@ MockStreamInfo::MockStreamInfo()
         filter_chain_name_ = std::string(filter_chain_name);
       }));
   ON_CALL(*this, filterChainName()).WillByDefault(ReturnRef(filter_chain_name_));
-  ON_CALL(*this, setUpstreamConnectionId(_))
-      .WillByDefault(Invoke(
-          [this](uint64_t id) { upstream_connection_id_ = id; }));
+  ON_CALL(*this, setUpstreamConnectionId(_)).WillByDefault(Invoke([this](uint64_t id) {
+    upstream_connection_id_ = id;
+  }));
   ON_CALL(*this, upstreamConnectionId()).WillByDefault(Invoke([this]() {
     return upstream_connection_id_;
   }));
