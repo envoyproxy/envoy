@@ -45,7 +45,7 @@ class ChangeDetectorInitializeError(ChangeDetectorError):
     pass
 
 
-BUF_LOCK_FILE = "tmp.json"
+BUF_STATE_FILE = "tmp.json"
 
 
 class BufWrapper(ProtoBreakingChangeDetector):
@@ -57,9 +57,9 @@ class BufWrapper(ProtoBreakingChangeDetector):
         if not Path(path_to_after).is_file():
             raise ValueError(f"path_to_after {path_to_after} does not exist")
 
-        self.path_to_before = path_to_before
-        self.path_to_after = path_to_after
-        self.additional_args = additional_args
+        self._path_to_before = path_to_before
+        self._path_to_after = path_to_after
+        self._additional_args = additional_args
 
     def run_detector(self):
         # 1) pull buf BSR dependencies with buf mod update (? still need to figure this out. commented out for now)
@@ -86,7 +86,7 @@ class BufWrapper(ProtoBreakingChangeDetector):
         #        bcode, bout, berr = run_command(f"{buf_path} mod update")
         #        bout, berr = ''.join(bout), ''.join(berr)
 
-        target = Path(temp_dir.name, f"{Path(self.path_to_before).stem}.proto")
+        target = Path(temp_dir.name, f"{Path(self._path_to_before).stem}.proto")
 
         buf_args = [
             "--path",
@@ -95,35 +95,37 @@ class BufWrapper(ProtoBreakingChangeDetector):
             "--config",
             str(yaml_file_loc),
         ]
-        if self.additional_args is not None:
-            buf_args.extend(self.additional_args)
+        if self._additional_args is not None:
+            buf_args.extend(self._additional_args)
 
-        copyfile(self.path_to_before, target)
+        copyfile(self._path_to_before, target)
 
         initial_code, initial_out, initial_err = run_command(
-            ' '.join([buf_path, f"build -o {Path(temp_dir.name, BUF_LOCK_FILE)}", *buf_args]))
+            ' '.join([buf_path, f"build -o {Path(temp_dir.name, BUF_STATE_FILE)}", *buf_args]))
         initial_out, initial_err = ''.join(initial_out), ''.join(initial_err)
 
         if initial_code != 0 or len(initial_out) > 0 or len(initial_err) > 0:
-            raise ChangeDetectorInitializeError("Unexpected error during init")
+            raise ChangeDetectorInitializeError(
+                f"Unexpected error during init:\n\tExit Status Code: {initial_code}\n\tstdout: {initial_out}\n\t stderr: {initial_err}\n"
+            )
 
-        lock_location = Path(temp_dir.name, BUF_LOCK_FILE)
-        with open(lock_location) as f:
+        lock_location = Path(temp_dir.name, BUF_STATE_FILE)
+        with open(lock_location, "r") as f:
             initial_lock = f.readlines()
 
-        copyfile(self.path_to_after, target)
+        copyfile(self._path_to_after, target)
 
         final_code, final_out, final_err = run_command(
             ' '.join(
-                [buf_path, f"breaking --against {Path(temp_dir.name, BUF_LOCK_FILE)}", *buf_args]))
+                [buf_path, f"breaking --against {Path(temp_dir.name, BUF_STATE_FILE)}", *buf_args]))
         final_out, final_err = ''.join(final_out), ''.join(final_err)
 
         # new with buf: lock must be manually re-built
         # but here we only re-build if there weren't any detected breaking changes
         if len(final_out) == len(final_err) == final_code == 0:
             _, _, _ = run_command(
-                ' '.join([buf_path, f"build -o {Path(temp_dir.name, BUF_LOCK_FILE)}", *buf_args]))
-        with open(lock_location) as f:
+                ' '.join([buf_path, f"build -o {Path(temp_dir.name, BUF_STATE_FILE)}", *buf_args]))
+        with open(lock_location, "r") as f:
             final_lock = f.readlines()
 
         temp_dir.cleanup()
@@ -137,7 +139,7 @@ class BufWrapper(ProtoBreakingChangeDetector):
         final_code, final_out, final_err = self.final_result
 
         # Ways buf output could be indicative of a breaking change:
-        # 1) run_command code is not 0 (e.g. it's 100)
+        # 1) final_code (exit status code) is not 0 (e.g. it's 100)
         # 2) stdout/stderr is nonempty
         # 3) stdout/stderr contains "Failure"
         break_condition = lambda inp: len(inp) > 0 or bool(re.match(r"Failure", inp))
