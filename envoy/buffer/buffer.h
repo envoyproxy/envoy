@@ -9,6 +9,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/http/stream_reset_handler.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/byte_order.h"
@@ -109,6 +110,19 @@ public:
    * @param amount the amount to credit.
    */
   virtual void credit(uint64_t amount) PURE;
+
+  /**
+   * Clears the associated downstream with this account.
+   * After this has been called, calls to reset the downstream become no-ops.
+   * Must be called before downstream is deleted.
+   */
+  virtual void clearDownstream() PURE;
+
+  /**
+   * Reset the downstream stream associated with this account. Resetting the downstream stream
+   * should trigger a reset of the corresponding upstream stream if it exists.
+   */
+  virtual void resetDownstream() PURE;
 };
 
 using BufferMemoryAccountSharedPtr = std::shared_ptr<BufferMemoryAccount>;
@@ -480,7 +494,8 @@ private:
 using InstancePtr = std::unique_ptr<Instance>;
 
 /**
- * A factory for creating buffers which call callbacks when reaching high and low watermarks.
+ * An abstract factory for creating watermarked buffers and buffer memory
+ * accounts. The factory also supports tracking active memory accounts.
  */
 class WatermarkFactory {
 public:
@@ -497,6 +512,15 @@ public:
   virtual InstancePtr createBuffer(std::function<void()> below_low_watermark,
                                    std::function<void()> above_high_watermark,
                                    std::function<void()> above_overflow_watermark) PURE;
+
+  /**
+   * Create and returns a buffer memory account.
+   *
+   * @param reset_handler supplies the stream_reset_handler the account will
+   * invoke to reset the stream.
+   * @return a BufferMemoryAccountSharedPtr of the newly created account.
+   */
+  virtual BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) PURE;
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;
