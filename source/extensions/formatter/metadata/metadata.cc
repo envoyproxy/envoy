@@ -20,7 +20,7 @@ public:
       : ::Envoy::Formatter::MetadataFormatter(filter_namespace, path, max_length,
                                               [](const StreamInfo::StreamInfo& stream_info)
                                                   -> const envoy::config::core::v3::Metadata* {
-                                                auto route = stream_info.routeEntry();
+                                                auto route = stream_info.route();
 
                                                 if (route == nullptr) {
                                                   return nullptr;

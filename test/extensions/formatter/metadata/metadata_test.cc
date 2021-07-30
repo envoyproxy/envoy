@@ -91,23 +91,20 @@ TEST_F(MetadataFormatterTest, ClusterMetadata) {
                                                         response_trailers_, stream_info_, body_));
 }
 
-// Test that METADATA(ROUTE accesses stream_info's RouteEntry.
+// Test that METADATA(ROUTE accesses stream_info's Route.
 TEST_F(MetadataFormatterTest, RouteMetadata) {
-  NiceMock<Router::MockRouteEntry> route;
-  EXPECT_CALL(route, metadata()).WillRepeatedly(testing::ReturnRef(metadata_));
-  EXPECT_CALL(stream_info_, routeEntry()).WillRepeatedly(testing::Return(&route));
+  std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
+  EXPECT_CALL(*route, metadata()).WillRepeatedly(testing::ReturnRef(metadata_));
+  EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(route));
 
   EXPECT_EQ("test_value",
             getTestMetadataFormatter("ROUTE")->format(request_headers_, response_headers_,
                                                       response_trailers_, stream_info_, body_));
 }
 
-// Make sure that code handles nullptr returned for stream_info::routeEntry().
+// Make sure that code handles nullptr returned for stream_info::route().
 TEST_F(MetadataFormatterTest, NonExistentRouteMetadata) {
-  // Make sure that formatter accesses dynamic metadata.
-  NiceMock<Router::MockRouteEntry> route;
-  EXPECT_CALL(route, metadata()).WillRepeatedly(testing::ReturnRef(metadata_));
-  EXPECT_CALL(stream_info_, routeEntry()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(nullptr));
 
   EXPECT_EQ("-", getTestMetadataFormatter("ROUTE")->format(
                      request_headers_, response_headers_, response_trailers_, stream_info_, body_));
