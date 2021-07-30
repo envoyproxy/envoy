@@ -108,13 +108,13 @@ private:
     void onEvent(ConnectionEvent event) override { parent_.onEvent(event, this); }
 
     void onAboveWriteBufferHighWatermark() override {
-      // No data will be written to the connection while the wrapper is assocaited with it,
+      // No data will be written to the connection while the wrapper is associated with it,
       // so the write buffer should never hit the high watermark.
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
     void onBelowWriteBufferLowWatermark() override {
-      // No data will be written to the connection while the wrapper is assocaited with it,
+      // No data will be written to the connection while the wrapper is associated with it,
       // so the write buffer should never hit the high watermark.
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
