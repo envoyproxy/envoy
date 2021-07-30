@@ -137,19 +137,18 @@ private:
 };
 
 struct ActiveTcpConnection;
-class OwnedActiveStreamListenerBase;
+class ActiveTcpListener;
 
 /**
  * Wrapper for a group of active connections which are attached to the same filter chain context.
  */
 class ActiveConnections : public Event::DeferredDeletable {
 public:
-  ActiveConnections(OwnedActiveStreamListenerBase& listener,
-                    const Network::FilterChain& filter_chain);
+  ActiveConnections(ActiveTcpListener& listener, const Network::FilterChain& filter_chain);
   ~ActiveConnections() override;
 
   // listener filter chain pair is the owner of the connections
-  OwnedActiveStreamListenerBase& listener_;
+  ActiveTcpListener& listener_;
   const Network::FilterChain& filter_chain_;
   // Owned connections
   std::list<std::unique_ptr<ActiveTcpConnection>> connections_;
@@ -180,30 +179,5 @@ struct ActiveTcpConnection : LinkedObject<ActiveTcpConnection>,
 using ActiveConnectionPtr = std::unique_ptr<ActiveTcpConnection>;
 using ActiveConnectionCollectionPtr = std::unique_ptr<ActiveConnections>;
 
-// The mixin that handles the composition type ActiveConnectionCollection. This mixin
-// provides the connection removal helper and the filter chain removal helper.
-class OwnedActiveStreamListenerBase : public ActiveStreamListenerBase {
-public:
-  OwnedActiveStreamListenerBase(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
-                                Network::ListenerPtr&& listener, Network::ListenerConfig& config)
-      : ActiveStreamListenerBase(parent, dispatcher, std::move(listener), config) {}
-
-  /**
-   * Remove and destroy an active connection.
-   * @param connection supplies the connection to remove.
-   */
-  void removeConnection(ActiveTcpConnection& connection);
-
-protected:
-  /**
-   * Return the active connections container attached with the given filter chain.
-   */
-  ActiveConnections& getOrCreateActiveConnections(const Network::FilterChain& filter_chain);
-
-  void removeFilterChain(const Network::FilterChain* filter_chain) override;
-
-  absl::flat_hash_map<const Network::FilterChain*, ActiveConnectionCollectionPtr>
-      connections_by_context_;
-};
 } // namespace Server
 } // namespace Envoy
