@@ -86,7 +86,7 @@ std::vector<Matchers::StringMatcherPtr>
 createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
   std::vector<Matchers::StringMatcherPtr> matchers;
   for (const auto& matcher : list.patterns()) {
-    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(matcher));
   }
   return matchers;
 }
@@ -136,7 +136,7 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatche
   for (const auto& key : keys) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(key.get());
-    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(matcher));
   }
 
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
@@ -157,7 +157,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
   if (matchers.empty()) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(Http::Headers::get().Host.get());
-    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(matcher));
 
     return std::make_shared<NotHeaderKeyMatcher>(std::move(matchers));
   }
@@ -171,7 +171,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
   for (const auto& key : keys) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(key.get());
-    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(matcher));
   }
 
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
