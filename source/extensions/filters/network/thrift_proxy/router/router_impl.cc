@@ -271,7 +271,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     for (const auto& policy : policies) {
       if (policy->enabled(runtime_)) {
         auto shadow_router =
-            shadow_writer_.submit(policy->clusterName(), metadata, upstream_req_info.transport, upstream_req_info.protocol);
+            shadow_writer_.submit(policy->clusterName(), metadata, upstream_req_info.transport,
+                                  upstream_req_info.protocol);
         if (shadow_router.has_value()) {
           shadow_routers_.push_back(shadow_router.value());
         }
