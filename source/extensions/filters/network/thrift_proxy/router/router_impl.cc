@@ -9,7 +9,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/strings/match.h"
 
@@ -192,6 +191,7 @@ void Router::onDestroy() {
 
 void Router::setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
+  upstream_response_callbacks_ = std::make_unique<UpstreamResponseCallbacksImpl>(callbacks_);
 
   // TODO(zuercher): handle buffer limits
 }
@@ -225,68 +225,11 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   route_entry_ = route_->routeEntry();
   const std::string& cluster_name = route_entry_->clusterName();
 
-  Upstream::ThreadLocalCluster* cluster = clusterManager().getThreadLocalCluster(cluster_name);
-  if (!cluster) {
-    ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, cluster_name);
-    stats().unknown_cluster_.inc();
-    callbacks_->sendLocalReply(AppException(AppExceptionType::InternalError,
-                                            fmt::format("unknown cluster '{}'", cluster_name)),
-                               true);
-    return FilterStatus::StopIteration;
-  }
-
-  cluster_ = cluster->info();
-  ENVOY_STREAM_LOG(debug, "cluster '{}' match for method '{}'", *callbacks_, cluster_name,
-                   metadata->methodName());
-  switch (metadata->messageType()) {
-  case MessageType::Call:
-    incRequestCall(*cluster_);
-    break;
-
-  case MessageType::Oneway:
-    incRequestOneWay(*cluster_);
-    break;
-
-  default:
-    incRequestInvalid(*cluster_);
-    break;
-  }
-
-  if (cluster_->maintenanceMode()) {
-    stats().upstream_rq_maintenance_mode_.inc();
-    callbacks_->sendLocalReply(
-        AppException(AppExceptionType::InternalError,
-                     fmt::format("maintenance mode for cluster '{}'", cluster_name)),
-        true);
-    return FilterStatus::StopIteration;
-  }
-
-  const std::shared_ptr<const ProtocolOptionsConfig> options =
-      cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(
-          NetworkFilterNames::get().ThriftProxy);
-
-  const TransportType transport = options
-                                      ? options->transport(callbacks_->downstreamTransportType())
-                                      : callbacks_->downstreamTransportType();
-  ASSERT(transport != TransportType::Auto);
-
-  const ProtocolType protocol = options ? options->protocol(callbacks_->downstreamProtocolType())
-                                        : callbacks_->downstreamProtocolType();
-  ASSERT(protocol != ProtocolType::Auto);
-
-  if (callbacks_->downstreamTransportType() == TransportType::Framed &&
-      transport == TransportType::Framed && callbacks_->downstreamProtocolType() == protocol &&
-      protocol != ProtocolType::Twitter) {
-    passthrough_supported_ = true;
-  }
-
-  auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
-  if (!conn_pool_data) {
-    stats().no_healthy_upstream_.inc();
-    callbacks_->sendLocalReply(
-        AppException(AppExceptionType::InternalError,
-                     fmt::format("no healthy upstream for '{}'", cluster_name)),
-        true);
+  auto prepare_result =
+      prepareUpstreamRequest(cluster_name, metadata, callbacks_->downstreamTransportType(),
+                             callbacks_->downstreamProtocolType(), this);
+  if (prepare_result.exception.has_value()) {
+    callbacks_->sendLocalReply(prepare_result.exception.value(), true);
     return FilterStatus::StopIteration;
   }
 
@@ -300,129 +243,30 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     }
   }
 
+  auto& upstream_req_info = prepare_result.upstream_request_info.value();
+  passthrough_supported_ = upstream_req_info.passthrough_supported;
   upstream_request_ =
-      std::make_unique<UpstreamRequest>(*this, *conn_pool_data, metadata, transport, protocol);
+      std::make_unique<UpstreamRequest>(*this, *upstream_req_info.conn_pool_data, metadata,
+                                        upstream_req_info.transport, upstream_req_info.protocol);
   return upstream_request_->start();
 }
 
 FilterStatus Router::messageEnd() {
   ProtocolConverter::messageEnd();
-
-  Buffer::OwnedImpl transport_buffer;
-
-  upstream_request_->metadata_->setProtocol(upstream_request_->protocol_->type());
-
-  upstream_request_->transport_->encodeFrame(transport_buffer, *upstream_request_->metadata_,
-                                             upstream_request_buffer_);
-
-  request_size_ += transport_buffer.length();
+  request_size_ += upstream_request_->encodeAndWrite(upstream_request_buffer_);
   recordUpstreamRequestSize(*cluster_, request_size_);
-
-  upstream_request_->conn_data_->connection().write(transport_buffer, false);
-  upstream_request_->onRequestComplete();
   return FilterStatus::Continue;
 }
 
 void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
-  ASSERT(!upstream_request_->response_complete_);
-
-  response_size_ += data.length();
-
-  if (upstream_request_->upgrade_response_ != nullptr) {
-    ENVOY_STREAM_LOG(trace, "reading upgrade response: {} bytes", *callbacks_, data.length());
-    // Handle upgrade response.
-    if (!upstream_request_->upgrade_response_->onData(data)) {
-      // Wait for more data.
-      return;
-    }
-
-    ENVOY_STREAM_LOG(debug, "upgrade response complete", *callbacks_);
-    upstream_request_->protocol_->completeUpgrade(*upstream_request_->conn_state_,
-                                                  *upstream_request_->upgrade_response_);
-
-    upstream_request_->upgrade_response_.reset();
-    upstream_request_->onRequestStart(true);
-  } else {
-    ENVOY_STREAM_LOG(trace, "reading response: {} bytes", *callbacks_, data.length());
-
-    // Handle normal response.
-    if (!upstream_request_->response_started_) {
-      callbacks_->startUpstreamResponse(*upstream_request_->transport_,
-                                        *upstream_request_->protocol_);
-      upstream_request_->response_started_ = true;
-    }
-
-    ThriftFilters::ResponseStatus status = callbacks_->upstreamData(data);
-    if (status == ThriftFilters::ResponseStatus::Complete) {
-      ENVOY_STREAM_LOG(debug, "response complete", *callbacks_);
-
-      recordUpstreamResponseSize(*cluster_, response_size_);
-
-      switch (callbacks_->responseMetadata()->messageType()) {
-      case MessageType::Reply:
-        incResponseReply(*cluster_);
-        if (callbacks_->responseSuccess()) {
-          upstream_request_->upstream_host_->outlierDetector().putResult(
-              Upstream::Outlier::Result::ExtOriginRequestSuccess);
-          incResponseReplySuccess(*cluster_);
-        } else {
-          upstream_request_->upstream_host_->outlierDetector().putResult(
-              Upstream::Outlier::Result::ExtOriginRequestFailed);
-          incResponseReplyError(*cluster_);
-        }
-        break;
-
-      case MessageType::Exception:
-        upstream_request_->upstream_host_->outlierDetector().putResult(
-            Upstream::Outlier::Result::ExtOriginRequestFailed);
-        incResponseException(*cluster_);
-        break;
-
-      default:
-        incResponseInvalidType(*cluster_);
-        break;
-      }
-      upstream_request_->onResponseComplete();
-      cleanup();
-      return;
-    } else if (status == ThriftFilters::ResponseStatus::Reset) {
-      // Note: invalid responses are not accounted in the response size histogram.
-      ENVOY_STREAM_LOG(debug, "upstream reset", *callbacks_);
-      upstream_request_->upstream_host_->outlierDetector().putResult(
-          Upstream::Outlier::Result::ExtOriginRequestFailed);
-      upstream_request_->resetStream();
-      return;
-    }
-  }
-
-  if (end_stream) {
-    // Response is incomplete, but no more data is coming.
-    ENVOY_STREAM_LOG(debug, "response underflow", *callbacks_);
-    upstream_request_->onResponseComplete();
-    upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  const bool done =
+      upstream_request_->handleUpstreamData(data, end_stream, *this, *upstream_response_callbacks_);
+  if (done) {
     cleanup();
   }
 }
 
-void Router::onEvent(Network::ConnectionEvent event) {
-  ASSERT(upstream_request_ && !upstream_request_->response_complete_);
-
-  switch (event) {
-  case Network::ConnectionEvent::RemoteClose:
-    ENVOY_STREAM_LOG(debug, "upstream remote close", *callbacks_);
-    upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
-    break;
-  case Network::ConnectionEvent::LocalClose:
-    ENVOY_STREAM_LOG(debug, "upstream local close", *callbacks_);
-    upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
-    break;
-  default:
-    // Connected is consumed by the connection pool.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-
-  upstream_request_->releaseConnection(false);
-}
+void Router::onEvent(Network::ConnectionEvent event) { upstream_request_->onEvent(event); }
 
 const Network::Connection* Router::downstreamConnection() const {
   if (callbacks_ != nullptr) {
