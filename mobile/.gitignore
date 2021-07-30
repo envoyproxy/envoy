@@ -22,3 +22,4 @@ clang.bazelrc
 user.bazelrc
 tags
 tulsi-workspace
+compile_commands.json
