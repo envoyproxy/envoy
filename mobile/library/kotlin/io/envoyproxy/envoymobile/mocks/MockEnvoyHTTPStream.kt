@@ -9,10 +9,15 @@ import java.nio.ByteBuffer
  *
  * @param callbacks Callbacks associated with the stream.
  */
-internal class MockEnvoyHTTPStream(val callbacks: EnvoyHTTPCallbacks) : EnvoyHTTPStream(0, callbacks) {
+internal class MockEnvoyHTTPStream(
+  val callbacks: EnvoyHTTPCallbacks,
+  val explicitFlowControl: Boolean
+) : EnvoyHTTPStream(0, callbacks, explicitFlowControl) {
   override fun sendHeaders(headers: MutableMap<String, MutableList<String>>?, endStream: Boolean) {}
 
   override fun sendData(data: ByteBuffer?, endStream: Boolean) {}
+
+  override fun readData(byteCount: Long) {}
 
   override fun sendTrailers(trailers: MutableMap<String, MutableList<String>>?) {}
 

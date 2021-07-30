@@ -499,9 +499,11 @@ static void ios_track_event(envoy_map map, const void *context) {
   }
 }
 
-- (id<EnvoyHTTPStream>)startStreamWithCallbacks:(EnvoyHTTPCallbacks *)callbacks {
+- (id<EnvoyHTTPStream>)startStreamWithCallbacks:(EnvoyHTTPCallbacks *)callbacks
+                            explicitFlowControl:(BOOL)explicitFlowControl {
   return [[EnvoyHTTPStreamImpl alloc] initWithHandle:init_stream(_engineHandle)
-                                           callbacks:callbacks];
+                                           callbacks:callbacks
+                                 explicitFlowControl:explicitFlowControl];
 }
 
 - (int)recordCounterInc:(NSString *)elements tags:(EnvoyTags *)tags count:(NSUInteger)count {

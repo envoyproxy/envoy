@@ -24,6 +24,17 @@ open class Stream(
   }
 
   /**
+   * Read data from the response stream. Returns immediately.
+   *
+   * @param byteCount Maximum number of bytes that may be be passed by the next data callback.
+   * @return This stream, for chaining syntax.
+   */
+  open fun readData(byteCount: Long): Stream {
+    underlyingStream.readData(byteCount)
+    return this
+  }
+
+  /**
    * For sending data to an associated stream.
    *
    * @param data Data to send over the stream.

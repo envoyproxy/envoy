@@ -11,9 +11,10 @@ public interface EnvoyEngine {
    * Creates a new stream with the provided callbacks.
    *
    * @param callbacks The callbacks for receiving callbacks from the stream.
+   * @param explicitFlowControl Whether explicit flow control will be enabled for this stream.
    * @return A stream that may be used for sending data.
    */
-  EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks);
+  EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl);
 
   /**
    * Terminates the running engine.
