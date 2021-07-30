@@ -165,8 +165,7 @@ private:
 
 class PortRangeMatcher : public Matcher {
 public:
-  PortRangeMatcher(const ::envoy::type::v3::Int32Range& range)
-      : start_(range.start()), end_(range.end()) {}
+  PortRangeMatcher(const ::envoy::type::v3::Int32Range& range);
 
   bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                const StreamInfo::StreamInfo& info) const override;

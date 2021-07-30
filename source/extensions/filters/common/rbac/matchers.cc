@@ -161,6 +161,22 @@ bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::Request
   return ip && ip->port() == port_;
 }
 
+PortRangeMatcher::PortRangeMatcher(const ::envoy::type::v3::Int32Range& range)
+    : start_(range.start()), end_(range.end()) {
+  auto start = range.start();
+  auto end = range.end();
+  if (start < 0 || start > 65536) {
+    throw EnvoyException(fmt::format("range start {} out of bounds", start));
+  }
+  if (end < 0 || end > 65536) {
+    throw EnvoyException(fmt::format("range end {} out of bounds", end));
+  }
+  if (start >= end) {
+    throw EnvoyException(
+        fmt::format("range start {} cannot be greater or equal than range end {}", start, end));
+  }
+}
+
 bool PortRangeMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                                const StreamInfo::StreamInfo& info) const {
   const Envoy::Network::Address::Ip* ip =
