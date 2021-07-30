@@ -27,18 +27,51 @@ class ProtoBreakingChangeDetector(ABC):
             path_to_before: str,
             path_to_after: str,
             additional_args: List[str] = None) -> None:
+        """Initializes the breaking change detector, setting up any necessary config without actually running
+        the detector against any proto files.
+
+        Takes in a single protobuf as 2 files, in a ``before`` state and an ``after`` state,
+        and checks if the ``after`` state violates any breaking change rules.
+
+        :param path_to_before: absolute path to the .proto file in the before state
+        :type path_to_before: ``str``
+
+        :param path_to_after: absolute path to the .proto file in the after state
+        :type path_to_after: ``str``
+
+        :param additional_args: additional arguments for the breaking change detector CLI. May be tool-dependent.
+            Additional arguments are passed in both the "initialize" and "detect changes" steps.
+        :type additional_args: ``List[str]``
+        """
         pass
 
     @abstractmethod
     def run_detector(self) -> None:
+        """Runs the breaking change detector with the parameters given in ``__init__``. This method should populate
+        the detector's internal data such that `is_breaking` and `lock_file_changed` do not require any additional
+        invocations to the breaking change detector.
+        """
         pass
 
     @abstractmethod
     def is_breaking(self) -> bool:
+        """Returns whether the changes between the ``before`` and ``after`` states of the proto file given in ``__init__``
+        violate any breaking change rules specified by this breaking change detector.
+
+        :return: a boolean flag indicating if the changes between ``before`` and ``after`` are breaking
+        :rtype: ``bool``
+        """
         pass
 
     @abstractmethod
     def lock_file_changed(self) -> bool:
+        """Returns whether the changes between the ``before`` and ``after`` states of the proto file given in ``__init__``
+        cause a change in the detector's state file. This function is mostly used for testing, to ensure that the breaking change 
+        detector is checking all of the protobuf features we are interested in.
+
+        :return: a boolean flag indicating if the changes between ``before`` and ``after`` cause a change in the state file
+        :rtype: ``bool``
+        """
         pass
 
 
@@ -60,6 +93,22 @@ class BufWrapper(ProtoBreakingChangeDetector):
             path_to_before: str,
             path_to_after: str,
             additional_args: List[str] = None) -> None:
+        """Initializes the breaking change detector, setting up any necessary config without actually running
+        the detector against any proto files.
+
+        Takes in a single protobuf as 2 files, in a ``before`` state and an ``after`` state,
+        and checks if the ``after`` state violates any breaking change rules.
+
+        :param path_to_before: absolute path to the .proto file in the before state
+        :type path_to_before: ``str``
+
+        :param path_to_after: absolute path to the .proto file in the after state
+        :type path_to_after: ``str``
+
+        :param additional_args: additional arguments for the breaking change detector CLI. May be tool-dependent.
+            Additional arguments are passed in both the "initialize" and "detect changes" steps.
+        :type additional_args: ``List[str]``
+        """
         if not Path(path_to_before).is_file():
             raise ValueError(f"path_to_before {path_to_before} does not exist")
 
@@ -71,6 +120,10 @@ class BufWrapper(ProtoBreakingChangeDetector):
         self._additional_args = additional_args
 
     def run_detector(self) -> None:
+        """Runs the breaking change detector with the parameters given in ``__init__``. This method should populate
+        the detector's internal data such that `is_breaking` and `lock_file_changed` do not require any additional
+        invocations to the breaking change detector.
+        """
         # 1) pull buf BSR dependencies with buf mod update (? still need to figure this out. commented out for now)
         # 2) copy buf.yaml into temp dir
         # 3) copy start file into temp dir
@@ -94,7 +147,6 @@ class BufWrapper(ProtoBreakingChangeDetector):
         # `buf mod update` doesn't seem to do anything, and the first test will fail because it forces buf to automatically start downloading the deps
         #        bcode, bout, berr = run_command(f"{buf_path} mod update")
         #        bout, berr = ''.join(bout), ''.join(berr)
-
         target = Path(temp_dir.name, f"{Path(self._path_to_before).stem}.proto")
 
         buf_args = [
@@ -145,6 +197,12 @@ class BufWrapper(ProtoBreakingChangeDetector):
         self.final_lock = final_lock
 
     def is_breaking(self) -> bool:
+        """Returns whether the changes between the ``before`` and ``after`` states of the proto file given in ``__init__``
+        violate any breaking change rules specified by this breaking change detector.
+
+        :return: a boolean flag indicating if the changes between ``before`` and ``after`` are breaking
+        :rtype: ``bool``
+        """
         final_code, final_out, final_err = self.final_result
 
         # Ways buf output could be indicative of a breaking change:
@@ -155,4 +213,11 @@ class BufWrapper(ProtoBreakingChangeDetector):
         return final_code != 0 or break_condition(final_out) or break_condition(final_err)
 
     def lock_file_changed(self) -> bool:
+        """Returns whether the changes between the ``before`` and ``after`` states of the proto file given in ``__init__``
+        cause a change in the detector's state file. This function is mostly used for testing, to ensure that the breaking change 
+        detector is checking all of the protobuf features we are interested in.
+
+        :return: a boolean flag indicating if the changes between ``before`` and ``after`` cause a change in the state file
+        :rtype: ``bool``
+        """
         return any(before != after for before, after in zip(self.initial_lock, self.final_lock))
