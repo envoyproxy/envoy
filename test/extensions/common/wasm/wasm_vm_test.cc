@@ -103,18 +103,18 @@ public:
 #if defined(PROXY_WASM_HAS_RUNTIME_V8)
 MockHostFunctions* g_host_functions;
 
-void pong(void*, Word value) { g_host_functions->pong(convertWordToUint32(value)); }
+void pong(Word value) { g_host_functions->pong(convertWordToUint32(value)); }
 
-Word random(void*) { return {g_host_functions->random()}; }
+Word random() { return {g_host_functions->random()}; }
 
 // pong() with wrong number of arguments.
-void bad_pong1(void*) {}
+void bad_pong1() {}
 
 // pong() with wrong return type.
-Word bad_pong2(void*, Word) { return 2; }
+Word bad_pong2(Word) { return 2; }
 
 // pong() with wrong argument type.
-double bad_pong3(void*, double) { return 3; }
+double bad_pong3(double) { return 3; }
 
 class WasmVmTest : public testing::TestWithParam<bool> {
 public:
