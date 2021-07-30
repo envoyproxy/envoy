@@ -91,14 +91,13 @@ std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClient
 }
 
 quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStreamId /*id*/) {
-  // Disallow server initiated stream.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  // Envoy doesn't support server initiated stream.
+  return nullptr;
 }
 
 quic::QuicSpdyStream*
 EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
-  // Disallow server initiated stream.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return nullptr;
 }
 
 bool EnvoyQuicClientSession::hasDataToWrite() { return HasDataToWrite(); }

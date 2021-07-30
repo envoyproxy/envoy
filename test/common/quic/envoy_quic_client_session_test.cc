@@ -6,6 +6,7 @@
 
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 #if defined(__GNUC__)
@@ -322,6 +323,22 @@ TEST_F(EnvoyQuicClientSessionTest, ConnectionClosePopulatesQuicVersionStats) {
             envoy_quic_session_.transportFailureReason());
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_EQ(1U, TestUtility::findCounter(store_, "http3.quic_version_rfc_v1")->value());
+}
+
+TEST_F(EnvoyQuicClientSessionTest, IncomingUnidirectionalReadStream) {
+  // IETF stream 3 is server initiated uni-directional stream.
+  quic::QuicStreamId stream_id = 3u;
+  auto payload = std::make_unique<char[]>(8);
+  quic::QuicDataWriter payload_writer(8, payload.get());
+  EXPECT_TRUE(payload_writer.WriteVarInt62(1ul));
+  quic::QuicStreamFrame stream_frame(stream_id, false, 0, absl::string_view(payload.get(), 1));
+  envoy_quic_session_.OnStreamFrame(stream_frame);
+  EXPECT_FALSE(quic::test::QuicSessionPeer::IsStreamCreated(&envoy_quic_session_, stream_id));
+
+  stream_id = 1u;
+  quic::QuicStreamFrame stream_frame2(stream_id, false, 0, "aaa");
+  envoy_quic_session_.OnStreamFrame(stream_frame2);
+  EXPECT_FALSE(quic::test::QuicSessionPeer::IsStreamCreated(&envoy_quic_session_, stream_id));
 }
 
 } // namespace Quic

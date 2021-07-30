@@ -1027,9 +1027,8 @@ TEST_F(EnvoyQuicServerSessionTest, IncomingUnidirectionalReadStream) {
   installReadFilter();
   Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
-  // IETF stream 5 and G-Quic stream 2 are server initiated.
-  quic::QuicStreamId stream_id =
-      quic::VersionUsesHttp3(quic_version_[0].transport_version) ? 2u : 3u;
+  // IETF stream 2 is client initiated uni-directional stream.
+  quic::QuicStreamId stream_id = 2u;
   auto payload = std::make_unique<char[]>(8);
   quic::QuicDataWriter payload_writer(8, payload.get());
   EXPECT_TRUE(payload_writer.WriteVarInt62(1ul));
