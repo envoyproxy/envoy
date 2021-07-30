@@ -166,10 +166,10 @@ PortRangeMatcher::PortRangeMatcher(const ::envoy::type::v3::Int32Range& range)
   auto start = range.start();
   auto end = range.end();
   if (start < 0 || start > 65536) {
-    throw EnvoyException(fmt::format("range start {} out of bounds", start));
+    throw EnvoyException(fmt::format("range start {} is out of bounds", start));
   }
   if (end < 0 || end > 65536) {
-    throw EnvoyException(fmt::format("range end {} out of bounds", end));
+    throw EnvoyException(fmt::format("range end {} is out of bounds", end));
   }
   if (start >= end) {
     throw EnvoyException(

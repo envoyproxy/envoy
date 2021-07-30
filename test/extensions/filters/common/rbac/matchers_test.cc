@@ -283,12 +283,12 @@ TEST(PortRangeMatcher, PortRangeMatcher) {
   range.set_start(-1);
   range.set_end(80);
   EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range), EnvoyException,
-                          "range start .* out of bounds");
+                          "range start .* is out of bounds");
 
   range.set_start(80);
   range.set_end(65537);
   EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range), EnvoyException,
-                          "range end .* out of bounds");
+                          "range end .* is out of bounds");
 
   range.set_start(80);
   range.set_end(80);
