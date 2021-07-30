@@ -41,8 +41,6 @@ ShadowRouterImpl::ShadowRouterImpl(ShadowWriterImpl& parent, const std::string& 
       std::make_unique<ShadowUpstreamResponseCallbacksImpl>(*response_decoder_);
 }
 
-ShadowRouterImpl::~ShadowRouterImpl() {}
-
 Event::Dispatcher& ShadowRouterImpl::dispatcher() { return parent_.dispatcher(); }
 
 bool ShadowRouterImpl::createUpstreamRequest() {

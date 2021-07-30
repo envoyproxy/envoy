@@ -125,7 +125,7 @@ public:
   ShadowRouterImpl(ShadowWriterImpl& parent, const std::string& cluster_name,
                    MessageMetadataSharedPtr& metadata, TransportType transport_type,
                    ProtocolType protocol_type);
-  ~ShadowRouterImpl() override;
+  ~ShadowRouterImpl() override = default;
 
   bool createUpstreamRequest();
   void maybeCleanup();
