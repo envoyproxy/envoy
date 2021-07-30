@@ -21,9 +21,7 @@ TEST(ApiVersionsTest, shouldBeAlwaysReadyForAnswer) {
   MockAbstractRequestListener filter;
   EXPECT_CALL(filter, onRequestReadyForAnswer());
   const RequestHeader header = {API_VERSIONS_REQUEST_API_KEY, 0, 0, absl::nullopt};
-  const ApiVersionsRequest data = {};
-  const auto message = std::make_shared<Request<ApiVersionsRequest>>(header, data);
-  ApiVersionsRequestHolder testee = {filter, message};
+  ApiVersionsRequestHolder testee = {filter, header};
 
   // when, then - invoking should immediately notify the filter.
   testee.startProcessing();

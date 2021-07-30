@@ -16,8 +16,7 @@ namespace Mesh {
  */
 class ApiVersionsRequestHolder : public BaseInFlightRequest {
 public:
-  ApiVersionsRequestHolder(AbstractRequestListener& filter,
-                           const std::shared_ptr<Request<ApiVersionsRequest>> request);
+  ApiVersionsRequestHolder(AbstractRequestListener& filter, const RequestHeader request_header);
 
   void startProcessing() override;
 
@@ -26,8 +25,8 @@ public:
   AbstractResponseSharedPtr computeAnswer() const override;
 
 private:
-  // Original request.
-  const std::shared_ptr<Request<ApiVersionsRequest>> request_;
+  // Original request header.
+  const RequestHeader request_header_;
 };
 
 } // namespace Mesh

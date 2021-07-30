@@ -22,19 +22,20 @@ constexpr int16_t MAX_PRODUCE_SUPPORTED = PRODUCE_REQUEST_MAX_VERSION; /* Genera
 constexpr int16_t MIN_METADATA_SUPPORTED = 1;
 constexpr int16_t MAX_METADATA_SUPPORTED = METADATA_REQUEST_MAX_VERSION; /* Generated value. */
 
-ApiVersionsRequestHolder::ApiVersionsRequestHolder(
-    AbstractRequestListener& filter, const std::shared_ptr<Request<ApiVersionsRequest>> request)
-    : BaseInFlightRequest{filter}, request_{request} {}
+ApiVersionsRequestHolder::ApiVersionsRequestHolder(AbstractRequestListener& filter,
+                                                   const RequestHeader request_header)
+    : BaseInFlightRequest{filter}, request_header_{request_header} {}
 
 // Api Versions requests are immediately ready for answer (as they do not need to reach upstream).
 void ApiVersionsRequestHolder::startProcessing() { notifyFilter(); }
 
-// Because these requests can be trivially handled, they are okay to be sent downstream at any time.
+// Because these requests can be trivially handled, the responses are okay to be sent downstream at
+// any time.
 bool ApiVersionsRequestHolder::finished() const { return true; }
 
 AbstractResponseSharedPtr ApiVersionsRequestHolder::computeAnswer() const {
-  const auto& header = request_->request_header_;
-  const ResponseMetadata metadata = {header.api_key_, header.api_version_, header.correlation_id_};
+  const ResponseMetadata metadata = {request_header_.api_key_, request_header_.api_version_,
+                                     request_header_.correlation_id_};
 
   const int16_t error_code = 0;
   const ApiVersionsResponseKey produce_entry = {PRODUCE_REQUEST_API_KEY, MIN_PRODUCE_SUPPORTED,

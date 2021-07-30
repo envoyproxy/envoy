@@ -31,7 +31,7 @@ void RequestProcessor::onMessage(AbstractRequestSharedPtr arg) {
 }
 
 void RequestProcessor::process(const std::shared_ptr<Request<ApiVersionsRequest>> request) const {
-  auto res = std::make_shared<ApiVersionsRequestHolder>(origin_, request);
+  auto res = std::make_shared<ApiVersionsRequestHolder>(origin_, request->request_header_);
   origin_.onRequest(res);
 }
 
