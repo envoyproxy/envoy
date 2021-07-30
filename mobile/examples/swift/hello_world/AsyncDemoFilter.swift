@@ -10,14 +10,19 @@ final class AsyncDemoFilter: AsyncResponseFilter {
   func onResponseHeaders(_ headers: ResponseHeaders, endStream: Bool)
     -> FilterHeadersStatus<ResponseHeaders>
   {
+    if endStream {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+        self?.callbacks.resumeResponse()
+      }
+    }
     return .stopIteration
   }
 
   func onResponseData(_ body: Data, endStream: Bool) -> FilterDataStatus<ResponseHeaders> {
-    // If this is the end of the stream, asynchronously resume response processing via callback.
-    // Note this call is re-entrant (but legal and safe).
     if endStream {
-      callbacks.resumeResponse()
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+        self?.callbacks.resumeResponse()
+      }
     }
     return .stopIterationAndBuffer
   }
@@ -25,9 +30,9 @@ final class AsyncDemoFilter: AsyncResponseFilter {
   func onResponseTrailers(
     _ trailers: ResponseTrailers
   ) -> FilterTrailersStatus<ResponseHeaders, ResponseTrailers> {
-    // Trailers imply end of stream, so asynchronously resume response processing via callback.
-    // Note this call is re-entrant (but legal and safe).
-    callbacks.resumeResponse()
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+      self?.callbacks.resumeResponse()
+    }
     return .stopIteration
   }
 
