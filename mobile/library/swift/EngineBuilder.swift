@@ -13,6 +13,7 @@ public class EngineBuilder: NSObject {
     case custom(String)
   }
 
+  private var adminInterfaceEnabled = false
   private var grpcStatsDomain: String?
   private var connectTimeoutSeconds: UInt32 = 30
   private var dnsRefreshSeconds: UInt32 = 60
@@ -273,12 +274,24 @@ public class EngineBuilder: NSObject {
     return self
   }
 
+  /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
+  /// used for development/debugging purposes only. Enabling it in production may open
+  /// your app to security vulnerabilities.
+  ///
+  /// returns: This builder.
+  @discardableResult
+  public func enableAdminInterface() -> Self {
+    self.adminInterfaceEnabled = true
+    return self
+  }
+
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
   public func build() -> Engine {
     let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger,
                                       eventTracker: self.eventTracker)
     let config = EnvoyConfiguration(
+      adminInterfaceEnabled: self.adminInterfaceEnabled,
       grpcStatsDomain: self.grpcStatsDomain,
       connectTimeoutSeconds: self.connectTimeoutSeconds,
       dnsRefreshSeconds: self.dnsRefreshSeconds,

@@ -11,6 +11,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 
 /* Typed configuration that may be used for starting Envoy. */
 public class EnvoyConfiguration {
+  public final Boolean adminInterfaceEnabled;
   public final String grpcStatsDomain;
   public final Integer statsdPort;
   public final Integer connectTimeoutSeconds;
@@ -33,6 +34,7 @@ public class EnvoyConfiguration {
   /**
    * Create a new instance of the configuration.
    *
+   * @param adminInterfaceEnabled        whether admin interface should be enabled or not.
    * @param grpcStatsDomain              the domain to flush stats to.
    * @param connectTimeoutSeconds        timeout for new network connections to hosts in
    *                                     the cluster.
@@ -50,15 +52,16 @@ public class EnvoyConfiguration {
    * @param httpPlatformFilterFactories  the configuration for platform filters.
    * @param stringAccessors              platform string accessors to register.
    */
-  public EnvoyConfiguration(String grpcStatsDomain, @Nullable Integer statsdPort,
-                            int connectTimeoutSeconds, int dnsRefreshSeconds,
-                            int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
-                            int dnsQueryTimeoutSeconds, String dnsPreresolveHostnames,
-                            int statsFlushSeconds, int streamIdleTimeoutSeconds, String appVersion,
-                            String appId, String virtualClusters,
-                            List<EnvoyNativeFilterConfig> nativeFilterChain,
+  public EnvoyConfiguration(Boolean adminInterfaceEnabled, String grpcStatsDomain,
+                            @Nullable Integer statsdPort, int connectTimeoutSeconds,
+                            int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase,
+                            int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds,
+                            String dnsPreresolveHostnames, int statsFlushSeconds,
+                            int streamIdleTimeoutSeconds, String appVersion, String appId,
+                            String virtualClusters, List<EnvoyNativeFilterConfig> nativeFilterChain,
                             List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
                             Map<String, EnvoyStringAccessor> stringAccessors) {
+    this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
     this.statsdPort = statsdPort;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
@@ -132,6 +135,10 @@ public class EnvoyConfiguration {
     } else if (statsdPort != null) {
       configBuilder.append("- &statsd_port ").append(statsdPort).append("\n");
       configBuilder.append("- &stats_sinks [ *base_statsd ]\n");
+    }
+
+    if (adminInterfaceEnabled) {
+      configBuilder.append("admin: *admin_interface\n");
     }
 
     configBuilder.append(processedTemplate);

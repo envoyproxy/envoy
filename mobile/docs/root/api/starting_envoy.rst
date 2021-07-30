@@ -236,6 +236,25 @@ This functionality is used for stat segmentation.
   // Swift
   builder.addVirtualClusters("[{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}]")
 
+~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableAdminInterface``
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Enable admin interface on 127.0.0.1:9901 address.
+
+.. attention::
+
+    Admin interface is intended to be used for development/debugging purposes only.
+    Enabling it in production may open your app to security vulnerabilities.
+
+**Example**::
+
+  // Kotlin
+  builder.enableAdminInterface()
+
+  // Swift
+  builder.enableAdminInterface()
+
 ~~~~~~~~~~~~~~~~~~~~~~
 ``setOnEngineRunning``
 ~~~~~~~~~~~~~~~~~~~~~~

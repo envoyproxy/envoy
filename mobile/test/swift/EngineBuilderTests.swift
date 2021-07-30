@@ -54,6 +54,33 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
+  func testAdminInterfaceIsDisabledByDefault() {
+    let expectation = self.expectation(description: "Run called with disabled admin interface")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertFalse(config.adminInterfaceEnabled)
+      expectation.fulfill()
+    }
+
+    _ = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
+  func testEnablingAdminInterfaceAddsToConfigurationWhenRunningEnvoy() {
+    let expectation = self.expectation(description: "Run called with enabled admin interface")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertTrue(config.adminInterfaceEnabled)
+      expectation.fulfill()
+    }
+
+    _ = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .enableAdminInterface()
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
   func testAddinggrpcStatsDomainAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -239,6 +266,7 @@ final class EngineBuilderTests: XCTestCase {
 
   func testResolvesYAMLWithIndividuallySetValues() throws {
     let config = EnvoyConfiguration(
+      adminInterfaceEnabled: false,
       grpcStatsDomain: "stats.envoyproxy.io",
       connectTimeoutSeconds: 200,
       dnsRefreshSeconds: 300,
@@ -271,6 +299,8 @@ final class EngineBuilderTests: XCTestCase {
 
     XCTAssertTrue(resolvedYAML.contains("&stream_idle_timeout 700s"))
 
+    XCTAssertFalse(resolvedYAML.contains("admin: *admin_interface"))
+
     // Metadata
     XCTAssertTrue(resolvedYAML.contains("device_os: iOS"))
     XCTAssertTrue(resolvedYAML.contains("app_version: v1.2.3"))
@@ -290,6 +320,7 @@ final class EngineBuilderTests: XCTestCase {
 
   func testReturnsNilWhenUnresolvedValueInTemplate() {
     let config = EnvoyConfiguration(
+      adminInterfaceEnabled: true,
       grpcStatsDomain: "stats.envoyproxy.io",
       connectTimeoutSeconds: 200,
       dnsRefreshSeconds: 300,
