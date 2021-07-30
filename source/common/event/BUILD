@@ -41,17 +41,14 @@ envoy_cc_library(
         "//envoy/event:signal_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/network:listener_interface",
+        "//envoy/network:dns_factory_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
         "//source/common/config:utility_lib",
         "//source/common/filesystem:watcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:listener_lib",
-        "//source/extensions/network/dns_resolver/cares:dns_lib",
-    ] + select({
-        "//bazel:apple": ["//source/extensions/network/dns_resolver/apple:apple_dns_lib"],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 envoy_cc_library(

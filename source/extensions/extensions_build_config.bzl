@@ -295,6 +295,13 @@ EXTENSIONS = {
     #
 
     "envoy.formatter.req_without_query":                "//source/extensions/formatter/req_without_query:config",
+
+    #
+    # DNS Resolver
+    #
+
+    "envoy.dns_resolver.cares":                "//source/extensions/network/dns_resolver/cares:dns_lib",
+    "envoy.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:apple_dns_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
