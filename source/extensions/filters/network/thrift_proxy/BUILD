@@ -47,6 +47,7 @@ envoy_cc_extension(
         ":framed_transport_lib",
         ":header_transport_lib",
         ":protocol_interface",
+        ":protocol_options_config_lib",
         ":twitter_protocol_lib",
         ":unframed_transport_lib",
         "//envoy/registry",
@@ -262,6 +263,15 @@ envoy_cc_library(
     hdrs = ["conn_state.h"],
     deps = [
         "//envoy/tcp:conn_pool_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "protocol_options_config_lib",
+    hdrs = ["protocol_options_config.h"],
+    deps = [
+        ":thrift_lib",
+        "//envoy/upstream:upstream_interface",
     ],
 )
 

@@ -388,8 +388,6 @@ public:
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
   MOCK_METHOD(absl::optional<std::string>, currentUrlPathAfterRewrite,
               (const Http::RequestHeaderMap&), (const));
-  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
-  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(const PathMatchCriterion&, pathMatchCriterion, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
@@ -413,7 +411,6 @@ public:
   MockTlsContextMatchCriteria tls_context_matches_criteria_;
   TestCorsPolicy cors_policy_;
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
-  envoy::config::core::v3::Metadata metadata_;
   UpgradeMap upgrade_map_;
   absl::optional<ConnectConfig> connect_config_;
 };
@@ -454,10 +451,13 @@ public:
   MOCK_METHOD(const Decorator*, decorator, (), (const));
   MOCK_METHOD(const RouteTracing*, tracingConfig, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
 
   testing::NiceMock<MockRouteEntry> route_entry_;
   testing::NiceMock<MockDecorator> decorator_;
   testing::NiceMock<MockRouteTracing> route_tracing_;
+  envoy::config::core::v3::Metadata metadata_;
 };
 
 class MockConfig : public Config {

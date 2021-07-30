@@ -10,7 +10,6 @@
 
 namespace Envoy {
 namespace Server {
-
 namespace {
 // Structure used to allow a unique_ptr to be captured in a posted lambda. See below.
 struct RebalancedSocket {
