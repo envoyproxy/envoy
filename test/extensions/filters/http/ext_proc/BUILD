@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_cc_fuzz_test",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -114,3 +115,36 @@ envoy_extension_cc_test_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test_library(
+    name = "ext_proc_grpc_fuzz_lib",
+    hdrs = ["ext_proc_grpc_fuzz_helper.h"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    deps = [
+        "//test/fuzz:utility_lib",
+        "//test/common/http:common_lib",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "ext_proc_grpc_fuzz_test",
+    srcs = ["ext_proc_grpc_fuzz.cc"],
+    corpus = "ext_proc_grpc_corpus",
+    deps = [
+        ":ext_proc_grpc_fuzz_lib",
+        ":test_processor_lib",
+        "//source/common/network:address_lib",
+        "//source/extensions/filters/http/ext_proc:config",
+        "//test/common/http:common_lib",
+        "//test/fuzz:utility_lib",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
+    ],
+)
+
