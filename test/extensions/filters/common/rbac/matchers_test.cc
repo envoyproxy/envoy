@@ -34,6 +34,10 @@ void checkMatcher(
   EXPECT_EQ(expected, matcher.matches(connection, headers, info));
 }
 
+PortRangeMatcher createPortRangeMatcher(envoy::type::v3::Int32Range range) {
+  return PortRangeMatcher(range);
+}
+
 TEST(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true); }
 
 TEST(AndMatcher, Permission_Set) {
@@ -274,6 +278,22 @@ TEST(PortRangeMatcher, PortRangeMatcher) {
       std::make_shared<const Envoy::Network::Address::PipeInstance>("test");
   info2.downstream_address_provider_->setLocalAddress(addr2);
   checkMatcher(PortRangeMatcher(range), false, conn, headers, info2);
+
+  // Invalid rule will cause an exception.
+  range.set_start(-1);
+  range.set_end(80);
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range), EnvoyException,
+                          "range start .* out of bounds");
+
+  range.set_start(80);
+  range.set_end(65537);
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range), EnvoyException,
+                          "range end .* out of bounds");
+
+  range.set_start(80);
+  range.set_end(80);
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range), EnvoyException,
+                          "range start .* cannot be greater or equal than range end .*");
 }
 
 TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
