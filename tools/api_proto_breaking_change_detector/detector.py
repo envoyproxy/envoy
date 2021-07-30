@@ -6,6 +6,7 @@ from shutil import copyfile
 import re
 from pathlib import Path
 import os
+from typing import List
 """
 This tool is used to detect "breaking changes" in protobuf files, to ensure proper backwards-compatibility in protobuf API updates.
 The tool can check for breaking changes of a single API by taking 2 .proto file paths as input (before and after) and outputting a bool `is_breaking`.
@@ -21,19 +22,23 @@ The tool is currently implemented with buf (https://buf.build/)
 class ProtoBreakingChangeDetector(ABC):
 
     @abstractmethod
-    def __init__(self, path_to_before, path_to_after, additional_args=None):
+    def __init__(
+            self,
+            path_to_before: str,
+            path_to_after: str,
+            additional_args: List[str] = None) -> None:
         pass
 
     @abstractmethod
-    def run_detector(self):
+    def run_detector(self) -> None:
         pass
 
     @abstractmethod
-    def is_breaking(self):
+    def is_breaking(self) -> bool:
         pass
 
     @abstractmethod
-    def lock_file_changed(self):
+    def lock_file_changed(self) -> bool:
         pass
 
 
@@ -50,7 +55,11 @@ BUF_STATE_FILE = "tmp.json"
 
 class BufWrapper(ProtoBreakingChangeDetector):
 
-    def __init__(self, path_to_before, path_to_after, additional_args=None):
+    def __init__(
+            self,
+            path_to_before: str,
+            path_to_after: str,
+            additional_args: List[str] = None) -> None:
         if not Path(path_to_before).is_file():
             raise ValueError(f"path_to_before {path_to_before} does not exist")
 
@@ -61,7 +70,7 @@ class BufWrapper(ProtoBreakingChangeDetector):
         self._path_to_after = path_to_after
         self._additional_args = additional_args
 
-    def run_detector(self):
+    def run_detector(self) -> None:
         # 1) pull buf BSR dependencies with buf mod update (? still need to figure this out. commented out for now)
         # 2) copy buf.yaml into temp dir
         # 3) copy start file into temp dir
@@ -135,7 +144,7 @@ class BufWrapper(ProtoBreakingChangeDetector):
         self.initial_lock = initial_lock
         self.final_lock = final_lock
 
-    def is_breaking(self):
+    def is_breaking(self) -> bool:
         final_code, final_out, final_err = self.final_result
 
         # Ways buf output could be indicative of a breaking change:
@@ -145,5 +154,5 @@ class BufWrapper(ProtoBreakingChangeDetector):
         break_condition = lambda inp: len(inp) > 0 or bool(re.match(r"Failure", inp))
         return final_code != 0 or break_condition(final_out) or break_condition(final_err)
 
-    def lock_file_changed(self):
+    def lock_file_changed(self) -> bool:
         return any(before != after for before, after in zip(self.initial_lock, self.final_lock))
