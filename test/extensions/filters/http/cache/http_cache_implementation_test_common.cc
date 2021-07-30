@@ -41,10 +41,11 @@ MATCHER(IsOk, "") { return arg.ok(); }
 } // namespace
 
 HttpCacheImplementationTest::HttpCacheImplementationTest()
-    : delegate_(GetParam()()), vary_allow_list_(getConfig().allowed_vary_headers()) {
+    : delegate_(GetParam()()), vary_allow_list_(getConfig().allowed_vary_headers()),
+      cache_policy_(std::make_unique<CachePolicyImpl>()) {
   request_headers_.setMethod("GET");
   request_headers_.setHost("example.com");
-  request_headers_.setScheme("https");
+  request_headers_.setForwardedProto("https");
   request_headers_.setCopy(Http::CustomHeaders::get().CacheControl, "max-age=3600");
 
   EXPECT_CALL(dispatcher_, post(_)).Times(AnyNumber());
@@ -67,8 +68,8 @@ void HttpCacheImplementationTest::updateHeaders(
 }
 
 LookupContextPtr HttpCacheImplementationTest::lookup(absl::string_view request_path) {
-  LookupRequest request = makeLookupRequest(request_path);
-  LookupContextPtr context = cache()->makeLookupContext(std::move(request), decoder_callbacks_);
+  LookupRequestPtr request = makeLookupRequest(request_path);
+  LookupContextPtr context = cache()->makeLookupContext(std::move(request));
   absl::Notification lookup_result_received;
   context->getHeaders([this, &lookup_result_received](LookupResult&& result) {
     lookup_result_ = std::move(result);
@@ -89,10 +90,10 @@ absl::Status HttpCacheImplementationTest::insert(
     LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& headers,
     const absl::string_view body, const absl::optional<Http::TestResponseTrailerMapImpl> trailers,
     std::chrono::milliseconds timeout) {
-  InsertContextPtr inserter = cache()->makeInsertContext(std::move(lookup), encoder_callbacks_);
-  const ResponseMetadata metadata{time_system_.systemTime()};
+  InsertContextPtr inserter = cache()->makeInsertContext(std::move(lookup));
+  auto metadata = std::make_unique<ResponseMetadata>(time_system_.systemTime());
   bool headers_end_stream = body.empty() && !trailers.has_value();
-  inserter->insertHeaders(headers, metadata, headers_end_stream);
+  inserter->insertHeaders(headers, std::move(metadata), headers_end_stream);
 
   if (headers_end_stream) {
     return absl::OkStatus();
@@ -181,9 +182,13 @@ Http::TestResponseTrailerMapImpl HttpCacheImplementationTest::getTrailers(Lookup
   return trailers;
 }
 
-LookupRequest HttpCacheImplementationTest::makeLookupRequest(absl::string_view request_path) {
+LookupRequestPtr HttpCacheImplementationTest::makeLookupRequest(absl::string_view request_path) {
   request_headers_.setPath(request_path);
-  return LookupRequest(request_headers_, time_system_.systemTime(), vary_allow_list_);
+  RequestCacheControl request_cache_control(request_headers_);
+
+  return std::make_unique<LookupRequest>(request_headers_, std::move(request_cache_control),
+                                         *cache_policy_, time_system_.systemTime(),
+                                         vary_allow_list_);
 }
 
 testing::AssertionResult HttpCacheImplementationTest::expectLookupSuccessWithHeaders(
@@ -385,9 +390,9 @@ TEST_P(HttpCacheImplementationTest, StreamingPut) {
                                                    {"age", "2"},
                                                    {"cache-control", "public, max-age=3600"}};
   const std::string request_path("/path");
-  InsertContextPtr inserter = cache()->makeInsertContext(lookup(request_path), encoder_callbacks_);
-  ResponseMetadata metadata{time_system_.systemTime()};
-  inserter->insertHeaders(response_headers, metadata, false);
+  InsertContextPtr inserter = cache()->makeInsertContext(lookup(request_path));
+  auto metadata = std::make_unique<ResponseMetadata>(time_system_.systemTime());
+  inserter->insertHeaders(response_headers, std::move(metadata), false);
   inserter->insertBody(
       Buffer::OwnedImpl("Hello, "), [](bool ready) { EXPECT_TRUE(ready); }, false);
   inserter->insertBody(Buffer::OwnedImpl("World!"), nullptr, true);

@@ -21,6 +21,8 @@ struct ResponseMetadata {
   // validated in this cache. This represents "response_time" in the age header
   // calculations at: https://httpwg.org/specs/rfc7234.html#age.calculations
   Envoy::SystemTime response_time_;
+
+  ResponseMetadata(Envoy::SystemTime response_time) : response_time_(response_time) {}
 };
 using ResponseMetadataPtr = std::unique_ptr<ResponseMetadata>;
 

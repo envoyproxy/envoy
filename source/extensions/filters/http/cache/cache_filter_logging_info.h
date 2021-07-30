@@ -60,7 +60,7 @@ enum class InsertStatus {
   // to cache a response with trailers.
   InsertAbortedResponseIncomplete,
   // The CacheFilter attempted to update the headers of an existing cache entry.
-  // This doesn't indicate  whether or not the update succeeded.
+  // This doesn't indicate whether or not the update succeeded.
   HeaderUpdate,
   // The CacheFilter found a cache entry and didn't attempt to insert or update its
   // headers.

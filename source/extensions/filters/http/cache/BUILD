@@ -59,12 +59,16 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "cache_policy_lib",
+    srcs = ["cache_policy.cc"],
     hdrs = ["cache_policy.h"],
     deps = [
+        ":cache_entry_utils_lib",
         ":cache_headers_utils_lib",
-        ":http_cache_lib",
+        ":key_cc_proto",
+        "//envoy/registry",
         "//source/common/http:header_map_lib",
         "//source/common/stream_info:filter_state_lib",
+        "@envoy_api//envoy/extensions/filters/http/cache/cache_policy/v3:pkg_cc_proto",
     ],
 )
 
@@ -81,6 +85,7 @@ envoy_cc_library(
         ":cache_custom_headers",
         ":cache_entry_utils_lib",
         ":cache_headers_utils_lib",
+        ":cache_policy_lib",
         ":key_cc_proto",
         ":range_utils_lib",
         "//envoy/buffer:buffer_interface",

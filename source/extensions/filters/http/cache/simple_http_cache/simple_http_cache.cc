@@ -10,21 +10,20 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
-namespace {
 
 class SimpleLookupContext : public LookupContext {
 public:
-  SimpleLookupContext(SimpleHttpCache& cache, LookupRequest&& request)
+  SimpleLookupContext(SimpleHttpCache& cache, LookupRequestPtr&& request)
       : cache_(cache), request_(std::move(request)) {}
 
   void getHeaders(LookupHeadersCallback&& cb) override {
-    auto entry = cache_.lookup(request_);
+    SimpleHttpCache::Entry entry = cache_.lookup(*request_);
     body_ = std::move(entry.body_);
     trailers_ = std::move(entry.trailers_);
-    cb(entry.response_headers_ ? request_.makeLookupResult(std::move(entry.response_headers_),
-                                                           std::move(entry.metadata_), body_.size(),
-                                                           trailers_ != nullptr)
-                               : LookupResult{});
+    cb(entry.response_headers_
+           ? request_->makeLookupResult(std::move(entry.response_headers_), *entry.metadata_,
+                                        body_.size(), trailers_ != nullptr)
+           : LookupResult{});
   }
 
   void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override {
@@ -38,12 +37,17 @@ public:
     cb(std::move(trailers_));
   }
 
-  const LookupRequest& request() const { return request_; }
+  const LookupRequest& request() const { return *request_; }
+
   void onDestroy() override {}
+
+  const Http::RequestHeaderMap& requestHeaders() const override {
+    return request_->requestHeaders();
+  }
 
 private:
   SimpleHttpCache& cache_;
-  const LookupRequest request_;
+  const LookupRequestPtr request_;
   std::string body_;
   Http::ResponseTrailerMapPtr trailers_;
 };
@@ -51,18 +55,18 @@ private:
 class SimpleInsertContext : public InsertContext {
 public:
   SimpleInsertContext(LookupContext& lookup_context, SimpleHttpCache& cache)
-      : key_(dynamic_cast<SimpleLookupContext&>(lookup_context).request().key()),
+      : key_(static_cast<SimpleLookupContext&>(lookup_context).request().key()),
         request_headers_(
-            dynamic_cast<SimpleLookupContext&>(lookup_context).request().requestHeaders()),
+            static_cast<SimpleLookupContext&>(lookup_context).request().requestHeaders()),
         vary_allow_list_(
-            dynamic_cast<SimpleLookupContext&>(lookup_context).request().varyAllowList()),
+            static_cast<SimpleLookupContext&>(lookup_context).request().varyAllowList()),
         cache_(cache) {}
 
   void insertHeaders(const Http::ResponseHeaderMap& response_headers,
-                     const ResponseMetadata& metadata, bool end_stream) override {
+                     ResponseMetadataPtr&& metadata, bool end_stream) override {
     ASSERT(!committed_);
     response_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
-    metadata_ = metadata;
+    metadata_ = std::move(metadata);
     if (end_stream) {
       commit();
     }
@@ -105,16 +109,14 @@ private:
   const Http::RequestHeaderMap& request_headers_;
   const VaryAllowList& vary_allow_list_;
   Http::ResponseHeaderMapPtr response_headers_;
-  ResponseMetadata metadata_;
+  ResponseMetadataPtr metadata_;
   SimpleHttpCache& cache_;
   Buffer::OwnedImpl body_;
   bool committed_ = false;
   Http::ResponseTrailerMapPtr trailers_;
 };
-} // namespace
 
-LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request,
-                                                    Http::StreamDecoderFilterCallbacks&) {
+LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequestPtr&& request) {
   return std::make_unique<SimpleLookupContext>(*this, std::move(request));
 }
 
@@ -182,7 +184,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
         }
         return Http::HeaderMap::Iterate::Continue;
       });
-  entry.metadata_ = metadata;
+  entry.metadata_ = std::make_unique<ResponseMetadata>(metadata);
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
@@ -202,12 +204,13 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
     }
     return SimpleHttpCache::Entry{
         Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*iter->second.response_headers_),
-        iter->second.metadata_, iter->second.body_, std::move(trailers_map)};
+        std::make_unique<ResponseMetadata>(*iter->second.metadata_), iter->second.body_,
+        std::move(trailers_map)};
   }
 }
 
 void SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
-                             ResponseMetadata&& metadata, std::string&& body,
+                             ResponseMetadataPtr&& metadata, std::string&& body,
                              Http::ResponseTrailerMapPtr&& trailers) {
   absl::WriterMutexLock lock(&mutex_);
   map_[key] = SimpleHttpCache::Entry{std::move(response_headers), std::move(metadata),
@@ -246,12 +249,13 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
 
   return SimpleHttpCache::Entry{
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*iter->second.response_headers_),
-      iter->second.metadata_, iter->second.body_, std::move(trailers_map)};
+      std::make_unique<ResponseMetadata>(*iter->second.metadata_), iter->second.body_,
+      std::move(trailers_map)};
 }
 
 void SimpleHttpCache::varyInsert(const Key& request_key,
                                  Http::ResponseHeaderMapPtr&& response_headers,
-                                 ResponseMetadata&& metadata, std::string&& body,
+                                 ResponseMetadataPtr&& metadata, std::string&& body,
                                  const Http::RequestHeaderMap& request_headers,
                                  const VaryAllowList& vary_allow_list,
                                  Http::ResponseTrailerMapPtr&& trailers) {
@@ -277,10 +281,9 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
   // Add a special entry to flag that this request generates varied responses.
   auto iter = map_.find(request_key);
   if (iter == map_.end()) {
-    Envoy::Http::ResponseHeaderMapPtr vary_only_map =
-        Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>({});
-    vary_only_map->setCopy(Envoy::Http::CustomHeaders::get().Vary,
-                           absl::StrJoin(vary_header_values, ","));
+    Http::ResponseHeaderMapPtr vary_only_map =
+        Http::createHeaderMap<Http::ResponseHeaderMapImpl>({});
+    vary_only_map->setCopy(Http::CustomHeaders::get().Vary, absl::StrJoin(vary_header_values, ","));
     // TODO(cbdm): In a cache that evicts entries, we could maintain a list of the "varykey"s that
     // we have inserted as the body for this first lookup. This way, we would know which keys we
     // have inserted for that resource. For the first entry simply use vary_identifier as the
@@ -291,8 +294,12 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
   }
 }
 
-InsertContextPtr SimpleHttpCache::makeInsertContext(LookupContextPtr&& lookup_context,
-                                                    Http::StreamEncoderFilterCallbacks&) {
+void SimpleHttpCache::clear() {
+  absl::WriterMutexLock lock(&mutex_);
+  map_.clear();
+}
+
+InsertContextPtr SimpleHttpCache::makeInsertContext(LookupContextPtr&& lookup_context) {
   ASSERT(lookup_context != nullptr);
   return std::make_unique<SimpleInsertContext>(*lookup_context, *this);
 }
@@ -317,9 +324,8 @@ public:
         envoy::extensions::cache::simple_http_cache::v3::SimpleHttpCacheConfig>();
   }
   // From HttpCacheFactory
-  std::shared_ptr<HttpCache>
-  getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
-           Server::Configuration::FactoryContext& context) override {
+  HttpCacheSharedPtr getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
+                              Server::Configuration::FactoryContext& context) override {
     return context.singletonManager().getTyped<SimpleHttpCache>(
         SINGLETON_MANAGER_REGISTERED_NAME(simple_http_cache_singleton), &createCache);
   }

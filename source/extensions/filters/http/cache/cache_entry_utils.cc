@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 
 #include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
