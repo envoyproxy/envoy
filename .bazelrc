@@ -220,7 +220,7 @@ build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --remote_timeout=7200
-build:remote --auth_enabled=true
+build:remote --google_default_credentials=true
 build:remote --remote_download_toplevel
 
 # Windows bazel does not allow sandboxed as a spawn strategy
@@ -229,7 +229,7 @@ build:remote-windows --strategy=Javac=remote,local
 build:remote-windows --strategy=Closure=remote,local
 build:remote-windows --strategy=Genrule=remote,local
 build:remote-windows --remote_timeout=7200
-build:remote-windows --auth_enabled=true
+build:remote-windows --google_default_credentials=true
 build:remote-windows --remote_download_toplevel
 
 build:remote-clang --config=remote
