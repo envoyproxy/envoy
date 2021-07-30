@@ -19,8 +19,6 @@ public:
                                                  size_t) const override;
 
 private:
-  static const size_t MetadataFormatterParamStart{sizeof("METADATA(") - 1};
-
   // Map used to dispatch types of metadata to individual handlers which will
   // access required metadata object.
   using FormatterProviderFunc = std::function<::Envoy::Formatter::FormatterProviderPtr(

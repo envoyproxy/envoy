@@ -53,7 +53,7 @@ MetadataFormatterCommandParser::MetadataFormatterCommandParser() {
 
 ::Envoy::Formatter::FormatterProviderPtr
 MetadataFormatterCommandParser::parse(const std::string& token, size_t, size_t) const {
-  const std::string METADATA_TOKEN = "METADATA(";
+  constexpr absl::string_view METADATA_TOKEN = "METADATA(";
   if (absl::StartsWith(token, METADATA_TOKEN)) {
     // Extract type of metadata and keys.
     std::string type, filter_namespace;

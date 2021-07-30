@@ -473,7 +473,11 @@ The following command operators are supported:
     For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
     when the referenced key is a simple value. If the referenced key is a struct or list value, a
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
-    length is ignored
+    length is ignored.
+
+  .. note::
+
+   DYNAMIC_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
 
 .. _config_access_log_format_cluster_metadata:
 
@@ -503,7 +507,11 @@ The following command operators are supported:
     For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
     when the referenced key is a simple value. If the referenced key is a struct or list value, a
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
-    length is ignored
+    length is ignored.
+
+  .. note::
+
+   CLUSTER_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
 
 .. _config_access_log_format_filter_state:
 
