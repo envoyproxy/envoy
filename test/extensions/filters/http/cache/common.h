@@ -68,10 +68,6 @@ std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
     return os << "RequiresValidation";
   case CacheEntryStatus::FoundNotModified:
     return os << "FoundNotModified";
-  case CacheEntryStatus::SatisfiableRange:
-    return os << "SatisfiableRange";
-  case CacheEntryStatus::NotSatisfiableRange:
-    return os << "NotSatisfiableRange";
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }

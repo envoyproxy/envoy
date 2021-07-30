@@ -26,6 +26,7 @@ using OptionalDuration = absl::optional<SystemTime::duration>;
 struct RequestCacheControl {
   RequestCacheControl() = default;
   explicit RequestCacheControl(absl::string_view cache_control_header);
+  explicit RequestCacheControl(const Envoy::Http::RequestHeaderMap& request_headers);
 
   // must_validate is true if 'no-cache' directive is present
   // A cached response must not be served without successful validation with the origin
@@ -54,12 +55,17 @@ struct RequestCacheControl {
   //   now - expiration_time < max-stale
   // If max-stale has no value then the client is willing to receive any stale response
   OptionalDuration max_stale_;
+
+private:
+  void applyCacheControlHeader(absl::string_view cache_control_header);
+  void applyPragmaHeader(absl::string_view pragma_header);
 };
 
 // According to: https://httpwg.org/specs/rfc7234.html#cache-response-directive
 struct ResponseCacheControl {
   ResponseCacheControl() = default;
   explicit ResponseCacheControl(absl::string_view cache_control_header);
+  explicit ResponseCacheControl(const Envoy::Http::ResponseHeaderMap& response_headers);
 
   // must_validate is true if 'no-cache' directive is present; arguments are ignored for now
   // This response must not be used to satisfy subsequent requests without successful validation
