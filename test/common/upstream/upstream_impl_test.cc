@@ -2280,7 +2280,7 @@ TEST(PrioritySet, MainPrioritySetTest) {
 
   // The host map is initially empty or null.
   EXPECT_TRUE(priority_set.readOnlyAllHostMapForTest()->empty());
-  EXPECT_EQ(nullptr, priority_set.mutableAllHostMapForTest());
+  EXPECT_EQ(nullptr, priority_set.mutableAllHostMapForTest().get());
 
   {
     HostVector hosts_added{hosts->front()};
@@ -2299,9 +2299,9 @@ TEST(PrioritySet, MainPrioritySetTest) {
   EXPECT_FALSE(priority_set.mutableAllHostMapForTest()->empty());
 
   // Mutable host map will be moved to read only host map after 'readOnlyAllHostMap' is called.
-  auto host_map = priority_set.mutableAllHostMapForTest();
-  EXPECT_EQ(host_map, priority_set.readOnlyAllHostMap());
-  EXPECT_EQ(nullptr, priority_set.mutableAllHostMapForTest());
+  HostMapSharedPtr host_map = priority_set.mutableAllHostMapForTest();
+  EXPECT_EQ(host_map.get(), priority_set.readOnlyAllHostMap().get());
+  EXPECT_EQ(nullptr, priority_set.mutableAllHostMapForTest().get());
 
   {
     HostVector hosts_added{};
@@ -2316,15 +2316,15 @@ TEST(PrioritySet, MainPrioritySetTest) {
 
   // New mutable host map will be created and all update will be applied to new mutable host map.
   // Read only host map will not be updated before 'readOnlyAllHostMap' is called.
-  EXPECT_EQ(host_map, priority_set.readOnlyAllHostMapForTest());
-  EXPECT_TRUE((priority_set.mutableAllHostMapForTest() != nullptr &&
-               priority_set.mutableAllHostMapForTest() != host_map));
+  EXPECT_EQ(host_map.get(), priority_set.readOnlyAllHostMapForTest().get());
+  EXPECT_TRUE((priority_set.mutableAllHostMapForTest().get() != nullptr &&
+               priority_set.mutableAllHostMapForTest().get() != host_map.get()));
 
   // Again, mutable host map will be moved to read only host map after 'readOnlyAllHostMap' is
   // called.
   host_map = priority_set.mutableAllHostMapForTest();
-  EXPECT_EQ(host_map, priority_set.readOnlyAllHostMap());
-  EXPECT_EQ(nullptr, priority_set.mutableAllHostMapForTest());
+  EXPECT_EQ(host_map.get(), priority_set.readOnlyAllHostMap().get());
+  EXPECT_EQ(nullptr, priority_set.mutableAllHostMapForTest().get());
 }
 
 class ClusterInfoImplTest : public testing::Test {
