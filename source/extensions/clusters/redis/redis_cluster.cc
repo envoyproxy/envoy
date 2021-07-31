@@ -109,7 +109,7 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
 
   // Get the map of all the latest existing hosts, which is used to filter out the existing
   // hosts in the process of updating cluster memberships.
-  Upstream::HostMapConstSharedPtr all_hosts = priority_set_.readOnlyAllHostMap();
+  Upstream::HostMapConstSharedPtr all_hosts = priority_set_.crossPriorityHostMap();
   ASSERT(all_hosts != nullptr);
 
   Upstream::HostVector hosts_added;

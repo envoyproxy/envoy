@@ -427,10 +427,10 @@ public:
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
 
   /**
-   * @return const HostMapConstSharedPtr& read only all host map that indexed by host address
-   * string.
+   * @return const HostMapConstSharedPtr& read only cross priority host map that indexed by host
+   * address string.
    */
-  virtual const HostMapConstSharedPtr& readOnlyAllHostMap() const PURE;
+  virtual const HostMapConstSharedPtr& crossPriorityHostMap() const PURE;
 
   /**
    * Parameter class for updateHosts.
@@ -455,11 +455,14 @@ public:
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
    * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+   * @param cross_priority_host_map read only cross-priority host map which is created in the main
+   * thread and shared by all the worker threads.
    */
-  virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
+  virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
-                           absl::optional<uint32_t> overprovisioning_factor) PURE;
+                           absl::optional<uint32_t> overprovisioning_factor,
+                           HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
   /**
    * Callback provided during batch updates that can be used to update hosts.
@@ -477,7 +480,7 @@ public:
      * @param hosts_removed supplies the hosts removed since the last update.
      * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
      */
-    virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
+    virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
                              absl::optional<uint32_t> overprovisioning_factor) PURE;

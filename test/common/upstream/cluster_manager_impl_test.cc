@@ -3455,9 +3455,9 @@ TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
   opt_cp.value().addDrainedCallback(drained_cb);
 }
 
-// Test that the read only host map in the main thread is correctly synchronized to the worker
-// thread when the cluster's host set is updated.
-TEST_F(ClusterManagerImplTest, ReadOnlyAllHostMapSyncTest) {
+// Test that the read only cross-priority host map in the main thread is correctly synchronized to
+// the worker thread when the cluster's host set is updated.
+TEST_F(ClusterManagerImplTest, CrossPriorityHostMapSyncTest) {
   std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -3485,10 +3485,10 @@ TEST_F(ClusterManagerImplTest, ReadOnlyAllHostMapSyncTest) {
   create(parseBootstrapFromV3Yaml(yaml));
 
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
-  EXPECT_EQ(2, cluster.prioritySet().readOnlyAllHostMap()->size());
+  EXPECT_EQ(2, cluster.prioritySet().crossPriorityHostMap()->size());
   EXPECT_EQ(
-      cluster_manager_->getThreadLocalCluster("cluster_1")->prioritySet().readOnlyAllHostMap(),
-      cluster.prioritySet().readOnlyAllHostMap());
+      cluster_manager_->getThreadLocalCluster("cluster_1")->prioritySet().crossPriorityHostMap(),
+      cluster.prioritySet().crossPriorityHostMap());
 
   HostVectorSharedPtr hosts(
       new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
@@ -3507,10 +3507,10 @@ TEST_F(ClusterManagerImplTest, ReadOnlyAllHostMapSyncTest) {
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 
-  EXPECT_EQ(1, cluster.prioritySet().readOnlyAllHostMap()->size());
+  EXPECT_EQ(1, cluster.prioritySet().crossPriorityHostMap()->size());
   EXPECT_EQ(
-      cluster_manager_->getThreadLocalCluster("cluster_1")->prioritySet().readOnlyAllHostMap(),
-      cluster.prioritySet().readOnlyAllHostMap());
+      cluster_manager_->getThreadLocalCluster("cluster_1")->prioritySet().crossPriorityHostMap(),
+      cluster.prioritySet().crossPriorityHostMap());
 
   hosts_added.push_back((*hosts)[0]);
   hosts_removed.clear();
@@ -3523,10 +3523,10 @@ TEST_F(ClusterManagerImplTest, ReadOnlyAllHostMapSyncTest) {
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 
-  EXPECT_EQ(2, cluster.prioritySet().readOnlyAllHostMap()->size());
+  EXPECT_EQ(2, cluster.prioritySet().crossPriorityHostMap()->size());
   EXPECT_EQ(
-      cluster_manager_->getThreadLocalCluster("cluster_1")->prioritySet().readOnlyAllHostMap(),
-      cluster.prioritySet().readOnlyAllHostMap());
+      cluster_manager_->getThreadLocalCluster("cluster_1")->prioritySet().crossPriorityHostMap(),
+      cluster.prioritySet().crossPriorityHostMap());
 }
 
 class TestUpstreamNetworkFilter : public Network::WriteFilter {

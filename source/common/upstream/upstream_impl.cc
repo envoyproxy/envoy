@@ -562,12 +562,17 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
 void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                                   LocalityWeightsConstSharedPtr locality_weights,
                                   const HostVector& hosts_added, const HostVector& hosts_removed,
-                                  absl::optional<uint32_t> overprovisioning_factor) {
+                                  absl::optional<uint32_t> overprovisioning_factor,
+                                  HostMapConstSharedPtr cross_priority_host_map) {
   // Ensure that we have a HostSet for the given priority.
   getOrCreateHostSet(priority, overprovisioning_factor);
   static_cast<HostSetImpl*>(host_sets_[priority].get())
       ->updateHosts(std::move(update_hosts_params), std::move(locality_weights), hosts_added,
                     hosts_removed, overprovisioning_factor);
+
+  if (cross_priority_host_map != nullptr) {
+    const_cross_priority_host_map_ = std::move(cross_priority_host_map);
+  }
 
   if (!batch_update_) {
     runUpdateCallbacks(hosts_added, hosts_removed);
@@ -607,6 +612,27 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
                       hosts_removed, overprovisioning_factor);
 }
 
+void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
+                                      LocalityWeightsConstSharedPtr locality_weights,
+                                      const HostVector& hosts_added,
+                                      const HostVector& hosts_removed,
+                                      absl::optional<uint32_t> overprovisioning_factor,
+                                      HostMapConstSharedPtr cross_priority_host_map) {
+  ASSERT(cross_priority_host_map == nullptr,
+         "External cross-priority host map is meaningless to MainPrioritySetImpl");
+  PrioritySetImpl::updateHosts(priority, std::move(update_hosts_params), locality_weights,
+                               hosts_added, hosts_removed, overprovisioning_factor);
+}
+
+const HostMapConstSharedPtr& MainPrioritySetImpl::crossPriorityHostMap() const {
+  // Check if the host set in the main thread PrioritySet has been updated.
+  if (mutable_cross_priority_host_map_ != nullptr) {
+    const_cross_priority_host_map_ = std::move(mutable_cross_priority_host_map_);
+    ASSERT(mutable_cross_priority_host_map_ == nullptr);
+  }
+  return const_cross_priority_host_map_;
+}
+
 void MainPrioritySetImpl::updateMutableAllHostMap(const HostVector& hosts_added,
                                                   const HostVector& hosts_removed) {
   if (hosts_added.empty() && hosts_removed.empty()) {
@@ -616,17 +642,17 @@ void MainPrioritySetImpl::updateMutableAllHostMap(const HostVector& hosts_added,
 
   // Since read_only_all_host_map_ may be shared by multiple threads, when the host set changes, we
   // cannot directly modify read_only_all_host_map_.
-  if (mutable_all_host_map_ == nullptr) {
+  if (mutable_cross_priority_host_map_ == nullptr) {
     // Copy old read only host map to mutable host map.
-    mutable_all_host_map_ = std::make_shared<HostMap>(*read_only_all_host_map_);
+    mutable_cross_priority_host_map_ = std::make_shared<HostMap>(*const_cross_priority_host_map_);
   }
 
   for (const auto& host : hosts_removed) {
-    mutable_all_host_map_->erase(host->address()->asString());
+    mutable_cross_priority_host_map_->erase(host->address()->asString());
   }
 
   for (const auto& host : hosts_added) {
-    mutable_all_host_map_->insert({host->address()->asString(), host});
+    mutable_cross_priority_host_map_->insert({host->address()->asString(), host});
   }
 }
 

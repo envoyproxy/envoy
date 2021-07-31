@@ -480,16 +480,13 @@ public:
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                    const HostVector& hosts_removed,
-                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
+                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
+                   HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
 
   void batchHostUpdate(BatchUpdateCb& callback) override;
 
-  const HostMapConstSharedPtr& readOnlyAllHostMap() const override {
-    return read_only_all_host_map_;
-  }
-
-  virtual void setReadOnlyAllHostMap(HostMapConstSharedPtr all_host_map) {
-    read_only_all_host_map_ = std::move(all_host_map);
+  const HostMapConstSharedPtr& crossPriorityHostMap() const override {
+    return const_cross_priority_host_map_;
   }
 
 protected:
@@ -513,7 +510,7 @@ protected:
   std::vector<std::unique_ptr<HostSet>> host_sets_;
 
   // Read only all host map for fast host searching. This will never be null.
-  mutable HostMapConstSharedPtr read_only_all_host_map_{std::make_shared<HostMap>()};
+  mutable HostMapConstSharedPtr const_cross_priority_host_map_{std::make_shared<HostMap>()};
 
 private:
   // This is a matching vector to store the callback handles for host_sets_. It is kept separately
@@ -554,37 +551,28 @@ private:
  * Specialized PrioritySetImpl designed for the main thread. It will update and maintain the read
  * only all host map when the hosts set changes.
  */
-class MainPrioritySetImpl : public PrioritySetImpl {
+class MainPrioritySetImpl : public PrioritySetImpl, public Logger::Loggable<Logger::Id::upstream> {
 public:
   MainPrioritySetImpl() {
-    all_host_map_update_handle_ = addPriorityUpdateCb(
+    host_map_update_handle_ = addPriorityUpdateCb(
         [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) {
           updateMutableAllHostMap(hosts_added, hosts_removed);
         });
   }
 
   // PrioritySet
-  const HostMapConstSharedPtr& readOnlyAllHostMap() const override {
-    // Check if the host set in the main thread PrioritySet has been updated.
-    if (mutable_all_host_map_ != nullptr) {
-      read_only_all_host_map_ = std::move(mutable_all_host_map_);
-      ASSERT(mutable_all_host_map_ == nullptr);
-    }
-    return read_only_all_host_map_;
-  }
-
-  // PrioritySetImpl
-  void setReadOnlyAllHostMap(HostMapConstSharedPtr) override {
-    // Using an external host map to update the read_only_all_host_map_ is not allowed in
-    // MainPrioritySetImpl.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
+                   LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
+                   const HostVector& hosts_removed,
+                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
+                   HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
+  const HostMapConstSharedPtr& crossPriorityHostMap() const override;
 
 protected:
   void updateMutableAllHostMap(const HostVector& hosts_added, const HostVector& hosts_removed);
 
-  mutable HostMapSharedPtr mutable_all_host_map_;
-  Common::CallbackHandlePtr all_host_map_update_handle_;
+  mutable HostMapSharedPtr mutable_cross_priority_host_map_;
+  Common::CallbackHandlePtr host_map_update_handle_;
 };
 
 /**

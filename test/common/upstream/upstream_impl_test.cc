@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -2215,20 +2216,25 @@ TEST(PrioritySet, Extend) {
   HostVectorSharedPtr hosts(
       new HostVector({makeTestHost(info, "tcp://127.0.0.1:80", *time_source)}));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostMapConstSharedPtr fake_cross_priority_host_map = std::make_shared<HostMap>();
   {
     HostVector hosts_added{hosts->front()};
     HostVector hosts_removed{};
 
-    priority_set.updateHosts(1,
-                             updateHostsParams(hosts, hosts_per_locality,
-                                               std::make_shared<const HealthyHostVector>(*hosts),
-                                               hosts_per_locality),
-                             {}, hosts_added, hosts_removed, absl::nullopt);
+    priority_set.updateHosts(
+        1,
+        updateHostsParams(hosts, hosts_per_locality,
+                          std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
+        {}, hosts_added, hosts_removed, absl::nullopt, fake_cross_priority_host_map);
   }
   EXPECT_EQ(1, priority_changes);
   EXPECT_EQ(1, membership_changes);
   EXPECT_EQ(last_priority, 1);
   EXPECT_EQ(1, priority_set.hostSetsPerPriority()[1]->hosts().size());
+
+  // Simply verify the set and get the cross-priority host map is working properly in the priority
+  // set.
+  EXPECT_EQ(fake_cross_priority_host_map.get(), priority_set.crossPriorityHostMap().get());
 
   // Test iteration.
   int i = 0;
@@ -2252,19 +2258,13 @@ TEST(PrioritySet, Extend) {
   // We expect to see two priority changes, but only one membership change.
   EXPECT_EQ(3, priority_changes);
   EXPECT_EQ(2, membership_changes);
-
-  // Simply verify the set and get the read only all host map is working properly in the priority
-  // set.
-  HostMapSharedPtr test_host_map = std::make_shared<HostMap>();
-  priority_set.setReadOnlyAllHostMap(test_host_map);
-  EXPECT_EQ(test_host_map.get(), priority_set.readOnlyAllHostMap().get());
 }
 
 // Helper class used to test MainPrioritySetImpl.
 class TestMainPrioritySetImpl : public MainPrioritySetImpl {
 public:
-  HostMapConstSharedPtr readOnlyAllHostMapForTest() { return read_only_all_host_map_; }
-  HostMapSharedPtr mutableAllHostMapForTest() { return mutable_all_host_map_; }
+  HostMapConstSharedPtr constHostMapForTest() { return const_cross_priority_host_map_; }
+  HostMapSharedPtr mutableHostMapForTest() { return mutable_cross_priority_host_map_; }
 };
 
 // Test that the priority set in the main thread can work correctly.
@@ -2279,8 +2279,8 @@ TEST(PrioritySet, MainPrioritySetTest) {
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
 
   // The host map is initially empty or null.
-  EXPECT_TRUE(priority_set.readOnlyAllHostMapForTest()->empty());
-  EXPECT_EQ(nullptr, priority_set.mutableAllHostMapForTest().get());
+  EXPECT_TRUE(priority_set.constHostMapForTest()->empty());
+  EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
 
   {
     HostVector hosts_added{hosts->front()};
@@ -2294,14 +2294,14 @@ TEST(PrioritySet, MainPrioritySetTest) {
   }
 
   // Only mutable host map can be updated directly. Read only host map will not be updated before
-  // 'readOnlyAllHostMap' is called.
-  EXPECT_TRUE(priority_set.readOnlyAllHostMapForTest()->empty());
-  EXPECT_FALSE(priority_set.mutableAllHostMapForTest()->empty());
+  // 'crossPriorityHostMap' is called.
+  EXPECT_TRUE(priority_set.constHostMapForTest()->empty());
+  EXPECT_FALSE(priority_set.mutableHostMapForTest()->empty());
 
-  // Mutable host map will be moved to read only host map after 'readOnlyAllHostMap' is called.
-  HostMapSharedPtr host_map = priority_set.mutableAllHostMapForTest();
-  EXPECT_EQ(host_map.get(), priority_set.readOnlyAllHostMap().get());
-  EXPECT_EQ(nullptr, priority_set.mutableAllHostMapForTest().get());
+  // Mutable host map will be moved to read only host map after 'crossPriorityHostMap' is called.
+  HostMapSharedPtr host_map = priority_set.mutableHostMapForTest();
+  EXPECT_EQ(host_map.get(), priority_set.crossPriorityHostMap().get());
+  EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
 
   {
     HostVector hosts_added{};
@@ -2315,16 +2315,16 @@ TEST(PrioritySet, MainPrioritySetTest) {
   }
 
   // New mutable host map will be created and all update will be applied to new mutable host map.
-  // Read only host map will not be updated before 'readOnlyAllHostMap' is called.
-  EXPECT_EQ(host_map.get(), priority_set.readOnlyAllHostMapForTest().get());
-  EXPECT_TRUE((priority_set.mutableAllHostMapForTest().get() != nullptr &&
-               priority_set.mutableAllHostMapForTest().get() != host_map.get()));
+  // Read only host map will not be updated before 'crossPriorityHostMap' is called.
+  EXPECT_EQ(host_map.get(), priority_set.constHostMapForTest().get());
+  EXPECT_TRUE((priority_set.mutableHostMapForTest().get() != nullptr &&
+               priority_set.mutableHostMapForTest().get() != host_map.get()));
 
-  // Again, mutable host map will be moved to read only host map after 'readOnlyAllHostMap' is
+  // Again, mutable host map will be moved to read only host map after 'crossPriorityHostMap' is
   // called.
-  host_map = priority_set.mutableAllHostMapForTest();
-  EXPECT_EQ(host_map.get(), priority_set.readOnlyAllHostMap().get());
-  EXPECT_EQ(nullptr, priority_set.mutableAllHostMapForTest().get());
+  host_map = priority_set.mutableHostMapForTest();
+  EXPECT_EQ(host_map.get(), priority_set.crossPriorityHostMap().get());
+  EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
 }
 
 class ClusterInfoImplTest : public testing::Test {

@@ -73,7 +73,7 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
 
   // Get the map of all the latest existing hosts, which is used to filter out the existing
   // hosts in the process of updating cluster memberships.
-  HostMapConstSharedPtr all_hosts = parent_.prioritySet().readOnlyAllHostMap();
+  HostMapConstSharedPtr all_hosts = parent_.prioritySet().crossPriorityHostMap();
   ASSERT(all_hosts != nullptr);
 
   const uint32_t overprovisioning_factor = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
