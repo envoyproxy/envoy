@@ -107,7 +107,7 @@ public:
 
   void setStreamInfo(StreamInfo::StreamInfo& stream_info) override { stream_info_ = &stream_info; }
 
-  virtual ~HttpUpstream() override { setBytesCount(); }
+  ~HttpUpstream() override { setBytesCount(); }
 
   void setBytesCount() {
     if (stream_info_ != nullptr) {
