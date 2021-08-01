@@ -175,27 +175,11 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     // The connection was closed before it could be used. Stats are not recorded.
     return;
   }
-  switch (version.transport_version) {
-  case quic::QUIC_VERSION_43:
-    codec_stats_->quic_version_43_.inc();
-    return;
-  case quic::QUIC_VERSION_46:
-    codec_stats_->quic_version_46_.inc();
-    return;
-  case quic::QUIC_VERSION_50:
-    codec_stats_->quic_version_50_.inc();
-    return;
-  case quic::QUIC_VERSION_51:
-    codec_stats_->quic_version_51_.inc();
-    return;
-  case quic::QUIC_VERSION_IETF_DRAFT_29:
-    codec_stats_->quic_version_h3_29_.inc();
-    return;
-  case quic::QUIC_VERSION_IETF_RFC_V1:
+  if (version.transport_version == quic::QUIC_VERSION_IETF_RFC_V1) {
     codec_stats_->quic_version_rfc_v1_.inc();
-    return;
-  default:
-    return;
+  } else {
+    ENVOY_BUG(false, fmt::format("Unexpected QUIC version {}",
+                                 quic::QuicVersionToString(version.transport_version)));
   }
 }
 

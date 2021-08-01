@@ -350,6 +350,21 @@ void StreamEncoderImpl::resetStream(StreamResetReason reason) {
   connection_.onResetStreamBase(reason);
 }
 
+void ResponseEncoderImpl::resetStream(StreamResetReason reason) {
+  // Clear the downstream on the account since we're resetting the downstream.
+  if (buffer_memory_account_) {
+    buffer_memory_account_->clearDownstream();
+  }
+
+  // For H1, we use idleTimeouts to cancel streams unless there was an
+  // explicit protocol error prior to sending a response to the downstream
+  // in which case we send a local reply.
+  // TODO(kbaichoo): If we want snappier resets of H1 streams we can
+  //  1) Send local reply if no response data sent yet
+  //  2) Invoke the idle timeout sooner to close underlying connection
+  StreamEncoderImpl::resetStream(reason);
+}
+
 void StreamEncoderImpl::readDisable(bool disable) {
   if (disable) {
     ++read_disable_calls_;

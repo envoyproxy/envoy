@@ -48,7 +48,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/stat_sinks/common/statsd:96.5"
 "source/extensions/stat_sinks/graphite_statsd:85.7"
 "source/extensions/stat_sinks/statsd:85.2"
-"source/extensions/tracers:96.5"
 "source/extensions/tracers/opencensus:92.5"
 "source/extensions/tracers/xray:94.0"
 "source/extensions/transport_sockets:95.7"

@@ -63,21 +63,14 @@ public:
 };
 
 // A test that sets up its own client connection with customized quic version and connection ID.
-class QuicHttpIntegrationTest : public HttpIntegrationTest, public QuicMultiVersionTest {
+class QuicHttpIntegrationTest : public HttpIntegrationTest,
+                                public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   QuicHttpIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam().first,
+      : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam(),
                             ConfigHelper::quicHttpProxyConfig()),
-        supported_versions_([]() {
-          if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
-            return quic::CurrentSupportedVersionsWithQuicCrypto();
-          }
-          bool use_http3 = GetParam().second == QuicVersionType::Iquic;
-          SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
-          SetQuicReloadableFlag(quic_disable_version_rfcv1, !use_http3);
-          return quic::CurrentSupportedVersions();
-        }()),
-        conn_helper_(*dispatcher_), alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
+        supported_versions_(quic::CurrentSupportedHttp3Versions()), conn_helper_(*dispatcher_),
+        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
 
   ~QuicHttpIntegrationTest() override {
     cleanupUpstreamAndDownstream();
@@ -172,13 +165,13 @@ public:
     }
     constexpr auto timeout_first = std::chrono::seconds(15);
     constexpr auto timeout_subsequent = std::chrono::milliseconds(10);
-    if (GetParam().first == Network::Address::IpVersion::v4) {
+    if (GetParam() == Network::Address::IpVersion::v4) {
       test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 8u, timeout_first);
     } else {
       test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_total", 8u, timeout_first);
     }
     for (size_t i = 0; i < concurrency_; ++i) {
-      if (GetParam().first == Network::Address::IpVersion::v4) {
+      if (GetParam() == Network::Address::IpVersion::v4) {
         test_server_->waitForGaugeEq(
             fmt::format("listener.127.0.0.1_0.worker_{}.downstream_cx_active", i), 1u,
             timeout_subsequent);
@@ -230,7 +223,8 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,
-                         testing::ValuesIn(generateTestParam()), testParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   testRouterHeaderOnlyRequestAndResponse();
@@ -264,7 +258,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
                   ->EarlyDataAccepted());
   // Close the second connection.
   codec_client_->close();
-  if (GetParam().first == Network::Address::IpVersion::v4) {
+  if (GetParam() == Network::Address::IpVersion::v4) {
     test_server_->waitForCounterEq(
         "listener.127.0.0.1_0.http3.downstream.rx.quic_connection_close_error_"
         "code_QUIC_NO_ERROR",
@@ -274,13 +268,8 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
                                    "error_code_QUIC_NO_ERROR",
                                    2u);
   }
-  if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
-    test_server_->waitForCounterEq("http3.quic_version_50", 2u);
-  } else if (GetParam().second == QuicVersionType::GquicTls) {
-    test_server_->waitForCounterEq("http3.quic_version_51", 2u);
-  } else {
-    test_server_->waitForCounterEq("http3.quic_version_rfc_v1", 2u);
-  }
+
+  test_server_->waitForCounterEq("http3.quic_version_rfc_v1", 2u);
 }
 
 // Ensure multiple quic connections work, regardless of platform BPF support
@@ -340,6 +329,22 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
+
+  // Switch to a socket with bad socket options.
+  auto option = std::make_shared<Network::MockSocketOption>();
+  EXPECT_CALL(*option, setOption(_, _))
+      .WillRepeatedly(
+          Invoke([](Network::Socket&, envoy::config::core::v3::SocketOption::SocketState state) {
+            if (state == envoy::config::core::v3::SocketOption::STATE_LISTENING) {
+              return false;
+            }
+            return true;
+          }));
+  auto options = std::make_shared<Network::Socket::Options>();
+  options->push_back(option);
+  quic_connection_->switchConnectionSocket(
+      createConnectionSocket(server_addr_, local_addr, options));
+  EXPECT_TRUE(codec_client_->disconnected());
   cleanupUpstreamAndDownstream();
 }
 
@@ -352,13 +357,9 @@ TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
   initialize();
   codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt);
   EXPECT_FALSE(codec_client_->connected());
-  std::string failure_reason =
-      GetParam().second == QuicVersionType::GquicQuicCrypto
-          ? "QUIC_PROOF_INVALID with details: Proof invalid: X509_verify_cert: certificate "
-            "verification error at depth 0: ok"
-          : "QUIC_TLS_CERTIFICATE_UNKNOWN with details: TLS handshake failure "
-            "(ENCRYPTION_HANDSHAKE) 46: "
-            "certificate unknown";
+  std::string failure_reason = "QUIC_TLS_CERTIFICATE_UNKNOWN with details: TLS handshake failure "
+                               "(ENCRYPTION_HANDSHAKE) 46: "
+                               "certificate unknown";
   EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
 }
 
@@ -390,12 +391,10 @@ TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
   EXPECT_FALSE(response->complete());
 
   // Verify stream error counters are correctly incremented.
-  std::string counter_scope = GetParam().first == Network::Address::IpVersion::v4
+  std::string counter_scope = GetParam() == Network::Address::IpVersion::v4
                                   ? "listener.127.0.0.1_0.http3.downstream.rx."
                                   : "listener.[__1]_0.http3.downstream.rx.";
-  std::string error_code = GetParam().second == QuicVersionType::Iquic
-                               ? "quic_reset_stream_error_code_QUIC_STREAM_GENERAL_PROTOCOL_ERROR"
-                               : "quic_reset_stream_error_code_QUIC_BAD_APPLICATION_PAYLOAD";
+  std::string error_code = "quic_reset_stream_error_code_QUIC_STREAM_GENERAL_PROTOCOL_ERROR";
   test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
 }
 

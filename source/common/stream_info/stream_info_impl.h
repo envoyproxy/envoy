@@ -214,7 +214,7 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_ssl_info_;
   }
 
-  const Router::RouteEntry* routeEntry() const override { return route_entry_; }
+  Router::RouteConstSharedPtr route() const override { return route_; }
 
   envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
   const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return metadata_; };
@@ -296,7 +296,7 @@ struct StreamInfoImpl : public StreamInfo {
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
-  const Router::RouteEntry* route_entry_{};
+  Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
   FilterStateSharedPtr upstream_filter_state_;
