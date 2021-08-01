@@ -535,6 +535,11 @@ void ListenerImpl::buildFilterChains() {
 }
 
 void ListenerImpl::buildSocketOptions() {
+#ifdef WIN32
+  // On Windows we use the exact connection balancer in along with reuse_port to
+  // balance connections between workers.
+  connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
+#else
   // TCP specific setup.
   if (connection_balancer_ == nullptr) {
     // Not in place listener update.
@@ -546,7 +551,7 @@ void ListenerImpl::buildSocketOptions() {
       connection_balancer_ = std::make_shared<Network::NopConnectionBalancerImpl>();
     }
   }
-
+#endif
   if (config_.has_tcp_fast_open_queue_length()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildTcpFastOpenOptions(
         config_.tcp_fast_open_queue_length().value()));

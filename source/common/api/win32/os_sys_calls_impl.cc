@@ -367,14 +367,8 @@ SysCallSizeResult OsSysCallsImpl::write(os_fd_t sockfd, const void* buffer, size
 }
 
 SysCallSocketResult OsSysCallsImpl::duplicate(os_fd_t oldfd) {
-  WSAPROTOCOL_INFO info;
-  auto currentProcess = ::GetCurrentProcessId();
-  auto rc = WSADuplicateSocket(oldfd, currentProcess, &info);
-  if (rc == SOCKET_ERROR) {
-    return {(SOCKET)-1, ::WSAGetLastError()};
-  }
-  auto new_socket = ::WSASocket(info.iAddressFamily, info.iSocketType, info.iProtocol, &info, 0, 0);
-  return {new_socket, SOCKET_VALID(new_socket) ? 0 : ::WSAGetLastError()};
+  // Do a swallow copy.
+  return {oldfd, ::WSAGetLastError()};
 }
 
 SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
