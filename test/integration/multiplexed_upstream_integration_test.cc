@@ -169,6 +169,7 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
   // Send some request data.
   codec_client_->sendData(*request_encoder_, 1024, false);
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 1024));
+  EXPECT_EQ(request_encoder_->getStream().sentBytes(), 1061);
 
   // Start sending the response.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
@@ -184,7 +185,6 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
   upstream_request_->encodeResetStream();
   ASSERT_TRUE(response->waitForReset());
   EXPECT_FALSE(response->complete());
-
   // The upstream stats should reflect receiving the reset, and downstream
   // reflect sending it on.
   EXPECT_EQ(1, upstreamRxResetCounterValue());
@@ -672,7 +672,9 @@ TEST_P(MixedUpstreamIntegrationTest, SimultaneousRequestAutoWithHttp3) {
 
 TEST_P(MixedUpstreamIntegrationTest, SimultaneousRequestAutoWithHttp2) {
   use_http2_ = true;
+  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED% %BYTES_SENT% %BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(0, 0, false);
+  EXPECT_THAT(waitForAccessLog(upstream_access_log_name_), testing::HasSubstr("168 13 0 0"));
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, MixedUpstreamIntegrationTest,

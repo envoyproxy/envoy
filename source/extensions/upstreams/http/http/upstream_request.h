@@ -81,6 +81,8 @@ public:
 
   void resetStream() override {
     auto& stream = request_encoder_->getStream();
+    setBytesCount();
+    stream_info_ = nullptr;
     stream.removeCallbacks(*this);
     stream.resetStream(Envoy::Http::StreamResetReason::LocalReset);
   }
@@ -103,18 +105,22 @@ public:
     upstream_request_.onBelowWriteBufferLowWatermark();
   }
 
-  void getStreamInfomation(StreamInfo::StreamInfo& stream_info) override {
-    if (request_encoder_ == nullptr) {
-      return;
+  void setStreamInfo(StreamInfo::StreamInfo& stream_info) override { stream_info_ = &stream_info; }
+
+  virtual ~HttpUpstream() override { setBytesCount(); }
+
+  void setBytesCount() {
+    if (stream_info_ != nullptr) {
+      auto& stream = request_encoder_->getStream();
+      stream_info_->setWireBytesReceived(stream.receivedBytes());
+      stream_info_->setWireBytesSent(stream.sentBytes());
     }
-    auto& stream = request_encoder_->getStream();
-    stream_info.setWireBytesReceived(stream.receivedBytes());
-    stream_info.setWireBytesSent(stream.sentBytes());
   }
 
 private:
   Router::UpstreamToDownstream& upstream_request_;
   Envoy::Http::RequestEncoder* request_encoder_{};
+  StreamInfo::StreamInfo* stream_info_{};
 };
 
 } // namespace Http

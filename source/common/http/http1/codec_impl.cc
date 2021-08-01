@@ -95,6 +95,26 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection)
   }
 }
 
+uint64_t StreamEncoderImpl::sentBytes() {
+  ENVOY_CONN_LOG(trace, "h1: get sent bytes {}\n", connection_.connection(), sent_bytes_);
+  return sent_bytes_;
+}
+
+void StreamEncoderImpl::updateSentBytes(size_t newly_sent_bytes) {
+  ENVOY_CONN_LOG(trace, "h1: update sent bytes {}\n", connection_.connection(), sent_bytes_);
+  sent_bytes_ += newly_sent_bytes;
+}
+
+uint64_t StreamEncoderImpl::receivedBytes() {
+  ENVOY_CONN_LOG(trace, "h1: get received bytes {}\n", connection_.connection(), received_bytes_);
+  return received_bytes_;
+}
+
+void StreamEncoderImpl::updateReceivedBytes(size_t newly_received_bytes) {
+  ENVOY_CONN_LOG(trace, "h1: update received bytes {}\n", connection_.connection(), sent_bytes_);
+  received_bytes_ += newly_received_bytes;
+}
+
 void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const char* value,
                                      uint32_t value_size) {
 

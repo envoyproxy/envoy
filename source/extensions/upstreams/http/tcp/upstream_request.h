@@ -84,7 +84,7 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
-  void getStreamInfomation(StreamInfo::StreamInfo&) override {}
+  void setStreamInfo(StreamInfo::StreamInfo&) override {}
 
 private:
   Router::UpstreamToDownstream* upstream_request_;

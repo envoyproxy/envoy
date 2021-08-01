@@ -291,14 +291,28 @@ protected:
     void encodeDataHelper(Buffer::Instance& data, bool end_stream,
                           bool skip_encoding_empty_trailers);
 
-    uint64_t sentBytes() override { return sent_bytes_; }
+    uint64_t sentBytes() override {
+      ENVOY_CONN_LOG(debug, "stream id {}:get sent bytes {}\n", parent_.connection_, stream_id_,
+                     sent_bytes_);
+      return sent_bytes_;
+    }
 
-    void updateSentBytes(size_t newly_sent_bytes) override { sent_bytes_ += newly_sent_bytes; }
+    void updateSentBytes(size_t newly_sent_bytes) override {
+      sent_bytes_ += newly_sent_bytes;
+      ENVOY_CONN_LOG(debug, "stream id {}:update sent bytes {}\n", parent_.connection_, stream_id_,
+                     sent_bytes_);
+    }
 
-    uint64_t receivedBytes() override { return received_bytes_; }
+    uint64_t receivedBytes() override {
+      ENVOY_CONN_LOG(debug, "stream id {}:get received bytes {}\n", parent_.connection_, stream_id_,
+                     received_bytes_);
+      return received_bytes_;
+    }
 
     void updateReceivedBytes(size_t newly_received_bytes) override {
       received_bytes_ += newly_received_bytes;
+      ENVOY_CONN_LOG(debug, "stream id {}:update received bytes {}\n", parent_.connection_,
+                     stream_id_, received_bytes_);
     }
 
     ConnectionImpl& parent_;

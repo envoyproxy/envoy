@@ -8,6 +8,7 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
@@ -1148,6 +1149,31 @@ bool ConfigHelper::setAccessLog(
   access_log_config.set_path(filename);
   hcm_config.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
   storeHttpConnectionManager(hcm_config);
+  return true;
+}
+
+bool ConfigHelper::setUpstreamAccessLog(const std::string& filename, absl::string_view format) {
+  RELEASE_ASSERT(!finalized_, "");
+  envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+  if (!format.empty()) {
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        std::string(format));
+  }
+  access_log_config.set_path(filename);
+
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+      hcm_config;
+  loadHttpConnectionManager(hcm_config);
+
+  envoy::extensions::filters::http::router::v3::Router router_config;
+  router_config.add_upstream_log()->mutable_typed_config()->PackFrom(access_log_config);
+
+  hcm_config.mutable_http_filters(hcm_config.http_filters_size() - 1)
+      ->mutable_typed_config()
+      ->PackFrom(router_config);
+
+  storeHttpConnectionManager(hcm_config);
+
   return true;
 }
 

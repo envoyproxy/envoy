@@ -78,9 +78,6 @@ UpstreamRequest::~UpstreamRequest() {
   if (max_stream_duration_timer_ != nullptr) {
     max_stream_duration_timer_->disableTimer();
   }
-  if (upstream_) {
-    upstream_->getStreamInfomation(stream_info_);
-  }
   clearRequestEncoder();
 
   // If desired, fire the per-try histogram when the UpstreamRequest
@@ -295,10 +292,6 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
     span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
   }
-  if (upstream_) {
-    upstream_->getStreamInfomation(stream_info_);
-  }
-
   clearRequestEncoder();
   awaiting_headers_ = false;
   if (!calling_encode_headers_) {
@@ -327,7 +320,6 @@ void UpstreamRequest::resetStream() {
 
   if (upstream_) {
     ENVOY_STREAM_LOG(debug, "resetting pool request", *parent_.callbacks());
-    upstream_->getStreamInfomation(stream_info_);
     upstream_->resetStream();
     clearRequestEncoder();
   }
@@ -392,7 +384,7 @@ void UpstreamRequest::onPoolReady(
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
   upstream_ = std::move(upstream);
-
+  upstream_->setStreamInfo(stream_info_);
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
 

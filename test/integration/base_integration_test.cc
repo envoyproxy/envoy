@@ -411,6 +411,11 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
   ASSERT_TRUE(config_helper_.setListenerAccessLog(listener_access_log_name_, format));
 }
 
+void BaseIntegrationTest::useUpstreamAccessLog(absl::string_view format) {
+  upstream_access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  ASSERT_TRUE(config_helper_.setUpstreamAccessLog(upstream_access_log_name_, format));
+}
+
 // Assuming logs are newline delineated, return the start index of the nth entry.
 // If there are not n entries, it will return file.length() (end of the string
 // index)

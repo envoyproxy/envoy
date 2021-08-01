@@ -79,15 +79,13 @@ public:
 
   void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
 
-  uint64_t sentBytes() override { return sent_bytes_; }
+  uint64_t sentBytes() override;
 
-  void updateSentBytes(size_t newly_sent_bytes) override { sent_bytes_ += newly_sent_bytes; }
+  void updateSentBytes(size_t newly_sent_bytes) override;
 
-  uint64_t receivedBytes() override { return received_bytes_; }
+  uint64_t receivedBytes() override;
 
-  void updateReceivedBytes(size_t newly_received_bytes) override {
-    received_bytes_ += newly_received_bytes;
-  }
+  void updateReceivedBytes(size_t newly_received_bytes) override;
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection);

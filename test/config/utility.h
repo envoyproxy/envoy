@@ -256,6 +256,9 @@ public:
   // Set the listener access log for the first listener to a given file.
   bool setListenerAccessLog(const std::string& filename, absl::string_view format = "");
 
+  // Set the upstream access log for the router filter to a given file.
+  bool setUpstreamAccessLog(const std::string& filename, absl::string_view format = "");
+
   // Renames the first listener to the name specified.
   void renameListener(const std::string& name);
 

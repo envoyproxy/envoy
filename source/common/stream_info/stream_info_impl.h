@@ -128,7 +128,7 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
-  void setWireBytesReceived(uint64_t wire_bytes_received) override {
+  void setWireBytesReceived(const uint64_t wire_bytes_received) override {
     wire_bytes_received_ = wire_bytes_received;
   }
 
@@ -162,7 +162,9 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t bytesSent() const override { return bytes_sent_; }
 
-  void setWireBytesSent(uint64_t wire_bytes_sent) override { wire_bytes_sent_ = wire_bytes_sent; }
+  void setWireBytesSent(const uint64_t wire_bytes_sent) override {
+    wire_bytes_sent_ = wire_bytes_sent;
+  }
 
   uint64_t wireBytesSent() const override { return wire_bytes_sent_; }
 
@@ -332,8 +334,8 @@ private:
 
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
-  uint64_t wire_bytes_received_{0};
-  uint64_t wire_bytes_sent_{0};
+  uint64_t wire_bytes_received_{};
+  uint64_t wire_bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   const Network::SocketAddressProviderSharedPtr downstream_address_provider_;
   Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
