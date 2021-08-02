@@ -5,7 +5,6 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-#include <memory>
 
 namespace Envoy {
 namespace Http {
