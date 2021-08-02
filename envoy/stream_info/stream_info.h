@@ -287,16 +287,25 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& getRouteName() const PURE;
+
   /**
    * @param bytes_received denotes number of bytes to add to total received bytes.
    */
   virtual void addBytesReceived(uint64_t bytes_received) PURE;
+
+  /**
+   * @param wire_bytes_received the total number of bytes decoded by the stream.
+   */
   virtual void setWireBytesReceived(uint64_t wire_bytes_received) PURE;
 
   /**
-   * @return the number of body bytes received in the request.
+   * @return the number of body bytes received by the stream.
    */
   virtual uint64_t bytesReceived() const PURE;
+
+  /**
+   * @return the total number of bytes decoded by the stream, including header, body, trailer, etc.
+   */
   virtual uint64_t wireBytesReceived() const PURE;
 
   /**
@@ -417,6 +426,9 @@ public:
    */
   virtual void addBytesSent(uint64_t bytes_sent) PURE;
 
+  /**
+   * @param wire_bytes_sent the total number of bytes encoded by the stream.
+   */
   virtual void setWireBytesSent(uint64_t wire_bytes_sent) PURE;
 
   /**
@@ -424,6 +436,9 @@ public:
    */
   virtual uint64_t bytesSent() const PURE;
 
+  /**
+   * @return the total number of bytes encoded by the stream, including header, body, trailer, etc.
+   */
   virtual uint64_t wireBytesSent() const PURE;
 
   /**
