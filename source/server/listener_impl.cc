@@ -167,13 +167,25 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
       socket_type_ != Network::Socket::Type::Stream) {
     return;
   }
-
+  int i = 0;
   for (auto& socket : sockets_) {
-    // TODO(mattklein123): At some point we lost error handling on this call which I think can
-    // technically fail (at least according to lingering code comments). Add error handling on this
-    // in a follow up.
-    socket->ioHandle().listen(tcp_backlog_size_);
-
+// TODO(mattklein123): At some point we lost error handling on this call which I think can
+// technically fail (at least according to lingering code comments). Add error handling on this
+// in a follow up.
+#ifdef WIN32
+    if (i == 0) {
+      const auto rc = socket->ioHandle().listen(tcp_backlog_size_);
+      if (rc.return_value_ != 0) {
+        throw EnvoyException(fmt::format("cannot listen() errno={}", rc.errno_));
+      }
+      i++;
+    }
+#else
+    const auto rc = socket->ioHandle().listen(tcp_backlog_size_);
+    if (rc.return_value_ != 0) {
+      throw EnvoyException(fmt::format("cannot listen() errno={}", rc.errno_));
+    }
+#endif
     if (!Network::Socket::applyOptions(socket->options(), *socket,
                                        envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
       throw Network::SocketOptionException(
@@ -535,13 +547,14 @@ void ListenerImpl::buildFilterChains() {
 }
 
 void ListenerImpl::buildSocketOptions() {
-#ifdef WIN32
-  // On Windows we use the exact connection balancer in along with reuse_port to
-  // balance connections between workers.
-  connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
-#else
   // TCP specific setup.
   if (connection_balancer_ == nullptr) {
+#ifdef WIN32
+    // On Windows we use the exact connection balancer in along with reuse_port to
+    // balance connections between workers.
+    ENVOY_LOG_MISC(debug, "I setup an ExactConnectionBalancerImpl");
+    connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
+#else
     // Not in place listener update.
     if (config_.has_connection_balance_config()) {
       // Currently exact balance is the only supported type and there are no options.
@@ -550,8 +563,9 @@ void ListenerImpl::buildSocketOptions() {
     } else {
       connection_balancer_ = std::make_shared<Network::NopConnectionBalancerImpl>();
     }
-  }
 #endif
+  }
+
   if (config_.has_tcp_fast_open_queue_length()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildTcpFastOpenOptions(
         config_.tcp_fast_open_queue_length().value()));
