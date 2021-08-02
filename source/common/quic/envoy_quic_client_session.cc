@@ -48,24 +48,8 @@ void EnvoyQuicClientSession::Initialize() {
 }
 
 void EnvoyQuicClientSession::OnCanWrite() {
-  if (quic::VersionUsesHttp3(transport_version())) {
-    quic::QuicSpdyClientSession::OnCanWrite();
-  } else {
-    // This will cause header stream flushing. It is the only place to discount bytes buffered in
-    // header stream from connection watermark buffer during writing.
-    SendBufferMonitor::ScopedWatermarkBufferUpdater updater(headers_stream(), this);
-    quic::QuicSpdyClientSession::OnCanWrite();
-  }
+  quic::QuicSpdyClientSession::OnCanWrite();
   maybeApplyDelayClosePolicy();
-}
-
-void EnvoyQuicClientSession::OnGoAway(const quic::QuicGoAwayFrame& frame) {
-  ENVOY_CONN_LOG(debug, "GOAWAY received with error {}: {}", *this,
-                 quic::QuicErrorCodeToString(frame.error_code), frame.reason_phrase);
-  quic::QuicSpdyClientSession::OnGoAway(frame);
-  if (http_connection_callbacks_ != nullptr) {
-    http_connection_callbacks_->onGoAway(quicErrorCodeToEnvoyErrorCode(frame.error_code));
-  }
 }
 
 void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {
@@ -128,23 +112,8 @@ quic::QuicConnection* EnvoyQuicClientSession::quicConnection() {
 }
 
 void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
+  quic::QuicSpdyClientSession::OnTlsHandshakeComplete();
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
-}
-
-size_t EnvoyQuicClientSession::WriteHeadersOnHeadersStream(
-    quic::QuicStreamId id, spdy::SpdyHeaderBlock headers, bool fin,
-    const spdy::SpdyStreamPrecedence& precedence,
-    quic::QuicReferenceCountedPointer<quic::QuicAckListenerInterface> ack_listener) {
-  ASSERT(!quic::VersionUsesHttp3(transport_version()));
-  // gQUIC headers are sent on a dedicated stream. Only count the bytes sent against
-  // connection level watermark buffer. Do not count them into stream level
-  // watermark buffer, because it is impossible to identify which byte belongs
-  // to which stream when the buffered bytes are drained in headers stream.
-  // This updater may be in the scope of another one in OnCanWrite(), in such
-  // case, this one doesn't update the watermark.
-  SendBufferMonitor::ScopedWatermarkBufferUpdater updater(headers_stream(), this);
-  return quic::QuicSpdyClientSession::WriteHeadersOnHeadersStream(id, std::move(headers), fin,
-                                                                  precedence, ack_listener);
 }
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {

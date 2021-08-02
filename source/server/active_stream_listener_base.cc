@@ -2,6 +2,9 @@
 
 #include "envoy/network/filter.h"
 
+#include "source/common/stats/timespan_impl.h"
+#include "source/server/active_tcp_listener.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -56,6 +59,62 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
     server_conn_ptr->close(Network::ConnectionCloseType::NoFlush);
   }
   newActiveConnection(*filter_chain, std::move(server_conn_ptr), std::move(stream_info));
+}
+
+ActiveConnections::ActiveConnections(ActiveTcpListener& listener,
+                                     const Network::FilterChain& filter_chain)
+    : listener_(listener), filter_chain_(filter_chain) {}
+
+ActiveConnections::~ActiveConnections() {
+  // connections should be defer deleted already.
+  ASSERT(connections_.empty());
+}
+
+ActiveTcpConnection::ActiveTcpConnection(ActiveConnections& active_connections,
+                                         Network::ConnectionPtr&& new_connection,
+                                         TimeSource& time_source,
+                                         std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
+    : stream_info_(std::move(stream_info)), active_connections_(active_connections),
+      connection_(std::move(new_connection)),
+      conn_length_(new Stats::HistogramCompletableTimespanImpl(
+          active_connections_.listener_.stats_.downstream_cx_length_ms_, time_source)) {
+  // We just universally set no delay on connections. Theoretically we might at some point want
+  // to make this configurable.
+  connection_->noDelay(true);
+  auto& listener = active_connections_.listener_;
+  listener.stats_.downstream_cx_total_.inc();
+  listener.stats_.downstream_cx_active_.inc();
+  listener.per_worker_stats_.downstream_cx_total_.inc();
+  listener.per_worker_stats_.downstream_cx_active_.inc();
+
+  // Active connections on the handler (not listener). The per listener connections have already
+  // been incremented at this point either via the connection balancer or in the socket accept
+  // path if there is no configured balancer.
+  listener.parent_.incNumConnections();
+}
+
+ActiveTcpConnection::~ActiveTcpConnection() {
+  ActiveStreamListenerBase::emitLogs(*active_connections_.listener_.config_, *stream_info_);
+  auto& listener = active_connections_.listener_;
+  listener.stats_.downstream_cx_active_.dec();
+  listener.stats_.downstream_cx_destroy_.inc();
+  listener.per_worker_stats_.downstream_cx_active_.dec();
+  conn_length_->complete();
+
+  // Active listener connections (not handler).
+  listener.decNumConnections();
+
+  // Active handler connections (not listener).
+  listener.parent_.decNumConnections();
+}
+
+void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
+  ENVOY_LOG(trace, "[C{}] connection on event {}", connection_->id(), static_cast<int>(event));
+  // Any event leads to destruction of the connection.
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
+    active_connections_.listener_.removeConnection(*this);
+  }
 }
 
 } // namespace Server
