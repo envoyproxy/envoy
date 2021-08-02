@@ -201,7 +201,6 @@ private:
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<Server::ValidationAdmin> admin_;
   Singleton::ManagerPtr singleton_manager_;
-  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   Random::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
