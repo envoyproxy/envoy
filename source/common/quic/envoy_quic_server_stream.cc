@@ -111,6 +111,10 @@ void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*meta
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
+  if (buffer_memory_account_) {
+    buffer_memory_account_->clearDownstream();
+  }
+
   if (local_end_stream_ && !reading_stopped()) {
     // This is after 200 early response. Reset with QUIC_STREAM_NO_ERROR instead
     // of propagating original reset reason. In QUICHE if a stream stops reading
@@ -237,13 +241,13 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
-    if (received_trailers().size() > filterManagerConnection()->maxIncomingHeadersCount()) {
-      details_ = Http3ResponseCodeDetailValues::too_many_trailers;
+    auto trailers = spdyHeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
+        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_);
+    if (trailers == nullptr) {
       onStreamError(close_connection_upon_invalid_header_);
       return;
     }
-    request_decoder_->decodeTrailers(
-        spdyHeaderBlockToEnvoyHeaders<Http::RequestTrailerMapImpl>(received_trailers()));
+    request_decoder_->decodeTrailers(std::move(trailers));
     MarkTrailersConsumed();
   }
 }
@@ -298,6 +302,21 @@ void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
   quic::QuicSpdyServerStreamBase::OnConnectionClosed(error, source);
 }
 
+void EnvoyQuicServerStream::CloseWriteSide() {
+  // Clear the downstream since the stream should not write additional data
+  // after this is called, e.g. cannot reset the stream.
+  // Only the downstream stream should clear the downstream of the
+  // memory account.
+  //
+  // There are cases where a corresponding upstream stream dtor might
+  // be called, but the downstream stream isn't going to terminate soon
+  // such as StreamDecoderFilterCallbacks::recreateStream().
+  if (buffer_memory_account_) {
+    buffer_memory_account_->clearDownstream();
+  }
+  quic::QuicSpdyServerStreamBase::CloseWriteSide();
+}
+
 void EnvoyQuicServerStream::OnClose() {
   quic::QuicSpdyServerStreamBase::OnClose();
   if (isDoingWatermarkAccounting()) {
@@ -328,7 +347,7 @@ QuicFilterManagerConnectionImpl* EnvoyQuicServerStream::filterManagerConnection(
 }
 
 Http::HeaderUtility::HeaderValidationResult
-EnvoyQuicServerStream::validateHeader(const std::string& header_name,
+EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
                                       absl::string_view header_value) {
   Http::HeaderUtility::HeaderValidationResult result =
       EnvoyQuicStream::validateHeader(header_name, header_value);

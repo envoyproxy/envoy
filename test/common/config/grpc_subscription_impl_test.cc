@@ -1,4 +1,5 @@
 #include "test/common/config/grpc_subscription_test_harness.h"
+#include "test/config/v2_link_hacks.h"
 
 #include "gtest/gtest.h"
 

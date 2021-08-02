@@ -2184,7 +2184,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
 
   EXPECT_CALL(decoder_callbacks_, clearRouteCache());
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.lua"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(nullptr));
 
   Http::TestRequestHeaderMapImpl request_headers_1{{":path", "/"}};
@@ -2192,7 +2192,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_1, true));
   EXPECT_EQ("world", request_headers_1.get_("hello"));
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.lua"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers_2{{":path", "/"}};
@@ -2228,7 +2228,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.lua"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
@@ -2257,7 +2257,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodeNotExist) {
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.lua"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
