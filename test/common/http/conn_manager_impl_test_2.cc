@@ -1002,7 +1002,7 @@ TEST_F(HttpConnectionManagerImplTest, Filter) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
-        EXPECT_EQ(route1->routeEntry(), decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->streamInfo().route());
         EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
         decoder_filters_[0]->callbacks_->clearRouteCache();
         return FilterHeadersStatus::Continue;
@@ -1011,7 +1011,7 @@ TEST_F(HttpConnectionManagerImplTest, Filter) {
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->route());
-        EXPECT_EQ(route2->routeEntry(), decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->streamInfo().route());
         // RDS & CDS consistency problem: route2 points to fake_cluster2, which doesn't exist.
         EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->clusterInfo());
         decoder_filters_[1]->callbacks_->clearRouteCache();
@@ -1022,7 +1022,7 @@ TEST_F(HttpConnectionManagerImplTest, Filter) {
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->clusterInfo());
         EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->route());
-        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->streamInfo().route());
         return FilterHeadersStatus::StopIteration;
       }));
   EXPECT_CALL(*decoder_filters_[2], decodeComplete());
@@ -1060,7 +1060,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToNullPtr) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
-        EXPECT_EQ(route1->routeEntry(), decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->streamInfo().route());
         EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
         decoder_filters_[0]->callbacks_->setRoute(nullptr);
         return FilterHeadersStatus::Continue;
@@ -1069,7 +1069,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToNullPtr) {
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->route());
-        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->streamInfo().route());
         EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->clusterInfo());
         return FilterHeadersStatus::StopIteration;
       }));
@@ -2492,7 +2492,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
 
         // Now route config provider returns something.
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
-        EXPECT_EQ(route1->routeEntry(), decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->streamInfo().route());
         EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
         return FilterHeadersStatus::StopIteration;
 
@@ -2557,7 +2557,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
         EXPECT_EQ(test_headers.get_("scope_key"), "bar");
         // Route now switched to route2 as header "scope_key" has changed.
         EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->route());
-        EXPECT_EQ(route2->routeEntry(), decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->streamInfo().route());
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -2599,7 +2599,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
-        EXPECT_EQ(route1->routeEntry(), decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->streamInfo().route());
         EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
         return FilterHeadersStatus::StopIteration;
       }));

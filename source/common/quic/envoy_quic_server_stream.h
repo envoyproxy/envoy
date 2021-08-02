@@ -55,9 +55,6 @@ public:
     // TODO(mattklein123): Actually implement this for HTTP/3 similar to HTTP/2.
   }
 
-  void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
-    // TODO(kbaichoo): implement account tracking for QUIC.
-  }
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   bool OnStopSending(quic::QuicRstStreamErrorCode error) override;
@@ -67,6 +64,7 @@ public:
   void OnCanWrite() override;
   // quic::QuicSpdyServerStreamBase
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
+  void CloseWriteSide() override;
 
   void clearWatermarkBuffer();
 

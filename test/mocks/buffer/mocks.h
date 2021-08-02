@@ -87,6 +87,8 @@ public:
   MOCK_METHOD(Buffer::Instance*, createBuffer_,
               (std::function<void()> below_low, std::function<void()> above_high,
                std::function<void()> above_overflow));
+
+  MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, createAccount, (Http::StreamResetHandler&));
 };
 
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {
