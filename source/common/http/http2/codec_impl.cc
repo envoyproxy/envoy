@@ -783,7 +783,7 @@ Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
   current_stream_id_ = hd->stream_id;
   StreamImpl* stream = getStream(hd->stream_id);
   if (stream != nullptr) {
-    stream->updateReceivedBytes(hd->length + 9);
+    stream->addDecodedBytes(hd->length + 9);
   }
   // Track all the frames without padding here, since this is the only callback we receive
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
@@ -917,7 +917,7 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "sent frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
   StreamImpl* stream = getStream(frame->hd.stream_id);
   if (stream != nullptr) {
-    stream->updateSentBytes(frame->hd.length + 9);
+    stream->addEncodedBytes(frame->hd.length + 9);
   }
   switch (frame->hd.type) {
   case NGHTTP2_GOAWAY: {

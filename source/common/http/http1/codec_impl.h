@@ -81,11 +81,11 @@ public:
 
   uint64_t encodedBytes() override;
 
-  void updateSentBytes(size_t newly_sent_bytes) override;
+  void addEncodedBytes(size_t newly_sent_bytes) override;
 
-  uint64_t receivedBytes() override;
+  uint64_t decodedBytes() override;
 
-  void updateReceivedBytes(size_t newly_received_bytes) override;
+  void addDecodedBytes(size_t newly_received_bytes) override;
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection);

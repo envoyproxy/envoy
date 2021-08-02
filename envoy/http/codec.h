@@ -395,14 +395,14 @@ public:
    */
   virtual uint64_t encodedBytes() PURE;
 
-  virtual void updateSentBytes(size_t newly_sent_bytes) PURE;
+  virtual void addEncodedBytes(size_t newly_sent_bytes) PURE;
 
   /**
    * The number of wire bytes decoded by this stream.
    */
-  virtual uint64_t receivedBytes() PURE;
+  virtual uint64_t decodedBytes() PURE;
 
-  virtual void updateReceivedBytes(size_t newly_received_bytes) PURE;
+  virtual void addDecodedBytes(size_t newly_received_bytes) PURE;
 };
 
 /**

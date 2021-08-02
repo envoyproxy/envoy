@@ -112,7 +112,7 @@ public:
   void setBytesCount() {
     if (stream_info_ != nullptr) {
       auto& stream = request_encoder_->getStream();
-      stream_info_->setWireBytesReceived(stream.receivedBytes());
+      stream_info_->setWireBytesReceived(stream.decodedBytes());
       stream_info_->setWireBytesSent(stream.encodedBytes());
     }
   }

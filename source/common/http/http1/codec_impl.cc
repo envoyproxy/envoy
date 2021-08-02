@@ -95,22 +95,22 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection)
   }
 }
 
-uint64_t StreamEncoderImpl::sentBytes() {
+uint64_t StreamEncoderImpl::encodedBytes() {
   ENVOY_CONN_LOG(trace, "h1: get sent bytes {}\n", connection_.connection(), sent_bytes_);
   return sent_bytes_;
 }
 
-void StreamEncoderImpl::updateSentBytes(size_t newly_sent_bytes) {
+void StreamEncoderImpl::addEncodedBytes(size_t newly_sent_bytes) {
   ENVOY_CONN_LOG(trace, "h1: update sent bytes {}\n", connection_.connection(), sent_bytes_);
   sent_bytes_ += newly_sent_bytes;
 }
 
-uint64_t StreamEncoderImpl::receivedBytes() {
+uint64_t StreamEncoderImpl::decodedBytes() {
   ENVOY_CONN_LOG(trace, "h1: get received bytes {}\n", connection_.connection(), received_bytes_);
   return received_bytes_;
 }
 
-void StreamEncoderImpl::updateReceivedBytes(size_t newly_received_bytes) {
+void StreamEncoderImpl::addDecodedBytes(size_t newly_received_bytes) {
   ENVOY_CONN_LOG(trace, "h1: update received bytes {}\n", connection_.connection(), sent_bytes_);
   received_bytes_ += newly_received_bytes;
 }
@@ -277,7 +277,7 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void StreamEncoderImpl::flushOutput() { updateSentBytes(connection_.flushOutput()); }
+void StreamEncoderImpl::flushOutput() { addEncodedBytes(connection_.flushOutput()); }
 
 void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
   if (!connection_.enableTrailers()) {
@@ -574,7 +574,7 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
 
 Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
   if (pending_response_.has_value()) {
-    pending_response_.value().encoder_.getStream().updateReceivedBytes(data.length());
+    pending_response_.value().encoder_.getStream().addDecodedBytes(data.length());
   }
   Http::Status status = ConnectionImpl::dispatch(data);
   if (status.ok() && data.length() > 0) {

@@ -292,26 +292,26 @@ protected:
                           bool skip_encoding_empty_trailers);
 
     uint64_t encodedBytes() override {
-      ENVOY_CONN_LOG(debug, "stream id {}:get sent bytes {}\n", parent_.connection_, stream_id_,
+      ENVOY_CONN_LOG(trace, "stream id {}:get sent bytes {}\n", parent_.connection_, stream_id_,
                      sent_bytes_);
       return sent_bytes_;
     }
 
-    void updateSentBytes(size_t newly_sent_bytes) override {
+    void addEncodedBytes(size_t newly_sent_bytes) override {
       sent_bytes_ += newly_sent_bytes;
-      ENVOY_CONN_LOG(debug, "stream id {}:update sent bytes {}\n", parent_.connection_, stream_id_,
+      ENVOY_CONN_LOG(trace, "stream id {}:update sent bytes {}\n", parent_.connection_, stream_id_,
                      sent_bytes_);
     }
 
-    uint64_t receivedBytes() override {
-      ENVOY_CONN_LOG(debug, "stream id {}:get received bytes {}\n", parent_.connection_, stream_id_,
+    uint64_t decodedBytes() override {
+      ENVOY_CONN_LOG(trace, "stream id {}:get received bytes {}\n", parent_.connection_, stream_id_,
                      received_bytes_);
       return received_bytes_;
     }
 
-    void updateReceivedBytes(size_t newly_received_bytes) override {
+    void addDecodedBytes(size_t newly_received_bytes) override {
       received_bytes_ += newly_received_bytes;
-      ENVOY_CONN_LOG(debug, "stream id {}:update received bytes {}\n", parent_.connection_,
+      ENVOY_CONN_LOG(trace, "stream id {}:update received bytes {}\n", parent_.connection_,
                      stream_id_, received_bytes_);
     }
 

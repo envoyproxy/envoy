@@ -41,11 +41,11 @@ public:
 
   uint64_t encodedBytes() override { return 0; }
 
-  void updateSentBytes(size_t) override {}
+  void addEncodedBytes(size_t) override {}
 
-  uint64_t receivedBytes() override { return 0; }
+  uint64_t decodedBytes() override { return 0; }
 
-  void updateReceivedBytes(size_t) override {}
+  void addDecodedBytes(size_t) override {}
 };
 
 } // namespace Http
