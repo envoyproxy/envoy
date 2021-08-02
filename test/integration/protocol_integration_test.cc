@@ -1352,42 +1352,6 @@ TEST_P(ProtocolIntegrationTest, BasicDynamicMaxStreamDuration) {
   }
 }
 
-TEST_P(ProtocolIntegrationTest, MaxStreamDurationTimerDisarmedWithDynamicValue) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    ConfigHelper::HttpProtocolOptions protocol_options;
-    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
-    http_protocol_options->mutable_max_stream_duration()->MergeFrom(
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(200));
-    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
-                                     protocol_options);
-  });
-
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  default_request_headers_.setEnvoyUpstreamStreamDurationMs(0);
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  // 1 sec is large enough to wait configured stream duration 200ms.
-  absl::SleepFor(absl::Seconds(1));
-
-  // Check that stream is not disconnected after 1 sec.
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers, true);
-
-  response->waitForHeaders();
-  codec_client_->close();
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 0);
-}
-
 TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicy) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
