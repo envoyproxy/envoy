@@ -65,7 +65,7 @@ void GrpcAccessLoggerImpl::addEntry(opentelemetry::proto::logs::v1::LogRecord&& 
 
 bool GrpcAccessLoggerImpl::isEmpty() { return root_->logs().empty(); }
 
-bool GrpcAccessLoggerImpl::isFatalEmpty() {
+bool GrpcAccessLoggerImpl::isCriticalMessageEmpty() {
   // Critical message must be empty in OpenTelemetry logger.
   return true;
 }

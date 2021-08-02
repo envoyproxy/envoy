@@ -188,12 +188,12 @@ private:
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   void addEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) override;
   void addEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) override;
-  void addFatalEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) override;
-  void addFatalEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) override;
+  void addCriticalMessageEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) override;
+  void addCriticalMessageEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) override;
   bool isEmpty() override;
-  bool isFatalEmpty() override;
+  bool isCriticalMessageEmpty() override;
   void initMessage() override;
-  void initFatalMessage() override;
+  void initCriticalMessage() override;
 
   const std::string log_name_;
   const LocalInfo::LocalInfo& local_info_;

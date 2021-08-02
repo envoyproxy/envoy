@@ -75,14 +75,14 @@ private:
                                                         1);
   }
 
-  void mockAddFatalEntry(const std::string& key) {
-    if (!fatal_message_.fields().contains(key)) {
+  void mockaddCriticalMessageEntry(const std::string& key) {
+    if (!critical_message_.fields().contains(key)) {
       ProtobufWkt::Value default_value;
       default_value.set_number_value(0);
-      fatal_message_.mutable_fields()->insert({key, default_value});
+      critical_message_.mutable_fields()->insert({key, default_value});
     }
-    fatal_message_.mutable_fields()->at(key).set_number_value(
-        fatal_message_.fields().at(key).number_value() + 1);
+    critical_message_.mutable_fields()->at(key).set_number_value(
+        critical_message_.fields().at(key).number_value() + 1);
   }
 
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
@@ -100,19 +100,19 @@ private:
     mockAddEntry(MOCK_TCP_LOG_FIELD_NAME);
   }
 
-  void addFatalEntry(ProtobufWkt::Struct&& entry) override {
+  void addCriticalMessageEntry(ProtobufWkt::Struct&& entry) override {
     (void)entry;
-    mockAddFatalEntry(MOCK_HTTP_LOG_FIELD_NAME);
+    mockaddCriticalMessageEntry(MOCK_HTTP_LOG_FIELD_NAME);
   }
 
-  void addFatalEntry(ProtobufWkt::Empty&& entry) override {
+  void addCriticalMessageEntry(ProtobufWkt::Empty&& entry) override {
     (void)entry;
-    mockAddFatalEntry(MOCK_TCP_LOG_FIELD_NAME);
+    mockaddCriticalMessageEntry(MOCK_TCP_LOG_FIELD_NAME);
   }
 
   bool isEmpty() override { return message_.fields().empty(); }
-  bool isFatalEmpty() override { return fatal_message_.fields().empty(); }
-  void initFatalMessage() override { ++num_fatal_inits_; }
+  bool isCriticalMessageEmpty() override { return critical_message_.fields().empty(); }
+  void initCriticalMessage() override { ++num_critical_inits_; }
   void initMessage() override { ++num_inits_; }
 
   void clearMessage() override {
@@ -120,15 +120,15 @@ private:
     num_clears_++;
   }
 
-  void clearFatalMessage() override {
-    fatal_message_.Clear();
-    num_fatal_clears_++;
+  void clearCriticalMessage() override {
+    critical_message_.Clear();
+    num_critical_clears_++;
   }
 
   int num_inits_ = 0;
-  int num_fatal_inits_ = 0;
+  int num_critical_inits_ = 0;
   int num_clears_ = 0;
-  int num_fatal_clears_ = 0;
+  int num_critical_clears_ = 0;
 };
 
 class GrpcAccessLogTest : public testing::Test {

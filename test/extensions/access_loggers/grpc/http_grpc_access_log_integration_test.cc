@@ -1,5 +1,3 @@
-#include <bits/stdint-uintn.h>
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -323,7 +321,7 @@ http_logs:
   cleanup();
 }
 
-TEST_P(CriticalAccessLogIntegrationTest, BasicFlow) {
+TEST_P(CriticalAccessLogIntegrationTest, NoResponseFlow) {
   testRouterNotFound();
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());

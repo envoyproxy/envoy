@@ -204,7 +204,7 @@ public:
         buffer_flush_interval_msec_(buffer_flush_interval_msec),
         flush_timer_(dispatcher.createTimer([this]() {
           flush();
-          flushFatal();
+          flushCriticalMessage();
           flush_timer_->enableTimer(buffer_flush_interval_msec_);
         })),
         max_buffer_size_bytes_(max_buffer_size_bytes),
@@ -220,10 +220,11 @@ public:
     // be flushed forever. This can lead to a continual memory drain. Messages for critical logs may
     // need to be flushed at regular intervals in such cases.
     if (is_critical) {
-      addFatalEntry(std::move(entry));
+      addCriticalMessageEntry(std::move(entry));
+      approximate_critical_message_size_bytes_ += entry.ByteSizeLong();
 
-      if (entry.ByteSizeLong() >= max_buffer_size_bytes_) {
-        flushFatal();
+      if (approximate_critical_message_size_bytes_ >= max_buffer_size_bytes_) {
+        flushCriticalMessage();
       }
 
       return;
@@ -239,12 +240,7 @@ public:
     }
   }
 
-  void log(TcpLogProto&& entry, bool is_critical) {
-    if (is_critical) {
-      addFatalEntry(std::move(entry));
-      return;
-    }
-
+  void log(TcpLogProto&& entry, bool) {
     approximate_message_size_bytes_ += entry.ByteSizeLong();
     addEntry(std::move(entry));
     if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
@@ -254,21 +250,21 @@ public:
 
 protected:
   Detail::GrpcAccessLogClient<LogRequest, LogResponse> client_;
-  std::unique_ptr<CriticalAccessLoggerGrpcClient<LogRequest>> fatal_client_;
+  std::unique_ptr<CriticalAccessLoggerGrpcClient<LogRequest>> critical_client_;
   LogRequest message_;
-  LogRequest fatal_message_;
+  LogRequest critical_message_;
 
 private:
   virtual bool isEmpty() PURE;
-  virtual bool isFatalEmpty() PURE;
+  virtual bool isCriticalMessageEmpty() PURE;
   virtual void initMessage() PURE;
-  virtual void initFatalMessage() PURE;
+  virtual void initCriticalMessage() PURE;
   virtual void addEntry(HttpLogProto&& entry) PURE;
   virtual void addEntry(TcpLogProto&& entry) PURE;
-  virtual void addFatalEntry(HttpLogProto&& entry) PURE;
-  virtual void addFatalEntry(TcpLogProto&& entry) PURE;
+  virtual void addCriticalMessageEntry(HttpLogProto&& entry) PURE;
+  virtual void addCriticalMessageEntry(TcpLogProto&& entry) PURE;
   virtual void clearMessage() { message_.Clear(); }
-  virtual void clearFatalMessage() { fatal_message_.Clear(); }
+  virtual void clearCriticalMessage() { critical_message_.Clear(); }
 
   void flush() {
     if (isEmpty()) {
@@ -287,16 +283,17 @@ private:
     }
   }
 
-  void flushFatal() {
-    if (fatal_client_ == nullptr || isFatalEmpty()) {
+  void flushCriticalMessage() {
+    if (critical_client_ == nullptr || isCriticalMessageEmpty()) {
       return;
     }
-    if (!fatal_client_->isStreamStarted()) {
-      initFatalMessage();
+    if (!critical_client_->isStreamStarted()) {
+      initCriticalMessage();
     }
 
-    fatal_client_->flush(fatal_message_);
-    clearFatalMessage();
+    approximate_critical_message_size_bytes_ = 0;
+    critical_client_->flush(critical_message_);
+    clearCriticalMessage();
   }
 
   bool canLogMore() {
@@ -317,6 +314,7 @@ private:
   const Event::TimerPtr flush_timer_;
   const uint64_t max_buffer_size_bytes_;
   uint64_t approximate_message_size_bytes_ = 0;
+  uint64_t approximate_critical_message_size_bytes_ = 0;
   GrpcAccessLoggerStats stats_;
 };
 

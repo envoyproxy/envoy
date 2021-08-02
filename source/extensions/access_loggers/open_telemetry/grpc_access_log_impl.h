@@ -47,14 +47,14 @@ private:
   void addEntry(opentelemetry::proto::logs::v1::LogRecord&& entry) override;
   // Non used addEntry method (the above is used for both TCP and HTTP).
   void addEntry(ProtobufWkt::Empty&& entry) override { (void)entry; };
-  void addFatalEntry(opentelemetry::proto::logs::v1::LogRecord&&) override {}
-  void addFatalEntry(ProtobufWkt::Empty&&) override{};
+  void addCriticalMessageEntry(opentelemetry::proto::logs::v1::LogRecord&&) override {}
+  void addCriticalMessageEntry(ProtobufWkt::Empty&&) override{};
   bool isEmpty() override;
-  bool isFatalEmpty() override;
+  bool isCriticalMessageEmpty() override;
   void initMessage() override;
   void clearMessage() override;
-  void clearFatalMessage() override {}
-  void initFatalMessage() override {}
+  void clearCriticalMessage() override {}
+  void initCriticalMessage() override {}
 
   opentelemetry::proto::logs::v1::InstrumentationLibraryLogs* root_;
 };

@@ -29,7 +29,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
               .getMethodDescriptorForVersion(transport_api_version),
           transport_api_version),
       log_name_(config.log_name()), local_info_(local_info) {
-  fatal_client_ = std::make_unique<CriticalAccessLoggerGrpcClientImpl>(
+  critical_client_ = std::make_unique<CriticalAccessLoggerGrpcClientImpl>(
       client,
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.accesslog.v3.AccessLogService.BufferedCriticalAccessLogs"),
@@ -45,20 +45,22 @@ void GrpcAccessLoggerImpl::addEntry(envoy::data::accesslog::v3::TCPAccessLogEntr
   message_.mutable_tcp_logs()->mutable_log_entry()->Add(std::move(entry));
 }
 
-void GrpcAccessLoggerImpl::addFatalEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
-  fatal_message_.mutable_http_logs()->mutable_log_entry()->Add(std::move(entry));
+void GrpcAccessLoggerImpl::addCriticalMessageEntry(
+    envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
+  critical_message_.mutable_http_logs()->mutable_log_entry()->Add(std::move(entry));
 }
 
-void GrpcAccessLoggerImpl::addFatalEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) {
-  fatal_message_.mutable_tcp_logs()->mutable_log_entry()->Add(std::move(entry));
+void GrpcAccessLoggerImpl::addCriticalMessageEntry(
+    envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) {
+  critical_message_.mutable_tcp_logs()->mutable_log_entry()->Add(std::move(entry));
 }
 
 bool GrpcAccessLoggerImpl::isEmpty() {
   return !message_.has_http_logs() && !message_.has_tcp_logs();
 }
 
-bool GrpcAccessLoggerImpl::isFatalEmpty() {
-  return !fatal_message_.has_http_logs() && !fatal_message_.has_tcp_logs();
+bool GrpcAccessLoggerImpl::isCriticalMessageEmpty() {
+  return !critical_message_.has_http_logs() && !critical_message_.has_tcp_logs();
 }
 
 void GrpcAccessLoggerImpl::initMessage() {
@@ -67,8 +69,8 @@ void GrpcAccessLoggerImpl::initMessage() {
   identifier->set_log_name(log_name_);
 }
 
-void GrpcAccessLoggerImpl::initFatalMessage() {
-  auto* identifier = fatal_message_.mutable_identifier();
+void GrpcAccessLoggerImpl::initCriticalMessage() {
+  auto* identifier = critical_message_.mutable_identifier();
   *identifier->mutable_node() = local_info_.node();
   identifier->set_log_name(log_name_);
 }
