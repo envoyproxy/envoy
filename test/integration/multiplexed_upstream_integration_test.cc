@@ -169,7 +169,7 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
   // Send some request data.
   codec_client_->sendData(*request_encoder_, 1024, false);
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 1024));
-  EXPECT_EQ(request_encoder_->getStream().sentBytes(), 1061);
+  EXPECT_EQ(request_encoder_->getStream().encodedBytes(), 1061);
 
   // Start sending the response.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);

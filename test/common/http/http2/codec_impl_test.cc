@@ -695,7 +695,7 @@ TEST_P(Http2CodecImplTest, TrailingHeaders) {
   response_encoder_->encodeData(world, false);
   EXPECT_CALL(response_decoder_, decodeTrailers_(_));
   response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"trailing", "header"}});
-  EXPECT_EQ(request_encoder_->getStream().sentBytes(), 57);
+  EXPECT_EQ(request_encoder_->getStream().encodedBytes(), 57);
 }
 
 // When having empty trailers, codec submits empty buffer and end_stream instead.

@@ -393,7 +393,7 @@ public:
   /**
    * The number of wire bytes encoded by this stream.
    */
-  virtual uint64_t sentBytes() PURE;
+  virtual uint64_t encodedBytes() PURE;
 
   virtual void updateSentBytes(size_t newly_sent_bytes) PURE;
 

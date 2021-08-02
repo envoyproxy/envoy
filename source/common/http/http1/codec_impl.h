@@ -79,7 +79,7 @@ public:
 
   void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
 
-  uint64_t sentBytes() override;
+  uint64_t encodedBytes() override;
 
   void updateSentBytes(size_t newly_sent_bytes) override;
 

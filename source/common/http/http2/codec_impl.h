@@ -291,7 +291,7 @@ protected:
     void encodeDataHelper(Buffer::Instance& data, bool end_stream,
                           bool skip_encoding_empty_trailers);
 
-    uint64_t sentBytes() override {
+    uint64_t encodedBytes() override {
       ENVOY_CONN_LOG(debug, "stream id {}:get sent bytes {}\n", parent_.connection_, stream_id_,
                      sent_bytes_);
       return sent_bytes_;

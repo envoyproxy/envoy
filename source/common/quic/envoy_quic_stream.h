@@ -108,7 +108,7 @@ public:
 
   absl::string_view responseDetails() override { return details_; }
 
-  uint64_t sentBytes() override { return 0; }
+  uint64_t encodedBytes() override { return 0; }
 
   void updateSentBytes(size_t) override {}
 
