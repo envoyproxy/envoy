@@ -1047,11 +1047,6 @@ OcspStapleAction ServerContextImpl::ocspStapleAction(const TlsContext& ctx,
   }
 
   auto& response = ctx.ocsp_response_;
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.check_ocsp_policy")) {
-    // Expiration check is disabled. Proceed as if the policy is LenientStapling and the response
-    // is not expired.
-    return response ? OcspStapleAction::Staple : OcspStapleAction::NoStaple;
-  }
 
   auto policy = ocsp_staple_policy_;
   if (ctx.is_must_staple_) {

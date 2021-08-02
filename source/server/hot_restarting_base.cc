@@ -20,7 +20,7 @@ HotRestartingBase::~HotRestartingBase() {
   if (my_domain_socket_ != -1) {
     Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
     Api::SysCallIntResult result = os_sys_calls.close(my_domain_socket_);
-    ASSERT(result.rc_ == 0);
+    ASSERT(result.return_value_ == 0);
   }
 }
 
@@ -56,7 +56,7 @@ void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role,
   unlink(address.sun_path);
   Api::SysCallIntResult result =
       os_sys_calls.bind(my_domain_socket_, reinterpret_cast<sockaddr*>(&address), sizeof(address));
-  if (result.rc_ != 0) {
+  if (result.return_value_ != 0) {
     const auto msg = fmt::format(
         "unable to bind domain socket with base_id={}, id={}, errno={} (see --base-id option)",
         base_id_, id, result.errno_);
@@ -119,7 +119,7 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
     bool sent = false;
     for (int i = 0; i < SENDMSG_MAX_RETRIES; i++) {
       auto result = os_sys_calls.sendmsg(my_domain_socket_, &message, 0);
-      rc = result.rc_;
+      rc = result.return_value_;
       saved_errno = result.errno_;
 
       if (rc == static_cast<int>(cur_chunk_size)) {

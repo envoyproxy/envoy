@@ -16,6 +16,7 @@
 #include "source/common/common/random_generator.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/runtime/runtime_impl.h"
@@ -111,7 +112,7 @@ public:
   bool enableReusePortDefault() override { return true; }
 
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
-  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
@@ -198,6 +199,7 @@ private:
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<Server::ValidationAdmin> admin_;
   Singleton::ManagerPtr singleton_manager_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   Random::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
@@ -213,6 +215,7 @@ private:
   Router::ContextImpl router_context_;
   Event::TimeSystem& time_system_;
   ServerFactoryContextImpl server_contexts_;
+  Quic::QuicStatNames quic_stat_names_;
 };
 
 } // namespace Server

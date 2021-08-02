@@ -73,7 +73,7 @@ class MobileHttpConnectionManagerFilterConfigFactory
                                      EnvoyMobileHttpConnectionManager> {
 public:
   MobileHttpConnectionManagerFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
+      : FactoryBase(NetworkFilterNames::get().EnvoyMobileHttpConnectionManager, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
@@ -323,7 +323,8 @@ public:
   static std::function<Http::ApiListenerPtr()> createHttpConnectionManagerFactoryFromProto(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
-      Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks);
+      Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
+      bool clear_hop_by_hop_headers);
 };
 
 /**
