@@ -9,6 +9,7 @@
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/service/accesslog/v3/als.pb.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/extensions/access_loggers/common/grpc_access_logger.h"
@@ -17,6 +18,14 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace GrpcCommon {
+
+#define CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(COUNTER, GAUGE)                                   \
+  COUNTER(fatal_logs_succeeded)                                                                    \
+  GAUGE(pending_fatal_logs, Accumulate)
+
+struct CriticalAccessLoggerGrpcClientStats {
+  CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
 
 class CriticalAccessLoggerGrpcClientImpl
     : public Common::CriticalAccessLoggerGrpcClient<
@@ -27,15 +36,18 @@ public:
 
   CriticalAccessLoggerGrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& client,
                                      const Protobuf::MethodDescriptor& method,
-                                     Event::Dispatcher& dispatcher, uint64_t message_ack_timeout)
-      : CriticalAccessLoggerGrpcClientImpl(client, method, dispatcher, message_ack_timeout,
+                                     Event::Dispatcher& dispatcher, Stats::Scope& scope,
+                                     uint64_t message_ack_timeout)
+      : CriticalAccessLoggerGrpcClientImpl(client, method, dispatcher, scope, message_ack_timeout,
                                            absl::nullopt) {}
   CriticalAccessLoggerGrpcClientImpl(
       const Grpc::RawAsyncClientSharedPtr& client, const Protobuf::MethodDescriptor& method,
-      Event::Dispatcher& dispatcher, uint64_t message_ack_timeout,
+      Event::Dispatcher& dispatcher, Stats::Scope& scope, uint64_t message_ack_timeout,
       absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version)
       : client_(client), service_method_(method), dispatcher_(dispatcher),
-        message_ack_timeout_(message_ack_timeout), transport_api_version_(transport_api_version) {}
+        message_ack_timeout_(message_ack_timeout), transport_api_version_(transport_api_version),
+        stats_({CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))}) {
+  }
 
   struct BufferedMessage {
     enum class State {
@@ -65,6 +77,8 @@ public:
 
         switch (message->status()) {
         case envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::ACK:
+          parent_.stats_.fatal_logs_succeeded_.inc();
+          parent_.stats_.pending_fatal_logs_.dec();
           parent_.buffered_messages_.erase(id);
           break;
         case envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::NACK:
@@ -75,6 +89,8 @@ public:
         default:
           return;
         }
+
+        return;
       }
     }
     void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
@@ -108,6 +124,7 @@ public:
 
     uint32_t id = MessageUtil::hash(message);
     buffered_messages_[id] = BufferedMessage{nullptr, BufferedMessage::State::Initial, message};
+    stats_.pending_fatal_logs_.inc();
 
     for (auto&& buffered_message : buffered_messages_) {
       uint32_t id = buffered_message.first;
@@ -146,6 +163,7 @@ private:
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds message_ack_timeout_;
   const absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version_;
+  CriticalAccessLoggerGrpcClientStats stats_;
 };
 
 class GrpcAccessLoggerImpl

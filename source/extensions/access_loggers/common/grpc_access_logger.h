@@ -153,7 +153,6 @@ public:
 #define ALL_GRPC_ACCESS_LOGGER_STATS(COUNTER)                                                      \
   COUNTER(logs_written)                                                                            \
   COUNTER(logs_dropped)
-// TODO(shikugawa): implement critical message related stats.
 
 /**
  * Wrapper struct for the access log stats. @see stats_macros.h
@@ -222,6 +221,11 @@ public:
     // need to be flushed at regular intervals in such cases.
     if (is_critical) {
       addFatalEntry(std::move(entry));
+
+      if (entry.ByteSizeLong() >= max_buffer_size_bytes_) {
+        flushFatal();
+      }
+
       return;
     }
 
@@ -287,7 +291,7 @@ private:
     if (fatal_client_ == nullptr || isFatalEmpty()) {
       return;
     }
-    if (fatal_client_->isStreamStarted()) {
+    if (!fatal_client_->isStreamStarted()) {
       initFatalMessage();
     }
 

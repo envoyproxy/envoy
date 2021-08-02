@@ -126,6 +126,10 @@ public:
                    testing::Values(envoy::config::core::v3::ApiVersion::V3,                        \
                                    envoy::config::core::v3::ApiVersion::V2,                        \
                                    envoy::config::core::v3::ApiVersion::AUTO))
+#define ONLYV3_GRPC_CLIENT_INTEGRATION_PARAMS                                                      \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
+                   testing::Values(envoy::config::core::v3::ApiVersion::V3))
 #define DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS                                                  \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \

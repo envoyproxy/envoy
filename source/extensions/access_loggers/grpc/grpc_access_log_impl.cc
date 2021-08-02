@@ -35,7 +35,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
       client,
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.accesslog.v3.AccessLogService.BufferedCriticalAccessLogs"),
-      dispatcher, PROTOBUF_GET_MS_OR_DEFAULT(config, message_ack_timeout, 5000),
+      dispatcher, scope, PROTOBUF_GET_MS_OR_DEFAULT(config, message_ack_timeout, 5000),
       transport_api_version);
 }
 

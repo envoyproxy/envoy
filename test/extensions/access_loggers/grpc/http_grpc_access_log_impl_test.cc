@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
@@ -20,6 +21,7 @@
 using namespace std::chrono_literals;
 using testing::_;
 using testing::An;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -75,14 +77,14 @@ public:
                                                       logger_cache_, factory_context_);
   }
 
-  void expectLog(const std::string& expected_log_entry_yaml) {
+  void expectLog(const std::string& expected_log_entry_yaml, bool expect_critical) {
     if (access_log_ == nullptr) {
       init();
     }
 
     HTTPAccessLogEntry expected_log_entry;
     TestUtility::loadFromYaml(expected_log_entry_yaml, expected_log_entry);
-    EXPECT_CALL(*logger_, log(An<HTTPAccessLogEntry&&>(), _))
+    EXPECT_CALL(*logger_, log(An<HTTPAccessLogEntry&&>(), Eq(expect_critical)))
         .WillOnce(Invoke(
             [expected_log_entry](envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry, bool) {
               EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
@@ -119,7 +121,8 @@ request:
   request_headers_bytes: {}
 response: {{}}
     )EOF",
-                          request_method, request_method.length() + 7));
+                          request_method, request_method.length() + 7),
+              false);
     access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
 
@@ -200,7 +203,8 @@ common_properties:
       value: 10s
 request: {}
 response: {}
-)EOF");
+)EOF",
+              false);
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 
@@ -230,7 +234,8 @@ common_properties:
     nanos: 2000000
 request: {}
 response: {}
-)EOF");
+)EOF",
+              false);
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 
@@ -332,7 +337,8 @@ response:
   response_headers_bytes: 10
   response_body_bytes: 20
   response_code_details: "via_upstream"
-)EOF");
+)EOF",
+              false);
     access_log_->log(&request_headers, &response_headers, nullptr, stream_info);
   }
 
@@ -367,7 +373,8 @@ request:
   request_method: "METHOD_UNSPECIFIED"
   request_headers_bytes: 16
 response: {}
-)EOF");
+)EOF",
+              false);
     access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
 
@@ -433,7 +440,8 @@ request:
   request_method: "METHOD_UNSPECIFIED"
   request_headers_bytes: 16
 response: {}
-)EOF");
+)EOF",
+              false);
     access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
 
@@ -483,7 +491,8 @@ common_properties:
 request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
-)EOF");
+)EOF",
+              false);
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 
@@ -533,7 +542,8 @@ common_properties:
 request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
-)EOF");
+)EOF",
+              false);
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 
@@ -583,7 +593,8 @@ common_properties:
 request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
-)EOF");
+)EOF",
+              false);
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 
@@ -633,7 +644,8 @@ common_properties:
 request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
-)EOF");
+)EOF",
+              false);
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 }
@@ -720,7 +732,8 @@ response:
   response_trailers:
     "x-logged-trailer": "value"
     "x-empty-trailer": ""
-)EOF");
+)EOF",
+              false);
     access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info);
   }
 }
@@ -736,6 +749,65 @@ TEST_F(HttpGrpcAccessLogTest, LogWithRequestMethod) {
   expectLogRequestMethod("OPTIONS");
   expectLogRequestMethod("TRACE");
   expectLogRequestMethod("PATCH");
+}
+
+TEST_F(HttpGrpcAccessLogTest, BufferLogFilterTest) {
+  const std::string filter_yaml = R"EOF(
+status_code_filter:
+  comparison:
+    op: EQ
+    value:
+      default_value: 200
+      runtime_key: access_log.access_error.status
+    )EOF";
+
+  envoy::config::accesslog::v3::AccessLogFilter config;
+  TestUtility::loadFromYaml(filter_yaml, config);
+  *config_.mutable_common_config()->mutable_buffer_log_filter() = config;
+
+  init();
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
+    stream_info.response_code_ = 200;
+
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":scheme", "scheme_value"},
+        {":authority", "authority_value"},
+        {":path", "path_value"},
+        {":method", "POST"},
+    };
+
+    expectLog(R"EOF(
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  start_time:
+    seconds: 3600
+request:
+  scheme: "scheme_value"
+  authority: "authority_value"
+  path: "path_value"
+  request_method: "POST"
+  request_headers_bytes: 70
+response:
+  response_code: 200
+)EOF",
+              true);
+    access_log_->log(&request_headers, nullptr, nullptr, stream_info);
+  }
 }
 
 } // namespace
