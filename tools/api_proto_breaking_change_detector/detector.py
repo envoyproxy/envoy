@@ -66,7 +66,7 @@ class ProtoBreakingChangeDetector(ABC):
     @abstractmethod
     def lock_file_changed(self) -> bool:
         """Returns whether the changes between the ``before`` and ``after`` states of the proto file given in ``__init__``
-        cause a change in the detector's state file. This function is mostly used for testing, to ensure that the breaking change 
+        cause a change in the detector's state file. This function is mostly used for testing, to ensure that the breaking change
         detector is checking all of the protobuf features we are interested in.
 
         :return: a boolean flag indicating if the changes between ``before`` and ``after`` cause a change in the state file
@@ -209,12 +209,14 @@ class BufWrapper(ProtoBreakingChangeDetector):
         # 1) final_code (exit status code) is not 0 (e.g. it's 100)
         # 2) stdout/stderr is nonempty
         # 3) stdout/stderr contains "Failure"
-        break_condition = lambda inp: len(inp) > 0 or bool(re.match(r"Failure", inp))
+        def break_condition(inp):
+            return len(inp) > 0 or bool(re.match(r"Failure", inp))
+
         return final_code != 0 or break_condition(final_out) or break_condition(final_err)
 
     def lock_file_changed(self) -> bool:
         """Returns whether the changes between the ``before`` and ``after`` states of the proto file given in ``__init__``
-        cause a change in the detector's state file. This function is mostly used for testing, to ensure that the breaking change 
+        cause a change in the detector's state file. This function is mostly used for testing, to ensure that the breaking change
         detector is checking all of the protobuf features we are interested in.
 
         :return: a boolean flag indicating if the changes between ``before`` and ``after`` cause a change in the state file

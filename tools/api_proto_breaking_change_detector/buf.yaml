@@ -2,7 +2,7 @@ version: v1beta1
 # commenting these out for now until I figure out how to automate buf.lock
 #deps:
   # TODO: should these point to specific commit hashes?
-  # 
+  #
 
 #    - buf.build/beta/udpa
 #    - buf.build/beta/googleapis
