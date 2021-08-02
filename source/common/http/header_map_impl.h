@@ -319,6 +319,8 @@ protected:
   void insertByKey(HeaderString&& key, HeaderString&& value);
   static uint64_t appendToHeader(HeaderString& header, absl::string_view data,
                                  absl::string_view delimiter = ",");
+  static absl::string_view delimiterByHeader(const LowerCaseString& key,
+                                             bool correctly_coalesce_cookies);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);

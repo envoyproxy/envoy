@@ -285,6 +285,17 @@ template <> HeaderMapImpl::StaticLookupTable<ResponseTrailerMap>::StaticLookupTa
   finalizeTable();
 }
 
+absl::string_view HeaderMapImpl::delimiterByHeader(const LowerCaseString& key,
+                                                   bool correctly_coalesce_cookies) {
+  // TODO(wbpcode): 'correctly_coalesce_cookies' feature is enabled by default and is allowed to be
+  // disabled via runtime. But I doubt if any user will actually disable it. The comma separator is
+  // obviously problematic for cookies. Maybe we can consider removing it.
+  if (correctly_coalesce_cookies && key == Http::Headers::get().Cookie) {
+    return "; ";
+  }
+  return ",";
+}
+
 uint64_t HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view data,
                                        absl::string_view delimiter) {
   if (data.empty()) {
@@ -368,8 +379,10 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
     if (*lookup.value().entry_ == nullptr) {
       maybeCreateInline(lookup.value().entry_, *lookup.value().key_, std::move(value));
     } else {
+      auto delimiter =
+          delimiterByHeader(*lookup.value().key_, header_map_correctly_coalesce_cookies_);
       const uint64_t added_size =
-          appendToHeader((*lookup.value().entry_)->value(), value.getStringView());
+          appendToHeader((*lookup.value().entry_)->value(), value.getStringView(), delimiter);
       addSize(added_size);
       value.clear();
     }
@@ -434,10 +447,8 @@ void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view val
   // TODO(#9221): converge on and document a policy for coalescing multiple headers.
   auto entry = getExisting(key);
   if (!entry.empty()) {
-    const std::string delimiter = (key == Http::Headers::get().Cookie ? "; " : ",");
-    const uint64_t added_size = header_map_correctly_coalesce_cookies_
-                                    ? appendToHeader(entry[0]->value(), value, delimiter)
-                                    : appendToHeader(entry[0]->value(), value);
+    auto delimiter = delimiterByHeader(key, header_map_correctly_coalesce_cookies_);
+    const uint64_t added_size = appendToHeader(entry[0]->value(), value, delimiter);
     addSize(added_size);
   } else {
     addCopy(key, value);
