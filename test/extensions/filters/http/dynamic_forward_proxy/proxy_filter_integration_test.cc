@@ -18,8 +18,9 @@ class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Addres
 public:
   ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
-  void setup(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024) {
+  void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024) {
     setUpstreamProtocol(Http::CodecType::HTTP1);
+    const std::string filename = TestEnvironment::temporaryPath("dns_cache.txt");
 
     const std::string filter = fmt::format(R"EOF(
 name: dynamic_forward_proxy
@@ -31,9 +32,14 @@ typed_config:
     max_hosts: {}
     dns_cache_circuit_breaker:
       max_pending_requests: {}
+    persistent_cache_config:
+      name: envoy.cache.key_value_cache.file_based_cache
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.cache.key_value_cache.v3.FileBasedKeyValueCacheConfig
+        filename: {}
 )EOF",
                                            Network::Test::ipVersionToDnsFamily(GetParam()),
-                                           max_hosts, max_pending_requests);
+                                           max_hosts, max_pending_requests, filename);
     config_helper_.addFilter(filter);
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -76,8 +82,13 @@ typed_config:
     max_hosts: {}
     dns_cache_circuit_breaker:
       max_pending_requests: {}
+    persistent_cache_config:
+      name: envoy.cache.key_value_cache.file_based_cache
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.cache.key_value_cache.v3.FileBasedKeyValueCacheConfig
+        filename: {}
 )EOF",
-        Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, max_pending_requests);
+        Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, max_pending_requests, filename);
 
     TestUtility::loadFromYaml(cluster_type_config, *cluster_.mutable_cluster_type());
     cluster_.mutable_circuit_breakers()
@@ -100,12 +111,20 @@ typed_config:
     } else {
       HttpIntegrationTest::createUpstreams();
     }
+    if (write_cache_file_) {
+      std::string host =
+          fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port());
+      std::string value = fake_upstreams_[0]->localAddress()->asString();
+      TestEnvironment::writeStringToFileForTest(
+          "dns_cache.txt", absl::StrCat(host.length(), "\n", host, value.length(), "\n", value));
+    }
   }
 
   bool upstream_tls_{};
   std::string upstream_cert_name_{"upstreamlocalhost"};
   CdsHelper cds_helper_;
   envoy::config::cluster::v3::Cluster cluster_;
+  bool write_cache_file_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
@@ -115,7 +134,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
 // A basic test where we pause a request to lookup localhost, and then do another request which
 // should hit the TLS cache.
 TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
-  setup();
+  initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
@@ -140,7 +159,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
 // Verify that after we populate the cache and reload the cluster we reattach to the cache with
 // its existing hosts.
 TEST_P(ProxyFilterIntegrationTest, ReloadClusterAndAttachToCache) {
-  setup();
+  initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
@@ -176,7 +195,7 @@ TEST_P(ProxyFilterIntegrationTest, ReloadClusterAndAttachToCache) {
 
 // Verify that we expire hosts.
 TEST_P(ProxyFilterIntegrationTest, RemoveHostViaTTL) {
-  setup();
+  initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
@@ -201,7 +220,7 @@ TEST_P(ProxyFilterIntegrationTest, RemoveHostViaTTL) {
 
 // Test DNS cache host overflow.
 TEST_P(ProxyFilterIntegrationTest, DNSCacheHostOverflow) {
-  setup(1);
+  initializeWithArgs(1);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
@@ -230,7 +249,7 @@ TEST_P(ProxyFilterIntegrationTest, DNSCacheHostOverflow) {
 // Verify that upstream TLS works with auto verification for SAN as well as auto setting SNI.
 TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
   upstream_tls_ = true;
-  setup();
+  initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
@@ -254,7 +273,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
 
 TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
   upstream_tls_ = true;
-  setup();
+  initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
@@ -280,7 +299,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
 TEST_P(ProxyFilterIntegrationTest, UpstreamTlsInvalidSAN) {
   upstream_tls_ = true;
   upstream_cert_name_ = "upstream";
-  setup();
+  initializeWithArgs();
   fake_upstreams_[0]->setReadDisableOnNewConnection(false);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -299,7 +318,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsInvalidSAN) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, DnsCacheCircuitBreakersInvoked) {
-  setup(1024, 0);
+  initializeWithArgs(1024, 0);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
@@ -315,6 +334,23 @@ TEST_P(ProxyFilterIntegrationTest, DnsCacheCircuitBreakersInvoked) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(ProxyFilterIntegrationTest, UseCacheFile) {
+  write_cache_file_ = true;
+
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  std::string host = fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", host}};
+
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }
 
 } // namespace

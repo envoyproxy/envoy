@@ -17,7 +17,8 @@ namespace DynamicForwardProxy {
 
 DnsCacheImpl::DnsCacheImpl(
     Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-    Random::RandomGenerator& random, Runtime::Loader& loader, Stats::Scope& root_scope,
+    Random::RandomGenerator& random, Filesystem::Instance& file_system, Runtime::Loader& loader,
+    Stats::Scope& root_scope, ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
     : main_thread_dispatcher_(main_thread_dispatcher),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
@@ -31,6 +32,7 @@ DnsCacheImpl::DnsCacheImpl(
           Config::Utility::prepareDnsRefreshStrategy<
               envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>(
               config, refresh_interval_.count(), random)),
+      file_system_(file_system), validation_visitor_(validation_visitor),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
@@ -40,6 +42,8 @@ DnsCacheImpl::DnsCacheImpl(
         "DNS Cache [{}] configured with preresolve_hostnames={} larger than max_hosts={}",
         config.name(), config.preresolve_hostnames().size(), max_hosts_));
   }
+
+  loadCacheEntries(config);
 
   // Preresolved hostnames are resolved without a read lock on primary hosts because it is done
   // during object construction.
@@ -252,6 +256,7 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
       runRemoveCallbacks(host);
     }
     {
+      removeCacheEntry(host);
       absl::WriterMutexLock writer_lock{&primary_hosts_lock_};
       auto host_it = primary_hosts_.find(host);
       ASSERT(host_it != primary_hosts_.end());
@@ -323,6 +328,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   bool address_changed = false;
   auto current_address = primary_host_info->host_info_->address();
   if (new_address != nullptr && (current_address == nullptr || *current_address != *new_address)) {
+    addCacheEntry(host, new_address);
     ENVOY_LOG(debug, "host '{}' address has changed", host);
     primary_host_info->host_info_->setAddress(new_address);
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
@@ -411,6 +417,48 @@ DnsCacheImpl::PrimaryHostInfo::PrimaryHostInfo(DnsCacheImpl& parent,
 DnsCacheImpl::PrimaryHostInfo::~PrimaryHostInfo() {
   parent_.stats_.host_removed_.inc();
   parent_.stats_.num_hosts_.dec();
+}
+
+void DnsCacheImpl::addCacheEntry(const std::string& host,
+                                 const Network::Address::InstanceConstSharedPtr& address) {
+  if (!key_value_store_) {
+    return;
+  }
+  const std::string value = absl::StrCat(address->asString());
+  key_value_store_->addOrUpdate(host, value);
+}
+
+void DnsCacheImpl::removeCacheEntry(const std::string& host) {
+  if (!key_value_store_) {
+    return;
+  }
+  key_value_store_->remove(host);
+}
+
+void DnsCacheImpl::loadCacheEntries(
+    const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) {
+  if (!config.has_persistent_cache_config()) {
+    return;
+  }
+  auto& factory =
+      Config::Utility::getAndCheckFactory<KeyValueStoreFactory>(config.persistent_cache_config());
+  key_value_store_ = factory.createStore(config.persistent_cache_config(), validation_visitor_,
+                                         main_thread_dispatcher_, file_system_);
+  KeyValueStore::ConstIterateCb load = [this](const std::string& key, const std::string& value) {
+    auto address = Network::Utility::parseInternetAddressAndPortNoThrow(value);
+    if (address == nullptr) {
+      return KeyValueStore::Iterate::Break;
+    }
+    stats_.cache_load_.inc();
+    std::list<Network::DnsResponse> response;
+    response.emplace_back(Network::DnsResponse(address, std::chrono::seconds(0) /* ttl */));
+    // TODO(alyssawilk) communicate this came from cache, or otherwise make it
+    // possible to disambiguate very stale cache results from fresh.
+    startCacheLoad(key, address->ip()->port());
+    finishResolve(key, Network::DnsResolver::ResolutionStatus::Success, std::move(response));
+    return KeyValueStore::Iterate::Continue;
+  };
+  key_value_store_->iterate(load);
 }
 
 } // namespace DynamicForwardProxy

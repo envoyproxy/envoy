@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package envoy.extensions.cache.key_value_cache.v3;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.cache.key_value_cache.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Key Value Cache storage plugin]
+
+// [#not-implemented-hide:]
+// [#extension: envoy.cache.key_value_cache]
+message KeyValueCacheConfig {
+  // Extensible config for key values caches.
+  // The expectation is that these are flushed to disk but for mobile, that may
+  // be via indirect APIs so may need more than just a simple file name.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  google.protobuf.Any typed_config = 2;
+
+  // The interval at which the key value store should be flushed to long term
+  // storage.
+  google.protobuf.Duration flush_interval = 3;
+}
+
+// [#not-implemented-hide:]
+// [#extension: envoy.cache.key_value_cache.file_based_cache]
+// This is configuration to flush a key value store out to disk.
+message FileBasedKeyValueCacheConfig {
+  // The filename to read the keys and values from, and write the keys and
+  // values to.
+  string filename = 1 [(validate.rules).string = {min_len: 1}];
+}

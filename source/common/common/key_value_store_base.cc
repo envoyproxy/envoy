@@ -1,5 +1,7 @@
 #include "source/common/common/key_value_store_base.h"
 
+#include "envoy/registry/registry.h"
+
 namespace Envoy {
 namespace {
 
@@ -72,6 +74,15 @@ absl::optional<absl::string_view> KeyValueStoreBase::get(absl::string_view key) 
   return it->second;
 }
 
+void KeyValueStoreBase::iterate(ConstIterateCb cb) const {
+  for (const auto& [key, value] : store_) {
+    Iterate ret = cb(key, value);
+    if (ret == Iterate::Break) {
+      return;
+    }
+  }
+}
+
 FileBasedKeyValueStore::FileBasedKeyValueStore(Event::Dispatcher& dispatcher,
                                                std::chrono::seconds flush_interval,
                                                Filesystem::Instance& file_system,
@@ -79,6 +90,7 @@ FileBasedKeyValueStore::FileBasedKeyValueStore(Event::Dispatcher& dispatcher,
     : KeyValueStoreBase(dispatcher, flush_interval), file_system_(file_system),
       filename_(filename) {
   if (!file_system_.fileExists(filename_)) {
+    ENVOY_LOG(info, "File for key value store does not yet exist: {}", filename);
     return;
   }
   const std::string contents = file_system_.fileReadToEnd(filename_);
@@ -104,5 +116,21 @@ void FileBasedKeyValueStore::flush() {
   }
   file->close();
 }
+
+KeyValueStorePtr FileBasedKeyValueStoreFactory::createStore(
+    const Protobuf::Message& config, ProtobufMessage::ValidationVisitor& validation_visitor,
+    Event::Dispatcher& dispatcher, Filesystem::Instance& file_system) {
+  const auto& typed_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::cache::key_value_cache::v3::KeyValueCacheConfig&>(
+      config, validation_visitor);
+  const auto file_config = MessageUtil::anyConvertAndValidate<
+      envoy::extensions::cache::key_value_cache::v3::FileBasedKeyValueCacheConfig>(
+      typed_config.typed_config(), validation_visitor);
+  auto ms = std::chrono::seconds(DurationUtil::durationToSeconds(typed_config.flush_interval()));
+  return std::make_unique<FileBasedKeyValueStore>(dispatcher, ms, file_system,
+                                                  file_config.filename());
+}
+
+REGISTER_FACTORY(FileBasedKeyValueStoreFactory, KeyValueStoreFactory);
 
 } // namespace Envoy
