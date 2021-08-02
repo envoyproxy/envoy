@@ -647,8 +647,8 @@ TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeConnectOverLimitWithCallbacks
     // after the temporary callbacks are removed and before the final callbacks are added.
     // This causes the underlying connection's high watermark notification to be swallowed.
     testing::InSequence s;
-    EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
     EXPECT_CALL(*failover_timer_, disableTimer());
+    EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
     EXPECT_CALL(*created_connections_[0], bufferLimit()).WillRepeatedly(Return(length - 1));
     EXPECT_CALL(*created_connections_[0], write(_, _));
     EXPECT_CALL(*created_connections_[0], addConnectionCallbacks(_));

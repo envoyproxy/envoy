@@ -428,7 +428,6 @@ void HappyEyeballsConnectionImpl::maybeScheduleNextAttempt() {
 
 void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
                                           ConnectionCallbacksWrapper* wrapper) {
-  wrapper->connection().removeConnectionCallbacks(*wrapper);
   if (event != ConnectionEvent::Connected) {
     // This connection attempt has failed. If possible, start another connection attempt
     // immediately, instead of waiting for the timer.
@@ -456,11 +455,15 @@ void HappyEyeballsConnectionImpl::setUpFinalConnection(ConnectionEvent event,
   connect_finished_ = true;
   next_attempt_timer_->disableTimer();
 
+  // Remove the proxied connection callbacks from all connections.
+  for (auto& w : callbacks_wrappers_) {
+    w->connection().removeConnectionCallbacks(*w);
+  }
+
   // Close and delete any other connections.
   auto it = connections_.begin();
   while (it != connections_.end()) {
     if (it->get() != &(wrapper->connection())) {
-      (*it)->removeConnectionCallbacks(*wrapper);
       (*it)->close(ConnectionCloseType::NoFlush);
       it = connections_.erase(it);
     } else {
@@ -525,6 +528,7 @@ void HappyEyeballsConnectionImpl::setUpFinalConnection(ConnectionEvent event,
 }
 
 void HappyEyeballsConnectionImpl::cleanupWrapperAndConnection(ConnectionCallbacksWrapper* wrapper) {
+  wrapper->connection().removeConnectionCallbacks(*wrapper);
   for (auto it = connections_.begin(); it != connections_.end();) {
     if (it->get() == &(wrapper->connection())) {
       (*it)->close(ConnectionCloseType::NoFlush);
