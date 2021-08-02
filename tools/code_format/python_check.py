@@ -17,7 +17,7 @@ import argparse
 import pathlib
 import sys
 from functools import cached_property
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Tuple
 
 from flake8.main.application import Application as Flake8Application  # type:ignore
 
@@ -46,8 +46,8 @@ class PythonChecker(checker.ForkingChecker):
         return flake8_app
 
     @property
-    def flake8_args(self) -> List[str]:
-        return ["--config", str(self.flake8_config_path), str(self.path)]
+    def flake8_args(self) -> Tuple[str, ...]:
+        return ("--config", str(self.flake8_config_path), str(self.path))
 
     @property
     def flake8_config_path(self) -> pathlib.Path:

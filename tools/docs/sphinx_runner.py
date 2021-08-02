@@ -189,7 +189,7 @@ class SphinxRunner(runner.Runner):
                 "Given git tag does not match the VERSION file content:"
                 f"{self.docs_tag} vs v{self.version_number}")
         # this should probs only check the first line
-        version_current = self.rst_dir.joinpath("version_history/current.rst").read_text()
+        version_current = self.rst_dir.joinpath("version_history", "current.rst").read_text()
         if not self.version_number in version_current:
             raise SphinxEnvError(
                 f"Git tag ({self.version_number}) not found in version_history/current.rst")

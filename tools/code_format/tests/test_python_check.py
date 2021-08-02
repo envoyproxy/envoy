@@ -60,9 +60,9 @@ def test_python_flake8_args(patches):
     with patched as (m_flake8_config, m_path):
         assert (
             checker.flake8_args
-            == ['--config',
+            == ('--config',
                 str(m_flake8_config.return_value),
-                str(m_path.return_value)])
+                str(m_path.return_value)))
 
 
 def test_python_flake8_config_path(patches):

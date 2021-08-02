@@ -5,6 +5,10 @@
 from typing import Any, Callable, Optional
 
 
+class NoCache(Exception):
+    pass
+
+
 class async_property:  # noqa: N801
     name = None
     cache_name = "__async_prop_cache__"
@@ -42,17 +46,18 @@ class async_property:  # noqa: N801
     # This is returned when the prop is called
     async def async_result(self) -> Any:
         # retrieve the value from cache if available
-        cached_property = self.get_cached_prop()
-        if cached_property:
-            return cached_property
+        try:
+            return self.get_cached_prop()
+        except (NoCache, KeyError):
+            pass
 
         # derive the result, set the cache if required, and return the result
         return self.set_prop_cache(await self.fun(self._instance))
 
     def get_cached_prop(self) -> Any:
         if not self.cache:
-            return
-        return self.prop_cache.get(self.name, None)
+            raise NoCache
+        return self.prop_cache[self.name]
 
     def set_prop_cache(self, result: Any) -> Any:
         if not self.cache:

@@ -54,7 +54,6 @@ def test_extensions_checker_configured_extensions(patches, is_module, is_loader)
                 checker.configured_extensions
                 == m_module.return_value.EXTENSIONS)
         else:
-
             with pytest.raises(extensions_check.ExtensionsConfigurationError) as e:
                 checker.configured_extensions
 
@@ -131,7 +130,6 @@ def test_extensions_metadata(patches, is_dict):
                 checker.metadata
                 == m_utils.from_yaml.return_value)
         else:
-
             with pytest.raises(extensions_check.ExtensionsConfigurationError) as e:
                 checker.metadata
 

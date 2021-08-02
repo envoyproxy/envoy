@@ -40,6 +40,10 @@ class Error2(Exception):
 def _failing_runner(errors):
 
     class DummyFailingRunner(object):
+        # this dummy runner calls the _runner mock
+        # when its run/run_async methods are called
+        # and optionally raises some type of error
+        # to ensure they are caught as expected
 
         log = PropertyMock()
         _runner = MagicMock()

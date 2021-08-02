@@ -54,7 +54,6 @@ def test_util_buffered_stdout_stderr():
 
 
 def test_util_buffered_no_stdout_stderr():
-
     with pytest.raises(utils.BufferUtilError):
         with utils.buffered():
             pass
@@ -138,7 +137,6 @@ def test_util_extract(patches, tarballs):
         if tarballs:
             assert utils.extract("PATH", *tarballs) == m_plib.Path.return_value
         else:
-
             with pytest.raises(utils.ExtractError) as e:
                 utils.extract("PATH", *tarballs)
 

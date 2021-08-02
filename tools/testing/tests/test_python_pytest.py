@@ -134,7 +134,6 @@ def test_plugin__command_main(patches, args, async_run, raises):
         if not raises or async_run:
             result = plugin._command_main(_patches, main, handler, **kwargs)
         else:
-
             with pytest.raises(AssertionError) as e:
                 plugin._command_main(_patches, main, handler, **kwargs)
 
@@ -192,7 +191,6 @@ def test_plugin__async_command_main(raises):
     if not raises:
         assert not plugin._async_command_main(_patches, main, handler, args)
     else:
-
         with pytest.raises(AssertionError):
             plugin._async_command_main(_patches, main, handler, args)
 

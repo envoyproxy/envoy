@@ -4,7 +4,7 @@ import re
 import shutil
 from functools import cached_property
 from itertools import chain
-from typing import Callable, Iterable, List, Optional, Tuple, Type, Union
+from typing import Callable, Iterable, List, Optional, Tuple, Type
 
 import verboselogs  # type:ignore
 
@@ -579,7 +579,7 @@ class DistroTest(object):
         elif _out:
             self.handle_test_output(_out)
 
-    def error(self, errors: Optional[Union[List[str], Tuple[str, ...]]]) -> int:
+    def error(self, errors: Optional[Iterable[str]]) -> int:
         """Fail a test and log the errors"""
         return self.checker.error(self.checker.active_check, errors)
 

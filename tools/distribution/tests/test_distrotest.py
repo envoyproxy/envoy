@@ -62,7 +62,6 @@ def test_config_config(patches, isdict):
         if isdict:
             assert config.config == m_utils.from_yaml.return_value
         else:
-
             with pytest.raises(distrotest.ConfigurationError) as e:
                 config.config
 
@@ -315,7 +314,6 @@ def test_config_get_package_type(patches, pkg_type, pkg_types):
         if pkg_type in pkg_types:
             assert config.get_package_type("IMAGE") == "Y"
         else:
-
             with pytest.raises(distrotest.ConfigurationError) as e:
                 config.get_package_type("IMAGE")
 
@@ -1369,7 +1367,6 @@ async def test_distrotest_start(patches, running):
         if running:
             assert await dtest.start() == m_create.return_value
         else:
-
             with pytest.raises(distrotest.ContainerError) as e:
                 await dtest.start()
 

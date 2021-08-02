@@ -8,8 +8,9 @@ from tools.base import functional
 @pytest.mark.asyncio
 @pytest.mark.parametrize("cache", [None, True, False])
 @pytest.mark.parametrize("raises", [True, False])
-async def test_functional_async_property(cache, raises):
-    m_async = AsyncMock()
+@pytest.mark.parametrize("result", [None, False, "X", 23])
+async def test_functional_async_property(cache, raises, result):
+    m_async = AsyncMock(return_value=result)
 
     class SomeError(Exception):
         pass
@@ -45,7 +46,6 @@ async def test_functional_async_property(cache, raises):
         == "prop")
 
     if raises:
-
         with pytest.raises(SomeError) as e:
             await klass.prop
 
@@ -58,8 +58,8 @@ async def test_functional_async_property(cache, raises):
         return
 
     # results can be repeatedly awaited
-    assert await klass.prop == m_async.return_value
-    assert await klass.prop == m_async.return_value
+    assert await klass.prop == result
+    assert await klass.prop == result
 
     if not cache:
         assert (
@@ -70,8 +70,8 @@ async def test_functional_async_property(cache, raises):
 
     # with cache we can keep awaiting the result but the fun
     # is still only called once
-    assert await klass.prop == m_async.return_value
-    assert await klass.prop == m_async.return_value
+    assert await klass.prop == result
+    assert await klass.prop == result
     assert (
         list(list(c) for c in m_async.call_args_list)
         == [[(), {}]])

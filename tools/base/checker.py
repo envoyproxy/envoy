@@ -177,7 +177,7 @@ class BaseChecker(runner.Runner):
     def error(
             self,
             name: str,
-            errors: Optional[Iterable],
+            errors: Optional[Iterable[str]],
             log: bool = True,
             log_type: str = "error") -> int:
         """Record (and log) errors for a check type"""

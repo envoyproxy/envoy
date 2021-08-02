@@ -543,7 +543,7 @@ def test_sphinx_runner_check_env(patches, py_compat, release_level, version_numb
 
     assert (
         list(m_rst.return_value.joinpath.call_args)
-        == [("version_history/current.rst", ), {}])
+        == [("version_history", "current.rst"), {}])
 
     if version_number not in current:
         assert (
@@ -606,7 +606,6 @@ def test_sphinx_runner_run(patches, raises):
         if not raises:
             assert runner.run() == m_run.return_value
         else:
-
             with pytest.raises(Exception):
                 runner.run()
 

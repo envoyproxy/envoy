@@ -46,7 +46,6 @@ def test_pip_checker_dependabot_config(patches, isdict):
         if isdict:
             assert checker.dependabot_config == m_utils.from_yaml.return_value
         else:
-
             with pytest.raises(pip_check.PipConfigurationError) as e:
                 checker.dependabot_config
 
