@@ -412,10 +412,6 @@ private:
       Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
                                                  LoadBalancerContext* context, bool peek);
 
-      void httpConnPoolIsIdle(HostConstSharedPtr host, ResourcePriority priority,
-                              const std::vector<uint8_t>& hash_key);
-      void tcpConnPoolIsIdle(HostConstSharedPtr host, const std::vector<uint8_t>& hash_key);
-
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
@@ -453,6 +449,9 @@ private:
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
     void drainTcpConnPools(TcpConnPoolsContainer& container);
+    void httpConnPoolIsIdle(HostConstSharedPtr host, ResourcePriority priority,
+                            const std::vector<uint8_t>& hash_key);
+    void tcpConnPoolIsIdle(HostConstSharedPtr host, const std::vector<uint8_t>& hash_key);
     void removeTcpConn(const HostConstSharedPtr& host, Network::ClientConnection& connection);
     void removeHosts(const std::string& name, const HostVector& hosts_removed);
     void updateClusterMembership(const std::string& name, uint32_t priority,

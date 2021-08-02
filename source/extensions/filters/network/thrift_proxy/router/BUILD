@@ -30,8 +30,12 @@ envoy_cc_library(
         "//envoy/router:router_interface",
         "//envoy/tcp:conn_pool_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:logger_lib",
+        "//source/extensions/filters/network:well_known_names",
+        "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
+        "//source/extensions/filters/network/thrift_proxy:protocol_options_config_lib",
     ],
 )
 
@@ -46,21 +50,36 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "upstream_request_lib",
+    srcs = ["upstream_request.cc"],
+    hdrs = ["upstream_request.h"],
+    deps = [
+        ":router_interface",
+        "//envoy/tcp:conn_pool_interface",
+        "//source/common/common:logger_lib",
+        "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
+        "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
+        "//source/extensions/filters/network/thrift_proxy:thrift_object_interface",
+        "//source/extensions/filters/network/thrift_proxy:transport_interface",
+        "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "router_lib",
     srcs = ["router_impl.cc"],
     hdrs = ["router_impl.h"],
     deps = [
         ":router_interface",
         ":router_ratelimit_lib",
+        ":upstream_request_lib",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:load_balancer_interface",
         "//envoy/upstream:thread_local_cluster_interface",
-        "//source/common/common:logger_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/router:metadatamatchcriteria_lib",
         "//source/common/upstream:load_balancer_lib",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",

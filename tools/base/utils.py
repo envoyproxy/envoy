@@ -4,6 +4,7 @@
 
 import io
 import os
+import pathlib
 import tarfile
 import tempfile
 from configparser import ConfigParser
@@ -11,6 +12,10 @@ from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdo
 from typing import Callable, Iterator, List, Optional, Union
 
 import yaml
+
+
+class ExtractError(Exception):
+    pass
 
 
 # this is testing specific - consider moving to tools.testing.utils
@@ -74,14 +79,20 @@ def buffered(
         stderr.extend(mangle(_stderr.read().strip().split("\n")))
 
 
-def extract(tarball: str, path: str) -> str:
-    with tarfile.open(tarball) as tarfiles:
-        tarfiles.extractall(path=path)
-        return path
+def extract(path: Union[pathlib.Path, str], *tarballs: Union[pathlib.Path,
+                                                             str]) -> Union[pathlib.Path, str]:
+    if not tarballs:
+        raise ExtractError(f"No tarballs specified for extraction to {path}")
+    openers = nested(*tuple(tarfile.open(tarball) for tarball in tarballs))
+
+    with openers as tarfiles:
+        for tar in tarfiles:
+            tar.extractall(path=path)
+    return path
 
 
 @contextmanager
-def untar(tarball: str) -> Iterator[str]:
+def untar(*tarballs: str) -> Iterator[str]:
     """Untar a tarball into a temporary directory
 
     for example to list the contents of a tarball:
@@ -102,7 +113,7 @@ def untar(tarball: str) -> Iterator[str]:
 
     """
     with tempfile.TemporaryDirectory() as tmpdir:
-        yield extract(tarball, tmpdir)
+        yield extract(tmpdir, *tarballs)
 
 
 def from_yaml(path: str) -> Union[dict, list, str, int]:
