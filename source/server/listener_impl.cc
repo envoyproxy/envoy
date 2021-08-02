@@ -167,32 +167,32 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
       socket_type_ != Network::Socket::Type::Stream) {
     return;
   }
-  int i = 0;
-  for (auto& socket : sockets_) {
-// TODO(mattklein123): At some point we lost error handling on this call which I think can
-// technically fail (at least according to lingering code comments). Add error handling on this
-// in a follow up.
-#ifdef WIN32
-    if (i == 0) {
-      const auto rc = socket->ioHandle().listen(tcp_backlog_size_);
-      if (rc.return_value_ != 0) {
-        throw EnvoyException(fmt::format("cannot listen() errno={}", rc.errno_));
-      }
-      i++;
-    }
-#else
-    const auto rc = socket->ioHandle().listen(tcp_backlog_size_);
+
+  if (sockets_.size() == 0) {
+    return;
+  }
+
+  auto listen_and_apply_options = [](Envoy::Network::SocketSharedPtr socket, int tcp_backlog_size) {
+    const auto rc = socket->ioHandle().listen(tcp_backlog_size);
     if (rc.return_value_ != 0) {
       throw EnvoyException(fmt::format("cannot listen() errno={}", rc.errno_));
     }
-#endif
     if (!Network::Socket::applyOptions(socket->options(), *socket,
                                        envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
       throw Network::SocketOptionException(
           fmt::format("cannot set post-listen socket option on socket: {}",
                       socket->addressProvider().localAddress()->asString()));
     }
+  };
+  // We listen on the first socket on all platforms
+  auto iterator = sockets_.begin();
+  listen_and_apply_options((*iterator), tcp_backlog_size_);
+  ++iterator;
+#ifndef WIN32
+  for (; iterator != sockets_.end(); ++iterator) {
+    listen_and_apply_options((*iterator), tcp_backlog_size_);
   }
+#endif
 }
 
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
