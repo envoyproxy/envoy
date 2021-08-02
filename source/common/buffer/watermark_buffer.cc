@@ -184,7 +184,7 @@ WatermarkBufferFactory::WatermarkBufferFactory(
                     : kDefaultMinimumTrackingBytes) {
   RELEASE_ASSERT(config.account_tracking_threshold_bytes() == 0 ||
                      (config.account_tracking_threshold_bytes() &
-                      config.account_tracking_threshold_bytes() - 1) == 0,
+                      (config.account_tracking_threshold_bytes() - 1)) == 0,
                  "Expected account_tracking_threshold_bytes to be a power of two.");
 }
 
