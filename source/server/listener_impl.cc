@@ -170,9 +170,15 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
 
   for (auto& socket : sockets_) {
     const auto rc = socket->ioHandle().listen(tcp_backlog_size_);
+#ifndef WIN32
     if (rc.return_value_ != 0) {
       throw EnvoyException(fmt::format("cannot listen() errno={}", rc.errno_));
     }
+#else
+    // TODO(davinci26): listen() error handling and generally listening on multiple workers
+    // is broken right now. This needs follow up to do something better on Windows.
+    UNREFERENCED_PARAMETER(rc);
+#endif
 
     if (!Network::Socket::applyOptions(socket->options(), *socket,
                                        envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
