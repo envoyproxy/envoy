@@ -313,6 +313,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "http_conn_pool_integration_test",
+    srcs = ["http_conn_pool_integration_test.cc"],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "http2_flood_integration_test",
     srcs = [
         "http2_flood_integration_test.cc",
@@ -374,6 +384,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
         ":tracked_watermark_buffer_lib",
         "//test/mocks/http:http_mocks",
@@ -1338,6 +1349,7 @@ envoy_cc_test(
     srcs = ["tracked_watermark_buffer_test.cc"],
     deps = [
         ":tracked_watermark_buffer_lib",
+        "//test/mocks/http:stream_reset_handler_mock",
         "//test/test_common:test_runtime_lib",
     ],
 )

@@ -8,8 +8,12 @@
 #include "envoy/tcp/conn_pool.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/metadata.h"
 #include "source/extensions/filters/network/thrift_proxy/protocol_converter.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol_options_config.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -101,7 +105,7 @@ struct RouterStats {
 /**
  * This interface is used by an upstream request to communicate its state.
  */
-class RequestOwner : public ProtocolConverter {
+class RequestOwner : public ProtocolConverter, public Logger::Loggable<Logger::Id::thrift> {
 public:
   RequestOwner(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
                Stats::Scope& scope)
@@ -180,6 +184,11 @@ public:
    * @return Upstream::ClusterManager& the cluster manager.
    */
   Upstream::ClusterManager& clusterManager() { return cluster_manager_; }
+
+  /**
+   * @return Upstream::Cluster& the upstream cluster associated with the request.
+   */
+  const Upstream::ClusterInfo& cluster() const { return *cluster_; }
 
   /**
    * Common stats.
@@ -268,6 +277,85 @@ public:
                                      Stats::Histogram::Unit unit) {
     recordClusterScopeHistogram(cluster, {upstream_rq_time_}, unit, value);
   }
+
+protected:
+  struct UpstreamRequestInfo {
+    bool passthrough_supported;
+    TransportType transport;
+    ProtocolType protocol;
+    absl::optional<Upstream::TcpPoolData> conn_pool_data;
+  };
+
+  struct PrepareUpstreamRequestResult {
+    absl::optional<AppException> exception;
+    absl::optional<UpstreamRequestInfo> upstream_request_info;
+  };
+
+  PrepareUpstreamRequestResult prepareUpstreamRequest(const std::string& cluster_name,
+                                                      MessageMetadataSharedPtr& metadata,
+                                                      TransportType transport,
+                                                      ProtocolType protocol,
+                                                      Upstream::LoadBalancerContext* lb_context) {
+    Upstream::ThreadLocalCluster* cluster = clusterManager().getThreadLocalCluster(cluster_name);
+    if (!cluster) {
+      ENVOY_LOG(debug, "unknown cluster '{}'", cluster_name);
+      stats().unknown_cluster_.inc();
+      return {AppException(AppExceptionType::InternalError,
+                           fmt::format("unknown cluster '{}'", cluster_name)),
+              absl::nullopt};
+    }
+
+    cluster_ = cluster->info();
+    ENVOY_LOG(debug, "cluster '{}' match for method '{}'", cluster_name, metadata->methodName());
+
+    switch (metadata->messageType()) {
+    case MessageType::Call:
+      incRequestCall(*cluster_);
+      break;
+
+    case MessageType::Oneway:
+      incRequestOneWay(*cluster_);
+      break;
+
+    default:
+      incRequestInvalid(*cluster_);
+      break;
+    }
+
+    if (cluster_->maintenanceMode()) {
+      stats().upstream_rq_maintenance_mode_.inc();
+      return {AppException(AppExceptionType::InternalError,
+                           fmt::format("maintenance mode for cluster '{}'", cluster_name)),
+              absl::nullopt};
+    }
+
+    const std::shared_ptr<const ProtocolOptionsConfig> options =
+        cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(
+            NetworkFilterNames::get().ThriftProxy);
+
+    const TransportType final_transport = options ? options->transport(transport) : transport;
+    ASSERT(final_transport != TransportType::Auto);
+
+    const ProtocolType final_protocol = options ? options->protocol(protocol) : protocol;
+    ASSERT(final_protocol != ProtocolType::Auto);
+
+    auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, lb_context);
+    if (!conn_pool_data) {
+      stats().no_healthy_upstream_.inc();
+      return {AppException(AppExceptionType::InternalError,
+                           fmt::format("no healthy upstream for '{}'", cluster_name)),
+              absl::nullopt};
+    }
+
+    const auto passthrough_supported =
+        transport == TransportType::Framed && final_transport == TransportType::Framed &&
+        protocol == final_protocol && final_protocol != ProtocolType::Twitter;
+    UpstreamRequestInfo result = {passthrough_supported, final_transport, final_protocol,
+                                  conn_pool_data};
+    return {absl::nullopt, result};
+  }
+
+  Upstream::ClusterInfoConstSharedPtr cluster_;
 
 private:
   void incClusterScopeCounter(const Upstream::ClusterInfo& cluster,
