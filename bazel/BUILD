@@ -550,6 +550,7 @@ selects.config_setting_group(
     name = "apple",
     match_any = [
         ":darwin",
+        ":darwin_arm64",
         ":darwin_x86_64",
         ":ios_arm64",
         ":ios_arm64e",

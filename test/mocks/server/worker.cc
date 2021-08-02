@@ -17,7 +17,7 @@ MockWorker::MockWorker() {
           Invoke([this](absl::optional<uint64_t> overridden_listener,
                         Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
             UNREFERENCED_PARAMETER(overridden_listener);
-            config.listenSocketFactory().getListenSocket();
+            config.listenSocketFactory().getListenSocket(0);
             EXPECT_EQ(nullptr, add_listener_completion_);
             add_listener_completion_ = completion;
           }));

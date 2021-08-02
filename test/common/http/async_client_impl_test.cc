@@ -1304,7 +1304,8 @@ TEST_F(AsyncClientImplTest, StreamTimeoutHeadReply) {
       }));
 
   RequestMessagePtr message{new RequestMessageImpl()};
-  HttpTestUtility::addDefaultHeaders(message->headers(), "HEAD");
+  message->headers().setMethod("HEAD");
+  HttpTestUtility::addDefaultHeaders(message->headers(), false);
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message->headers()), true));
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40), _));
@@ -1585,8 +1586,7 @@ TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
   EXPECT_EQ(absl::nullopt, route_entry.grpcTimeoutOffset());
   EXPECT_TRUE(route_entry.opaqueConfig().empty());
   EXPECT_TRUE(route_entry.includeVirtualHostRateLimits());
-  EXPECT_TRUE(route_entry.metadata().filter_metadata().empty());
-  EXPECT_EQ(nullptr, route_entry.typedMetadata().get<Config::TypedMetadata::Object>("bar"));
+  EXPECT_EQ(nullptr, route_impl_->typedMetadata().get<Config::TypedMetadata::Object>("bar"));
   EXPECT_EQ(nullptr, route_entry.perFilterConfig("bar"));
   EXPECT_TRUE(route_entry.upgradeMap().empty());
   EXPECT_EQ(false, route_entry.internalRedirectPolicy().enabled());

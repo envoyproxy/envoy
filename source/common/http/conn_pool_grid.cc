@@ -193,11 +193,13 @@ ConnectivityGrid::ConnectivityGrid(
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
     AlternateProtocolsCacheSharedPtr alternate_protocols,
-    std::chrono::milliseconds next_attempt_duration, ConnectivityOptions connectivity_options)
+    std::chrono::milliseconds next_attempt_duration, ConnectivityOptions connectivity_options,
+    Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
       state_(state), next_attempt_duration_(next_attempt_duration), time_source_(time_source),
-      http3_status_tracker_(dispatcher_), alternate_protocols_(alternate_protocols) {
+      http3_status_tracker_(dispatcher_), alternate_protocols_(alternate_protocols),
+      quic_stat_names_(quic_stat_names), scope_(scope) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
   // TODO(#15649) support v6/v4, WiFi/cellular.
@@ -205,7 +207,7 @@ ConnectivityGrid::ConnectivityGrid(
 }
 
 ConnectivityGrid::~ConnectivityGrid() {
-  // Ignore drained callbacks while the pools are destroyed below.
+  // Ignore idle callbacks while the pools are destroyed below.
   destroying_ = true;
   // Callbacks might have pending streams registered with the pools, so cancel and delete
   // the callback before deleting the pools.
@@ -213,25 +215,41 @@ ConnectivityGrid::~ConnectivityGrid() {
   pools_.clear();
 }
 
+void ConnectivityGrid::deleteIsPending() {
+  deferred_deleting_ = true;
+  for (const auto& pool : pools_) {
+    pool->deleteIsPending();
+  }
+}
+
 absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool() {
+  ASSERT(!deferred_deleting_);
   // Pools are created by newStream, which should not be called during draining.
-  ASSERT(drained_callbacks_.empty());
+  ASSERT(!draining_);
   // Right now, only H3 and TCP are supported, so if there are 2 pools we're done.
-  if (pools_.size() == 2 || !drained_callbacks_.empty()) {
+  if (pools_.size() == 2 || draining_) {
     return absl::nullopt;
   }
 
   // HTTP/3 is hard-coded as higher priority, H2 as secondary.
+  ConnectionPool::InstancePtr pool;
   if (pools_.empty()) {
-    pools_.push_back(Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_,
-                                             options_, transport_socket_options_, state_,
-                                             time_source_));
-    return pools_.begin();
+    pool = Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_, options_,
+                                   transport_socket_options_, state_, time_source_,
+                                   quic_stat_names_, scope_);
+  } else {
+    pool = std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
+                                                   options_, transport_socket_options_, state_);
   }
-  pools_.push_back(std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_,
-                                                           priority_, options_,
-                                                           transport_socket_options_, state_));
-  return std::next(pools_.begin());
+
+  setupPool(*pool);
+  pools_.push_back(std::move(pool));
+
+  return --pools_.end();
+}
+
+void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {
+  pool.addIdleCallback([this]() { onIdleReceived(); });
 }
 
 bool ConnectivityGrid::hasActiveConnections() const {
@@ -246,6 +264,11 @@ bool ConnectivityGrid::hasActiveConnections() const {
 
 ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& decoder,
                                                          ConnectionPool::Callbacks& callbacks) {
+  ASSERT(!deferred_deleting_);
+
+  // New streams should not be created during draining.
+  ASSERT(!draining_);
+
   if (pools_.empty()) {
     createNextPool();
   }
@@ -267,22 +290,24 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   return ret;
 }
 
-void ConnectivityGrid::addDrainedCallback(DrainedCb cb) {
+void ConnectivityGrid::addIdleCallback(IdleCb cb) {
   // Add the callback to the list of callbacks to be called when all drains are
   // complete.
-  drained_callbacks_.emplace_back(cb);
+  idle_callbacks_.emplace_back(cb);
+}
 
-  if (drained_callbacks_.size() != 1) {
+void ConnectivityGrid::startDrain() {
+  if (draining_) {
+    // A drain callback has already been set, and only needs to happen once.
     return;
   }
 
-  // If this is the first time a drained callback has been added, track the
-  // number of pools which need to be drained in order to pass drain-completion
-  // up to the callers. Note that no new pools can be created from this point on
-  // as createNextPool fast-fails if drained callbacks are present.
-  drains_needed_ = pools_.size();
+  // Note that no new pools can be created from this point on
+  // as createNextPool fast-fails if `draining_` is true.
+  draining_ = true;
+
   for (auto& pool : pools_) {
-    pool->addDrainedCallback([this]() -> void { onDrainReceived(); });
+    pool->startDrain();
   }
 }
 
@@ -316,21 +341,25 @@ void ConnectivityGrid::markHttp3Broken() { http3_status_tracker_.markHttp3Broken
 
 void ConnectivityGrid::markHttp3Confirmed() { http3_status_tracker_.markHttp3Confirmed(); }
 
-void ConnectivityGrid::onDrainReceived() {
+bool ConnectivityGrid::isIdle() const {
+  // This is O(n) but the function is constant and there are no plans for n > 8.
+  bool idle = true;
+  for (const auto& pool : pools_) {
+    idle &= pool->isIdle();
+  }
+  return idle;
+}
+
+void ConnectivityGrid::onIdleReceived() {
   // Don't do any work under the stack of ~ConnectivityGrid()
   if (destroying_) {
     return;
   }
 
-  // If not all the pools have drained, keep waiting.
-  ASSERT(drains_needed_ != 0);
-  if (--drains_needed_ != 0) {
-    return;
-  }
-
-  // All the pools have drained. Notify drain subscribers.
-  for (auto& callback : drained_callbacks_) {
-    callback();
+  if (isIdle()) {
+    for (auto& callback : idle_callbacks_) {
+      callback();
+    }
   }
 }
 

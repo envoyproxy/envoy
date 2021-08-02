@@ -1,8 +1,9 @@
 import argparse
 import asyncio
+import logging
 import os
 from functools import cached_property
-from typing import Sequence, Tuple, Type
+from typing import Optional, Sequence, Tuple, Type
 
 from tools.base import runner
 
@@ -13,6 +14,7 @@ class Checker(runner.Runner):
     Check methods should call the `self.warn`, `self.error` or `self.succeed`
     depending upon the outcome of the checks.
     """
+    _active_check: Optional[str] = None
     checks: Tuple[str, ...] = ()
 
     def __init__(self, *args):
@@ -20,6 +22,10 @@ class Checker(runner.Runner):
         self.success = {}
         self.errors = {}
         self.warnings = {}
+
+    @property
+    def active_check(self) -> Optional[str]:
+        return self._active_check
 
     @property
     def diff(self) -> bool:
@@ -30,6 +36,10 @@ class Checker(runner.Runner):
     def error_count(self) -> int:
         """Count of all errors found"""
         return sum(len(e) for e in self.errors.values())
+
+    @property
+    def exiting(self):
+        return "exiting" in self.errors
 
     @property
     def failed(self) -> dict:
@@ -70,8 +80,7 @@ class Checker(runner.Runner):
     def show_summary(self) -> bool:
         """Show a summary at the end or not"""
         return bool(
-            not "exiting" in self.errors
-            and (self.args.summary or self.error_count or self.warning_count))
+            not self.exiting and (self.args.summary or self.error_count or self.warning_count))
 
     @property
     def status(self) -> dict:
@@ -167,6 +176,8 @@ class Checker(runner.Runner):
 
     def error(self, name: str, errors: list, log: bool = True, log_type: str = "error") -> int:
         """Record (and log) errors for a check type"""
+        if not errors:
+            return 0
         self.errors[name] = self.errors.get(name, [])
         self.errors[name].extend(errors)
         if not log:
@@ -175,7 +186,9 @@ class Checker(runner.Runner):
             getattr(self.log, log_type)(f"[{name}] {message}")
         return 1
 
-    def exiting(self):
+    def exit(self) -> int:
+        self.log.handlers[0].setLevel(logging.FATAL)
+        self.stdout.handlers[0].setLevel(logging.FATAL)
         return self.error("exiting", ["Keyboard exit"], log_type="fatal")
 
     def get_checks(self) -> Sequence[str]:
@@ -185,14 +198,16 @@ class Checker(runner.Runner):
             [check for check in self.args.check if check in self.checks])
 
     def on_check_begin(self, check: str) -> None:
+        self._active_check = check
         self.log.notice(f"[{check}] Running check")
 
     def on_check_run(self, check: str) -> None:
         """Callback hook called after each check run"""
-        if check in self.errors:
+        self._active_check = None
+        if self.exiting:
+            return
+        elif check in self.errors:
             self.log.error(f"[{check}] Check failed")
-        elif "exiting" in self.errors:
-            pass
         elif check in self.warnings:
             self.log.warning(f"[{check}] Check has warnings")
         else:
@@ -218,7 +233,7 @@ class Checker(runner.Runner):
                 getattr(self, f"check_{check}")()
                 self.on_check_run(check)
         except KeyboardInterrupt as e:
-            self.exiting()
+            self.exit()
         finally:
             result = self.on_checks_complete()
         return result
@@ -316,7 +331,10 @@ class AsyncChecker(Checker):
                 await getattr(self, f"check_{check}")()
                 await self.on_check_run(check)
         finally:
-            result = await self.on_checks_complete()
+            if self.exiting:
+                result = 1
+            else:
+                result = await self.on_checks_complete()
         return result
 
     def run(self) -> int:
@@ -325,7 +343,7 @@ class AsyncChecker(Checker):
         except KeyboardInterrupt as e:
             # This needs to be outside the loop to catch the a keyboard interrupt
             # This means that a new loop has to be created to cleanup
-            result = self.exiting()
+            result = self.exit()
             result = asyncio.get_event_loop().run_until_complete(self.on_checks_complete())
             return result
 

@@ -713,8 +713,9 @@ ClusterInfoImpl::ClusterInfoImpl(
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
                             "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
                         factory_context.messageValidationVisitor())),
-      max_requests_per_connection_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
+      max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          http_protocol_options_->common_http_protocol_options_, max_requests_per_connection,
+          config.max_requests_per_connection().value())),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http_protocol_options_->common_http_protocol_options_, max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
@@ -767,6 +768,12 @@ ClusterInfoImpl::ClusterInfoImpl(
               : absl::nullopt),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
+  if (config.has_max_requests_per_connection() &&
+      http_protocol_options_->common_http_protocol_options_.has_max_requests_per_connection()) {
+    throw EnvoyException("Only one of max_requests_per_connection from Cluster or "
+                         "HttpProtocolOptions can be specified");
+  }
+
   switch (config.lb_policy()) {
   case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
     lb_type_ = LoadBalancerType::RoundRobin;
@@ -779,22 +786,6 @@ ClusterInfoImpl::ClusterInfoImpl(
     break;
   case envoy::config::cluster::v3::Cluster::RING_HASH:
     lb_type_ = LoadBalancerType::RingHash;
-    break;
-  case envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB:
-    if (config.type() != envoy::config::cluster::v3::Cluster::ORIGINAL_DST) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} is not valid for Cluster type {}. 'ORIGINAL_DST_LB' "
-                      "is allowed only with cluster type 'ORIGINAL_DST'",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy()),
-                      envoy::config::cluster::v3::Cluster::DiscoveryType_Name(config.type())));
-    }
-    if (config.has_lb_subset_config()) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-    }
-
-    lb_type_ = LoadBalancerType::ClusterProvided;
     break;
   case envoy::config::cluster::v3::Cluster::MAGLEV:
     lb_type_ = LoadBalancerType::Maglev;
@@ -895,6 +886,10 @@ std::vector<Http::Protocol>
 ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const {
   if (downstream_protocol.has_value() &&
       features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
+    if (downstream_protocol.value() == Http::Protocol::Http3 &&
+        !(features_ & Upstream::ClusterInfo::Features::HTTP3)) {
+      return {Http::Protocol::Http2};
+    }
     return {downstream_protocol.value()};
   }
 

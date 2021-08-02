@@ -68,27 +68,19 @@ def test_sphinx_runner_colors(patches):
 def test_sphinx_runner_config_file(patches):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
-        "open",
-        "yaml",
+        "utils",
         ("SphinxRunner.config_file_path", dict(new_callable=PropertyMock)),
         ("SphinxRunner.configs", dict(new_callable=PropertyMock)),
         prefix="tools.docs.sphinx_runner")
 
-    with patched as (m_open, m_yaml, m_fpath,  m_configs):
+    with patched as (m_utils, m_fpath,  m_configs):
         assert (
             runner.config_file
-            == m_fpath.return_value)
+            == m_utils.to_yaml.return_value)
 
     assert (
-        list(m_open.call_args)
-        == [(m_fpath.return_value, 'w'), {}])
-    assert (
-        list(m_yaml.dump.call_args)
-        == [(m_configs.return_value,), {}])
-    assert (
-        m_open.return_value.__enter__.return_value.write.call_args
-        == [(m_yaml.dump.return_value,), {}])
-
+        list(m_utils.to_yaml.call_args)
+        == [(m_configs.return_value, m_fpath.return_value), {}])
     assert "config_file" in runner.__dict__
 
 
@@ -255,12 +247,12 @@ def test_sphinx_runner_rst_dir(patches, rst_tar):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
         "os.path",
-        "tarfile",
+        "utils",
         ("SphinxRunner.build_dir", dict(new_callable=PropertyMock)),
         ("SphinxRunner.rst_tar", dict(new_callable=PropertyMock)),
         prefix="tools.docs.sphinx_runner")
 
-    with patched as (m_path, m_tar, m_dir, m_rst):
+    with patched as (m_path, m_utils, m_dir, m_rst):
         m_rst.return_value = rst_tar
         assert runner.rst_dir == m_path.join.return_value
 
@@ -270,13 +262,10 @@ def test_sphinx_runner_rst_dir(patches, rst_tar):
 
     if rst_tar:
         assert (
-            list(m_tar.open.call_args)
-            == [(rst_tar,), {}])
-        assert (
-            list(m_tar.open.return_value.__enter__.return_value.extractall.call_args)
-            == [(), {'path': m_path.join.return_value}])
+            list(m_utils.extract.call_args)
+            == [(m_path.join.return_value, rst_tar), {}])
     else:
-        assert not m_tar.open.called
+        assert not m_utils.extract.called
     assert "rst_dir" in runner.__dict__
 
 
