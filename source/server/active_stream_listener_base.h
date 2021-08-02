@@ -10,6 +10,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/listener.h"
+#include "envoy/stats/timespan.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/linked_object.h"
@@ -134,6 +135,49 @@ protected:
 private:
   Event::Dispatcher& dispatcher_;
 };
+
+struct ActiveTcpConnection;
+class ActiveTcpListener;
+
+/**
+ * Wrapper for a group of active connections which are attached to the same filter chain context.
+ */
+class ActiveConnections : public Event::DeferredDeletable {
+public:
+  ActiveConnections(ActiveTcpListener& listener, const Network::FilterChain& filter_chain);
+  ~ActiveConnections() override;
+
+  // listener filter chain pair is the owner of the connections
+  ActiveTcpListener& listener_;
+  const Network::FilterChain& filter_chain_;
+  // Owned connections
+  std::list<std::unique_ptr<ActiveTcpConnection>> connections_;
+};
+
+/**
+ * Wrapper for an active TCP connection owned by this handler.
+ */
+struct ActiveTcpConnection : LinkedObject<ActiveTcpConnection>,
+                             public Event::DeferredDeletable,
+                             public Network::ConnectionCallbacks,
+                             Logger::Loggable<Logger::Id::conn_handler> {
+  ActiveTcpConnection(ActiveConnections& active_connections,
+                      Network::ConnectionPtr&& new_connection, TimeSource& time_system,
+                      std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
+  ~ActiveTcpConnection() override;
+  // Network::ConnectionCallbacks
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
+  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
+  ActiveConnections& active_connections_;
+  Network::ConnectionPtr connection_;
+  Stats::TimespanPtr conn_length_;
+};
+
+using ActiveConnectionPtr = std::unique_ptr<ActiveTcpConnection>;
+using ActiveConnectionCollectionPtr = std::unique_ptr<ActiveConnections>;
 
 } // namespace Server
 } // namespace Envoy
