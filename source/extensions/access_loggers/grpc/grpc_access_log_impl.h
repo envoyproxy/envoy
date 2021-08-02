@@ -19,9 +19,12 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace GrpcCommon {
 
+static constexpr absl::string_view GRPC_LOG_STATS_PREFIX = "access_logs.grpc_access_log.";
+
 #define CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(COUNTER, GAUGE)                                   \
-  COUNTER(fatal_logs_succeeded)                                                                    \
-  GAUGE(pending_fatal_logs, Accumulate)
+  COUNTER(critical_logs_succeeded)                                                                 \
+  COUNTER(pending_timeout)                                                                         \
+  GAUGE(pending_critical_logs, Accumulate)
 
 struct CriticalAccessLoggerGrpcClientStats {
   CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
@@ -46,8 +49,9 @@ public:
       absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version)
       : client_(client), service_method_(method), dispatcher_(dispatcher),
         message_ack_timeout_(message_ack_timeout), transport_api_version_(transport_api_version),
-        stats_({CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))}) {
-  }
+        stats_({CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(
+            POOL_COUNTER_PREFIX(scope, GRPC_LOG_STATS_PREFIX.data()),
+            POOL_GAUGE_PREFIX(scope, GRPC_LOG_STATS_PREFIX.data()))}) {}
 
   struct BufferedMessage {
     enum class State {
@@ -77,8 +81,8 @@ public:
 
         switch (message->status()) {
         case envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::ACK:
-          parent_.stats_.fatal_logs_succeeded_.inc();
-          parent_.stats_.pending_fatal_logs_.dec();
+          parent_.stats_.critical_logs_succeeded_.inc();
+          parent_.stats_.pending_critical_logs_.dec();
           parent_.buffered_messages_.erase(id);
           break;
         case envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::NACK:
@@ -124,15 +128,16 @@ public:
 
     uint32_t id = MessageUtil::hash(message);
     buffered_messages_[id] = BufferedMessage{nullptr, BufferedMessage::State::Initial, message};
-    stats_.pending_fatal_logs_.inc();
+    stats_.pending_critical_logs_.inc();
 
     for (auto&& buffered_message : buffered_messages_) {
       uint32_t id = buffered_message.first;
       buffered_message.second.message_.set_id(id);
       buffered_message.second.state_ = BufferedMessage::State::Pending;
 
-      buffered_message.second.timer_ = dispatcher_.createTimer([&buffered_message]() {
+      buffered_message.second.timer_ = dispatcher_.createTimer([&]() {
         if (buffered_message.second.state_ == BufferedMessage::State::Pending) {
+          stats_.pending_timeout_.inc();
           buffered_message.second.state_ = BufferedMessage::State::Initial;
           buffered_message.second.timer_->disableTimer();
           buffered_message.second.timer_.reset();

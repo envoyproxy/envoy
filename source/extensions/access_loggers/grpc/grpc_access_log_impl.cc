@@ -10,8 +10,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/grpc/typed_async_client.h"
 
-const char GRPC_LOG_STATS_PREFIX[] = "access_logs.grpc_access_log.";
-
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
@@ -25,7 +23,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
     envoy::config::core::v3::ApiVersion transport_api_version)
     : GrpcAccessLogger(
           std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher, scope,
-          GRPC_LOG_STATS_PREFIX,
+          GRPC_LOG_STATS_PREFIX.data(),
           Grpc::VersionedMethods("envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs",
                                  "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs")
               .getMethodDescriptorForVersion(transport_api_version),
