@@ -47,7 +47,8 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
       std::move(socket), std::move(transport_socket), *stream_info);
   if (const auto timeout = filter_chain->transportSocketConnectTimeout();
       timeout != std::chrono::milliseconds::zero()) {
-    server_conn_ptr->setTransportSocketConnectTimeout(timeout);
+    server_conn_ptr->setTransportSocketConnectTimeout(
+        timeout, stats_.downstream_cx_transport_socket_connect_timeout_);
   }
   server_conn_ptr->setBufferLimits(config_->perConnectionBufferLimitBytes());
   RELEASE_ASSERT(server_conn_ptr->addressProvider().remoteAddress() != nullptr, "");
