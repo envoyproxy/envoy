@@ -132,7 +132,7 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
   if (VaryHeader::hasVary(*iter->second.response_headers_)) {
     return varyLookup(request, iter->second.response_headers_);
   } else {
-    Http::ResponseTrailerMapPtr trailers_map = nullptr;
+    Http::ResponseTrailerMapPtr trailers_map;
     if (iter->second.trailers_) {
       trailers_map = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*iter->second.trailers_);
     }
@@ -168,7 +168,7 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
     return SimpleHttpCache::Entry{};
   }
   ASSERT(iter->second.response_headers_);
-  Http::ResponseTrailerMapPtr trailers_map = nullptr;
+  Http::ResponseTrailerMapPtr trailers_map;
   if (iter->second.trailers_) {
     trailers_map = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*iter->second.trailers_);
   }
