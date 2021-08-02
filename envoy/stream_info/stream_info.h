@@ -600,7 +600,7 @@ public:
   virtual void setUpstreamConnectionId(uint64_t id) PURE;
 
   /**
-   * @return the ID of the upstream connection, nullopt if not available.
+   * @return the ID of the upstream connection, or absl::nullopt if not available.
    */
   virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
 };
