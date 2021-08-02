@@ -766,7 +766,8 @@ public:
   }
 
 private:
-  struct LbImpl : public LoadBalancer {
+  class LbImpl : public LoadBalancer {
+  public:
     LbImpl() = default;
 
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override {
@@ -777,13 +778,15 @@ private:
     }
   };
 
-  struct LbFactory : public LoadBalancerFactory {
+  class LbFactory : public LoadBalancerFactory {
+  public:
     LbFactory() = default;
 
     Upstream::LoadBalancerPtr create() override { return std::make_unique<LbImpl>(); }
   };
 
-  struct ThreadAwareLbImpl : public Upstream::ThreadAwareLoadBalancer {
+  class ThreadAwareLbImpl : public Upstream::ThreadAwareLoadBalancer {
+  public:
     ThreadAwareLbImpl() = default;
 
     Upstream::LoadBalancerFactorySharedPtr factory() override {
