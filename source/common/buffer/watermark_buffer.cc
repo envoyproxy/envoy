@@ -10,7 +10,13 @@
 namespace Envoy {
 namespace Buffer {
 namespace {
+
+// TODO(kbaichoo): remove when msvc supports absl::bit_width as constexpr.
+#ifndef WIN32
 constexpr uint32_t kDefaultMinimumTrackingBytes = absl::bit_width(uint32_t(1024 * 256)) - 1;
+#else
+constexpr uint32_t kDefaultMinimumTrackingBytes = 18; // Computed from the expression above.
+#endif
 } // end namespace
 
 void WatermarkBuffer::add(const void* data, uint64_t size) {
