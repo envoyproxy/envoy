@@ -921,35 +921,6 @@ void Utility::transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers,
   }
 }
 
-void Utility::traversePerFilterConfigGeneric(
-    const std::string& filter_name, const Router::RouteConstSharedPtr& route,
-    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-  if (!route) {
-    return;
-  }
-
-  const Router::RouteEntry* routeEntry = route->routeEntry();
-
-  if (routeEntry != nullptr) {
-    auto maybe_vhost_config = routeEntry->virtualHost().perFilterConfig(filter_name);
-    if (maybe_vhost_config != nullptr) {
-      cb(*maybe_vhost_config);
-    }
-  }
-
-  auto maybe_route_config = route->perFilterConfig(filter_name);
-  if (maybe_route_config != nullptr) {
-    cb(*maybe_route_config);
-  }
-
-  if (routeEntry != nullptr) {
-    auto maybe_weighted_cluster_config = routeEntry->perFilterConfig(filter_name);
-    if (maybe_weighted_cluster_config != nullptr) {
-      cb(*maybe_weighted_cluster_config);
-    }
-  }
-}
-
 std::string Utility::PercentEncoding::encode(absl::string_view value,
                                              absl::string_view reserved_chars) {
   absl::flat_hash_set<char> reserved_char_set{reserved_chars.begin(), reserved_chars.end()};

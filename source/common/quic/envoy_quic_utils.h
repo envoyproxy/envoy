@@ -66,7 +66,7 @@ class HeaderValidator {
 public:
   virtual ~HeaderValidator() = default;
   virtual Http::HeaderUtility::HeaderValidationResult
-  validateHeader(const std::string& header_name, absl::string_view header_value) = 0;
+  validateHeader(absl::string_view name, absl::string_view header_value) = 0;
 };
 
 // The returned header map has all keys in lower case.
@@ -105,15 +105,36 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
 }
 
 template <class T>
-std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block) {
+std::unique_ptr<T> spdyHeaderBlockToEnvoyTrailers(const spdy::SpdyHeaderBlock& header_block,
+                                                  uint32_t max_headers_allowed,
+                                                  HeaderValidator& validator,
+                                                  absl::string_view& details) {
   auto headers = T::create();
+  if (header_block.size() > max_headers_allowed) {
+    details = Http3ResponseCodeDetailValues::too_many_trailers;
+    return nullptr;
+  }
   for (auto entry : header_block) {
     // TODO(danzh): Avoid temporary strings and addCopy() with string_view.
     std::string key(entry.first);
     // QUICHE coalesces multiple trailer values with the same key with '\0'.
     std::vector<absl::string_view> values = absl::StrSplit(entry.second, '\0');
     for (const absl::string_view& value : values) {
-      headers->addCopy(Http::LowerCaseString(key), value);
+      if (max_headers_allowed == 0) {
+        details = Http3ResponseCodeDetailValues::too_many_trailers;
+        return nullptr;
+      }
+      max_headers_allowed--;
+      Http::HeaderUtility::HeaderValidationResult result =
+          validator.validateHeader(entry.first, value);
+      switch (result) {
+      case Http::HeaderUtility::HeaderValidationResult::REJECT:
+        return nullptr;
+      case Http::HeaderUtility::HeaderValidationResult::DROP:
+        continue;
+      case Http::HeaderUtility::HeaderValidationResult::ACCEPT:
+        headers->addCopy(Http::LowerCaseString(key), value);
+      }
     }
   }
   return headers;
