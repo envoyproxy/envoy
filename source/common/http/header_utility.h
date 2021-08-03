@@ -250,7 +250,7 @@ public:
    * headers_with_underscores_action.
    */
   static HeaderValidationResult checkHeaderNameForUnderscores(
-      const std::string& header_name,
+      absl::string_view header_name,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action,
       Stats::Counter& dropped_headers_with_underscores,
