@@ -247,12 +247,12 @@ def test_sphinx_runner_rst_dir(patches, rst_tar):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
         "os.path",
-        "tarfile",
+        "utils",
         ("SphinxRunner.build_dir", dict(new_callable=PropertyMock)),
         ("SphinxRunner.rst_tar", dict(new_callable=PropertyMock)),
         prefix="tools.docs.sphinx_runner")
 
-    with patched as (m_path, m_tar, m_dir, m_rst):
+    with patched as (m_path, m_utils, m_dir, m_rst):
         m_rst.return_value = rst_tar
         assert runner.rst_dir == m_path.join.return_value
 
@@ -262,13 +262,10 @@ def test_sphinx_runner_rst_dir(patches, rst_tar):
 
     if rst_tar:
         assert (
-            list(m_tar.open.call_args)
-            == [(rst_tar,), {}])
-        assert (
-            list(m_tar.open.return_value.__enter__.return_value.extractall.call_args)
-            == [(), {'path': m_path.join.return_value}])
+            list(m_utils.extract.call_args)
+            == [(m_path.join.return_value, rst_tar), {}])
     else:
-        assert not m_tar.open.called
+        assert not m_utils.extract.called
     assert "rst_dir" in runner.__dict__
 
 
