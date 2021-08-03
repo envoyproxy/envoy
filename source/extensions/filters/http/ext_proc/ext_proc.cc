@@ -467,6 +467,9 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
 void Filter::onGrpcClose() {
   ENVOY_LOG(debug, "Received gRPC stream close");
+  if (processing_complete_) {
+    return;
+  }
   processing_complete_ = true;
   stats_.streams_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
