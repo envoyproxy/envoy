@@ -17,8 +17,9 @@ option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: DPDS]
-// Dynamic parameter discovery :ref:`architecture overview <arch_overview_service_discovery_types_dpds>`
 
+// Returns a set of dynamic parameter constraints to be used by the
+// client when subscribing to xDS resources.
 service DynamicParametersDiscoveryService {
   option (envoy.annotations.resource).type = "envoy.config.dynamic_parameters.v3.DynamicParameters";
 
