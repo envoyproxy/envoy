@@ -7,9 +7,9 @@ api_cc_test(
     srcs = ["pgv_test.cc"],
     deps = [
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/compression/gzip/decompressor/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/fault/v3:pkg_cc_proto",
