@@ -4,6 +4,7 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/type/matcher/v3/metadata.pb.h"
 
+#include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
@@ -31,6 +32,10 @@ void checkMatcher(
     const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::TestRequestHeaderMapImpl(),
     const StreamInfo::StreamInfo& info = NiceMock<StreamInfo::MockStreamInfo>()) {
   EXPECT_EQ(expected, matcher.matches(connection, headers, info));
+}
+
+PortRangeMatcher createPortRangeMatcher(envoy::type::v3::Int32Range range) {
+  return PortRangeMatcher(range);
 }
 
 TEST(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true); }
@@ -98,6 +103,12 @@ TEST(OrMatcher, Permission_Set) {
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
   info.downstream_address_provider_->setLocalAddress(addr);
+
+  checkMatcher(RBAC::OrMatcher(set), false, conn, headers, info);
+
+  perm = set.add_rules();
+  perm->mutable_destination_port_range()->set_start(123);
+  perm->mutable_destination_port_range()->set_end(456);
 
   checkMatcher(RBAC::OrMatcher(set), false, conn, headers, info);
 
@@ -231,6 +242,58 @@ TEST(PortMatcher, PortMatcher) {
 
   checkMatcher(PortMatcher(123), true, conn, headers, info);
   checkMatcher(PortMatcher(456), false, conn, headers, info);
+}
+
+// Test valid and invalid destination_port_range permission rule in RBAC.
+TEST(PortRangeMatcher, PortRangeMatcher) {
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  Envoy::Network::Address::InstanceConstSharedPtr addr =
+      Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
+  info.downstream_address_provider_->setLocalAddress(addr);
+
+  // IP address with port 456 is in range [123, 789) and [456, 789), but not in range [123, 456) or
+  // [12, 34).
+  envoy::type::v3::Int32Range range;
+  range.set_start(123);
+  range.set_end(789);
+  checkMatcher(PortRangeMatcher(range), true, conn, headers, info);
+
+  range.set_start(456);
+  range.set_end(789);
+  checkMatcher(PortRangeMatcher(range), true, conn, headers, info);
+
+  range.set_start(123);
+  range.set_end(456);
+  checkMatcher(PortRangeMatcher(range), false, conn, headers, info);
+
+  range.set_start(12);
+  range.set_end(34);
+  checkMatcher(PortRangeMatcher(range), false, conn, headers, info);
+
+  // Only IP address is valid for the permission rule.
+  NiceMock<StreamInfo::MockStreamInfo> info2;
+  Envoy::Network::Address::InstanceConstSharedPtr addr2 =
+      std::make_shared<const Envoy::Network::Address::PipeInstance>("test");
+  info2.downstream_address_provider_->setLocalAddress(addr2);
+  checkMatcher(PortRangeMatcher(range), false, conn, headers, info2);
+
+  // Invalid rule will cause an exception.
+  range.set_start(-1);
+  range.set_end(80);
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range), EnvoyException,
+                          "range start .* is out of bounds");
+
+  range.set_start(80);
+  range.set_end(65537);
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range), EnvoyException,
+                          "range end .* is out of bounds");
+
+  range.set_start(80);
+  range.set_end(80);
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range), EnvoyException,
+                          "range start .* cannot be greater or equal than range end .*");
 }
 
 TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
