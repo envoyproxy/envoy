@@ -413,5 +413,20 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
+TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  std::string value = std::string(1, 2);
+  EXPECT_FALSE(Http::HeaderUtility::headerValueIsValid(value));
+  default_request_headers_.addCopy("illegal_header", value);
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForReset());
+}
+
 } // namespace Quic
 } // namespace Envoy

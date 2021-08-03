@@ -6,6 +6,7 @@
 #include "test/common/config/grpc_subscription_test_harness.h"
 #include "test/common/config/http_subscription_test_harness.h"
 #include "test/common/config/subscription_test_harness.h"
+#include "test/config/v2_link_hacks.h"
 
 using testing::InSequence;
 
