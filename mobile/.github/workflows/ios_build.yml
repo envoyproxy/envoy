@@ -51,17 +51,10 @@ jobs:
         if: steps.check-cache.outputs.cache-hit != 'true'
         name: 'Install dependencies'
       - env:
-          CREDENTIALS: ${{ secrets.ENGFLOW_CREDENTIALS }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Skipping for backend update"
-          exit 0
-          if [[ -z $CREDENTIALS ]]; then echo "Empty CREDENTIALS"; exit 0; fi
-          echo "$CREDENTIALS" > .credentials
-          export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.credentials
-          echo "$GOOGLE_APPLICATION_CREDENTIALS"
-          ls -l "$GOOGLE_APPLICATION_CREDENTIALS"
           bazelisk shutdown
-          bazelisk build --config=ios --config=remote-ci-macos //:ios_dist
+          bazelisk build --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //:ios_dist
         if: steps.check-cache.outputs.cache-hit != 'true'
         name: 'Build Envoy.framework distributable'
   swifthelloworld:
