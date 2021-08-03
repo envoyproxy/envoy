@@ -1108,8 +1108,8 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithEmptyBodyStreamed) {
 }
 
 // Test how the filter responds when asked to stream a request body for a POST
-// request with an empty body. We should get an empty body message because
-// the Envoy filter stream received the body after all the headers.
+// request with an empty body in "buffered partial" mode. We should get an empty body message
+// because the Envoy filter stream received the body after all the headers.
 TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithEmptyBodyBufferedPartial) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
   initializeConfig();
@@ -1171,8 +1171,8 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetRequestNoBodyStreaming) {
 }
 
 // Test how the filter responds when asked to stream a request body for a GET
-// request with no body. We should receive no body message because the Envoy
-// filter stream received the headers and end simultaneously.
+// request with no body in "buffered partial" mode. We should receive no body message because the
+// Envoy filter stream received the headers and end simultaneously.
 TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetRequestNoBodyBufferedPartial) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
   initializeConfig();

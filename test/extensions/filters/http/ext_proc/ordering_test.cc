@@ -39,7 +39,7 @@ using testing::Unused;
 
 using namespace std::chrono_literals;
 
-// The buffer size for certain callbacks
+// The value to return for the decoder buffer limit.
 static const uint32_t BufferSize = 100000;
 
 // These tests directly drive the filter. They concentrate on testing out all the different

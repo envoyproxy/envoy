@@ -243,7 +243,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     // from running out of memory while we wait.
     // 4) It is possible that Envoy will keep sending us data even in that case, so
     // we must continue to queue data and prepare to re-inject it later.
-    if (state.partialLimitReached()) {
+    if (state.partialBodyProcessed()) {
       // We already sent and received the buffer, so everything else just falls through.
       ENVOY_LOG(trace, "Partial buffer limit reached");
       result = FilterDataStatus::Continue;

@@ -66,8 +66,10 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
         ENVOY_LOG(debug, "The message had no body");
       } else if (complete_body_available_ && body_mode_ != ProcessingMode::NONE) {
         // If we get here, then all the body data came in before the header message
-        // was complete, and the server wants the body. So, don't continue filter
-        // processing, but send the buffered request body now.
+        // was complete, and the server wants the body. It doesn't matter whether the
+        // processing mode is buffered, streamed, or partially streamed -- if we get
+        // here then the whole body is in the buffer and we can proceed as if the
+        // "buffered" processing mode was set.
         ENVOY_LOG(debug, "Sending buffered request body message");
         filter_.sendBufferedData(*this, ProcessorState::CallbackState::BufferedBodyCallback, true);
         clearWatermark();
@@ -195,7 +197,7 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
       should_continue = true;
       clearWatermark();
       callback_state_ = CallbackState::Idle;
-      partial_limit_reached_ = true;
+      partial_body_processed_ = true;
 
       // If anything else is left on the queue, inject it too
       while (auto leftover_chunk = dequeueStreamingChunk(false)) {

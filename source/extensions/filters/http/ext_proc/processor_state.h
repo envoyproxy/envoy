@@ -42,9 +42,12 @@ public:
   const QueuedChunk& consolidate(bool delivered);
 
 private:
-  // A queue of chunks that were sent in streaming mode
+  // If we are in either streaming mode, store chunks that we received here,
+  // and use the "delivered" flag to keep track of which ones were pushed
+  // to the external processor. When matching responses come back for these
+  // chunks, then they will be removed.
   std::deque<QueuedChunkPtr> queue_;
-  // The total size of chunks in the queue
+  // The total size of chunks in the queue.
   uint32_t bytes_enqueued_{};
 };
 
@@ -76,7 +79,7 @@ public:
   explicit ProcessorState(Filter& filter)
       : filter_(filter), watermark_requested_(false), paused_(false), no_body_(false),
         complete_body_available_(false), trailers_available_(false), body_replaced_(false),
-        partial_limit_reached_(false) {}
+        partial_body_processed_(false) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
@@ -90,7 +93,7 @@ public:
   void setHasNoBody(bool b) { no_body_ = b; }
   void setTrailersAvailable(bool d) { trailers_available_ = d; }
   bool bodyReplaced() const { return body_replaced_; }
-  bool partialLimitReached() const { return partial_limit_reached_; }
+  bool partialBodyProcessed() const { return partial_body_processed_; }
 
   virtual void setProcessingMode(
       const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) PURE;
@@ -170,9 +173,9 @@ protected:
   bool trailers_available_ : 1;
   // If true, then a CONTINUE_AND_REPLACE status was used on a response
   bool body_replaced_ : 1;
-  // If true, we are in "buffered partial" mode and already got back
-  // the response to the buffer.
-  bool partial_limit_reached_ : 1;
+  // If true, we are in "buffered partial" mode and we already reached the buffer
+  // limit, sent the body in a message, and got back a reply.
+  bool partial_body_processed_ : 1;
 
   // If true, the server wants to see the headers
   bool send_headers_ : 1;
