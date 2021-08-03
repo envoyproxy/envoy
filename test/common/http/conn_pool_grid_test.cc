@@ -125,7 +125,7 @@ public:
   void addHttp3AlternateProtocol() {
     AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
     const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-        {"h3-29", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
+        {"h3", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
     alternate_protocols_->setAlternatives(origin, protocols);
   }
 
