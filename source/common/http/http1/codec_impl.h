@@ -138,8 +138,8 @@ private:
   void flushOutput();
 
   absl::string_view details_;
-  uint64_t sent_bytes_{0};
-  uint64_t received_bytes_{0};
+  uint64_t encoded_bytes_{0};
+  uint64_t decoded_bytes_{0};
 };
 
 /**

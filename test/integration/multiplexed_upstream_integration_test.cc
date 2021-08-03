@@ -674,7 +674,11 @@ TEST_P(MixedUpstreamIntegrationTest, SimultaneousRequestAutoWithHttp2) {
   use_http2_ = true;
   useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED% %BYTES_SENT% %BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(0, 0, false);
-  EXPECT_THAT(waitForAccessLog(upstream_access_log_name_), testing::HasSubstr("168 13 0 0"));
+  std::string access_log = waitForAccessLog(upstream_access_log_name_);
+  std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
+  int wire_sent_bytes = std::stoi(log_entries[0]), wire_received_bytes = std::stoi(log_entries[1]);
+  EXPECT_EQ(wire_sent_bytes, 168);
+  EXPECT_EQ(wire_received_bytes, 13);
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, MixedUpstreamIntegrationTest,

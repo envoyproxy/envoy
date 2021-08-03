@@ -292,35 +292,35 @@ protected:
                           bool skip_encoding_empty_trailers);
 
     uint64_t encodedBytes() override {
-      ENVOY_CONN_LOG(trace, "stream id {}:get sent bytes {}\n", parent_.connection_, stream_id_,
-                     sent_bytes_);
-      return sent_bytes_;
+      ENVOY_CONN_LOG(trace, "stream id {}:get encoded bytes {}\n", parent_.connection_, stream_id_,
+                     encoded_bytes_);
+      return encoded_bytes_;
     }
 
-    void addEncodedBytes(size_t newly_sent_bytes) override {
-      sent_bytes_ += newly_sent_bytes;
-      ENVOY_CONN_LOG(trace, "stream id {}:update sent bytes {}\n", parent_.connection_, stream_id_,
-                     sent_bytes_);
+    void addEncodedBytes(size_t newly_encoded_bytes) override {
+      encoded_bytes_ += newly_encoded_bytes;
+      ENVOY_CONN_LOG(trace, "stream id {}:update encoded bytes {}\n", parent_.connection_,
+                     stream_id_, encoded_bytes_);
     }
 
     uint64_t decodedBytes() override {
-      ENVOY_CONN_LOG(trace, "stream id {}:get received bytes {}\n", parent_.connection_, stream_id_,
-                     received_bytes_);
-      return received_bytes_;
+      ENVOY_CONN_LOG(trace, "stream id {}:get rdecoded bytes {}\n", parent_.connection_, stream_id_,
+                     decoded_bytes_);
+      return decoded_bytes_;
     }
 
-    void addDecodedBytes(size_t newly_received_bytes) override {
-      received_bytes_ += newly_received_bytes;
-      ENVOY_CONN_LOG(trace, "stream id {}:update received bytes {}\n", parent_.connection_,
-                     stream_id_, received_bytes_);
+    void addDecodedBytes(size_t newly_decoded_bytes) override {
+      decoded_bytes_ += newly_decoded_bytes;
+      ENVOY_CONN_LOG(trace, "stream id {}:update decoded bytes {}\n", parent_.connection_,
+                     stream_id_, decoded_bytes_);
     }
 
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
-    uint64_t sent_bytes_{0};
-    uint64_t received_bytes_{0};
+    uint64_t encoded_bytes_{0};
+    uint64_t decoded_bytes_{0};
 
     Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
     // Note that in current implementation the watermark callbacks of the pending_recv_data_ are

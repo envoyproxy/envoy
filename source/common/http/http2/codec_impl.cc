@@ -803,8 +803,9 @@ Status ConnectionImpl::protocolErrorForTest() {
 }
 
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
-  ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}, stream_id={}", connection_,
-                 static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags), hd->stream_id);
+  ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}, stream_id={}, length={}",
+                 connection_, static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags),
+                 hd->stream_id, hd->length + 9);
   current_stream_id_ = hd->stream_id;
   StreamImpl* stream = getStream(hd->stream_id);
   if (stream != nullptr) {
@@ -939,7 +940,8 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   // data from our peer. Sometimes it raises the invalid frame callback, and sometimes it does not.
   // In all cases however it will attempt to send a GOAWAY frame with an error status. If we see
   // an outgoing frame of this type, we will return an error code so that we can abort execution.
-  ENVOY_CONN_LOG(trace, "sent frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
+  ENVOY_CONN_LOG(trace, "sent frame type={}, stream_id={}, length={}", connection_,
+                 static_cast<uint64_t>(frame->hd.type), frame->hd.stream_id, frame->hd.length + 9);
   StreamImpl* stream = getStream(frame->hd.stream_id);
   if (stream != nullptr) {
     stream->addEncodedBytes(frame->hd.length + 9);
