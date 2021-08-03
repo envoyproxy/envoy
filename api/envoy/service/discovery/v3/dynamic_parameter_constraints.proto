@@ -34,33 +34,24 @@ message DynamicParameterConstraints {
         repeated Range range = 1;
       }
 
-      message Exists {
-      }
-
       oneof constraint {
         // The key must have this specific value.
         string value = 1;
 
         // The key's value must be integers and within one of the ranges in this list.
         IntegerRangeList integer_range_list = 2;
-
-        // The key exists.
-        Exists exists = 3;
       }
-
-      // If true, the constraint is inverted (i.e., logical-not of the constraint).
-      bool invert = 4;
     }
 
     // A list of one or more constraints on the value of the key.
     // All constraints must be met.
     repeated Constraint constraints = 2;
-
-    // If specified, the key is optional (i.e., a subscription will match
-    // even if it does not have the specified dynamic parameter).
-    bool is_optional = 3;
   }
 
   // One entry per key.
+  // Note that if a key has a constraint here, it will place restrictions
+  // on the key's value if the key is present on a variant of the resource.
+  // However, if a key has a constraint here but is not present on the
+  // resource, it will match, regardless of what the constraint says.
   map<string, KeyConstraints> key_constraints = 1;
 }
