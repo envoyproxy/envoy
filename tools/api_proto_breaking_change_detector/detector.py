@@ -132,69 +132,67 @@ class BufWrapper(ProtoBreakingChangeDetector):
         # 6) buf breaking --against tmp_file
         # 7) check for differences (if changes are breaking, there should be none)
 
-        temp_dir = tempfile.TemporaryDirectory(
-            prefix=str(Path(".").absolute())
-            + os.sep)  # buf requires protobuf files to be in a subdirectory of cwd
-        buf_path = runfiles.Create().Rlocation("com_github_bufbuild_buf/bin/buf")
+        with tempfile.TemporaryDirectory(
+                prefix=str(Path(".").absolute())
+                + os.sep) as temp_dir:  # buf requires protobuf files to be in a subdirectory of cwd
+            buf_path = runfiles.Create().Rlocation("com_github_bufbuild_buf/bin/buf")
 
-        buf_config_loc = Path(".", "tools", "api_proto_breaking_change_detector")
+            buf_config_loc = Path(".", "tools", "api_proto_breaking_change_detector")
 
-        #copyfile(Path(buf_config_loc, "buf.lock"), Path(".", "buf.lock")) # not needed? refer to comment below
-        yaml_file_loc = Path(".", "buf.yaml")
-        copyfile(Path(buf_config_loc, "buf.yaml"), yaml_file_loc)
+            #copyfile(Path(buf_config_loc, "buf.lock"), Path(".", "buf.lock")) # not needed? refer to comment below
+            yaml_file_loc = Path(".", "buf.yaml")
+            copyfile(Path(buf_config_loc, "buf.yaml"), yaml_file_loc)
 
-        # TODO: figure out how to automatically pull buf deps
-        # `buf mod update` doesn't seem to do anything, and the first test will fail because it forces buf to automatically start downloading the deps
-        #        bcode, bout, berr = run_command(f"{buf_path} mod update")
-        #        bout, berr = ''.join(bout), ''.join(berr)
-        target = Path(temp_dir.name, f"{Path(self._path_to_before).stem}.proto")
+            # TODO: figure out how to automatically pull buf deps
+            # `buf mod update` doesn't seem to do anything, and the first test will fail because it forces buf to automatically start downloading the deps
+            #        bcode, bout, berr = run_command(f"{buf_path} mod update")
+            #        bout, berr = ''.join(bout), ''.join(berr)
+            target = Path(temp_dir, f"{Path(self._path_to_before).stem}.proto")
 
-        buf_args = [
-            "--path",
-            str(target.relative_to(
-                Path(".").absolute())),  # buf requires relative pathing for roots...
-            "--config",
-            str(yaml_file_loc),
-        ]
-        if self._additional_args is not None:
-            buf_args.extend(self._additional_args)
+            buf_args = [
+                "--path",
+                str(target.relative_to(
+                    Path(".").absolute())),  # buf requires relative pathing for roots...
+                "--config",
+                str(yaml_file_loc),
+            ]
+            if self._additional_args is not None:
+                buf_args.extend(self._additional_args)
 
-        copyfile(self._path_to_before, target)
+            copyfile(self._path_to_before, target)
 
-        initial_code, initial_out, initial_err = run_command(
-            ' '.join([buf_path, f"build -o {Path(temp_dir.name, BUF_STATE_FILE)}", *buf_args]))
-        initial_out, initial_err = ''.join(initial_out), ''.join(initial_err)
+            initial_code, initial_out, initial_err = run_command(
+                ' '.join([buf_path, f"build -o {Path(temp_dir, BUF_STATE_FILE)}", *buf_args]))
+            initial_out, initial_err = ''.join(initial_out), ''.join(initial_err)
 
-        if initial_code != 0 or len(initial_out) > 0 or len(initial_err) > 0:
-            raise ChangeDetectorInitializeError(
-                f"Unexpected error during init:\n\tExit Status Code: {initial_code}\n\tstdout: {initial_out}\n\t stderr: {initial_err}\n"
-            )
+            if initial_code != 0 or len(initial_out) > 0 or len(initial_err) > 0:
+                raise ChangeDetectorInitializeError(
+                    f"Unexpected error during init:\n\tExit Status Code: {initial_code}\n\tstdout: {initial_out}\n\t stderr: {initial_err}\n"
+                )
 
-        lock_location = Path(temp_dir.name, BUF_STATE_FILE)
-        with open(lock_location, "r") as f:
-            initial_lock = f.readlines()
+            lock_location = Path(temp_dir, BUF_STATE_FILE)
+            with open(lock_location, "r") as f:
+                initial_lock = f.readlines()
 
-        copyfile(self._path_to_after, target)
+            copyfile(self._path_to_after, target)
 
-        final_code, final_out, final_err = run_command(
-            ' '.join(
-                [buf_path, f"breaking --against {Path(temp_dir.name, BUF_STATE_FILE)}", *buf_args]))
-        final_out, final_err = ''.join(final_out), ''.join(final_err)
+            final_code, final_out, final_err = run_command(
+                ' '.join(
+                    [buf_path, f"breaking --against {Path(temp_dir, BUF_STATE_FILE)}", *buf_args]))
+            final_out, final_err = ''.join(final_out), ''.join(final_err)
 
-        # new with buf: lock must be manually re-built
-        # but here we only re-build if there weren't any detected breaking changes
-        if len(final_out) == len(final_err) == final_code == 0:
-            _, _, _ = run_command(
-                ' '.join([buf_path, f"build -o {Path(temp_dir.name, BUF_STATE_FILE)}", *buf_args]))
-        with open(lock_location, "r") as f:
-            final_lock = f.readlines()
+            # new with buf: lock must be manually re-built
+            # but here we only re-build if there weren't any detected breaking changes
+            if len(final_out) == len(final_err) == final_code == 0:
+                _, _, _ = run_command(
+                    ' '.join([buf_path, f"build -o {Path(temp_dir, BUF_STATE_FILE)}", *buf_args]))
+            with open(lock_location, "r") as f:
+                final_lock = f.readlines()
 
-        temp_dir.cleanup()
-
-        self.initial_result = initial_code, initial_out, initial_err
-        self.final_result = final_code, final_out, final_err
-        self.initial_lock = initial_lock
-        self.final_lock = final_lock
+            self.initial_result = initial_code, initial_out, initial_err
+            self.final_result = final_code, final_out, final_err
+            self.initial_lock = initial_lock
+            self.final_lock = final_lock
 
     def is_breaking(self) -> bool:
         """Returns whether the changes between the ``before`` and ``after`` states of the proto file given in ``__init__``
