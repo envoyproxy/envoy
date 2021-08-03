@@ -108,9 +108,7 @@ Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
   Watch* watch = watch_map->second->addWatch(callbacks, resource_decoder);
   // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
   updateWatch(type_url, watch, resources, options);
-  // TODO (dmitri-d) return naked pointer instead once legacy mux has been removed and mux interface
-  // can be updated
-  return std::make_unique<WatchCompatibilityWrapper>(watch);
+  return std::make_unique<WatchImpl>(type_url, watch, *this, options);
 }
 
 // Updates the list of resource names watched by the given watch. If an added name is new across
@@ -407,16 +405,6 @@ Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   const absl::flat_hash_set<std::string>&,
                                                   SubscriptionCallbacks&, OpaqueResourceDecoder&,
                                                   const SubscriptionOptions&) {
-  throw EnvoyException("ADS must be configured to support an ADS config source");
-}
-
-void NullGrpcMuxImpl::updateWatch(const std::string&, Watch*,
-                                  const absl::flat_hash_set<std::string>&,
-                                  const SubscriptionOptions&) {
-  throw EnvoyException("ADS must be configured to support an ADS config source");
-}
-
-void NullGrpcMuxImpl::removeWatch(const std::string&, Watch*) {
   throw EnvoyException("ADS must be configured to support an ADS config source");
 }
 

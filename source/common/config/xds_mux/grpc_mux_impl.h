@@ -36,14 +36,6 @@ public:
   virtual void shutdown() PURE;
 };
 
-class WatchCompatibilityWrapper : public Envoy::Config::GrpcMuxWatch {
-public:
-  WatchCompatibilityWrapper(Watch* watch) : watch_(watch) {}
-  void update(const absl::flat_hash_set<std::string>&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-
-  Watch* watch_;
-};
-
 // Manages subscriptions to one or more type of resource. The logical protocol
 // state of those subscription(s) is handled by SubscriptionState.
 // This class owns the GrpcStream used to talk to the server, maintains queuing
@@ -73,10 +65,10 @@ public:
 
   ~GrpcMuxImpl() override;
 
-  // Causes all NewGrpcMuxImpl objects to stop sending any messages on `grpc_stream_` to fix a crash
+  // Causes all GrpcMuxImpl objects to stop sending any messages on `grpc_stream_` to fix a crash
   // on Envoy shutdown due to dangling pointers. This may not be the ideal fix; it is probably
   // preferable for the `ServerImpl` to cause all configuration subscriptions to be shutdown, which
-  // would then cause all `NewGrpcMuxImpl` to be destructed.
+  // would then cause all `GrpcMuxImpl` to be destructed.
   // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
   static void shutdownAll();
 
@@ -91,8 +83,8 @@ public:
                                    const SubscriptionOptions& options) override;
   void updateWatch(const std::string& type_url, Watch* watch,
                    const absl::flat_hash_set<std::string>& resources,
-                   const SubscriptionOptions& options) override;
-  void removeWatch(const std::string& type_url, Watch* watch) override;
+                   const SubscriptionOptions& options);
+  void removeWatch(const std::string& type_url, Watch* watch);
 
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
@@ -114,6 +106,32 @@ public:
   GrpcStream<RQ, RS>& grpcStreamForTest() { return grpc_stream_; }
 
 protected:
+  class WatchImpl : public Envoy::Config::GrpcMuxWatch {
+  public:
+    WatchImpl(const std::string& type_url, Watch* watch, GrpcMuxImpl& parent,
+              const SubscriptionOptions& options)
+        : type_url_(type_url), watch_(watch), parent_(parent), options_(options) {}
+
+    ~WatchImpl() override { remove(); }
+
+    void remove() {
+      if (watch_) {
+        parent_.removeWatch(type_url_, watch_);
+        watch_ = nullptr;
+      }
+    }
+
+    void update(const absl::flat_hash_set<std::string>& resources) override {
+      parent_.updateWatch(type_url_, watch_, resources, options_);
+    }
+
+  private:
+    const std::string type_url_;
+    Watch* watch_;
+    GrpcMuxImpl& parent_;
+    const SubscriptionOptions options_;
+  };
+
   void establishGrpcStream() { grpc_stream_.establishNewStream(); }
   void sendGrpcMessage(RQ& msg_proto, S& sub_state);
   void maybeUpdateQueueSizeStat(uint64_t size) { grpc_stream_.maybeUpdateQueueSizeStat(size); }
@@ -142,15 +160,15 @@ protected:
 
 private:
   // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
-  // whether we *want* to send a DeltaDiscoveryRequest).
+  // whether we *want* to send a (Delta)DiscoveryRequest).
   bool canSendDiscoveryRequest(const std::string& type_url);
 
-  // Checks whether we have something to say in a DeltaDiscoveryRequest, which can be an ACK and/or
-  // a subscription update. (Does not check whether we *can* send that DeltaDiscoveryRequest).
-  // Returns the type_url we should send the DeltaDiscoveryRequest for (if any).
-  // First, prioritizes ACKs over non-ACK subscription interest updates.
-  // Then, prioritizes non-ACK updates in the order the various types
-  // of subscriptions were activated (as tracked by subscription_ordering_).
+  // Checks whether we have something to say in a (Delta)DiscoveryRequest, which can be an ACK
+  // and/or a subscription update. (Does not check whether we *can* send that
+  // (Delta)DiscoveryRequest). Returns the type_url we should send the DeltaDiscoveryRequest for (if
+  // any). First, prioritizes ACKs over non-ACK subscription interest updates. Then, prioritizes
+  // non-ACK updates in the order the various types of subscriptions were activated (as tracked by
+  // subscription_ordering_).
   absl::optional<std::string> whoWantsToSendDiscoveryRequest();
 
   // Invoked when dynamic context parameters change for a resource type.
@@ -181,7 +199,7 @@ private:
   // State to help with skip_subsequent_node's logic.
   bool any_request_sent_yet_in_current_stream_{};
 
-  // Used to populate the [Delta]DiscoveryRequest's node field. That field is the same across
+  // Used to populate the (Delta)DiscoveryRequest's node field. That field is the same across
   // all type_urls, and moreover, the 'skip_subsequent_node' logic needs to operate across all
   // the type_urls. So, while the SubscriptionStates populate every other field of these messages,
   // this one is up to GrpcMux.
@@ -237,10 +255,6 @@ public:
   ScopedResume pause(const std::vector<std::string>) override {
     return std::make_unique<Cleanup>([]() {});
   }
-
-  void updateWatch(const std::string&, Watch*, const absl::flat_hash_set<std::string>&,
-                   const SubscriptionOptions&) override;
-  void removeWatch(const std::string&, Watch*) override;
 
   Config::GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
                                    SubscriptionCallbacks&, OpaqueResourceDecoder&,

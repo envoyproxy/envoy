@@ -192,11 +192,8 @@ TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
   // Update to bar type should resend Node.
   expectSendMessage("bar", {}, {});
   local_info_.context_provider_.update_cb_handler_.runCallbacks("bar");
-  if (!isUnifiedMuxTest()) {
-    // in "legacy" delta mux implementation destruction of "foo_sub"
-    // results in an unsubscribe message.
-    expectSendMessage("foo", {}, {"x", "y"});
-  }
+
+  expectSendMessage("foo", {}, {"x", "y"});
 }
 
 // Validate cached nonces are cleared on reconnection.
@@ -246,11 +243,8 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   expectSendMessage(type_url, {"x", "y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
                     {{"x", "2000"}, {"y", "3000"}});
   remoteClose();
-  if (!isUnifiedMuxTest()) {
-    // in legacy implementation, destruction of the EDS subscription will issue an "unsubscribe"
-    // request.
-    expectSendMessage(type_url, {}, {"x", "y"});
-  }
+
+  expectSendMessage(type_url, {}, {"x", "y"});
 }
 
 // Validate resources are not sent on wildcard watch reconnection.
@@ -406,14 +400,8 @@ TEST_P(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   EXPECT_LOG_CONTAINS("debug", "for " + type_url + " from HAL 9000",
                       onDiscoveryResponse(std::move(response)));
   EXPECT_TRUE(subscriptionExists(type_url));
-  if (isUnifiedMuxTest()) {
-    dynamic_cast<XdsMux::GrpcMuxDelta*>(grpc_mux_.get())
-        ->updateWatch(type_url,
-                      dynamic_cast<XdsMux::WatchCompatibilityWrapper*>(watch.get())->watch_, {},
-                      options);
-  } else {
-    watch->update({});
-  }
+  watch->update({});
+
   EXPECT_EQ("HAL 9000", stats_.textReadout("control_plane.identifier").value());
 }
 
@@ -547,11 +535,7 @@ TEST_P(NewGrpcMuxImplTest, RequestOnDemandUpdate) {
   expectSendMessage("foo", {"z"}, {});
   grpc_mux_->requestOnDemandUpdate("foo", {"z"});
 
-  if (!isUnifiedMuxTest()) {
-    // in legacy implementation, destruction of the EDS subscription will issue an "unsubscribe"
-    // request.
-    expectSendMessage("foo", {}, {"x", "y"});
-  }
+  expectSendMessage("foo", {}, {"x", "y"});
 }
 
 TEST_P(NewGrpcMuxImplTest, Shutdown) {

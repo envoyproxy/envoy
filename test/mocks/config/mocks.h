@@ -123,13 +123,6 @@ public:
               (const std::string& type_url,
                const absl::flat_hash_set<std::string>& add_these_names));
 
-  MOCK_METHOD(void, updateWatch,
-              (const std::string& type_url, Watch* watch,
-               const absl::flat_hash_set<std::string>& resources,
-               const SubscriptionOptions& options));
-
-  MOCK_METHOD(void, removeWatch, (const std::string& type_url, Watch* watch));
-
   MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
 };
 

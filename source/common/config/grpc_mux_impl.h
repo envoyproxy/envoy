@@ -88,12 +88,6 @@ private:
   void setRetryTimer();
   void sendDiscoveryRequest(const std::string& type_url);
 
-  void removeWatch(const std::string&, Watch*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  void updateWatch(const std::string&, Watch*, const absl::flat_hash_set<std::string>&,
-                   const SubscriptionOptions&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,
                      SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
@@ -222,9 +216,6 @@ public:
     ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
   }
 
-  void updateWatch(const std::string&, Watch*, const absl::flat_hash_set<std::string>&,
-                   const SubscriptionOptions&) override;
-  void removeWatch(const std::string&, Watch*) override;
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }

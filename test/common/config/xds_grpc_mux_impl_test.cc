@@ -104,37 +104,16 @@ public:
         sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_request), false));
   }
 
-  // These tests were written around GrpcMuxWatch, an RAII type returned by the old subscribe().
-  // To preserve these tests for the new code, we need an RAII watch handler. That is
-  // GrpcSubscriptionImpl, but to keep things simple, we'll fake it. (What we really care about
-  // is the destructor, which is identical to the real one).
-  class FakeGrpcSubscription {
-  public:
-    FakeGrpcSubscription(GrpcMux* grpc_mux, std::string type_url, Config::GrpcMuxWatchPtr watch)
-        : grpc_mux_(grpc_mux), type_url_(std::move(type_url)),
-          watch_(dynamic_cast<XdsMux::WatchCompatibilityWrapper*>(watch.get())->watch_) {}
-    ~FakeGrpcSubscription() { grpc_mux_->removeWatch(type_url_, watch_); }
-
-  private:
-    GrpcMux* const grpc_mux_;
-    std::string type_url_;
-    Watch* const watch_;
-  };
-
-  FakeGrpcSubscription makeWatch(const std::string& type_url,
-                                 const absl::flat_hash_set<std::string>& resources) {
-    return FakeGrpcSubscription(
-        grpc_mux_.get(), type_url,
-        grpc_mux_->addWatch(type_url, resources, callbacks_, resource_decoder_, {}));
+  Config::GrpcMuxWatchPtr makeWatch(const std::string& type_url,
+                                    const absl::flat_hash_set<std::string>& resources) {
+    return grpc_mux_->addWatch(type_url, resources, callbacks_, resource_decoder_, {});
   }
 
-  FakeGrpcSubscription makeWatch(const std::string& type_url,
-                                 const absl::flat_hash_set<std::string>& resources,
-                                 NiceMock<MockSubscriptionCallbacks>& callbacks,
-                                 Config::OpaqueResourceDecoder& resource_decoder) {
-    return FakeGrpcSubscription(
-        grpc_mux_.get(), type_url,
-        grpc_mux_->addWatch(type_url, resources, callbacks, resource_decoder, {}));
+  Config::GrpcMuxWatchPtr makeWatch(const std::string& type_url,
+                                    const absl::flat_hash_set<std::string>& resources,
+                                    NiceMock<MockSubscriptionCallbacks>& callbacks,
+                                    Config::OpaqueResourceDecoder& resource_decoder) {
+    return grpc_mux_->addWatch(type_url, resources, callbacks, resource_decoder, {});
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -163,17 +142,17 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
   setup();
   InSequence s;
 
-  FakeGrpcSubscription foo_sub = makeWatch("type_url_foo", {"x", "y"});
-  FakeGrpcSubscription bar_sub = makeWatch("type_url_bar", {});
+  auto foo_sub = makeWatch("type_url_foo", {"x", "y"});
+  auto bar_sub = makeWatch("type_url_bar", {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("type_url_foo", {"x", "y"}, "", true);
   expectSendMessage("type_url_bar", {}, "");
   grpc_mux_->start();
   EXPECT_EQ(1, control_plane_connected_state_.value());
   expectSendMessage("type_url_bar", {"z"}, "");
-  FakeGrpcSubscription bar_z_sub = makeWatch("type_url_bar", {"z"});
+  auto bar_z_sub = makeWatch("type_url_bar", {"z"});
   expectSendMessage("type_url_bar", {"zz", "z"}, "");
-  FakeGrpcSubscription bar_zz_sub = makeWatch("type_url_bar", {"zz"});
+  auto bar_zz_sub = makeWatch("type_url_bar", {"zz"});
   expectSendMessage("type_url_bar", {"z"}, "");
   expectSendMessage("type_url_bar", {}, "");
   expectSendMessage("type_url_foo", {}, "");
@@ -190,9 +169,9 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   new Event::MockTimer(&dispatcher_);
 
   setup();
-  FakeGrpcSubscription foo_sub = makeWatch("type_url_foo", {"x", "y"});
-  FakeGrpcSubscription bar_sub = makeWatch("type_url_bar", {});
-  FakeGrpcSubscription baz_sub = makeWatch("type_url_baz", {"z"});
+  auto foo_sub = makeWatch("type_url_foo", {"x", "y"});
+  auto bar_sub = makeWatch("type_url_bar", {});
+  auto baz_sub = makeWatch("type_url_baz", {"z"});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("type_url_foo", {"x", "y"}, "", true);
   expectSendMessage("type_url_bar", {}, "");
@@ -202,7 +181,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   // Send another message for foo so that the node is cleared in the cached request.
   // This is to test that the the node is set again in the first message below.
   expectSendMessage("type_url_foo", {"z", "x", "y"}, "");
-  FakeGrpcSubscription foo_z_sub = makeWatch("type_url_foo", {"z"});
+  auto foo_z_sub = makeWatch("type_url_foo", {"z"});
 
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _))
@@ -227,7 +206,10 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
 TEST_F(GrpcMuxImplTest, PauseResume) {
   setup();
   InSequence s;
-  grpc_mux_->addWatch("type_url_foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  GrpcMuxWatchPtr foo1;
+  GrpcMuxWatchPtr foo2;
+  GrpcMuxWatchPtr foo3;
+  auto foo = grpc_mux_->addWatch("type_url_foo", {"x", "y"}, callbacks_, resource_decoder_, {});
   {
     ScopedResume a = grpc_mux_->pause("type_url_foo");
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
@@ -237,20 +219,21 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
   {
     ScopedResume a = grpc_mux_->pause("type_url_bar");
     expectSendMessage("type_url_foo", {"z", "x", "y"}, "");
-    grpc_mux_->addWatch("type_url_foo", {"z"}, callbacks_, resource_decoder_, {});
+    foo1 = grpc_mux_->addWatch("type_url_foo", {"z"}, callbacks_, resource_decoder_, {});
   }
   {
     ScopedResume a = grpc_mux_->pause("type_url_foo");
-    grpc_mux_->addWatch("type_url_foo", {"zz"}, callbacks_, resource_decoder_, {});
+    foo2 = grpc_mux_->addWatch("type_url_foo", {"zz"}, callbacks_, resource_decoder_, {});
     expectSendMessage("type_url_foo", {"zz", "z", "x", "y"}, "");
   }
   // When nesting, we only have a single resumption.
   {
     ScopedResume a = grpc_mux_->pause("type_url_foo");
     ScopedResume b = grpc_mux_->pause("type_url_foo");
-    grpc_mux_->addWatch("type_url_foo", {"zzz"}, callbacks_, resource_decoder_, {});
+    foo3 = grpc_mux_->addWatch("type_url_foo", {"zzz"}, callbacks_, resource_decoder_, {});
     expectSendMessage("type_url_foo", {"zzz", "zz", "z", "x", "y"}, "");
   }
+
   grpc_mux_->pause("type_url_foo")->cancel();
 }
 
@@ -260,7 +243,7 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
 
   auto invalid_response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   InSequence s;
-  FakeGrpcSubscription foo_sub = makeWatch("type_url_foo", {"x", "y"});
+  auto foo_sub = makeWatch("type_url_foo", {"x", "y"});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("type_url_foo", {"x", "y"}, "", true);
@@ -300,7 +283,7 @@ TEST_F(GrpcMuxImplTest, RpcErrorMessageTruncated) {
   setup();
   auto invalid_response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   InSequence s;
-  FakeGrpcSubscription foo_sub = makeWatch("type_url_foo", {"x", "y"});
+  auto foo_sub = makeWatch("type_url_foo", {"x", "y"});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("type_url_foo", {"x", "y"}, "", true);
@@ -368,7 +351,7 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   InSequence s;
   auto* ttl_timer = new Event::MockTimer(&dispatcher_);
-  FakeGrpcSubscription eds_sub = makeWatch(type_url, {"x"}, callbacks_, resource_decoder);
+  auto eds_sub = makeWatch(type_url, {"x"}, callbacks_, resource_decoder);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x"}, "", true);
@@ -525,7 +508,7 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
   setup();
 
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  FakeGrpcSubscription foo_sub = makeWatch(type_url, {}, callbacks_, resource_decoder_);
+  auto foo_sub = makeWatch(type_url, {}, callbacks_, resource_decoder_);
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {}, "", true);
   grpc_mux_->start();
@@ -559,9 +542,9 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
 
   NiceMock<MockSubscriptionCallbacks> foo_callbacks;
-  FakeGrpcSubscription foo_sub = makeWatch(type_url, {"x", "y"}, foo_callbacks, resource_decoder_);
+  auto foo_sub = makeWatch(type_url, {"x", "y"}, foo_callbacks, resource_decoder_);
   NiceMock<MockSubscriptionCallbacks> bar_callbacks;
-  FakeGrpcSubscription bar_sub = makeWatch(type_url, {"y", "z"}, bar_callbacks, resource_decoder_);
+  auto bar_sub = makeWatch(type_url, {"y", "z"}, bar_callbacks, resource_decoder_);
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Should dedupe the "x" resource.
   expectSendMessage(type_url, {"y", "z", "x"}, "", true);
@@ -644,7 +627,7 @@ TEST_F(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   NiceMock<MockSubscriptionCallbacks> foo_callbacks;
-  FakeGrpcSubscription foo_sub = makeWatch(type_url, {"x", "y"}, foo_callbacks, resource_decoder_);
+  auto foo_sub = makeWatch(type_url, {"x", "y"}, foo_callbacks, resource_decoder_);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x", "y"}, "", true);
@@ -666,7 +649,7 @@ TEST_F(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
   setup();
   const std::string& type_url = Config::TypeUrl::get().Cluster;
   NiceMock<MockSubscriptionCallbacks> foo_callbacks;
-  FakeGrpcSubscription foo_sub = makeWatch(type_url, {}, foo_callbacks, resource_decoder_);
+  auto foo_sub = makeWatch(type_url, {}, foo_callbacks, resource_decoder_);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {}, "", true);
@@ -717,7 +700,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
     }
   };
 
-  FakeGrpcSubscription foo_sub = makeWatch("type_url_foo", {"x"});
+  auto foo_sub = makeWatch("type_url_foo", {"x"});
   expectSendMessage("type_url_foo", {"x"}, "", true);
   grpc_mux_->start();
 
@@ -756,7 +739,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithEmptyRateLimitSettings) {
     }
   };
 
-  FakeGrpcSubscription foo_sub = makeWatch("type_url_foo", {"x"});
+  auto foo_sub = makeWatch("type_url_foo", {"x"});
   expectSendMessage("type_url_foo", {"x"}, "", true);
   grpc_mux_->start();
 
@@ -816,7 +799,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
     }
   };
 
-  FakeGrpcSubscription foo_sub = makeWatch("type_url_foo", {"x"});
+  auto foo_sub = makeWatch("type_url_foo", {"x"});
   expectSendMessage("type_url_foo", {"x"}, "", true);
   grpc_mux_->start();
 
@@ -851,7 +834,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   {
     // subscribe and unsubscribe to simulate a cluster added and removed
     expectSendMessage(type_url, {"y"}, "", true);
-    FakeGrpcSubscription temp_sub = makeWatch(type_url, {"y"});
+    auto temp_sub = makeWatch(type_url, {"y"});
     expectSendMessage(type_url, {}, "");
   }
 
@@ -868,7 +851,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
 
   // When we become interested in "x", we should send a request indicating that interest.
   expectSendMessage(type_url, {"x"}, "1", false, "bar");
-  FakeGrpcSubscription sub = makeWatch(type_url, {"x"});
+  auto sub = makeWatch(type_url, {"x"});
 
   // Watch destroyed -> interest gone -> unsubscribe request.
   expectSendMessage(type_url, {}, "1", false, "bar");
@@ -892,7 +875,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsResources) {
   {
     expectSendMessage(type_url, {"y"}, "", true);
     expectSendMessage(type_url, {}, "");
-    FakeGrpcSubscription delete_immediately = makeWatch(type_url, {"y"});
+    auto delete_immediately = makeWatch(type_url, {"y"});
   }
   auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   response->set_type_url(type_url);
@@ -937,8 +920,8 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
 TEST_F(GrpcMuxImplTest, DynamicContextParameters) {
   setup();
   InSequence s;
-  grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
-  grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
+  auto foo = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  auto bar = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, "", true);
   expectSendMessage("bar", {}, "");
@@ -951,6 +934,9 @@ TEST_F(GrpcMuxImplTest, DynamicContextParameters) {
   // Update to bar type should resend Node.
   expectSendMessage("bar", {}, "", true);
   local_info_.context_provider_.update_cb_handler_.runCallbacks("bar");
+  // only destruction of foo watch is going to result in an unsubscribe message.
+  // bar watch is empty and its destruction doesn't change it resource list.
+  expectSendMessage("foo", {}, "", false);
 }
 
 } // namespace
