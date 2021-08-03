@@ -62,6 +62,7 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     external_deps = ["curl"],
     deps = [
+        "//source/common/common:empty_string",
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
     ],

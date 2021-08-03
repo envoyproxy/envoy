@@ -11,7 +11,6 @@
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/load_balancer.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
@@ -160,11 +159,29 @@ private:
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
 };
 
+// Adapter from DecoderFilterCallbacks to UpstreamResponseCallbacks.
+class UpstreamResponseCallbacksImpl : public UpstreamResponseCallbacks {
+public:
+  UpstreamResponseCallbacksImpl(ThriftFilters::DecoderFilterCallbacks* callbacks)
+      : callbacks_(callbacks) {}
+
+  void startUpstreamResponse(Transport& transport, Protocol& protocol) override {
+    callbacks_->startUpstreamResponse(transport, protocol);
+  }
+  ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override {
+    return callbacks_->upstreamData(buffer);
+  }
+  MessageMetadataSharedPtr responseMetadata() override { return callbacks_->responseMetadata(); }
+  bool responseSuccess() override { return callbacks_->responseSuccess(); }
+
+private:
+  ThriftFilters::DecoderFilterCallbacks* callbacks_{};
+};
+
 class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                public Upstream::LoadBalancerContextBase,
                public RequestOwner,
-               public ThriftFilters::DecoderFilter,
-               Logger::Loggable<Logger::Id::thrift> {
+               public ThriftFilters::DecoderFilter {
 public:
   Router(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
          Stats::Scope& scope)
@@ -213,16 +230,15 @@ private:
   void cleanup();
 
   ThriftFilters::DecoderFilterCallbacks* callbacks_{};
+  std::unique_ptr<UpstreamResponseCallbacksImpl> upstream_response_callbacks_{};
   RouteConstSharedPtr route_{};
   const RouteEntry* route_entry_{};
-  Upstream::ClusterInfoConstSharedPtr cluster_;
 
   std::unique_ptr<UpstreamRequest> upstream_request_;
   Buffer::OwnedImpl upstream_request_buffer_;
 
   bool passthrough_supported_ : 1;
   uint64_t request_size_{};
-  uint64_t response_size_{};
 };
 
 } // namespace Router

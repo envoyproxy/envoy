@@ -326,31 +326,11 @@ TEST_F(FilterTest, TestNoRoute) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
 }
 
-// Test if routeEntry() return null, fallback to call config config.
-TEST_F(FilterTest, TestNoRouteEnty) {
-  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
-  // routeEntry() call return nullptr
-  EXPECT_CALL(*mock_route_, routeEntry()).WillOnce(Return(nullptr));
-
-  // Calling the findVerifier from filter config.
-  EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).WillOnce(Return(nullptr));
-  // findPerRouteVerifier is not called.
-  EXPECT_CALL(*mock_config_.get(), findPerRouteVerifier(_)).Times(0);
-
-  auto headers = Http::TestRequestHeaderMapImpl{};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-  EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
-
-  Buffer::OwnedImpl data("");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
-}
-
 // Test if no per-route config, fallback to call config config.
 TEST_F(FilterTest, TestNoPerRouteConfig) {
   EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
   // perFilterConfig return nullptr.
-  EXPECT_CALL(mock_route_->route_entry_, perFilterConfig("envoy.filters.http.jwt_authn"))
+  EXPECT_CALL(*mock_route_, mostSpecificPerFilterConfig("envoy.filters.http.jwt_authn"))
       .WillOnce(Return(nullptr));
 
   // Calling the findVerifier from filter config.
@@ -370,7 +350,7 @@ TEST_F(FilterTest, TestNoPerRouteConfig) {
 // Test bypass requirement from per-route config
 TEST_F(FilterTest, TestPerRouteBypass) {
   EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
-  EXPECT_CALL(mock_route_->route_entry_, perFilterConfig("envoy.filters.http.jwt_authn"))
+  EXPECT_CALL(*mock_route_, mostSpecificPerFilterConfig("envoy.filters.http.jwt_authn"))
       .WillOnce(Return(per_route_config_.get()));
 
   // findVerifier is not called.
@@ -391,7 +371,7 @@ TEST_F(FilterTest, TestPerRouteBypass) {
 // Test per-route config with wrong requirement_name
 TEST_F(FilterTest, TestPerRouteWrongRequirementName) {
   EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
-  EXPECT_CALL(mock_route_->route_entry_, perFilterConfig("envoy.filters.http.jwt_authn"))
+  EXPECT_CALL(*mock_route_, mostSpecificPerFilterConfig("envoy.filters.http.jwt_authn"))
       .WillOnce(Return(per_route_config_.get()));
 
   // findVerifier is not called.
@@ -415,7 +395,7 @@ TEST_F(FilterTest, TestPerRouteWrongRequirementName) {
 // Test verifier from per-route config
 TEST_F(FilterTest, TestPerRouteVerifierOK) {
   EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
-  EXPECT_CALL(mock_route_->route_entry_, perFilterConfig("envoy.filters.http.jwt_authn"))
+  EXPECT_CALL(*mock_route_, mostSpecificPerFilterConfig("envoy.filters.http.jwt_authn"))
       .WillOnce(Return(per_route_config_.get()));
 
   // findVerifier is not called.
