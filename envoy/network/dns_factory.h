@@ -66,18 +66,18 @@ static inline
                                envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
 
   if (config.has_typed_dns_resolver_config()) {
-        typed_dns_resolver_config.CopyFrom(config.typed_dns_resolver_config());
+        typed_dns_resolver_config.MergeFrom(config.typed_dns_resolver_config());
   } else {
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
     if (config.has_dns_resolution_config()) {
-      cares.mutable_resolvers()->CopyFrom(config.dns_resolution_config().resolvers());
-      cares.mutable_dns_resolver_options()->CopyFrom(config.dns_resolution_config().dns_resolver_options());
+      cares.mutable_resolvers()->MergeFrom(config.dns_resolution_config().resolvers());
+      cares.mutable_dns_resolver_options()->MergeFrom(config.dns_resolution_config().dns_resolver_options());
     } else {
       // Skipping copying these fields for DnsFilterConfig.
       if constexpr (!(std::is_same_v<T,envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig::ClientContextConfig>)) {
         cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(config.use_tcp_for_dns_lookups());
         if constexpr (std::is_same_v<T, envoy::config::cluster::v3::Cluster>) {
-          cares.mutable_resolvers()->CopyFrom(config.dns_resolvers()); // for cluster config, need to copy dns_resolvers field.
+          cares.mutable_resolvers()->MergeFrom(config.dns_resolvers()); // for cluster config, need to copy dns_resolvers field.
         }
       }
     }
