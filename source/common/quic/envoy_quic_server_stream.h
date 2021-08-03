@@ -70,7 +70,7 @@ public:
 
   // EnvoyQuicStream
   Http::HeaderUtility::HeaderValidationResult
-  validateHeader(const std::string& header_name, absl::string_view header_value) override;
+  validateHeader(absl::string_view header_name, absl::string_view header_value) override;
 
 protected:
   // EnvoyQuicStream
