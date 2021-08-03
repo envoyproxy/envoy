@@ -28,7 +28,7 @@ public:
                const HostVector& hosts_removed, absl::optional<uint32_t> overprovisioning_factor,
                HostMapConstSharedPtr cross_priority_host_map));
   MOCK_METHOD(void, batchHostUpdate, (BatchUpdateCb&));
-  MOCK_METHOD(const HostMapConstSharedPtr&, crossPriorityHostMap, (), (const));
+  MOCK_METHOD(HostMapConstSharedPtr, crossPriorityHostMap, (), (const));
 
   MockHostSet* getMockHostSet(uint32_t priority) {
     getHostSet(priority); // Ensure the host set exists.
