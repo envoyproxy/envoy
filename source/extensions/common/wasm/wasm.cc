@@ -175,11 +175,8 @@ Word resolve_dns(void* raw_context, Word dns_address_ptr, Word dns_address_size,
     root_context->onResolveDns(token, status, std::move(response));
   };
   if (!context->wasm()->dnsResolver()) {
-    envoy::config::core::v3::DnsResolutionConfig dns_resolution_config;
-    envoy::config::core::v3::TypedExtensionConfig dns_resolver_config;
-
     context->wasm()->dnsResolver() = context->wasm()->dispatcher().createDnsResolver(
-        dns_resolution_config, dns_resolver_config);
+        envoy::config::core::v3::TypedExtensionConfig());
   }
   context->wasm()->dnsResolver()->resolve(std::string(address.value()),
                                           Network::DnsLookupFamily::Auto, callback);

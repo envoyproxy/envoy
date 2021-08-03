@@ -2,6 +2,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/server/options.h"
+#include "envoy/network/dns_factory.h"
 
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
@@ -93,27 +94,9 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
        !cluster.dns_resolution_config().resolvers().empty()) ||
       !cluster.dns_resolvers().empty()) {
 
-    envoy::config::core::v3::DnsResolutionConfig dns_resolution_config;
-    envoy::config::core::v3::TypedExtensionConfig dns_resolver_config;
-
-    if (cluster.has_typed_dns_resolver_config()) {
-      dns_resolver_config.CopyFrom(cluster.typed_dns_resolver_config());
-    } else {
-      if (cluster.has_dns_resolution_config()) {
-        dns_resolution_config.CopyFrom(cluster.dns_resolution_config());
-      } else {
-        // If `cluster.dns_resolution_config` is not set.
-        // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward
-        // compatible utilize cluster.use_tcp_for_dns_lookups().
-        dns_resolution_config.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(cluster.use_tcp_for_dns_lookups());
-        // Field repeated Address `dns_resolvers` will be deprecated in future. To be backward
-        // compatible utilize cluster.dns_resolvers().
-        dns_resolution_config.mutable_resolvers()->CopyFrom(cluster.dns_resolvers());
-      }
-    }
-
-    return context.dispatcher().createDnsResolver(dns_resolution_config,
-                                                  dns_resolver_config);
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    Envoy::Network::makeDnsResolverConfig(cluster, typed_dns_resolver_config);
+    return context.dispatcher().createDnsResolver(typed_dns_resolver_config);
   }
 
   return context.dnsResolver();

@@ -75,9 +75,7 @@ public:
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
-    envoy::config::core::v3::DnsResolutionConfig dns_resolution_config;
-    envoy::config::core::v3::TypedExtensionConfig dns_resolver_config;
-    return dispatcher().createDnsResolver(dns_resolution_config, dns_resolver_config);
+    return dispatcher().createDnsResolver(envoy::config::core::v3::TypedExtensionConfig());
   }
   void drainListeners() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   DrainManager& drainManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

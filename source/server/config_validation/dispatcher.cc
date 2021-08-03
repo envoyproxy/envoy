@@ -16,8 +16,7 @@ Network::ClientConnectionPtr ValidationDispatcher::createClientConnection(
 }
 
 Network::DnsResolverSharedPtr ValidationDispatcher::createDnsResolver(
-    envoy::config::core::v3::DnsResolutionConfig&,
-    envoy::config::core::v3::TypedExtensionConfig&) {
+    const envoy::config::core::v3::TypedExtensionConfig&) {
   return dns_resolver_;
 }
 

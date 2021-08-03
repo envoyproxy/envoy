@@ -153,46 +153,29 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                                          std::move(transport_socket), options);
 }
 
-// @param dns_resolution_config always contains data since even DnsResolutionConfig is not present
-// in the caller protobuf config (could be bootstrap_, cluster, or dns_cache_config),
-// the caller will program some other data in it, like use_tcp_for_dns_lookups or dns_resolvers.
-// @param dns_resolver_config could be empty.
+
+// Create DNS resolver based on the @param typed_dns_resolver_config, which could be
+// cares DNS resolver, Apple DNS resolver, or any other DNS resolver type.
+// If no DNS resolver type are registered, or none of the registered DNS resolver
+// matching the typed_dns_resolver_config, getAndCheckFactory() will throw an exception
+// and the code will abort.
+
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
-    envoy::config::core::v3::DnsResolutionConfig& dns_resolution_config,
-    envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) {
+    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
 
   ASSERT(isThreadSafe());
 
   Network::DnsResolverFactory* dns_resolver_factory;
 
-  if (dns_resolver_config.typed_config().type_url().empty()) {
-    // If the typed dns resolver configuration is missing, synthetic a dns_resolver_config
-    // based on the run time use_apple_api_for_dns_lookups flag. Then using
-    // the dns_resolver_config to retrieve dns_resolver_factory.
-
-    static bool use_apple_api_for_dns_lookups =
-      Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups");
-    if (use_apple_api_for_dns_lookups) {
-      // In Apple system, ignore the dns_resolution_config.
-      dns_resolver_config.mutable_typed_config()->PackFrom(Envoy::ProtobufWkt::Struct());
-    } else {
-      dns_resolver_config.mutable_typed_config()->PackFrom(dns_resolution_config);
-    }
-  }
-
   // If a typed dns resolver is configured, derive the DNS resolver factory from the config.
+  // The code will abort if no factory can be found.
   dns_resolver_factory =
-      &Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(dns_resolver_config);
-  if (dns_resolver_factory != nullptr) {
-    ENVOY_LOG(info, "create DNS resolver type: {}", dns_resolver_config.name());
-    return dns_resolver_factory->createDnsResolverCb(*this,
-                                                     api_,
-                                                     dns_resolver_config);
+      &Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(typed_dns_resolver_config);
 
-  }
-
-  return nullptr;
-
+  ENVOY_LOG(info, "create DNS resolver type: {}", typed_dns_resolver_config.name());
+  return dns_resolver_factory->createDnsResolverCb(*this,
+                                                   api_,
+                                                   typed_dns_resolver_config);
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,

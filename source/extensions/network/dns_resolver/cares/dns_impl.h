@@ -120,21 +120,20 @@ public:
   std::string name() const override { return "envoy.dns_resolver.cares"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::config::core::v3::DnsResolutionConfig};
+    return ProtobufTypes::MessagePtr{new envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig()};
   }
 
   DnsResolverSharedPtr createDnsResolverCb(Event::Dispatcher& dispatcher,
                                            const Api::Api&,
-                                           const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) override {
-    envoy::config::core::v3::DnsResolutionConfig dns_resolution_config;
+                                           const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) override {
+    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
     envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
 
-    dns_resolver_config.typed_config().UnpackTo(&dns_resolution_config);
-
-    dns_resolver_options.CopyFrom(dns_resolution_config.dns_resolver_options());
-    if (!dns_resolution_config.resolvers().empty()) {
-      const auto& resolver_addrs = dns_resolution_config.resolvers();
+    typed_dns_resolver_config.typed_config().UnpackTo(&cares);
+    dns_resolver_options.CopyFrom(cares.dns_resolver_options());
+    if (!cares.resolvers().empty()) {
+      const auto& resolver_addrs = cares.resolvers();
       resolvers.reserve(resolver_addrs.size());
       for (const auto& resolver_addr : resolver_addrs) {
         resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));

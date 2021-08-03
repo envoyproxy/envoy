@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
+#include "envoy/network/dns_factory.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/resolver_impl.h"
@@ -71,22 +72,9 @@ DnsCacheImpl::~DnsCacheImpl() {
 Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
     Event::Dispatcher& main_thread_dispatcher) {
-  envoy::config::core::v3::DnsResolutionConfig dns_resolution_config;
-  envoy::config::core::v3::TypedExtensionConfig dns_resolver_config;
-
-  if (config.has_typed_dns_resolver_config()) {
-    dns_resolver_config.CopyFrom(config.typed_dns_resolver_config());
-  } else {
-    if (config.has_dns_resolution_config()) {
-      dns_resolution_config.CopyFrom(config.dns_resolution_config());
-    } else {
-      // If DnsResolutionConfig proto config is missing, put the to-be-deprecated config
-      // use_tcp_for_dns_lookups in dns_resolution_config for backward compatibility support.
-      dns_resolution_config.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(config.use_tcp_for_dns_lookups());
-    }
-  }
-  return main_thread_dispatcher.createDnsResolver(dns_resolution_config,
-                                                  dns_resolver_config);
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Envoy::Network::makeDnsResolverConfig(config, typed_dns_resolver_config);
+  return main_thread_dispatcher.createDnsResolver(typed_dns_resolver_config);
 
 }
 

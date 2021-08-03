@@ -221,16 +221,15 @@ public:
   /**
    * Creates an async DNS resolver. The resolver should only be used on the thread that runs this
    * dispatcher.
-   * @param resolvers supplies the addresses of DNS resolvers that this resolver should use. If left
-   * empty, it will not use any specific resolvers, but use defaults (/etc/resolv.conf)
-   * @param dns_resolver_options supplies the aggregated area options flags needed for dns resolver
-   * init.
+   * @param typed_dns_resolver_config contains the resolvers (supplies the addresses of DNS resolvers
+   * that this resolver should use) or dns_resolver_options (supplies the aggregated area options flags
+   * needed for dns resolver init) information, or left empty. If empty,  it will not use any specific
+   * resolvers, but use defaults (/etc/resolv.conf).
    * @return Network::DnsResolverSharedPtr that is owned by the caller.
    */
   virtual Network::DnsResolverSharedPtr
   createDnsResolver(
-      envoy::config::core::v3::DnsResolutionConfig& dns_resolution_config,
-      envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) PURE;
+      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) PURE;
 
   /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.
