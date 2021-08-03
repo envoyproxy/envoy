@@ -339,8 +339,11 @@ public:
    * Set the amount of time allowed for the transport socket to report that a connection is
    * established. The provided timeout is relative to the current time. If this method is called
    * after a connection has already been established, it is a no-op.
+   *
+   * If a timeout occurs, `timeout_stat` will be incremented.
    */
-  virtual void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) PURE;
+  virtual void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
+                                                Stats::Counter& timeout_stat) PURE;
 };
 
 using ServerConnectionPtr = std::unique_ptr<ServerConnection>;

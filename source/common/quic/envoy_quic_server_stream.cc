@@ -241,13 +241,13 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
-    if (received_trailers().size() > filterManagerConnection()->maxIncomingHeadersCount()) {
-      details_ = Http3ResponseCodeDetailValues::too_many_trailers;
+    auto trailers = spdyHeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
+        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_);
+    if (trailers == nullptr) {
       onStreamError(close_connection_upon_invalid_header_);
       return;
     }
-    request_decoder_->decodeTrailers(
-        spdyHeaderBlockToEnvoyHeaders<Http::RequestTrailerMapImpl>(received_trailers()));
+    request_decoder_->decodeTrailers(std::move(trailers));
     MarkTrailersConsumed();
   }
 }
@@ -347,7 +347,7 @@ QuicFilterManagerConnectionImpl* EnvoyQuicServerStream::filterManagerConnection(
 }
 
 Http::HeaderUtility::HeaderValidationResult
-EnvoyQuicServerStream::validateHeader(const std::string& header_name,
+EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
                                       absl::string_view header_value) {
   Http::HeaderUtility::HeaderValidationResult result =
       EnvoyQuicStream::validateHeader(header_name, header_value);
