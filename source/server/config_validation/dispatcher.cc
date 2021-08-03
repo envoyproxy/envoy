@@ -15,8 +15,8 @@ Network::ClientConnectionPtr ValidationDispatcher::createClientConnection(
                                                              std::move(transport_socket), options);
 }
 
-Network::DnsResolverSharedPtr ValidationDispatcher::createDnsResolver(
-    const envoy::config::core::v3::TypedExtensionConfig&) {
+Network::DnsResolverSharedPtr
+ValidationDispatcher::createDnsResolver(const envoy::config::core::v3::TypedExtensionConfig&) {
   return dns_resolver_;
 }
 

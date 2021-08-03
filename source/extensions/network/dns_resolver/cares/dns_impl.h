@@ -120,12 +120,13 @@ public:
   std::string name() const override { return "envoy.dns_resolver.cares"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig()};
+    return ProtobufTypes::MessagePtr{
+        new envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig()};
   }
 
-  DnsResolverSharedPtr createDnsResolverCb(Event::Dispatcher& dispatcher,
-                                           const Api::Api&,
-                                           const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) override {
+  DnsResolverSharedPtr createDnsResolverCb(
+      Event::Dispatcher& dispatcher, const Api::Api&,
+      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) override {
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
     envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
@@ -139,11 +140,9 @@ public:
         resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
       }
     }
-    return std::make_shared<Network::DnsResolverImpl>(dispatcher,
-                                                      resolvers, dns_resolver_options);
+    return std::make_shared<Network::DnsResolverImpl>(dispatcher, resolvers, dns_resolver_options);
   }
 };
-
 
 } // namespace Network
 } // namespace Envoy

@@ -8,14 +8,15 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/scope_tracker.h"
+#include "envoy/network/dns_factory.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
-#include "envoy/network/dns_factory.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
+#include "source/common/config/utility.h"
 #include "source/common/event/file_event_impl.h"
 #include "source/common/event/libevent_scheduler.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
@@ -26,14 +27,12 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/common/config/utility.h"
 
 #include "event2/event.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "source/common/signal/signal_action.h"
 #endif
-
 
 namespace Envoy {
 namespace Event {
@@ -153,7 +152,6 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                                          std::move(transport_socket), options);
 }
 
-
 // Create DNS resolver based on the @param typed_dns_resolver_config, which could be
 // cares DNS resolver, Apple DNS resolver, or any other DNS resolver type.
 // If no DNS resolver type are registered, or none of the registered DNS resolver
@@ -173,9 +171,7 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
       &Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(typed_dns_resolver_config);
 
   ENVOY_LOG(info, "create DNS resolver type: {}", typed_dns_resolver_config.name());
-  return dns_resolver_factory->createDnsResolverCb(*this,
-                                                   api_,
-                                                   typed_dns_resolver_config);
+  return dns_resolver_factory->createDnsResolverCb(*this, api_, typed_dns_resolver_config);
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,

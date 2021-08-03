@@ -1,7 +1,7 @@
 #include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 
-#include "envoy/network/listener.h"
 #include "envoy/network/dns_factory.h"
+#include "envoy/network/listener.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "source/common/config/datasource.h"

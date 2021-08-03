@@ -14,14 +14,14 @@ envoy_cc_extension(
     hdrs = ["dns_impl.h"],
     external_deps = ["ares"],
     deps = [
-        "//source/common/network:address_lib",
-        "//source/common/network:utility_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:file_event_interface",
-        "//envoy/network:dns_interface",
         "//envoy/network:dns_factory_interface",
+        "//envoy/network:dns_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
+        "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
+        "//source/common/network:utility_lib",
     ],
 )

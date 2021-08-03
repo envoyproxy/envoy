@@ -126,20 +126,19 @@ private:
   AppleDnsResolverStats stats_;
 };
 
-
 class AppleDnsResolverFactoryImpl : public DnsResolverFactory {
 public:
   std::string name() const override { return "envoy.dns_resolver.apple"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig()};
+    return ProtobufTypes::MessagePtr{
+        new envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig()};
   }
-  DnsResolverSharedPtr  createDnsResolverCb(Event::Dispatcher& dispatcher,
-                                            const Api::Api& api,
-                                            const envoy::config::core::v3::TypedExtensionConfig& ) override {
+  DnsResolverSharedPtr
+  createDnsResolverCb(Event::Dispatcher& dispatcher, const Api::Api& api,
+                      const envoy::config::core::v3::TypedExtensionConfig&) override {
     return std::make_shared<Network::AppleDnsResolverImpl>(dispatcher, api.rootScope());
   }
 };
-
 
 } // namespace Network
 } // namespace Envoy

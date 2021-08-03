@@ -18,13 +18,12 @@ enum class DnsFilterResolverStatus { Pending, Complete, TimedOut };
  */
 class DnsFilterResolver : Logger::Loggable<Logger::Id::filter> {
 public:
-  DnsFilterResolver(DnsFilterResolverCallback& callback,
-                    std::chrono::milliseconds timeout, Event::Dispatcher& dispatcher,
-                    uint64_t max_pending_lookups,
+  DnsFilterResolver(DnsFilterResolverCallback& callback, std::chrono::milliseconds timeout,
+                    Event::Dispatcher& dispatcher, uint64_t max_pending_lookups,
                     const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config)
       : timeout_(timeout), dispatcher_(dispatcher),
-        resolver_(dispatcher.createDnsResolver(typed_dns_resolver_config)),
-        callback_(callback), max_pending_lookups_(max_pending_lookups) {}
+        resolver_(dispatcher.createDnsResolver(typed_dns_resolver_config)), callback_(callback),
+        max_pending_lookups_(max_pending_lookups) {}
   /**
    * @brief entry point to resolve the name in a DnsQueryRecord
    *

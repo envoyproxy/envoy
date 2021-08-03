@@ -1,8 +1,8 @@
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
-
 #include "envoy/network/dns_factory.h"
+
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/resolver_impl.h"
@@ -75,7 +75,6 @@ Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   Envoy::Network::makeDnsResolverConfig(config, typed_dns_resolver_config);
   return main_thread_dispatcher.createDnsResolver(typed_dns_resolver_config);
-
 }
 
 DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {
