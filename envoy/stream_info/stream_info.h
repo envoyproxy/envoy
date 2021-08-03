@@ -600,7 +600,8 @@ public:
   virtual void setAttemptCount(uint32_t attempt_count) PURE;
 
   /**
-   * @return the number of times the request was attempted upstream, absl::nullopt if the request was never attempted upstream.
+   * @return the number of times the request was attempted upstream, absl::nullopt if the request
+   * was never attempted upstream.
    */
   virtual absl::optional<uint32_t> attemptCount() const PURE;
 };

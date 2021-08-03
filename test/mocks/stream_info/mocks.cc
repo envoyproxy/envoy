@@ -129,9 +129,8 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, setAttemptCount(_)).WillByDefault(Invoke([this](uint32_t attempt_count) {
     attempt_count_ = attempt_count;
   }));
-  ON_CALL(*this, attemptCount()).WillByDefault(Invoke([this]() {
-    return attempt_count_;
-  }));}
+  ON_CALL(*this, attemptCount()).WillByDefault(Invoke([this]() { return attempt_count_; }));
+}
 
 MockStreamInfo::~MockStreamInfo() = default;
 
