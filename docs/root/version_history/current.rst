@@ -12,6 +12,13 @@ Minor Behavior Changes
 * http: disable the integration between :ref:`ExtensionWithMatcher <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
   and HTTP filters by default to reflects its experimental status. This feature can be enabled by seting
   `envoy.reloadable_features.experimental_matching_api` to true.
+* http: reject requests with #fragment in the URI path. The fragment is not allowed to be part of request
+  URI according to RFC3986 (3.5), RFC7230 (5.1) and RFC 7540 (8.1.2.3). Rejection of requests can be changed
+  to stripping the #fragment instead by setting the runtime guard `envoy.reloadable_features.http_reject_path_with_fragment`
+  to false. This behavior can further be changed to the deprecated behavior of keeping the fragment by setting the runtime guard
+  `envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled`. This runtime guard must only be set
+  to false when existing non-compliant traffic relies on #fragment in URI. When this option is enabled, Envoy request
+  authorization extensions may be bypassed. This override and its associated behavior will be decommissioned after the standard deprecation period.
 
 Bug Fixes
 ---------
