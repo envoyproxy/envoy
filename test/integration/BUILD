@@ -384,6 +384,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
         ":tracked_watermark_buffer_lib",
         "//test/mocks/http:http_mocks",
@@ -1348,6 +1349,7 @@ envoy_cc_test(
     srcs = ["tracked_watermark_buffer_test.cc"],
     deps = [
         ":tracked_watermark_buffer_lib",
+        "//test/mocks/http:stream_reset_handler_mock",
         "//test/test_common:test_runtime_lib",
     ],
 )

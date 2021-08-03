@@ -142,14 +142,6 @@ bool DelegatingRouteEntry::includeVirtualHostRateLimits() const {
   return base_route_->routeEntry()->includeVirtualHostRateLimits();
 }
 
-const Envoy::Config::TypedMetadata& DelegatingRouteEntry::typedMetadata() const {
-  return base_route_->routeEntry()->typedMetadata();
-}
-
-const envoy::config::core::v3::Metadata& DelegatingRouteEntry::metadata() const {
-  return base_route_->routeEntry()->metadata();
-}
-
 const TlsContextMatchCriteria* DelegatingRouteEntry::tlsContextMatchCriteria() const {
   return base_route_->routeEntry()->tlsContextMatchCriteria();
 }

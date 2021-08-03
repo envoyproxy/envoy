@@ -166,10 +166,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.healthCheck(true);
     EXPECT_TRUE(stream_info.healthCheck());
 
-    EXPECT_EQ(nullptr, stream_info.routeEntry());
-    NiceMock<Router::MockRouteEntry> route_entry;
-    stream_info.route_entry_ = &route_entry;
-    EXPECT_EQ(&route_entry, stream_info.routeEntry());
+    EXPECT_EQ(nullptr, stream_info.route());
+    std::shared_ptr<NiceMock<Router::MockRoute>> route =
+        std::make_shared<NiceMock<Router::MockRoute>>();
+    stream_info.route_ = route;
+    EXPECT_EQ(route, stream_info.route());
 
     stream_info.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
                                        FilterState::StateType::ReadOnly,

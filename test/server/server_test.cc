@@ -1183,15 +1183,6 @@ TEST_P(ServerInstanceImplTest, InvalidBootstrapVersion) {
       EnvoyException, "Unknown bootstrap version 1.");
 }
 
-// Validate that we always reject v2.
-TEST_P(ServerInstanceImplTest, InvalidV2Bootstrap) {
-  options_.bootstrap_version_ = 2;
-
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
-      EnvoyException, "v2 bootstrap is deprecated and no longer supported.");
-}
-
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {
   options_.config_proto_.mutable_node()->set_id("foo");
   initialize("test/server/test_data/server/node_bootstrap.yaml");
