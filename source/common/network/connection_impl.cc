@@ -825,6 +825,9 @@ ClientConnectionImpl::ClientConnectionImpl(
                      std::move(transport_socket), stream_info_, false),
       stream_info_(dispatcher.timeSource(), socket_->addressProviderSharedPtr()) {
 
+  // "Upstream" doesn't make explicit sense here as the connection ID we are setting on stream_info_
+  // is the ID of the connection itself. However, because this is a ClientConnection, which connects
+  // to an upstream "Server" upstream seems appropriate enough.
   stream_info_.setUpstreamConnectionId(id());
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.

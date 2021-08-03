@@ -420,6 +420,10 @@ void UpstreamRequest::onPoolReady(
   stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
   parent_.callbacks()->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
 
+  // info is a StreamInfo for the GenericUpstream. However, the stream info interface at this
+  // intersection of upstream/downstream is ambiguous. The ID being assigned here is the internal
+  // ID of the connection underlying the GenericUpstream selected to back this UpstreamRequest.
+  // Hence the use of the upstreamConnectionId() API.
   if (info.upstreamConnectionId().has_value()) {
     stream_info_.setUpstreamConnectionId(info.upstreamConnectionId().value());
     parent_.callbacks()->streamInfo().setUpstreamConnectionId(info.upstreamConnectionId().value());
