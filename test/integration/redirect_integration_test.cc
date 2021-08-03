@@ -110,6 +110,24 @@ TEST_P(RedirectIntegrationTest, RedirectNotConfigured) {
             response->headers().get(test_header_key_)[0]->value().getStringView());
 }
 
+// Verify that URI fragment in upstream server Location header is passed unmodified to the
+// downstream client.
+TEST_P(RedirectIntegrationTest, UpstreamRedirectPreservesURIFragmentInLocation) {
+  // Use base class initialize.
+  HttpProtocolIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestResponseHeaderMapImpl redirect_response{
+      {":status", "302"},
+      {"content-length", "0"},
+      {"location", "http://authority2/new/url?p1=v1&p2=v2#fragment"}};
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, redirect_response, 0);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("302", response->headers().getStatusValue());
+  EXPECT_EQ("http://authority2/new/url?p1=v1&p2=v2#fragment",
+            response->headers().getLocationValue());
+}
+
 // Now test a route with redirects configured on in pass-through mode.
 TEST_P(RedirectIntegrationTest, InternalRedirectPassedThrough) {
   useAccessLog("%RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
@@ -168,6 +186,47 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
               HasSubstr("302 internal_redirect test-header-value\n"));
   // No test header
   EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -\n"));
+}
+
+TEST_P(RedirectIntegrationTest, InternalRedirectStripsUriFragment) {
+  // Validate that header sanitization is only called once.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.set_via("via_value"); });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  // Redirect to URI with fragment
+  Http::TestResponseHeaderMapImpl redirect_response{
+      {":status", "302"},
+      {"content-length", "0"},
+      {"location", "http://authority2/new/url?p1=v1&p2=v2#fragment"}};
+
+  upstream_request_->encodeHeaders(redirect_response, true);
+
+  waitForNextUpstreamRequest();
+  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  EXPECT_EQ("http://handle.internal.redirect/test/long/url",
+            upstream_request_->headers().getEnvoyOriginalUrlValue());
+  // During internal redirect Envoy always strips fragment from Location URI
+  EXPECT_EQ("/new/url?p1=v1&p2=v2", upstream_request_->headers().getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
+  EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
+                   ->value());
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {

@@ -416,6 +416,20 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
     return NormalizePathAction::Continue; // It's as valid as it is going to get.
   }
 
+  auto fragment_pos = request_headers.getPathValue().find('#');
+  if (fragment_pos != absl::string_view::npos) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_reject_path_with_fragment")) {
+      return NormalizePathAction::Reject;
+    }
+    // Check runtime override and throw away fragment from URI path
+    // TODO(yanavlasov): remove this override after deprecation period.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled")) {
+      request_headers.setPath(request_headers.getPathValue().substr(0, fragment_pos));
+    }
+  }
+
   NormalizePathAction final_action = NormalizePathAction::Continue;
   const auto escaped_slashes_action = config.pathWithEscapedSlashesAction();
   ASSERT(escaped_slashes_action != envoy::extensions::filters::network::http_connection_manager::
