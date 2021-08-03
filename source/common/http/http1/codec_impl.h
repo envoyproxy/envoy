@@ -69,8 +69,12 @@ public:
     // require a flush timeout not already covered by other timeouts.
   }
 
-  void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
-    // TODO(kbaichoo): implement account tracking for H1.
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {
+    // TODO(kbaichoo): implement account tracking for H1. Particularly, binding
+    // the account to the buffers used. The current wiring is minimal, and used
+    // to ensure the memory_account gets notified that the downstream request is
+    // closing.
+    buffer_memory_account_ = account;
   }
 
   void setIsResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
@@ -88,6 +92,7 @@ protected:
   static const std::string CRLF;
   static const std::string LAST_CHUNK;
 
+  Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
   ConnectionImpl& connection_;
   uint32_t read_disable_calls_{};
   bool disable_chunk_encoding_ : 1;
@@ -134,6 +139,18 @@ public:
       : StreamEncoderImpl(connection),
         stream_error_on_invalid_http_message_(stream_error_on_invalid_http_message) {}
 
+  ~ResponseEncoderImpl() override {
+    // Only the downstream stream should clear the downstream of the
+    // memory account.
+    //
+    // There are cases where a corresponding upstream stream dtor might
+    // be called, but the downstream stream isn't going to terminate soon
+    // such as StreamDecoderFilterCallbacks::recreateStream().
+    if (buffer_memory_account_) {
+      buffer_memory_account_->clearDownstream();
+    }
+  }
+
   bool startedResponse() { return started_response_; }
 
   // Http::ResponseEncoder
@@ -144,6 +161,9 @@ public:
   bool streamErrorOnInvalidHttpMessage() const override {
     return stream_error_on_invalid_http_message_;
   }
+
+  // Http1::StreamEncoderImpl
+  void resetStream(StreamResetReason reason) override;
 
 private:
   bool started_response_{};

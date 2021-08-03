@@ -23,6 +23,8 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
                                              IPMatcher::Type::DownstreamLocal);
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPort:
     return std::make_shared<const PortMatcher>(permission.destination_port());
+  case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPortRange:
+    return std::make_shared<const PortRangeMatcher>(permission.destination_port_range());
   case envoy::config::rbac::v3::Permission::RuleCase::kAny:
     return std::make_shared<const AlwaysMatcher>();
   case envoy::config::rbac::v3::Permission::RuleCase::kMetadata:
@@ -157,6 +159,34 @@ bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::Request
   const Envoy::Network::Address::Ip* ip =
       info.downstreamAddressProvider().localAddress().get()->ip();
   return ip && ip->port() == port_;
+}
+
+PortRangeMatcher::PortRangeMatcher(const ::envoy::type::v3::Int32Range& range)
+    : start_(range.start()), end_(range.end()) {
+  auto start = range.start();
+  auto end = range.end();
+  if (start < 0 || start > 65536) {
+    throw EnvoyException(fmt::format("range start {} is out of bounds", start));
+  }
+  if (end < 0 || end > 65536) {
+    throw EnvoyException(fmt::format("range end {} is out of bounds", end));
+  }
+  if (start >= end) {
+    throw EnvoyException(
+        fmt::format("range start {} cannot be greater or equal than range end {}", start, end));
+  }
+}
+
+bool PortRangeMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+                               const StreamInfo::StreamInfo& info) const {
+  const Envoy::Network::Address::Ip* ip =
+      info.downstreamAddressProvider().localAddress().get()->ip();
+  if (ip) {
+    const auto port = ip->port();
+    return start_ <= port && port < end_;
+  } else {
+    return false;
+  }
 }
 
 bool AuthenticatedMatcher::matches(const Network::Connection& connection,

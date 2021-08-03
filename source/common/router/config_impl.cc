@@ -1005,9 +1005,24 @@ void RouteEntryImplBase::validateClusters(
   }
 }
 
-const RouteSpecificFilterConfig*
-RouteEntryImplBase::perFilterConfig(const std::string& name) const {
-  return per_filter_configs_.get(name);
+void RouteEntryImplBase::traversePerFilterConfig(
+    const std::string& filter_name,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+  const Router::RouteEntry* route_entry = routeEntry();
+
+  // TODO(soulxu): This has similar bug with https://github.com/envoyproxy/envoy/issues/17377
+  // it should be fixed.
+  if (route_entry != nullptr) {
+    auto maybe_vhost_config = vhost_.perFilterConfig(filter_name);
+    if (maybe_vhost_config != nullptr) {
+      cb(*maybe_vhost_config);
+    }
+  }
+
+  auto maybe_route_config = per_filter_configs_.get(filter_name);
+  if (maybe_route_config != nullptr) {
+    cb(*maybe_route_config);
+  }
 }
 
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
@@ -1050,10 +1065,15 @@ Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderT
   return transforms;
 }
 
-const RouteSpecificFilterConfig*
-RouteEntryImplBase::WeightedClusterEntry::perFilterConfig(const std::string& name) const {
-  const auto cfg = per_filter_configs_.get(name);
-  return cfg != nullptr ? cfg : DynamicRouteEntry::perFilterConfig(name);
+void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
+    const std::string& filter_name,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+  DynamicRouteEntry::traversePerFilterConfig(filter_name, cb);
+
+  const auto* cfg = per_filter_configs_.get(filter_name);
+  if (cfg) {
+    cb(*cfg);
+  }
 }
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(
