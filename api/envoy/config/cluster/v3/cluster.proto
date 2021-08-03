@@ -860,18 +860,12 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple's API only allows overriding DNS resolvers via system settings.
   // This field is deprecated in favor of *dns_resolution_config*
   // which aggregates all of the DNS resolver configuration in a single message.
   repeated core.v3.Address dns_resolvers = 18
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Always use TCP queries instead of UDP queries for DNS lookups.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple' API only uses UDP for DNS resolution.
   // This field is deprecated in favor of *dns_resolution_config*
   // which aggregates all of the DNS resolver configuration in a single message.
   bool use_tcp_for_dns_lookups = 45
