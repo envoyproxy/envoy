@@ -83,16 +83,14 @@ build:coverage --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build:coverage --javabase=@bazel_tools//tools/jdk:remote_jdk11
 
 # Experimental EngFlow Remote Execution Config
-# TODO: Use --config=remote if that makes sense.
-build:remote-ci-macos --spawn_strategy=remote,sandboxed,local
-build:remote-ci-macos --strategy=Javac=remote,sandboxed,local
-build:remote-ci-macos --strategy=Closure=remote,sandboxed,local
-build:remote-ci-macos --strategy=Genrule=remote,sandboxed,local
+# --config=remote also sets --auth_enabled=true to enable GCP authentication.
+# We are not using GCP authentication for the MacOS remote execution cluster,
+# so we have to override it to false here.
+build:remote-ci-macos --config=remote
+build:remote-ci-macos --auth_enabled=false
 build:remote-ci-macos --remote_executor=grpcs://envoy.cluster.engflow.com
 build:remote-ci-macos --bes_backend=grpcs://envoy.cluster.engflow.com/
 build:remote-ci-macos --bes_results_url=https://envoy.cluster.engflow.com/invocation/
 build:remote-ci-macos --bes_lifecycle_events
-build:remote-ci-macos --jobs=72
+build:remote-ci-macos --jobs=40
 build:remote-ci-macos --verbose_failures
-build:remote-ci-macos --google_default_credentials
-build:remote-ci-macos --google_auth_scopes=email
