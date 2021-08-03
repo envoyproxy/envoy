@@ -53,7 +53,6 @@ api_proto_package($fields)
 
 IGNORED_V2_PROTOS = [
     "envoy/config/accesslog/v2",
-    "envoy/config/bootstrap/v2",
     "envoy/config/cluster/aggregate/v2alpha",
     "envoy/config/cluster/dynamic_forward_proxy/v2alpha",
     "envoy/config/cluster/redis",
