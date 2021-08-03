@@ -626,17 +626,6 @@ TEST_P(ParseInvalidRangeHeaderTest, InvalidRangeReturnsEmpty) {
   ASSERT_EQ(0, result_vector.size());
 }
 
-TEST_F(LookupRequestTest, VariedHeaders) {
-  request_headers_.addCopy("accept", "image/*");
-  request_headers_.addCopy("other-header", "abc123");
-  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
-  const Http::RequestHeaderMap& result = lookup_request.getVaryHeaders();
-
-  ASSERT_FALSE(result.get(Http::LowerCaseString("accept")).empty());
-  ASSERT_EQ(result.get(Http::LowerCaseString("accept"))[0]->value().getStringView(), "image/*");
-  ASSERT_TRUE(result.get(Http::LowerCaseString("other-header")).empty());
-}
-
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters
