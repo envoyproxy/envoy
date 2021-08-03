@@ -50,6 +50,7 @@ Filter::StreamOpenState Filter::openStream() {
 }
 
 void Filter::onDestroy() {
+  ENVOY_LOG(trace, "onDestroy");
   // Make doubly-sure we no longer use the stream, as
   // per the filter contract.
   processing_complete_ = true;
@@ -414,6 +415,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // We won't be sending anything more to the stream after we
     // receive this message.
     processing_complete_ = true;
+    cleanUpTimers();
     sendImmediateResponse(response->immediate_response());
     message_handled = true;
     break;
