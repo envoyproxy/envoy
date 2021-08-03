@@ -3,6 +3,7 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
+"source/common:96.5" # Raise when QUIC coverage goes up
 "source/common/api:75.3"
 "source/common/api/posix:73.9"
 "source/common/common:96.3"
@@ -17,7 +18,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/singleton:95.8"
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/matcher:95.0"
-"source/common/quic:91.3"
+"source/common/quic:91.2"
 "source/common/tracing:96.1"
 "source/common/watchdog:42.9" # Death tests don't report LCOV
 "source/exe:94.3"

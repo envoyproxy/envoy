@@ -21,7 +21,7 @@ Minor Behavior Changes
   can be reverted by setting runtime guard ``correct_scheme_and_xfp`` to false.
 * http: set the default :ref:`lazy headermap threshold <arch_overview_http_header_map_settings>` to 3,
   which defines the minimal number of headers in a request/response/trailers required for using a
-  dictionary in addition to the list. Setting the `envoy.http.headermap.lazy_map_min_size` runtime
+  dictionary in addition to the list. Setting the ``envoy.http.headermap.lazy_map_min_size`` runtime
   feature to a non-negative number will override the default value.
 * listener: added the :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>`
   field and changed the default for reuse_port from false to true, as the feature is now well
@@ -29,7 +29,7 @@ Minor Behavior Changes
   restart, as otherwise the change would not be backwards compatible between restarts. This means
   that hot restarting on to a new binary will retain the default of false until the binary undergoes
   a full restart. To retain the previous behavior, either explicitly set the new configuration
-  field to false, or set the runtime feature flag `envoy.reloadable_features.listener_reuse_port_default_enabled`
+  field to false, or set the runtime feature flag ``envoy.reloadable_features.listener_reuse_port_default_enabled``
   to false. As part of this change, the use of reuse_port for TCP listeners on both macOS and
   Windows has been disabled due to suboptimal behavior. See the field documentation for more
   information.
@@ -38,6 +38,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* access log: fix ``%UPSTREAM_CLUSTER%`` when used in http upstream access logs. Previously, it was always logging as an unset value.
 * access log: fix `%UPSTREAM_CLUSTER%` when used in http upstream access logs. Previously, it was always logging as an unset value.
 * aws request signer: fix the AWS Request Signer extension to correctly normalize the path and query string to be signed according to AWS' guidelines, so that the hash on the server side matches. See `AWS SigV4 documentaion <https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html>`_.
 * cluster: delete pools when they're idle to fix unbounded memory use when using PROXY protocol upstream with tcp_proxy. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.conn_pool_delete_when_idle`` runtime guard to false.
