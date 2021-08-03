@@ -4667,6 +4667,7 @@ TEST_F(RouterTest, Redirect) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
@@ -4690,6 +4691,7 @@ TEST_F(RouterTest, RedirectFound) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
@@ -4711,6 +4713,7 @@ TEST_F(RouterTest, DirectResponse) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
 }
@@ -4735,6 +4738,7 @@ TEST_F(RouterTest, DirectResponseWithBody) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
 }
@@ -4759,6 +4763,7 @@ TEST_F(RouterTest, DirectResponseWithLocation) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
 }
@@ -4782,6 +4787,7 @@ TEST_F(RouterTest, DirectResponseWithoutLocation) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
 }
