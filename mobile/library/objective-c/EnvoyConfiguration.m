@@ -114,15 +114,15 @@
                             self.appVersion, self.appId];
   [definitions appendFormat:@"- &virtual_clusters %@\n", self.virtualClusters];
 
-  if (self.adminInterfaceEnabled) {
-    [definitions appendString:@"admin: *admin_interface\n"];
-  }
-
   if (self.grpcStatsDomain != nil) {
     [definitions appendFormat:@"- &stats_domain %@\n", self.grpcStatsDomain];
     [definitions
         appendFormat:@"- &stats_flush_interval %lus\n", (unsigned long)self.statsFlushSeconds];
     [definitions appendString:@"- &stats_sinks [ *base_metrics_service ]\n"];
+  }
+
+  if (self.adminInterfaceEnabled) {
+    [definitions appendString:@"admin: *admin_interface\n"];
   }
 
   [definitions appendString:templateYAML];
