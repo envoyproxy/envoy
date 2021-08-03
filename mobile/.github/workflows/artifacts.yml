@@ -23,11 +23,11 @@ jobs:
         name: 'Install dependencies'
       - name: 'Build envoy.aar distributable'
         run: |
-          current_short_commit=$(git rev-parse --short HEAD)
+          current_release_version=$(git describe --tag --abbrev=0)
           bazelisk build \
               --config=release-android \
               --fat_apk_cpu=x86 \
-              --define=pom_version=main-$current_short_commit \
+              --define=pom_version=$current_release_version \
               //:android_dist_ci
       - name: 'Tar artifacts'
         run: tar -czvf envoy_mobile.tar.gz dist/envoy.aar dist/envoy-pom.xml dist/envoy-javadoc.jar dist/envoy-sources.jar
