@@ -35,6 +35,12 @@ typed_config:
                                            Network::Test::ipVersionToDnsFamily(GetParam()),
                                            max_hosts, max_pending_requests);
     config_helper_.addFilter(filter);
+    if (buffer_) {
+      // make sure DFP will be between the buffer filter and the router filter.
+      config_helper_.addFilter(R"EOF(
+      name: buffer-body-filter
+        )EOF");
+    }
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.
@@ -103,6 +109,7 @@ typed_config:
   }
 
   bool upstream_tls_{};
+  bool buffer_{};
   std::string upstream_cert_name_{"upstreamlocalhost"};
   CdsHelper cds_helper_;
   envoy::config::cluster::v3::Cluster cluster_;
@@ -135,6 +142,32 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   checkSimpleRequestSuccess(512, 512, response.get());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+}
+
+TEST_P(ProxyFilterIntegrationTest, RequestWithPause) {
+  // Add a pause before DFP to regression test
+  // https://github.com/envoyproxy/envoy/issues/17514
+  buffer_ = true;
+  setup();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  auto& encoder = encoder_decoder.first;
+
+  // Send some data, but not the entire body.
+  std::string data(1024, 'a');
+  Buffer::OwnedImpl send1(data);
+  encoder.encodeData(send1, false);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_FALSE(upstream_request_->waitForData(*dispatcher_, 1, std::chrono::milliseconds(100)));
 }
 
 // Verify that after we populate the cache and reload the cluster we reattach to the cache with
