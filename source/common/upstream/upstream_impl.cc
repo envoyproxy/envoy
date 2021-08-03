@@ -821,7 +821,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     const auto& lb_policy =
         std::find_if(config.load_balancing_policy().policies().begin(),
                      config.load_balancing_policy().policies().end(),
-                     [](envoy::config::cluster::v3::LoadBalancingPolicy_Policy policy) {
+                     [](const envoy::config::core::v3::TypedExtensionConfig& policy) {
                        return Registry::FactoryRegistry<TypedLoadBalancerFactory>::getFactory(
                                   policy.name()) != nullptr;
                      });

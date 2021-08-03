@@ -189,7 +189,7 @@ public:
   virtual ThreadAwareLoadBalancerPtr
   create(const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& stats_scope,
          Runtime::Loader& runtime, Random::RandomGenerator& random,
-         const ::envoy::config::cluster::v3::LoadBalancingPolicy::Policy& lb_policy) PURE;
+         const ::envoy::config::core::v3::TypedExtensionConfig& lb_policy) PURE;
 
   std::string category() const override { return "envoy.load_balancers"; }
 };

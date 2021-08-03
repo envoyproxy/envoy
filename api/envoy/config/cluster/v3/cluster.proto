@@ -1094,6 +1094,7 @@ message Cluster {
 message LoadBalancingPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.LoadBalancingPolicy";
 
+  // Deprecated and replaced by TypedExtensionConfig.
   message Policy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.LoadBalancingPolicy.Policy";
@@ -1111,7 +1112,7 @@ message LoadBalancingPolicy {
   // Each client will iterate over the list in order and stop at the first policy that it
   // supports. This provides a mechanism for starting to use new LB policies that are not yet
   // supported by all clients.
-  repeated Policy policies = 1;
+  repeated core.v3.TypedExtensionConfig policies = 1;
 }
 
 // An extensible structure containing the address Envoy should bind to when

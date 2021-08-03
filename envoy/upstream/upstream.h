@@ -787,11 +787,10 @@ public:
   }
 
   /**
-   * @return const envoy::config::cluster::v3::LoadBalancingPolicy_Policy& the load balancing policy
-   * to use for this cluster.
+   * @return const envoy::config::core::v3::TypedExtensionConfig& the load balancing policy to use
+   * for this cluster.
    */
-  virtual const envoy::config::cluster::v3::LoadBalancingPolicy_Policy&
-  loadBalancingPolicy() const PURE;
+  virtual const envoy::config::core::v3::TypedExtensionConfig& loadBalancingPolicy() const PURE;
 
   /**
    * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for

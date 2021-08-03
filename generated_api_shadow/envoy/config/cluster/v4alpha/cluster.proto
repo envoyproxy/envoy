@@ -1104,24 +1104,10 @@ message LoadBalancingPolicy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.cluster.v3.LoadBalancingPolicy";
 
-  message Policy {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.cluster.v3.LoadBalancingPolicy.Policy";
-
-    reserved 2;
-
-    reserved "config";
-
-    // Required. The name of the LB policy.
-    string name = 1;
-
-    google.protobuf.Any typed_config = 3;
-  }
-
   // Each client will iterate over the list in order and stop at the first policy that it
   // supports. This provides a mechanism for starting to use new LB policies that are not yet
   // supported by all clients.
-  repeated Policy policies = 1;
+  repeated core.v4alpha.TypedExtensionConfig policies = 1;
 }
 
 // An extensible structure containing the address Envoy should bind to when

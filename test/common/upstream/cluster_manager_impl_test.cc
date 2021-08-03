@@ -761,7 +761,7 @@ public:
   ThreadAwareLoadBalancerPtr
   create(const PrioritySet&, ClusterStats&, Stats::Scope&, Runtime::Loader&,
          Random::RandomGenerator&,
-         const ::envoy::config::cluster::v3::LoadBalancingPolicy::Policy&) override {
+         const ::envoy::config::core::v3::TypedExtensionConfig&) override {
     return std::make_unique<ThreadAwareLbImpl>();
   }
 
