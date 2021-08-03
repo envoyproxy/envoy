@@ -527,6 +527,7 @@ protected:
   // controlled by "envoy.reloadable_features.http2_skip_encoding_empty_trailers" runtime feature
   // flag.
   const bool skip_encoding_empty_trailers_;
+  const bool skip_dispatching_frames_for_closed_connection_;
 
   // dumpState helper method.
   virtual void dumpStreams(std::ostream& os, int indent_level) const;

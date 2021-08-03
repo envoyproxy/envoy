@@ -40,6 +40,7 @@ Minor Behavior Changes
   which defines the minimal number of headers in a request/response/trailers required for using a
   dictionary in addition to the list. Setting the ``envoy.http.headermap.lazy_map_min_size`` runtime
   feature to a non-negative number will override the default value.
+* http: stop processing pending H/2 frames if connection transitioned to a closed state. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.skip_dispatching_frames_for_closed_connection`` to false.
 * listener: added the :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>`
   field and changed the default for reuse_port from false to true, as the feature is now well
   supported on the majority of production Linux kernels in use. The default change is aware of hot
