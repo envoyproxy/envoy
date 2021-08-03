@@ -624,7 +624,7 @@ void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& upd
                                hosts_added, hosts_removed, overprovisioning_factor);
 }
 
-const HostMapConstSharedPtr& MainPrioritySetImpl::crossPriorityHostMap() const {
+HostMapConstSharedPtr MainPrioritySetImpl::crossPriorityHostMap() const {
   // Check if the host set in the main thread PrioritySet has been updated.
   if (mutable_cross_priority_host_map_ != nullptr) {
     const_cross_priority_host_map_ = std::move(mutable_cross_priority_host_map_);

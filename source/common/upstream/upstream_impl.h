@@ -485,7 +485,7 @@ public:
 
   void batchHostUpdate(BatchUpdateCb& callback) override;
 
-  const HostMapConstSharedPtr& crossPriorityHostMap() const override {
+  HostMapConstSharedPtr crossPriorityHostMap() const override {
     return const_cross_priority_host_map_;
   }
 
@@ -549,7 +549,7 @@ private:
 
 /**
  * Specialized PrioritySetImpl designed for the main thread. It will update and maintain the read
- * only all host map when the hosts set changes.
+ * only all host map when the host set changes.
  */
 class MainPrioritySetImpl : public PrioritySetImpl, public Logger::Loggable<Logger::Id::upstream> {
 public:
@@ -566,7 +566,7 @@ public:
                    const HostVector& hosts_removed,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
                    HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
-  const HostMapConstSharedPtr& crossPriorityHostMap() const override;
+  HostMapConstSharedPtr crossPriorityHostMap() const override;
 
 protected:
   void updateMutableAllHostMap(const HostVector& hosts_added, const HostVector& hosts_removed);

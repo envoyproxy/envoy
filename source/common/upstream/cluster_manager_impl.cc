@@ -1246,14 +1246,14 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority, PrioritySet::UpdateHostsParams update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, uint64_t overprovisioning_factor,
-    const HostMapConstSharedPtr& cross_priority_host_map) {
+    HostMapConstSharedPtr cross_priority_host_map) {
   ASSERT(thread_local_clusters_.find(name) != thread_local_clusters_.end());
   const auto& cluster_entry = thread_local_clusters_[name];
   ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
             hosts_added.size(), hosts_removed.size());
-  cluster_entry->priority_set_.updateHosts(priority, std::move(update_hosts_params),
-                                           std::move(locality_weights), hosts_added, hosts_removed,
-                                           overprovisioning_factor, cross_priority_host_map);
+  cluster_entry->priority_set_.updateHosts(
+      priority, std::move(update_hosts_params), std::move(locality_weights), hosts_added,
+      hosts_removed, overprovisioning_factor, std::move(cross_priority_host_map));
 
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (cluster_entry->lb_factory_ != nullptr) {

@@ -2294,11 +2294,11 @@ TEST(PrioritySet, MainPrioritySetTest) {
   }
 
   // Only mutable host map can be updated directly. Read only host map will not be updated before
-  // 'crossPriorityHostMap' is called.
+  // `crossPriorityHostMap` is called.
   EXPECT_TRUE(priority_set.constHostMapForTest()->empty());
   EXPECT_FALSE(priority_set.mutableHostMapForTest()->empty());
 
-  // Mutable host map will be moved to read only host map after 'crossPriorityHostMap' is called.
+  // Mutable host map will be moved to read only host map after `crossPriorityHostMap` is called.
   HostMapSharedPtr host_map = priority_set.mutableHostMapForTest();
   EXPECT_EQ(host_map.get(), priority_set.crossPriorityHostMap().get());
   EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
@@ -2315,12 +2315,12 @@ TEST(PrioritySet, MainPrioritySetTest) {
   }
 
   // New mutable host map will be created and all update will be applied to new mutable host map.
-  // Read only host map will not be updated before 'crossPriorityHostMap' is called.
+  // Read only host map will not be updated before `crossPriorityHostMap` is called.
   EXPECT_EQ(host_map.get(), priority_set.constHostMapForTest().get());
   EXPECT_TRUE((priority_set.mutableHostMapForTest().get() != nullptr &&
                priority_set.mutableHostMapForTest().get() != host_map.get()));
 
-  // Again, mutable host map will be moved to read only host map after 'crossPriorityHostMap' is
+  // Again, mutable host map will be moved to read only host map after `crossPriorityHostMap` is
   // called.
   host_map = priority_set.mutableHostMapForTest();
   EXPECT_EQ(host_map.get(), priority_set.crossPriorityHostMap().get());

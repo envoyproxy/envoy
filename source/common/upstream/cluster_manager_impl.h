@@ -454,7 +454,7 @@ private:
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
                                  uint64_t overprovisioning_factor,
-                                 const HostMapConstSharedPtr& cross_priority_host_map);
+                                 HostMapConstSharedPtr cross_priority_host_map);
     void onHostHealthFailure(const HostSharedPtr& host);
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,

@@ -427,10 +427,10 @@ public:
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
 
   /**
-   * @return const HostMapConstSharedPtr& read only cross priority host map that indexed by host
-   * address string.
+   * @return HostMapConstSharedPtr read only cross priority host map that indexed by host address
+   * string.
    */
-  virtual const HostMapConstSharedPtr& crossPriorityHostMap() const PURE;
+  virtual HostMapConstSharedPtr crossPriorityHostMap() const PURE;
 
   /**
    * Parameter class for updateHosts.
