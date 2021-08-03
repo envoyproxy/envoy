@@ -168,7 +168,7 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
     return;
   }
 
-  if (sockets_.size() == 0) {
+  if (sockets_.empty()) {
     return;
   }
 
@@ -184,11 +184,16 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
                       socket->addressProvider().localAddress()->asString()));
     }
   };
-  // We listen on the first socket on all platforms
+  // On all platforms we should listen on the first socket.
   auto iterator = sockets_.begin();
   listen_and_apply_options((*iterator), tcp_backlog_size_);
   ++iterator;
 #ifndef WIN32
+  // With this implementation on Windows we only accept
+  // connections on Worker 1 and then we use the `ExactConnectionBalancer`
+  // to balance these connections to all workers.
+  // TODO(davinci26): We should update the behavior when socket duplication
+  // does not cause accepts to hang in the OS.
   for (; iterator != sockets_.end(); ++iterator) {
     listen_and_apply_options((*iterator), tcp_backlog_size_);
   }
@@ -552,9 +557,9 @@ void ListenerImpl::buildSocketOptions() {
   // TCP specific setup.
   if (connection_balancer_ == nullptr) {
 #ifdef WIN32
-    // On Windows we use the exact connection balancer in along with reuse_port to
-    // balance connections between workers.
-    ENVOY_LOG_MISC(debug, "I setup an ExactConnectionBalancerImpl");
+    // On Windows we use the exact connection balancer to dispatch connections
+    // from worker 1 to all workers. This is a perf hit but it is the only way
+    // to make all the workers do work.
     connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
 #else
     // Not in place listener update.
