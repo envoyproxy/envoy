@@ -72,14 +72,6 @@ void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderM
 
 void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders (end_stream={}) {}.", *this, end_stream, headers);
-  // QUICHE guarantees to take all the headers. This could cause infinite data to
-  // be buffered on headers stream in Google QUIC implementation because
-  // headers stream doesn't have upper bound for its send buffer. But in IETF
-  // QUIC implementation this is safe as headers are sent on data stream which
-  // is bounded by max concurrent streams limited.
-  // Same vulnerability exists in crypto stream which can infinitely buffer data
-  // if handshake implementation goes wrong.
-  // TODO(#8826) Modify QUICHE to have an upper bound for header stream send buffer.
   // This is counting not serialized bytes in the send buffer.
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
@@ -119,6 +111,10 @@ void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*meta
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
+  if (buffer_memory_account_) {
+    buffer_memory_account_->clearDownstream();
+  }
+
   if (local_end_stream_ && !reading_stopped()) {
     // This is after 200 early response. Reset with QUIC_STREAM_NO_ERROR instead
     // of propagating original reset reason. In QUICHE if a stream stops reading
@@ -245,20 +241,27 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
-    if (received_trailers().size() > filterManagerConnection()->maxIncomingHeadersCount()) {
-      details_ = Http3ResponseCodeDetailValues::too_many_trailers;
+    auto trailers = spdyHeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
+        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_);
+    if (trailers == nullptr) {
       onStreamError(close_connection_upon_invalid_header_);
       return;
     }
-    request_decoder_->decodeTrailers(
-        spdyHeaderBlockToEnvoyHeaders<Http::RequestTrailerMapImpl>(received_trailers()));
+    request_decoder_->decodeTrailers(std::move(trailers));
     MarkTrailersConsumed();
   }
 }
 
 bool EnvoyQuicServerStream::OnStopSending(quic::QuicRstStreamErrorCode error) {
+  // Only called in IETF Quic to close write side.
+  ENVOY_STREAM_LOG(debug, "received STOP_SENDING with reset code={}", *this, error);
+  stats_.rx_reset_.inc();
+  bool end_stream_encoded = local_end_stream_;
+  // This call will close write.
   bool ret = quic::QuicSpdyServerStreamBase::OnStopSending(error);
-  if (read_side_closed()) {
+  ASSERT(write_side_closed());
+  if (read_side_closed() && !end_stream_encoded) {
+    // If both directions are closed but end stream hasn't been encoded yet, notify reset callbacks.
     // Treat this as a remote reset, since the stream will be closed in both directions.
     runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error));
   }
@@ -266,10 +269,17 @@ bool EnvoyQuicServerStream::OnStopSending(quic::QuicRstStreamErrorCode error) {
 }
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
-  ENVOY_STREAM_LOG(debug, "received reset code={}", *this, frame.error_code);
+  ENVOY_STREAM_LOG(debug, "received RESET_STREAM with reset code={}", *this, frame.error_code);
   stats_.rx_reset_.inc();
+  bool end_stream_decoded_and_encoded = read_side_closed() && local_end_stream_;
+  // This closes read side in IETF Quic, but doesn't close write side.
   quic::QuicSpdyServerStreamBase::OnStreamReset(frame);
-  runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
+  ASSERT(read_side_closed());
+  if (write_side_closed() && !end_stream_decoded_and_encoded) {
+    // If both directions are closed but upstream hasn't received or sent end stream, run reset
+    // stream callback.
+    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
+  }
 }
 
 void EnvoyQuicServerStream::Reset(quic::QuicRstStreamErrorCode error) {
@@ -290,6 +300,21 @@ void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
                           : quicErrorCodeToEnvoyRemoteResetReason(error));
   }
   quic::QuicSpdyServerStreamBase::OnConnectionClosed(error, source);
+}
+
+void EnvoyQuicServerStream::CloseWriteSide() {
+  // Clear the downstream since the stream should not write additional data
+  // after this is called, e.g. cannot reset the stream.
+  // Only the downstream stream should clear the downstream of the
+  // memory account.
+  //
+  // There are cases where a corresponding upstream stream dtor might
+  // be called, but the downstream stream isn't going to terminate soon
+  // such as StreamDecoderFilterCallbacks::recreateStream().
+  if (buffer_memory_account_) {
+    buffer_memory_account_->clearDownstream();
+  }
+  quic::QuicSpdyServerStreamBase::CloseWriteSide();
 }
 
 void EnvoyQuicServerStream::OnClose() {
@@ -322,7 +347,7 @@ QuicFilterManagerConnectionImpl* EnvoyQuicServerStream::filterManagerConnection(
 }
 
 Http::HeaderUtility::HeaderValidationResult
-EnvoyQuicServerStream::validateHeader(const std::string& header_name,
+EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
                                       absl::string_view header_value) {
   Http::HeaderUtility::HeaderValidationResult result =
       EnvoyQuicStream::validateHeader(header_name, header_value);

@@ -54,8 +54,8 @@ public:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    config_.reset(
-        new FilterConfig(proto_config, stats_store_, runtime_, http_context_, "ext_authz_prefix"));
+    config_.reset(new FilterConfig(proto_config, stats_store_, runtime_, http_context_,
+                                   "ext_authz_prefix", bootstrap_));
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
@@ -70,6 +70,7 @@ public:
   }
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::MockClient* client_;
   std::unique_ptr<Filter> filter_;
@@ -1486,9 +1487,6 @@ TEST_P(HttpFilterTestParam, ContextExtensions) {
       "default_route_value";
   // Initialize the virtual host's per filter config.
   FilterConfigPerRoute auth_per_vhost(settingsvhost);
-  ON_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
-          perFilterConfig("envoy.filters.http.ext_authz"))
-      .WillByDefault(Return(&auth_per_vhost));
 
   // Place something in the context extensions on the route.
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settingsroute;
@@ -1496,8 +1494,16 @@ TEST_P(HttpFilterTestParam, ContextExtensions) {
       "value_route";
   // Initialize the route's per filter config.
   FilterConfigPerRoute auth_per_route(settingsroute);
-  ON_CALL(filter_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.ext_authz"))
-      .WillByDefault(Return(&auth_per_route));
+
+  EXPECT_CALL(*filter_callbacks_.route_,
+              mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+      .WillOnce(Return(&auth_per_route));
+  EXPECT_CALL(*filter_callbacks_.route_, traversePerFilterConfig("envoy.filters.http.ext_authz", _))
+      .WillOnce(Invoke([&](const std::string&,
+                           std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+        cb(auth_per_vhost);
+        cb(auth_per_route);
+      }));
 
   prepareCheck();
 
@@ -1526,7 +1532,7 @@ TEST_P(HttpFilterTestParam, DisabledOnRoute) {
 
   prepareCheck();
 
-  ON_CALL(filter_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable = [&](bool disabled) {
@@ -1557,7 +1563,7 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
-  ON_CALL(filter_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable = [&](bool disabled) {
@@ -2135,7 +2141,7 @@ TEST_P(HttpFilterTestParam, NoCluster) {
       "value_route";
   // Initialize the route's per filter config.
   FilterConfigPerRoute auth_per_route(settingsroute);
-  ON_CALL(filter_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
       .WillByDefault(Return(&auth_per_route));
 
   prepareCheck();
@@ -2161,7 +2167,7 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
-  ON_CALL(filter_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable_request_body_buffering = [&](bool bypass) {

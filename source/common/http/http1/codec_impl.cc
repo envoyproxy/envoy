@@ -350,6 +350,21 @@ void StreamEncoderImpl::resetStream(StreamResetReason reason) {
   connection_.onResetStreamBase(reason);
 }
 
+void ResponseEncoderImpl::resetStream(StreamResetReason reason) {
+  // Clear the downstream on the account since we're resetting the downstream.
+  if (buffer_memory_account_) {
+    buffer_memory_account_->clearDownstream();
+  }
+
+  // For H1, we use idleTimeouts to cancel streams unless there was an
+  // explicit protocol error prior to sending a response to the downstream
+  // in which case we send a local reply.
+  // TODO(kbaichoo): If we want snappier resets of H1 streams we can
+  //  1) Send local reply if no response data sent yet
+  //  2) Invoke the idle timeout sooner to close underlying connection
+  StreamEncoderImpl::resetStream(reason);
+}
+
 void StreamEncoderImpl::readDisable(bool disable) {
   if (disable) {
     ++read_disable_calls_;
@@ -899,11 +914,8 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
 
 void ServerConnectionImpl::dumpAdditionalState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
-  os << DUMP_MEMBER_AS(active_request_.request_url_,
-                       active_request_.has_value() &&
-                               !active_request_.value().request_url_.getStringView().empty()
-                           ? active_request_.value().request_url_.getStringView()
-                           : "null");
+
+  DUMP_DETAILS(active_request_);
   os << '\n';
 
   // Dump header map, it may be null if it was moved to the request, and
@@ -1226,6 +1238,13 @@ Status ServerConnectionImpl::checkHeaderNameForUnderscores() {
     }
   }
   return okStatus();
+}
+
+void ServerConnectionImpl::ActiveRequest::dumpState(std::ostream& os, int indent_level) const {
+  (void)indent_level;
+  os << DUMP_MEMBER_AS(
+      request_url_, !request_url_.getStringView().empty() ? request_url_.getStringView() : "null");
+  os << DUMP_MEMBER(response_encoder_.local_end_stream_);
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,

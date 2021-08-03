@@ -22,7 +22,17 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
+  directory: "/tools/base"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
   directory: "/tools/docs"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/tools/git"
   schedule:
     interval: "daily"
 
@@ -37,6 +47,11 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
+  directory: "/tools/docker"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
   directory: "/tools/dependency"
   schedule:
     interval: "daily"
@@ -47,7 +62,7 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/extensions"
+  directory: "/tools/gpg"
   schedule:
     interval: "daily"
 

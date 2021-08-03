@@ -54,7 +54,8 @@
             pass_through_mode: false
             headers:
               - name: ":path"
-                exact_match: "/healthcheck"
+                string_match:
+                  exact: "/healthcheck"
         - name: envoy.filters.http.buffer
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer

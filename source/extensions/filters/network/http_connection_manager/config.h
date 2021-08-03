@@ -50,6 +50,11 @@ public:
   HttpConnectionManagerFilterConfigFactory()
       : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
 
+  static Network::FilterFactoryCb createFilterFactoryFromProtoAndHopByHop(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          proto_config,
+      Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers);
+
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -58,6 +63,26 @@ private:
 };
 
 DECLARE_FACTORY(HttpConnectionManagerFilterConfigFactory);
+
+/**
+ * Config registration for the HTTP connection manager filter. @see NamedNetworkFilterConfigFactory.
+ */
+class MobileHttpConnectionManagerFilterConfigFactory
+    : Logger::Loggable<Logger::Id::config>,
+      public Common::FactoryBase<envoy::extensions::filters::network::http_connection_manager::v3::
+                                     EnvoyMobileHttpConnectionManager> {
+public:
+  MobileHttpConnectionManagerFilterConfigFactory()
+      : FactoryBase(NetworkFilterNames::get().EnvoyMobileHttpConnectionManager, true) {}
+
+private:
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::network::http_connection_manager::v3::
+          EnvoyMobileHttpConnectionManager& proto_config,
+      Server::Configuration::FactoryContext& context) override;
+};
+
+DECLARE_FACTORY(MobileHttpConnectionManagerFilterConfigFactory);
 
 /**
  * Determines if an address is internal based on user provided config.
@@ -192,6 +217,7 @@ public:
   originalIpDetectionExtensions() const override {
     return original_ip_detection_extensions_;
   }
+  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -286,6 +312,7 @@ private:
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction path_with_escaped_slashes_action_;
   const bool strip_trailing_host_dot_;
+  const uint64_t max_requests_per_connection_;
 };
 
 /**
@@ -296,7 +323,8 @@ public:
   static std::function<Http::ApiListenerPtr()> createHttpConnectionManagerFactoryFromProto(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
-      Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks);
+      Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
+      bool clear_hop_by_hop_headers);
 };
 
 /**

@@ -44,18 +44,17 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
   testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
   EXPECT_CALL(context, getServerFactoryContext())
-      .Times(1)
-      .WillOnce(testing::ReturnRef(server_context));
-  EXPECT_CALL(server_context, singletonManager());
-  EXPECT_CALL(context, threadLocal());
+      .WillRepeatedly(testing::ReturnRef(server_context));
   EXPECT_CALL(context, messageValidationVisitor());
   EXPECT_CALL(context, clusterManager());
   EXPECT_CALL(context, runtime());
   EXPECT_CALL(context, scope()).Times(2);
-  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-      }));
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
+      .WillOnce(Invoke(
+          [](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool, Grpc::CacheOption) {
+            return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+          }));
+
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
@@ -119,6 +118,9 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
+  testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
+  EXPECT_CALL(context, getServerFactoryContext())
+      .WillRepeatedly(testing::ReturnRef(server_context));
   EXPECT_CALL(context, messageValidationVisitor());
   EXPECT_CALL(context, clusterManager());
   EXPECT_CALL(context, runtime());
@@ -127,50 +129,6 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   testing::StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
-}
-
-// Test that setting the use_alpha proto field throws.
-TEST(HttpExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(UseAlphaFieldIsNoLongerSupported)) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features:envoy.extensions.filters.http.ext_authz.v3.ExtAuthz.hidden_"
-        "envoy_deprecated_use_alpha",
-        "true"}});
-
-  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
-  proto_config.set_hidden_envoy_deprecated_use_alpha(true);
-
-  // Trigger the throw in the Envoy gRPC branch.
-  {
-    testing::StrictMock<Server::Configuration::MockFactoryContext> context;
-    EXPECT_CALL(context, messageValidationVisitor());
-    EXPECT_CALL(context, runtime());
-    EXPECT_CALL(context, scope());
-
-    ExtAuthzFilterConfig factory;
-    EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context),
-                              EnvoyException,
-                              "The use_alpha field is deprecated and is no longer supported.")
-  }
-
-  // Trigger the throw in the Google gRPC branch.
-  {
-    auto google_grpc = new envoy::config::core::v3::GrpcService_GoogleGrpc();
-    google_grpc->set_stat_prefix("grpc");
-    google_grpc->set_target_uri("http://example.com");
-    proto_config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-    proto_config.mutable_grpc_service()->set_allocated_google_grpc(google_grpc);
-
-    testing::StrictMock<Server::Configuration::MockFactoryContext> context;
-    EXPECT_CALL(context, messageValidationVisitor());
-    EXPECT_CALL(context, runtime());
-    EXPECT_CALL(context, scope());
-
-    ExtAuthzFilterConfig factory;
-    EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context),
-                              EnvoyException,
-                              "The use_alpha field is deprecated and is no longer supported.")
-  }
 }
 
 // Test that the deprecated extension name still functions.

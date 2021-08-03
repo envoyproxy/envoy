@@ -32,6 +32,7 @@ ENOTCONN
 EPIPE
 HEXDIG
 HEXDIGIT
+LRU
 OWS
 Preconnecting
 RCVBUF
@@ -682,6 +683,7 @@ hackery
 hacky
 handshaker
 hardcoded
+hardcodes
 hardcoding
 hasher
 hashtagging

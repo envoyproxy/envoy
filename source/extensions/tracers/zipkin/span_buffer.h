@@ -24,7 +24,7 @@ public:
    * the method allocateBuffer(size).
    *
    * @param version The selected Zipkin collector version. @see
-   * api/envoy/config/trace/v2/trace.proto.
+   * api/envoy/config/trace/v3/trace.proto.
    * @param shared_span_context To determine whether client and server spans will share the same
    * span context.
    */
@@ -35,7 +35,7 @@ public:
    * Constructor that initializes a buffer with the given size.
    *
    * @param version The selected Zipkin collector version. @see
-   * api/envoy/config/trace/v2/trace.proto.
+   * api/envoy/config/trace/v3/trace.proto.
    * @param shared_span_context To determine whether client and server spans will share the same
    * span context.
    * @param size The desired buffer size.

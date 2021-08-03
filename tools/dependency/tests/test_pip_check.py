@@ -34,26 +34,19 @@ def test_pip_checker_config_requirements():
 def test_pip_checker_dependabot_config(patches):
     checker = pip_check.PipChecker("path1", "path2", "path3")
     patched = patches(
-        "open",
-        "yaml.safe_load",
+        "utils",
         ("PipChecker.path", dict(new_callable=PropertyMock)),
         "os.path.join",
         prefix="tools.dependency.pip_check")
 
-    with patched as (m_open, m_yaml, m_path, m_join):
-        assert checker.dependabot_config == m_yaml.return_value
+    with patched as (m_utils, m_path, m_join):
+        assert checker.dependabot_config == m_utils.from_yaml.return_value
 
     assert (
         list(m_join.call_args)
         == [(m_path.return_value, checker._dependabot_config), {}])
     assert (
-        list(m_yaml.call_args)
-        == [(m_open.return_value.__enter__.return_value.read.return_value,), {}])
-    assert (
-        list(m_open.return_value.__enter__.return_value.read.call_args,)
-        == [(), {}])
-    assert (
-        list(m_open.call_args)
+        list(m_utils.from_yaml.call_args)
         == [(m_join.return_value,), {}])
 
 
@@ -148,10 +141,7 @@ def test_pip_checker_dependabot_success(patches):
     assert (
         list(m_succeed.call_args)
         == [('dependabot',
-             [f'Correct dependabot config for {m_fname.return_value} in dir: A',
-              f'Correct dependabot config for {m_fname.return_value} in dir: B',
-              f'Correct dependabot config for {m_fname.return_value} in dir: C',
-              f'Correct dependabot config for {m_fname.return_value} in dir: D']), {}])
+             [f"{m_fname.return_value}: {x}" for x in sorted(success)]),  {}])
 
 
 def test_pip_checker_dependabot_errors(patches):
@@ -169,12 +159,8 @@ def test_pip_checker_dependabot_errors(patches):
         checker.dependabot_errors(errors, MSG)
 
     assert (
-        list(m_error.call_args)
-        == [('dependabot',
-             [f"[ERROR:{m_name.return_value}] (dependabot) {MSG}: A",
-              f"[ERROR:{m_name.return_value}] (dependabot) {MSG}: B",
-              f"[ERROR:{m_name.return_value}] (dependabot) {MSG}: C",
-              f"[ERROR:{m_name.return_value}] (dependabot) {MSG}: D"]), {}])
+        list(list(c) for c in list(m_error.call_args_list))
+        == [[('dependabot', [f'ERROR MESSAGE: {x}']), {}] for x in sorted(errors)])
 
 
 def test_pip_checker_main():

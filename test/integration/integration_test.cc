@@ -57,9 +57,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Verify that we gracefully handle an invalid pre-bind socket option when using reuse port.
+// Verify that we gracefully handle an invalid pre-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
-  // Reserve a port that we can then use on the integration listener with reuse port.
+  // Reserve a port that we can then use on the integration listener with reuse_port.
   auto addr_socket =
       Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
   // Do not wait for listeners to start as the listener will fail.
@@ -67,7 +67,6 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
         addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
@@ -79,9 +78,9 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
   test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
 }
 
-// Verify that we gracefully handle an invalid post-bind socket option when using reuse port.
+// Verify that we gracefully handle an invalid post-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
-  // Reserve a port that we can then use on the integration listener with reuse port.
+  // Reserve a port that we can then use on the integration listener with reuse_port.
   auto addr_socket =
       Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
   // Do not wait for listeners to start as the listener will fail.
@@ -89,11 +88,26 @@ TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
         addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_BOUND);
+    socket_option->set_level(10000);     // Invalid level.
+    socket_option->set_int_value(10000); // Invalid value.
+  });
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+}
+
+// Verify that we gracefully handle an invalid post-listen socket option.
+TEST_P(IntegrationTest, BadPostListenSocketOption) {
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto socket_option = listener->add_socket_options();
+    socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
     socket_option->set_level(10000);     // Invalid level.
     socket_option->set_int_value(10000); // Invalid value.
   });
@@ -440,9 +454,15 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
     // Ensure we only have one connection upstream, one request active at a time.
-    cluster->mutable_max_requests_per_connection()->set_value(1);
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_common_http_protocol_options()
+        ->mutable_max_requests_per_connection()
+        ->set_value(1);
+    protocol_options.mutable_use_downstream_protocol_config();
     auto* circuit_breakers = cluster->mutable_circuit_breakers();
     circuit_breakers->add_thresholds()->mutable_max_connections()->set_value(1);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
   initialize();
 
@@ -1076,6 +1096,7 @@ TEST_P(IntegrationTest, AbsolutePathUsingHttpsDisallowedAtFrontline) {
 }
 
 TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
+  autonomous_upstream_ = true;
   // Sent an HTTPS request over non-TLS. It will be allowed for non-front-line Envoys
   // and match the configured redirect.
   auto host = config_helper_.createVirtualHost("www.redirect.com", "/");

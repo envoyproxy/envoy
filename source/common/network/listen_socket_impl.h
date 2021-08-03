@@ -30,7 +30,7 @@ protected:
                              address_provider_->localAddress()));
   }
 
-  void setupSocket(const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
+  void setupSocket(const Network::Socket::OptionsSharedPtr& options);
   void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options);
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;
 };
@@ -58,18 +58,17 @@ public:
     if (bind_to_port) {
       RELEASE_ASSERT(io_handle_->isOpen(), "");
       setPrebindSocketOptions();
+      setupSocket(options);
     } else {
       // If the tcp listener does not bind to port, we test that the ip family is supported.
       if (auto ip = address->ip(); ip != nullptr) {
         RELEASE_ASSERT(
             Network::SocketInterfaceSingleton::get().ipFamilySupported(ip->ipv4() ? AF_INET
                                                                                   : AF_INET6),
-            fmt::format(
-                "Creating listen socket address {} but the address familiy is not supported",
-                address->asStringView()));
+            fmt::format("Creating listen socket address {} but the address family is not supported",
+                        address->asStringView()));
       }
     }
-    setupSocket(options, bind_to_port);
   }
 
   NetworkListenSocket(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address,
@@ -109,7 +108,7 @@ protected:
 #ifndef WIN32
     int on = 1;
     auto status = setSocketOption(SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-    RELEASE_ASSERT(status.rc_ != -1, "failed to set SO_REUSEADDR socket option");
+    RELEASE_ASSERT(status.return_value_ != -1, "failed to set SO_REUSEADDR socket option");
 #endif
   }
 };

@@ -163,6 +163,11 @@ public:
    * @return StatsConfig& the servers stats configuration.
    */
   virtual StatsConfig& statsConfig() PURE;
+
+  /**
+   * @return envoy::config::bootstrap::v3::Bootstrap& the servers bootstrap configuration.
+   */
+  virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;
 };
 
 /**
@@ -205,6 +210,11 @@ public:
    * @return Stats::Scope& the listener's stats scope.
    */
   virtual Stats::Scope& listenerScope() PURE;
+
+  /**
+   * @return bool if these filters are created under the scope of a Quic listener.
+   */
+  virtual bool isQuicListener() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the config metadata associated with this

@@ -57,10 +57,14 @@ public:
   void log(absl::string_view msg) override;
   void flush() override;
 
-  const std::vector<std::string>& messages() const { return messages_; }
+  const std::vector<std::string> messages() const {
+    absl::MutexLock ml(&mtx_);
+    std::vector<std::string> copy(messages_);
+    return copy;
+  }
 
 private:
-  absl::Mutex mtx_;
+  mutable absl::Mutex mtx_;
   std::vector<std::string> messages_ ABSL_GUARDED_BY(mtx_);
 };
 
@@ -98,24 +102,24 @@ using ExpectedLogMessages = std::vector<StringPair>;
     sink_ptr->setShouldEscape(escaped);                                                            \
     Envoy::LogRecordingSink log_recorder(sink_ptr);                                                \
     stmt;                                                                                          \
-    if (log_recorder.messages().empty()) {                                                         \
+    auto messages = log_recorder.messages();                                                       \
+    if (messages.empty()) {                                                                        \
       FAIL() << "Expected message(s), but NONE was recorded.";                                     \
     }                                                                                              \
     Envoy::ExpectedLogMessages failed_expectations;                                                \
     for (const Envoy::StringPair& expected : expected_messages) {                                  \
       const auto log_message =                                                                     \
-          std::find_if(log_recorder.messages().begin(), log_recorder.messages().end(),             \
-                       [&expected](const std::string& message) {                                   \
-                         return (message.find(expected.second) != std::string::npos) &&            \
-                                (message.find(expected.first) != std::string::npos);               \
-                       });                                                                         \
-      if (log_message == log_recorder.messages().end()) {                                          \
+          std::find_if(messages.begin(), messages.end(), [&expected](const std::string& message) { \
+            return (message.find(expected.second) != std::string::npos) &&                         \
+                   (message.find(expected.first) != std::string::npos);                            \
+          });                                                                                      \
+      if (log_message == messages.end()) {                                                         \
         failed_expectations.push_back(expected);                                                   \
       }                                                                                            \
     }                                                                                              \
     if (!failed_expectations.empty()) {                                                            \
       std::string failed_message;                                                                  \
-      absl::StrAppend(&failed_message, "\nLogs:\n ", absl::StrJoin(log_recorder.messages(), " "),  \
+      absl::StrAppend(&failed_message, "\nLogs:\n ", absl::StrJoin(messages, " "),                 \
                       "\n Do NOT contain:\n");                                                     \
       for (const auto& expectation : failed_expectations) {                                        \
         absl::StrAppend(&failed_message, "  '", expectation.first, "', '", expectation.second,     \
@@ -138,11 +142,12 @@ using ExpectedLogMessages = std::vector<StringPair>;
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                      \
     stmt;                                                                                          \
-    for (const std::string& message : log_recorder.messages()) {                                   \
+    auto messages = log_recorder.messages();                                                       \
+    for (const std::string& message : messages) {                                                  \
       if ((message.find(substr) != std::string::npos) &&                                           \
           (message.find(loglevel) != std::string::npos)) {                                         \
-        FAIL() << "\nLogs:\n " << absl::StrJoin(log_recorder.messages(), " ")                      \
-               << "\n Should NOT contain:\n '" << loglevel << "', '" << substr "'\n";              \
+        FAIL() << "\nLogs:\n " << absl::StrJoin(messages, " ") << "\n Should NOT contain:\n '"     \
+               << loglevel << "', '" << substr "'\n";                                              \
       }                                                                                            \
     }                                                                                              \
   } while (false)
@@ -161,6 +166,24 @@ using ExpectedLogMessages = std::vector<StringPair>;
     EXPECT_LOG_CONTAINS_ALL_OF(message, stmt);                                                     \
   } while (false)
 
+// Validates that when stmt is executed, the supplied substring occurs exactly the specified
+// number of times.
+#define EXPECT_LOG_CONTAINS_N_TIMES(loglevel, substr, expected_occurrences, stmt)                  \
+  do {                                                                                             \
+    Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
+    Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                      \
+    stmt;                                                                                          \
+    auto messages = log_recorder.messages();                                                       \
+    uint64_t actual_occurrences = 0;                                                               \
+    for (const std::string& message : messages) {                                                  \
+      if ((message.find(substr) != std::string::npos) &&                                           \
+          (message.find(loglevel) != std::string::npos)) {                                         \
+        actual_occurrences++;                                                                      \
+      }                                                                                            \
+    }                                                                                              \
+    EXPECT_EQ(expected_occurrences, actual_occurrences);                                           \
+  } while (false)
+
 // Validates that when stmt is executed, no logs will be emitted.
 // Expected equality of these values:
 //   0
@@ -174,7 +197,7 @@ using ExpectedLogMessages = std::vector<StringPair>;
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                      \
     stmt;                                                                                          \
-    const std::vector<std::string>& logs = log_recorder.messages();                                \
+    const std::vector<std::string> logs = log_recorder.messages();                                 \
     ASSERT_EQ(0, logs.size()) << " Logs:\n   " << absl::StrJoin(logs, "   ");                      \
   } while (false)
 

@@ -51,7 +51,7 @@ uint32_t getLength(const Buffer::Instance* instance) { return instance ? instanc
 
 bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
                   const Network::Connection& connection) {
-  if (downstream_headers.getForwardedProtoValue() == Http::Headers::get().SchemeValues.Http) {
+  if (Http::Utility::getScheme(downstream_headers) == Http::Headers::get().SchemeValues.Http) {
     return true;
   }
   if (!connection.ssl()) {
@@ -83,8 +83,12 @@ void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool down
     if (Http::HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
       return;
     }
-    if (Http::HeaderUtility::schemeIsValid(headers.getForwardedProtoValue())) {
-      headers.setScheme(headers.getForwardedProtoValue());
+    // After all the changes in https://github.com/envoyproxy/envoy/issues/14587
+    // this path should only occur if a buggy filter has removed the :scheme
+    // header. In that case best-effort set from X-Forwarded-Proto.
+    absl::string_view xfp = headers.getForwardedProtoValue();
+    if (Http::HeaderUtility::schemeIsValid(xfp)) {
+      headers.setScheme(xfp);
       return;
     }
   }
@@ -297,8 +301,6 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     const bool is_canary = (upstream_canary_header && upstream_canary_header->value() == "true") ||
                            (upstream_host ? upstream_host->canary() : false);
     const bool internal_request = Http::HeaderUtility::isEnvoyInternalRequest(*downstream_headers_);
-    const bool exclude_http_code_stats =
-        grpc_request_ && config_.suppress_grpc_request_failure_code_stats_;
 
     Stats::StatName upstream_zone = upstreamZone(upstream_host);
     Http::CodeStats::ResponseStatInfo info{config_.scope_,
@@ -314,7 +316,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                            is_canary};
 
     Http::CodeStats& code_stats = httpContext().codeStats();
-    code_stats.chargeResponseStat(info, exclude_http_code_stats);
+    code_stats.chargeResponseStat(info, exclude_http_code_stats_);
 
     if (alt_stat_prefix_ != nullptr) {
       Http::CodeStats::ResponseStatInfo alt_info{config_.scope_,
@@ -327,7 +329,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                                  config_.zone_name_,
                                                  upstream_zone,
                                                  is_canary};
-      code_stats.chargeResponseStat(alt_info, exclude_http_code_stats);
+      code_stats.chargeResponseStat(alt_info, exclude_http_code_stats_);
     }
 
     if (dropped) {
@@ -362,6 +364,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   // TODO: Maybe add a filter API for this.
   grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
+  exclude_http_code_stats_ = grpc_request_ && config_.suppress_grpc_request_failure_code_stats_;
 
   // Only increment rq total stat if we actually decode headers here. This does not count requests
   // that get handled by earlier filters.
@@ -1271,9 +1274,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         pending_retries_++;
         upstream_request.upstreamHost()->stats().rq_error_.inc();
         Http::CodeStats& code_stats = httpContext().codeStats();
-        code_stats.chargeBasicResponseStat(cluster_->statsScope(),
-                                           config_.stats_.stat_names_.retry_,
-                                           static_cast<Http::Code>(response_code));
+        code_stats.chargeBasicResponseStat(
+            cluster_->statsScope(), config_.stats_.stat_names_.retry_,
+            static_cast<Http::Code>(response_code), exclude_http_code_stats_);
 
         if (!end_stream || !upstream_request.encodeComplete()) {
           upstream_request.resetStream();
@@ -1517,7 +1520,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   }
 
   const auto& policy = route_entry_->internalRedirectPolicy();
-  // Don't allow serving TLS responses over plaintext unless allowed by policy.
+  // Don't change the scheme from the original request
   const bool scheme_is_http = schemeIsHttp(downstream_headers, *callbacks_->connection());
   const bool target_is_http = absolute_url.scheme() == Http::Headers::get().SchemeValues.Http;
   if (!policy.isCrossSchemeRedirectAllowed() && scheme_is_http != target_is_http) {

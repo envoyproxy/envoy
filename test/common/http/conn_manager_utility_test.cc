@@ -414,6 +414,23 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
   EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
 }
 
+// Verify we preserve hop by hop headers if configured to do so.
+TEST_F(ConnectionManagerUtilityTest, PreserveHopByHop) {
+  TestRequestHeaderMapImpl request_headers;
+  TestResponseHeaderMapImpl response_headers{{"connection", "foo"},
+                                             {"transfer-encoding", "foo"},
+                                             {"upgrade", "eep"},
+                                             {"keep-alive", "ads"},
+                                             {"proxy-connection", "dsa"}};
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, via_,
+                                                  false);
+  EXPECT_TRUE(response_headers.has(Headers::get().Connection));
+  EXPECT_TRUE(response_headers.has(Headers::get().TransferEncoding));
+  EXPECT_TRUE(response_headers.has(Headers::get().Upgrade));
+  EXPECT_TRUE(response_headers.has(Headers::get().KeepAlive));
+  EXPECT_TRUE(response_headers.has(Headers::get().ProxyConnection));
+}
+
 // Verify that we don't set the via header on requests/responses when empty.
 TEST_F(ConnectionManagerUtilityTest, ViaEmpty) {
   connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
