@@ -53,7 +53,9 @@ class CurrentVersionFile(object):
                 if ticks_match else [])
 
     def check_line(self, line: str) -> list:
-        errors = self.check_reflink(line) + self.check_flags(line) + self.check_ticks(line)
+        errors = self.check_reflink(line) + self.check_flags(line)
+        if RELOADABLE_FLAG_REGEX.match(line):
+            errors += self.check_ticks(line)
         if line.startswith("* "):
             errors += self.check_list_item(line)
         elif not line:
