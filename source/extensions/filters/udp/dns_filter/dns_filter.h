@@ -84,15 +84,14 @@ public:
   const absl::flat_hash_map<std::string, std::chrono::seconds>& domainTtl() const {
     return domain_ttl_;
   }
-  const AddressConstPtrVec& resolvers() const { return resolvers_; }
   bool forwardQueries() const { return forward_queries_; }
   const std::chrono::milliseconds resolverTimeout() const { return resolver_timeout_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   uint64_t retryCount() const { return retry_count_; }
   Random::RandomGenerator& random() const { return random_; }
   uint64_t maxPendingLookups() const { return max_pending_lookups_; }
-  const envoy::config::core::v3::DnsResolverOptions& dnsResolverOptions() const {
-    return dns_resolver_options_;
+  const envoy::config::core::v3::TypedExtensionConfig& typedDnsResolverConfig() const {
+    return typed_dns_resolver_config_;
   }
   const TrieLookupTable<DnsVirtualDomainConfigSharedPtr>& getDnsTrie() const {
     return dns_lookup_trie_;
@@ -123,11 +122,10 @@ private:
   absl::flat_hash_map<std::string, std::chrono::seconds> domain_ttl_;
   bool forward_queries_;
   uint64_t retry_count_;
-  AddressConstPtrVec resolvers_;
   std::chrono::milliseconds resolver_timeout_;
   Random::RandomGenerator& random_;
   uint64_t max_pending_lookups_;
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config_;
 };
 
 using DnsFilterEnvoyConfigSharedPtr = std::shared_ptr<const DnsFilterEnvoyConfig>;

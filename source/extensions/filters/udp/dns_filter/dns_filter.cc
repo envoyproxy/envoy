@@ -1,6 +1,7 @@
 #include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 
 #include "envoy/network/listener.h"
+#include "envoy/network/dns_factory.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "source/common/config/datasource.h"
@@ -159,16 +160,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
   forward_queries_ = config.has_client_config();
   if (forward_queries_) {
     const auto& client_config = config.client_config();
-    if (client_config.has_dns_resolution_config()) {
-      dns_resolver_options_.CopyFrom(client_config.dns_resolution_config().dns_resolver_options());
-      if (!client_config.dns_resolution_config().resolvers().empty()) {
-        const auto& resolver_addrs = client_config.dns_resolution_config().resolvers();
-        resolvers_.reserve(resolver_addrs.size());
-        for (const auto& resolver_addr : resolver_addrs) {
-          resolvers_.push_back(Network::Utility::protobufAddressToAddress(resolver_addr));
-        }
-      }
-    }
+    Envoy::Network::makeDnsResolverConfig(client_config, typed_dns_resolver_config_);
 
     // Set additional resolving options from configuration
     resolver_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
@@ -256,8 +248,8 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
   };
 
   resolver_ = std::make_unique<DnsFilterResolver>(
-      resolver_callback_, config->resolvers(), config->resolverTimeout(), listener_.dispatcher(),
-      config->maxPendingLookups(), config->dnsResolverOptions());
+      resolver_callback_, config->resolverTimeout(), listener_.dispatcher(),
+      config->maxPendingLookups(), config->typedDnsResolverConfig());
 }
 
 void DnsFilter::onData(Network::UdpRecvData& client_request) {
