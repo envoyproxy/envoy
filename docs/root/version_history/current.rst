@@ -29,6 +29,13 @@ Minor Behavior Changes
 * http: correct the use of the ``x-forwarded-proto`` header and the ``:scheme`` header. Where they differ
   (which is rare) ``:scheme`` will now be used for serving redirect URIs and cached content. This behavior
   can be reverted by setting runtime guard ``correct_scheme_and_xfp`` to false.
+* http: reject requests with #fragment in the URI path. The fragment is not allowed to be part of request
+  URI according to RFC3986 (3.5), RFC7230 (5.1) and RFC 7540 (8.1.2.3). Rejection of requests can be changed
+  to stripping the #fragment instead by setting the runtime guard ``envoy.reloadable_features.http_reject_path_with_fragment``
+  to false. This behavior can further be changed to the deprecated behavior of keeping the fragment by setting the runtime guard
+  ``envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled``. This runtime guard must only be set
+  to false when existing non-compliant traffic relies on #fragment in URI. When this option is enabled, Envoy request
+  authorization extensions may be bypassed. This override and its associated behavior will be decommissioned after the standard deprecation period.
 * http: set the default :ref:`lazy headermap threshold <arch_overview_http_header_map_settings>` to 3,
   which defines the minimal number of headers in a request/response/trailers required for using a
   dictionary in addition to the list. Setting the ``envoy.http.headermap.lazy_map_min_size`` runtime
