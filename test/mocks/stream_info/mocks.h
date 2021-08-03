@@ -96,6 +96,8 @@ public:
   MOCK_METHOD(void, setConnectionID, (uint64_t));
   MOCK_METHOD(void, setFilterChainName, (const absl::string_view));
   MOCK_METHOD(const std::string&, filterChainName, (), (const));
+  MOCK_METHOD(void, attemptCount, (uint32_t), ());
+  MOCK_METHOD(absl::optional<uint32_t>, attemptCount, (), (const));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
@@ -128,6 +130,7 @@ public:
   std::string route_name_;
   std::string upstream_transport_failure_reason_;
   std::string filter_chain_name_;
+  absl::optional<uint32_t> attempt_count_;
 };
 
 } // namespace StreamInfo

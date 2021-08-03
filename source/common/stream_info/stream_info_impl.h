@@ -280,6 +280,10 @@ struct StreamInfoImpl : public StreamInfo {
 
   const std::string& filterChainName() const override { return filter_chain_name_; }
 
+  void setAttemptCount(uint32_t attempt_count) override { attempt_count_ = attempt_count; }
+
+  absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
+
   TimeSource& time_source_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -301,6 +305,7 @@ struct StreamInfoImpl : public StreamInfo {
   FilterStateSharedPtr filter_state_;
   FilterStateSharedPtr upstream_filter_state_;
   std::string route_name_;
+  absl::optional<uint32_t> attempt_count_;
 
 private:
   static Network::SocketAddressProviderSharedPtr emptyDownstreamAddressProvider() {
