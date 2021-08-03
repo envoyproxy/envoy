@@ -1096,6 +1096,7 @@ message LoadBalancingPolicy {
 
   // Deprecated and replaced by TypedExtensionConfig.
   message Policy {
+    option deprecated = true;
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.LoadBalancingPolicy.Policy";
 
