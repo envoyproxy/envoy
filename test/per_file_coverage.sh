@@ -17,7 +17,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/singleton:95.8"
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/matcher:95.0"
-"source/common/quic:91.3"
+"source/common/quic:91.2"
 "source/common/tracing:96.1"
 "source/common/watchdog:42.9" # Death tests don't report LCOV
 "source/exe:94.3"
