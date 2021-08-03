@@ -96,7 +96,7 @@ public:
   MOCK_METHOD(void, setConnectionID, (uint64_t));
   MOCK_METHOD(void, setFilterChainName, (const absl::string_view));
   MOCK_METHOD(const std::string&, filterChainName, (), (const));
-  MOCK_METHOD(void, attemptCount, (uint32_t), ());
+  MOCK_METHOD(void, setAttemptCount, (uint32_t), ());
   MOCK_METHOD(absl::optional<uint32_t>, attemptCount, (), (const));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
