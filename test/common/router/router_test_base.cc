@@ -153,7 +153,7 @@ void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_c
   router_.decodeHeaders(headers, true);
 
   EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
-  EXPECT_EQ(expected_count, callbacks_.stream_info_.attemptCount().value());
+  EXPECT_EQ(1U, callbacks_.stream_info_.attemptCount().value());
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
@@ -203,7 +203,6 @@ void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-  // EXPECT_EQ(expected_count, callbacks_.stream_info_.attemptCount().value());
 }
 
 void RouterTestBase::sendRequest(bool end_stream) {
