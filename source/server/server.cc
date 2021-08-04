@@ -416,7 +416,7 @@ void InstanceImpl::initialize(const Options& options,
   perfetto::TrackEvent::Register();
   perfetto::TraceConfig cfg;
   // TODO(rojkov): make the tracer configurable with either `Perfetto`'s native
-  // message or a custom one embedded into Bootstrap.
+  // message or custom one embedded into Bootstrap.
   cfg.add_buffers()->set_size_kb(1024);
   auto* ds_cfg = cfg.add_data_sources()->mutable_config();
   ds_cfg->set_name("track_event");
