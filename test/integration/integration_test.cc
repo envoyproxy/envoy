@@ -157,7 +157,7 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 1);
 }
 
-// Make sure we have correctly specified per-worker performance stats.
+// Make sure we all workers picking up connections
 TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   concurrency_ = 2;
   initialize();
@@ -188,8 +188,6 @@ TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
     auto worker0_ctr = test_server_->counter(worker0_stat_name);
     auto worker1_ctr = test_server_->counter(worker1_stat_name);
     auto target = w0_ctr + w1_ctr + requests_per_loop;
-    ENVOY_LOG_MISC(info, "current values are {} {} with target {}", worker0_ctr->value(),
-                   worker1_ctr->value(), target);
     while (test_server_->counter(worker0_stat_name)->value() +
                test_server_->counter(worker1_stat_name)->value() <
            target) {

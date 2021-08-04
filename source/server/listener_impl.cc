@@ -168,10 +168,7 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
     return;
   }
 
-  if (sockets_.empty()) {
-    return;
-  }
-
+  ASSERT(!sockets_.empty());
   auto listen_and_apply_options = [](Envoy::Network::SocketSharedPtr socket, int tcp_backlog_size) {
     const auto rc = socket->ioHandle().listen(tcp_backlog_size);
     if (rc.return_value_ != 0) {
@@ -186,7 +183,7 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
   };
   // On all platforms we should listen on the first socket.
   auto iterator = sockets_.begin();
-  listen_and_apply_options((*iterator), tcp_backlog_size_);
+  listen_and_apply_options(*iterator, tcp_backlog_size_);
   ++iterator;
 #ifndef WIN32
   // With this implementation on Windows we only accept
@@ -195,7 +192,7 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
   // TODO(davinci26): We should update the behavior when socket duplication
   // does not cause accepts to hang in the OS.
   for (; iterator != sockets_.end(); ++iterator) {
-    listen_and_apply_options((*iterator), tcp_backlog_size_);
+    listen_and_apply_options(*iterator, tcp_backlog_size_);
   }
 #endif
 }
@@ -560,6 +557,13 @@ void ListenerImpl::buildSocketOptions() {
     // On Windows we use the exact connection balancer to dispatch connections
     // from worker 1 to all workers. This is a perf hit but it is the only way
     // to make all the workers do work.
+    // TODO(davinci26): We can be faster here if we create a balancer implementation
+    // that dispatches the connection to a random thread.
+    ENVOY_LOG(warn,
+          "ExactBalance was forced enabled for TCP listener '{}' because "
+          "Envoy is not running on Windows. This is the only mechanism available to
+           load balance connections between workers on Windows..",
+          config_.name());
     connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
 #else
     // Not in place listener update.
