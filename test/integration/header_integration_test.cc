@@ -11,6 +11,7 @@
 #include "source/common/http/exception.h"
 #include "source/common/protobuf/protobuf.h"
 
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"

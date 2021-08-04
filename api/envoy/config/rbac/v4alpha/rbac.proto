@@ -7,6 +7,7 @@ import "envoy/config/route/v4alpha/route_components.proto";
 import "envoy/type/matcher/v4alpha/metadata.proto";
 import "envoy/type/matcher/v4alpha/path.proto";
 import "envoy/type/matcher/v4alpha/string.proto";
+import "envoy/type/v3/range.proto";
 
 import "google/api/expr/v1alpha1/checked.proto";
 import "google/api/expr/v1alpha1/syntax.proto";
@@ -143,7 +144,7 @@ message Policy {
 }
 
 // Permission defines an action (or actions) that a principal can take.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message Permission {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v3.Permission";
 
@@ -182,6 +183,9 @@ message Permission {
 
     // A port number that describes the destination port connecting to.
     uint32 destination_port = 6 [(validate.rules).uint32 = {lte: 65535}];
+
+    // A port number range that describes a range of destination ports connecting to.
+    type.v3.Int32Range destination_port_range = 11;
 
     // Metadata that describes additional information about the action.
     type.matcher.v4alpha.MetadataMatcher metadata = 7;

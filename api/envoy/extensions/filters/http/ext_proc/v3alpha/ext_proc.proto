@@ -23,26 +23,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // The External Processing filter allows an external service to act on HTTP traffic in a flexible way.
 
 // **Current Implementation Status:**
-// The filter will send the "request_headers" and "response_headers" messages by default.
-// In addition, if the "processing mode" is set , the "request_body" and "response_body"
-// messages will be sent if the corresponding fields of the "processing_mode" are
-// set to BUFFERED or STREAMED, and trailers will be sent if the corresponding fields are set
-// to SEND. The BUFFERED_PARTIAL body processing mode is not
-// implemented yet. The filter will also respond to "immediate_response" messages
-// at any point in the stream.
-
-// As designed, the filter supports up to six different processing steps, which are in the
-// process of being implemented:
+// All options and processing modes are implemented except for the following:
 //
-// * Request headers: IMPLEMENTED
-// * Request body: BUFFERED_PARTIAL processing mode is not yet implemented
-// * Request trailers: IMPLEMENTED
-// * Response headers: IMPLEMENTED
-// * Response body: BUFFERED_PARTIAL processing mode is not yet implemented
-// * Response trailers: IMPLEMENTED
+// * Request and response attributes are not sent and not processed.
+// * Dynamic metadata in responses from the external processor is ignored.
+// * "async mode" is not implemented
+// * Per-route configuration is not implemented
 
-// The filter communicates with an external gRPC service that can use it to do a variety of things
-// with the request and response:
+// The filter communicates with an external gRPC service called an "external processor"
+// that can do a variety of things with the request and response:
 //
 // * Access and modify the HTTP headers on the request, response, or both
 // * Access and modify the HTTP request and response bodies
@@ -61,6 +50,30 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   sent asynchronously.
 // * To modify request or response trailers if they already exist
 // * To add request or response trailers where they are not present
+//
+// The filter supports up to six different processing steps. Each is represented by
+// a gRPC stream message that is sent to the external processor. For each message, the
+// processor must send a matching response.
+//
+// * Request headers: Contains the headers from the original HTTP request.
+// * Request body: Sent in a single message if the BUFFERED or BUFFERED_PARTIAL
+//   mode is chosen, in multiple messages if the STREAMED mode is chosen, and not
+//   at all otherwise.
+// * Request trailers: Delivered if they are present and if the trailer mode is set
+//   to SEND.
+// * Response headers: Contains the headers from the HTTP response. Keep in mind
+//   that if the upstream system sends them before processing the request body that
+//   this message may arrive before the complete body.
+// * Response body: Sent according to the processing mode like the request body.
+// * Response trailers: Delivered according to the processing mode like the
+//   request trailers.
+//
+// By default, the processor sends only the request and response headers messages.
+// This may be changed to include any of the six steps by changing the processing_mode
+// setting of the filter configuration, or by setting the mode_override of any response
+// from the external processor. This way, a processor may, for example, use information
+// in the request header to determine whether the message body must be examined, or whether
+// the proxy should simply stream it straight through.
 //
 // All of this together allows a server to process the filter traffic in fairly
 // sophisticated ways. For example:

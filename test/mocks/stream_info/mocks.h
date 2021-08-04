@@ -66,11 +66,9 @@ public:
   MOCK_METHOD(bool, healthCheck, (), (const));
   MOCK_METHOD(void, healthCheck, (bool is_health_check));
   MOCK_METHOD(const Network::SocketAddressProvider&, downstreamAddressProvider, (), (const));
-  MOCK_METHOD(void, setDownstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
-  MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, downstreamSslConnection, (), (const));
   MOCK_METHOD(void, setUpstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, upstreamSslConnection, (), (const));
-  MOCK_METHOD(const Router::RouteEntry*, routeEntry, (), (const));
+  MOCK_METHOD(Router::RouteConstSharedPtr, route, (), (const));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
   MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));

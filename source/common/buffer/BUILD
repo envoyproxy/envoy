@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["watermark_buffer.cc"],
     hdrs = ["watermark_buffer.h"],
     deps = [
+        "//envoy/http:stream_reset_handler_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/runtime:runtime_features_lib",

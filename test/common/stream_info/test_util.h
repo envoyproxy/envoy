@@ -78,14 +78,6 @@ public:
   const Network::SocketAddressSetter& downstreamAddressProvider() const override {
     return *downstream_address_provider_;
   }
-  void
-  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
-    downstream_connection_info_ = connection_info;
-  }
-
-  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
-    return downstream_connection_info_;
-  }
 
   void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
     upstream_connection_info_ = connection_info;
@@ -99,7 +91,7 @@ public:
   }
   const std::string& getRouteName() const override { return route_name_; }
 
-  const Router::RouteEntry* routeEntry() const override { return route_entry_; }
+  Router::RouteConstSharedPtr route() const override { return route_; }
 
   absl::optional<std::chrono::nanoseconds>
   duration(const absl::optional<MonotonicTime>& time) const {
@@ -245,7 +237,7 @@ public:
       std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr)};
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
-  const Router::RouteEntry* route_entry_{};
+  Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   Envoy::StreamInfo::FilterStateSharedPtr filter_state_{
       std::make_shared<Envoy::StreamInfo::FilterStateImpl>(

@@ -197,15 +197,6 @@ struct StreamInfoImpl : public StreamInfo {
     return *downstream_address_provider_;
   }
 
-  void
-  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
-    downstream_ssl_info_ = connection_info;
-  }
-
-  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
-    return downstream_ssl_info_;
-  }
-
   void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
     upstream_ssl_info_ = connection_info;
   }
@@ -214,7 +205,7 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_ssl_info_;
   }
 
-  const Router::RouteEntry* routeEntry() const override { return route_entry_; }
+  Router::RouteConstSharedPtr route() const override { return route_; }
 
   envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
   const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return metadata_; };
@@ -296,7 +287,7 @@ struct StreamInfoImpl : public StreamInfo {
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
-  const Router::RouteEntry* route_entry_{};
+  Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
   FilterStateSharedPtr upstream_filter_state_;
@@ -324,7 +315,6 @@ private:
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   const Network::SocketAddressProviderSharedPtr downstream_address_provider_;
-  Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};

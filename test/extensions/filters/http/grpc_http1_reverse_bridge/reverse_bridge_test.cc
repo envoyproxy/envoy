@@ -615,8 +615,8 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteDisabled) {
   filter_config_per_route.set_disabled(true);
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_,
-          perFilterConfig("envoy.filters.http.grpc_http1_reverse_bridge"))
+  ON_CALL(*decoder_callbacks_.route_,
+          mostSpecificPerFilterConfig("envoy.filters.http.grpc_http1_reverse_bridge"))
       .WillByDefault(testing::Return(&filterConfigPerRoute));
 
   EXPECT_CALL(decoder_callbacks_, route()).Times(2);
@@ -644,8 +644,8 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteEnabled) {
   filter_config_per_route.set_disabled(false);
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_,
-          perFilterConfig("envoy.filters.http.grpc_http1_reverse_bridge"))
+  ON_CALL(*decoder_callbacks_.route_,
+          mostSpecificPerFilterConfig("envoy.filters.http.grpc_http1_reverse_bridge"))
       .WillByDefault(testing::Return(&filterConfigPerRoute));
 
   {
