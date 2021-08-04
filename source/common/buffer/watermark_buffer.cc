@@ -3,8 +3,8 @@
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/runtime/runtime_features.h"
 

@@ -1381,6 +1381,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/buffer:watermark_buffer_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 
