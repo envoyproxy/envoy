@@ -55,7 +55,7 @@ message TcpGrpcAccessLogConfig {
 }
 
 // Common configuration for gRPC access logs.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message CommonGrpcAccessLogConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig";
@@ -106,4 +106,9 @@ message CommonGrpcAccessLogConfig {
   // the message is considered undeliverable and the failed transmission is buffered again.
   google.protobuf.Duration message_ack_timeout = 8
       [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+  // Soft size limit (in bytes) of the buffer used to store messages during processing in a
+  // critical logger. A critical logger buffers messages until it receives an ACK from upstream.
+  // The default is 16384.
+  google.protobuf.UInt32Value pending_critical_buffer_size_bytes = 9;
 }

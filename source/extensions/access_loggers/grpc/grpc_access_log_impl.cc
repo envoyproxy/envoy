@@ -34,6 +34,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.accesslog.v3.AccessLogService.BufferedCriticalAccessLogs"),
       dispatcher, scope, PROTOBUF_GET_MS_OR_DEFAULT(config, message_ack_timeout, 5000),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, pending_critical_buffer_size_bytes, 16384),
       transport_api_version);
 }
 

@@ -74,6 +74,10 @@ public:
         }));
   }
 
+  void expectStreamCriticalNoMessage() {
+    EXPECT_CALL(stream_, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
+  }
+
 private:
   MockAccessLogStream stream_;
   AccessLogCallbacks* callbacks_;
@@ -169,6 +173,40 @@ id: 0
   envoy::data::accesslog::v3::HTTPAccessLogEntry entry;
   entry.mutable_request()->set_path("/test/path1");
   logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry), true);
+}
+
+class CriticalGrpcAccessLoggerImplBufferLimitTest : public testing::Test {
+public:
+  CriticalGrpcAccessLoggerImplBufferLimitTest()
+      : async_client_(new Grpc::MockAsyncClient), timer_(new Event::MockTimer(&dispatcher_)),
+        grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
+    EXPECT_CALL(*timer_, enableTimer(_, _));
+    config_.set_log_name("test_log_name");
+    config_.mutable_pending_critical_buffer_size_bytes()->set_value(0);
+    logger_ = std::make_unique<GrpcAccessLoggerImpl>(
+        Grpc::RawAsyncClientPtr{async_client_}, config_, FlushInterval, BUFFER_SIZE_BYTES,
+        dispatcher_, local_info_, stats_store_, envoy::config::core::v3::ApiVersion::AUTO);
+  }
+
+  Grpc::MockAsyncClient* async_client_;
+  Stats::IsolatedStoreImpl stats_store_;
+  LocalInfo::MockLocalInfo local_info_;
+  Event::MockDispatcher dispatcher_;
+  Event::MockTimer* timer_;
+  std::unique_ptr<GrpcAccessLoggerImpl> logger_;
+  GrpcAccessLoggerImplTestHelper grpc_access_logger_impl_test_helper_;
+  envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig config_;
+};
+
+TEST_F(CriticalGrpcAccessLoggerImplBufferLimitTest, BasicBehavior) {
+  grpc_access_logger_impl_test_helper_.expectStreamCriticalNoMessage();
+
+  envoy::data::accesslog::v3::HTTPAccessLogEntry entry;
+  entry.mutable_request()->set_path("/test/path1");
+  logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry), true);
+  EXPECT_EQ(
+      stats_store_.counterFromString("access_logs.grpc_access_log.ciritcal_logs_disposed").value(),
+      1);
 }
 
 class GrpcAccessLoggerCacheImplTest : public testing::Test {

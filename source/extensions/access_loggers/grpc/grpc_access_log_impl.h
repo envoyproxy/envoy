@@ -23,6 +23,7 @@ static constexpr absl::string_view GRPC_LOG_STATS_PREFIX = "access_logs.grpc_acc
 
 #define CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(COUNTER, GAUGE)                                   \
   COUNTER(critical_logs_succeeded)                                                                 \
+  COUNTER(ciritcal_logs_disposed)                                                                  \
   COUNTER(pending_timeout)                                                                         \
   GAUGE(pending_critical_logs, Accumulate)
 
@@ -40,18 +41,21 @@ public:
   CriticalAccessLoggerGrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& client,
                                      const Protobuf::MethodDescriptor& method,
                                      Event::Dispatcher& dispatcher, Stats::Scope& scope,
-                                     uint64_t message_ack_timeout)
+                                     uint64_t message_ack_timeout,
+                                     uint64_t max_critical_buffer_size_bytes)
       : CriticalAccessLoggerGrpcClientImpl(client, method, dispatcher, scope, message_ack_timeout,
-                                           absl::nullopt) {}
+                                           max_critical_buffer_size_bytes, absl::nullopt) {}
   CriticalAccessLoggerGrpcClientImpl(
       const Grpc::RawAsyncClientSharedPtr& client, const Protobuf::MethodDescriptor& method,
       Event::Dispatcher& dispatcher, Stats::Scope& scope, uint64_t message_ack_timeout,
+      uint64_t max_critical_buffer_size_bytes,
       absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version)
       : client_(client), service_method_(method), dispatcher_(dispatcher),
         message_ack_timeout_(message_ack_timeout), transport_api_version_(transport_api_version),
         stats_({CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(
             POOL_COUNTER_PREFIX(scope, GRPC_LOG_STATS_PREFIX.data()),
-            POOL_GAUGE_PREFIX(scope, GRPC_LOG_STATS_PREFIX.data()))}) {}
+            POOL_GAUGE_PREFIX(scope, GRPC_LOG_STATS_PREFIX.data()))}),
+        max_critical_buffer_size_bytes_(max_critical_buffer_size_bytes) {}
 
   struct BufferedMessage {
     enum class State {
@@ -83,12 +87,12 @@ public:
         case envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::ACK:
           parent_.stats_.critical_logs_succeeded_.inc();
           parent_.stats_.pending_critical_logs_.dec();
+          parent_.current_critical_buffer_size_bytes_ -=
+              parent_.buffered_messages_.at(id).message_.ByteSizeLong();
           parent_.buffered_messages_.erase(id);
           break;
         case envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::NACK:
           parent_.buffered_messages_.at(id).state_ = BufferedMessage::State::Initial;
-          // TODO(shikugawa): After many NACK occurred, Buffer will be overwhelmed.
-          // To resolve this, Buffer should have size limit.
           break;
         default:
           return;
@@ -127,7 +131,15 @@ public:
     }
 
     uint32_t id = MessageUtil::hash(message);
+    const auto message_byte_size = message.ByteSizeLong();
+
+    if (current_critical_buffer_size_bytes_ + message_byte_size > max_critical_buffer_size_bytes_) {
+      stats_.ciritcal_logs_disposed_.inc();
+      return;
+    }
+
     buffered_messages_[id] = BufferedMessage{nullptr, BufferedMessage::State::Initial, message};
+    current_critical_buffer_size_bytes_ += message_byte_size;
     stats_.pending_critical_logs_.inc();
 
     for (auto&& buffered_message : buffered_messages_) {
@@ -169,6 +181,8 @@ private:
   std::chrono::milliseconds message_ack_timeout_;
   const absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version_;
   CriticalAccessLoggerGrpcClientStats stats_;
+  uint64_t current_critical_buffer_size_bytes_ = 0;
+  const uint64_t max_critical_buffer_size_bytes_;
 };
 
 class GrpcAccessLoggerImpl : public Common::GrpcAccessLogger<
