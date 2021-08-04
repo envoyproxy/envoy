@@ -8,6 +8,7 @@ import logging
 import pathlib
 import subprocess
 import sys
+import tempfile
 from functools import cached_property, wraps
 from typing import Callable, Optional, Tuple, Type, Union
 
@@ -70,9 +71,45 @@ def catches(errors: Union[Type[Exception], Tuple[Type[Exception], ...]]) -> Call
                 self.log.error(str(e) or repr(e))
                 return 1
 
-        return async_wrapped if inspect.iscoroutinefunction(fun) else wrapped
+        wrapped_fun = async_wrapped if inspect.iscoroutinefunction(fun) else wrapped
+
+        # mypy doesnt trust `@wraps` to give back a `__wrapped__` object so we
+        # need to code defensively here
+        wrapping = getattr(wrapped_fun, "__wrapped__", None)
+        if wrapping:
+            setattr(wrapping, "__catches__", errors)
+        return wrapped_fun
 
     return wrapper
+
+
+def cleansup(fun) -> Callable:
+    """Method decorator to call `.cleanup()` after run.
+
+    Can work with `sync` and `async` methods.
+    """
+
+    @wraps(fun)
+    def wrapped(self, *args, **kwargs) -> Optional[int]:
+        try:
+            return fun(self, *args, **kwargs)
+        finally:
+            self.cleanup()
+
+    @wraps(fun)
+    async def async_wrapped(self, *args, **kwargs) -> Optional[int]:
+        try:
+            return await fun(self, *args, **kwargs)
+        finally:
+            await self.cleanup()
+
+    # mypy doesnt trust `@wraps` to give back a `__wrapped__` object so we
+    # need to code defensively here
+    wrapped_fun = async_wrapped if inspect.iscoroutinefunction(fun) else wrapped
+    wrapping = getattr(wrapped_fun, "__wrapped__", None)
+    if wrapping:
+        setattr(wrapping, "__cleansup__", True)
+    return wrapped_fun
 
 
 class BazelRunError(Exception):
@@ -85,7 +122,7 @@ class LogFilter(logging.Filter):
         return rec.levelno in (logging.DEBUG, logging.INFO)
 
 
-class Runner(object):
+class BaseRunner:
 
     def __init__(self, *args):
         self._args = args
@@ -158,6 +195,19 @@ class Runner(object):
         logger.addHandler(handler)
         return logger
 
+    @cached_property
+    def tempdir(self) -> tempfile.TemporaryDirectory:
+        """If you call this property, remember to call `.cleanup`
+
+        For `run` methods this should be done by decorating the method with
+        `@runner.cleansup`
+        """
+        if self._missing_cleanup:
+            self.log.warning(
+                "Tempdir created but instance has a `run` method which is not decorated with `@runner.cleansup`"
+            )
+        return tempfile.TemporaryDirectory()
+
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         """Override this method to add custom arguments to the arg parser"""
         parser.add_argument(
@@ -167,8 +217,32 @@ class Runner(object):
             default="info",
             help="Log level to display")
 
+    @property
+    def _missing_cleanup(self) -> bool:
+        run_fun = getattr(self, "run", None)
+        return bool(
+            run_fun
+            and not getattr(getattr(run_fun, "__wrapped__", object()), "__cleansup__", False))
 
-class ForkingAdapter(object):
+    def _cleanup_tempdir(self) -> None:
+        if "tempdir" in self.__dict__:
+            self.tempdir.cleanup()
+            del self.__dict__["tempdir"]
+
+
+class Runner(BaseRunner):
+
+    def cleanup(self) -> None:
+        self._cleanup_tempdir()
+
+
+class AsyncRunner(BaseRunner):
+
+    async def cleanup(self) -> None:
+        self._cleanup_tempdir()
+
+
+class ForkingAdapter:
 
     def __init__(self, context: Runner):
         self.context = context
@@ -183,7 +257,7 @@ class ForkingAdapter(object):
         return subprocess.run(*args, capture_output=capture_output, **kwargs)
 
 
-class BazelAdapter(object):
+class BazelAdapter:
 
     def __init__(self, context: "ForkingRunner"):
         self.context = context
