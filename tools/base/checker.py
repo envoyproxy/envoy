@@ -1,20 +1,20 @@
 import argparse
 import asyncio
 import logging
-import os
+import pathlib
 from functools import cached_property
-from typing import Optional, Sequence, Tuple, Type
+from typing import Any, Iterable, Optional, Sequence, Tuple, Type
 
 from tools.base import runner
 
 
-class Checker(runner.Runner):
+class BaseChecker(runner.Runner):
     """Runs check methods prefixed with `check_` and named in `self.checks`
 
     Check methods should call the `self.warn`, `self.error` or `self.succeed`
     depending upon the outcome of the checks.
     """
-    _active_check: Optional[str] = None
+    _active_check = ""
     checks: Tuple[str, ...] = ()
 
     def __init__(self, *args):
@@ -24,7 +24,7 @@ class Checker(runner.Runner):
         self.warnings = {}
 
     @property
-    def active_check(self) -> Optional[str]:
+    def active_check(self) -> str:
         return self._active_check
 
     @property
@@ -58,14 +58,14 @@ class Checker(runner.Runner):
         return bool(self.failed or self.warned)
 
     @cached_property
-    def path(self) -> str:
+    def path(self) -> pathlib.Path:
         """The "path" - usually Envoy src dir. This is used for finding configs for the tooling and should be a dir"""
         try:
-            path = self.args.path or self.args.paths[0]
+            path = pathlib.Path(self.args.path or self.args.paths[0])
         except IndexError:
             raise self.parser.error(
                 "Missing path: `path` must be set either as an arg or with --path")
-        if not os.path.isdir(path):
+        if not path.is_dir():
             raise self.parser.error(
                 "Incorrect path: `path` must be a directory, set either as first arg or with --path"
             )
@@ -174,7 +174,12 @@ class Checker(runner.Runner):
             "Paths to check. At least one path must be specified, or the `path` argument should be provided"
         )
 
-    def error(self, name: str, errors: list, log: bool = True, log_type: str = "error") -> int:
+    def error(
+            self,
+            name: str,
+            errors: Optional[Iterable[str]],
+            log: bool = True,
+            log_type: str = "error") -> int:
         """Record (and log) errors for a check type"""
         if not errors:
             return 0
@@ -197,13 +202,13 @@ class Checker(runner.Runner):
             self.checks if not self.args.check else
             [check for check in self.args.check if check in self.checks])
 
-    def on_check_begin(self, check: str) -> None:
+    def on_check_begin(self, check: str) -> Any:
         self._active_check = check
         self.log.notice(f"[{check}] Running check")
 
-    def on_check_run(self, check: str) -> None:
+    def on_check_run(self, check: str) -> Any:
         """Callback hook called after each check run"""
-        self._active_check = None
+        self._active_check = ""
         if self.exiting:
             return
         elif check in self.errors:
@@ -213,11 +218,11 @@ class Checker(runner.Runner):
         else:
             self.log.success(f"[{check}] Check completed successfully")
 
-    def on_checks_begin(self) -> None:
+    def on_checks_begin(self) -> Any:
         """Callback hook called before all checks"""
         pass
 
-    def on_checks_complete(self) -> int:
+    def on_checks_complete(self) -> Any:
         """Callback hook called after all checks have run, and returning the final outcome of a checks_run"""
         if self.show_summary:
             self.summary.print_summary()
@@ -257,6 +262,21 @@ class Checker(runner.Runner):
             self.log.warning(f"[{name}] {message}")
 
 
+class Checker(BaseChecker):
+
+    def on_check_begin(self, check: str) -> None:
+        super().on_check_begin(check)
+
+    def on_check_run(self, check: str) -> None:
+        super().on_check_run(check)
+
+    def on_checks_begin(self) -> None:
+        super().on_checks_complete()
+
+    def on_checks_complete(self) -> int:
+        return super().on_checks_complete()
+
+
 class ForkingChecker(runner.ForkingRunner, Checker):
     pass
 
@@ -267,7 +287,7 @@ class BazelChecker(runner.BazelRunner, Checker):
 
 class CheckerSummary(object):
 
-    def __init__(self, checker: Checker):
+    def __init__(self, checker: BaseChecker):
         self.checker = checker
 
     @property
@@ -319,7 +339,7 @@ class CheckerSummary(object):
         return section
 
 
-class AsyncChecker(Checker):
+class AsyncChecker(BaseChecker):
     """Async version of the Checker class for use with asyncio"""
 
     async def _run(self) -> int:

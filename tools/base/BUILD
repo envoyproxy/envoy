@@ -16,10 +16,13 @@ envoy_py_library(
     ],
 )
 
+envoy_py_library("tools.base.functional")
+
 envoy_py_library(
     "tools.base.utils",
     deps = [
         requirement("pyyaml"),
+        requirement("setuptools"),
     ],
 )
 

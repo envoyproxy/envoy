@@ -20,16 +20,16 @@
 #
 
 import argparse
-import os
+import pathlib
 import shutil
 import subprocess
 import sys
 import tarfile
 from functools import cached_property
 from itertools import chain
-from typing import Iterator, Optional, Type
+from typing import Iterator, Optional, Tuple, Type, Union
 
-import verboselogs
+import verboselogs  # type:ignore
 
 from tools.base import runner, utils
 from tools.gpg import identity
@@ -55,17 +55,17 @@ class SigningError(Exception):
 class DirectorySigningUtil(object):
     """Base class for signing utils - eg for deb or rpm packages"""
 
-    command_name = None
-    _package_type = None
-    ext = None
+    command_name = ""
+    _package_type = ""
+    ext = ""
 
     def __init__(
             self,
-            path: str,
+            path: Union[pathlib.Path, str],
             maintainer: identity.GPGIdentity,
             log: verboselogs.VerboseLogger,
             command: Optional[str] = ""):
-        self.path = path
+        self._path = path
         self.maintainer = maintainer
         self.log = log
         self._command = command
@@ -87,34 +87,35 @@ class DirectorySigningUtil(object):
         return self._package_type or self.ext
 
     @property
-    def pkg_files(self) -> tuple:
+    def path(self) -> pathlib.Path:
+        return pathlib.Path(self._path)
+
+    @property
+    def pkg_files(self) -> Tuple[pathlib.Path, ...]:
         """Tuple of paths to package files to sign"""
         # TODO?(phlax): check maintainer/packager field matches key id
         return tuple(
-            os.path.join(self.path, filename)
-            for filename in os.listdir(self.path)
-            if filename.endswith(f".{self.ext}"))
+            pkg_file for pkg_file in self.path.glob("*") if pkg_file.name.endswith(f".{self.ext}"))
 
     def sign(self) -> None:
         """Sign the packages"""
         for pkg in self.pkg_files:
             self.sign_pkg(pkg)
 
-    def sign_command(self, pkg_file: str) -> tuple:
+    def sign_command(self, pkg_file: pathlib.Path) -> tuple:
         """Tuple of command parts to sign a specific package"""
-        return (self.command,) + self.command_args + (pkg_file,)
+        return (self.command,) + self.command_args + (str(pkg_file),)
 
-    def sign_pkg(self, pkg_file: str) -> None:
+    def sign_pkg(self, pkg_file: pathlib.Path) -> None:
         """Sign a specific package file"""
-        pkg_name = os.path.basename(pkg_file)
-        self.log.notice(f"Sign package ({self.package_type}): {pkg_name}")
+        self.log.notice(f"Sign package ({self.package_type}): {pkg_file.name}")
         response = subprocess.run(
             self.sign_command(pkg_file), capture_output=True, encoding="utf-8")
 
         if response.returncode:
             raise SigningError(response.stdout + response.stderr)
 
-        self.log.success(f"Signed package ({self.package_type}): {pkg_name}")
+        self.log.success(f"Signed package ({self.package_type}): {pkg_file.name}")
 
 
 # Runner
@@ -161,12 +162,12 @@ class PackageSigningRunner(runner.Runner):
         return self.args.package_type
 
     @property
-    def path(self) -> str:
+    def path(self) -> pathlib.Path:
         """Path to the packages directory"""
-        return self.args.path
+        return pathlib.Path(self.args.path)
 
     @property
-    def tar(self) -> bool:
+    def tar(self) -> str:
         return self.args.tar
 
     @cached_property
@@ -198,33 +199,32 @@ class PackageSigningRunner(runner.Runner):
             default="",
             help="Maintainer email to match when searching for a GPG key to match with")
 
-    def archive(self, path: str) -> None:
+    def archive(self, path: Union[pathlib.Path, str]) -> None:
         with tarfile.open(self.tar, "w") as tar:
             tar.add(path, arcname=".")
 
-    def get_signing_util(self, package_type: str, path: str) -> DirectorySigningUtil:
-        return self.signing_utils[package_type](path, self.maintainer, self.log)
+    def get_signing_util(self, path: pathlib.Path) -> DirectorySigningUtil:
+        return self.signing_utils[path.name](path, self.maintainer, self.log)
 
     @runner.catches((identity.GPGError, SigningError))
-    def run(self) -> Optional[int]:
+    def run(self) -> None:
         if self.extract:
             self.sign_tarball()
         else:
             self.sign_directory()
         self.log.success("Successfully signed packages")
 
-    def sign(self, package_type: str, path: str) -> None:
-        self.log.notice(f"Signing {package_type}s ({self.maintainer}) {path}")
-        self.get_signing_util(package_type, path).sign()
+    def sign(self, path: pathlib.Path) -> None:
+        self.log.notice(f"Signing {path.name}s ({self.maintainer}) {str(path)}")
+        self.get_signing_util(path).sign()
 
-    def sign_all(self, path: str) -> None:
-        for package_type in os.listdir(path):
-            if package_type in self.signing_utils:
-                target = os.path.join(path, package_type)
-                self.sign(package_type, target)
+    def sign_all(self, path: pathlib.Path) -> None:
+        for directory in path.glob("*"):
+            if directory.name in self.signing_utils:
+                self.sign(directory)
 
     def sign_directory(self) -> None:
-        self.sign(self.package_type, self.path)
+        self.sign(self.path)
         if self.tar:
             self.archive(self.path)
 
@@ -244,20 +244,24 @@ class RPMMacro(object):
 
     _macro_filename = ".rpmmacros"
 
-    def __init__(self, home: str, overwrite: bool = False, **kwargs):
-        self.home = home
+    def __init__(self, home: Union[pathlib.Path, str], overwrite: bool = False, **kwargs):
+        self._home = home
         self.overwrite = bool(overwrite)
         self.kwargs = kwargs
 
     @property
-    def path(self) -> str:
-        return os.path.join(self.home, self._macro_filename)
+    def home(self) -> pathlib.Path:
+        return pathlib.Path(self._home)
+
+    @property
+    def path(self) -> pathlib.Path:
+        return self.home.joinpath(self._macro_filename)
 
     @property
     def macro(self) -> str:
         macro = self.template
         for k, v in self.kwargs.items():
-            macro = macro.replace(f"__{k.upper()}__", v)
+            macro = macro.replace(f"__{k.upper()}__", str(v))
         return macro
 
     @property
@@ -265,10 +269,9 @@ class RPMMacro(object):
         return RPMMACRO_TEMPLATE
 
     def write(self) -> None:
-        if not self.overwrite and os.path.exists(self.path):
+        if not self.overwrite and self.path.exists():
             return
-        with open(self.path, "w") as f:
-            f.write(self.macro)
+        self.path.write_text(self.macro)
 
 
 class RPMSigningUtil(DirectorySigningUtil):
@@ -283,7 +286,7 @@ class RPMSigningUtil(DirectorySigningUtil):
 
     @cached_property
     def command(self) -> str:
-        if not os.path.basename(self.maintainer.gpg_bin) == "gpg2":
+        if not (self.maintainer.gpg_bin and self.maintainer.gpg_bin.name == "gpg2"):
             raise SigningError("GPG2 is required to sign RPM packages")
         return super().command
 
@@ -303,8 +306,8 @@ class RPMSigningUtil(DirectorySigningUtil):
             gpg_bin=self.maintainer.gpg_bin,
             gpg_config=self.maintainer.gnupg_home).write()
 
-    def sign_pkg(self, pkg_file: str) -> None:
-        os.chmod(pkg_file, 0o755)
+    def sign_pkg(self, pkg_file: pathlib.Path) -> None:
+        pkg_file.chmod(0o755)
         super().sign_pkg(pkg_file)
 
 
@@ -333,13 +336,13 @@ class DebChangesFiles(object):
     def __init__(self, src):
         self.src = src
 
-    def __iter__(self) -> Iterator[str]:
+    def __iter__(self) -> Iterator[pathlib.Path]:
         """Iterate the required changes files, creating them, yielding the paths
         of the newly created files, and deleting the original
         """
         for path in self.files:
             yield path
-        os.unlink(self.src)
+        self.src.unlink()
 
     @cached_property
     def distributions(self) -> str:
@@ -354,22 +357,20 @@ class DebChangesFiles(object):
         raise SigningError(f"Did not find Distribution field in changes file {self.src}")
 
     @property
-    def files(self) -> Iterator[str]:
+    def files(self) -> Iterator[pathlib.Path]:
         """Create changes files for each distro, yielding the paths"""
         for distro in self.distributions.split():
             yield self.changes_file(distro)
 
-    def changes_file(self, distro: str) -> str:
+    def changes_file(self, distro: str) -> pathlib.Path:
         """Create a `changes` file for a specific distro"""
         target = self.changes_file_path(distro)
-        with open(target, "w") as df:
-            with open(self.src) as f:
-                df.write(f.read().replace(self.distributions, distro))
+        target.write_text(self.src.read_text().replace(self.distributions, distro))
         return target
 
-    def changes_file_path(self, distro: str) -> str:
+    def changes_file_path(self, distro: str) -> pathlib.Path:
         """Path to write the new changes file to"""
-        return ".".join([os.path.splitext(self.src)[0], distro, "changes"])
+        return self.src.with_suffix(f".{distro}.changes")
 
 
 class DebSigningUtil(DirectorySigningUtil):
