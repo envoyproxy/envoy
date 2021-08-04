@@ -120,6 +120,10 @@ MockStreamInfo::MockStreamInfo()
         filter_chain_name_ = std::string(filter_chain_name);
       }));
   ON_CALL(*this, filterChainName()).WillByDefault(ReturnRef(filter_chain_name_));
+  ON_CALL(*this, setAttemptCount(_)).WillByDefault(Invoke([this](uint32_t attempt_count) {
+    attempt_count_ = attempt_count;
+  }));
+  ON_CALL(*this, attemptCount()).WillByDefault(Invoke([this]() { return attempt_count_; }));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

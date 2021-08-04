@@ -602,6 +602,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       headers.setEnvoyAttemptCount(attempt_count_);
     };
   }
+  callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
   // Inject the active span's tracing context into the request headers.
   callbacks_->activeSpan().injectContext(headers);
@@ -1605,6 +1606,7 @@ void Filter::doRetry() {
 
   is_retry_ = true;
   attempt_count_++;
+  callbacks_->streamInfo().setAttemptCount(attempt_count_);
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
 

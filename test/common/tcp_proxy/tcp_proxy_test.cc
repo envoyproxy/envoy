@@ -279,6 +279,7 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamLocalFail) {
   EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_cx_connect_attempts_exceeded")
                     .value());
+  EXPECT_EQ(2U, filter_->getStreamInfo().attemptCount().value());
 }
 
 // Make sure that the tcp proxy code handles reentrant calls to onPoolFailure.

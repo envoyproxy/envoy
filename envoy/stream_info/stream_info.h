@@ -581,6 +581,17 @@ public:
    * @return Network filter chain name of the downstream connection.
    */
   virtual const std::string& filterChainName() const PURE;
+
+  /**
+   * @param attempt_count, the number of times the request was attempted upstream.
+   */
+  virtual void setAttemptCount(uint32_t attempt_count) PURE;
+
+  /**
+   * @return the number of times the request was attempted upstream, absl::nullopt if the request
+   * was never attempted upstream.
+   */
+  virtual absl::optional<uint32_t> attemptCount() const PURE;
 };
 
 } // namespace StreamInfo

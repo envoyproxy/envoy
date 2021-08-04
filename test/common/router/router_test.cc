@@ -895,6 +895,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
               putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+  EXPECT_EQ(2, callbacks_.stream_info_.attemptCount().value());
 }
 
 // Validate that x-envoy-attempt-count is added when option is true.
@@ -957,6 +958,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponsePresentWithLocalReply) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
   EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started{connection failure}");
+  EXPECT_EQ(1U, callbacks_.stream_info_.attemptCount().value());
 }
 
 // Validate that the x-envoy-attempt-count header in the downstream response reflects the number of
@@ -982,6 +984,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_EQ(1U, callbacks_.stream_info_.attemptCount().value());
 
   // 5xx response.
   router_.retry_state_->expectHeadersRetry();
@@ -1007,6 +1010,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
   router_.retry_state_->callback_();
   EXPECT_EQ(2U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_EQ(2U, callbacks_.stream_info_.attemptCount().value());
 
   // Normal response.
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
@@ -4663,6 +4667,7 @@ TEST_F(RouterTest, Redirect) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
@@ -4686,6 +4691,7 @@ TEST_F(RouterTest, RedirectFound) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
@@ -4707,6 +4713,7 @@ TEST_F(RouterTest, DirectResponse) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
 }
@@ -4731,6 +4738,7 @@ TEST_F(RouterTest, DirectResponseWithBody) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
 }
@@ -4755,6 +4763,7 @@ TEST_F(RouterTest, DirectResponseWithLocation) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
 }
@@ -4778,6 +4787,7 @@ TEST_F(RouterTest, DirectResponseWithoutLocation) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
 }
