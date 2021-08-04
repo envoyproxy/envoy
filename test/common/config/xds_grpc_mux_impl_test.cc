@@ -3,18 +3,19 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/event/timer.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/empty_string.h"
-#include "source/common/config/api_version.h"
 #include "source/common/config/protobuf_link_hacks.h"
+#include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/version_converter.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -24,7 +25,6 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -33,12 +33,14 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
 using testing::IsSubstring;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Config {
@@ -54,10 +56,8 @@ public:
         control_plane_stats_(Utility::generateControlPlaneStats(stats_)),
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)),
-        control_plane_pending_requests_(
-            stats_.gauge("control_plane.pending_requests", Stats::Gauge::ImportMode::NeverImport)),
-        resource_decoder_(TestUtility::TestOpaqueResourceDecoderImpl<
-                          envoy::config::endpoint::v3::ClusterLoadAssignment>("cluster_name")) {}
+        control_plane_pending_requests_(stats_.gauge("control_plane.pending_requests",
+                                                     Stats::Gauge::ImportMode::NeverImport)) {}
 
   void setup() {
     grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(
@@ -123,13 +123,13 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::unique_ptr<XdsMux::GrpcMuxSotw> grpc_mux_;
   NiceMock<MockSubscriptionCallbacks> callbacks_;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder_{"cluster_name"};
   Stats::TestUtil::TestStore stats_;
   ControlPlaneStats control_plane_stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Stats::Gauge& control_plane_connected_state_;
   Stats::Gauge& control_plane_pending_requests_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_;
 };
 
 class GrpcMuxImplTest : public GrpcMuxImplTestBase {

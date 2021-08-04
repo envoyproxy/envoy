@@ -204,8 +204,8 @@ envoy_cc_test(
     name = "xds_grpc_mux_impl_test",
     srcs = ["xds_grpc_mux_impl_test.cc"],
     deps = [
-        "//source/common/config:api_version_lib",
         "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:resource_name_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/protobuf",
