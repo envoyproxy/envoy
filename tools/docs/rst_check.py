@@ -9,6 +9,10 @@ REF_WITH_PUNCTUATION_REGEX = re.compile(r".*\. <[^<]*>`\s*")
 RELOADABLE_FLAG_REGEX = re.compile(r".*(...)(envoy.reloadable_features.[^ ]*)\s.*")
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile(r"\* ([a-z \-_]+): ([a-z:`]+)")
 VERSION_HISTORY_SECTION_NAME = re.compile(r"^[A-Z][A-Za-z ]*$")
+# Make sure backticks come in pairs.
+# Exceptions: reflinks (ref:`` where the backtick won't be preceded by a space
+#             links `title <link>`_ where the _ is checked for in the regex.
+BAD_TICKS_REGEX = re.compile(r".* `[^`].*`[^_]")
 
 
 class CurrentVersionFile(object):
@@ -43,8 +47,15 @@ class CurrentVersionFile(object):
         return ([f"Flag {flag_match.groups()[1]} should be enclosed in double back ticks"]
                 if flag_match and not flag_match.groups()[0].startswith(' ``') else [])
 
+    def check_ticks(self, line: str) -> list:
+        ticks_match = BAD_TICKS_REGEX.match(line)
+        return ([f"Backticks should come in pairs (except for links and reflinks): {line}"]
+                if ticks_match else [])
+
     def check_line(self, line: str) -> list:
         errors = self.check_reflink(line) + self.check_flags(line)
+        if RELOADABLE_FLAG_REGEX.match(line):
+            errors += self.check_ticks(line)
         if line.startswith("* "):
             errors += self.check_list_item(line)
         elif not line:

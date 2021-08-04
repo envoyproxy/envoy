@@ -122,7 +122,7 @@ public:
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
-      filter_callbacks_.connection_.streamInfo().setDownstreamSslConnection(
+      filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setSslConnection(
           filter_callbacks_.connection_.ssl());
     }
 
@@ -225,7 +225,7 @@ TEST_F(TcpProxyTest, BadFactory) {
   EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
-  filter_callbacks_.connection_.streamInfo().setDownstreamSslConnection(
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setSslConnection(
       filter_callbacks_.connection_.ssl());
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 }
@@ -279,6 +279,7 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamLocalFail) {
   EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_cx_connect_attempts_exceeded")
                     .value());
+  EXPECT_EQ(2U, filter_->getStreamInfo().attemptCount().value());
 }
 
 // Make sure that the tcp proxy code handles reentrant calls to onPoolFailure.
@@ -936,7 +937,7 @@ TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {
   const std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(ReturnRef(session_id));
-  stream_info.setDownstreamSslConnection(ssl_info);
+  stream_info.downstream_address_provider_->setSslConnection(ssl_info);
   EXPECT_CALL(*upstream_connections_.at(0), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 
   raiseEventUpstreamConnected(0);
@@ -1096,12 +1097,12 @@ TEST_F(TcpProxyTest, AccessDownstreamAndUpstreamProperties) {
   setup(1);
 
   raiseEventUpstreamConnected(0);
-  EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamSslConnection(),
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamAddressProvider().sslConnection(),
             filter_callbacks_.connection().ssl());
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamLocalAddress(),
             upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().localAddress());
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamSslConnection(),
-            upstream_connections_.at(0)->streamInfo().downstreamSslConnection());
+            upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().sslConnection());
 }
 } // namespace
 } // namespace TcpProxy
