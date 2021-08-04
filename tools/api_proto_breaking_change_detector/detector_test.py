@@ -1,18 +1,23 @@
+""" Proto Breaking Change Detector Test Suite
+
+This script evaluates breaking change detectors (e.g. buf) against
+different protobuf file changes to ensure proper and consistent behavior
+in `allowed`and `breaking` circumstances. Although the dependency likely
+already tests for these circumstances, these specify Envoy's requirements
+and ensure that tool behavior is consistent across dependency updates.
+"""
+
 from pathlib import Path
 import unittest
 
 from detector import BufWrapper
-"""
-Tests breaking change detectors (e.g. buf) against different proto changes to ensure proper behavior in
-`allowed` and `breaking` circumstances. Although the dependency likely already tests for these circumstances,
-these specify Envoy's requirements and ensure that tool behavior is consistent across dependency updates.
-"""
 
 
 class BreakingChangeDetectorTests(object):
     detector_type = None
 
     def run_detector_test(self, testname, is_breaking, expects_changes, additional_args=None):
+        """Runs a test case for an arbitrary breaking change detector type"""
         tests_path = Path(
             Path(__file__).absolute().parent.parent, "testdata",
             "api_proto_breaking_change_detector", "breaking" if is_breaking else "allowed")
@@ -68,7 +73,7 @@ class TestBreakingChanges(BreakingChangeDetectorTests):
 
 class TestAllowedChanges(BreakingChangeDetectorTests):
 
-    def run_allowed_test(self, testname, additional_args=None):
+    def run_allowed_test(self, testname):
         self.run_detector_test(testname, is_breaking=False, expects_changes=True)
 
     def test_add_comment(self):
@@ -86,9 +91,6 @@ class TestAllowedChanges(BreakingChangeDetectorTests):
     def test_remove_and_reserve_field(self):
         self.run_allowed_test(self.test_remove_and_reserve_field.__name__)
 
-    def test_force_breaking_change(self):
-        self.run_allowed_test(self.test_force_breaking_change.__name__, additional_args=["--force"])
-
 
 class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
     detector_type = BufWrapper
@@ -103,14 +105,6 @@ class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
 
     @unittest.skip("PGV oneof option support not yet added to buf")
     def test_change_pgv_oneof(self):
-        pass
-
-    # copied from protolock tests but might remove
-    # It doesn't make sense to evaluate 'forcing' a breaking change in buf because by default,
-    # buf lets you re-build without checking for breaking changes
-    # Buf does not require forcing breaking changes into the lock file like protolock does
-    @unittest.skip("'forcing' a breaking change does not make sense for buf")
-    def test_force_breaking_change(self):
         pass
 
 
