@@ -518,6 +518,12 @@ message HttpConnectionManager {
   // the request. If the request isn't rejected nor any extension succeeds, the HCM will
   // fallback to using the remote address.
   //
+  // .. WARNING::
+  //    Extensions cannot be used in conjunction with :ref:`use_remote_address
+  //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
+  //    nor :ref:`xff_num_trusted_hops
+  //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops`.
+  //
   // [#extension-category: envoy.http.original_ip_detection]
   repeated config.core.v3.TypedExtensionConfig original_ip_detection_extensions = 46;
 
