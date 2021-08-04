@@ -31,11 +31,10 @@ struct CriticalAccessLoggerGrpcClientStats {
   CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
+template <typename RequestType>
 class CriticalAccessLoggerGrpcClientImpl
-    : public Common::CriticalAccessLoggerGrpcClient<
-          envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage> {
+    : public Common::CriticalAccessLoggerGrpcClient<RequestType> {
 public:
-  using RequestType = envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage;
   using ResponseType = envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse;
 
   CriticalAccessLoggerGrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& client,
@@ -109,7 +108,7 @@ public:
       }
     }
 
-    CriticalAccessLoggerGrpcClientImpl& parent_;
+    CriticalAccessLoggerGrpcClientImpl<RequestType>& parent_;
     Grpc::AsyncStream<RequestType> stream_;
   };
 
@@ -185,12 +184,11 @@ private:
   const uint64_t max_critical_buffer_size_bytes_;
 };
 
-class GrpcAccessLoggerImpl : public Common::GrpcAccessLogger<
-                                 envoy::data::accesslog::v3::HTTPAccessLogEntry,
-                                 envoy::data::accesslog::v3::TCPAccessLogEntry,
-                                 envoy::service::accesslog::v3::StreamAccessLogsMessage,
-                                 envoy::service::accesslog::v3::StreamAccessLogsResponse,
-                                 envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage> {
+class GrpcAccessLoggerImpl
+    : public Common::GrpcAccessLogger<envoy::data::accesslog::v3::HTTPAccessLogEntry,
+                                      envoy::data::accesslog::v3::TCPAccessLogEntry,
+                                      envoy::service::accesslog::v3::StreamAccessLogsMessage,
+                                      envoy::service::accesslog::v3::StreamAccessLogsResponse> {
 public:
   GrpcAccessLoggerImpl(
       const Grpc::RawAsyncClientSharedPtr& client,
@@ -200,16 +198,26 @@ public:
       envoy::config::core::v3::ApiVersion transport_api_version);
 
 private:
+  bool isCriticalMessageEmpty();
+  void initCriticalMessage();
+  void addCriticalMessageEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry);
+  void addCriticalMessageEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry);
+  void clearCriticalMessage() { critical_message_.Clear(); }
+
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   void addEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) override;
   void addEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) override;
-  void addCriticalMessageEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) override;
-  void addCriticalMessageEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) override;
   bool isEmpty() override;
-  bool isCriticalMessageEmpty() override;
   void initMessage() override;
-  void initCriticalMessage() override;
+  void flushCriticalMessage() override;
+  void logCritical(envoy::data::accesslog::v3::HTTPAccessLogEntry&&) override;
 
+  uint64_t approximate_critical_message_size_bytes_ = 0;
+  uint64_t max_critical_buffer_size_bytes_;
+  Common::CriticalAccessLoggerGrpcClientPtr<
+      envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage>
+      critical_client_;
+  envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage critical_message_;
   const std::string log_name_;
   const LocalInfo::LocalInfo& local_info_;
 };

@@ -33,8 +33,7 @@ class GrpcAccessLoggerImpl
           // as an empty placeholder for the non-used addEntry method.
           // TODO(itamarkam): Don't cache OpenTelemetry loggers by type (HTTP/TCP).
           ProtobufWkt::Empty, opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest,
-          opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse,
-          ProtobufWkt::Empty> {
+          opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse> {
 public:
   GrpcAccessLoggerImpl(const Grpc::RawAsyncClientSharedPtr& client, std::string log_name,
                        std::chrono::milliseconds buffer_flush_interval_msec,
@@ -48,14 +47,9 @@ private:
   void addEntry(opentelemetry::proto::logs::v1::LogRecord&& entry) override;
   // Non used addEntry method (the above is used for both TCP and HTTP).
   void addEntry(ProtobufWkt::Empty&& entry) override { (void)entry; };
-  void addCriticalMessageEntry(opentelemetry::proto::logs::v1::LogRecord&&) override {}
-  void addCriticalMessageEntry(ProtobufWkt::Empty&&) override{};
   bool isEmpty() override;
-  bool isCriticalMessageEmpty() override;
   void initMessage() override;
   void clearMessage() override;
-  void clearCriticalMessage() override {}
-  void initCriticalMessage() override {}
 
   opentelemetry::proto::logs::v1::InstrumentationLibraryLogs* root_;
 };

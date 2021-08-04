@@ -28,8 +28,11 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
                                  "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs")
               .getMethodDescriptorForVersion(transport_api_version),
           transport_api_version),
-      log_name_(config.log_name()), local_info_(local_info) {
-  critical_client_ = std::make_unique<CriticalAccessLoggerGrpcClientImpl>(
+      // TODO(shikugawa): configure approximate_critical_message_size_bytes
+      approximate_critical_message_size_bytes_(max_buffer_size_bytes), log_name_(config.log_name()),
+      local_info_(local_info) {
+  critical_client_ = std::make_unique<CriticalAccessLoggerGrpcClientImpl<
+      envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage>>(
       client,
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.accesslog.v3.AccessLogService.BufferedCriticalAccessLogs"),
@@ -50,6 +53,7 @@ void GrpcAccessLoggerImpl::addCriticalMessageEntry(
     envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
   critical_message_.mutable_message()->mutable_http_logs()->mutable_log_entry()->Add(
       std::move(entry));
+  std::cout << "add" << std::endl;
 }
 
 void GrpcAccessLoggerImpl::addCriticalMessageEntry(
@@ -65,6 +69,28 @@ bool GrpcAccessLoggerImpl::isEmpty() {
 bool GrpcAccessLoggerImpl::isCriticalMessageEmpty() {
   return !critical_message_.message().has_http_logs() &&
          !critical_message_.message().has_tcp_logs();
+}
+
+void GrpcAccessLoggerImpl::flushCriticalMessage() {
+  if (critical_client_ == nullptr || isCriticalMessageEmpty()) {
+    return;
+  }
+  if (!critical_client_->isStreamStarted()) {
+    initCriticalMessage();
+  }
+
+  approximate_critical_message_size_bytes_ = 0;
+  critical_client_->flush(critical_message_);
+  clearCriticalMessage();
+}
+
+void GrpcAccessLoggerImpl::logCritical(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
+  approximate_critical_message_size_bytes_ += entry.ByteSizeLong();
+  addCriticalMessageEntry(std::move(entry));
+
+  if (approximate_critical_message_size_bytes_ <= max_critical_buffer_size_bytes_) {
+    flushCriticalMessage();
+  }
 }
 
 void GrpcAccessLoggerImpl::initMessage() {
