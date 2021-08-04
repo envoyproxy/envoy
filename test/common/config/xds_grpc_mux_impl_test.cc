@@ -33,14 +33,12 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
 using testing::IsSubstring;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Config {
