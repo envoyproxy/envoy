@@ -2765,8 +2765,6 @@ TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
   codec_client_->close();
 }
 
-static bool near(int x, int y) { return std::abs(x - y) <= (0.03 * x); }
-
 TEST_P(ProtocolIntegrationTest, HeaderOnlyWireBytesCount) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
