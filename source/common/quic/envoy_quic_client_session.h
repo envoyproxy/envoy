@@ -17,6 +17,7 @@
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/envoy_quic_crypto_stream_factory.h"
+#include "source/common/quic/quic_stat_names.h"
 
 namespace Envoy {
 namespace Quic {
@@ -38,7 +39,8 @@ public:
                          std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
                          quic::QuicClientPushPromiseIndex* push_promise_index,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-                         EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory);
+                         EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
+                         QuicStatNames& quic_stat_names, Stats::Scope& scope);
 
   ~EnvoyQuicClientSession() override;
 
@@ -62,13 +64,11 @@ public:
                           quic::ConnectionCloseSource source) override;
   void Initialize() override;
   void OnCanWrite() override;
-  void OnGoAway(const quic::QuicGoAwayFrame& frame) override;
   void OnHttp3GoAway(uint64_t stream_id) override;
   void OnTlsHandshakeComplete() override;
-  size_t WriteHeadersOnHeadersStream(
-      quic::QuicStreamId id, spdy::SpdyHeaderBlock headers, bool fin,
-      const spdy::SpdyStreamPrecedence& precedence,
-      quic::QuicReferenceCountedPointer<quic::QuicAckListenerInterface> ack_listener) override;
+  void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicRstStreamErrorCode error,
+                               quic::QuicStreamOffset bytes_written) override;
+  void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   // quic::QuicSpdyClientSessionBase
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 
@@ -102,6 +102,8 @@ private:
   const absl::string_view host_name_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory_;
+  QuicStatNames& quic_stat_names_;
+  Stats::Scope& scope_;
 };
 
 } // namespace Quic

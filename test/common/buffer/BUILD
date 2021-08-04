@@ -84,6 +84,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "buffer_memory_account_test",
+    srcs = ["buffer_memory_account_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//test/integration:tracked_watermark_buffer_lib",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/http:stream_reset_handler_mock",
+    ],
+)
+
+envoy_cc_test(
     name = "zero_copy_input_stream_test",
     srcs = ["zero_copy_input_stream_test.cc"],
     deps = [

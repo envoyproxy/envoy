@@ -4467,7 +4467,6 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
 TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   enableRedirects(3);
   setNumPreviousRedirect(2);
-  default_request_headers_.setForwardedProto("http");
   sendRequest();
 
   EXPECT_CALL(callbacks_, clearRouteCache());
@@ -4489,6 +4488,7 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   enableRedirects(3);
   setNumPreviousRedirect(1);
+  default_request_headers_.setScheme("https");
 
   sendRequest();
 
@@ -4508,6 +4508,7 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
 TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   enableRedirects();
+  default_request_headers_.setScheme("https");
 
   sendRequest();
 

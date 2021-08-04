@@ -524,8 +524,8 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   case PropertyToken::CLUSTER_NAME:
     if (info && info->upstreamHost()) {
       return CelValue::CreateString(&info->upstreamHost()->cluster().name());
-    } else if (info && info->routeEntry()) {
-      return CelValue::CreateString(&info->routeEntry()->clusterName());
+    } else if (info && info->route() && info->route()->routeEntry()) {
+      return CelValue::CreateString(&info->route()->routeEntry()->clusterName());
     } else if (info && info->upstreamClusterInfo().has_value() &&
                info->upstreamClusterInfo().value()) {
       return CelValue::CreateString(&info->upstreamClusterInfo().value()->name());
@@ -551,8 +551,8 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     break;
   case PropertyToken::ROUTE_METADATA:
-    if (info && info->routeEntry()) {
-      return CelProtoWrapper::CreateMessage(&info->routeEntry()->metadata(), arena);
+    if (info && info->route()) {
+      return CelProtoWrapper::CreateMessage(&info->route()->metadata(), arena);
     }
     break;
   case PropertyToken::PLUGIN_NAME:
@@ -1593,7 +1593,8 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
       if (!decoder_callbacks_->streamInfo().responseCodeDetails().has_value()) {
         decoder_callbacks_->streamInfo().setResponseCodeDetails(CloseStreamResponseDetails);
       }
-      decoder_callbacks_->resetStream();
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] { decoder_callbacks_->resetStream(); });
     }
     return WasmResult::Ok;
   case WasmStreamType::Response:
@@ -1601,19 +1602,26 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
       if (!encoder_callbacks_->streamInfo().responseCodeDetails().has_value()) {
         encoder_callbacks_->streamInfo().setResponseCodeDetails(CloseStreamResponseDetails);
       }
-      encoder_callbacks_->resetStream();
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] { encoder_callbacks_->resetStream(); });
     }
     return WasmResult::Ok;
   case WasmStreamType::Downstream:
     if (network_read_filter_callbacks_) {
-      network_read_filter_callbacks_->connection().close(
-          Envoy::Network::ConnectionCloseType::FlushWrite);
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] {
+        network_read_filter_callbacks_->connection().close(
+            Envoy::Network::ConnectionCloseType::FlushWrite);
+      });
     }
     return WasmResult::Ok;
   case WasmStreamType::Upstream:
     if (network_write_filter_callbacks_) {
-      network_write_filter_callbacks_->connection().close(
-          Envoy::Network::ConnectionCloseType::FlushWrite);
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] {
+        network_write_filter_callbacks_->connection().close(
+            Envoy::Network::ConnectionCloseType::FlushWrite);
+      });
     }
     return WasmResult::Ok;
   }

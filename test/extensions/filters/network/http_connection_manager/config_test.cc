@@ -201,10 +201,23 @@ http_filters:
   )EOF";
 
 #ifdef ENVOY_ENABLE_QUIC
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                     filter_config_provider_manager_);
+  {
+    EXPECT_CALL(context_, isQuicListener()).WillOnce(Return(false));
+
+    EXPECT_THROW_WITH_MESSAGE(
+        HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
+                                           context_, date_provider_, route_config_provider_manager_,
+                                           scoped_routes_config_provider_manager_,
+                                           http_tracer_manager_, filter_config_provider_manager_),
+        EnvoyException, "HTTP/3 codec configured on non-QUIC listener.");
+  }
+  {
+    EXPECT_CALL(context_, isQuicListener()).WillOnce(Return(true));
+    HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                       date_provider_, route_config_provider_manager_,
+                                       scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                       filter_config_provider_manager_);
+  }
 #else
   EXPECT_THROW_WITH_MESSAGE(
       HttpConnectionManagerConfig(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -213,6 +226,35 @@ http_filters:
                                   filter_config_provider_manager_),
       EnvoyException, "HTTP3 configured but not enabled in the build.");
 #endif
+}
+
+TEST_F(HttpConnectionManagerConfigTest, Http3HalfConfigured) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_, isQuicListener()).WillOnce(Return(true));
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                         date_provider_, route_config_provider_manager_,
+                                         scoped_routes_config_provider_manager_,
+                                         http_tracer_manager_, filter_config_provider_manager_),
+      EnvoyException, "Non-HTTP/3 codec configured on QUIC listener.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, TracingNotEnabledAndNoTracingConfigInBootstrap) {
@@ -776,25 +818,6 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   EXPECT_EQ(0, config.streamIdleTimeout().count());
 }
 
-// Validate that deprecated idle_timeout is still ingested.
-TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(IdleTimeout)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml_string = R"EOF(
-  stat_prefix: ingress_http
-  idle_timeout: 1s
-  route_config:
-    name: local_route
-  http_filters:
-  - name: envoy.filters.http.router
-  )EOF";
-
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string, false),
-                                     context_, date_provider_, route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                     filter_config_provider_manager_);
-  EXPECT_EQ(1000, config.idleTimeout().value().count());
-}
-
 // Validate that idle_timeout set in common_http_protocol_options is used.
 TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeout) {
   const std::string yaml_string = R"EOF(
@@ -884,6 +907,42 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeaderCountConfigurable) {
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
   EXPECT_EQ(200, config.maxRequestHeadersCount());
+}
+
+// Checking that default max_requests_per_connection is 0.
+TEST_F(HttpConnectionManagerConfigTest, DefaultMaxRequestPerConnection) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(0, config.maxRequestsPerConnection());
+}
+
+// Check that max_requests_per_connection is configured.
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestPerConnectionConfigurable) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    max_requests_per_connection: 5
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(5, config.maxRequestsPerConnection());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {

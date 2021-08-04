@@ -19,7 +19,6 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
-        "//source/extensions/stat_sinks:well_known_names",
         "//source/extensions/stat_sinks/common/statsd:statsd_lib",
         "//source/server:configuration_lib",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",

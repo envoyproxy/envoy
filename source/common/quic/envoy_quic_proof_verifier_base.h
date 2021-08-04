@@ -27,8 +27,6 @@ public:
   ~EnvoyQuicProofVerifierBase() override = default;
 
   // quic::ProofVerifier
-  // Return success if the certs chain is valid and signature of {
-  // server_config + chlo_hash} is valid. Otherwise failure.
   quic::QuicAsyncStatus
   VerifyProof(const std::string& hostname, const uint16_t port, const std::string& server_config,
               quic::QuicTransportVersion /*quic_version*/, absl::string_view chlo_hash,
@@ -38,11 +36,6 @@ public:
               std::unique_ptr<quic::ProofVerifierCallback> callback) override;
 
   std::unique_ptr<quic::ProofVerifyContext> CreateDefaultContext() override { return nullptr; }
-
-protected:
-  virtual bool verifySignature(const std::string& server_config, absl::string_view chlo_hash,
-                               const std::string& cert, const std::string& signature,
-                               std::string* error_details);
 };
 
 } // namespace Quic

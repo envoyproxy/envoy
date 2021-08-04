@@ -4,10 +4,18 @@
 
 import io
 import os
+import pathlib
+import tarfile
 import tempfile
 from configparser import ConfigParser
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from typing import Callable, Iterator, List, Optional, Union
+
+import yaml
+
+
+class ExtractError(Exception):
+    pass
 
 
 # this is testing specific - consider moving to tools.testing.utils
@@ -69,3 +77,54 @@ def buffered(
     if stderr is not None:
         _stderr.seek(0)
         stderr.extend(mangle(_stderr.read().strip().split("\n")))
+
+
+def extract(path: Union[pathlib.Path, str], *tarballs: Union[pathlib.Path, str]) -> pathlib.Path:
+    if not tarballs:
+        raise ExtractError(f"No tarballs specified for extraction to {path}")
+    openers = nested(*tuple(tarfile.open(tarball) for tarball in tarballs))
+
+    with openers as tarfiles:
+        for tar in tarfiles:
+            tar.extractall(path=path)
+    return pathlib.Path(path)
+
+
+@contextmanager
+def untar(*tarballs: Union[pathlib.Path, str]) -> Iterator[pathlib.Path]:
+    """Untar a tarball into a temporary directory
+
+    for example to list the contents of a tarball:
+
+    ```
+    import os
+
+    from tooling.base.utils import untar
+
+
+    with untar("path/to.tar") as tmpdir:
+        print(os.listdir(tmpdir))
+
+    ```
+
+    the created temp directory will be cleaned up on
+    exiting the contextmanager
+
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield extract(tmpdir, *tarballs)
+
+
+def from_yaml(path: Union[pathlib.Path, str]) -> Union[dict, list, str, int]:
+    """Returns the loaded python object from a yaml file given by `path`"""
+    return yaml.safe_load(pathlib.Path(path).read_text())
+
+
+def to_yaml(data: Union[dict, list, str, int], path: Union[pathlib.Path, str]) -> pathlib.Path:
+    """For given `data` dumps as yaml to provided `path`.
+
+    Returns `path`
+    """
+    path = pathlib.Path(path)
+    path.write_text(yaml.dump(data))
+    return path
