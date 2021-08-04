@@ -135,7 +135,7 @@ private:
   void encodeFormattedHeader(absl::string_view key, absl::string_view value,
                              HeaderKeyFormatterOptConstRef formatter);
 
-  void flushOutput();
+  void flushOutput(bool end_encode = false);
 
   absl::string_view details_;
   uint64_t encoded_bytes_{0};

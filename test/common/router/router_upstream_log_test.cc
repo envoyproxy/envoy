@@ -232,7 +232,9 @@ public:
         new Http::TestResponseHeaderMapImpl{{":status", "200"}});
     EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
                 putHttpResponseCode(200));
-    response_decoder->decodeHeaders(std::move(response_headers), true);
+    if (response_decoder != nullptr) {
+      response_decoder->decodeHeaders(std::move(response_headers), true);
+    }
   }
 
   std::vector<std::string> output_;

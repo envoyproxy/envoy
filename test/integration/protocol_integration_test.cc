@@ -2765,4 +2765,56 @@ TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
   codec_client_->close();
 }
 
+static bool near(int x, int y) { return std::abs(x - y) <= (0.03 * x); }
+
+TEST_P(ProtocolIntegrationTest, HeaderOnlyWireBytesCount) {
+  // we only care about upstream protocol.
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED% %BYTES_SENT% %BYTES_RECEIVED%");
+  testRouterRequestAndResponseWithBody(0, 0, false);
+  std::string access_log = waitForAccessLog(upstream_access_log_name_);
+  std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
+  int wire_sent_bytes = std::stoi(log_entries[0]), wire_received_bytes = std::stoi(log_entries[1]);
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
+    EXPECT_TRUE(near(wire_sent_bytes, 168));
+    EXPECT_TRUE(near(wire_received_bytes, 13));
+  }
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    EXPECT_EQ(wire_sent_bytes, 251);
+    EXPECT_EQ(wire_received_bytes, 38);
+  }
+}
+
+TEST_P(ProtocolIntegrationTest, ResponseWithTrailerWireBytesCount) {
+  // we only care about upstream protocol.
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED% %BYTES_SENT% %BYTES_RECEIVED%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 128);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(128, false);
+  Http::TestResponseTrailerMapImpl response_trailers{{"response", "trailer"}};
+  upstream_request_->encodeTrailers(response_trailers);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string access_log = waitForAccessLog(upstream_access_log_name_);
+  std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
+  int wire_sent_bytes = std::stoi(log_entries[0]), wire_received_bytes = std::stoi(log_entries[1]);
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
+    EXPECT_TRUE(near(wire_sent_bytes, 251));
+    EXPECT_TRUE(near(wire_received_bytes, 173));
+  }
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    EXPECT_EQ(wire_sent_bytes, 326);
+    EXPECT_EQ(wire_received_bytes, 205);
+  }
+}
+
 } // namespace Envoy

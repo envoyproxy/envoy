@@ -101,7 +101,7 @@ uint64_t StreamEncoderImpl::encodedBytes() {
 }
 
 void StreamEncoderImpl::addEncodedBytes(size_t newly_encoded_bytes) {
-  ENVOY_CONN_LOG(trace, "h1: update sent bytes {}\n", connection_.connection(), encoded_bytes_);
+  ENVOY_CONN_LOG(trace, "h1: update encoded bytes {}\n", connection_.connection(), encoded_bytes_);
   encoded_bytes_ += newly_encoded_bytes;
 }
 
@@ -277,7 +277,9 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void StreamEncoderImpl::flushOutput() { addEncodedBytes(connection_.flushOutput()); }
+void StreamEncoderImpl::flushOutput(bool end_encode) {
+  addEncodedBytes(connection_.flushOutput(end_encode));
+}
 
 void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
   if (!connection_.enableTrailers()) {
@@ -314,7 +316,7 @@ void StreamEncoderImpl::endEncode() {
     connection_.buffer().add(CRLF);
   }
 
-  connection_.flushOutput(true);
+  flushOutput(true);
   connection_.onEncodeComplete();
   // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream.
   if (connect_request_ || is_tcp_tunneling_) {
