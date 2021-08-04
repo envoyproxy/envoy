@@ -482,11 +482,9 @@ TEST(WatermarkBufferFactoryTest, CanConfigureMinimumTrackingAmount) {
   EXPECT_EQ(factory.bitshift(), 2);
 }
 
-TEST(WatermarkBufferFactoryTest, ReleaseAssertIfAccountTrackingThresholdBytesIsNotPowerOfTwo) {
-  envoy::config::bootstrap::v3::BufferFactoryConfig config;
-  config.set_account_tracking_threshold_bytes(3);
-  EXPECT_DEATH(WatermarkBufferFactory{config},
-               "Expected account_tracking_threshold_bytes to be a power of two.");
+TEST(WatermarkBufferFactoryTest, DefaultsToTrackingAccountsGreaterThanOrEqualTo256KB) {
+  TrackedWatermarkBufferFactory factory;
+  EXPECT_EQ(factory.bitshift(), 18);
 }
 
 } // namespace

@@ -4,6 +4,7 @@
 
 #include "envoy/buffer/buffer.h"
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "source/common/common/assert.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -184,15 +185,10 @@ void WatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPt
 }
 
 WatermarkBufferFactory::WatermarkBufferFactory(
-    const envoy::config::bootstrap::v3::BufferFactoryConfig& config)
-    : bitshift_(config.account_tracking_threshold_bytes()
-                    ? absl::bit_width(config.account_tracking_threshold_bytes() - 1)
-                    : kDefaultMinimumTrackingBytes) {
-  RELEASE_ASSERT(config.account_tracking_threshold_bytes() == 0 ||
-                     (config.account_tracking_threshold_bytes() &
-                      (config.account_tracking_threshold_bytes() - 1)) == 0,
-                 "Expected account_tracking_threshold_bytes to be a power of two.");
-}
+    const envoy::config::bootstrap::v3::ResourceTrackingConfig::BufferFactoryConfig& config)
+    : bitshift_(config.minimum_account_to_track_power_of_two()
+                    ? config.minimum_account_to_track_power_of_two() - 1
+                    : kDefaultMinimumTrackingBytes) {}
 
 WatermarkBufferFactory::~WatermarkBufferFactory() {
   for (auto& account_set : size_class_account_sets_) {
@@ -215,8 +211,7 @@ BufferMemoryAccountImpl::createAccount(WatermarkBufferFactory* factory,
 }
 
 int BufferMemoryAccountImpl::balanceToClassIndex() {
-  static uint32_t bitshift = factory_->bitshift();
-  uint64_t shifted_balance = buffer_memory_allocated_ >> bitshift;
+  const uint64_t shifted_balance = buffer_memory_allocated_ >> factory_->bitshift();
 
   if (shifted_balance == 0) {
     return -1; // Not worth tracking anything < configured minimum threshold

@@ -199,7 +199,8 @@ message Bootstrap {
     (udpa.annotations.security).configure_for_untrusted_upstream = true
   ];
 
-  BufferFactoryConfig buffer_factory_config = 33;
+  // Optional configuration for resource tracking.
+  ResourceTrackingConfig resource_tracking_config = 33;
 
   // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
   // Note that this records a value for each iteration of the event loop on every thread. This
@@ -621,18 +622,27 @@ message CustomInlineHeader {
   InlineHeaderType inline_header_type = 2 [(validate.rules).enum = {defined_only: true}];
 }
 
-// Configuration for the Buffer Factories that create Buffers and Accounts.
-message BufferFactoryConfig {
+// Context object encapsulating resource tracking configuration for a variety of
+// components.
+message ResourceTrackingConfig {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.bootstrap.v3.BufferFactoryConfig";
+      "envoy.config.bootstrap.v3.ResourceTrackingConfig";
 
-  // The minimum account size at which Envoy starts tracking a stream.
-  // This *MUST* be a power of two.
-  //
-  // Envoy has 8 power of two buckets starting from this value.
-  // Concretely the 1st bucket contains accounts for streams that use
-  // [account_tracking_threshold_bytes, 2 * account_tracking_threshold_bytes).
-  // With the 8th bucket tracking accounts
-  // >= 128 * account_tracking_threshold_bytes.
-  uint32 account_tracking_threshold_bytes = 1 [(validate.rules).uint32 = {gt: 0}];
+  // Configuration for which accounts the WatermarkBuffer Factories should track.
+  message BufferFactoryConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.bootstrap.v3.ResourceTrackingConfig.BufferFactoryConfig";
+
+    // The minimum power of two at which Envoy starts tracking an account.
+    //
+    // Envoy has 8 power of two buckets starting with the provided exponent below.
+    // Concretely the 1st bucket contains accounts for streams that use
+    // [2^minimum_account_to_track_power_of_two,
+    // 2^(minimum_account_to_track_power_of_two + 1)) bytes.
+    // With the 8th bucket tracking accounts
+    // >= 128 * 2^minimum_account_to_track_power_of_two.
+    uint32 minimum_account_to_track_power_of_two = 1 [(validate.rules).uint32 = {lte: 63 gt: 0}];
+  }
+
+  BufferFactoryConfig buffer_factory_config = 1;
 }

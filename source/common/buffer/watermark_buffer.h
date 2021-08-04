@@ -183,7 +183,8 @@ private:
  */
 class WatermarkBufferFactory : public WatermarkFactory {
 public:
-  WatermarkBufferFactory(const envoy::config::bootstrap::v3::BufferFactoryConfig& config);
+  WatermarkBufferFactory(
+      const envoy::config::bootstrap::v3::ResourceTrackingConfig::BufferFactoryConfig& config);
 
   // Buffer::WatermarkFactory
   ~WatermarkBufferFactory() override;

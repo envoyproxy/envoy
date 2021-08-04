@@ -1,5 +1,6 @@
 #include "test/integration/tracked_watermark_buffer.h"
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/thread/thread.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/thread_local/thread_local_object.h"
@@ -13,10 +14,15 @@ TrackedWatermarkBufferFactory::TrackedWatermarkBufferFactory() : TrackedWatermar
 
 TrackedWatermarkBufferFactory::TrackedWatermarkBufferFactory(uint32_t min_tracking_bytes)
     : WatermarkBufferFactory([min_tracking_bytes]() {
-        auto config = envoy::config::bootstrap::v3::BufferFactoryConfig();
-        config.set_account_tracking_threshold_bytes(min_tracking_bytes);
+        auto config = envoy::config::bootstrap::v3::ResourceTrackingConfig::BufferFactoryConfig();
+        if (min_tracking_bytes > 0) {
+          config.set_minimum_account_to_track_power_of_two(absl::bit_width(min_tracking_bytes));
+        }
         return config;
-      }()) {}
+      }()) {
+  ASSERT(min_tracking_bytes == 0 || (min_tracking_bytes & (min_tracking_bytes - 1)) == 0,
+         "Expected min_tracking_bytes to be either 0 to use the default or a power of two.");
+}
 
 TrackedWatermarkBufferFactory::~TrackedWatermarkBufferFactory() {
   ASSERT(active_buffer_count_ == 0);
