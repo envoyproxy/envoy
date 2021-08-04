@@ -63,4 +63,3 @@ envoy_cc_library(
         "//source/extensions/filters/network/kafka/mesh:abstract_command_lib",
     ],
 )
-
