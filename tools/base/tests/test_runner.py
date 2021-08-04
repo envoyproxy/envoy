@@ -40,6 +40,10 @@ class Error2(Exception):
 def _failing_runner(errors):
 
     class DummyFailingRunner(object):
+        # this dummy runner calls the _runner mock
+        # when its run/run_async methods are called
+        # and optionally raises some type of error
+        # to ensure they are caught as expected
 
         log = PropertyMock()
         _runner = MagicMock()
@@ -54,9 +58,18 @@ def _failing_runner(errors):
                 raise self.raises("AN ERROR OCCURRED")
             return result
 
+        @runner.catches(errors)
+        async def run_async(self, *args, **kwargs):
+            result = self._runner(*args, **kwargs)
+            if self.raises:
+                raise self.raises("AN ERROR OCCURRED")
+            return result
+
     return DummyFailingRunner
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("async_fun", [True, False])
 @pytest.mark.parametrize(
     "errors",
     [Error1, (Error1, Error2)])
@@ -69,7 +82,7 @@ def _failing_runner(errors):
 @pytest.mark.parametrize(
     "kwargs",
     [{}, dict(key1="VAL1", key2="VAL2")])
-def test_catches(errors, raises, args, kwargs):
+async def test_catches(errors, async_fun, raises, args, kwargs):
     run = _failing_runner(errors)(raises)
     should_fail = (
         raises
@@ -81,9 +94,9 @@ def test_catches(errors, raises, args, kwargs):
     if should_fail:
         result = 1
         with pytest.raises(raises):
-            run.run(*args, **kwargs)
+            run.run(*args, **kwargs) if not async_fun else await run.run_async(*args, **kwargs)
     else:
-        result = run.run(*args, **kwargs)
+        result = run.run(*args, **kwargs) if not async_fun else await run.run_async(*args, **kwargs)
 
     assert (
         list(run._runner.call_args)
@@ -234,19 +247,21 @@ def test_runner_parser(patches):
     assert "parser" in run.__dict__
 
 
-def test_checker_path():
+def test_runner_path(patches):
     run = runner.Runner("path1", "path2", "path3")
-    cwd_mock = patch("tools.base.runner.os.getcwd")
+    patched = patches(
+        "pathlib",
+        prefix="tools.base.runner")
 
-    with cwd_mock as m_cwd:
-        assert run.path == m_cwd.return_value
+    with patched as (m_plib, ):
+        assert run.path == m_plib.Path.return_value
 
     assert (
-        list(m_cwd.call_args)
-        == [(), {}])
+        list(m_plib.Path.call_args)
+        == [(".", ), {}])
 
 
-def test_checker_stdout(patches):
+def test_runner_stdout(patches):
     run = runner.Runner("path1", "path2", "path3")
 
     patched = patches(

@@ -78,14 +78,6 @@ public:
   const Network::SocketAddressSetter& downstreamAddressProvider() const override {
     return *downstream_address_provider_;
   }
-  void
-  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
-    downstream_connection_info_ = connection_info;
-  }
-
-  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
-    return downstream_connection_info_;
-  }
 
   void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
     upstream_connection_info_ = connection_info;
@@ -219,6 +211,10 @@ public:
 
   const std::string& filterChainName() const override { return filter_chain_name_; }
 
+  void setAttemptCount(uint32_t attempt_count) override { attempt_count_ = attempt_count; }
+
+  absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
+
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -261,6 +257,7 @@ public:
   absl::optional<uint64_t> connection_id_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_{Tracing::Reason::NotTraceable};
+  absl::optional<uint32_t> attempt_count_;
 };
 
 } // namespace Envoy

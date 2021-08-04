@@ -197,15 +197,6 @@ struct StreamInfoImpl : public StreamInfo {
     return *downstream_address_provider_;
   }
 
-  void
-  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
-    downstream_ssl_info_ = connection_info;
-  }
-
-  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
-    return downstream_ssl_info_;
-  }
-
   void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
     upstream_ssl_info_ = connection_info;
   }
@@ -262,7 +253,8 @@ struct StreamInfoImpl : public StreamInfo {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
        << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
-       << DUMP_MEMBER(health_check_request_) << DUMP_MEMBER(route_name_) << "\n";
+       << DUMP_OPTIONAL_MEMBER(attempt_count_) << DUMP_MEMBER(health_check_request_)
+       << DUMP_MEMBER(route_name_) << "\n";
   }
 
   void setUpstreamClusterInfo(
@@ -279,6 +271,10 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   const std::string& filterChainName() const override { return filter_chain_name_; }
+
+  void setAttemptCount(uint32_t attempt_count) override { attempt_count_ = attempt_count; }
+
+  absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
   TimeSource& time_source_;
   const SystemTime start_time_;
@@ -301,6 +297,7 @@ struct StreamInfoImpl : public StreamInfo {
   FilterStateSharedPtr filter_state_;
   FilterStateSharedPtr upstream_filter_state_;
   std::string route_name_;
+  absl::optional<uint32_t> attempt_count_;
 
 private:
   static Network::SocketAddressProviderSharedPtr emptyDownstreamAddressProvider() {
@@ -324,7 +321,6 @@ private:
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   const Network::SocketAddressProviderSharedPtr downstream_address_provider_;
-  Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
