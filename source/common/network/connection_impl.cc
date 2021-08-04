@@ -99,6 +99,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
   // TODO(soulxu): generate the connection id inside the addressProvider directly,
   // then we don't need a setter or any of the optional stuff.
   socket_->addressProvider().setConnectionID(id());
+  socket_->addressProvider().setSslConnection(transport_socket_->ssl());
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -788,10 +789,13 @@ ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info,
                      connected) {}
 
-void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) {
+void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
+                                                            Stats::Counter& timeout_stat) {
   if (!transport_connect_pending_) {
     return;
   }
+
+  transport_socket_timeout_stat_ = &timeout_stat;
   if (transport_socket_connect_timer_ == nullptr) {
     transport_socket_connect_timer_ =
         dispatcher_.createScaledTimer(Event::ScaledTimerType::TransportSocketConnectTimeout,
@@ -814,6 +818,7 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
 void ServerConnectionImpl::onTransportSocketConnectTimeout() {
   stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
   closeConnectionImmediately();
+  transport_socket_timeout_stat_->inc();
 }
 
 ClientConnectionImpl::ClientConnectionImpl(

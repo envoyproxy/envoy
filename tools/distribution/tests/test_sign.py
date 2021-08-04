@@ -18,7 +18,7 @@ def test_util_constructor(command):
     if command is not None:
         args += (command, )
     util = sign.DirectorySigningUtil(*args)
-    assert util.path == "PATH"
+    assert util._path == "PATH"
     assert util.maintainer == maintainer
     assert util.log == "LOG"
     assert util._command == (command or "")
@@ -48,10 +48,10 @@ def test_util_command(patches, command_name, command, which):
 
             assert (
                 list(m_shutil.which.call_args)
-                == [(command_name,), {}])
+                == [(command_name or "",), {}])
             assert (
                 e.value.args[0]
-                == f"Signing software missing ({m_type.return_value}): {command_name}")
+                == f"Signing software missing ({m_type.return_value}): {command_name or ''}")
             return
 
         result = util.command
@@ -66,7 +66,7 @@ def test_util_command(patches, command_name, command, which):
 
     assert (
         list(m_shutil.which.call_args)
-        == [(command_name,), {}])
+        == [(command_name or "",), {}])
     assert result == m_shutil.which.return_value
 
 
@@ -111,33 +111,29 @@ def test_util_sign_pkg(patches, returncode):
     packager = sign.PackageSigningRunner("x", "y", "z")
     maintainer = identity.GPGIdentity(packager)
     util = sign.DirectorySigningUtil("PATH", maintainer, "LOG")
+    util.log = MagicMock()
+    pkg_file = MagicMock()
     patched = patches(
-        "os",
         "subprocess",
         "DirectorySigningUtil.sign_command",
         ("PackageSigningRunner.log", dict(new_callable=PropertyMock)),
         ("DirectorySigningUtil.package_type", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.sign")
 
-    util.log = MagicMock()
-
-    with patched as (m_os, m_subproc, m_command, m_log, m_type):
+    with patched as (m_subproc, m_command, m_log, m_type):
         m_subproc.run.return_value.returncode = returncode
         if returncode:
             with pytest.raises(sign.SigningError) as e:
-                util.sign_pkg("PACKAGE")
+                util.sign_pkg(pkg_file)
         else:
-            assert not util.sign_pkg("PACKAGE")
+            assert not util.sign_pkg(pkg_file)
 
     assert (
-        list(m_os.path.basename.call_args)
-        == [('PACKAGE',), {}])
-    assert (
         list(util.log.notice.call_args)
-        == [(f"Sign package ({m_type.return_value}): {m_os.path.basename.return_value}",), {}])
+        == [(f"Sign package ({m_type.return_value}): {pkg_file.name}",), {}])
     assert (
         list(m_command.call_args)
-        == [('PACKAGE',), {}])
+        == [(pkg_file,), {}])
     assert (
         list(m_subproc.run.call_args)
         == [(m_command.return_value,),
@@ -147,7 +143,7 @@ def test_util_sign_pkg(patches, returncode):
     if not returncode:
         assert (
             list(util.log.success.call_args)
-            == [(f"Signed package ({m_type.return_value}): {m_os.path.basename.return_value}",), {}])
+            == [(f"Signed package ({m_type.return_value}): {pkg_file.name}",), {}])
         return
     assert e.value.args[0] == m_subproc.run.return_value.stdout + m_subproc.run.return_value.stderr
 
@@ -163,6 +159,21 @@ def test_util_package_type(ext, package_type):
     assert util.package_type == package_type or ext
 
 
+def test_util_path(patches):
+    packager = sign.PackageSigningRunner("x", "y", "z")
+    maintainer = identity.GPGIdentity(packager)
+    util = sign.DirectorySigningUtil("PATH", maintainer, "LOG")
+    patched = patches(
+        "pathlib",
+        prefix="tools.distribution.sign")
+    with patched as (m_plib, ):
+        assert util.path == m_plib.Path.return_value
+
+    assert (
+        list(m_plib.Path.call_args)
+        == [(util._path,), {}])
+
+
 @pytest.mark.parametrize(
     "files",
     [[],
@@ -174,34 +185,30 @@ def test_util_pkg_files(patches, files):
     maintainer = identity.GPGIdentity(packager)
     util = sign.DirectorySigningUtil("PATH", maintainer, "LOG")
     patched = patches(
-        "os",
         ("DirectorySigningUtil.ext", dict(new_callable=PropertyMock)),
+        ("DirectorySigningUtil.path", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.sign")
-    with patched as (m_os, m_ext):
+    with patched as (m_ext, m_path):
+        _glob = {}
+
+        for _path in files:
+            _mock = MagicMock()
+            _mock.name = _path
+            _glob[_path] = _mock
+        m_path.return_value.glob.return_value = _glob.values()
+
         m_ext.return_value = "EXT"
-        m_os.listdir.return_value = files
         result = util.pkg_files
 
     expected = [fname for fname in files if fname.endswith(".EXT")]
 
     assert (
-        list(m_os.listdir.call_args)
-        == [("PATH",), {}])
-    if not expected:
-        assert not m_os.path.join.called
-        assert not result
-    else:
-        assert (
-            result
-            == tuple(
-                m_os.path.join.return_value
-                for fname in expected))
-        assert (
-            list(list(c) for c in m_os.path.join.call_args_list)
-            == [[("PATH", fname), {}]
-                for fname in expected])
-
+        list(m_path.return_value.glob.call_args)
+        == [("*",), {}])
     assert "pkg_files" not in util.__dict__
+    assert (
+        result
+        == tuple(_glob[k] for k in expected))
 
 
 # PackageSigningRunner
@@ -305,14 +312,17 @@ def test_packager_package_type(patches):
 
 def test_packager_path(patches):
     packager = sign.PackageSigningRunner("x", "y", "z")
-
     patched = patches(
+        "pathlib",
         ("PackageSigningRunner.args", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.sign")
 
-    with patched as (m_args, ):
-        assert packager.path == m_args.return_value.path
+    with patched as (m_plib, m_args):
+        assert packager.path == m_plib.Path.return_value
 
+    assert (
+        list(m_plib.Path.call_args)
+        == [(m_args.return_value.path, ), {}])
     assert "path" not in packager.__dict__
 
 
@@ -390,16 +400,17 @@ def test_packager_get_signing_util(patches):
         ("PackageSigningRunner.maintainer", dict(new_callable=PropertyMock)),
         ("PackageSigningRunner.signing_utils", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.sign")
+    path = MagicMock()
 
     with patched as (m_log, m_maintainer, m_utils):
-        assert packager.get_signing_util("UTIL", "PATH") == m_utils.return_value.__getitem__.return_value.return_value
+        assert packager.get_signing_util(path) == m_utils.return_value.__getitem__.return_value.return_value
 
     assert (
         list(m_utils.return_value.__getitem__.call_args)
-        == [("UTIL",), {}])
+        == [(path.name,), {}])
     assert (
         list(m_utils.return_value.__getitem__.return_value.call_args)
-        == [("PATH", m_maintainer.return_value, m_log.return_value), {}])
+        == [(path, m_maintainer.return_value, m_log.return_value), {}])
 
 
 @pytest.mark.parametrize("extract", [True, False])
@@ -460,16 +471,17 @@ def test_packager_sign(patches):
         ("PackageSigningRunner.log", dict(new_callable=PropertyMock)),
         ("PackageSigningRunner.maintainer", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.sign")
+    path = MagicMock()
 
     with patched as (m_util, m_log, m_maintainer):
-        assert not packager.sign("PACKAGE_TYPE", "PATH")
+        assert not packager.sign(path)
 
     assert (
         list(m_log.return_value.notice.call_args)
-        == [(f"Signing PACKAGE_TYPEs ({m_maintainer.return_value}) PATH",), {}])
+        == [(f"Signing {path.name}s ({m_maintainer.return_value}) {path}",), {}])
     assert (
         list(m_util.call_args)
-        == [('PACKAGE_TYPE', 'PATH'), {}])
+        == [(path, ), {}])
     assert (
         list(m_util.return_value.sign.call_args)
         == [(), {}])
@@ -480,25 +492,29 @@ def test_packager_sign(patches):
 def test_packager_sign_all(patches, listdir, utils):
     packager = sign.PackageSigningRunner("x", "y", "z")
     patched = patches(
-        "os",
         "PackageSigningRunner.sign",
         ("PackageSigningRunner.signing_utils", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.sign")
+    path = MagicMock()
 
-    with patched as (m_os, m_sign, m_utils):
-        m_os.listdir.return_value = listdir
+    with patched as (m_sign, m_utils):
+        _glob = {}
+
+        for _path in listdir:
+            _mock = MagicMock()
+            _mock.name = _path
+            _glob[_path] = _mock
+        path.glob.return_value = _glob.values()
         m_utils.return_value = utils
-        assert not packager.sign_all("PATH")
+        assert not packager.sign_all(path)
+
     assert (
-        list(m_os.listdir.call_args)
-        == [('PATH',), {}])
+        list(path.glob.call_args)
+        == [('*',), {}])
     expected = [x for x in listdir if x in utils]
     assert (
-        list(list(c) for c in m_os.path.join.call_args_list)
-        == [[('PATH', k), {}] for k in expected])
-    assert (
         list(list(c) for c in m_sign.call_args_list)
-        == [[(k, m_os.path.join.return_value), {}] for k in expected])
+        == [[(_glob[k], ), {}] for k in expected])
 
 
 @pytest.mark.parametrize("tar", [True, False])
@@ -507,18 +523,17 @@ def test_packager_sign_directory(patches, tar):
     patched = patches(
         "PackageSigningRunner.archive",
         "PackageSigningRunner.sign",
-        ("PackageSigningRunner.package_type", dict(new_callable=PropertyMock)),
         ("PackageSigningRunner.path", dict(new_callable=PropertyMock)),
         ("PackageSigningRunner.tar", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.sign")
 
-    with patched as (m_archive, m_sign, m_type, m_path, m_tar):
+    with patched as (m_archive, m_sign, m_path, m_tar):
         m_tar.return_value = tar
         assert not packager.sign_directory()
 
     assert (
         list(m_sign.call_args)
-        == [(m_type.return_value, m_path.return_value), {}])
+        == [(m_path.return_value, ), {}])
     if not tar:
         assert not m_archive.called
         return
@@ -577,23 +592,36 @@ def test_rpmmacro_constructor(patches, overwrite, kwargs):
         if overwrite != []
         else sign.RPMMacro("HOME", **kwargs))
     assert rpmmacro._macro_filename == ".rpmmacros"
-    assert rpmmacro.home == "HOME"
+    assert rpmmacro._home == "HOME"
     assert rpmmacro.overwrite == bool(overwrite or False)
     assert rpmmacro.kwargs == kwargs
     assert rpmmacro.template == sign.RPMMACRO_TEMPLATE
 
 
+def test_rpmmacro_home(patches):
+    rpmmacro = sign.RPMMacro("HOME")
+    patched = patches(
+        "pathlib",
+        prefix="tools.distribution.sign")
+    with patched as (m_plib, ):
+        assert rpmmacro.home == m_plib.Path.return_value
+
+    assert (
+        list(m_plib.Path.call_args)
+        == [(rpmmacro._home,), {}])
+
+
 def test_rpmmacro_path(patches):
     rpmmacro = sign.RPMMacro("HOME")
     patched = patches(
-        "os",
+        ("RPMMacro.home", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.sign")
-    with patched as (m_os, ):
-        assert rpmmacro.path == m_os.path.join.return_value
+    with patched as (m_home, ):
+        assert rpmmacro.path == m_home.return_value.joinpath.return_value
 
     assert (
-        list(m_os.path.join.call_args)
-        == [('HOME', rpmmacro._macro_filename), {}])
+        list(m_home.return_value.joinpath.call_args)
+        == [(rpmmacro._macro_filename, ), {}])
 
 
 @pytest.mark.parametrize("kwargs", [{}, dict(K1="V1", K2="V2")])
@@ -621,34 +649,28 @@ def test_rpmmacro_macro(patches, kwargs):
 def test_rpmmacro_write(patches, overwrite, exists):
     rpmmacro = sign.RPMMacro("HOME")
     patched = patches(
-        "open",
-        "os",
         ("RPMMacro.macro", dict(new_callable=PropertyMock)),
         ("RPMMacro.path", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.sign")
     rpmmacro.overwrite = overwrite
 
-    with patched as (m_open, m_os, m_macro, m_path):
-        m_os.path.exists.return_value = exists
+    with patched as (m_macro, m_path):
+        m_path.return_value.exists.return_value = exists
         assert not rpmmacro.write()
 
     if not overwrite:
         assert (
-            list(m_os.path.exists.call_args)
-            == [(m_path.return_value,), {}])
+            list(m_path.return_value.exists.call_args)
+            == [(), {}])
     else:
-        assert not m_os.path.join.called
-        assert not m_os.exists.join.called
+        assert not m_path.return_value.exists.join.called
 
     if not overwrite and exists:
-        assert not m_open.called
+        assert not m_path.return_value.write_text.called
         return
 
     assert (
-        list(m_open.call_args)
-        == [(m_path.return_value, 'w'), {}])
-    assert (
-        list(m_open.return_value.__enter__.return_value.write.call_args)
+        list(m_path.return_value.write_text.call_args)
         == [(m_macro.return_value,), {}])
 
 
@@ -683,14 +705,13 @@ def test_rpmsign_constructor(patches, args, kwargs):
 def test_rpmsign_command(patches, gpg2):
     maintainer = identity.GPGIdentity()
     patched = patches(
-        "os",
         "RPMSigningUtil.__init__",
         ("DirectorySigningUtil.command", dict(new_callable=PropertyMock)),
         ("identity.GPGIdentity.gpg_bin", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.sign")
 
-    with patched as (m_os, m_init, m_super, m_gpg):
-        m_os.path.basename.return_value = "gpg2" if gpg2 else "notgpg2"
+    with patched as (m_init, m_super, m_gpg):
+        m_gpg.return_value.name = "gpg2" if gpg2 else "notgpg2"
         m_init.return_value = None
         rpmsign = sign.RPMSigningUtil("PATH", maintainer, "LOG")
         rpmsign.maintainer = maintainer
@@ -705,9 +726,6 @@ def test_rpmsign_command(patches, gpg2):
                 e.value.args[0]
                 == 'GPG2 is required to sign RPM packages')
 
-    assert (
-        list(m_os.path.basename.call_args)
-        == [(m_gpg.return_value,), {}])
     if gpg2:
         assert "command" in rpmsign.__dict__
     else:
@@ -735,7 +753,7 @@ def test_rpmsign_command_args(patches):
 class DummyRPMSigningUtil(sign.RPMSigningUtil):
 
     def __init__(self, path, maintainer):
-        self.path = path
+        self._path = path
         self.maintainer = maintainer
 
 
@@ -765,19 +783,19 @@ def test_rpmsign_sign_pkg(patches):
     maintainer = identity.GPGIdentity(packager)
     rpmsign = DummyRPMSigningUtil("PATH", maintainer)
     patched = patches(
-        "os",
         "DirectorySigningUtil.sign_pkg",
         prefix="tools.distribution.sign")
+    file = MagicMock()
 
-    with patched as (m_os, m_sign):
-        assert not rpmsign.sign_pkg("FILE")
+    with patched as (m_sign, ):
+        assert not rpmsign.sign_pkg(file)
 
     assert (
-        list(m_os.chmod.call_args)
-        == [('FILE', 0o755), {}])
+        list(file.chmod.call_args)
+        == [(0o755, ), {}])
     assert (
         list(m_sign.call_args)
-        == [('FILE',), {}])
+        == [(file,), {}])
 
 
 # DebChangesFiles
@@ -788,23 +806,23 @@ def test_changes_constructor():
 
 
 def test_changes_dunder_iter(patches):
-    changes = sign.DebChangesFiles("SRC")
+    path = MagicMock()
+    changes = sign.DebChangesFiles(path)
 
     patched = patches(
-        "os",
         ("DebChangesFiles.files", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.sign")
     _files = ["FILE1", "FILE2", "FILE3"]
 
-    with patched as (m_os, m_files):
+    with patched as (m_files, ):
         m_files.return_value = _files
         result = changes.__iter__()
         assert list(result) == _files
 
     assert isinstance(result, types.GeneratorType)
     assert (
-        list(m_os.unlink.call_args)
-        == [('SRC',), {}])
+        list(path.unlink.call_args)
+        == [(), {}])
 
 
 @pytest.mark.parametrize(
@@ -885,14 +903,14 @@ def test_changes_files(patches):
 
 
 def test_changes_changes_file(patches):
-    changes = sign.DebChangesFiles("SRC")
+    path = MagicMock()
+    changes = sign.DebChangesFiles(path)
     patched = patches(
-        "open",
         "DebChangesFiles.changes_file_path",
         ("DebChangesFiles.distributions", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.sign")
 
-    with patched as (m_open, m_path, m_distros):
+    with patched as (m_path, m_distros):
         assert (
             changes.changes_file("DISTRO")
             == m_path.return_value)
@@ -901,29 +919,23 @@ def test_changes_changes_file(patches):
         list(m_path.call_args)
         == [('DISTRO',), {}])
     assert (
-        list(list(c) for c in m_open.call_args_list)
-        == [[(m_path.return_value, 'w'), {}],
-            [('SRC',), {}]])
+        list(m_path.return_value.write_text.call_args)
+        == [(path.read_text.return_value.replace.return_value,), {}])
     assert (
-        list(m_open.return_value.__enter__.return_value.write.call_args)
-        == [(m_open.return_value.__enter__.return_value.read.return_value.replace.return_value,), {}])
-    assert (
-        list(m_open.return_value.__enter__.return_value.read.call_args)
+        list(path.read_text.call_args)
         == [(), {}])
     assert (
-        list(m_open.return_value.__enter__.return_value.read.return_value.replace.call_args)
-        == [(m_distros.return_value, 'DISTRO'), {}])
+        list(path.read_text.return_value.replace.call_args)
+        == [(m_distros.return_value, "DISTRO"), {}])
 
 
-@pytest.mark.parametrize(
-    "path",
-    [("SRC", "SRC.DISTRO.changes"),
-     ("SRC.changes", "SRC.DISTRO.changes"),
-     ("SRC.FOO.BAR.changes", "SRC.FOO.BAR.DISTRO.changes")])
-def test_changes_file_path(path):
-    path, expected = path
+def test_changes_file_path():
+    path = MagicMock()
     changes = sign.DebChangesFiles(path)
-    assert changes.changes_file_path("DISTRO") == expected
+    assert changes.changes_file_path("DISTRO") == path.with_suffix.return_value
+    assert (
+        list(path.with_suffix.call_args)
+        == [('.DISTRO.changes',), {}])
 
 
 # DebSigningUtil
@@ -939,7 +951,7 @@ def test_debsign_constructor(patches, args):
     assert debsign.command_name == "debsign"
     assert debsign._package_type == "deb"
     assert debsign.changes_files == sign.DebChangesFiles
-    assert debsign.path == "PATH"
+    assert debsign._path == "PATH"
     assert debsign.maintainer == maintainer
     assert debsign.log == "LOG"
 

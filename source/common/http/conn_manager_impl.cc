@@ -664,9 +664,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   }
 
-  filter_manager_.streamInfo().setDownstreamSslConnection(
-      connection_manager_.read_callbacks_->connection().ssl());
-
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
     stream_idle_timer_ =

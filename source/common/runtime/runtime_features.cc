@@ -59,6 +59,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.add_and_validate_scheme_header",
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
+    "envoy.reloadable_features.conn_pool_delete_when_idle",
     "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
@@ -110,9 +111,6 @@ constexpr const char* runtime_features[] = {
 constexpr const char* disabled_runtime_features[] = {
     // v2 is fatal-by-default.
     "envoy.test_only.broken_in_production.enable_deprecated_v2_api",
-    // Defaulting to off due to high risk.
-    // TODO(ggreenway): Move this to default-on during 1.20 release cycle.
-    "envoy.reloadable_features.conn_pool_delete_when_idle",
     // TODO(asraa) flip to true in a separate PR to enable the new JSON by default.
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
