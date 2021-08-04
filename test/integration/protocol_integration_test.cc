@@ -2765,26 +2765,24 @@ TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
   codec_client_->close();
 }
 
-static bool integer_near(int x, int y) { return std::abs(x - y) <= (x / 30); }
-
 TEST_P(ProtocolIntegrationTest, HeaderOnlyWireBytesCount) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
   }
-  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED% %BYTES_SENT% %BYTES_RECEIVED%");
+  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(0, 0, false);
-  std::string access_log = waitForAccessLog(upstream_access_log_name_);
-  std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
-  int wire_sent_bytes = std::stoi(log_entries[0]), wire_received_bytes = std::stoi(log_entries[1]);
-  if (upstreamProtocol() == Http::CodecType::HTTP2) {
-    EXPECT_TRUE(integer_near(wire_sent_bytes, 168));
-    EXPECT_TRUE(integer_near(wire_received_bytes, 13));
+  expectWireBytesSentAndReceived(0, 251, 38, 168, 13);
+}
+
+TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCount) {
+  // we only care about upstream protocol.
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
   }
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    EXPECT_EQ(wire_sent_bytes, 251);
-    EXPECT_EQ(wire_received_bytes, 38);
-  }
+  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%");
+  testRouterRequestAndResponseWithBody(100, 100, false);
+  expectWireBytesSentAndReceived(0, 371, 158, 277, 122);
 }
 
 TEST_P(ProtocolIntegrationTest, ResponseWithTrailerWireBytesCount) {
@@ -2792,7 +2790,7 @@ TEST_P(ProtocolIntegrationTest, ResponseWithTrailerWireBytesCount) {
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
   }
-  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED% %BYTES_SENT% %BYTES_RECEIVED%");
+  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2803,18 +2801,20 @@ TEST_P(ProtocolIntegrationTest, ResponseWithTrailerWireBytesCount) {
   Http::TestResponseTrailerMapImpl response_trailers{{"response", "trailer"}};
   upstream_request_->encodeTrailers(response_trailers);
   ASSERT_TRUE(response->waitForEndStream());
+  expectWireBytesSentAndReceived(0, 326, 205, 251, 173);
+}
 
-  std::string access_log = waitForAccessLog(upstream_access_log_name_);
-  std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
-  int wire_sent_bytes = std::stoi(log_entries[0]), wire_received_bytes = std::stoi(log_entries[1]);
-  if (upstreamProtocol() == Http::CodecType::HTTP2) {
-    EXPECT_TRUE(integer_near(wire_sent_bytes, 251));
-    EXPECT_TRUE(integer_near(wire_received_bytes, 173));
+TEST_P(ProtocolIntegrationTest, TwoRequestsWireBytesCount) {
+  // we only care about upstream protocol.
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
   }
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    EXPECT_EQ(wire_sent_bytes, 326);
-    EXPECT_EQ(wire_received_bytes, 205);
-  }
+  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%\n");
+
+  testTwoRequests(false);
+
+  expectWireBytesSentAndReceived(0, 1223, 571, 1148, 534);
+  expectWireBytesSentAndReceived(1, 711, 1083, 579, 1043);
 }
 
 } // namespace Envoy

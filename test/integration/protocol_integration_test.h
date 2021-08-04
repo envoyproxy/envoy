@@ -19,6 +19,24 @@ public:
     }
   }
 
+  void expectWireBytesSentAndReceived(int log_id, int h1_wire_bytes_sent,
+                                      int h1_wire_bytes_received, int h2_wire_bytes_sent,
+                                      int h2_wire_bytes_received) {
+    auto integer_near = [](int x, int y) -> bool { return std::abs(x - y) <= (x / 30); };
+    std::string access_log = waitForAccessLog(upstream_access_log_name_, log_id);
+    std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
+    int wire_bytes_sent = std::stoi(log_entries[0]),
+        wire_bytes_received = std::stoi(log_entries[1]);
+    if (upstreamProtocol() == Http::CodecType::HTTP1) {
+      EXPECT_EQ(h1_wire_bytes_sent, wire_bytes_sent);
+      EXPECT_EQ(h1_wire_bytes_received, wire_bytes_received);
+    }
+    if (upstreamProtocol() == Http::CodecType::HTTP2) {
+      EXPECT_TRUE(integer_near(h2_wire_bytes_sent, wire_bytes_sent));
+      EXPECT_TRUE(integer_near(h2_wire_bytes_received, wire_bytes_received));
+    }
+  }
+
   // Allow exceptions to the rule. There are some tests which will do upstream
   // calls for some downstream protocols and not for others, and those still
   // need the full mesh.
