@@ -197,15 +197,6 @@ struct StreamInfoImpl : public StreamInfo {
     return *downstream_address_provider_;
   }
 
-  void
-  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
-    downstream_ssl_info_ = connection_info;
-  }
-
-  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
-    return downstream_ssl_info_;
-  }
-
   void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
     upstream_ssl_info_ = connection_info;
   }
@@ -324,7 +315,6 @@ private:
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   const Network::SocketAddressProviderSharedPtr downstream_address_provider_;
-  Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};

@@ -1912,7 +1912,7 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
 
   const auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+  stream_info_.downstream_address_provider_->setSslConnection(connection_info);
 
   EXPECT_CALL(*connection_info, peerCertificatePresented()).WillOnce(Return(true));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("peerCertificatePresented")));
@@ -2010,7 +2010,7 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnectionOnPlainConnecti
   setup(SCRIPT);
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
+  stream_info_.downstream_address_provider_->setSslConnection(nullptr);
 
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("downstreamSslConnection is nil")));
 
@@ -2033,7 +2033,7 @@ TEST_F(LuaHttpFilterTest, SurviveMultipleDownstreamSslConnectionCalls) {
 
   const auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+  stream_info_.downstream_address_provider_->setSslConnection(connection_info);
 
   for (uint64_t i = 0; i < 200; i++) {
     EXPECT_CALL(*filter_,
@@ -2184,7 +2184,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
 
   EXPECT_CALL(decoder_callbacks_, clearRouteCache());
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.lua"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(nullptr));
 
   Http::TestRequestHeaderMapImpl request_headers_1{{":path", "/"}};
@@ -2192,7 +2192,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_1, true));
   EXPECT_EQ("world", request_headers_1.get_("hello"));
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.lua"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers_2{{":path", "/"}};
@@ -2228,7 +2228,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.lua"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
@@ -2257,7 +2257,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodeNotExist) {
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.lua"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};

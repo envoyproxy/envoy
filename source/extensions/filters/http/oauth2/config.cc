@@ -4,7 +4,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/auth/secret.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.validate.h"
 #include "envoy/registry/registry.h"
