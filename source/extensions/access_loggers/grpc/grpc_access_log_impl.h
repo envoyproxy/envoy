@@ -32,9 +32,9 @@ struct CriticalAccessLoggerGrpcClientStats {
 
 class CriticalAccessLoggerGrpcClientImpl
     : public Common::CriticalAccessLoggerGrpcClient<
-          envoy::service::accesslog::v3::StreamAccessLogsMessage> {
+          envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage> {
 public:
-  using RequestType = envoy::service::accesslog::v3::StreamAccessLogsMessage;
+  using RequestType = envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage;
   using ResponseType = envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse;
 
   CriticalAccessLoggerGrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& client,
@@ -171,11 +171,12 @@ private:
   CriticalAccessLoggerGrpcClientStats stats_;
 };
 
-class GrpcAccessLoggerImpl
-    : public Common::GrpcAccessLogger<envoy::data::accesslog::v3::HTTPAccessLogEntry,
-                                      envoy::data::accesslog::v3::TCPAccessLogEntry,
-                                      envoy::service::accesslog::v3::StreamAccessLogsMessage,
-                                      envoy::service::accesslog::v3::StreamAccessLogsResponse> {
+class GrpcAccessLoggerImpl : public Common::GrpcAccessLogger<
+                                 envoy::data::accesslog::v3::HTTPAccessLogEntry,
+                                 envoy::data::accesslog::v3::TCPAccessLogEntry,
+                                 envoy::service::accesslog::v3::StreamAccessLogsMessage,
+                                 envoy::service::accesslog::v3::StreamAccessLogsResponse,
+                                 envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage> {
 public:
   GrpcAccessLoggerImpl(
       const Grpc::RawAsyncClientSharedPtr& client,

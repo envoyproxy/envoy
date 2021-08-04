@@ -28,7 +28,7 @@ service AccessLogService {
   rpc StreamAccessLogs(stream StreamAccessLogsMessage) returns (StreamAccessLogsResponse) {
   }
 
-  rpc BufferedCriticalAccessLogs(stream StreamAccessLogsMessage)
+  rpc BufferedCriticalAccessLogs(stream BufferedCriticalAccessLogsMessage)
       returns (stream BufferedCriticalAccessLogsResponse) {
   }
 }
@@ -108,8 +108,20 @@ message StreamAccessLogsMessage {
 
     TCPAccessLogEntries tcp_logs = 3;
   }
+}
+
+// Stream message for the BufferedCriticalAccessLogs API.
+// Envoy opens a stream to the server and streams the access log,
+// expecting a response. Each message sent is assigned an individual ID,
+// and the state of the message is tracked based on the ID.
+message BufferedCriticalAccessLogsMessage {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.service.accesslog.v3.BufferedCriticalAccessLogsMessage";
+
+  // The body of the log message sent to BufferedCriticalAccessLogs.
+  StreamAccessLogsMessage message = 1;
 
   // This is an ID to identify the message, and can be added to the Critical Endpoint
   // response message to uniquely identify the message being buffered in the Envoy.
-  uint32 id = 4;
+  uint64 id = 4;
 }

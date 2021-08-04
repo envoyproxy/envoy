@@ -47,12 +47,14 @@ void GrpcAccessLoggerImpl::addEntry(envoy::data::accesslog::v3::TCPAccessLogEntr
 
 void GrpcAccessLoggerImpl::addCriticalMessageEntry(
     envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
-  critical_message_.mutable_http_logs()->mutable_log_entry()->Add(std::move(entry));
+  critical_message_.mutable_message()->mutable_http_logs()->mutable_log_entry()->Add(
+      std::move(entry));
 }
 
 void GrpcAccessLoggerImpl::addCriticalMessageEntry(
     envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) {
-  critical_message_.mutable_tcp_logs()->mutable_log_entry()->Add(std::move(entry));
+  critical_message_.mutable_message()->mutable_tcp_logs()->mutable_log_entry()->Add(
+      std::move(entry));
 }
 
 bool GrpcAccessLoggerImpl::isEmpty() {
@@ -60,7 +62,8 @@ bool GrpcAccessLoggerImpl::isEmpty() {
 }
 
 bool GrpcAccessLoggerImpl::isCriticalMessageEmpty() {
-  return !critical_message_.has_http_logs() && !critical_message_.has_tcp_logs();
+  return !critical_message_.message().has_http_logs() &&
+         !critical_message_.message().has_tcp_logs();
 }
 
 void GrpcAccessLoggerImpl::initMessage() {
@@ -70,7 +73,7 @@ void GrpcAccessLoggerImpl::initMessage() {
 }
 
 void GrpcAccessLoggerImpl::initCriticalMessage() {
-  auto* identifier = critical_message_.mutable_identifier();
+  auto* identifier = critical_message_.mutable_message()->mutable_identifier();
   *identifier->mutable_node() = local_info_.node();
   identifier->set_log_name(log_name_);
 }

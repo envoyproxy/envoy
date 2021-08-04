@@ -60,12 +60,12 @@ public:
   }
 
   void expectStreamCriticalMessage(const std::string& expected_message_yaml) {
-    envoy::service::accesslog::v3::StreamAccessLogsMessage expected_message;
+    envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage expected_message;
     TestUtility::loadFromYaml(expected_message_yaml, expected_message);
     EXPECT_CALL(stream_, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
     EXPECT_CALL(stream_, sendMessageRaw_(_, false))
         .WillOnce(Invoke([expected_message](Buffer::InstancePtr& request, bool) {
-          envoy::service::accesslog::v3::StreamAccessLogsMessage message;
+          envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage message;
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
           EXPECT_GT(message.id(), 0);
@@ -152,17 +152,18 @@ private:
 
 TEST_F(CriticalGrpcAccessLoggerImplTest, CriticalLogHttp) {
   grpc_access_logger_impl_test_helper_.expectStreamCriticalMessage(R"EOF(
-identifier:
-  node:
-    id: node_name
-    cluster: cluster_name
-    locality:
-      zone: zone_name
-  log_name: test_log_name
-http_logs:
-  log_entry:
-    request:
-      path: /test/path1
+message:
+  identifier:
+    node:
+      id: node_name
+      cluster: cluster_name
+      locality:
+        zone: zone_name
+    log_name: test_log_name
+  http_logs:
+    log_entry:
+      request:
+        path: /test/path1
 id: 0
 )EOF");
   envoy::data::accesslog::v3::HTTPAccessLogEntry entry;

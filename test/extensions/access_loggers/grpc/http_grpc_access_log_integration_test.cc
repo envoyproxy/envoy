@@ -167,18 +167,18 @@ public:
 
   ABSL_MUST_USE_RESULT
   AssertionResult waitForCriticalAccessLogRequest(const std::string& expected_request_msg_yaml) {
-    envoy::service::accesslog::v3::StreamAccessLogsMessage request_msg;
+    envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
     EXPECT_EQ("POST", access_log_request_->headers().getMethodValue());
     EXPECT_EQ("/envoy.service.accesslog.v3.AccessLogService/BufferedCriticalAccessLogs",
               access_log_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", access_log_request_->headers().getContentTypeValue());
 
-    envoy::service::accesslog::v3::StreamAccessLogsMessage expected_request_msg;
+    envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage expected_request_msg;
     TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
 
     // Clear fields which are not deterministic.
-    auto* log_entry = request_msg.mutable_http_logs()->mutable_log_entry(0);
+    auto* log_entry = request_msg.mutable_message()->mutable_http_logs()->mutable_log_entry(0);
     log_entry->mutable_common_properties()->clear_downstream_remote_address();
     log_entry->mutable_common_properties()->clear_downstream_direct_remote_address();
     log_entry->mutable_common_properties()->clear_downstream_local_address();
@@ -187,8 +187,8 @@ public:
     log_entry->mutable_common_properties()->clear_time_to_first_downstream_tx_byte();
     log_entry->mutable_common_properties()->clear_time_to_last_downstream_tx_byte();
     log_entry->mutable_request()->clear_request_id();
-    if (request_msg.has_identifier()) {
-      auto* node = request_msg.mutable_identifier()->mutable_node();
+    if (request_msg.message().has_identifier()) {
+      auto* node = request_msg.mutable_message()->mutable_identifier()->mutable_node();
       node->clear_extensions();
       node->clear_user_agent_build_version();
     }
@@ -215,31 +215,32 @@ TEST_P(CriticalAccessLogIntegrationTest, BasicAckFlow) {
   ASSERT_TRUE(waitForAccessLogStream());
 
   ASSERT_TRUE(waitForCriticalAccessLogRequest(fmt::format(R"EOF(
-identifier:
-  node:
-    id: node_name
-    cluster: cluster_name
-    locality:
-      zone: zone_name
-    user_agent_name: "envoy"
-  log_name: foo
-http_logs:
-  log_entry:
-    common_properties:
-      response_flags:
-        no_route_found: true
-    protocol_version: HTTP11
-    request:
-      scheme: http
-      authority: host
-      path: /notfound
-      request_headers_bytes: 118
-      request_method: GET
-    response:
-      response_code:
-        value: 404
-      response_code_details: "route_not_found"
-      response_headers_bytes: 54
+message:
+  identifier:
+    node:
+      id: node_name
+      cluster: cluster_name
+      locality:
+        zone: zone_name
+      user_agent_name: "envoy"
+    log_name: foo
+  http_logs:
+    log_entry:
+      common_properties:
+        response_flags:
+          no_route_found: true
+      protocol_version: HTTP11
+      request:
+        scheme: http
+        authority: host
+        path: /notfound
+        request_headers_bytes: 118
+        request_method: GET
+      response:
+        response_code:
+          value: 404
+        response_code_details: "route_not_found"
+        response_headers_bytes: 54
 )EOF")));
 
   access_log_request_->startGrpcStream();
@@ -272,31 +273,32 @@ TEST_P(CriticalAccessLogIntegrationTest, BasicNackFlow) {
   ASSERT_TRUE(waitForAccessLogStream());
 
   ASSERT_TRUE(waitForCriticalAccessLogRequest(fmt::format(R"EOF(
-identifier:
-  node:
-    id: node_name
-    cluster: cluster_name
-    locality:
-      zone: zone_name
-    user_agent_name: "envoy"
-  log_name: foo
-http_logs:
-  log_entry:
-    common_properties:
-      response_flags:
-        no_route_found: true
-    protocol_version: HTTP11
-    request:
-      scheme: http
-      authority: host
-      path: /notfound
-      request_headers_bytes: 118
-      request_method: GET
-    response:
-      response_code:
-        value: 404
-      response_code_details: "route_not_found"
-      response_headers_bytes: 54
+message:
+  identifier:
+    node:
+      id: node_name
+      cluster: cluster_name
+      locality:
+        zone: zone_name
+      user_agent_name: "envoy"
+    log_name: foo
+  http_logs:
+    log_entry:
+      common_properties:
+        response_flags:
+          no_route_found: true
+      protocol_version: HTTP11
+      request:
+        scheme: http
+        authority: host
+        path: /notfound
+        request_headers_bytes: 118
+        request_method: GET
+      response:
+        response_code:
+          value: 404
+        response_code_details: "route_not_found"
+        response_headers_bytes: 54
 )EOF")));
 
   access_log_request_->startGrpcStream();
@@ -327,31 +329,32 @@ TEST_P(CriticalAccessLogIntegrationTest, NoResponseFlow) {
   ASSERT_TRUE(waitForAccessLogStream());
 
   ASSERT_TRUE(waitForCriticalAccessLogRequest(fmt::format(R"EOF(
-identifier:
-  node:
-    id: node_name
-    cluster: cluster_name
-    locality:
-      zone: zone_name
-    user_agent_name: "envoy"
-  log_name: foo
-http_logs:
-  log_entry:
-    common_properties:
-      response_flags:
-        no_route_found: true
-    protocol_version: HTTP11
-    request:
-      scheme: http
-      authority: host
-      path: /notfound
-      request_headers_bytes: 118
-      request_method: GET
-    response:
-      response_code:
-        value: 404
-      response_code_details: "route_not_found"
-      response_headers_bytes: 54
+message:
+  identifier:
+    node:
+      id: node_name
+      cluster: cluster_name
+      locality:
+        zone: zone_name
+      user_agent_name: "envoy"
+    log_name: foo
+  http_logs:
+    log_entry:
+      common_properties:
+        response_flags:
+          no_route_found: true
+      protocol_version: HTTP11
+      request:
+        scheme: http
+        authority: host
+        path: /notfound
+        request_headers_bytes: 118
+        request_method: GET
+      response:
+        response_code:
+          value: 404
+        response_code_details: "route_not_found"
+        response_headers_bytes: 54
 )EOF")));
 
   test_server_->waitForCounterEq("access_logs.grpc_access_log.pending_timeout", 1);

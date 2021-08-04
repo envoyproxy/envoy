@@ -33,7 +33,8 @@ class GrpcAccessLoggerImpl
           // as an empty placeholder for the non-used addEntry method.
           // TODO(itamarkam): Don't cache OpenTelemetry loggers by type (HTTP/TCP).
           ProtobufWkt::Empty, opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest,
-          opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse> {
+          opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse,
+          ProtobufWkt::Empty> {
 public:
   GrpcAccessLoggerImpl(const Grpc::RawAsyncClientSharedPtr& client, std::string log_name,
                        std::chrono::milliseconds buffer_flush_interval_msec,

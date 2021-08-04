@@ -182,7 +182,8 @@ public:
  * The log entries and messages are distinct types to support batching of multiple access log
  * entries in a single gRPC messages that go on the wire.
  */
-template <typename HttpLogProto, typename TcpLogProto, typename LogRequest, typename LogResponse>
+template <typename HttpLogProto, typename TcpLogProto, typename LogRequest, typename LogResponse,
+          typename CriticalLogRequest>
 class GrpcAccessLogger : public Detail::GrpcAccessLogger<HttpLogProto, TcpLogProto> {
 public:
   using Interface = Detail::GrpcAccessLogger<HttpLogProto, TcpLogProto>;
@@ -250,9 +251,9 @@ public:
 
 protected:
   Detail::GrpcAccessLogClient<LogRequest, LogResponse> client_;
-  std::unique_ptr<CriticalAccessLoggerGrpcClient<LogRequest>> critical_client_;
+  std::unique_ptr<CriticalAccessLoggerGrpcClient<CriticalLogRequest>> critical_client_;
   LogRequest message_;
-  LogRequest critical_message_;
+  CriticalLogRequest critical_message_;
 
 private:
   virtual bool isEmpty() PURE;
