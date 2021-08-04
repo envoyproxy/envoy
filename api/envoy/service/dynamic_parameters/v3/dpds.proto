@@ -23,15 +23,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 service DynamicParametersDiscoveryService {
   option (envoy.annotations.resource).type = "envoy.config.dynamic_parameters.v3.DynamicParameters";
 
-  rpc StreamEndpoints(stream discovery.v3.DiscoveryRequest)
+  rpc StreamDynamicParameterConstraints(stream discovery.v3.DiscoveryRequest)
       returns (stream discovery.v3.DiscoveryResponse) {
   }
 
-  rpc DeltaEndpoints(stream discovery.v3.DeltaDiscoveryRequest)
+  rpc DeltaDynamicParameterConstraints(stream discovery.v3.DeltaDiscoveryRequest)
       returns (stream discovery.v3.DeltaDiscoveryResponse) {
   }
 
-  rpc FetchEndpoints(discovery.v3.DiscoveryRequest) returns (discovery.v3.DiscoveryResponse) {
+  rpc FetchDynamicParameterConstraints(discovery.v3.DiscoveryRequest)
+      returns (discovery.v3.DiscoveryResponse) {
     option (google.api.http).post = "/v3/discovery:dynamic_parameters";
     option (google.api.http).body = "*";
   }
