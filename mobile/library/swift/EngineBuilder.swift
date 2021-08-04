@@ -3,7 +3,7 @@ import Foundation
 
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
-public class EngineBuilder: NSObject {
+open class EngineBuilder: NSObject {
   private let base: BaseConfiguration
   private var engineType: EnvoyEngine.Type = EnvoyEngineImpl.self
   private var logLevel: LogLevel = .info
