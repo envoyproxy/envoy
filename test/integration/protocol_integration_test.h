@@ -32,6 +32,10 @@ public:
       EXPECT_EQ(h1_wire_bytes_received, wire_bytes_received);
     }
     if (upstreamProtocol() == Http::CodecType::HTTP2) {
+      // Because of non-deterministic h2 compression, the same plain text length don't map to the
+      // same number of wire bytes.
+      // EXPECT_EQ(h2_wire_bytes_sent, wire_bytes_sent);
+      // EXPECT_EQ(h2_wire_bytes_received, wire_bytes_received);
       EXPECT_TRUE(integer_near(h2_wire_bytes_sent, wire_bytes_sent));
       EXPECT_TRUE(integer_near(h2_wire_bytes_received, wire_bytes_received));
     }

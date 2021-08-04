@@ -2785,23 +2785,18 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCount) {
   expectWireBytesSentAndReceived(0, 371, 158, 277, 122);
 }
 
-TEST_P(ProtocolIntegrationTest, ResponseWithTrailerWireBytesCount) {
+TEST_P(ProtocolIntegrationTest, TrailersWireBytesCount) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
   }
   useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%");
-  initialize();
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 128);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  upstream_request_->encodeData(128, false);
-  Http::TestResponseTrailerMapImpl response_trailers{{"response", "trailer"}};
-  upstream_request_->encodeTrailers(response_trailers);
-  ASSERT_TRUE(response->waitForEndStream());
-  expectWireBytesSentAndReceived(0, 326, 205, 251, 173);
+  testTrailers(10, 20, true, true);
+
+  expectWireBytesSentAndReceived(0, 248, 120, 172, 81);
 }
 
 TEST_P(ProtocolIntegrationTest, TwoRequestsWireBytesCount) {
@@ -2815,6 +2810,66 @@ TEST_P(ProtocolIntegrationTest, TwoRequestsWireBytesCount) {
 
   expectWireBytesSentAndReceived(0, 1223, 571, 1148, 534);
   expectWireBytesSentAndReceived(1, 711, 1083, 579, 1043);
+}
+
+TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireBytesCount) {
+  // we only care about upstream protocol.
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%\n");
+
+  testRouterDownstreamDisconnectBeforeRequestComplete(nullptr);
+
+  expectWireBytesSentAndReceived(0, 187, 0, 114, 0);
+}
+
+TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytesCount) {
+  // we only care about upstream protocol.
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%\n");
+
+  testRouterUpstreamDisconnectBeforeRequestComplete();
+
+  expectWireBytesSentAndReceived(0, 187, 0, 114, 0);
+}
+
+TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeResponseCompleteWireBytesCount) {
+  // we only care about upstream protocol.
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%\n");
+
+  testRouterDownstreamDisconnectBeforeResponseComplete(nullptr);
+
+  expectWireBytesSentAndReceived(0, 159, 566, 113, 534);
+}
+
+TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireBytesCount) {
+  // we only care about upstream protocol.
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%\n");
+
+  testRouterUpstreamDisconnectBeforeResponseComplete();
+
+  expectWireBytesSentAndReceived(0, 159, 47, 113, 13);
+}
+
+TEST_P(ProtocolIntegrationTest, DownstreamResetWireBytesCount) {
+  // we only care about upstream protocol.
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%\n");
+
+  testDownstreamResetBeforeResponseComplete();
+
+  expectWireBytesSentAndReceived(0, 210, 566, 132, 534);
 }
 
 } // namespace Envoy
