@@ -88,7 +88,7 @@ protected:
 
   void TearDown() override {
     for (auto* t : timers_) {
-      // This will fail if any timer is un-disabled at the end of the test run.
+      // This will fail if, at the end of the test, we left any timers enabled.
       // (This particular test suite does not actually let timers expire,
       // although other test suites do.)
       EXPECT_FALSE(t->enabled_);
