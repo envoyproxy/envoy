@@ -265,6 +265,10 @@ TEST_F(GrpcAccessLogTest, StreamFailure) {
 
 TEST_F(GrpcAccessLogTest, StreamFailureAndRetry) {
   config_.mutable_grpc_stream_retry_policy()->mutable_num_retries()->set_value(2);
+  config_.mutable_grpc_stream_retry_policy()
+      ->mutable_retry_back_off()
+      ->mutable_base_interval()
+      ->set_seconds(1);
   initLogger(FlushInterval, 1);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
