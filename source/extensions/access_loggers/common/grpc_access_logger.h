@@ -78,11 +78,11 @@ template <typename LogRequest, typename LogResponse> class GrpcAccessLogClient {
 public:
   GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
                       const Protobuf::MethodDescriptor& service_method,
-                      const absl::optional<envoy::config::core::v3::RetryPolicy> retry_policy)
+                      const envoy::config::core::v3::RetryPolicy& retry_policy)
       : GrpcAccessLogClient(client, service_method, retry_policy, absl::nullopt) {}
   GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
                       const Protobuf::MethodDescriptor& service_method,
-                      const absl::optional<envoy::config::core::v3::RetryPolicy> retry_policy,
+                      const envoy::config::core::v3::RetryPolicy& retry_policy,
                       envoy::config::core::v3::ApiVersion transport_api_version)
       : client_(client), service_method_(service_method),
         transport_api_version_(transport_api_version), grpc_stream_retry_policy_(retry_policy) {}
@@ -146,6 +146,18 @@ public:
     envoy::config::route::v3::RetryPolicy retry_policy;
     retry_policy.mutable_num_retries()->set_value(
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(*grpc_stream_retry_policy_, num_retries, 1));
+
+    if (grpc_stream_retry_policy_->has_retry_back_off()) {
+      const auto& base_retry_backoff = grpc_stream_retry_policy_->retry_back_off();
+      const auto base_interval_ms = PROTOBUF_GET_MS_REQUIRED(base_retry_backoff, base_interval);
+
+      auto* mutable_retry_back_off = retry_policy.mutable_retry_back_off();
+      mutable_retry_back_off->mutable_base_interval()->CopyFrom(
+          Protobuf::util::TimeUtil::MillisecondsToDuration(base_interval_ms));
+      mutable_retry_back_off->mutable_max_interval()->CopyFrom(
+          Protobuf::util::TimeUtil::MillisecondsToDuration(
+              PROTOBUF_GET_MS_OR_DEFAULT(base_retry_backoff, max_interval, 10 * base_interval_ms)));
+    }
     retry_policy.set_retry_on("connect-failure");
 
     opt.setBufferBodyForRetry(true);
