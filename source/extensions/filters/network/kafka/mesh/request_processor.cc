@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 
 #include "source/extensions/filters/network/kafka/mesh/command_handlers/api_versions.h"
+#include "source/extensions/filters/network/kafka/mesh/command_handlers/metadata.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -10,7 +11,9 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-RequestProcessor::RequestProcessor(AbstractRequestListener& origin) : origin_{origin} {}
+RequestProcessor::RequestProcessor(AbstractRequestListener& origin,
+                                   const UpstreamKafkaConfiguration& configuration)
+    : origin_{origin}, configuration_{configuration} {}
 
 // Helper function. Throws a nice message. Filter will react by closing the connection.
 static void throwOnUnsupportedRequest(const std::string& reason, const RequestHeader& header) {
@@ -20,6 +23,9 @@ static void throwOnUnsupportedRequest(const std::string& reason, const RequestHe
 
 void RequestProcessor::onMessage(AbstractRequestSharedPtr arg) {
   switch (arg->request_header_.api_key_) {
+  case METADATA_REQUEST_API_KEY:
+    process(std::dynamic_pointer_cast<Request<MetadataRequest>>(arg));
+    break;
   case API_VERSIONS_REQUEST_API_KEY:
     process(std::dynamic_pointer_cast<Request<ApiVersionsRequest>>(arg));
     break;
@@ -28,6 +34,11 @@ void RequestProcessor::onMessage(AbstractRequestSharedPtr arg) {
     throwOnUnsupportedRequest("unsupported (bad client API invoked?)", arg->request_header_);
     break;
   } // switch
+}
+
+void RequestProcessor::process(const std::shared_ptr<Request<MetadataRequest>> request) const {
+  auto res = std::make_shared<MetadataRequestHolder>(origin_, configuration_, request);
+  origin_.onRequest(res);
 }
 
 void RequestProcessor::process(const std::shared_ptr<Request<ApiVersionsRequest>> request) const {

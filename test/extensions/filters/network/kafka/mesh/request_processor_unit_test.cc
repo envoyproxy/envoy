@@ -1,5 +1,6 @@
 #include "source/extensions/filters/network/kafka/mesh/abstract_command.h"
 #include "source/extensions/filters/network/kafka/mesh/command_handlers/api_versions.h"
+#include "source/extensions/filters/network/kafka/mesh/command_handlers/metadata.h"
 #include "source/extensions/filters/network/kafka/mesh/request_processor.h"
 
 #include "test/test_common/utility.h"
@@ -22,11 +23,35 @@ public:
   MOCK_METHOD(void, onRequestReadyForAnswer, ());
 };
 
+class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
+public:
+  MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
+              (const));
+  MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
+};
+
 class RequestProcessorTest : public testing::Test {
 protected:
   MockAbstractRequestListener listener_;
-  RequestProcessor testee_ = {listener_};
+  MockUpstreamKafkaConfiguration configuration_;
+  RequestProcessor testee_ = {listener_, configuration_};
 };
+
+TEST_F(RequestProcessorTest, ShouldProcessMetadataRequest) {
+  // given
+  const RequestHeader header = {METADATA_REQUEST_API_KEY, 0, 0, absl::nullopt};
+  const MetadataRequest data = {absl::nullopt};
+  const auto message = std::make_shared<Request<MetadataRequest>>(header, data);
+
+  InFlightRequestSharedPtr capture = nullptr;
+  EXPECT_CALL(listener_, onRequest(_)).WillOnce(testing::SaveArg<0>(&capture));
+
+  // when
+  testee_.onMessage(message);
+
+  // then
+  ASSERT_NE(std::dynamic_pointer_cast<MetadataRequestHolder>(capture), nullptr);
+}
 
 TEST_F(RequestProcessorTest, ShouldProcessApiVersionsRequest) {
   // given
