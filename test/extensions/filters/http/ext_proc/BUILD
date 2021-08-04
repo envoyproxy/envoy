@@ -42,6 +42,16 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "state_test",
+    size = "small",
+    srcs = ["state_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    deps = [
+        "//source/extensions/filters/http/ext_proc",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "ordering_test",
     size = "small",
     srcs = ["ordering_test.cc"],

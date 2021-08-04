@@ -6,8 +6,9 @@ import pathlib
 import re
 import sys
 from functools import cached_property
+from importlib.abc import Loader
 from importlib.util import spec_from_loader, module_from_spec
-from importlib.machinery import SourceFileLoader
+from importlib.machinery import ModuleSpec, SourceFileLoader
 from typing import Iterator
 
 from tools.base import checker, utils
@@ -71,6 +72,10 @@ FUZZ_TEST_PATH = "test/extensions/filters/network/common/fuzz/uber_per_readfilte
 METADATA_PATH = "source/extensions/extensions_metadata.yaml"
 
 
+class ExtensionsConfigurationError(Exception):
+    pass
+
+
 class ExtensionsChecker(checker.Checker):
     checks = ("registered", "fuzzed", "metadata")
     extension_categories = EXTENSION_CATEGORIES
@@ -88,9 +93,16 @@ class ExtensionsChecker(checker.Checker):
         _extensions_build_config_spec = spec_from_loader(
             "extensions_build_config",
             SourceFileLoader("extensions_build_config", BUILD_CONFIG_PATH))
+
+        if not isinstance(_extensions_build_config_spec, ModuleSpec):
+            raise ExtensionsConfigurationError(f"Unable to parse build config {BUILD_CONFIG_PATH}")
         extensions_build_config = module_from_spec(_extensions_build_config_spec)
+
+        if not isinstance(_extensions_build_config_spec.loader, Loader):
+            raise ExtensionsConfigurationError(f"Unable to parse build config {BUILD_CONFIG_PATH}")
+
         _extensions_build_config_spec.loader.exec_module(extensions_build_config)
-        return extensions_build_config.EXTENSIONS
+        return getattr(extensions_build_config, "EXTENSIONS")
 
     @property
     def fuzzed_count(self) -> int:
@@ -101,7 +113,10 @@ class ExtensionsChecker(checker.Checker):
 
     @cached_property
     def metadata(self) -> dict:
-        return utils.from_yaml(METADATA_PATH)
+        result = utils.from_yaml(METADATA_PATH)
+        if not isinstance(result, dict):
+            raise ExtensionsConfigurationError(f"Unable to parse configuration: {METADATA_PATH}")
+        return result
 
     @property
     def robust_to_downstream_count(self) -> int:
