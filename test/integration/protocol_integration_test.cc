@@ -2765,6 +2765,8 @@ TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
   codec_client_->close();
 }
 
+static bool integer_near(int x, int y) { return std::abs(x - y) <= (x / 30); }
+
 TEST_P(ProtocolIntegrationTest, HeaderOnlyWireBytesCount) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
@@ -2776,8 +2778,8 @@ TEST_P(ProtocolIntegrationTest, HeaderOnlyWireBytesCount) {
   std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
   int wire_sent_bytes = std::stoi(log_entries[0]), wire_received_bytes = std::stoi(log_entries[1]);
   if (upstreamProtocol() == Http::CodecType::HTTP2) {
-    EXPECT_TRUE(near(wire_sent_bytes, 168));
-    EXPECT_TRUE(near(wire_received_bytes, 13));
+    EXPECT_TRUE(integer_near(wire_sent_bytes, 168));
+    EXPECT_TRUE(integer_near(wire_received_bytes, 13));
   }
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     EXPECT_EQ(wire_sent_bytes, 251);
@@ -2806,8 +2808,8 @@ TEST_P(ProtocolIntegrationTest, ResponseWithTrailerWireBytesCount) {
   std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
   int wire_sent_bytes = std::stoi(log_entries[0]), wire_received_bytes = std::stoi(log_entries[1]);
   if (upstreamProtocol() == Http::CodecType::HTTP2) {
-    EXPECT_TRUE(near(wire_sent_bytes, 251));
-    EXPECT_TRUE(near(wire_received_bytes, 173));
+    EXPECT_TRUE(integer_near(wire_sent_bytes, 251));
+    EXPECT_TRUE(integer_near(wire_received_bytes, 173));
   }
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     EXPECT_EQ(wire_sent_bytes, 326);
