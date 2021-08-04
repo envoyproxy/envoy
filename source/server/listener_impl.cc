@@ -561,7 +561,7 @@ void ListenerImpl::buildSocketOptions() {
     // that dispatches the connection to a random thread.
     ENVOY_LOG(warn, "ExactBalance was forced enabled for TCP listener '{}' because "
                     "Envoy is not running on Windows. This is the only mechanism available
-                    to load balance connections between workers on Windows",
+                    to load balance connections between workers on Windows.",
                     config_.name());
     connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
 #else
