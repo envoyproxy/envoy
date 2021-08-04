@@ -19,13 +19,9 @@ namespace Config {
 namespace {
 class AllMuxesState {
 public:
-  void insert(NewGrpcMuxImpl* mux) {
-    muxes_.insert(mux);
-  }
+  void insert(NewGrpcMuxImpl* mux) { muxes_.insert(mux); }
 
-  void erase(NewGrpcMuxImpl* mux) {
-    muxes_.erase(mux);
-  }
+  void erase(NewGrpcMuxImpl* mux) { muxes_.erase(mux); }
 
   void shutdownAll() {
     for (auto& mux : muxes_) {
