@@ -2,7 +2,6 @@
 
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/filter_state.h"
-
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 
@@ -74,7 +73,7 @@ public:
   /**
    * Determines whether the cached entry may be used directly or must be validated with upstream.
    * @param request_headers - request headers associated with the response_headers.
-   * @param response_headers - headers from the cached response.
+   * @param cached_response_headers - headers from the cached response.
    * @param request_cache_control - the parsed result of the request's Cache-Control header, parsed
    * by the caller.
    * @param cached_response_cache_control - the parsed result of the response's Cache-Control
