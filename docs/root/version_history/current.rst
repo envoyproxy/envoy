@@ -29,6 +29,7 @@ Removed Config or Runtime
 New Features
 ------------
 * http: added :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>` in the header matcher.
+* http: added :ref:`x-envoy-upstream-stream-duration-ms <config_http_filters_router_x-envoy-upstream-stream-duration-ms>` that allows to configure the a lifetime from the request header.
 
 Deprecated
 ----------

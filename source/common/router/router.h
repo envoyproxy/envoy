@@ -147,9 +147,9 @@ public:
                                   bool respect_expected_rq_timeout);
 
   /**
-   * Try to parse header entry that may have timeout field.
+   * Try to parse a header entry that may have a timeout field
    *
-   * @param header_timeout_entry header entry which may contain timeout value.
+   * @param header_timeout_entry header entry which may contain a timeout value.
    * @return result timeout value from header. It will return nullopt if parse failed.
    */
   static absl::optional<std::chrono::milliseconds>
