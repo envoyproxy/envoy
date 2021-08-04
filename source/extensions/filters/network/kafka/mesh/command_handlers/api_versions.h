@@ -9,10 +9,14 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
+/**
+ * Api version requests are the first requests sent by Kafka clients to brokers.
+ * We send our customized response to fail clients that might be trying to accomplish something more
+ * than this filter supports.
+ */
 class ApiVersionsRequestHolder : public BaseInFlightRequest {
 public:
-  ApiVersionsRequestHolder(AbstractRequestListener& filter,
-                           const std::shared_ptr<Request<ApiVersionsRequest>> request);
+  ApiVersionsRequestHolder(AbstractRequestListener& filter, const RequestHeader request_header);
 
   void startProcessing() override;
 
@@ -21,8 +25,8 @@ public:
   AbstractResponseSharedPtr computeAnswer() const override;
 
 private:
-  // Original request.
-  const std::shared_ptr<Request<ApiVersionsRequest>> request_;
+  // Original request header.
+  const RequestHeader request_header_;
 };
 
 } // namespace Mesh

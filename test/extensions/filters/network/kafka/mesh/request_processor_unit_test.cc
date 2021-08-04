@@ -47,7 +47,7 @@ protected:
 
 TEST_F(RequestProcessorTest, ShouldProcessProduceRequest) {
   // given
-  const RequestHeader header = {0, 0, 0, absl::nullopt};
+  const RequestHeader header = {PRODUCE_REQUEST_API_KEY, 0, 0, absl::nullopt};
   const ProduceRequest data = {0, 0, {}};
   const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
 
@@ -63,7 +63,7 @@ TEST_F(RequestProcessorTest, ShouldProcessProduceRequest) {
 
 TEST_F(RequestProcessorTest, ShouldProcessMetadataRequest) {
   // given
-  const RequestHeader header = {3, 0, 0, absl::nullopt};
+  const RequestHeader header = {METADATA_REQUEST_API_KEY, 0, 0, absl::nullopt};
   const MetadataRequest data = {absl::nullopt};
   const auto message = std::make_shared<Request<MetadataRequest>>(header, data);
 
@@ -79,7 +79,7 @@ TEST_F(RequestProcessorTest, ShouldProcessMetadataRequest) {
 
 TEST_F(RequestProcessorTest, ShouldProcessApiVersionsRequest) {
   // given
-  const RequestHeader header = {18, 0, 0, absl::nullopt};
+  const RequestHeader header = {API_VERSIONS_REQUEST_API_KEY, 0, 0, absl::nullopt};
   const ApiVersionsRequest data = {};
   const auto message = std::make_shared<Request<ApiVersionsRequest>>(header, data);
 
@@ -95,7 +95,7 @@ TEST_F(RequestProcessorTest, ShouldProcessApiVersionsRequest) {
 
 TEST_F(RequestProcessorTest, ShouldHandleUnsupportedRequest) {
   // given
-  const RequestHeader header = {2, 0, 0, absl::nullopt};
+  const RequestHeader header = {LIST_OFFSET_REQUEST_API_KEY, 0, 0, absl::nullopt};
   const ListOffsetRequest data = {0, {}};
   const auto message = std::make_shared<Request<ListOffsetRequest>>(header, data);
 

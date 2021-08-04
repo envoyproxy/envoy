@@ -13,13 +13,18 @@
 namespace Envoy {
 namespace Server {
 
+bool isQuic(const envoy::config::listener::v3::Listener& config) {
+  return config.has_udp_listener_config() && config.udp_listener_config().has_quic_options();
+}
+
 ApiListenerImplBase::ApiListenerImplBase(const envoy::config::listener::v3::Listener& config,
                                          ListenerManagerImpl& parent, const std::string& name)
     : config_(config), parent_(parent), name_(name),
       address_(Network::Address::resolveProtoAddress(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(parent_.server_.stats().createScope(fmt::format("listener.api.{}.", name_))),
-      factory_context_(parent_.server_, config_, *this, *global_scope_, *listener_scope_),
+      factory_context_(parent_.server_, config_, *this, *global_scope_, *listener_scope_,
+                       isQuic(config)),
       read_callbacks_(SyntheticReadCallbacks(*this)) {}
 
 void ApiListenerImplBase::SyntheticReadCallbacks::SyntheticConnection::raiseConnectionEvent(

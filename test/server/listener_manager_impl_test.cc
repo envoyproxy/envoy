@@ -1760,7 +1760,7 @@ filter_chains:
   )EOF";
 
   auto syscall_result = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0);
-  ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
+  ASSERT_TRUE(SOCKET_VALID(syscall_result.return_value_));
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_,
@@ -1799,7 +1799,7 @@ filter_chains:
   )EOF";
 
   auto syscall_result = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0);
-  ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
+  ASSERT_TRUE(SOCKET_VALID(syscall_result.return_value_));
 
   // On Windows if the socket has not been bound to an address with bind
   // the call to getsockname fails with `WSAEINVAL`. To avoid that we make sure
@@ -1808,7 +1808,7 @@ filter_chains:
       .WillByDefault(Invoke(
           [&](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) -> Api::SysCallIntResult {
             Api::SysCallIntResult result = os_sys_calls_actual_.bind(sockfd, addr, addrlen);
-            ASSERT(result.rc_ >= 0);
+            ASSERT(result.return_value_ >= 0);
             return result;
           }));
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
@@ -1836,6 +1836,41 @@ TEST_F(ListenerManagerImplTest, NotSupportedDatagramUds) {
                             EnvoyException,
                             "socket type SocketType::Datagram not supported for pipes");
 }
+
+// TODO(davinci26): See ListenSocketFactoryImpl::doFinalPreWorkerInit() for why this test is
+// not run on Windows.
+#ifndef WIN32
+TEST_F(ListenerManagerImplTest, CantListen) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true);
+
+  EXPECT_CALL(*listener_factory_.socket_->io_handle_, listen(_))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 100}));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  listener_foo->target_.ready();
+
+  EXPECT_EQ(
+      1UL,
+      server_.stats_store_.counterFromString("listener_manager.listener_create_failure").value());
+}
+#endif
 
 TEST_F(ListenerManagerImplTest, CantBindSocket) {
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));

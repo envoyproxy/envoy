@@ -26,25 +26,20 @@ static void throwOnUnsupportedRequest(const std::string& reason, const RequestHe
 
 void RequestProcessor::onMessage(AbstractRequestSharedPtr arg) {
   switch (arg->request_header_.api_key_) {
-  case /* Produce */ 0:
+  case PRODUCE_REQUEST_API_KEY:
     process(std::dynamic_pointer_cast<Request<ProduceRequest>>(arg));
     break;
-  case /* Metadata */ 3:
+  case METADATA_REQUEST_API_KEY:
     process(std::dynamic_pointer_cast<Request<MetadataRequest>>(arg));
     break;
-  case /* ApiVersions */ 18:
+  case API_VERSIONS_REQUEST_API_KEY:
     process(std::dynamic_pointer_cast<Request<ApiVersionsRequest>>(arg));
     break;
   default:
-    // We got something else than typical Produce request.
+    // Client sent a request we cannot handle right now.
     throwOnUnsupportedRequest("unsupported (bad client API invoked?)", arg->request_header_);
     break;
   } // switch
-}
-
-// We got something that the parser could not handle.
-void RequestProcessor::onFailedParse(RequestParseFailureSharedPtr arg) {
-  throwOnUnsupportedRequest("unknown", arg->request_header_);
 }
 
 void RequestProcessor::process(const std::shared_ptr<Request<ProduceRequest>> request) const {
@@ -58,8 +53,13 @@ void RequestProcessor::process(const std::shared_ptr<Request<MetadataRequest>> r
 }
 
 void RequestProcessor::process(const std::shared_ptr<Request<ApiVersionsRequest>> request) const {
-  auto res = std::make_shared<ApiVersionsRequestHolder>(origin_, request);
+  auto res = std::make_shared<ApiVersionsRequestHolder>(origin_, request->request_header_);
   origin_.onRequest(res);
+}
+
+// We got something that the parser could not handle.
+void RequestProcessor::onFailedParse(RequestParseFailureSharedPtr arg) {
+  throwOnUnsupportedRequest("unknown", arg->request_header_);
 }
 
 } // namespace Mesh

@@ -169,10 +169,16 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
   }
 
   for (auto& socket : sockets_) {
-    // TODO(mattklein123): At some point we lost error handling on this call which I think can
-    // technically fail (at least according to lingering code comments). Add error handling on this
-    // in a follow up.
-    socket->ioHandle().listen(tcp_backlog_size_);
+    const auto rc = socket->ioHandle().listen(tcp_backlog_size_);
+#ifndef WIN32
+    if (rc.return_value_ != 0) {
+      throw EnvoyException(fmt::format("cannot listen() errno={}", rc.errno_));
+    }
+#else
+    // TODO(davinci26): listen() error handling and generally listening on multiple workers
+    // is broken right now. This needs follow up to do something better on Windows.
+    UNREFERENCED_PARAMETER(rc);
+#endif
 
     if (!Network::Socket::applyOptions(socket->options(), *socket,
                                        envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
@@ -193,7 +199,8 @@ ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
                       !config.stat_prefix().empty()
                           ? config.stat_prefix()
                           : Network::Address::resolveProtoAddress(config.address())->asString()))),
-      validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)) {}
+      validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)),
+      is_quic_(config.udp_listener_config().has_quic_options()) {}
 
 AccessLog::AccessLogManager& ListenerFactoryContextBaseImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -251,6 +258,7 @@ ListenerFactoryContextBaseImpl::getTransportSocketFactoryContext() const {
   return server_.transportSocketFactoryContext();
 }
 Stats::Scope& ListenerFactoryContextBaseImpl::listenerScope() { return *listener_scope_; }
+bool ListenerFactoryContextBaseImpl::isQuicListener() const { return is_quic_; }
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
 Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }
 
@@ -660,6 +668,9 @@ PerListenerFactoryContextImpl::getTransportSocketFactoryContext() const {
 }
 Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
   return listener_factory_context_base_->listenerScope();
+}
+bool PerListenerFactoryContextImpl::isQuicListener() const {
+  return listener_factory_context_base_->isQuicListener();
 }
 Init::Manager& PerListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 

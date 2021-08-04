@@ -85,8 +85,8 @@ Network::IoResult UpstreamProxyProtocolSocket::writeHeader() {
     Api::IoCallUint64Result result = callbacks_->ioHandle().write(header_buffer_);
 
     if (result.ok()) {
-      ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.rc_);
-      bytes_written += result.rc_;
+      ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.return_value_);
+      bytes_written += result.return_value_;
     } else {
       ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(),
                      result.err_->getErrorDetails());

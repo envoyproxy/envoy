@@ -42,6 +42,7 @@ envoy_cc_test(
         ":test_cluster_manager",
         "//source/common/router:context_lib",
         "//source/extensions/transport_sockets/tls:config",
+        "//test/config:v2_link_hacks",
         "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/upstream:cds_api_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",

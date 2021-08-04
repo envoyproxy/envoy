@@ -47,6 +47,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         ":connection_mocks",
+        ":io_handle_mocks",
         ":transport_socket_mocks",
         "//envoy/buffer:buffer_interface",
         "//envoy/network:connection_interface",
