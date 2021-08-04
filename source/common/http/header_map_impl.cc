@@ -46,6 +46,13 @@ bool validatedLowerCaseString(absl::string_view str) {
   return lower_case_str == str;
 }
 
+absl::string_view delimiterByHeader(const LowerCaseString& key, bool correctly_coalesce_cookies) {
+  if (correctly_coalesce_cookies && key == Http::Headers::get().Cookie) {
+    return "; ";
+  }
+  return ",";
+}
+
 } // namespace
 
 // Initialize as a Type::Inline
@@ -283,17 +290,6 @@ template <> HeaderMapImpl::StaticLookupTable<ResponseTrailerMap>::StaticLookupTa
   INLINE_RESP_HEADERS_TRAILERS(REGISTER_RESPONSE_TRAILER)
 
   finalizeTable();
-}
-
-absl::string_view HeaderMapImpl::delimiterByHeader(const LowerCaseString& key,
-                                                   bool correctly_coalesce_cookies) {
-  // TODO(wbpcode): 'correctly_coalesce_cookies' feature is enabled by default and is allowed to be
-  // disabled via runtime. But I doubt if any user will actually disable it. The comma separator is
-  // obviously problematic for cookies. Maybe we can consider removing it.
-  if (correctly_coalesce_cookies && key == Http::Headers::get().Cookie) {
-    return "; ";
-  }
-  return ",";
 }
 
 uint64_t HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view data,
