@@ -157,7 +157,7 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 1);
 }
 
-// Make sure we all workers picking up connections
+// Make sure all workers pick up connections
 TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   concurrency_ = 2;
   initialize();
