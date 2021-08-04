@@ -422,7 +422,8 @@ void UpstreamRequest::onPoolReady(
 
   if (info.downstreamAddressProvider().connectionID().has_value()) {
     stream_info_.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
-    parent_.callbacks()->streamInfo().setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
+    parent_.callbacks()->streamInfo().setUpstreamConnectionId(
+        info.downstreamAddressProvider().connectionID().value());
   }
 
   if (parent_.downstreamEndStream()) {
