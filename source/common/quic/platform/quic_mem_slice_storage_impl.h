@@ -34,9 +34,11 @@ public:
   QuicMemSliceStorageImpl(QuicMemSliceStorageImpl&& other) = default;
   QuicMemSliceStorageImpl& operator=(QuicMemSliceStorageImpl&& other) = default;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   QuicMemSliceSpan ToSpan() { return QuicMemSliceSpan(QuicMemSliceSpanImpl(buffer_)); }
 
-  void Append(QuicMemSliceImpl mem_slice) { buffer_.move(mem_slice.single_slice_buffer()); }
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  void Append(QuicMemSliceImpl mem_slice) { buffer_.move(mem_slice.getSingleSliceBuffer()); }
 
 private:
   Envoy::Buffer::OwnedImpl buffer_;

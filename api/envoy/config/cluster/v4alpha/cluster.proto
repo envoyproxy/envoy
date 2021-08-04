@@ -631,11 +631,12 @@ message Cluster {
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
 
-  reserved 12, 15, 7, 11, 35, 46, 29, 13, 14, 18, 45, 26, 47;
+  reserved 12, 15, 7, 11, 35, 9, 46, 29, 13, 14, 18, 45, 26, 47;
 
-  reserved "hosts", "tls_context", "extension_protocol_options", "upstream_http_protocol_options",
-      "common_http_protocol_options", "http_protocol_options", "http2_protocol_options",
-      "dns_resolvers", "use_tcp_for_dns_lookups", "protocol_selection", "track_timeout_budgets";
+  reserved "hosts", "tls_context", "extension_protocol_options", "max_requests_per_connection",
+      "upstream_http_protocol_options", "common_http_protocol_options", "http_protocol_options",
+      "http2_protocol_options", "dns_resolvers", "use_tcp_for_dns_lookups", "protocol_selection",
+      "track_timeout_budgets";
 
   // Configuration to use different transport sockets for different endpoints.
   // The entry of *envoy.transport_socket_match* in the
@@ -750,12 +751,6 @@ message Cluster {
   // configuration is specified no health checking will be done and all cluster
   // members will be considered healthy at all times.
   repeated core.v4alpha.HealthCheck health_checks = 8;
-
-  // Optional maximum requests for a single upstream connection. This parameter
-  // is respected by both the HTTP/1.1 and HTTP/2 connection pool
-  // implementations. If not specified, there is no limit. Setting this
-  // parameter to 1 will effectively disable keep alive.
-  google.protobuf.UInt32Value max_requests_per_connection = 9;
 
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   CircuitBreakers circuit_breakers = 10;

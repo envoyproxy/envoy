@@ -27,7 +27,7 @@ public:
       const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
       const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&&, Network::TcpListenerCallbacks&,
-                                      bool bind_to_port, uint32_t backlog_size) override;
+                                      bool bind_to_port) override;
 
 protected:
   std::shared_ptr<Network::ValidationDnsResolver> dns_resolver_{

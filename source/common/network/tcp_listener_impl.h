@@ -17,8 +17,7 @@ namespace Network {
 class TcpListenerImpl : public BaseListenerImpl {
 public:
   TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
-                  SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port,
-                  uint32_t backlog_size);
+                  SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port);
   ~TcpListenerImpl() override {
     if (bind_to_port_) {
       socket_->ioHandle().resetFileEvents();
@@ -31,10 +30,7 @@ public:
   static const absl::string_view GlobalMaxCxRuntimeKey;
 
 protected:
-  void setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket);
-
   TcpListenerCallbacks& cb_;
-  const uint32_t backlog_size_;
 
 private:
   void onSocketEvent(short flags);

@@ -153,6 +153,7 @@ public:
   originalIpDetectionExtensions() const override {
     return ip_detection_extensions_;
   }
+  uint64_t maxRequestsPerConnection() const override { return 0; }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;

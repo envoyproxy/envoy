@@ -3,14 +3,76 @@
 #
 
 import argparse
+import inspect
 import logging
-import os
+import pathlib
 import subprocess
 import sys
-from functools import cached_property
+from functools import cached_property, wraps
+from typing import Callable, Optional, Tuple, Type, Union
+
+from frozendict import frozendict
+
+import coloredlogs  # type:ignore
+import verboselogs  # type:ignore
 
 LOG_LEVELS = (("debug", logging.DEBUG), ("info", logging.INFO), ("warn", logging.WARN),
               ("error", logging.ERROR))
+LOG_FIELD_STYLES: frozendict = frozendict(
+    name=frozendict(color="blue"), levelname=frozendict(color="cyan", bold=True))
+LOG_FMT = "%(name)s %(levelname)s %(message)s"
+LOG_LEVEL_STYLES: frozendict = frozendict(
+    critical=frozendict(bold=True, color="red"),
+    debug=frozendict(color="green"),
+    error=frozendict(color="red", bold=True),
+    info=frozendict(color="white", bold=True),
+    notice=frozendict(color="magenta", bold=True),
+    spam=frozendict(color="green", faint=True),
+    success=frozendict(bold=True, color="green"),
+    verbose=frozendict(color="blue"),
+    warning=frozendict(color="yellow", bold=True))
+
+
+def catches(errors: Union[Type[Exception], Tuple[Type[Exception], ...]]) -> Callable:
+    """Method decorator to catch specified errors
+
+    logs and returns 1 for sys.exit if error/s are caught
+
+    can be used as so:
+
+    ```python
+
+    class MyRunner(runner.Runner):
+
+        @runner.catches((MyError, MyOtherError))
+        def run(self):
+            self.myrun()
+    ```
+
+    Can work with `async` methods too.
+    """
+
+    def wrapper(fun: Callable) -> Callable:
+
+        @wraps(fun)
+        def wrapped(self, *args, **kwargs) -> Optional[int]:
+            try:
+                return fun(self, *args, **kwargs)
+            except errors as e:
+                self.log.error(str(e) or repr(e))
+                return 1
+
+        @wraps(fun)
+        async def async_wrapped(self, *args, **kwargs) -> Optional[int]:
+            try:
+                return await fun(self, *args, **kwargs)
+            except errors as e:
+                self.log.error(str(e) or repr(e))
+                return 1
+
+        return async_wrapped if inspect.iscoroutinefunction(fun) else wrapped
+
+    return wrapper
 
 
 class BazelRunError(Exception):
@@ -38,18 +100,31 @@ class Runner(object):
         """Unparsed args"""
         return self.parser.parse_known_args(self._args)[1]
 
+    @property
+    def log_field_styles(self):
+        return LOG_FIELD_STYLES
+
+    @property
+    def log_fmt(self):
+        return LOG_FMT
+
+    @property
+    def log_level_styles(self):
+        return LOG_LEVEL_STYLES
+
     @cached_property
-    def log(self) -> logging.Logger:
+    def log(self) -> verboselogs.VerboseLogger:
         """Instantiated logger"""
+        verboselogs.install()
         logger = logging.getLogger(self.name)
         logger.setLevel(self.log_level)
-        stdout_handler = logging.StreamHandler(sys.stdout)
-        stdout_handler.setLevel(logging.DEBUG)
-        stdout_handler.addFilter(LogFilter())
-        stderr_handler = logging.StreamHandler(sys.stderr)
-        stderr_handler.setLevel(logging.WARN)
-        logger.addHandler(stdout_handler)
-        logger.addHandler(stderr_handler)
+        coloredlogs.install(
+            field_styles=self.log_field_styles,
+            level_styles=self.log_level_styles,
+            fmt=self.log_fmt,
+            level='DEBUG',
+            logger=logger,
+            isatty=True)
         return logger
 
     @cached_property
@@ -70,8 +145,18 @@ class Runner(object):
         return parser
 
     @cached_property
-    def path(self) -> str:
-        return os.getcwd()
+    def path(self) -> pathlib.Path:
+        return pathlib.Path(".")
+
+    @cached_property
+    def stdout(self) -> logging.Logger:
+        """Log to stdout"""
+        logger = logging.getLogger("stdout")
+        logger.setLevel(self.log_level)
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        logger.addHandler(handler)
+        return logger
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         """Override this method to add custom arguments to the arg parser"""

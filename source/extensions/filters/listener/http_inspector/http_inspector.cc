@@ -98,7 +98,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 
 ParseState Filter::onRead() {
   auto result = cb_->socket().ioHandle().recv(buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
-  ENVOY_LOG(trace, "http inspector: recv: {}", result.rc_);
+  ENVOY_LOG(trace, "http inspector: recv: {}", result.return_value_);
   if (!result.ok()) {
     if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
       return ParseState::Continue;
@@ -108,7 +108,7 @@ ParseState Filter::onRead() {
   }
 
   const auto parse_state =
-      parseHttpHeader(absl::string_view(reinterpret_cast<const char*>(buf_), result.rc_));
+      parseHttpHeader(absl::string_view(reinterpret_cast<const char*>(buf_), result.return_value_));
   switch (parse_state) {
   case ParseState::Continue:
     // do nothing but wait for the next event
