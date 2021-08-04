@@ -3,24 +3,25 @@
 #
 
 import argparse
+import inspect
 import logging
-import os
+import pathlib
 import subprocess
 import sys
 from functools import cached_property, wraps
-from typing import Callable, Tuple, Optional, Union
+from typing import Callable, Optional, Tuple, Type, Union
 
 from frozendict import frozendict
 
-import coloredlogs
-import verboselogs
+import coloredlogs  # type:ignore
+import verboselogs  # type:ignore
 
 LOG_LEVELS = (("debug", logging.DEBUG), ("info", logging.INFO), ("warn", logging.WARN),
               ("error", logging.ERROR))
-LOG_FIELD_STYLES = frozendict(
+LOG_FIELD_STYLES: frozendict = frozendict(
     name=frozendict(color="blue"), levelname=frozendict(color="cyan", bold=True))
 LOG_FMT = "%(name)s %(levelname)s %(message)s"
-LOG_LEVEL_STYLES = frozendict(
+LOG_LEVEL_STYLES: frozendict = frozendict(
     critical=frozendict(bold=True, color="red"),
     debug=frozendict(color="green"),
     error=frozendict(color="red", bold=True),
@@ -32,7 +33,7 @@ LOG_LEVEL_STYLES = frozendict(
     warning=frozendict(color="yellow", bold=True))
 
 
-def catches(errors: Union[Tuple[Exception], Exception]) -> Callable:
+def catches(errors: Union[Type[Exception], Tuple[Type[Exception], ...]]) -> Callable:
     """Method decorator to catch specified errors
 
     logs and returns 1 for sys.exit if error/s are caught
@@ -48,6 +49,7 @@ def catches(errors: Union[Tuple[Exception], Exception]) -> Callable:
             self.myrun()
     ```
 
+    Can work with `async` methods too.
     """
 
     def wrapper(fun: Callable) -> Callable:
@@ -60,7 +62,15 @@ def catches(errors: Union[Tuple[Exception], Exception]) -> Callable:
                 self.log.error(str(e) or repr(e))
                 return 1
 
-        return wrapped
+        @wraps(fun)
+        async def async_wrapped(self, *args, **kwargs) -> Optional[int]:
+            try:
+                return await fun(self, *args, **kwargs)
+            except errors as e:
+                self.log.error(str(e) or repr(e))
+                return 1
+
+        return async_wrapped if inspect.iscoroutinefunction(fun) else wrapped
 
     return wrapper
 
@@ -103,7 +113,7 @@ class Runner(object):
         return LOG_LEVEL_STYLES
 
     @cached_property
-    def log(self) -> logging.Logger:
+    def log(self) -> verboselogs.VerboseLogger:
         """Instantiated logger"""
         verboselogs.install()
         logger = logging.getLogger(self.name)
@@ -135,8 +145,8 @@ class Runner(object):
         return parser
 
     @cached_property
-    def path(self) -> str:
-        return os.getcwd()
+    def path(self) -> pathlib.Path:
+        return pathlib.Path(".")
 
     @cached_property
     def stdout(self) -> logging.Logger:

@@ -1,15 +1,17 @@
 import argparse
 import os
+import pathlib
 import platform
 import re
 import sys
 import tarfile
 import tempfile
 from functools import cached_property
+from typing import Tuple
 
-from colorama import Fore, Style
+from colorama import Fore, Style  # type:ignore
 
-from sphinx.cmd.build import main as sphinx_build
+from sphinx.cmd.build import main as sphinx_build  # type:ignore
 
 from tools.base import runner, utils
 
@@ -32,9 +34,9 @@ class SphinxRunner(runner.Runner):
         return self.docs_tag or self.build_sha
 
     @property
-    def build_dir(self) -> str:
+    def build_dir(self) -> pathlib.Path:
         """Returns current build_dir - most likely a temp directory"""
-        return self._build_dir
+        return pathlib.Path(self.tempdir.name)
 
     @property
     def build_sha(self) -> str:
@@ -47,17 +49,17 @@ class SphinxRunner(runner.Runner):
         return dict(chrome=Fore.LIGHTYELLOW_EX, key=Fore.LIGHTCYAN_EX, value=Fore.LIGHTMAGENTA_EX)
 
     @cached_property
-    def config_file(self) -> str:
+    def config_file(self) -> pathlib.Path:
         """Populates a config file with self.configs and returns the file path"""
         return utils.to_yaml(self.configs, self.config_file_path)
 
     @property
-    def config_file_path(self) -> str:
+    def config_file_path(self) -> pathlib.Path:
         """Path to a (temporary) build config"""
-        return os.path.join(self.build_dir, "build.yaml")
+        return self.build_dir.joinpath("build.yaml")
 
     @cached_property
-    def configs(self) -> str:
+    def configs(self) -> dict:
         """Build configs derived from provided args"""
         _configs = dict(
             version_string=self.version_string,
@@ -66,15 +68,15 @@ class SphinxRunner(runner.Runner):
             version_number=self.version_number,
             docker_image_tag_name=self.docker_image_tag_name)
         if self.validator_path:
-            _configs["validator_path"] = self.validator_path
+            _configs["validator_path"] = str(self.validator_path)
         if self.descriptor_path:
-            _configs["descriptor_path"] = self.descriptor_path
+            _configs["descriptor_path"] = str(self.descriptor_path)
         return _configs
 
     @property
-    def descriptor_path(self) -> str:
+    def descriptor_path(self) -> pathlib.Path:
         """Path to a descriptor file for config validation"""
-        return os.path.abspath(self.args.descriptor_path)
+        return pathlib.Path(self.args.descriptor_path)
 
     @property
     def docker_image_tag_name(self) -> str:
@@ -87,14 +89,14 @@ class SphinxRunner(runner.Runner):
         return self.args.docs_tag
 
     @cached_property
-    def html_dir(self) -> str:
+    def html_dir(self) -> pathlib.Path:
         """Path to (temporary) directory for outputting html"""
-        return os.path.join(self.build_dir, "generated/html")
+        return self.build_dir.joinpath("generated", "html")
 
     @property
-    def output_filename(self) -> str:
+    def output_filename(self) -> pathlib.Path:
         """Path to tar file for saving generated html docs"""
-        return self.args.output_filename
+        return pathlib.Path(self.args.output_filename)
 
     @property
     def py_compatible(self) -> bool:
@@ -107,40 +109,44 @@ class SphinxRunner(runner.Runner):
         return "tagged" if self.docs_tag else "pre-release"
 
     @cached_property
-    def rst_dir(self) -> str:
+    def rst_dir(self) -> pathlib.Path:
         """Populates an rst directory with contents of given rst tar,
         and returns the path to the directory
         """
-        rst_dir = os.path.join(self.build_dir, "generated/rst")
+        rst_dir = self.build_dir.joinpath("generated", "rst")
         if self.rst_tar:
             utils.extract(rst_dir, self.rst_tar)
         return rst_dir
 
     @property
-    def rst_tar(self) -> str:
+    def rst_tar(self) -> pathlib.Path:
         """Path to the rst tarball"""
-        return self.args.rst_tar
+        return pathlib.Path(self.args.rst_tar)
 
     @property
-    def sphinx_args(self) -> list:
+    def sphinx_args(self) -> Tuple[str, ...]:
         """Command args for sphinx"""
-        return ["-W", "--keep-going", "--color", "-b", "html", self.rst_dir, self.html_dir]
+        return (
+            "-W", "--keep-going", "--color", "-b", "html", str(self.rst_dir), str(self.html_dir))
+
+    @cached_property
+    def tempdir(self) -> tempfile.TemporaryDirectory:
+        return tempfile.TemporaryDirectory()
 
     @property
-    def validator_path(self) -> str:
+    def validator_path(self) -> pathlib.Path:
         """Path to validator utility for validating snippets"""
-        return os.path.abspath(self.args.validator_path)
+        return pathlib.Path(self.args.validator_path)
 
     @property
-    def version_file(self) -> str:
+    def version_file(self) -> pathlib.Path:
         """Path to version files for deriving docs version"""
-        return self.args.version_file
+        return pathlib.Path(self.args.version_file)
 
     @cached_property
     def version_number(self) -> str:
         """Semantic version"""
-        with open(self.version_file) as f:
-            return f.read().strip()
+        return self.version_file.read_text().strip()
 
     @property
     def version_string(self) -> str:
@@ -182,25 +188,32 @@ class SphinxRunner(runner.Runner):
             raise SphinxEnvError(
                 "Given git tag does not match the VERSION file content:"
                 f"{self.docs_tag} vs v{self.version_number}")
-        with open(os.path.join(self.rst_dir, "version_history/current.rst")) as f:
-            if not self.version_number in f.read():
-                raise SphinxEnvError(
-                    f"Git tag ({self.version_number}) not found in version_history/current.rst")
+        # this should probs only check the first line
+        version_current = self.rst_dir.joinpath("version_history", "current.rst").read_text()
+        if not self.version_number in version_current:
+            raise SphinxEnvError(
+                f"Git tag ({self.version_number}) not found in version_history/current.rst")
+
+    def cleanup(self):
+        if "tempdir" in self.__dict__:
+            self.tempdir.cleanup()
+            del self.__dict__["tempdir"]
 
     def create_tarball(self) -> None:
         with tarfile.open(self.output_filename, "w") as tar:
             tar.add(self.html_dir, arcname=".")
 
     def run(self) -> int:
-        with tempfile.TemporaryDirectory() as build_dir:
-            return self._run(build_dir)
+        try:
+            return self._run()
+        finally:
+            self.cleanup()
 
     def _color(self, msg, name=None):
         return f"{self.colors[name or 'chrome']}{msg}{Style.RESET_ALL}"
 
-    def _run(self, build_dir):
-        self._build_dir = build_dir
-        os.environ["ENVOY_DOCS_BUILD_CONFIG"] = self.config_file
+    def _run(self):
+        os.environ["ENVOY_DOCS_BUILD_CONFIG"] = str(self.config_file)
         try:
             self.check_env()
         except SphinxEnvError as e:
