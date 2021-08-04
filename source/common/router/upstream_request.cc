@@ -420,9 +420,9 @@ void UpstreamRequest::onPoolReady(
   stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
   parent_.callbacks()->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
 
-  if (info.upstreamConnectionId().has_value()) {
-    stream_info_.setUpstreamConnectionId(info.upstreamConnectionId().value());
-    parent_.callbacks()->streamInfo().setUpstreamConnectionId(info.upstreamConnectionId().value());
+  if (info.downstreamAddressProvider().connectionID().has_value()) {
+    stream_info_.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
+    parent_.callbacks()->streamInfo().setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
   }
 
   if (parent_.downstreamEndStream()) {
