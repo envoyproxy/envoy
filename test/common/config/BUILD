@@ -210,6 +210,7 @@ envoy_cc_test(
         "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/protobuf",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/config:v2_link_hacks",
         "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
