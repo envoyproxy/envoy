@@ -559,10 +559,11 @@ void ListenerImpl::buildSocketOptions() {
     // to make all the workers do work.
     // TODO(davinci26): We can be faster here if we create a balancer implementation
     // that dispatches the connection to a random thread.
-    ENVOY_LOG(warn, "ExactBalance was forced enabled for TCP listener '{}' because "
-                    "Envoy is not running on Windows. This is the only mechanism available
-                    to load balance connections between workers on Windows.",
-                    config_.name());
+    ENVOY_LOG(warn,
+              "ExactBalance was forced enabled for TCP listener '{}' because "
+              "Envoy is running on Windows."
+              "ExactBalance is used to load balance connections between workers on Windows.",
+              config_.name());
     connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
 #else
     // Not in place listener update.
