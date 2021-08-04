@@ -48,7 +48,7 @@ const Protobuf::MethodDescriptor& mockMethodDescriptor() {
 // standard Struct and Empty protos.
 class MockGrpcAccessLoggerImpl
     : public Common::GrpcAccessLogger<ProtobufWkt::Struct, ProtobufWkt::Empty, ProtobufWkt::Struct,
-                                      ProtobufWkt::Struct> {
+                                      ProtobufWkt::Struct, ProtobufWkt::Struct> {
 public:
   MockGrpcAccessLoggerImpl(const Grpc::RawAsyncClientSharedPtr& client,
                            std::chrono::milliseconds buffer_flush_interval_msec,
