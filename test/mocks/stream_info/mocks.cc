@@ -64,15 +64,9 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, upstreamLocalAddress()).WillByDefault(ReturnRef(upstream_local_address_));
   ON_CALL(*this, downstreamAddressProvider())
       .WillByDefault(ReturnPointee(downstream_address_provider_));
-  ON_CALL(*this, setDownstreamSslConnection(_))
-      .WillByDefault(Invoke(
-          [this](const auto& connection_info) { downstream_connection_info_ = connection_info; }));
   ON_CALL(*this, setUpstreamSslConnection(_))
       .WillByDefault(Invoke(
           [this](const auto& connection_info) { upstream_connection_info_ = connection_info; }));
-  ON_CALL(*this, downstreamSslConnection()).WillByDefault(Invoke([this]() {
-    return downstream_connection_info_;
-  }));
   ON_CALL(*this, upstreamSslConnection()).WillByDefault(Invoke([this]() {
     return upstream_connection_info_;
   }));
