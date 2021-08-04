@@ -1,34 +1,33 @@
 syntax = "proto3";
 
-package envoy.config.endpoint.v3;
+package envoy.config.endpoint.v4alpha;
 
-import "envoy/config/core/v3/address.proto";
-import "envoy/config/core/v3/base.proto";
-import "envoy/config/core/v3/config_source.proto";
-import "envoy/config/core/v3/health_check.proto";
+import "envoy/config/core/v4alpha/address.proto";
+import "envoy/config/core/v4alpha/base.proto";
+import "envoy/config/core/v4alpha/config_source.proto";
+import "envoy/config/core/v4alpha/health_check.proto";
 
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.config.endpoint.v3";
+option java_package = "io.envoyproxy.envoy.config.endpoint.v4alpha";
 option java_outer_classname = "EndpointComponentsProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Endpoints]
 
 // Upstream host identifier.
 message Endpoint {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.endpoint.Endpoint";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.endpoint.v3.Endpoint";
 
   // The optional health check configuration.
   message HealthCheckConfig {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.api.v2.endpoint.Endpoint.HealthCheckConfig";
+        "envoy.config.endpoint.v3.Endpoint.HealthCheckConfig";
 
     // Optional alternative health check port value.
     //
@@ -55,7 +54,7 @@ message Endpoint {
   //   specified :ref:`resolver <envoy_v3_api_field_config.core.v3.SocketAddress.resolver_name>`
   //   in the Address). For LOGICAL or STRICT DNS, it is expected to be hostname,
   //   and will be resolved via DNS.
-  core.v3.Address address = 1;
+  core.v4alpha.Address address = 1;
 
   // The optional health check configuration is used as configuration for the
   // health checker to contact the health checked host.
@@ -76,7 +75,8 @@ message Endpoint {
 // An Endpoint that Envoy can route traffic to.
 // [#next-free-field: 6]
 message LbEndpoint {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.endpoint.LbEndpoint";
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.endpoint.v3.LbEndpoint";
 
   // Upstream host identifier or a named reference.
   oneof host_identifier {
@@ -87,7 +87,7 @@ message LbEndpoint {
   }
 
   // Optional health status when known and supplied by EDS server.
-  core.v3.HealthStatus health_status = 2;
+  core.v4alpha.HealthStatus health_status = 2;
 
   // The endpoint metadata specifies values that may be used by the load
   // balancer to select endpoints in a cluster for a given request. The filter
@@ -96,7 +96,7 @@ message LbEndpoint {
   // This may be matched against in a route's
   // :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` metadata_match field
   // to subset the endpoints considered in cluster load balancing.
-  core.v3.Metadata metadata = 3;
+  core.v4alpha.Metadata metadata = 3;
 
   // The optional load balancing weight of the upstream host; at least 1.
   // Envoy uses the load balancing weight in some of the built in load
@@ -113,8 +113,11 @@ message LbEndpoint {
 // [#not-implemented-hide:]
 // A configuration for a LEDS collection.
 message LedsClusterLocalityConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.endpoint.v3.LedsClusterLocalityConfig";
+
   // Configuration for the source of LEDS updates for a Locality.
-  core.v3.ConfigSource leds_config = 1;
+  core.v4alpha.ConfigSource leds_config = 1;
 
   // The xDS transport protocol glob collection resource name.
   // The service is only supported in delta xDS (incremental) mode.
@@ -128,16 +131,19 @@ message LedsClusterLocalityConfig {
 // [#next-free-field: 9]
 message LocalityLbEndpoints {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.api.v2.endpoint.LocalityLbEndpoints";
+      "envoy.config.endpoint.v3.LocalityLbEndpoints";
 
   // [#not-implemented-hide:]
   // A list of endpoints of a specific locality.
   message LbEndpointList {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.endpoint.v3.LocalityLbEndpoints.LbEndpointList";
+
     repeated LbEndpoint lb_endpoints = 1;
   }
 
   // Identifies location of where the upstream hosts run.
-  core.v3.Locality locality = 1;
+  core.v4alpha.Locality locality = 1;
 
   // The group of endpoints belonging to the locality specified.
   // [#comment:TODO(adisuissa): Once LEDS is implemented this field needs to be
