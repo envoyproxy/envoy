@@ -7988,6 +7988,32 @@ virtual_hosts:
   checkEach(yaml, 123, expected_traveled_config);
 }
 
+TEST_F(PerFilterConfigsTest, RouteLocalTypedConfigWithDirectResponse) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        direct_response:
+          status: 200
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/google.protobuf.Timestamp
+            value:
+              seconds: 123
+    typed_per_filter_config:
+      test.filter:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value:
+          seconds: 456
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  absl::InlinedVector<uint32_t, 3> expected_traveled_config({456, 123});
+  checkEach(yaml, 123, expected_traveled_config);
+}
+
 TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterConfig)) {
   TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
