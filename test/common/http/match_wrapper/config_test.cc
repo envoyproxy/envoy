@@ -57,7 +57,7 @@ extension_config:
   name: test
   typed_config:
     "@type": type.googleapis.com/google.protobuf.StringValue
-matcher:
+xds_matcher:
   matcher_tree:
     input:
       name: request-headers
@@ -96,7 +96,7 @@ extension_config:
   name: test
   typed_config:
     "@type": type.googleapis.com/google.protobuf.StringValue
-matcher:
+xds_matcher:
   matcher_tree:
     input:
       name: request-headers
@@ -147,7 +147,7 @@ extension_config:
   name: test
   typed_config:
     "@type": type.googleapis.com/google.protobuf.StringValue
-matcher:
+xds_matcher:
   matcher_tree:
     input:
       name: request-headers
