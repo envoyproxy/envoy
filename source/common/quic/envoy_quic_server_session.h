@@ -101,8 +101,6 @@ protected:
 private:
   void setUpRequestDecoder(EnvoyQuicServerStream& stream);
 
-  void initializeStream(EnvoyQuicServerStream* stream);
-
   std::unique_ptr<EnvoyQuicServerConnection> quic_connection_;
   // These callbacks are owned by network filters and quic session should out live
   // them.

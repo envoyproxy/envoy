@@ -49,22 +49,6 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
          "Send buffer limit should be larger than 8KB.");
 }
 
-EnvoyQuicServerStream::EnvoyQuicServerStream(
-    quic::PendingStream* pending, quic::QuicSpdySession* session, quic::StreamType type,
-    Http::Http3::CodecStats& stats,
-    const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
-    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action)
-    : quic::QuicSpdyServerStreamBase(pending, session, type),
-      EnvoyQuicStream(
-          // This should be larger than 8k to fully utilize congestion control
-          // window. And no larger than the max stream flow control window for
-          // the stream to buffer all the data.
-          static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
-          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
-          stats, http3_options),
-      headers_with_underscores_action_(headers_with_underscores_action) {}
-
 void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
   encodeHeaders(headers, false);

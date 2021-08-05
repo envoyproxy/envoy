@@ -97,6 +97,7 @@ quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStr
 
 quic::QuicSpdyStream*
 EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
+  // Envoy doesn't support server push.
   return nullptr;
 }
 
