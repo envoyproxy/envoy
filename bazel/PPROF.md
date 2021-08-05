@@ -331,7 +331,7 @@ private:
 
 # Performance analysis with Perfetto
 
-Similar results can be achieved with [Perfetto tracing macros](https://github.com/envoyproxy/envoy/blob/main/source/common/common/tracing.h) enabled with
+Similar results can be achieved with [Perfetto tracing macros](https://github.com/envoyproxy/envoy/blob/main/source/common/common/perf_tracing.h) enabled with
 
 ```
 bazel --define=perf_tracing=enabled ...
