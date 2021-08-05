@@ -469,7 +469,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     // Listener level traffic direction overrides the operation name
     switch (context.direction()) {
     case envoy::config::core::v3::UNSPECIFIED: {
-      // Continuing legacy behavior; if unspecififed, we treat this as ingress.
+      // Continuing legacy behavior; if unspecified, we treat this as ingress.
       tracing_operation_name = Tracing::OperationName::Ingress;
       break;
     }
