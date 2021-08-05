@@ -262,11 +262,8 @@ bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) const {
       return false;
     }
 
-    for (const auto& rule : allow_list_) {
-      if (rule->match(header)) {
-        valid = true;
-        break;
-      }
+    if (allowsHeader(header)) {
+      valid = true;
     }
 
     if (!valid) {
