@@ -149,11 +149,6 @@ public:
   // Checks if the headers contain an allowed value in the Vary header.
   bool isAllowed(const Http::ResponseHeaderMap& headers) const;
 
-  // Returns a header map containing the subset of the original headers that can be varied from the
-  // request.
-  Http::RequestHeaderMapPtr
-  possibleVariedHeaders(const Http::RequestHeaderMap& request_headers) const;
-
 private:
   // Stores the matching rules that define whether a header is allowed to be varied.
   std::vector<Matchers::StringMatcherPtr> allow_list_;
