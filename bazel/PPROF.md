@@ -17,6 +17,7 @@
       * [On-CPU analysis](#on-cpu-analysis)
       * [Memory analysis](#memory-analysis)
    * [Performance annotations](#performance-annotations)
+   * [Performance analysis with Perfetto](#performance-analysis-with-perfetto)
 
 # CPU or memory consumption testing with `gperftools` and `pprof`
 
