@@ -52,6 +52,7 @@ Removed Config or Runtime
 * http: removed ``envoy.reloadable_features.allow_preconnect`` runtime guard and legacy code paths.
 * listener: removed ``envoy.reloadable_features.disable_tls_inspector_injection`` runtime guard and legacy code paths.
 * ocsp: removed ``envoy.reloadable_features.check_ocsp_policy deprecation`` runtime guard and legacy code paths.
+* ocsp: removed ``envoy.reloadable_features.require_ocsp_response_for_must_staple_certs deprecation`` and legacy code paths.
 
 New Features
 ------------
