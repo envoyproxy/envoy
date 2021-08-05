@@ -52,8 +52,12 @@ private:
   public:
     // Builds a ResourceVersion in the waitingForServer state.
     ResourceState() = default;
+    // Builds a ResourceState with a specific version
+    ResourceState(absl::string_view version) : version_(version) {}
     // Self-documenting alias of default constructor.
     static ResourceState waitingForServer() { return ResourceState(); }
+    // Self-documenting alias of constructor with version.
+    static ResourceState withVersion(absl::string_view version) { return ResourceState(version); }
 
     // If true, we currently have no version of this resource - we are waiting for the server to
     // provide us with one.
@@ -88,9 +92,12 @@ private:
   // A map from resource name to per-resource version. The keys of this map are resource names we
   // have received as a part of the wildcard subscription.
   absl::node_hash_map<std::string, std::string> wildcard_resource_state_;
+  // Used for storing resources that we lost interest in, but could
+  // also be a part of wildcard subscription.
+  absl::node_hash_map<std::string, std::string> ambiguous_resource_state_;
 
+  bool in_initial_legacy_wildcard_{true};
   bool any_request_sent_yet_in_current_stream_{};
-  bool is_legacy_wildcard_{};
 
   // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.
   // TODO: Can't use absl::flat_hash_set due to ordering issues in gTest expectation matching.

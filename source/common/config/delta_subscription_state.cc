@@ -11,6 +11,16 @@
 namespace Envoy {
 namespace Config {
 
+namespace {
+
+// Usable with maps and sets. Used for ASSERTs, to avoid too much typing.
+template <typename Container, typename Key>
+bool container_contains(const Container& container, const Key& key) {
+  return container.find(key) != container.end();
+}
+
+} // namespace
+
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
                                                const LocalInfo::LocalInfo& local_info,
@@ -26,7 +36,8 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                   maybe_resource.has_value()) {
                 maybe_resource->setAsWaitingForServer();
                 removed_resources.Add(std::string(resource));
-              } else if (auto erased_count = wildcard_resource_state_.erase(resource);
+              } else if (auto erased_count = wildcard_resource_state_.erase(resource) +
+                                             ambiguous_resource_state_.erase(resource);
                          erased_count > 0) {
                 removed_resources.Add(std::string(resource));
               }
@@ -42,10 +53,24 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     const absl::flat_hash_set<std::string>& cur_added,
     const absl::flat_hash_set<std::string>& cur_removed) {
   for (const auto& a : cur_added) {
-    // This adds a resource state that is waiting for the server for more information. This also may
-    // be a wildcard resource, which is fine too.
-    requested_resource_state_.insert_or_assign(a, ResourceState::waitingForServer());
-    wildcard_resource_state_.erase(a);
+    if (in_initial_legacy_wildcard_ && a != Wildcard) {
+      in_initial_legacy_wildcard_ = false;
+    }
+    // If the requested resource existed as a wildcard resource,
+    // transition it to requested. Otherwise mark it as a resource
+    // waiting for the server to receive the version.
+    if (auto it = wildcard_resource_state_.find(a); it != wildcard_resource_state_.end()) {
+      requested_resource_state_.insert_or_assign(a, ResourceState::withVersion(it->second));
+      wildcard_resource_state_.erase(it);
+    } else if (it = ambiguous_resource_state_.find(a); it != ambiguous_resource_state_.end()) {
+      requested_resource_state_.insert_or_assign(a, ResourceState::withVersion(it->second));
+      ambiguous_resource_state_.erase(it);
+    } else {
+      requested_resource_state_.insert_or_assign(a, ResourceState::waitingForServer());
+    }
+    ASSERT(container_contains(requested_resource_state_, a));
+    ASSERT(!container_contains(wildcard_resource_state_, a));
+    ASSERT(!container_contains(ambiguous_resource_state_, a));
     // If interest in a resource is removed-then-added (all before a discovery request
     // can be sent), we must treat it as a "new" addition: our user may have forgotten its
     // copy of the resource after instructing us to remove it, and need to be reminded of it.
@@ -53,7 +78,26 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     names_added_.insert(a);
   }
   for (const auto& r : cur_removed) {
-    requested_resource_state_.erase(r);
+    in_initial_legacy_wildcard_ = false;
+    // The resource we are interested in could also come from a wildcard subscription. Instead of
+    // removing it outright, mark the resource as not interesting to us any more. The server could
+    // later send us an update. If we don't have a wildcard subscription, just drop it.
+    if (auto it = requested_resource_state_.find(Wildcard); it != requested_resource_state_.end()) {
+      if (it = requested_resource_state_.find(r); it != requested_resource_state_.end()) {
+        // Wildcard resources always have a version. If our requested resource has no version, it
+        // won't be a wildcard resource then. If r is Wildcard itself, then it never has a version
+        // attached to it.
+        if (!it->second.isWaitingForServer()) {
+          ambiguous_resource_state_.insert({it->first, it->second.version()});
+        }
+        requested_resource_state_.erase(it);
+      }
+    } else {
+      requested_resource_state_.erase(r);
+    }
+    ASSERT(!container_contains(requested_resource_state_, r));
+    // This function shouldn't ever be called for resources that came from wildcard subscription.
+    ASSERT(!container_contains(wildcard_resource_state_, r));
     // Ideally, when interest in a resource is added-then-removed in between requests,
     // we would avoid putting a superfluous "unsubscribe [resource that was never subscribed]"
     // in the request. However, the removed-then-added case *does* need to go in the request,
@@ -63,34 +107,45 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     names_removed_.insert(r);
   }
   // If we unsubscribe from wildcard resource, drop all the resources that came from wildcard from
-  // cache.
+  // cache. Also drop the ambiguous resources - we aren't interested in those, but we didn't know if
+  // those came from wildcard subscription or not, but now it's not important any more.
   if (cur_removed.contains(Wildcard)) {
     wildcard_resource_state_.clear();
-  }
-  // Check if this is a legacy wildcard subscription request. If we repeatedly call this function
-  // with empty cur_added and cur_removed, we keep the legacy wildcard subscription.
-  if (is_legacy_wildcard_) {
-    is_legacy_wildcard_ = cur_added.empty() && cur_removed.empty();
-  } else {
-    // This is a legacy wildcard subscription if we have not expressed interest in any resources so
-    // far. Nor we tried to remove any resources.
-    is_legacy_wildcard_ = !any_request_sent_yet_in_current_stream_ &&
-                          requested_resource_state_.empty() && names_removed_.empty();
-    if (is_legacy_wildcard_) {
-      // Inserting wildcard to requested resource as waiting for server, which means that wildcard
-      // resource has no version and should never get one actually. As such, it won't be listed in
-      // initial_resource_versions field.
-      requested_resource_state_.insert_or_assign(Wildcard, ResourceState::waitingForServer());
-      names_added_.emplace(Wildcard);
-    }
+    ambiguous_resource_state_.clear();
   }
 }
 
 // Not having sent any requests yet counts as an "update pending" since you're supposed to resend
 // the entirety of your interest at the start of a stream, even if nothing has changed.
 bool DeltaSubscriptionState::subscriptionUpdatePending() const {
-  return !names_added_.empty() || !names_removed_.empty() ||
-         !any_request_sent_yet_in_current_stream_ || must_send_discovery_request_;
+  if (!names_added_.empty() || !names_removed_.empty()) {
+    return true;
+  }
+  // At this point, we have no new resources to subscribe to or any
+  // resources to unsubscribe from.
+  if (!any_request_sent_yet_in_current_stream_) {
+    // If we haven't sent anything on the current stream, but we are actually interested in some
+    // resource then we obviously need to let the server know about those.
+    if (!requested_resource_state_.empty()) {
+      return true;
+    }
+    // So there are no new names and we are interested in nothing. This may either mean that we want
+    // the legacy wildcard subscription to kick in or we actually unsubscribed from everything. If
+    // the latter is true, then we should not be sending any requests. In such case the initial
+    // wildcard mode will be false. Otherwise it means that the legacy wildcard request should be
+    // sent.
+    return in_initial_legacy_wildcard_;
+  }
+
+  // At this point, we have no changes in subscription resources and this isn't a first request in
+  // the stream, so even if there are no resources we are interested in, we can send the request,
+  // because even if it's empty, it won't be interpreted as legacy wildcard subscription, which can
+  // only for the first request in the stream. So sending an empty request at this point should be
+  // harmless.
+  //
+  // If sending empty requests at this point is actually harmful, we would need to add "&&
+  // !requested_resource_state_.empty()" to the return below.
+  return must_send_discovery_request_;
 }
 
 UpdateAck DeltaSubscriptionState::handleResponse(
@@ -123,6 +178,14 @@ bool DeltaSubscriptionState::isHeartbeatResponse(
 
   if (const auto itr = wildcard_resource_state_.find(resource.name());
       itr != wildcard_resource_state_.end()) {
+    return resource.version() == itr->second;
+  }
+
+  if (const auto itr = ambiguous_resource_state_.find(resource.name());
+      itr != wildcard_resource_state_.end()) {
+    // In theory we should move the ambiguous resource to wildcard, because probably we shouldn't be
+    // getting hearbeat responses about resources that we are not interested in, but the server
+    // could have sent this heartbeat before it learned about our lack of interest in the resource.
     return resource.version() == itr->second;
   }
 
@@ -175,15 +238,17 @@ void DeltaSubscriptionState::handleGoodResponse(
   // case saying nothing is fine, or the server will bring back something new, which we should
   // receive regardless (which is the logic that not specifying a version will get you).
   //
-  // So, leave the version map entry present but blank. It will be left out of
-  // initial_resource_versions messages, but will remind us to explicitly tell the server "I'm
-  // cancelling my subscription" when we lose interest. In case of resources received as a part of
-  // the wildcard subscription, we just drop them.
+  // So, leave the version map entry present but blank if we are still interested in the resource.
+  // It will be left out of initial_resource_versions messages, but will remind us to explicitly
+  // tell the server "I'm cancelling my subscription" when we lose interest. In case of resources
+  // received as a part of the wildcard subscription or resources we already lost interest in, we
+  // just drop them.
   for (const auto& resource_name : message.removed_resources()) {
     if (auto maybe_resource = getRequestedResourceState(resource_name);
         maybe_resource.has_value()) {
       maybe_resource->setAsWaitingForServer();
-    } else {
+    } else if (auto erased_count = ambiguous_resource_state_.erase(resource_name);
+               erased_count == 0) {
       wildcard_resource_state_.erase(resource_name);
     }
   }
@@ -210,6 +275,36 @@ DeltaSubscriptionState::getNextRequestAckless() {
   must_send_discovery_request_ = false;
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
+    bool is_legacy_wildcard = in_initial_legacy_wildcard_;
+    if (is_legacy_wildcard) {
+      requested_resource_state_.insert_or_assign(Wildcard, ResourceState::waitingForServer());
+      ASSERT(container_contains(requested_resource_state_, Wildcard));
+      ASSERT(!container_contains(wildcard_resource_state_, Wildcard));
+      ASSERT(!container_contains(ambiguous_resource_state_, Wildcard));
+    } else {
+      // If we are here, this means that we lost our initial wildcard mode, because we subscribed to
+      // something in the past. We could still be in the situation now that all we are subscribed to
+      // now is wildcard resource, so in such case try to send a legacy wildcard subscription
+      // request anyway. For this to happen, two conditions need to apply:
+      //
+      // 1. No change in interest.
+      // 2. The only requested resource is Wildcard resource.
+      //
+      // The invariant of the code here is that this code is executed only when
+      // subscriptionUpdatePending actually returns true, which in our case can only happen if the
+      // requested resources state_ isn't empty.
+      ASSERT(!requested_resource_state_.empty());
+
+      // If our subscription interest didn't change then the first condition for using legacy
+      // wildcard subscription is met.
+      is_legacy_wildcard = names_added_.empty() && names_removed_.empty();
+      if (is_legacy_wildcard) {
+        // If we requested only a wildcard resource then the second condition for using legacy
+        // wildcard condition is met.
+        is_legacy_wildcard = requested_resource_state_.size() == 1 &&
+                             requested_resource_state_.begin()->first == Wildcard;
+      }
+    }
     // initial_resource_versions "must be populated for first request in a stream".
     // Also, since this might be a new server, we must explicitly state *all* of our subscription
     // interest.
@@ -225,13 +320,14 @@ DeltaSubscriptionState::getNextRequestAckless() {
       names_added_.insert(resource_name);
     }
     for (auto const& [resource_name, resource_version] : wildcard_resource_state_) {
-      // Populate initial_resource_versions with the resource versions we currently have.
       (*request.mutable_initial_resource_versions())[resource_name] = resource_version;
-      // We are not adding these resources to resource_names_subscribe.
+    }
+    for (auto const& [resource_name, resource_version] : ambiguous_resource_state_) {
+      (*request.mutable_initial_resource_versions())[resource_name] = resource_version;
     }
     // If this is a legacy wildcard request, then make sure that the resource_names_subscribe is
     // empty.
-    if (is_legacy_wildcard_) {
+    if (is_legacy_wildcard) {
       names_added_.clear();
     }
     names_removed_.clear();
@@ -272,9 +368,18 @@ void DeltaSubscriptionState::addResourceStateFromServer(
       maybe_resource.has_value()) {
     // It is a resource that we requested.
     maybe_resource->setVersion(resource.version());
+    ASSERT(container_contains(requested_resource_state_, resource.name()));
+    ASSERT(!container_contains(wildcard_resource_state_, resource.name()));
+    ASSERT(!container_contains(ambiguous_resource_state_, resource.name()));
   } else {
     // It is a resource that is a part of our wildcard request.
     wildcard_resource_state_.insert({resource.name(), resource.version()});
+    // The resource could be ambiguous before, but now the ambiguity
+    // is resolved.
+    ambiguous_resource_state_.erase(resource.name());
+    ASSERT(!container_contains(requested_resource_state_, resource.name()));
+    ASSERT(container_contains(wildcard_resource_state_, resource.name()));
+    ASSERT(!container_contains(ambiguous_resource_state_, resource.name()));
   }
 }
 
