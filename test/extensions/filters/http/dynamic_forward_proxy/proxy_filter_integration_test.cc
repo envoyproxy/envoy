@@ -36,7 +36,7 @@ typed_config:
                                            max_hosts, max_pending_requests);
     config_helper_.addFilter(filter);
     if (buffer_) {
-      // make sure DFP will be between the buffer filter and the router filter.
+      // make sure dynamic forward proxy will be between the buffer filter and the router filter.
       config_helper_.addFilter(R"EOF(
       name: buffer-body-filter
         )EOF");
@@ -145,7 +145,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, RequestWithPause) {
-  // Add a pause before DFP to regression test
+  // Add a pause before dynamic forward proxy to regression test
   // https://github.com/envoyproxy/envoy/issues/17514
   buffer_ = true;
   setup();
