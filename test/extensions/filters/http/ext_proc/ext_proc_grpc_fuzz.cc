@@ -1,3 +1,4 @@
+#include <mutex>
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -63,6 +64,7 @@ public:
 
   void initializeFuzzer(bool autonomous_upstream) {
     autonomous_upstream_ = autonomous_upstream;
+    autonomous_allow_incomplete_streams_ = true;
     initializeConfig();
     HttpIntegrationTest::initialize();
   }
@@ -135,7 +137,7 @@ public:
   }
 
   IntegrationStreamDecoderPtr sendDownstreamRequestWithChunks(
-      FuzzedDataProvider* fdp,
+      ExtProcFuzzHelper* fh,
       absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
       const std::string http_method = "POST") {
     auto conn = makeClientConnection(lookupPort("http"));
@@ -149,35 +151,59 @@ public:
     IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
     auto& encoder = encoder_decoder.first;
 
-    uint32_t num_chunks = fdp->ConsumeIntegralInRange<uint32_t>(0, 50);
+    uint32_t num_chunks = fh->ConsumeIntegralInRange<uint32_t>(0, 50);
     for (uint32_t i = 0; i < num_chunks; i++) {
       Buffer::OwnedImpl chunk;
-      std::string data = fdp->ConsumeRandomLengthString();
+      std::string data = fh->ConsumeRandomLengthString();
       chunk.add(data);
+
+      // If proxy closes connection before body is fully sent it causes a
+      // seg fault. To address this, the external processor sets a flag to
+      // signal when it has generated an immediate response which will close
+      // the connection in the future. We check this flag, which is protected
+      // by a lock, before sending a chunk. If the flag is set, we don't attempt
+      // to send more data, regardless of whether or not the
+      // codec_client connection is still open. There are no locks protecting
+      // the codec_client connection and cannot trust that it's safe to send
+      // another chunk
+      std::unique_lock<std::mutex> lock(fh->immediate_resp_lock_);
+      if (fh->immediate_resp_sent_) {
+        ENVOY_LOG_MISC(trace, "Proxy closed connection, returning early");
+        return response;
+      }
       ENVOY_LOG_MISC(trace, "Sending chunk of {} bytes", data.length());
       codec_client_->sendData(encoder, chunk, false);
+      lock.unlock();
     }
 
-    Buffer::OwnedImpl empty_chunk;
-    codec_client_->sendData(encoder, empty_chunk, true);
+    // See comment above
+    std::unique_lock<std::mutex> lock(fh->immediate_resp_lock_);
+    if (!fh->immediate_resp_sent_) {
+      ENVOY_LOG_MISC(trace, "Sending empty chunk to close stream");
+      Buffer::OwnedImpl empty_chunk;
+      codec_client_->sendData(encoder, empty_chunk, true);
+    }
+    lock.unlock();
     return response;
   }
 
-  IntegrationStreamDecoderPtr randomDownstreamRequest(FuzzedDataProvider* fdp) {
+  IntegrationStreamDecoderPtr randomDownstreamRequest(ExtProcFuzzHelper* fh) {
     // From the external processor's view each of these requests
     // are handled the same way. They only differ in what the server should
     // send back to the client.
-    switch (fdp->ConsumeEnum<HttpMethod>()) {
+    // TODO(ikepolinsky): add random flag for sending trailers with a request
+    //   using HttpIntegration::sendTrailers()
+    switch (fh->ConsumeEnum<HttpMethod>()) {
       case HttpMethod::GET:
         ENVOY_LOG_MISC(trace, "Sending GET request");
         return sendDownstreamRequest(absl::nullopt);
       case HttpMethod::POST:
-        if (fdp->ConsumeBool()) {
+        if (fh->ConsumeBool()) {
           ENVOY_LOG_MISC(trace, "Sending POST request with body");
-          return sendDownstreamRequestWithBody(fdp->ConsumeRandomLengthString(), absl::nullopt);
+          return sendDownstreamRequestWithBody(fh->ConsumeRandomLengthString(), absl::nullopt);
         } else {
           ENVOY_LOG_MISC(trace, "Sending POST request with chunked body");
-          return sendDownstreamRequestWithChunks(fdp, absl::nullopt);
+          return sendDownstreamRequestWithChunks(fh, absl::nullopt);
         }
       default:
         ENVOY_LOG_MISC(error, "Unhandled HttpMethod");
@@ -195,33 +221,41 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   FuzzedDataProvider provider(buf, len);
 
   ExtProcIntegrationFuzz fuzzer(Network::Address::IpVersion::v4, Grpc::ClientType::GoogleGrpc);
+  ExtProcFuzzHelper fuzz_helper(&provider);
+
+  // This starts an external processor in a separate thread. This allows for the
+  // external process to consume messages in a loop without blocking the fuzz
+  // target from receiving the repsonse.
   fuzzer.test_processor_.start(
-      [&provider](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      [&fuzz_helper](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         while (true) {
           ProcessingRequest req;
           if (!stream->Read(&req)) {
             return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
           }
 
+          // The following blocks generate random data for the 9 fields of the
+          // ProcessingResponse gRPC message
+
           // 1 - 7. Randomize response
           // If true, immediately close the connection with a random Grpc Status.
           // Otherwise randomize the response
           ProcessingResponse resp;
-          if (provider.ConsumeBool()) {
-            return RandomGrpcStatusWithMessage(&provider);
+          if (fuzz_helper.ConsumeBool()) {
+            return fuzz_helper.RandomGrpcStatusWithMessage();
           } else {
-            RandomizeResponse(&resp, &req, &provider);
+            fuzz_helper.RandomizeResponse(&resp, &req);
           }
 
           // 8. Randomize dynamic_metadata
-          /* TODO: Skipping - not implemented
+          /* TODO(ikepolinsky): Skipping - not implemented
           if (provider.ConsumeBool()) {
           } */
 
           // 9. Randomize mode_override
-          if (provider.ConsumeBool()) {
+          if (fuzz_helper.ConsumeBool()) {
             ProcessingMode* msg = resp.mutable_mode_override();
-            RandomizeOverrideResponse(msg, &provider);
+            fuzz_helper.RandomizeOverrideResponse(msg);
            }
 
           ENVOY_LOG_MISC(trace, "Response generated, writing to stream.");
@@ -236,7 +270,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   fuzzer.initializeFuzzer(true);
   ENVOY_LOG_MISC(trace, "Fuzzer initialized");
 
-  auto response = fuzzer.randomDownstreamRequest(&provider);
+  auto response = fuzzer.randomDownstreamRequest(&fuzz_helper);
 
   // For fuzz testing we don't care about the response code, only that
   // the stream ended in some graceful manner
@@ -244,8 +278,9 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   if (response->waitForEndStream(std::chrono::milliseconds(2000))) {
     ENVOY_LOG_MISC(trace, "Response received.");
   } else {
-    // TODO: investigate if there is anyway around this. Waiting 2 seconds
-    // for a fuzz case to fail will drasticially cut executions/second.
+    // TODO(ikepolinsky): investigate if there is anyway around this.
+    // Waiting 2 seconds for a fuzz case to fail will drasticially
+    // reduce executions/second.
     ENVOY_LOG_MISC(trace, "Response timed out.");
   }
   fuzzer.TearDown();
