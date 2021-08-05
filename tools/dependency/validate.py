@@ -122,7 +122,7 @@ class BuildGraph(object):
     Returns:
       A set of dependency identifiers that are reachable from targets.
     """
-        deps_query = ' union '.join(f'deps({l})' for l in targets)
+        deps_query = 'deps(set({}))'.format(' '.join(targets))
         try:
             deps = subprocess.check_output(['bazel', 'query', deps_query],
                                            stderr=subprocess.PIPE).decode().splitlines()
