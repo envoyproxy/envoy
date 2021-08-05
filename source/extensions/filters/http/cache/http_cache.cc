@@ -25,8 +25,7 @@ namespace Cache {
 
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
                              const VaryHeader& vary_allow_list)
-    : request_headers_(
-          Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers)),
+    : request_headers_(Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers)),
       vary_allow_list_(vary_allow_list), timestamp_(timestamp) {
   // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
   // CacheFilter doesn't create LookupRequests for such requests.
