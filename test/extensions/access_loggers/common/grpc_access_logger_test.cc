@@ -48,7 +48,7 @@ const Protobuf::MethodDescriptor& mockMethodDescriptor() {
 // standard Struct and Empty protos.
 class MockGrpcAccessLoggerImpl
     : public Common::GrpcAccessLogger<ProtobufWkt::Struct, ProtobufWkt::Empty, ProtobufWkt::Struct,
-                                      ProtobufWkt::Struct, ProtobufWkt::Struct> {
+                                      ProtobufWkt::Struct> {
 public:
   MockGrpcAccessLoggerImpl(const Grpc::RawAsyncClientSharedPtr& client,
                            std::chrono::milliseconds buffer_flush_interval_msec,
@@ -75,16 +75,6 @@ private:
                                                         1);
   }
 
-  void mockaddCriticalMessageEntry(const std::string& key) {
-    if (!critical_message_.fields().contains(key)) {
-      ProtobufWkt::Value default_value;
-      default_value.set_number_value(0);
-      critical_message_.mutable_fields()->insert({key, default_value});
-    }
-    critical_message_.mutable_fields()->at(key).set_number_value(
-        critical_message_.fields().at(key).number_value() + 1);
-  }
-
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   // For testing purposes, we don't really care how each of these virtual methods is implemented, as
   // it's up to each logger implementation. We test whether they were called in the regular flow of
@@ -100,19 +90,7 @@ private:
     mockAddEntry(MOCK_TCP_LOG_FIELD_NAME);
   }
 
-  void addCriticalMessageEntry(ProtobufWkt::Struct&& entry) override {
-    (void)entry;
-    mockaddCriticalMessageEntry(MOCK_HTTP_LOG_FIELD_NAME);
-  }
-
-  void addCriticalMessageEntry(ProtobufWkt::Empty&& entry) override {
-    (void)entry;
-    mockaddCriticalMessageEntry(MOCK_TCP_LOG_FIELD_NAME);
-  }
-
   bool isEmpty() override { return message_.fields().empty(); }
-  bool isCriticalMessageEmpty() override { return critical_message_.fields().empty(); }
-  void initCriticalMessage() override { ++num_critical_inits_; }
   void initMessage() override { ++num_inits_; }
 
   void clearMessage() override {
@@ -120,15 +98,8 @@ private:
     num_clears_++;
   }
 
-  void clearCriticalMessage() override {
-    critical_message_.Clear();
-    num_critical_clears_++;
-  }
-
   int num_inits_ = 0;
-  int num_critical_inits_ = 0;
   int num_clears_ = 0;
-  int num_critical_clears_ = 0;
 };
 
 class GrpcAccessLogTest : public testing::Test {
