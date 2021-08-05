@@ -50,7 +50,7 @@ template <class Proto> struct TestCase {
 
 // Basic protoc-gen-validate C++ validation header inclusion and Validate calls
 // from data plane API.
-int main(int argc, char* argv[]) {
+int main(int /*argc*/, char* /*argv*/[]) {
   envoy::config::bootstrap::v3::Bootstrap invalid_bootstrap;
   invalid_bootstrap.mutable_static_resources()->add_clusters();
   // This is a baseline test of the validation features we care about. It's
