@@ -44,6 +44,7 @@ Bug Fixes
 * cluster: delete pools when they're idle to fix unbounded memory use when using PROXY protocol upstream with tcp_proxy. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.conn_pool_delete_when_idle`` runtime guard to false.
 * listener: fixed an issue on Windows where connections are not handled by all worker threads.
 * ext_authz: the authentication shouldn't be skpped when the direct response is set. This was fixed. This behavior can be temporarily reverted by setting the ``"envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response"`` runtime guard to false.
+* ext_authz: the authentication shouldn't be skpped when the direct response is set. This was fixed. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response`` runtime guard to false.
 * xray: fix the AWS X-Ray tracer bug where span's error, fault and throttle information was not reported properly as per the `AWS X-Ray documentation <https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html>`_. Before this fix, server error was reported under 'annotations' section of the segment data.
 
 Removed Config or Runtime
