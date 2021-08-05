@@ -102,7 +102,7 @@ protected:
   Event::SimulatedTimeSystem time_source_;
   SystemTime current_time_ = time_source_.systemTime();
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
-  VaryHeader vary_allow_list_;
+  VaryAllowList vary_allow_list_;
 };
 
 // Simple flow of putting in an item, getting it, deleting it.
@@ -261,7 +261,7 @@ TEST_F(SimpleHttpCacheTest, VaryResponses) {
   Protobuf::RepeatedPtrField<::envoy::type::matcher::v3::StringMatcher> proto_allow_list;
   ::envoy::type::matcher::v3::StringMatcher* matcher = proto_allow_list.Add();
   matcher->set_exact("width");
-  vary_allow_list_ = VaryHeader(proto_allow_list);
+  vary_allow_list_ = VaryAllowList(proto_allow_list);
   lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 }
