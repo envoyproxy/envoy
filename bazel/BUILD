@@ -170,6 +170,11 @@ config_setting(
 )
 
 config_setting(
+    name = "clang_pch_build",
+    values = {"define": "ENVOY_CLANG_PCH=1"},
+)
+
+config_setting(
     name = "gcc_build_gcc",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "gcc",
@@ -545,6 +550,7 @@ selects.config_setting_group(
     name = "apple",
     match_any = [
         ":darwin",
+        ":darwin_arm64",
         ":darwin_x86_64",
         ":ios_arm64",
         ":ios_arm64e",

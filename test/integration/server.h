@@ -51,8 +51,8 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
 class TestComponentFactory : public ComponentFactory {
 public:
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
-    return Server::DrainManagerPtr{
-        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY)};
+    return Server::DrainManagerPtr{new Server::DrainManagerImpl(
+        server, envoy::config::listener::v3::Listener::MODIFY_ONLY, server.dispatcher())};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
                                    Server::Configuration::Initial& config) override {
@@ -430,7 +430,6 @@ public:
   void setOnServerReadyCb(std::function<void(IntegrationTestServer&)> on_server_ready) {
     on_server_ready_cb_ = std::move(on_server_ready);
   }
-  void onRuntimeCreated() override {}
   void onWorkersStarted() override {}
 
   void start(const Network::Address::IpVersion version,
@@ -499,8 +498,8 @@ public:
 
   // Server::ComponentFactory
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
-    drain_manager_ =
-        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY);
+    drain_manager_ = new Server::DrainManagerImpl(
+        server, envoy::config::listener::v3::Listener::MODIFY_ONLY, server.dispatcher());
     return Server::DrainManagerPtr{drain_manager_};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,

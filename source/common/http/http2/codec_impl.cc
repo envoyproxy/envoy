@@ -131,11 +131,11 @@ template <typename T> static T* removeConst(const void* object) {
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
     : parent_(parent),
-      pending_recv_data_(parent_.connection_.dispatcher().getWatermarkFactory().create(
+      pending_recv_data_(parent_.connection_.dispatcher().getWatermarkFactory().createBuffer(
           [this]() -> void { this->pendingRecvBufferLowWatermark(); },
           [this]() -> void { this->pendingRecvBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      pending_send_data_(parent_.connection_.dispatcher().getWatermarkFactory().create(
+      pending_send_data_(parent_.connection_.dispatcher().getWatermarkFactory().createBuffer(
           [this]() -> void { this->pendingSendBufferLowWatermark(); },
           [this]() -> void { this->pendingSendBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
@@ -778,8 +778,8 @@ Status ConnectionImpl::protocolErrorForTest() {
 }
 
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
-  ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}", connection_,
-                 static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags));
+  ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}, stream_id={}", connection_,
+                 static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags), hd->stream_id);
   current_stream_id_ = hd->stream_id;
 
   // Track all the frames without padding here, since this is the only callback we receive
@@ -985,9 +985,15 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
     }
     break;
 
+  case NGHTTP2_ERR_FLOW_CONTROL:
+  case NGHTTP2_ERR_PROTO:
+  case NGHTTP2_ERR_STREAM_CLOSED:
+    // Known error conditions that should trigger connection close.
+    break;
+
   default:
-    ASSERT(error_code == NGHTTP2_ERR_FLOW_CONTROL || error_code == NGHTTP2_ERR_PROTO,
-           absl::StrCat("Unexpected error_code: ", error_code));
+    // Unknown error conditions. Trigger ENVOY_BUG and connection close.
+    ENVOY_BUG(false, absl::StrCat("Unexpected error_code: ", error_code));
     break;
   }
 
@@ -1539,8 +1545,9 @@ void ConnectionImpl::StreamImpl::dumpState(std::ostream& os, int indent_level) c
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "ConnectionImpl::StreamImpl " << this << DUMP_MEMBER(stream_id_)
      << DUMP_MEMBER(unconsumed_bytes_) << DUMP_MEMBER(read_disable_count_)
-     << DUMP_MEMBER(local_end_stream_sent_) << DUMP_MEMBER(remote_end_stream_)
-     << DUMP_MEMBER(data_deferred_) << DUMP_MEMBER(received_noninformational_headers_)
+     << DUMP_MEMBER(local_end_stream_) << DUMP_MEMBER(local_end_stream_sent_)
+     << DUMP_MEMBER(remote_end_stream_) << DUMP_MEMBER(data_deferred_)
+     << DUMP_MEMBER(received_noninformational_headers_)
      << DUMP_MEMBER(pending_receive_buffer_high_watermark_called_)
      << DUMP_MEMBER(pending_send_buffer_high_watermark_called_)
      << DUMP_MEMBER(reset_due_to_messaging_error_)

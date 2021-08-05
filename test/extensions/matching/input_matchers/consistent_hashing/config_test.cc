@@ -11,6 +11,7 @@ namespace InputMatchers {
 namespace ConsistentHashing {
 
 TEST(ConfigTest, TestConfig) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   const std::string yaml_string = R"EOF(
     name: hashing
     typed_config:
@@ -32,6 +33,8 @@ TEST(ConfigTest, TestConfig) {
 }
 
 TEST(ConfigTest, InvalidConfig) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
   const std::string yaml_string = R"EOF(
     name: hashing
     typed_config:

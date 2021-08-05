@@ -1,8 +1,9 @@
+import logging
 from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from tools.base.checker import BazelChecker, Checker, CheckerSummary, ForkingChecker
+from tools.base.checker import AsyncChecker, BazelChecker, Checker, CheckerSummary, ForkingChecker
 from tools.base.runner import BazelRunner, ForkingRunner
 
 
@@ -49,6 +50,9 @@ def test_checker_constructor():
         == [('path1', 'path2', 'path3'), {}])
     assert checker.summary_class == CheckerSummary
 
+    assert checker.active_check is None
+    assert "active_check" not in checker.__dict__
+
 
 def test_checker_diff():
     checker = Checker("path1", "path2", "path3")
@@ -59,6 +63,16 @@ def test_checker_diff():
     with args_mock as m_args:
         assert checker.diff == m_args.return_value.diff
     assert "diff" not in checker.__dict__
+
+
+@pytest.mark.parametrize(
+    "errors",
+    [{}, dict(exiting="EEK"), dict(notexiting="OK")])
+def test_checker_exiting(errors):
+    checker = Checker("path1", "path2", "path3")
+    checker.errors = errors
+    assert checker.exiting == bool("exiting" in errors)
+    assert "exiting" not in checker.__dict__
 
 
 def test_checker_error_count():
@@ -168,21 +182,26 @@ def test_checker_paths(patches, paths):
 @pytest.mark.parametrize("summary", [True, False])
 @pytest.mark.parametrize("error_count", [0, 1])
 @pytest.mark.parametrize("warning_count", [0, 1])
-def test_checker_show_summary(patches, summary, error_count, warning_count):
+@pytest.mark.parametrize("exiting", [True, False])
+def test_checker_show_summary(patches, summary, error_count, warning_count, exiting):
     checker = Checker("path1", "path2", "path3")
     patched = patches(
         ("Checker.args", dict(new_callable=PropertyMock)),
+        ("Checker.exiting", dict(new_callable=PropertyMock)),
         ("Checker.error_count", dict(new_callable=PropertyMock)),
         ("Checker.warning_count", dict(new_callable=PropertyMock)),
         prefix="tools.base.checker")
 
-    with patched as (m_args, m_errors, m_warnings):
+    with patched as (m_args, m_exit, m_errors, m_warnings):
         m_args.return_value.summary = summary
         m_errors.return_value = error_count
         m_warnings.return_value = warning_count
+        m_exit.return_value = exiting
         result = checker.show_summary
 
-    if summary or error_count or warning_count:
+    if exiting:
+        assert result is False
+    elif summary or error_count or warning_count:
         assert result is True
     else:
         assert result is False
@@ -268,10 +287,20 @@ def test_checker_warning_count():
     assert "warning_count" not in checker.__dict__
 
 
-def test_checker_add_arguments():
+def test_checker_add_arguments(patches):
     checker = DummyCheckerWithChecks("path1", "path2", "path3")
     parser = MagicMock()
-    checker.add_arguments(parser)
+    patched = patches(
+        "runner.Runner.add_arguments",
+        prefix="tools.base.checker")
+
+    with patched as (m_super, ):
+        assert checker.add_arguments(parser) is None
+
+    assert (
+        list(m_super.call_args)
+        == [(parser,), {}])
+
     assert (
         list(list(c) for c in parser.add_argument.call_args_list)
         == [[('--fix',),
@@ -311,9 +340,6 @@ def test_checker_add_arguments():
             [('--path', '-p'),
              {'default': None,
               'help': 'Path to the test root (usually Envoy source dir). If not specified the first path of paths is used'}],
-            [('--log-level', '-l'),
-             {'choices': ['info', 'warn', 'debug', 'error'],
-              'default': 'info', 'help': 'Log level to display'}],
             [('paths',),
              {'nargs': '*',
               'help': 'Paths to check. At least one path must be specified, or the `path` argument should be provided'}]])
@@ -328,27 +354,66 @@ TEST_ERRORS = (
 
 
 @pytest.mark.parametrize("log", [True, False])
+@pytest.mark.parametrize("log_type", [None, "fatal"])
 @pytest.mark.parametrize("errors", TEST_ERRORS)
-def test_checker_error(patches, log, errors):
+@pytest.mark.parametrize("newerrors", [[], ["err1", "err2", "err3"]])
+def test_checker_error(log, log_type, errors, newerrors):
     checker = Checker("path1", "path2", "path3")
     log_mock = patch(
         "tools.base.checker.Checker.log",
         new_callable=PropertyMock)
     checker.errors = errors.copy()
+    result = 1 if newerrors else 0
 
     with log_mock as m_log:
-        assert checker.error("mycheck", ["err1", "err2", "err3"], log) == 1
+        if log_type:
+            assert checker.error("mycheck", newerrors, log, log_type=log_type) == result
+        else:
+            assert checker.error("mycheck", newerrors, log) == result
 
-    assert checker.errors["mycheck"] == errors.get("mycheck", []) + ["err1", "err2", "err3"]
+    if not newerrors:
+        assert not m_log.called
+        assert "mycheck" not in checker.errors
+        return
+
+    assert checker.errors["mycheck"] == errors.get("mycheck", []) + newerrors
     for k, v in errors.items():
         if k != "mycheck":
             assert checker.errors[k] == v
     if log:
         assert (
-            list(m_log.return_value.error.call_args)
-            == [('err1\nerr2\nerr3',), {}])
+            list(list(c) for c in getattr(m_log.return_value, log_type or "error").call_args_list)
+            == [[(f'[mycheck] err{i}',), {}] for i in range(1, 4)])
     else:
-        assert not m_log.return_value.error.called
+        assert not getattr(m_log.return_value, log_type or "error").called
+
+
+def test_checker_exit(patches):
+    checker = Checker("path1", "path2", "path3")
+    patched = patches(
+        "Checker.error",
+        ("Checker.log", dict(new_callable=PropertyMock)),
+        ("Checker.stdout", dict(new_callable=PropertyMock)),
+        prefix="tools.base.checker")
+
+    with patched as (m_error, m_log, m_stdout):
+        assert checker.exit() == m_error.return_value
+
+    assert (
+        list(m_log.return_value.handlers.__getitem__.call_args)
+        == [(0,), {}])
+    assert (
+        list(m_log.return_value.handlers.__getitem__.return_value.setLevel.call_args)
+        == [(logging.FATAL,), {}])
+    assert (
+        list(m_stdout.return_value.handlers.__getitem__.call_args)
+        == [(0,), {}])
+    assert (
+        list(m_stdout.return_value.handlers.__getitem__.return_value.setLevel.call_args)
+        == [(logging.FATAL,), {}])
+    assert (
+        list(m_error.call_args)
+        == [('exiting', ['Keyboard exit']), {'log_type': 'fatal'}])
 
 
 TEST_CHECKS = (
@@ -378,9 +443,67 @@ def test_checker_get_checks(checks):
             assert checker.get_checks() == checker.checks
 
 
-def test_checker_on_check_run():
+def test_checker_on_check_begin(patches):
     checker = Checker("path1", "path2", "path3")
-    assert not checker.on_check_run("checkname")
+    patched = patches(
+        ("Checker.log", dict(new_callable=PropertyMock)),
+        prefix="tools.base.checker")
+
+    with patched as (m_log, ):
+        assert not checker.on_check_begin("checkname")
+
+    assert checker.active_check == "checkname"
+    assert (
+        list(m_log.return_value.notice.call_args)
+        == [('[checkname] Running check',), {}])
+
+
+@pytest.mark.parametrize("errors", [[], ["CHECK1", "CHECK2", "CHECK3"], ["CHECK2", "CHECK3"]])
+@pytest.mark.parametrize("warnings", [[], ["CHECK1", "CHECK2", "CHECK3"], ["CHECK2", "CHECK3"]])
+@pytest.mark.parametrize("exiting", [True, False])
+def test_checker_on_check_run(patches, errors, warnings, exiting):
+    checker = Checker("path1", "path2", "path3")
+    patched = patches(
+        ("Checker.exiting", dict(new_callable=PropertyMock)),
+        ("Checker.log", dict(new_callable=PropertyMock)),
+        prefix="tools.base.checker")
+
+    check = "CHECK1"
+    checker.errors = errors
+    checker.warnings = warnings
+    checker._active_check = check
+
+    with patched as (m_exit, m_log):
+        m_exit.return_value = exiting
+        assert not checker.on_check_run(check)
+
+    assert checker.active_check is None
+
+    if exiting:
+        assert not m_log.called
+        return
+
+    if check in errors:
+        assert (
+            list(m_log.return_value.error.call_args)
+            == [('[CHECK1] Check failed',), {}])
+        assert not m_log.return_value.warning.called
+        assert not m_log.return_value.success.called
+        return
+
+    if check in warnings:
+        assert (
+            list(m_log.return_value.warning.call_args)
+            == [('[CHECK1] Check has warnings',), {}])
+        assert not m_log.return_value.error.called
+        assert not m_log.return_value.info.called
+        return
+
+    assert (
+        list(m_log.return_value.success.call_args)
+        == [(f'[{check}] Check completed successfully',), {}])
+    assert not m_log.return_value.warning.called
+    assert not m_log.return_value.error.called
 
 
 def test_checker_on_checks_begin():
@@ -411,33 +534,62 @@ def test_checker_on_checks_complete(patches, failed, show_summary):
         assert not m_summary.return_value.print_summary.called
 
 
-def test_checker_run(patches):
+@pytest.mark.parametrize("raises", [None, KeyboardInterrupt, Exception])
+def test_checker_run(patches, raises):
     checker = DummyCheckerWithChecks("path1", "path2", "path3")
     patched = patches(
+        "Checker.exit",
         "Checker.get_checks",
+        "Checker.on_check_begin",
+        "Checker.on_check_run",
         "Checker.on_checks_begin",
         "Checker.on_checks_complete",
         ("Checker.log", dict(new_callable=PropertyMock)),
         ("Checker.name", dict(new_callable=PropertyMock)),
         prefix="tools.base.checker")
 
-    with patched as (m_get, m_begin, m_complete, m_log, m_name):
+    with patched as (m_exit, m_get, m_check, m_run, m_begin, m_complete, m_log, m_name):
         m_get.return_value = ("check1", "check2")
-        assert checker.run() == m_complete.return_value
 
-    assert (
-        list(m_get.call_args)
-        == [(), {}])
+        if raises:
+            m_begin.side_effect = raises()
+
+            if raises == KeyboardInterrupt:
+                result = checker.run()
+
+            else:
+                with pytest.raises(raises):
+                    checker.run()
+        else:
+            assert checker.run() == m_complete.return_value
+
     assert (
         list(m_begin.call_args)
         == [(), {}])
     assert (
         list(m_complete.call_args)
         == [(), {}])
+
+    if raises == KeyboardInterrupt:
+        assert (
+            list(m_exit.call_args)
+            == [(), {}])
+        return
+
+    assert not m_exit.called
+
+    if raises:
+        return
+
     assert (
-        list(list(c) for c in m_log.return_value.info.call_args_list)
-        == [[(f"[CHECKS:{m_name.return_value}] check1",), {}],
-            [(f"[CHECKS:{m_name.return_value}] check2",), {}]])
+        list(m_get.call_args)
+        == [(), {}])
+    assert (
+        list(list(c) for c in m_check.call_args_list)
+        == [[(f'check{i}',), {}] for i in range(1, 3)])
+    assert (
+        list(list(c) for c in m_run.call_args_list)
+        == [[(f'check{i}',), {}] for i in range(1, 3)])
     assert (
         list(checker.check1.call_args)
         == [(), {}])
@@ -472,8 +624,8 @@ def test_checker_warn(patches, log, warns):
             assert checker.warnings[k] == v
     if log:
         assert (
-            list(m_log.return_value.warning.call_args)
-            == [('warn1\nwarn2\nwarn3',), {}])
+            list(list(c) for c in m_log.return_value.warning.call_args_list)
+            == [[(f'[mycheck] warn{i}',), {}] for i in range(1, 4)])
     else:
         assert not m_log.return_value.warn.called
 
@@ -504,10 +656,10 @@ def test_checker_succeed(patches, log, success):
             assert checker.success[k] == v
     if log:
         assert (
-            list(m_log.return_value.info.call_args)
-            == [('success1\nsuccess2\nsuccess3',), {}])
+            list(list(c) for c in m_log.return_value.success.call_args_list)
+            == [[(f'[mycheck] success{i}',), {}] for i in range(1, 4)])
     else:
-        assert not m_log.return_value.info.called
+        assert not m_log.return_value.success.called
 
 
 # CheckerSummary tests
@@ -562,32 +714,46 @@ def test_checker_summary_section(section):
     summary = CheckerSummary(checker)
     message, lines = section
     expected = [
-        "",
+        "Summary",
         "-" * 80,
-        "",
         f"{message}"]
     if lines:
         expected += lines
     assert summary._section(message, lines) == expected
 
 
-def test_checker_summary_print_status(patches):
+@pytest.mark.parametrize("errors", (True, False))
+@pytest.mark.parametrize("warnings", (True, False))
+def test_checker_summary_print_status(patches, errors, warnings):
     checker = DummyChecker()
     summary = CheckerSummary(checker)
-    patched = patches(
-        "CheckerSummary._section",
-        prefix="tools.base.checker")
-
     summary.checker = MagicMock()
-    with patched as (m_section, ):
-        m_section.return_value = ["A", "B", "C"]
-        summary.print_status()
+    summary.checker.errors = errors
+    summary.checker.warnings = warnings
+
+    assert not summary.print_status()
+
+    if errors:
+        assert (
+            list(summary.checker.log.error.call_args)
+            == [(f"{summary.checker.status}",), {}])
+        assert not summary.checker.log.warning.called
+        assert not summary.checker.log.info.called
+        return
+
+    if warnings:
+        assert (
+            list(summary.checker.log.warning.call_args)
+            == [(f"{summary.checker.status}",), {}])
+        assert not summary.checker.log.error.called
+        assert not summary.checker.log.info.called
+        return
+
     assert (
-        list(m_section.call_args)
-        == [(f"[SUMMARY:{summary.checker.name}] {summary.checker.status}",), {}])
-    assert (
-        list(summary.checker.log.warning.call_args)
-        == [('A\nB\nC',), {}])
+        list(summary.checker.log.info.call_args)
+        == [(f"{summary.checker.status}",), {}])
+    assert not summary.checker.log.error.called
+    assert not summary.checker.log.warning.called
 
 
 @pytest.mark.parametrize("problem_type", ("errors", "warnings"))
@@ -612,12 +778,17 @@ def test_checker_summary_print_failed(patches, problem_type, max_display, proble
         assert not summary.checker.log.error.called
         assert not m_section.called
         return
+
+    output = (
+        summary.checker.log.warning if problem_type == "warnings" else summary.checker.log.error)
+
     assert (
-        list(summary.checker.log.error.call_args)
-        == [("\n".join(['A\nB\nC'] * len(problems)),), {}])
+        list(output.call_args)
+        == [("".join(['A\nB\nC\n'] * len(problems)),), {}])
+
     if max_display == 0:
         expected = [
-            [(f"[{problem_type.upper()}:{summary.checker.name}] {prob}", []), {}]
+            [(f"{summary.checker.name} {prob}", []), {}]
             for prob in problems]
     else:
         def _problems(prob):
@@ -633,7 +804,7 @@ def test_checker_summary_print_failed(patches, problem_type, max_display, proble
                       if max_display != 0
                       else ""))
         expected = [
-            [(f"[{problem_type.upper()}:{summary.checker.name}] {prob}{_extra(prob)}", _problems(prob)), {}]
+            [(f"{summary.checker.name} {prob}{_extra(prob)}", _problems(prob)), {}]
             for prob in problems]
     assert (
         list(list(c) for c in m_section.call_args_list)
@@ -654,3 +825,203 @@ def test_bazelchecker_constructor():
     checker = DummyBazelChecker()
     assert isinstance(checker, BazelRunner)
     assert isinstance(checker, Checker)
+
+
+# AsyncChecker tests
+
+def test_asynchecker_constructor():
+    checker = AsyncChecker()
+    assert isinstance(checker, Checker)
+
+
+@pytest.mark.parametrize("raises", [None, KeyboardInterrupt, Exception])
+def test_asynchecker_run(patches, raises):
+    checker = AsyncChecker()
+
+    patched = patches(
+        "asyncio",
+        "Checker.exit",
+        ("AsyncChecker._run", dict(new_callable=MagicMock)),
+        ("AsyncChecker.on_checks_complete", dict(new_callable=MagicMock)),
+        prefix="tools.base.checker")
+
+    with patched as (m_async, m_exit, m_run, m_complete):
+        if raises:
+            m_run.side_effect = raises
+
+            if raises == KeyboardInterrupt:
+                result = checker.run()
+            else:
+                with pytest.raises(raises):
+                    checker.run()
+                return
+        else:
+            assert (
+                checker.run()
+                == m_async.get_event_loop.return_value.run_until_complete.return_value)
+
+    if raises == KeyboardInterrupt:
+        assert (
+            list(m_exit.call_args)
+            == [(), {}])
+        assert (
+            list(m_async.get_event_loop.call_args_list[1])
+            == [(), {}])
+        assert (
+            list(m_async.get_event_loop.return_value.run_until_complete.call_args)
+            == [(m_complete.return_value,), {}])
+        assert (
+            list(m_complete.call_args)
+            == [(), {}])
+        assert result == m_async.get_event_loop.return_value.run_until_complete.return_value
+        return
+
+    assert not m_exit.called
+    assert (
+        list(m_async.get_event_loop.call_args)
+        == [(), {}])
+    assert (
+        list(m_async.get_event_loop.return_value.run_until_complete.call_args)
+        == [(m_run.return_value,), {}])
+    assert (
+        list(m_run.call_args)
+        == [(), {}])
+
+
+@pytest.mark.asyncio
+async def test_asynchecker_on_check_begin(patches):
+    checker = AsyncChecker()
+    patched = patches(
+        "Checker.on_check_begin",
+        prefix="tools.base.checker")
+
+    with patched as (m_super, ):
+        assert not await checker.on_check_begin("CHECKNAME")
+
+    assert (
+        list(m_super.call_args)
+        == [('CHECKNAME',), {}])
+
+
+@pytest.mark.asyncio
+async def test_asynchecker_on_check_run(patches):
+    checker = AsyncChecker()
+    patched = patches(
+        "Checker.on_check_run",
+        prefix="tools.base.checker")
+
+    with patched as (m_super, ):
+        assert not await checker.on_check_run("CHECKNAME")
+
+    assert (
+        list(m_super.call_args)
+        == [('CHECKNAME',), {}])
+
+
+@pytest.mark.asyncio
+async def test_asynchecker_on_checks_begin(patches):
+    checker = AsyncChecker()
+    patched = patches(
+        "Checker.on_checks_begin",
+        prefix="tools.base.checker")
+
+    with patched as (m_super, ):
+        assert not await checker.on_checks_begin()
+
+    assert (
+        list(m_super.call_args)
+        == [(), {}])
+
+
+@pytest.mark.asyncio
+async def test_asynchecker_on_checks_complete(patches):
+    checker = AsyncChecker()
+
+    patched = patches(
+        "Checker.on_checks_complete",
+        prefix="tools.base.checker")
+
+    with patched as (m_complete, ):
+        assert (
+            await checker.on_checks_complete()
+            == m_complete.return_value)
+
+    assert (
+        list(m_complete.call_args)
+        == [(), {}])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("raises", [True, False])
+@pytest.mark.parametrize("exiting", [True, False])
+async def test_asynchecker__run(patches, raises, exiting):
+    _check1 = MagicMock()
+    _check2 = MagicMock()
+    _check3 = MagicMock()
+
+    class AsyncCheckerWithChecks(AsyncChecker):
+
+        async def check_check1(self):
+            return _check1()
+
+        async def check_check2(self):
+            return _check2()
+
+        async def check_check3(self):
+            return _check3()
+
+    class SomeError(Exception):
+        pass
+
+    checker = AsyncCheckerWithChecks()
+
+    patched = patches(
+        "Checker.log",
+        "Checker.get_checks",
+        "AsyncChecker.on_checks_begin",
+        "AsyncChecker.on_check_begin",
+        "AsyncChecker.on_check_run",
+        "AsyncChecker.on_checks_complete",
+        ("AsyncChecker.exiting", dict(new_callable=PropertyMock)),
+        prefix="tools.base.checker")
+
+    with patched as (m_log, m_checks, m_begin, m_check, m_run, m_complete, m_exit):
+        m_checks.return_value = ["check1", "check2", "check3"]
+        m_exit.return_value = exiting
+        if raises:
+            m_begin.side_effect = SomeError("AN ERROR OCCURRED")
+
+            with pytest.raises(SomeError):
+                await checker._run()
+        elif exiting:
+            assert await checker._run() == 1
+        else:
+            assert await checker._run() == m_complete.return_value
+
+    assert (
+        list(m_begin.call_args)
+        == [(), {}])
+
+    if exiting:
+        return
+
+    assert (
+        list(m_complete.call_args)
+        == [(), {}])
+
+    if raises:
+        return
+
+    assert (
+        list(m_checks.call_args)
+        == [(), {}])
+    assert (
+        list(list(c) for c in m_check.call_args_list)
+        == [[(f'check{i}',), {}] for i in range(1, 4)])
+    for check in [_check1, _check2, _check3]:
+        assert (
+            list(check.call_args)
+            == [(), {}])
+    assert (
+        list(list(c) for c in m_run.call_args_list)
+        == [[('check1',), {}], [('check2',), {}], [('check3',), {}]])

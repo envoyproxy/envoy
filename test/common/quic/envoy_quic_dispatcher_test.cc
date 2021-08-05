@@ -67,7 +67,7 @@ public:
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
-          SetQuicReloadableFlag(quic_enable_version_rfcv1, use_http3);
+          SetQuicReloadableFlag(quic_disable_version_rfcv1, !use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         quic_version_(version_manager_.GetSupportedVersions()[0]),
@@ -212,6 +212,9 @@ public:
           EXPECT_EQ("test.example.org", socket.requestedServerName());
           return &proof_source_->filterChain();
         }));
+    Network::MockTransportSocketFactory transport_socket_factory;
+    EXPECT_CALL(proof_source_->filterChain(), transportSocketFactory())
+        .WillOnce(ReturnRef(transport_socket_factory));
     EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
         .WillOnce(ReturnRef(filter_factory));
     EXPECT_CALL(listener_config_, filterChainFactory());
@@ -290,6 +293,9 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
   EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
   EXPECT_CALL(filter_chain_manager, findFilterChain(_))
       .WillOnce(Return(&proof_source_->filterChain()));
+  Network::MockTransportSocketFactory transport_socket_factory;
+  EXPECT_CALL(proof_source_->filterChain(), transportSocketFactory())
+      .WillOnce(ReturnRef(transport_socket_factory));
   EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
       .WillOnce(ReturnRef(filter_factory));
   EXPECT_CALL(listener_config_, filterChainFactory());

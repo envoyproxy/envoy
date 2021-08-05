@@ -64,9 +64,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "connection_handler_lib",
     deps = [
-        "//source/server:active_tcp_listener",
-        "//source/server:active_udp_listener",
-        "//source/server:connection_handler_impl",
+        ":active_tcp_listener",
+        ":active_udp_listener",
+        ":connection_handler_impl",
     ],
 )
 
@@ -86,6 +86,7 @@ envoy_cc_library(
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/network:listener_interface",
+        "//envoy/runtime:runtime_interface",
         "//envoy/server:listener_manager_interface",
         "//envoy/stats:timespan_interface",
         "//source/common/common:linked_object",
@@ -116,25 +117,20 @@ envoy_cc_library(
         "active_tcp_listener.h",
     ],
     deps = [
+        ":active_stream_listener_base",
+        ":active_tcp_socket",
         "//envoy/common:time_interface",
         "//envoy/event:deferred_deletable",
         "//envoy/event:dispatcher_interface",
-        "//envoy/event:timer_interface",
         "//envoy/network:connection_handler_interface",
         "//envoy/network:connection_interface",
-        "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/network:listener_interface",
         "//envoy/server:listener_manager_interface",
-        "//envoy/stats:timespan_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
-        "//source/common/common:non_copyable",
-        "//source/common/common:safe_memcpy_lib",
-        "//source/common/event:deferred_task",
         "//source/common/network:connection_lib",
         "//source/common/stats:timespan_lib",
-        "//source/common/stream_info:stream_info_lib",
         "//source/server:active_listener_base",
     ],
 )
@@ -158,6 +154,76 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "active_tcp_listener_headers",
+    hdrs = [
+        "active_stream_listener_base.h",
+        "active_tcp_socket.h",
+    ],
+    deps = [
+        ":active_listener_base",
+        "//envoy/common:time_interface",
+        "//envoy/event:deferred_deletable",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/network:connection_handler_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/network:listen_socket_interface",
+        "//envoy/network:listener_interface",
+        "//envoy/server:listener_manager_interface",
+        "//source/common/common:linked_object",
+    ],
+)
+
+envoy_cc_library(
+    name = "active_tcp_socket",
+    srcs = ["active_tcp_socket.cc"],
+    hdrs = [
+        "active_tcp_socket.h",
+    ],
+    deps = [
+        ":active_listener_base",
+        ":active_tcp_listener_headers",
+        "//envoy/common:time_interface",
+        "//envoy/event:deferred_deletable",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/network:connection_handler_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/network:listen_socket_interface",
+        "//envoy/network:listener_interface",
+        "//source/common/common:linked_object",
+        "//source/common/network:connection_lib",
+        "//source/common/stream_info:stream_info_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "active_stream_listener_base",
+    srcs = ["active_stream_listener_base.cc"],
+    hdrs = [
+        "active_stream_listener_base.h",
+    ],
+    deps = [
+        ":active_listener_base",
+        ":active_tcp_listener_headers",
+        "//envoy/common:time_interface",
+        "//envoy/event:deferred_deletable",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/network:connection_handler_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/network:listen_socket_interface",
+        "//envoy/network:listener_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:linked_object",
+        "//source/common/network:connection_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "drain_manager_lib",
     srcs = ["drain_manager_impl.cc"],
     hdrs = [
@@ -170,6 +236,7 @@ envoy_cc_library(
         "//envoy/server:drain_manager_interface",
         "//envoy/server:instance_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:callback_impl_lib",
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
@@ -409,6 +476,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/common/quic:quic_stat_names_lib",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/upstreams/http/generic:config",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -421,7 +489,6 @@ envoy_cc_library(
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:udp_gso_batch_writer_lib",
-        "//source/common/quic:quic_stat_names_lib",
     ]),
 )
 
@@ -507,17 +574,21 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:grpc_mux_lib",
+        "//source/common/config:new_grpc_mux_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_resource_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/grpc:context_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:context_lib",
+        "//source/common/http:headers_lib",
         "//source/common/init:manager_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/memory:heap_shrinker_lib",
         "//source/common/memory:stats_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/quic:quic_stat_names_lib",
         "//source/common/router:rds_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/secret:secret_manager_impl_lib",

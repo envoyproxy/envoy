@@ -98,7 +98,8 @@ and_match:
     - http_response_headers_match:
         headers:
           - name: bar
-            exact_match: baz
+            string_match:
+              exact: baz
 )EOF";
 
   TestUtility::loadFromYaml(matcher_yaml, config_);

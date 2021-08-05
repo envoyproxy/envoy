@@ -12,6 +12,8 @@ namespace Stats {
 
 class StatsMatcherTest : public testing::Test {
 protected:
+  StatsMatcherTest() : pool_(symbol_table_) {}
+
   envoy::type::matcher::v3::StringMatcher* inclusionList() {
     return stats_config_.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns();
   }
@@ -21,18 +23,22 @@ protected:
   void rejectAll(const bool should_reject) {
     stats_config_.mutable_stats_matcher()->set_reject_all(should_reject);
   }
-  void initMatcher() { stats_matcher_impl_ = std::make_unique<StatsMatcherImpl>(stats_config_); }
-  void expectAccepted(std::vector<std::string> expected_to_pass) {
+  void initMatcher() {
+    stats_matcher_impl_ = std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_);
+  }
+  void expectAccepted(const std::vector<std::string>& expected_to_pass) {
     for (const auto& stat_name : expected_to_pass) {
-      EXPECT_FALSE(stats_matcher_impl_->rejects(stat_name)) << "Accepted: " << stat_name;
+      EXPECT_FALSE(stats_matcher_impl_->rejects(pool_.add(stat_name))) << "Accepted: " << stat_name;
     }
   }
-  void expectDenied(std::vector<std::string> expected_to_fail) {
+  void expectDenied(const std::vector<std::string>& expected_to_fail) {
     for (const auto& stat_name : expected_to_fail) {
-      EXPECT_TRUE(stats_matcher_impl_->rejects(stat_name)) << "Rejected: " << stat_name;
+      EXPECT_TRUE(stats_matcher_impl_->rejects(pool_.add(stat_name))) << "Rejected: " << stat_name;
     }
   }
 
+  SymbolTableImpl symbol_table_;
+  StatNamePool pool_;
   std::unique_ptr<StatsMatcherImpl> stats_matcher_impl_;
 
 private:
@@ -56,6 +62,7 @@ TEST_F(StatsMatcherTest, CheckRejectAll) {
   expectDenied({"foo", "bar", "foo.bar", "foo.bar.baz", "foobarbaz"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_TRUE(stats_matcher_impl_->rejectsAll());
+  EXPECT_EQ(StatsMatcher::FastResult::Rejects, stats_matcher_impl_->fastRejects(StatName()));
 }
 
 TEST_F(StatsMatcherTest, CheckNotRejectAll) {
@@ -65,6 +72,7 @@ TEST_F(StatsMatcherTest, CheckNotRejectAll) {
   expectAccepted({"foo", "bar", "foo.bar", "foo.bar.baz", "foobarbaz"});
   EXPECT_TRUE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+  EXPECT_EQ(StatsMatcher::FastResult::NoMatch, stats_matcher_impl_->fastRejects(StatName()));
 }
 
 TEST_F(StatsMatcherTest, CheckIncludeAll) {
@@ -90,8 +98,7 @@ TEST_F(StatsMatcherTest, CheckIncludeExact) {
   inclusionList()->set_exact("abc");
   initMatcher();
   expectAccepted({"abc"});
-  expectDenied({"abcd", "abc.d", "d.abc", "dabc", "ab", "ac", "abcc", "Abc", "aBc", "abC", "abc.",
-                ".abc", "ABC"});
+  expectDenied({"abcd", "abc.d", "d.abc", "dabc", "ab", "ac", "abcc", "Abc", "aBc", "abC", "ABC"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
@@ -99,8 +106,8 @@ TEST_F(StatsMatcherTest, CheckIncludeExact) {
 TEST_F(StatsMatcherTest, CheckExcludeExact) {
   exclusionList()->set_exact("abc");
   initMatcher();
-  expectAccepted({"abcd", "abc.d", "d.abc", "dabc", "ab", "ac", "abcc", "Abc", "aBc", "abC", "abc.",
-                  ".abc", "ABC"});
+  expectAccepted(
+      {"abcd", "abc.d", "d.abc", "dabc", "ab", "ac", "abcc", "Abc", "aBc", "abC", "ABC"});
   expectDenied({"abc"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
@@ -115,6 +122,18 @@ TEST_F(StatsMatcherTest, CheckIncludePrefix) {
   expectDenied({"ABC", "ABC.foo", "ABCfoo", "foo", "abb", "a.b.c", "_abc", "foo.abc", "fooabc"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+}
+
+TEST_F(StatsMatcherTest, CheckIncludePrefixDot) {
+  inclusionList()->set_prefix("abc.");
+  initMatcher();
+  expectAccepted({"abc", "abc.foo"});
+  expectDenied(
+      {"abcfoo", "ABC", "ABC.foo", "ABCfoo", "foo", "abb", "a.b.c", "_abc", "foo.abc", "fooabc"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+  EXPECT_EQ(StatsMatcher::FastResult::Matches,
+            stats_matcher_impl_->fastRejects(pool_.add("abc.foo")));
 }
 
 TEST_F(StatsMatcherTest, CheckExcludePrefix) {
@@ -279,6 +298,34 @@ TEST_F(StatsMatcherTest, CheckMultipleAssortedExclusionMatchers) {
   initMatcher();
   expectAccepted({"requestsEnvoy", "EnvoyProxy", "foo", "regex_etc"});
   expectDenied({"envoy.matchers.requests", "requests.for.envoy", "envoyrequests", "regex"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+}
+
+TEST_F(StatsMatcherTest, CheckMultipleAssortedInclusionMatchersWithPrefix) {
+  inclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
+  inclusionList()->set_suffix("requests");
+  inclusionList()->set_exact("regex");
+  inclusionList()->set_prefix("prefix.");
+  initMatcher();
+  expectAccepted({"envoy.matchers.requests", "requests.for.envoy", "envoyrequests", "regex",
+                  "prefix", "prefix.foo"});
+  expectAccepted({"prefix.envoy.matchers.requests", "prefix.requests.for.envoy",
+                  "prefix.envoyrequests", "prefix.regex"});
+  expectDenied({"requestsEnvoy", "EnvoyProxy", "foo", "regex_etc"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+}
+
+TEST_F(StatsMatcherTest, CheckMultipleAssortedExclusionMatchersWithPrefix) {
+  exclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
+  exclusionList()->set_suffix("requests");
+  exclusionList()->set_exact("regex");
+  exclusionList()->set_prefix("prefix.");
+  initMatcher();
+  expectAccepted({"requestsEnvoy", "EnvoyProxy", "foo", "regex_etc", "prefixfoo"});
+  expectDenied({"envoy.matchers.requests", "requests.for.envoy", "envoyrequests", "regex", "prefix",
+                "prefix.foo", "prefix.requests.for.envoy"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }

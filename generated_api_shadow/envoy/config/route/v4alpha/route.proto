@@ -4,6 +4,7 @@ package envoy.config.route.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/config_source.proto";
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/route/v4alpha/route_components.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -21,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 // * HTTP :ref:`router filter <config_http_filters_router>`
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.route.v3.RouteConfiguration";
@@ -120,6 +121,21 @@ message RouteConfiguration {
   //   is not subject to data plane buffering controls.
   //
   google.protobuf.UInt32Value max_direct_response_body_size_bytes = 11;
+
+  // [#not-implemented-hide:]
+  // A list of plugins and their configurations which may be used by a
+  // :ref:`envoy_v3_api_field_config.route.v3.RouteAction.cluster_specifier_plugin`
+  // within the route. All *extension.name* fields in this list must be unique.
+  repeated ClusterSpecifierPlugin cluster_specifier_plugins = 12;
+}
+
+// Configuration for a cluster specifier plugin.
+message ClusterSpecifierPlugin {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.route.v3.ClusterSpecifierPlugin";
+
+  // The name of the plugin and its opaque configuration.
+  core.v4alpha.TypedExtensionConfig extension = 1;
 }
 
 message Vhds {

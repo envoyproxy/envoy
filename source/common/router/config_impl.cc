@@ -299,7 +299,9 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
                           ? config.hidden_envoy_deprecated_enabled().value()
                           : true) {
   for (const auto& string_match : config.allow_origin_string_match()) {
-    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_match));
+    allow_origins_.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            string_match));
   }
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
@@ -826,6 +828,9 @@ absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHead
 
   if (host_end != absl::string_view::npos) {
     absl::string_view request_port = request_host.substr(host_end);
+    // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
+    // connection), do port stripping based on X-Forwarded-Proto so http://foo.com:80 won't
+    // have the port stripped when served over TLS.
     absl::string_view request_protocol = headers.getForwardedProtoValue();
     bool remove_port = !new_port.empty();
 
@@ -857,8 +862,9 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   } else if (https_redirect_) {
     final_scheme = Http::Headers::get().SchemeValues.Https;
   } else {
-    ASSERT(headers.ForwardedProto());
-    final_scheme = headers.getForwardedProtoValue();
+    // Serve the redirect URL based on the scheme of the original URL, not the
+    // security of the underlying connection.
+    final_scheme = Http::Utility::getScheme(headers);
   }
 
   if (!port_redirect_.empty()) {
@@ -1097,7 +1103,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
                                                        cluster.response_headers_to_remove())),
       per_filter_configs_(cluster.typed_per_filter_config(),
                           cluster.hidden_envoy_deprecated_per_filter_config(),
-                          optional_http_filters, factory_context, validator) {
+                          optional_http_filters, factory_context, validator),
+      host_rewrite_(cluster.host_rewrite_literal()) {
   if (cluster.has_metadata_match()) {
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -1423,18 +1430,21 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
                                                          const Http::RequestHeaderMap& headers,
                                                          const StreamInfo::StreamInfo& stream_info,
                                                          uint64_t random_value) const {
-  // No x-forwarded-proto header. This normally only happens when ActiveStream::decodeHeaders
-  // bails early (as it rejects a request), so there is no routing is going to happen anyway.
-  const auto* forwarded_proto_header = headers.ForwardedProto();
-  if (forwarded_proto_header == nullptr) {
+  // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
+  // connection), force a redirect based on underlying protocol, rather than URL
+  // scheme, so don't force a redirect for a http:// url served over a TLS
+  // connection.
+  const absl::string_view scheme = headers.getForwardedProtoValue();
+  if (scheme.empty()) {
+    // No scheme header. This normally only happens when ActiveStream::decodeHeaders
+    // bails early (as it rejects a request), or a buggy filter removes the :scheme header.
     return nullptr;
   }
 
   // First check for ssl redirect.
-  if (ssl_requirements_ == SslRequirements::All && forwarded_proto_header->value() != "https") {
+  if (ssl_requirements_ == SslRequirements::All && scheme != "https") {
     return SSL_REDIRECT_ROUTE;
-  } else if (ssl_requirements_ == SslRequirements::ExternalOnly &&
-             forwarded_proto_header->value() != "https" &&
+  } else if (ssl_requirements_ == SslRequirements::ExternalOnly && scheme != "https" &&
              !Http::HeaderUtility::isEnvoyInternalRequest(headers)) {
     return SSL_REDIRECT_ROUTE;
   }

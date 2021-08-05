@@ -8,7 +8,6 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
-#include "source/common/network/socket_interface_impl.h"
 #include "source/common/network/utility.h"
 
 #include "test/mocks/network/mocks.h"
@@ -24,18 +23,6 @@ using testing::Return;
 namespace Envoy {
 namespace Network {
 namespace {
-
-class MockSingleFamilySocketInterface : public SocketInterfaceImpl {
-public:
-  explicit MockSingleFamilySocketInterface(Address::IpVersion version) : version_(version) {}
-  MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, Address::Type, Address::IpVersion, bool),
-              (const));
-  MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, const Address::InstanceConstSharedPtr), (const));
-  bool ipFamilySupported(int domain) override {
-    return (version_ == Address::IpVersion::v4) ? domain == AF_INET : domain == AF_INET6;
-  }
-  const Address::IpVersion version_;
-};
 
 TEST(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
   absl::string_view serverName("www.EXAMPLE.com");
@@ -109,7 +96,7 @@ protected:
       // instead of if block.
       auto os_sys_calls = Api::OsSysCallsSingleton::get();
       if (NetworkSocketTrait<Type>::type == Socket::Type::Stream) {
-        EXPECT_EQ(0, socket1->listen(0).rc_);
+        EXPECT_EQ(0, socket1->listen(0).return_value_);
       }
 
       EXPECT_EQ(addr->ip()->port(), socket1->addressProvider().localAddress()->ip()->port());
@@ -131,8 +118,9 @@ protected:
       // Test createListenSocketPtr from IoHandlePtr's os_fd_t constructor
       int domain = version_ == Address::IpVersion::v4 ? AF_INET : AF_INET6;
       auto socket_result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
-      EXPECT_TRUE(SOCKET_VALID(socket_result.rc_));
-      Network::IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(socket_result.rc_);
+      EXPECT_TRUE(SOCKET_VALID(socket_result.return_value_));
+      Network::IoHandlePtr io_handle =
+          std::make_unique<IoSocketHandleImpl>(socket_result.return_value_);
       auto socket3 = createListenSocketPtr(std::move(io_handle), addr, nullptr);
       EXPECT_EQ(socket3->addressProvider().localAddress()->asString(), addr->asString());
 
@@ -198,7 +186,8 @@ TEST_P(ListenSocketImplTestTcp, CheckIpVersionWithNullLocalAddress) {
 }
 
 TEST_P(ListenSocketImplTestTcp, SupportedIpFamilyVirtualSocketIsCreatedWithNoBsdSocketCreated) {
-  auto mock_interface = std::make_unique<MockSingleFamilySocketInterface>(version_);
+  auto mock_interface =
+      std::make_unique<MockSocketInterface>(std::vector<Network::Address::IpVersion>{version_});
   auto* mock_interface_ptr = mock_interface.get();
   auto any_address = version_ == Address::IpVersion::v4 ? Utility::getIpv4AnyAddress()
                                                         : Utility::getIpv6AnyAddress();
@@ -214,7 +203,8 @@ TEST_P(ListenSocketImplTestTcp, SupportedIpFamilyVirtualSocketIsCreatedWithNoBsd
 }
 
 TEST_P(ListenSocketImplTestTcp, DeathAtUnSupportedIpFamilyListenSocket) {
-  auto mock_interface = std::make_unique<MockSingleFamilySocketInterface>(version_);
+  auto mock_interface =
+      std::make_unique<MockSocketInterface>(std::vector<Network::Address::IpVersion>{version_});
   auto* mock_interface_ptr = mock_interface.get();
   auto the_other_address = version_ == Address::IpVersion::v4 ? Utility::getIpv6AnyAddress()
                                                               : Utility::getIpv4AnyAddress();

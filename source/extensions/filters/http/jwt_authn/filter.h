@@ -49,6 +49,8 @@ private:
   FilterConfigSharedPtr config_;
   // Verify context for current request.
   ContextSharedPtr context_;
+
+  std::string original_uri_;
 };
 
 } // namespace JwtAuthn

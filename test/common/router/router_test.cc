@@ -4467,7 +4467,6 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
 TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   enableRedirects(3);
   setNumPreviousRedirect(2);
-  default_request_headers_.setForwardedProto("http");
   sendRequest();
 
   EXPECT_CALL(callbacks_, clearRouteCache());
@@ -4489,6 +4488,7 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   enableRedirects(3);
   setNumPreviousRedirect(1);
+  default_request_headers_.setScheme("https");
 
   sendRequest();
 
@@ -4508,6 +4508,7 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
 TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   enableRedirects();
+  default_request_headers_.setScheme("https");
 
   sendRequest();
 
@@ -5863,7 +5864,7 @@ TEST_F(RouterTest, ApplicationProtocols) {
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
       .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
                            Upstream::LoadBalancerContext* context) {
-        Network::TransportSocketOptionsSharedPtr transport_socket_options =
+        Network::TransportSocketOptionsConstSharedPtr transport_socket_options =
             context->upstreamTransportSocketOptions();
         EXPECT_NE(transport_socket_options, nullptr);
         EXPECT_FALSE(transport_socket_options->applicationProtocolListOverride().empty());

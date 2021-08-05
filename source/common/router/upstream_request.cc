@@ -62,6 +62,11 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   }
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
+      parent_.callbacks()->streamInfo().upstreamClusterInfo();
+  if (cluster_info.has_value()) {
+    stream_info_.setUpstreamClusterInfo(*cluster_info);
+  }
 }
 
 UpstreamRequest::~UpstreamRequest() {
@@ -234,7 +239,7 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!upstream_ || paused_for_connect_) {
     ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks(), data.length());
     if (!buffered_request_body_) {
-      buffered_request_body_ = parent_.callbacks()->dispatcher().getWatermarkFactory().create(
+      buffered_request_body_ = parent_.callbacks()->dispatcher().getWatermarkFactory().createBuffer(
           [this]() -> void { this->enableDataFromDownstreamForFlowControl(); },
           [this]() -> void { this->disableDataFromDownstreamForFlowControl(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });

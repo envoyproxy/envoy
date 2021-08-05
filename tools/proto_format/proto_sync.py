@@ -52,22 +52,31 @@ api_proto_package($fields)
 """)
 
 IGNORED_V2_PROTOS = [
+    "envoy/config/accesslog/v2",
+    "envoy/config/cluster/aggregate/v2alpha",
+    "envoy/config/cluster/redis",
+    "envoy/config/common/tap/v2alpha",
     "envoy/config/filter/dubbo/router/v2alpha1",
     "envoy/config/filter/http/adaptive_concurrency/v2alpha",
     "envoy/config/filter/http/aws_lambda/v2alpha",
     "envoy/config/filter/http/aws_request_signing/v2alpha",
     "envoy/config/filter/http/buffer/v2",
     "envoy/config/filter/http/cache/v2alpha",
+    "envoy/config/filter/http/compressor/v2",
     "envoy/config/filter/http/cors/v2",
     "envoy/config/filter/http/csrf/v2",
     "envoy/config/filter/http/dynamic_forward_proxy/v2alpha",
     "envoy/config/filter/http/dynamo/v2",
+    "envoy/config/filter/http/ext_authz/v2",
     "envoy/config/filter/http/fault/v2",
     "envoy/config/filter/http/grpc_http1_bridge/v2",
     "envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1",
     "envoy/config/filter/http/grpc_stats/v2alpha",
     "envoy/config/filter/http/grpc_web/v2",
+    "envoy/config/filter/http/gzip/v2",
     "envoy/config/filter/http/header_to_metadata/v2",
+    "envoy/config/filter/http/health_check/v2",
+    "envoy/config/filter/http/ip_tagging/v2",
     "envoy/config/filter/http/jwt_authn/v2alpha",
     "envoy/config/filter/http/lua/v2",
     "envoy/config/filter/http/on_demand/v2",
@@ -98,6 +107,18 @@ IGNORED_V2_PROTOS = [
     "envoy/config/filter/network/zookeeper_proxy/v1alpha1",
     "envoy/config/filter/thrift/rate_limit/v2alpha1",
     "envoy/config/filter/udp/udp_proxy/v2alpha",
+    "envoy/config/grpc_credential/v2alpha",
+    "envoy/config/ratelimit/v2",
+    "envoy/config/rbac/v2",
+    "envoy/config/retry/omit_host_metadata/v2",
+    "envoy/config/retry/previous_priorities",
+    "envoy/config/transport_socket/raw_buffer/v2",
+    "envoy/config/transport_socket/tap/v2alpha",
+    "envoy/data/cluster/v2alpha",
+    "envoy/data/dns/v2alpha",
+    "envoy/data/core/v2alpha",
+    "envoy/service/event_reporting/v2alpha",
+    "envoy/service/trace/v2",
 ]
 
 IMPORT_REGEX = re.compile('import "(.*)";')
@@ -251,6 +272,9 @@ def get_import_deps(proto_path):
                 # Special case handling for UDPA annotations.
                 if import_path.startswith('udpa/annotations/'):
                     imports.append('@com_github_cncf_udpa//udpa/annotations:pkg')
+                    continue
+                if import_path.startswith('xds/type/matcher/v3/'):
+                    imports.append('@com_github_cncf_udpa//xds/type/matcher/v3:pkg')
                     continue
                 # Special case handling for UDPA core.
                 if import_path.startswith('xds/core/v3/'):

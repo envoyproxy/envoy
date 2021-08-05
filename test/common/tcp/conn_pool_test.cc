@@ -25,6 +25,7 @@
 
 using testing::_;
 using testing::AnyNumber;
+using testing::AtLeast;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
@@ -56,10 +57,11 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
     conn_data_ = std::move(conn);
     conn_data_->addUpstreamCallbacks(callbacks_);
     host_ = host;
+    ssl_ = conn_data_->connection().streamInfo().downstreamSslConnection();
     pool_ready_.ready();
   }
 
-  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                      Upstream::HostDescriptionConstSharedPtr host) override {
     reason_ = reason;
     host_ = host;
@@ -72,6 +74,7 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
   ConnectionPool::ConnectionDataPtr conn_data_{};
   absl::optional<ConnectionPool::PoolFailureReason> reason_;
   Upstream::HostDescriptionConstSharedPtr host_;
+  Ssl::ConnectionInfoConstSharedPtr ssl_;
 };
 
 class TestActiveTcpClient : public ActiveTcpClient {
@@ -99,10 +102,12 @@ public:
   ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb,
                Network::ConnectionSocket::OptionsSharedPtr options,
-               Network::TransportSocketOptionsSharedPtr transport_socket_options,
+               Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                bool test_new_connection_pool);
 
-  void addDrainedCallback(DrainedCb cb) override { conn_pool_->addDrainedCallback(cb); }
+  void addIdleCallback(IdleCb cb) override { conn_pool_->addIdleCallback(cb); }
+  bool isIdle() const override { return conn_pool_->isIdle(); }
+  void startDrain() override { return conn_pool_->startDrain(); }
   void drainConnections() override { conn_pool_->drainConnections(); }
   void closeConnections() override { conn_pool_->closeConnections(); }
   ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
@@ -152,17 +157,18 @@ public:
   Event::MockDispatcher& mock_dispatcher_;
   NiceMock<Event::MockSchedulableCallback>* mock_upstream_ready_cb_;
   std::vector<TestConnection> test_conns_;
+  Upstream::HostSharedPtr host_;
   Network::ConnectionCallbacks* callbacks_ = nullptr;
   bool test_new_connection_pool_;
   Network::ConnectionSocket::OptionsSharedPtr options_;
-  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 
 protected:
   class ConnPoolImplForTest : public ConnPoolImpl {
   public:
     ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                         Network::ConnectionSocket::OptionsSharedPtr options,
-                        Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                        Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                         ConnPoolBase& parent)
         : ConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, options,
                        transport_socket_options, state_),
@@ -187,10 +193,11 @@ protected:
 
   class OriginalConnPoolImplForTest : public OriginalConnPoolImpl {
   public:
-    OriginalConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
-                                Network::ConnectionSocket::OptionsSharedPtr options,
-                                Network::TransportSocketOptionsSharedPtr transport_socket_options,
-                                ConnPoolBase& parent)
+    OriginalConnPoolImplForTest(
+        Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
+        Network::ConnectionSocket::OptionsSharedPtr options,
+        Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+        ConnPoolBase& parent)
         : OriginalConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, options,
                                transport_socket_options),
           parent_(parent) {}
@@ -229,7 +236,7 @@ protected:
 ConnPoolBase::ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                            NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb,
                            Network::ConnectionSocket::OptionsSharedPtr options,
-                           Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                           Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                            bool test_new_connection_pool)
     : mock_dispatcher_(dispatcher), mock_upstream_ready_cb_(upstream_ready_cb),
       test_new_connection_pool_(test_new_connection_pool), options_(options),
@@ -285,7 +292,7 @@ public:
   NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   Upstream::HostSharedPtr host_;
   Network::ConnectionSocket::OptionsSharedPtr options_;
-  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   std::unique_ptr<ConnPoolBase> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
@@ -320,7 +327,7 @@ public:
     EXPECT_CALL(*connection_, connect());
     EXPECT_CALL(*connection_, setConnectionStats(_));
     EXPECT_CALL(*connection_, noDelay(true));
-    EXPECT_CALL(*connection_, streamInfo()).Times(2);
+    EXPECT_CALL(*connection_, streamInfo()).Times(3);
     EXPECT_CALL(*connection_, id()).Times(AnyNumber());
     EXPECT_CALL(*connection_, readDisable(_)).Times(AnyNumber());
 
@@ -337,6 +344,7 @@ public:
     EXPECT_CALL(*connection_, ssl()).WillOnce(Return(ssl_));
     connection_->raiseEvent(Network::ConnectionEvent::Connected);
     EXPECT_EQ(connection_->streamInfo().downstreamSslConnection(), ssl_);
+    EXPECT_EQ(callbacks_->ssl_, ssl_);
   }
 
   bool test_new_connection_pool_;
@@ -969,16 +977,16 @@ TEST_P(TcpConnPoolImplTest, ConnectionStateWithConcurrentConnections) {
 TEST_P(TcpConnPoolImplTest, DrainCallback) {
   initialize();
   ReadyWatcher drained;
-
   EXPECT_CALL(drained, ready());
-  conn_pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  conn_pool_->startDrain();
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
   ActiveTestConn c2(*this, 0, ActiveTestConn::Type::Pending);
   c2.handle_->cancel(ConnectionPool::CancelPolicy::Default);
 
   EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
-  EXPECT_CALL(drained, ready());
+  EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   c1.releaseConn();
 
   EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
@@ -998,11 +1006,13 @@ TEST_P(TcpConnPoolImplTest, DrainWhileConnecting) {
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_->newConnection(callbacks);
   EXPECT_NE(nullptr, handle);
 
-  conn_pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  conn_pool_->startDrain();
+
   if (test_new_connection_pool_) {
     // The shared connection pool removes and closes connecting clients if there are no
     // pending requests.
-    EXPECT_CALL(drained, ready());
+    EXPECT_CALL(drained, ready()).Times(AtLeast(1));
     handle->cancel(ConnectionPool::CancelPolicy::Default);
   } else {
     handle->cancel(ConnectionPool::CancelPolicy::Default);
@@ -1022,11 +1032,12 @@ TEST_P(TcpConnPoolImplTest, DrainOnClose) {
   initialize();
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready());
-  conn_pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  conn_pool_->startDrain();
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
 
-  EXPECT_CALL(drained, ready());
+  EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   EXPECT_CALL(c1.callbacks_.callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
         EXPECT_EQ(Network::ConnectionEvent::RemoteClose, event);
@@ -1105,6 +1116,25 @@ TEST_P(TcpConnPoolImplTest, RequestCapacity) {
   conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   conn_pool_->test_conns_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   conn_pool_->test_conns_[2].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Test that connections that are closed due to idle timeout causes the idle callback to be fired.
+TEST_P(TcpConnPoolImplTest, TestIdleTimeout) {
+  initialize();
+  testing::MockFunction<void()> idle_callback;
+  conn_pool_->addIdleCallback(idle_callback.AsStdFunction());
+
+  EXPECT_CALL(idle_callback, Call());
+  ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
+  EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
+  c1.releaseConn();
+  conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  testing::MockFunction<void()> drained_callback;
+  EXPECT_CALL(idle_callback, Call());
+  conn_pool_->startDrain();
+  EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
+  dispatcher_.clearDeferredDeleteList();
 }
 
 // Test that maybePreconnect is passed up to the base class implementation.

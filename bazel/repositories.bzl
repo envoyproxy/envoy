@@ -175,6 +175,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
     external_http_archive("rules_cc")
+    external_http_archive("rules_pkg")
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
@@ -877,6 +878,11 @@ def _com_github_google_jwt_verify():
     native.bind(
         name = "jwt_verify_lib",
         actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
+    )
+
+    native.bind(
+        name = "simple_lru_cache_lib",
+        actual = "@com_github_google_jwt_verify//:simple_lru_cache_lib",
     )
 
 def _com_github_luajit_luajit():

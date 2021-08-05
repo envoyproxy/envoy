@@ -386,8 +386,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
 
-  const std::string new_path =
-      absl::StrCat(headers.ForwardedProto()->value().getStringView(), "://", host_, "/");
+  const std::string new_path = absl::StrCat(Http::Utility::getScheme(headers), "://", host_, "/");
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutCookieValue);
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutBearerTokenValue);
   response_headers->setLocation(new_path);

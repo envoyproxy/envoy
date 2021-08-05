@@ -16,6 +16,7 @@
 #include "source/common/grpc/common.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -34,23 +35,6 @@ static std::string buildResponseCode(const StreamInfo::StreamInfo& info) {
 static absl::string_view valueOrDefault(const Http::HeaderEntry* header,
                                         const char* default_value) {
   return header ? header->value().getStringView() : default_value;
-}
-
-static std::string buildUrl(const Http::RequestHeaderMap& request_headers,
-                            const uint32_t max_path_length) {
-  if (!request_headers.Path()) {
-    return "";
-  }
-  absl::string_view path(request_headers.EnvoyOriginalPath()
-                             ? request_headers.getEnvoyOriginalPathValue()
-                             : request_headers.getPathValue());
-
-  if (path.length() > max_path_length) {
-    path = path.substr(0, max_path_length);
-  }
-
-  return absl::StrCat(request_headers.getForwardedProtoValue(), "://",
-                      request_headers.getHostValue(), path);
 }
 
 const std::string HttpTracerUtility::IngressOperation = "ingress";
@@ -159,8 +143,9 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
     if (request_headers->RequestId()) {
       span.setTag(Tracing::Tags::get().GuidXRequestId, request_headers->getRequestIdValue());
     }
-    span.setTag(Tracing::Tags::get().HttpUrl,
-                buildUrl(*request_headers, tracing_config.maxPathTagLength()));
+    span.setTag(
+        Tracing::Tags::get().HttpUrl,
+        Http::Utility::buildOriginalUri(*request_headers, tracing_config.maxPathTagLength()));
     span.setTag(Tracing::Tags::get().HttpMethod, request_headers->getMethodValue());
     span.setTag(Tracing::Tags::get().DownstreamCluster,
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
@@ -317,12 +302,12 @@ RequestHeaderCustomTag::RequestHeaderCustomTag(
       default_value_(request_header.default_value()) {}
 
 absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) const {
-  if (!ctx.request_headers) {
+  if (ctx.trace_context == nullptr) {
     return default_value_;
   }
   // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
-  const auto entry = ctx.request_headers->get(name_);
-  return !entry.empty() ? entry[0]->value().getStringView() : default_value_;
+  const auto entry = ctx.trace_context->getTraceContext(name_);
+  return entry.value_or(default_value_);
 }
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,

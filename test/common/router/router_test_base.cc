@@ -219,7 +219,7 @@ void RouterTestBase::sendRequest(bool end_stream) {
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
-  HttpTestUtility::addDefaultHeaders(default_request_headers_);
+  HttpTestUtility::addDefaultHeaders(default_request_headers_, false);
   router_.decodeHeaders(default_request_headers_, end_stream);
 }
 

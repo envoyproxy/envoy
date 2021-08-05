@@ -23,7 +23,7 @@ public:
     ON_CALL(Const(cb_), dynamicMetadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
 
-  void fuzz(Network::ListenerFilter& filter,
+  void fuzz(Network::ListenerFilterPtr filter,
             const test::extensions::filters::listener::FilterFuzzTestCase& input);
 
 private:

@@ -30,6 +30,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/common/common:matchers_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:version_converter_lib",
         "//source/common/protobuf:utility_lib",
@@ -308,6 +309,16 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "http_conn_pool_integration_test",
+    srcs = ["http_conn_pool_integration_test.cc"],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 
@@ -625,6 +636,7 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
         "//test/integration/filters:backpressure_filter_config_lib",
+        "//test/integration/filters:reset_idle_timer_filter_lib",
         "//test/test_common:test_time_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -802,6 +814,7 @@ envoy_cc_test_library(
         "//source/common/http/http3:quic_client_connection_factory_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
+        "//source/common/quic:quic_stat_names_lib",
         "//source/common/stats:allocator_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/thread_local:thread_local_lib",

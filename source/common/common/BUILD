@@ -6,6 +6,7 @@ load(
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
     "envoy_package",
+    "envoy_pch_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -300,6 +301,7 @@ envoy_cc_library(
         "//envoy/common:regex_interface",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
         "@com_googlesource_code_re2//:re2",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
@@ -414,10 +416,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "callback_impl_lib",
+    srcs = ["callback_impl.cc"],
     hdrs = ["callback_impl.h"],
     deps = [
         ":assert_lib",
+        ":lock_guard_lib",
+        ":thread_lib",
         "//envoy/common:callback",
+        "//source/common/event:dispatcher_lib",
     ],
 )
 
@@ -467,5 +473,32 @@ envoy_cc_library(
     hdrs = ["statusor.h"],
     deps = [
         "@com_google_absl//absl/status:statusor",
+    ],
+)
+
+envoy_pch_library(
+    name = "common_pch",
+    external_deps = [
+        "spdlog",
+    ],
+    includes = [
+        "envoy/config/bootstrap/v3/bootstrap.pb.h",
+        "envoy/config/cluster/v3/cluster.pb.h",
+        "envoy/config/core/v3/base.pb.h",
+        "envoy/config/core/v3/config_source.pb.h",
+        "envoy/config/route/v3/route_components.pb.h",
+        "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h",
+        "envoy/service/discovery/v3/discovery.pb.h",
+        "spdlog/sinks/android_sink.h",
+        "spdlog/spdlog.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

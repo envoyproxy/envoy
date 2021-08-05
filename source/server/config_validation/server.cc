@@ -53,7 +53,8 @@ ValidationInstance::ValidationInstance(
                           store),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
       http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
-      time_system_(time_system), server_contexts_(*this) {
+      time_system_(time_system), server_contexts_(*this),
+      quic_stat_names_(stats_store_.symbolTable()) {
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {
@@ -91,9 +92,11 @@ void ValidationInstance::initialize(const Options& options,
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       dispatcher(), stats(), threadLocal(), bootstrap.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
-  Configuration::InitialImpl initial_config(bootstrap, options, *this);
+  Configuration::InitialImpl initial_config(bootstrap, options);
+  initial_config.initAdminAccessLog(bootstrap, *this);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
+  listener_manager_ =
+      std::make_unique<ListenerManagerImpl>(*this, *this, *this, false, quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
@@ -102,7 +105,8 @@ void ValidationInstance::initialize(const Options& options,
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), dnsResolver(), sslContextManager(), dispatcher(),
       localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
-      grpc_context_, router_context_, accessLogManager(), singletonManager(), options);
+      grpc_context_, router_context_, accessLogManager(), singletonManager(), options,
+      quic_stat_names_);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });

@@ -396,6 +396,24 @@ bool sanitizeConnectionHeader(Http::RequestHeaderMap& headers);
 const std::string& getProtocolString(const Protocol p);
 
 /**
+ * Return the scheme of the request.
+ * For legacy code (envoy.reloadable_features.correct_scheme_and_xfp == false) this
+ * will be the value of the X-Forwarded-Proto header value. By default it will
+ * return the scheme if present, otherwise the value of X-Forwarded-Proto if
+ * present.
+ */
+absl::string_view getScheme(const RequestHeaderMap& headers);
+
+/**
+ * Constructs the original URI sent from the client from
+ * the request headers.
+ * @param request headers from the original request
+ * @param length to truncate the constructed URI's path
+ */
+std::string buildOriginalUri(const Http::RequestHeaderMap& request_headers,
+                             absl::optional<uint32_t> max_path_length);
+
+/**
  * Extract host and path from a URI. The host may contain port.
  * This function doesn't validate if the URI is valid. It only parses the URI with following
  * format: scheme://host/path.

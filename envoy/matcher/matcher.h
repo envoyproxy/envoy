@@ -16,7 +16,7 @@ namespace Envoy {
 
 namespace Server {
 namespace Configuration {
-class FactoryContext;
+class ServerFactoryContext;
 }
 } // namespace Server
 
@@ -156,7 +156,7 @@ class InputMatcherFactory : public Config::TypedFactory {
 public:
   virtual InputMatcherFactoryCb
   createInputMatcherFactoryCb(const Protobuf::Message& config,
-                              ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+                              Server::Configuration::ServerFactoryContext& factory_context) PURE;
 
   std::string category() const override { return "envoy.matching.input_matchers"; }
 };

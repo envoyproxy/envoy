@@ -14,11 +14,12 @@ public:
     return std::make_unique<envoy::extensions::quic::crypto_stream::v3::CryptoServerStreamConfig>();
   }
   std::string name() const override { return "envoy.quic.crypto_stream.server.quiche"; }
-  std::unique_ptr<quic::QuicCryptoServerStreamBase>
-  createEnvoyQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
-                                    quic::QuicCompressedCertsCache* compressed_certs_cache,
-                                    quic::QuicSession* session,
-                                    quic::QuicCryptoServerStreamBase::Helper* helper) override;
+  std::unique_ptr<quic::QuicCryptoServerStreamBase> createEnvoyQuicCryptoServerStream(
+      const quic::QuicCryptoServerConfig* crypto_config,
+      quic::QuicCompressedCertsCache* compressed_certs_cache, quic::QuicSession* session,
+      quic::QuicCryptoServerStreamBase::Helper* helper,
+      OptRef<const Network::TransportSocketFactory> transport_socket_factory,
+      Envoy::Event::Dispatcher& dispatcher) override;
 };
 
 DECLARE_FACTORY(EnvoyQuicCryptoServerStreamFactoryImpl);

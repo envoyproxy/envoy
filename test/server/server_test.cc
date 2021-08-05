@@ -334,6 +334,98 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// The finalize() of Http::CustomInlineHeaderRegistry will be called When InstanceImpl is
+// instantiated. For this reason, the test case for inline headers must precede all other test
+// cases.
+
+// Test the case where inline headers contain names that cannot be registered as inline headers.
+TEST_P(ServerInstanceImplTest, WithErrorCustomInlineHeaders) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/bootstrap_inline_headers_error.yaml"),
+      EnvoyException, "Header set-cookie cannot be registered as an inline header.");
+}
+
+TEST_P(ServerInstanceImplTest, WithDeathCustomInlineHeaders) {
+#if !defined(NDEBUG)
+  // The finalize() of Http::CustomInlineHeaderRegistry will be called after the first successful
+  // instantiation of InstanceImpl. If InstanceImpl is instantiated again and the inline header is
+  // registered again, the assertion will be triggered.
+  EXPECT_DEATH(
+      {
+        initialize("test/server/test_data/server/bootstrap_inline_headers.yaml");
+        initialize("test/server/test_data/server/bootstrap_inline_headers.yaml");
+      },
+      "");
+#endif // !defined(NDEBUG)
+}
+
+// Test whether the custom inline headers can be registered correctly.
+TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
+  static bool is_registered = false;
+
+  if (!is_registered) {
+    // Avoid repeated registration of custom inline headers in the current process after the
+    // finalize() of Http::CustomInlineHeaderRegistry has already been called.
+    EXPECT_NO_THROW(initialize("test/server/test_data/server/bootstrap_inline_headers.yaml"));
+    is_registered = true;
+  }
+
+  EXPECT_TRUE(
+      Http::CustomInlineHeaderRegistry::getInlineHeader<Http::RequestHeaderMap::header_map_type>(
+          Http::LowerCaseString("test1"))
+          .has_value());
+  EXPECT_TRUE(
+      Http::CustomInlineHeaderRegistry::getInlineHeader<Http::RequestTrailerMap::header_map_type>(
+          Http::LowerCaseString("test2"))
+          .has_value());
+  EXPECT_TRUE(
+      Http::CustomInlineHeaderRegistry::getInlineHeader<Http::ResponseHeaderMap::header_map_type>(
+          Http::LowerCaseString("test3"))
+          .has_value());
+  EXPECT_TRUE(
+      Http::CustomInlineHeaderRegistry::getInlineHeader<Http::ResponseTrailerMap::header_map_type>(
+          Http::LowerCaseString("test4"))
+          .has_value());
+
+  {
+    Http::TestRequestHeaderMapImpl headers{
+        {"test1", "test1_value1"},
+        {"test1", "test1_value2"},
+        {"test3", "test3_value1"},
+        {"test3", "test3_value2"},
+    };
+
+    // 'test1' is registered as the inline request header.
+    auto test1_headers = headers.get(Http::LowerCaseString("test1"));
+    EXPECT_EQ(1, test1_headers.size());
+    EXPECT_EQ("test1_value1,test1_value2", headers.get_("test1"));
+
+    // 'test3' is not registered as an inline request header.
+    auto test3_headers = headers.get(Http::LowerCaseString("test3"));
+    EXPECT_EQ(2, test3_headers.size());
+    EXPECT_EQ("test3_value1", headers.get_("test3"));
+  }
+
+  {
+    Http::TestResponseHeaderMapImpl headers{
+        {"test1", "test1_value1"},
+        {"test1", "test1_value2"},
+        {"test3", "test3_value1"},
+        {"test3", "test3_value2"},
+    };
+
+    // 'test1' is not registered as the inline response header.
+    auto test1_headers = headers.get(Http::LowerCaseString("test1"));
+    EXPECT_EQ(2, test1_headers.size());
+    EXPECT_EQ("test1_value1", headers.get_("test1"));
+
+    // 'test3' is registered as an inline response header.
+    auto test3_headers = headers.get(Http::LowerCaseString("test3"));
+    EXPECT_EQ(1, test3_headers.size());
+    EXPECT_EQ("test3_value1,test3_value2", headers.get_("test3"));
+  }
+}
+
 // Validates that server stats are flushed even when server is stuck with initialization.
 TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   CustomStatsSinkFactory factory;
@@ -347,6 +439,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.state")->value());
   EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
 
+  EXPECT_TRUE(server_->enableReusePortDefault());
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
 }
@@ -1135,6 +1228,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
+  EXPECT_FALSE(server_->enableReusePortDefault());
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo").value().get());
   // This should access via the override/some_service overlay.
   EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz").value().get());
@@ -1269,7 +1363,7 @@ void bindAndListenTcpSocket(const Network::Address::InstanceConstSharedPtr& addr
   auto socket = std::make_unique<Network::TcpListenSocket>(address, options, true);
   // Some kernels erroneously allow `bind` without SO_REUSEPORT for addresses
   // with some other socket already listening on it, see #7636.
-  if (SOCKET_FAILURE(socket->ioHandle().listen(1).rc_)) {
+  if (SOCKET_FAILURE(socket->ioHandle().listen(1).return_value_)) {
     // Mimic bind exception for the test simplicity.
     throw Network::SocketBindException(fmt::format("cannot listen: {}", errorDetails(errno)),
                                        errno);
@@ -1716,6 +1810,12 @@ TEST_P(ServerInstanceImplTest, NullProcessContextTest) {
   initialize("test/server/test_data/server/empty_bootstrap.yaml");
   ProcessContextOptRef context = server_->processContext();
   EXPECT_FALSE(context.has_value());
+}
+
+TEST_P(ServerInstanceImplTest, AdminAccessLogFilter) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/access_log_filter_bootstrap.yaml"));
 }
 
 } // namespace

@@ -28,7 +28,8 @@ public:
   static ConstSupportedBuckets& defaultBuckets();
 
 private:
-  using Config = std::pair<Matchers::StringMatcherImpl, ConstSupportedBuckets>;
+  using Config = std::pair<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>,
+                           ConstSupportedBuckets>;
   const std::vector<Config> configs_{};
 };
 
