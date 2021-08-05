@@ -10,7 +10,24 @@ load("@rules_proto_grpc//java:repositories.bzl", rules_proto_grpc_java_repos = "
 load("@rules_python//python:pip.bzl", "pip_install")
 load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
 
+def _default_extra_swift_sources_impl(ctx):
+    ctx.file("WORKSPACE", "")
+    ctx.file("empty.swift", "")
+    ctx.file("BUILD.bazel", """
+filegroup(
+    name = "extra_swift_srcs",
+    srcs = ["empty.swift"],
+    visibility = ["//visibility:public"],
+)""")
+
+_default_extra_swift_sources = repository_rule(
+    implementation = _default_extra_swift_sources_impl,
+)
+
 def envoy_mobile_dependencies():
+    if not native.existing_rule("envoy_mobile_extra_swift_sources"):
+        _default_extra_swift_sources(name = "envoy_mobile_extra_swift_sources")
+
     swift_dependencies()
     kotlin_dependencies()
     python_dependencies()
