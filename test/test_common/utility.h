@@ -870,7 +870,17 @@ public:
       context_map_[value.first] = value.second;
     }
   }
-
+  absl::string_view contextProtocol() const override { return context_protocol_; }
+  absl::string_view contextAuthority() const override { return context_authority_; }
+  absl::string_view contextPath() const override { return context_path_; }
+  absl::string_view contextMethod() const override { return context_method_; }
+  void iterateContext(IterateCallback callback) const override {
+    for (const auto& pair : context_map_) {
+      if (!callback(pair.first, pair.second)) {
+        break;
+      }
+    }
+  }
   absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override {
     auto iter = context_map_.find(key);
     if (iter == context_map_.end()) {
@@ -878,11 +888,14 @@ public:
     }
     return iter->second;
   }
-
   void setTraceContext(absl::string_view key, absl::string_view val) override {
     context_map_.insert({std::string(key), std::string(val)});
   }
 
+  std::string context_protocol_;
+  std::string context_authority_;
+  std::string context_path_;
+  std::string context_method_;
   absl::flat_hash_map<std::string, std::string> context_map_;
 };
 
@@ -1102,6 +1115,20 @@ public:
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 
+  // Tracing::TraceContext
+  absl::string_view contextProtocol() const override { return header_map_->getProtocolValue(); }
+  absl::string_view contextAuthority() const override { return header_map_->getHostValue(); }
+  absl::string_view contextPath() const override { return header_map_->getPathValue(); }
+  absl::string_view contextMethod() const override { return header_map_->getMethodValue(); }
+  void iterateContext(IterateCallback callback) const override {
+    ASSERT(header_map_);
+    header_map_->iterate([cb = std::move(callback)](const HeaderEntry& entry) {
+      if (cb(entry.key().getStringView(), entry.value().getStringView())) {
+        return HeaderMap::Iterate::Continue;
+      }
+      return HeaderMap::Iterate::Break;
+    });
+  }
   absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override {
     ASSERT(header_map_);
     return header_map_->getTraceContext(key);
@@ -1110,12 +1137,10 @@ public:
     ASSERT(header_map_);
     header_map_->setTraceContext(key, value);
   }
-
   void setTraceContextReferenceKey(absl::string_view key, absl::string_view val) override {
     ASSERT(header_map_);
     header_map_->setTraceContextReferenceKey(key, val);
   }
-
   void setTraceContextReference(absl::string_view key, absl::string_view val) override {
     ASSERT(header_map_);
     header_map_->setTraceContextReference(key, val);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -14,14 +15,50 @@ namespace Tracing {
  * Protocol-independent abstraction for traceable stream. It hides the differences between different
  * protocol and provides tracer driver with common methods for obtaining and setting the tracing
  * context.
- *
- * TODO(wbpcode): A new interface should be added to obtain general traceable stream information,
- * such as host, RPC method, protocol identification, etc. At the same time, a new interface needs
- * to be added to support traversal of all trace contexts.
  */
 class TraceContext {
 public:
   virtual ~TraceContext() = default;
+
+  using IterateCallback = std::function<bool(absl::string_view key, absl::string_view val)>;
+
+  /**
+   * Get context protocol.
+   *
+   * @return A string view representing the protocol of the traceable stream behind the context.
+   */
+  virtual absl::string_view contextProtocol() const PURE;
+
+  /**
+   * Get context authority.
+   *
+   * @return The authority of traceable stream. It generally consists of the host and an optional
+   * user information and an optional port.
+   */
+  virtual absl::string_view contextAuthority() const PURE;
+
+  /**
+   * Get context path.
+   *
+   * @return The path of traceable stream. The content and meaning of path are determined by
+   * specific protocol itself.
+   */
+  virtual absl::string_view contextPath() const PURE;
+
+  /**
+   * Get context method.
+   *
+   * @return The method of traceable stream. The content and meaning of method are determined by
+   * specific protocol itself.
+   */
+  virtual absl::string_view contextMethod() const PURE;
+
+  /**
+   * Iterate over all context entry.
+   *
+   * @param callback supplies the iteration callback.
+   */
+  virtual void iterateContext(IterateCallback callback) const PURE;
 
   /**
    * Get tracing context value by key.

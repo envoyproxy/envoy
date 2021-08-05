@@ -66,34 +66,18 @@ public:
   }
 
   opentracing::expected<void> ForeachKey(OpenTracingCb f) const override {
-    // TODO(wbpcode): TraceContext currently does not provide an API to traverse all entries. So
-    // dynamic_cast has to be used here. This is a temporary compromise to ensure that the existing
-    // functions are correct. After TraceContext provides the iterative API, this part of the code
-    // needs to be rewritten.
-    const auto headers = dynamic_cast<const Http::RequestHeaderMap*>(&trace_context_);
-    if (headers != nullptr) {
-      headers->iterate(headerMapCallback(f));
-    }
+    trace_context_.iterateContext(
+        [cb = std::move(f)](absl::string_view key, absl::string_view val) {
+          opentracing::string_view opentracing_key{key.data(), key.length()};
+          opentracing::string_view opentracing_val{val.data(), val.length()};
+          cb(opentracing_key, opentracing_val);
+          return true;
+        });
     return {};
   }
 
 private:
   const Tracing::TraceContext& trace_context_;
-
-  static Http::HeaderMap::ConstIterateCb headerMapCallback(OpenTracingCb callback) {
-    return [callback =
-                std::move(callback)](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-      opentracing::string_view key{header.key().getStringView().data(),
-                                   header.key().getStringView().length()};
-      opentracing::string_view value{header.value().getStringView().data(),
-                                     header.value().getStringView().length()};
-      if (callback(key, value)) {
-        return Http::HeaderMap::Iterate::Continue;
-      } else {
-        return Http::HeaderMap::Iterate::Break;
-      }
-    };
-  }
 };
 } // namespace
 

@@ -658,6 +658,23 @@ HeaderMapImplUtility::getAllHeaderMapImplInfo() {
   return ret;
 }
 
+absl::string_view RequestHeaderMapImpl::contextProtocol() const { return getProtocolValue(); }
+
+absl::string_view RequestHeaderMapImpl::contextAuthority() const { return getHostValue(); }
+
+absl::string_view RequestHeaderMapImpl::contextPath() const { return getPathValue(); }
+
+absl::string_view RequestHeaderMapImpl::contextMethod() const { return getMethodValue(); }
+
+void RequestHeaderMapImpl::iterateContext(Tracing::TraceContext::IterateCallback callback) const {
+  HeaderMapImpl::iterate([cb = std::move(callback)](const HeaderEntry& entry) {
+    if (cb(entry.key().getStringView(), entry.value().getStringView())) {
+      return HeaderMap::Iterate::Continue;
+    }
+    return HeaderMap::Iterate::Break;
+  });
+}
+
 absl::optional<absl::string_view>
 RequestHeaderMapImpl::getTraceContext(absl::string_view key) const {
   ASSERT(validatedLowerCaseString(key));

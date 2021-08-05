@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <memory>
 #include <string>
 
@@ -1371,6 +1372,43 @@ TEST_P(HeaderMapImplTest, ValidHeaderString) {
 }
 
 TEST_P(HeaderMapImplTest, HttpTraceContextTest) {
+  {
+    TestRequestHeaderMapImpl request_headers;
+
+    // Protocol.
+    EXPECT_EQ(request_headers.contextProtocol(), "");
+    request_headers.addCopy(Http::Headers::get().Protocol, "HTTP/x");
+    EXPECT_EQ(request_headers.contextProtocol(), "HTTP/x");
+
+    // Authority.
+    EXPECT_EQ(request_headers.contextAuthority(), "");
+    request_headers.addCopy(Http::Headers::get().Host, "test.com:233");
+    EXPECT_EQ(request_headers.contextAuthority(), "test.com:233");
+
+    // Path.
+    EXPECT_EQ(request_headers.contextPath(), "");
+    request_headers.addCopy(Http::Headers::get().Path, "/anything");
+    EXPECT_EQ(request_headers.contextPath(), "/anything");
+
+    // Method.
+    EXPECT_EQ(request_headers.contextMethod(), "");
+    request_headers.addCopy(Http::Headers::get().Method, Http::Headers::get().MethodValues.Options);
+    EXPECT_EQ(request_headers.contextMethod(), Http::Headers::get().MethodValues.Options);
+  }
+
+  {
+    size_t size = 0;
+    TestRequestHeaderMapImpl request_headers{{"host", "foo"}, {"bar", "var"}, {"ok", "no"}};
+    request_headers.iterateContext([&size](absl::string_view key, absl::string_view val) {
+      size += key.size();
+      size += val.size();
+      return true;
+    });
+    // 'host' will be converted to ':authority'.
+    EXPECT_EQ(23, size);
+    EXPECT_EQ(23, request_headers.byteSize());
+  }
+
   {
     TestRequestHeaderMapImpl request_headers{{"host", "foo"}};
     EXPECT_EQ(request_headers.getTraceContext("host").value(), "foo");

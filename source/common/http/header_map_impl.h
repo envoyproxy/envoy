@@ -484,6 +484,11 @@ public:
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
 
   // Tracing::TraceContext
+  absl::string_view contextProtocol() const override;
+  absl::string_view contextAuthority() const override;
+  absl::string_view contextPath() const override;
+  absl::string_view contextMethod() const override;
+  void iterateContext(Tracing::TraceContext::IterateCallback callback) const override;
   absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override;
   void setTraceContext(absl::string_view key, absl::string_view val) override;
   void setTraceContextReferenceKey(absl::string_view key, absl::string_view val) override;
