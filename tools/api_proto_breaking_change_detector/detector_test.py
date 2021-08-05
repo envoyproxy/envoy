@@ -10,11 +10,29 @@ and ensure that tool behavior is consistent across dependency updates.
 from pathlib import Path
 import unittest
 
-from detector import BufWrapper
+from detector import ProtoBreakingChangeDetector, BufWrapper
+from detector_errors import ChangeDetectorInitializeError
+
+import tempfile
+from rules_python.python.runfiles import runfiles
+from tools.run_command import run_command
+from shutil import copyfile
+import os
+from buf_utils import make_lock, pull_buf_deps
+from typing import Tuple
 
 
 class BreakingChangeDetectorTests(object):
-    detector_type = None
+
+    def initialize_test(self, testname, current_file, changed_file, additional_args=None):
+        pass
+
+    def create_detector(
+            self,
+            lock_location,
+            changed_directory,
+            additional_args=None) -> ProtoBreakingChangeDetector:
+        pass
 
     def run_detector_test(self, testname, is_breaking, expects_changes, additional_args=None):
         """Runs a test case for an arbitrary breaking change detector type"""
@@ -25,8 +43,14 @@ class BreakingChangeDetectorTests(object):
         current = Path(tests_path, f"{testname}_current")
         changed = Path(tests_path, f"{testname}_next")
 
-        detector_obj = self.detector_type(current, changed, additional_args)
-        detector_obj.run_detector()
+        # buf requires protobuf files to be in a subdirectory of the yaml file
+        with tempfile.TemporaryDirectory(prefix=str(Path(".").absolute()) + os.sep) as temp_dir:
+            lock_location, changed_dir = self.initialize_test(
+                testname, temp_dir, current, changed, additional_args)
+
+            detector_obj = self.create_detector(lock_location, changed_dir, additional_args)
+            detector_obj.run_detector()
+            detector_obj.update_lock_file()
 
         breaking_response = detector_obj.is_breaking()
         self.assertEqual(breaking_response, is_breaking)
@@ -93,7 +117,43 @@ class TestAllowedChanges(BreakingChangeDetectorTests):
 
 
 class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
-    detector_type = BufWrapper
+    _config_file_loc = Path(".", "buf.yaml")
+    _buf_path = runfiles.Create().Rlocation("com_github_bufbuild_buf/bin/buf")
+    _buf_state_file = "tmp.json"
+
+    def initialize_test(
+            self, testname, target_path, current_file, changed_file, additional_args=None):
+        target = Path(target_path, f"{testname}.proto")
+        copyfile(current_file, target)
+        lock_location = Path(target_path, self._buf_state_file)
+
+        bazel_buf_config_loc = Path(".", "external", "envoy_api_canonical", "buf.yaml")
+        copyfile(bazel_buf_config_loc, self._config_file_loc)
+
+        pull_buf_deps(
+            self._buf_path,
+            target_path,
+            config_file_loc=self._config_file_loc,
+            additional_args=additional_args)
+
+        make_lock(
+            self._buf_path,
+            target_path,
+            lock_location,
+            config_file_loc=self._config_file_loc,
+            additional_args=additional_args)
+
+        copyfile(changed_file, target)
+
+        return lock_location, target_path
+
+    def create_detector(self, lock_location, changed_directory, additional_args=None) -> BufWrapper:
+        return BufWrapper(
+            changed_directory,
+            additional_args=additional_args,
+            buf_path=self._buf_path,
+            config_file_loc=self._config_file_loc,
+            path_to_lock_file=lock_location)
 
     @unittest.skip("PGV field support not yet added to buf")
     def test_change_pgv_field(self):

@@ -4,11 +4,14 @@ licenses(["notice"])  # Apache 2
 
 py_binary(
     name = "proto_breaking_change_detector",
-    srcs = ["detector.py"],
+    srcs = [
+        "buf_utils.py",
+        "detector.py",
+        "detector_errors.py",
+    ],
     data = [
-        ":buf.lock",
-        ":buf.yaml",
         "@com_github_bufbuild_buf//:buf",
+        "@envoy_api_canonical//:proto_breaking_change_detector_buf_config",
     ],
     main = "detector.py",
     tags = ["manual"],
@@ -22,7 +25,6 @@ py_test(
     srcs = ["detector_test.py"],
     data = [
         "//tools/testdata/api_proto_breaking_change_detector:proto_breaking_change_detector_testdata",
-        "@com_github_bufbuild_buf//:buf",
     ],
     main = "detector_test.py",
     python_version = "PY3",
