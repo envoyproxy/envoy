@@ -1,7 +1,6 @@
 #include "source/extensions/filters/http/compressor/compressor_filter.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/perf_tracing.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 
@@ -50,7 +49,6 @@ const std::string& compressorRegistryKey() { CONSTRUCT_ON_FIRST_USE(std::string,
 void compressAndUpdateStats(const Compression::Compressor::CompressorPtr& compressor,
                             const CompressorStats& stats, Buffer::Instance& data, bool end_stream) {
   ASSERT(compressor != nullptr);
-  TRACE_EVENT("extensions", "compressAndUpdateStats");
   stats.total_uncompressed_bytes_.add(data.length());
   compressor->compress(data, end_stream ? Envoy::Compression::Compressor::State::Finish
                                         : Envoy::Compression::Compressor::State::Flush);
@@ -188,7 +186,6 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
 }
 
 Http::FilterDataStatus CompressorFilter::decodeData(Buffer::Instance& data, bool end_stream) {
-  TRACE_EVENT("extensions", "CompressorFilter::decodeData");
   if (request_compressor_ != nullptr) {
     compressAndUpdateStats(request_compressor_, config_->requestDirectionConfig().stats(), data,
                            end_stream);
@@ -234,7 +231,6 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
 
 Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                           bool end_stream) {
-  TRACE_EVENT("extensions", "CompressorFilter::encodeHeaders");
   const auto& config = config_->responseDirectionConfig();
   const bool isEnabledAndContentLengthBigEnough =
       config.compressionEnabled() && config.isMinimumContentLength(headers);
@@ -270,7 +266,6 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
 }
 
 Http::FilterDataStatus CompressorFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  TRACE_EVENT("extensions", "CompressorFilter::encodeData");
   if (response_compressor_ != nullptr) {
     compressAndUpdateStats(response_compressor_, config_->responseDirectionConfig().stats(), data,
                            end_stream);
@@ -279,7 +274,6 @@ Http::FilterDataStatus CompressorFilter::encodeData(Buffer::Instance& data, bool
 }
 
 Http::FilterTrailersStatus CompressorFilter::encodeTrailers(Http::ResponseTrailerMap&) {
-  TRACE_EVENT("extensions", "CompressorFilter::encodeTrailers");
   if (response_compressor_ != nullptr) {
     Buffer::OwnedImpl empty_buffer;
     // The presence of trailers means the stream is ended, but encodeData()

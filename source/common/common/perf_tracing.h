@@ -8,7 +8,6 @@
 // analysis. In Envoy we use it only as a library for recording app-level
 // traces which can be later analyzed online at https://ui.perfetto.dev/ or wit
 // custom tools.
-// See https://perfetto.dev/docs/instrumentation/track-events for details.
 //
 // The support is enabled with
 //   bazel --define=perf_tracing=enabled ...
@@ -17,6 +16,8 @@
 //
 // The supported `Perfetto` macros are TRACE_EVENT, TRACE_EVENT_BEGIN,
 // TRACE_EVENT_END and TRACE_COUNTER.
+//
+// See https://perfetto.dev/docs/instrumentation/track-events for more details.
 
 // NOLINT(namespace-envoy)
 

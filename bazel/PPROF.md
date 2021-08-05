@@ -330,7 +330,7 @@ private:
 
 # Performance analysis with Perfetto
 
-Similar results can be obtained with [Perfetto tracing macros](https://github.com/envoyproxy/envoy/blob/main/source/common/common/tracing.h) which can be enabled with
+Similar results can be achieved with [Perfetto tracing macros](https://github.com/envoyproxy/envoy/blob/main/source/common/common/tracing.h) enabled with
 
 ```
 bazel --define=perf_tracing=enabled ...
@@ -344,3 +344,52 @@ using SQL and a web-based UI to visualize and explore multi-GB traces.
 Currently when the Perfetto support is enabled the tracing data in binary Protobuf
 format is dumped into `envoy.pftrace` upon process termination. The file
 can be analyzed online at https://ui.perfetto.dev/ or with a custom tool.
+
+To generate a scoped trace event which uses C++ RAII under the hood add the
+`TRACE_EVENT` macro to the block of your interest:
+
+```c++
+#include "source/common/common/perf_tracing.h"
+
+RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encoder,
+                                                 bool is_internally_created) {
+  TRACE_EVENT("core", "ConnectionManagerImpl::newStream"); // Begin "ConnectionManagerImpl::newStream" slice.
+  ...
+
+  // End "ConnectionManagerImpl::newStream" slice.
+}
+```
+
+For events that don't follow function scoping, use `TRACE_EVENT_BEGIN` and
+`TRACE_EVENT_END`. Please note that in case of events crossing function boundaries
+it is usually required to emit them on a separate dedicated track. Below is an
+example for a trace event covering an object's life span:
+
+```c++
+#include "source/common/common/perf_tracing.h"
+
+#define PERFETTO_HTTP_REQUEST_CHILD_TRACK_ID 42
+
+Http::Request::Request(const Config& conf) {
+  TRACE_EVENT_BEGIN("core", "Http::Request",
+                    perfetto::Track(PERFETTO_HTTP_REQUEST_CHILD_TRACK_ID, perfetto::ThreadTrack::Current()));
+  ...
+}
+
+Http::Request::~Request() {
+  ...
+
+  TRACE_EVENT_END("core", perfetto::Track(PERFETTO_HTTP_REQUEST_CHILD_TRACK_ID,
+                                          perfetto::ThreadTrack::Current()));
+}
+
+```
+
+Time-varying numeric data can be recorded with the `TRACE_COUNTER` macro:
+
+```c++
+TRACE_COUNTER("extensions", "MemoryAllocated",
+              tcmalloc::MallocExtension::GetNumericProperty("generic.current_allocated_bytes"));
+```
+
+For more details please refer https://perfetto.dev/docs/instrumentation/track-events.

@@ -5,7 +5,6 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/common/perf_tracing.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -40,9 +39,7 @@ void ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy c
 
 void ZlibCompressorImpl::compress(Buffer::Instance& buffer,
                                   Envoy::Compression::Compressor::State state) {
-  TRACE_EVENT("extensions", "ZlibCompressorImpl::compress");
   for (const Buffer::RawSlice& input_slice : buffer.getRawSlices()) {
-    TRACE_EVENT("extensions", "compress slice");
     zstream_ptr_->avail_in = input_slice.len_;
     zstream_ptr_->next_in = static_cast<Bytef*>(input_slice.mem_);
     // Z_NO_FLUSH tells the compressor to take the data in and compresses it as much as possible
