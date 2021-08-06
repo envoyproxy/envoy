@@ -401,7 +401,7 @@ private:
         absl::node_hash_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>;
 
     class ClusterEntry : public ThreadLocalCluster {
-     public:
+    public:
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry() override;
@@ -419,21 +419,23 @@ private:
       Http::AsyncClient& httpAsyncClient() override;
 
       // Updates the hosts in the priority set.
-      void updateHosts(const std::string& name, uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
+      void updateHosts(const std::string& name, uint32_t priority,
+                       PrioritySet::UpdateHostsParams&& update_hosts_params,
                        LocalityWeightsConstSharedPtr locality_weights,
                        const HostVector& hosts_added, const HostVector& hosts_removed,
                        absl::optional<uint32_t> overprovisioning_factor);
 
-      // Drains any connection pools assocaited with the removed hosts.
+      // Drains any connection pools associated with the removed hosts.
       void drainConnPools(const HostVector& hosts_removed);
 
     private:
-      Http::ConnectionPool::Instance* httpConnPoolImpl(ResourcePriority priority,
-                                                   absl::optional<Http::Protocol> downstream_protocol,
-                                                   LoadBalancerContext* context, bool peek);
+      Http::ConnectionPool::Instance*
+      httpConnPoolImpl(ResourcePriority priority,
+                       absl::optional<Http::Protocol> downstream_protocol,
+                       LoadBalancerContext* context, bool peek);
 
       Tcp::ConnectionPool::Instance* tcpConnPoolImpl(ResourcePriority priority,
-                                                 LoadBalancerContext* context, bool peek);
+                                                     LoadBalancerContext* context, bool peek);
 
       ThreadLocalClusterManagerImpl& parent_;
       PrioritySetImpl priority_set_;
