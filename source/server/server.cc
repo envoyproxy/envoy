@@ -154,11 +154,8 @@ InstanceImpl::~InstanceImpl() {
 
 #ifdef ENVOY_PERFETTO
   if (tracing_session_ != nullptr) {
-    // StopTracing
-    // Make sure the last event is closed for this example.
-    perfetto::TrackEvent::Flush();
-
     // Stop tracing and read the trace data.
+    perfetto::TrackEvent::Flush();
     tracing_session_->StopBlocking();
     std::vector<char> trace_data(tracing_session_->ReadTraceBlocking());
 
