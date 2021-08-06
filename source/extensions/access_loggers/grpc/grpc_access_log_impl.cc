@@ -53,7 +53,6 @@ void GrpcAccessLoggerImpl::addCriticalMessageEntry(
     envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
   critical_message_.mutable_message()->mutable_http_logs()->mutable_log_entry()->Add(
       std::move(entry));
-  std::cout << "add" << std::endl;
 }
 
 void GrpcAccessLoggerImpl::addCriticalMessageEntry(
@@ -88,7 +87,7 @@ void GrpcAccessLoggerImpl::logCritical(envoy::data::accesslog::v3::HTTPAccessLog
   approximate_critical_message_size_bytes_ += entry.ByteSizeLong();
   addCriticalMessageEntry(std::move(entry));
 
-  if (approximate_critical_message_size_bytes_ <= max_critical_buffer_size_bytes_) {
+  if (approximate_critical_message_size_bytes_ >= max_critical_buffer_size_bytes_) {
     flushCriticalMessage();
   }
 }

@@ -213,7 +213,7 @@ private:
   void logCritical(envoy::data::accesslog::v3::HTTPAccessLogEntry&&) override;
 
   uint64_t approximate_critical_message_size_bytes_ = 0;
-  uint64_t max_critical_buffer_size_bytes_;
+  uint64_t max_critical_buffer_size_bytes_ = 0;
   Common::CriticalAccessLoggerGrpcClientPtr<
       envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage>
       critical_client_;
