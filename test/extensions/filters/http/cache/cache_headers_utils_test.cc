@@ -775,7 +775,7 @@ TEST(CreateVaryIdentifier, DisallowedHeader) {
   Http::TestRequestHeaderMapImpl request_headers{{"width", "foo"}};
   VaryHeader vary_allow_list(ToStringMatchers({"accept", "accept-language", "width"}));
 
-  EXPECT_EQ(vary_allow_list.createVaryIdentifier({"somethingdisallowed"}, request_headers),
+  EXPECT_EQ(vary_allow_list.createVaryIdentifier({"disallowed"}, request_headers),
             absl::nullopt);
 }
 
@@ -783,7 +783,7 @@ TEST(CreateVaryIdentifier, DisallowedHeaderWithAllowedHeader) {
   Http::TestRequestHeaderMapImpl request_headers{{"width", "foo"}};
   VaryHeader vary_allow_list(ToStringMatchers({"accept", "accept-language", "width"}));
 
-  EXPECT_EQ(vary_allow_list.createVaryIdentifier({"somethingdisallowed,width"}, request_headers),
+  EXPECT_EQ(vary_allow_list.createVaryIdentifier({"disallowed,width"}, request_headers),
             absl::nullopt);
 }
 

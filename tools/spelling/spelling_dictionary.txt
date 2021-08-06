@@ -21,6 +21,7 @@ AWS
 BACKTRACE
 BSON
 BPF
+btree
 CAS
 CB
 CDN
@@ -598,6 +599,7 @@ dubbo
 dup
 durations
 dynamodb
+eg
 emplace
 emplaced
 emscripten
