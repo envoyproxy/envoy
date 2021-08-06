@@ -21,7 +21,10 @@ open class EngineBuilder(
 ) {
   protected var onEngineRunning: (() -> Unit) = {}
   protected var logger: ((String) -> Unit)? = null
-  private var engineType: () -> EnvoyEngine = { EnvoyEngineImpl(onEngineRunning, logger) }
+  protected var eventTracker: ((Map<String, String>) -> Unit)? = null
+  private var engineType: () -> EnvoyEngine = {
+    EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
+  }
   private var logLevel = LogLevel.INFO
   private var adminInterfaceEnabled = false
   private var grpcStatsDomain: String? = null
@@ -237,6 +240,13 @@ open class EngineBuilder(
     return this
   }
 
+  /**
+   * Set event tracker for the engine to call when it emits an event.
+   */
+  fun setEventTracker(eventTracker: (Map<String, String>) -> Unit): EngineBuilder {
+    this.eventTracker = eventTracker
+    return this
+  }
   /**
    * Add a string accessor to this Envoy Client.
    *

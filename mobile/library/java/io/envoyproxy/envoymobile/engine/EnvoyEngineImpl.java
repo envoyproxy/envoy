@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile.engine;
 
+import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
@@ -14,18 +15,17 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   private static final int ENVOY_FAILURE = 1;
 
   private final long engineHandle;
-  private EnvoyOnEngineRunning onEngineRunning;
-  private EnvoyLogger logger;
+  private final EnvoyEventTracker eventTracker;
 
   /**
    * @param runningCallback Called when the engine finishes its async startup and begins running.
    * @param logger          The logging interface.
    */
-  public EnvoyEngineImpl(EnvoyOnEngineRunning runningCallback, EnvoyLogger logger) {
+  public EnvoyEngineImpl(EnvoyOnEngineRunning runningCallback, EnvoyLogger logger,
+                         EnvoyEventTracker eventTracker) {
     JniLibrary.load();
-    this.onEngineRunning = runningCallback;
-    this.logger = logger;
-    this.engineHandle = JniLibrary.initEngine(onEngineRunning, logger);
+    this.engineHandle = JniLibrary.initEngine(runningCallback, logger);
+    this.eventTracker = eventTracker;
   }
 
   /**
@@ -77,6 +77,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
                                         new JvmStringAccessorContext(entry.getValue()));
     }
 
+    JniLibrary.registerEventTracker(this.eventTracker);
     return runWithResolvedYAML(envoyConfiguration.resolveTemplate(
                                    configurationYAML, JniLibrary.platformFilterTemplateString(),
                                    JniLibrary.nativeFilterTemplateString()),
@@ -96,7 +97,6 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   }
 
   private int runWithResolvedYAML(String configurationYAML, String logLevel) {
-    JniLibrary.registerEventTracker();
     try {
       return JniLibrary.runEngine(this.engineHandle, configurationYAML, logLevel);
     } catch (Throwable throwable) {

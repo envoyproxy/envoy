@@ -873,18 +873,42 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerStringAccessor(JNIEnv* 
   return result;
 }
 
+static void jvm_on_track(envoy_map events, const void* context) {
+  jni_log("[Envoy]", "jvm_on_track");
+  if (context == nullptr) {
+    return;
+  }
+
+  JNIEnv* env = get_env();
+  jobject events_hashmap = native_map_to_map(env, events);
+
+  jobject j_context = static_cast<jobject>(const_cast<void*>(context));
+  jclass jcls_EnvoyEventTracker = env->GetObjectClass(j_context);
+  jmethodID jmid_onTrack = env->GetMethodID(jcls_EnvoyEventTracker, "track", "(Ljava/util/Map;)V");
+  env->CallVoidMethod(j_context, jmid_onTrack, events_hashmap);
+
+  release_envoy_map(events);
+  env->DeleteLocalRef(events_hashmap);
+  env->DeleteLocalRef(jcls_EnvoyEventTracker);
+}
+
 // EnvoyEventTracker
 
 extern "C" JNIEXPORT jint JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerEventTracker(JNIEnv* env, jclass) {
-  // TODO(Augustyniak): The event_tracker leaks, but it's tied to the life of the engine.
-  // This will need to be updated for https://github.com/lyft/envoy-mobile/issues/332.
-  envoy_event_tracker* event_tracker =
-      (envoy_event_tracker*)safe_malloc(sizeof(envoy_event_tracker));
-  // TODO(Augustyniak): Allow for the registration of a "real" (no no-op) event tracker.
-  event_tracker->track = nullptr;
-  event_tracker->context = nullptr;
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerEventTracker(JNIEnv* env, jclass,
+                                                                      jobject j_event_tracker) {
+  jni_log("[Envoy]", "register event tracker");
 
+  // TODO(goaway): The retained_context leaks, but it's tied to the life of the engine.
+  // This will need to be updated for https://github.com/lyft/envoy-mobile/issues/332.
+  jobject retained_context = env->NewGlobalRef(j_event_tracker);
+  jni_log_fmt("[Envoy]", "retained_context: %p", retained_context);
+  envoy_event_tracker* event_tracker = nullptr;
+  if (j_event_tracker != nullptr) {
+    event_tracker = (envoy_event_tracker*)safe_malloc(sizeof(envoy_event_tracker));
+    event_tracker->track = jvm_on_track;
+    event_tracker->context = retained_context;
+  }
   envoy_status_t result = register_platform_api(envoy_event_tracker_api_name, event_tracker);
   return result;
 }
