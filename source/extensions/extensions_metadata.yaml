@@ -438,6 +438,11 @@ envoy.filters.udp_listener.udp_proxy:
   - envoy.filters.udp_listener
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.formatter.metadata:
+  categories:
+  - envoy.formatter
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
 envoy.formatter.req_without_query:
   categories:
   - envoy.formatter
