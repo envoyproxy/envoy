@@ -26,11 +26,11 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //
 // .. code-block:: yaml
 //
-//  stats_sinks:
-//  - name: envoy.stat_sinks.metrics_service
-//    typed_config:
-//      "@type": type.googleapis.com/envoy.config.metrics.v3.MetricsServiceConfig
-//      transport_api_version: V3
+//     stats_sinks:
+//       - name: envoy.stat_sinks.metrics_service
+//         typed_config:
+//           "@type": type.googleapis.com/envoy.config.metrics.v3.MetricsServiceConfig
+//           transport_api_version: V3
 //
 // [#extension: envoy.stat_sinks.metrics_service]
 message MetricsServiceConfig {
