@@ -1616,11 +1616,13 @@ TEST_P(HttpFilterTestParam, NoRoute) {
 }
 
 // Test that the authentication will be skipped when the filter_callbacks has no route when
-// the runtime flag `envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response` is false.
+// the runtime flag
+// `envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect` is false.
 TEST_P(HttpFilterTestParam, NoRouteWithSkipAuth) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response", "false"}});
+      {{"envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",
+        "false"}});
   EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
