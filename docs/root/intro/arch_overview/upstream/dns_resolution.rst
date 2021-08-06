@@ -13,6 +13,14 @@ Envoy uses `c-ares <https://github.com/c-ares/c-ares>`_ as a third party DNS res
 On Apple OSes Envoy additionally offers resolution using Apple specific APIs via the
 ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime feature.
 
+Envoy DNS is an extension point. To use a specific DNS resolver, corresponding DNS library need to be enabled in
+source/extensions/extensions_build_config.bzl file. And appropriate configurations need to be added in the envoy
+running config. More details please follow documents (
+:ref:'CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>'
+:ref:'AppleDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig>'
+).
+
+
 The Apple-based DNS Resolver emits the following stats rooted in the ``dns.apple`` stats tree:
 
   .. csv-table::
