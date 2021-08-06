@@ -31,6 +31,7 @@ java_library(
         "EnvoyNativeResourceRegistry.java",
         "EnvoyNativeResourceReleaser.java",
         "EnvoyNativeResourceWrapper.java",
+        "EnvoyStreamIntelImpl.java",
         "JniBridgeUtility.java",
         "JniLibrary.java",
         "JvmBridgeUtility.java",

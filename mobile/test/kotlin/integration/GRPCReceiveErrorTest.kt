@@ -109,9 +109,9 @@ class GRPCReceiveErrorTest {
 
     GRPCClient(engine.streamClient())
       .newGRPCStreamPrototype()
-      .setOnResponseHeaders { headers, endStream -> }
-      .setOnResponseMessage { }
-      .setOnError {
+      .setOnResponseHeaders { _, _, _ -> }
+      .setOnResponseMessage { _, _ -> }
+      .setOnError { _, _ ->
         callbackReceivedError.countDown()
       }
       .setOnCancel { fail("Unexpected call to onCancel response callback") }

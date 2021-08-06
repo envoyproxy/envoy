@@ -84,7 +84,8 @@ NSString *_REQUEST_SCHEME = @"https";
 
   __weak ViewController *weakSelf = self;
   StreamPrototype *prototype = [self.streamClient newStreamPrototype];
-  [prototype setOnResponseHeadersWithClosure:^(ResponseHeaders *headers, BOOL endStream) {
+  [prototype setOnResponseHeadersWithClosure:^(ResponseHeaders *headers, BOOL endStream,
+                                               StreamIntel *ignored) {
     int statusCode = [[[headers valueForName:@":status"] firstObject] intValue];
     NSString *message = [NSString stringWithFormat:@"received headers with status %i", statusCode];
 
@@ -102,7 +103,7 @@ NSString *_REQUEST_SCHEME = @"https";
 
     [weakSelf addResponseMessage:message headerMessage:headerMessage error:nil];
   }];
-  [prototype setOnErrorWithClosure:^(EnvoyError *error) {
+  [prototype setOnErrorWithClosure:^(EnvoyError *error, StreamIntel *ignored) {
     // TODO: expose attemptCount. https://github.com/lyft/envoy-mobile/issues/823
     NSString *message =
         [NSString stringWithFormat:@"failed within Envoy library %@", error.message];

@@ -66,8 +66,9 @@ public class StreamPrototype: NSObject {
   /// - returns: This stream, for chaining syntax.
   @discardableResult
   public func setOnResponseHeaders(
-    closure: @escaping (_ headers: ResponseHeaders, _ endStream: Bool) -> Void) -> StreamPrototype
-  {
+    closure: @escaping (_ headers: ResponseHeaders, _ endStream: Bool,
+                        _ streamIntel: StreamIntel) -> Void
+  ) -> StreamPrototype {
     self.callbacks.onHeaders = closure
     return self
   }
@@ -81,8 +82,8 @@ public class StreamPrototype: NSObject {
   /// - returns: This stream, for chaining syntax.
   @discardableResult
   public func setOnResponseData(
-    closure: @escaping (_ body: Data, _ endStream: Bool) -> Void) -> StreamPrototype
-  {
+    closure: @escaping (_ body: Data, _ endStream: Bool, _ streamIntel: StreamIntel) -> Void
+  ) -> StreamPrototype {
     self.callbacks.onData = closure
     return self
   }
@@ -95,8 +96,8 @@ public class StreamPrototype: NSObject {
   /// - returns: This stream, for chaining syntax.
   @discardableResult
   public func setOnResponseTrailers(
-    closure: @escaping (_ trailers: ResponseTrailers) -> Void) -> StreamPrototype
-  {
+    closure: @escaping (_ trailers: ResponseTrailers, _ streamIntel: StreamIntel) -> Void
+  ) -> StreamPrototype {
     self.callbacks.onTrailers = closure
     return self
   }
@@ -109,8 +110,8 @@ public class StreamPrototype: NSObject {
   /// - returns: This stream, for chaining syntax.
   @discardableResult
   public func setOnError(
-    closure: @escaping (_ error: EnvoyError) -> Void) -> StreamPrototype
-  {
+    closure: @escaping (_ error: EnvoyError, _ streamIntel: StreamIntel) -> Void
+  ) -> StreamPrototype {
     self.callbacks.onError = closure
     return self
   }
@@ -123,8 +124,8 @@ public class StreamPrototype: NSObject {
   /// - returns: This stream, for chaining syntax.
   @discardableResult
   public func setOnCancel(
-    closure: @escaping () -> Void) -> StreamPrototype
-  {
+    closure: @escaping (_ streamIntel: StreamIntel) -> Void
+  ) -> StreamPrototype {
     self.callbacks.onCancel = closure
     return self
   }

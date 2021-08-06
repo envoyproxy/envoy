@@ -23,13 +23,13 @@ final class DirectResponseExactPathMatchIntegrationTest: XCTestCase {
     engine
       .streamClient()
       .newStreamPrototype()
-      .setOnResponseHeaders { headers, endStream in
+      .setOnResponseHeaders { headers, endStream, _ in
         XCTAssertEqual(200, headers.httpStatus)
         XCTAssertEqual(["aaa"], headers.value(forName: "x-response-foo"))
         XCTAssertFalse(endStream)
         headersExpectation.fulfill()
       }
-      .setOnResponseData { data, endStream in
+      .setOnResponseData { data, endStream, _ in
         responseBuffer.append(contentsOf: data)
         if endStream {
           XCTAssertEqual("hello world", String(data: responseBuffer, encoding: .utf8))

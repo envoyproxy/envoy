@@ -33,6 +33,7 @@ swift_library(
         "StreamCallbacks.swift",
         "StreamClient.swift",
         "StreamClientImpl.swift",
+        "StreamIntel.swift",
         "StreamPrototype.swift",
         "TestEngineBuilder.swift",
         "Trailers.swift",

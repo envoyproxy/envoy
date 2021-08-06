@@ -12,27 +12,31 @@ public interface EnvoyHTTPCallbacks {
   /**
    * Called when all headers get received on the async HTTP stream.
    *
-   * @param headers,   the headers received.
-   * @param endStream, whether the response is headers-only.
+   * @param headers,     the headers received.
+   * @param endStream,   whether the response is headers-only.
+   * @param streamIntel, contains internal HTTP stream metrics, context, and other details.
    */
-  void onHeaders(Map<String, List<String>> headers, boolean endStream);
+  void onHeaders(Map<String, List<String>> headers, boolean endStream,
+                 EnvoyStreamIntel streamIntel);
 
   /**
    * Called when a data frame gets received on the async HTTP stream. This
    * callback can be invoked multiple times if the data gets streamed.
    *
-   * @param data,      the buffer of the data received.
-   * @param endStream, whether the data is the last data frame.
+   * @param data,        the buffer of the data received.
+   * @param endStream,   whether the data is the last data frame.
+   * @param streamIntel, contains internal HTTP stream metrics, context, and other details.
    */
-  void onData(ByteBuffer data, boolean endStream);
+  void onData(ByteBuffer data, boolean endStream, EnvoyStreamIntel streamIntel);
 
   /**
    * Called when all trailers get received on the async HTTP stream. Note that end
    * stream is implied when on_trailers is called.
    *
-   * @param trailers, the trailers received.
+   * @param trailers,    the trailers received.
+   * @param streamIntel, contains internal HTTP stream metrics, context, and other details.
    */
-  void onTrailers(Map<String, List<String>> trailers);
+  void onTrailers(Map<String, List<String>> trailers, EnvoyStreamIntel streamIntel);
 
   /**
    * Called when the async HTTP stream has an error.
@@ -43,11 +47,12 @@ public interface EnvoyHTTPCallbacks {
    *                      -1 is used in scenarios where it does not make sense to have an attempt
    *                      count for an error. This is different from 0, which intentionally conveys
    *                      that the action was _not_ executed.
+   * @param streamIntel,  contains internal HTTP stream metrics, context, and other details.
    */
-  void onError(int errorCode, String message, int attemptCount);
+  void onError(int errorCode, String message, int attemptCount, EnvoyStreamIntel streamIntel);
 
   /**
    * Called when the async HTTP stream is canceled.
    */
-  void onCancel();
+  void onCancel(EnvoyStreamIntel streamIntel);
 }

@@ -32,7 +32,7 @@ class GRPCStreamPrototype(
    * @return This stream, for chaining syntax.
    */
   fun setOnResponseHeaders(
-    closure: (headers: ResponseHeaders, endStream: Boolean) -> Unit
+    closure: (headers: ResponseHeaders, endStream: Boolean, streamIntel: StreamIntel) -> Unit
   ): GRPCStreamPrototype {
     underlyingStream.setOnResponseHeaders(closure)
     return this
@@ -46,12 +46,12 @@ class GRPCStreamPrototype(
    * @return This stream, for chaining syntax.
    */
   fun setOnResponseMessage(
-    closure: (data: ByteBuffer) -> Unit
+    closure: (data: ByteBuffer, streamIntel: StreamIntel) -> Unit
   ): GRPCStreamPrototype {
     val byteBufferedOutputStream = ByteArrayOutputStream()
     val processor = GRPCMessageProcessor()
     var processState: GRPCMessageProcessor.ProcessState = GRPCMessageProcessor.ProcessState.CompressionFlag
-    underlyingStream.setOnResponseData { byteBuffer, _ ->
+    underlyingStream.setOnResponseData { byteBuffer, _, streamIntel ->
       val byteBufferArray = if (byteBuffer.hasArray()) {
         byteBuffer.array()
       } else {
@@ -61,7 +61,7 @@ class GRPCStreamPrototype(
       }
       byteBufferedOutputStream.write(byteBufferArray)
 
-      processState = processor.processData(byteBufferedOutputStream, processState, closure)
+      processState = processor.processData(byteBufferedOutputStream, processState, streamIntel, closure)
     }
 
     return this
@@ -75,7 +75,7 @@ class GRPCStreamPrototype(
    * @return This stream, for chaining syntax.
    */
   fun setOnResponseTrailers(
-    closure: (trailers: ResponseTrailers) -> Unit
+    closure: (trailers: ResponseTrailers, streamIntel: StreamIntel) -> Unit
   ): GRPCStreamPrototype {
     underlyingStream.setOnResponseTrailers(closure)
     return this
@@ -89,7 +89,7 @@ class GRPCStreamPrototype(
    * @return This stream, for chaining syntax.
    */
   fun setOnError(
-    closure: (error: EnvoyError) -> Unit
+    closure: (error: EnvoyError, streamIntel: StreamIntel) -> Unit
   ): GRPCStreamPrototype {
     underlyingStream.setOnError(closure)
     return this
@@ -103,7 +103,7 @@ class GRPCStreamPrototype(
    * @return This stream, for chaining syntax.
    */
   fun setOnCancel(
-    closure: () -> Unit
+    closure: (streamIntel: StreamIntel) -> Unit
   ): GRPCStreamPrototype {
     underlyingStream.setOnCancel(closure)
     return this
@@ -137,7 +137,8 @@ private class GRPCMessageProcessor {
   fun processData(
     bufferedStream: ByteArrayOutputStream,
     processState: GRPCMessageProcessor.ProcessState,
-    onMessage: (byteBuffer: ByteBuffer) -> Unit
+    streamIntel: StreamIntel,
+    onMessage: (byteBuffer: ByteBuffer, streamIntel: StreamIntel) -> Unit
   ): GRPCMessageProcessor.ProcessState {
     var nextState = processState
 
@@ -181,7 +182,8 @@ private class GRPCMessageProcessor {
             byteArray.sliceArray(
               GRPC_PREFIX_LENGTH until GRPC_PREFIX_LENGTH + processState.messageLength
             )
-          )
+          ),
+          streamIntel
         )
         bufferedStream.reset()
         bufferedStream.write(
@@ -199,6 +201,6 @@ private class GRPCMessageProcessor {
       }
     }
 
-    return processData(bufferedStream, nextState, onMessage)
+    return processData(bufferedStream, nextState, streamIntel, onMessage)
   }
 }

@@ -95,7 +95,7 @@ final class GRPCStreamTests: XCTestCase {
 
     _ = GRPCClient(streamClient: streamClient)
       .newGRPCStreamPrototype()
-      .setOnResponseHeaders { headers, endStream in
+      .setOnResponseHeaders { headers, endStream, _ in
         XCTAssertEqual(expectedHeaders, headers)
         XCTAssertTrue(endStream)
         expectation.fulfill()
@@ -115,7 +115,7 @@ final class GRPCStreamTests: XCTestCase {
 
     _ = GRPCClient(streamClient: streamClient)
       .newGRPCStreamPrototype()
-      .setOnResponseTrailers { trailers in
+      .setOnResponseTrailers { trailers, _ in
         XCTAssertEqual(expectedTrailers, trailers)
         expectation.fulfill()
       }
@@ -137,7 +137,7 @@ final class GRPCStreamTests: XCTestCase {
 
     _ = GRPCClient(streamClient: streamClient)
       .newGRPCStreamPrototype()
-      .setOnResponseMessage { message in
+      .setOnResponseMessage { message, _ in
         XCTAssertEqual(kMessage1, message)
         expectation.fulfill()
       }
@@ -173,7 +173,7 @@ final class GRPCStreamTests: XCTestCase {
 
     _ = GRPCClient(streamClient: streamClient)
       .newGRPCStreamPrototype()
-      .setOnResponseMessage { message in
+      .setOnResponseMessage { message, _ in
         XCTAssertEqual(expectedMessages.removeFirst(), message)
         expectation.fulfill()
       }
@@ -199,7 +199,7 @@ final class GRPCStreamTests: XCTestCase {
 
     _ = GRPCClient(streamClient: streamClient)
       .newGRPCStreamPrototype()
-      .setOnResponseMessage { message in
+      .setOnResponseMessage { message, _ in
         XCTAssertTrue(message.isEmpty)
         expectation.fulfill()
       }
@@ -228,7 +228,7 @@ final class GRPCStreamTests: XCTestCase {
 
     _ = GRPCClient(streamClient: streamClient)
       .newGRPCStreamPrototype()
-      .setOnResponseMessage { message in
+      .setOnResponseMessage { message, _ in
         XCTAssertEqual(expectedMessages.removeFirst(), message)
         expectation.fulfill()
       }

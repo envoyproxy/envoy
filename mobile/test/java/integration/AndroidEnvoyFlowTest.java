@@ -189,31 +189,31 @@ public class AndroidEnvoyFlowTest {
 
     Stream stream = engine.streamClient()
                         .newStreamPrototype()
-                        .setOnResponseHeaders((responseHeaders, endStream) -> {
+                        .setOnResponseHeaders((responseHeaders, endStream, ignored) -> {
                           response.get().setHeaders(responseHeaders);
                           if (endStream) {
                             latch.countDown();
                           }
                           return null;
                         })
-                        .setOnResponseData((data, endStream) -> {
+                        .setOnResponseData((data, endStream, ignored) -> {
                           response.get().addBody(data);
                           if (endStream) {
                             latch.countDown();
                           }
                           return null;
                         })
-                        .setOnResponseTrailers(trailers -> {
+                        .setOnResponseTrailers((trailers, ignored) -> {
                           response.get().setTrailers(trailers);
                           latch.countDown();
                           return null;
                         })
-                        .setOnError(error -> {
+                        .setOnError((error, ignored) -> {
                           response.get().setEnvoyError(error);
                           latch.countDown();
                           return null;
                         })
-                        .setOnCancel(() -> {
+                        .setOnCancel((ignored) -> {
                           response.get().setCancelled();
                           latch.countDown();
                           return null;

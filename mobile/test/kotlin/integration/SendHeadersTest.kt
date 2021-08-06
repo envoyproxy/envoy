@@ -79,12 +79,12 @@ class SendHeadersTest {
     var resultHeaders: ResponseHeaders? = null
     var resultEndStream: Boolean? = null
     client.newStreamPrototype()
-      .setOnResponseHeaders { responseHeaders, endStream ->
+      .setOnResponseHeaders { responseHeaders, endStream, _ ->
         resultHeaders = responseHeaders
         resultEndStream = endStream
         headersExpectation.countDown()
       }
-      .setOnError { fail("Unexpected error") }
+      .setOnError { _, _ -> fail("Unexpected error") }
       .start()
       .sendHeaders(requestHeaders, true)
 

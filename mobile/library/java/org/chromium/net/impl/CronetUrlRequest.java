@@ -500,11 +500,11 @@ public final class CronetUrlRequest extends UrlRequestBase {
       mStream = mCronvoyEngine.getEnvoyEngine()
                     .streamClient()
                     .newStreamPrototype()
-                    .setOnResponseHeaders((responseHeaders, lastCallback) -> {
+                    .setOnResponseHeaders((responseHeaders, lastCallback, ignored) -> {
                       onResponseHeaders(responseHeaders, lastCallback);
                       return null;
                     })
-                    .setOnResponseData((data, lastCallback) -> {
+                    .setOnResponseData((data, lastCallback, ignored) -> {
                       mEnvoyCallbackExecutor.pause();
                       mEndStream = lastCallback;
                       if (!mMostRecentBufferRead.compareAndSet(null, data)) {
@@ -513,7 +513,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
                       processReadResult();
                       return null;
                     })
-                    .setOnError(error -> {
+                    .setOnError((error, ignored) -> {
                       String message = "failed with error after " + error.getAttemptCount() +
                                        " attempts. Message=[" + error.getMessage() + "] Code=[" +
                                        error.getErrorCode() + "]";
@@ -521,7 +521,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
                       mCronvoyExecutor.execute(() -> enterCronetErrorState(throwable));
                       return null;
                     })
-                    .setOnCancel(() -> {
+                    .setOnCancel((ignored) -> {
                       mCancelCalled.set(true);
                       cancel();
                       return null;

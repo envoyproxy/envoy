@@ -101,19 +101,19 @@ static_resources:
 
     client
       .newGRPCStreamPrototype()
-      .setOnResponseHeaders { _, _ in
+      .setOnResponseHeaders { _, _, _ in
         XCTFail("Headers received instead of expected error")
       }
-      .setOnResponseMessage { _ in
+      .setOnResponseMessage { _, _ in
         XCTFail("Message received instead of expected error")
       }
       // The unmatched expecation will cause a local reply which gets translated in Envoy Mobile to
       // an error.
-      .setOnError { error in
+      .setOnError { error, _ in
          XCTAssertEqual(error.errorCode, 2) // 503/Connection Failure
          callbackReceivedError.fulfill()
       }
-      .setOnCancel {
+      .setOnCancel { _ in
         XCTFail("Unexpected call to onCancel response callback")
       }
       .start()

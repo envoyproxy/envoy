@@ -100,19 +100,19 @@ static_resources:
 
     client
       .newStreamPrototype()
-      .setOnResponseHeaders { _, _ in
+      .setOnResponseHeaders { _, _, _ in
         XCTFail("Headers received instead of expected error")
       }
-      .setOnResponseData { _, _ in
+      .setOnResponseData { _, _, _ in
         XCTFail("Data received instead of expected error")
       }
       // The unmatched expectation will cause a local reply which gets translated in Envoy Mobile to
       // an error.
-      .setOnError { error in
+      .setOnError { error, _ in
          XCTAssertEqual(error.errorCode, 2) // 503/Connection Failure
          callbackReceivedError.fulfill()
       }
-      .setOnCancel {
+      .setOnCancel { _ in
         XCTFail("Unexpected call to onCancel response callback")
       }
       .start()

@@ -32,6 +32,8 @@ envoy_data array_to_native_data(JNIEnv* env, jbyteArray j_data);
  */
 jbyteArray native_data_to_array(JNIEnv* env, envoy_data data);
 
+jlongArray native_stream_intel_to_array(JNIEnv* env, envoy_stream_intel stream_intel);
+
 /**
  * Utility function that copies envoy_map to a java HashMap jobject.
  *

@@ -1,3 +1,4 @@
+@_implementationOnly import EnvoyEngine
 import Foundation
 
 /// Mock implementation of `Stream` that also provides an interface for sending
@@ -51,7 +52,7 @@ public final class MockStream: Stream {
   /// - parameter headers:   Response headers to receive.
   /// - parameter endStream: Whether this is a headers-only response.
   public func receiveHeaders(_ headers: ResponseHeaders, endStream: Bool) {
-    self.mockStream.callbacks.onHeaders(headers.headers, endStream)
+    self.mockStream.callbacks.onHeaders(headers.headers, endStream, EnvoyStreamIntel())
   }
 
   /// Simulate response data coming back over the stream.
@@ -59,19 +60,19 @@ public final class MockStream: Stream {
   /// - parameter data:      Response data to receive.
   /// - parameter endStream: Whether this is the last data frame.
   public func receiveData(_ data: Data, endStream: Bool) {
-    self.mockStream.callbacks.onData(data, endStream)
+    self.mockStream.callbacks.onData(data, endStream, EnvoyStreamIntel())
   }
 
   /// Simulate trailers coming back over the stream.
   ///
   /// - parameter trailers: Response trailers to receive.
   public func receiveTrailers(_ trailers: ResponseTrailers) {
-    self.mockStream.callbacks.onTrailers(trailers.headers)
+    self.mockStream.callbacks.onTrailers(trailers.headers, EnvoyStreamIntel())
   }
 
   /// Simulate the stream receiving a cancellation signal from Envoy.
   public func receiveCancel() {
-    self.mockStream.callbacks.onCancel()
+    self.mockStream.callbacks.onCancel(EnvoyStreamIntel())
   }
 
   /// Simulate Envoy returning an error.
@@ -79,6 +80,7 @@ public final class MockStream: Stream {
   /// - parameter error: The error to receive.
   public func receiveError(_ error: EnvoyError) {
     self.mockStream.callbacks.onError(error.errorCode, error.message,
-                                      Int32(error.attemptCount ?? 0))
+                                      Int32(error.attemptCount ?? 0),
+                                      EnvoyStreamIntel())
   }
 }
