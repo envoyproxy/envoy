@@ -12,6 +12,7 @@
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/codec_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -49,7 +50,9 @@ Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderM
 
   response_headers_ = &headers;
   if (end_stream) {
-    setupHttp1Status(headers.GrpcStatus(), headers.GrpcMessage());
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_bridge_convert_code_for_header_only_response")) {
+      setupHttp1Status(headers.GrpcStatus(), headers.GrpcMessage());
+    }
     return Http::FilterHeadersStatus::Continue;
   } else {
     return Http::FilterHeadersStatus::StopIteration;
@@ -62,7 +65,9 @@ Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance&, bool end
   }
 
   if (end_stream) {
-    setupHttp1Status(response_headers_->GrpcStatus(), response_headers_->GrpcMessage());
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_bridge_convert_code_for_header_only_response")) {
+      setupHttp1Status(response_headers_->GrpcStatus(), response_headers_->GrpcMessage());
+    }
     return Http::FilterDataStatus::Continue;
   } else {
     // Buffer until the complete request has been processed.

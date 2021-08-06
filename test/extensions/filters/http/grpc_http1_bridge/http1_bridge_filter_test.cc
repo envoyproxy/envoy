@@ -242,7 +242,6 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
-
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "1"}, {"grpc-message", "foo"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
   EXPECT_EQ("503", response_headers.get_(":status"));
@@ -251,7 +250,8 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {
   EXPECT_EQ("foo", response_headers.get_("grpc-message"));
 }
 
-TEST_F(GrpcHttp1BridgeFilterTest, HandlingNoTailerBadGrpcStatus) {
+// Verifies that we convert grpc-status to the appropriates status code for a headers only response
+TEST_F(GrpcHttp1BridgeFilterTest, HandlingHeadersOnlyResponseBadGrpcStatus) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc"},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
