@@ -1759,6 +1759,26 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_core_connection_context_lib",
+    srcs = [
+        "quiche/quic/core/quic_connection_context.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/quic_connection_context.h",
+    ],
+    copts = quiche_copts,
+    external_deps = [
+        "abseil_str_format",
+    ],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_platform_export",
+        ":quiche_common_platform",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_core_connection_id_manager",
     srcs = ["quiche/quic/core/quic_connection_id_manager.cc"],
     hdrs = ["quiche/quic/core/quic_connection_id_manager.h"],
@@ -1791,6 +1811,7 @@ envoy_cc_library(
         ":quic_core_bandwidth_lib",
         ":quic_core_blocked_writer_interface_lib",
         ":quic_core_config_lib",
+        ":quic_core_connection_context_lib",
         ":quic_core_connection_id_manager",
         ":quic_core_connection_stats_lib",
         ":quic_core_crypto_crypto_handshake_lib",
@@ -3972,6 +3993,7 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_flags.h",
         "quiche/common/platform/api/quiche_logging.h",
         "quiche/common/platform/api/quiche_prefetch.h",
+        "quiche/common/platform/api/quiche_thread_local.h",
         "quiche/common/platform/api/quiche_time_utils.h",
     ],
     repository = "@envoy",
@@ -3988,6 +4010,7 @@ envoy_cc_library(
     name = "quiche_common_platform_default_quiche_platform_impl_export_lib",
     hdrs = [
         "quiche/common/platform/default/quiche_platform_impl/quiche_export_impl.h",
+        "quiche/common/platform/default/quiche_platform_impl/quiche_thread_local_impl.h",
     ],
     repository = "@envoy",
     tags = ["nofips"],

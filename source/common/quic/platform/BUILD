@@ -276,10 +276,3 @@ envoy_cc_library(
         "@com_googlesource_quiche//:quiche_common_lib",
     ],
 )
-
-envoy_cc_library(
-    name = "quiche_common_platform_export_impl_lib",
-    hdrs = ["quiche_export_impl.h"],
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-)
