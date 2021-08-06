@@ -131,8 +131,12 @@ public:
     envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
 
+    // Only cares DNS factory will call into this function.
+    // Directly unpack the typed config to a cares object.
     typed_dns_resolver_config.typed_config().UnpackTo(&cares);
-    dns_resolver_options.MergeFrom(cares.dns_resolver_options());
+    if (cares.has_dns_resolver_options()) {
+      dns_resolver_options.MergeFrom(cares.dns_resolver_options());
+    }
     if (!cares.resolvers().empty()) {
       const auto& resolver_addrs = cares.resolvers();
       resolvers.reserve(resolver_addrs.size());
