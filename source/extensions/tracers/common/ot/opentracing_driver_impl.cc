@@ -70,8 +70,7 @@ public:
         [cb = std::move(f)](absl::string_view key, absl::string_view val) {
           opentracing::string_view opentracing_key{key.data(), key.length()};
           opentracing::string_view opentracing_val{val.data(), val.length()};
-          cb(opentracing_key, opentracing_val);
-          return true;
+          return static_cast<bool>(cb(opentracing_key, opentracing_val));
         });
     return {};
   }
