@@ -428,9 +428,9 @@ private:
       void drainConnPools(const HostVector& hosts_removed);
 
     private:
-      Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
-                                               absl::optional<Http::Protocol> downstream_protocol,
-                                               LoadBalancerContext* context, bool peek);
+      Http::ConnectionPool::Instance* httpConnPool(ResourcePriority priority,
+                                                   absl::optional<Http::Protocol> downstream_protocol,
+                                                   LoadBalancerContext* context, bool peek);
 
       Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
                                                  LoadBalancerContext* context, bool peek);
