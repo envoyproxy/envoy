@@ -80,6 +80,21 @@ jbyteArray native_data_to_array(JNIEnv* env, envoy_data data) {
   return j_data;
 }
 
+jobject native_map_to_map(JNIEnv* env, envoy_map map) {
+  jclass jcls_hashMap = env->FindClass("java/util/HashMap");
+  jmethodID jmid_hashMapInit = env->GetMethodID(jcls_hashMap, "<init>", "(I)V");
+  jobject j_hashMap = env->NewObject(jcls_hashMap, jmid_hashMapInit, map.length);
+  jmethodID jmid_hashMapPut = env->GetMethodID(
+      jcls_hashMap, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+  for (envoy_map_size_t i = 0; i < map.length; i++) {
+    env->CallObjectMethod(j_hashMap, jmid_hashMapPut,
+                          native_data_to_string(env, map.entries[i].key),
+                          native_data_to_string(env, map.entries[i].value));
+  }
+  env->DeleteLocalRef(jcls_hashMap);
+  return j_hashMap;
+}
+
 envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data) {
   uint8_t* direct_address = static_cast<uint8_t*>(env->GetDirectBufferAddress(j_data));
 

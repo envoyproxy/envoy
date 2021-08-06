@@ -299,7 +299,9 @@ Specify a closure to be called when Envoy's engine emits an event.
 **Example**::
 
   // Kotlin
-  // This interface is pending for Kotlin
+  builder.setEventTracker ({
+    // Track the events. Events are passed in as Map<String, String>.
+  })
 
   // Swift
   builder.setEventTracker { event in

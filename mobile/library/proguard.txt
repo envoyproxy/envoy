@@ -11,6 +11,10 @@
     native <methods>;
 }
 
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker {
+   <methods>;
+}
+
 -keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning {
    <methods>;
 }

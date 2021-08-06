@@ -32,6 +32,16 @@ envoy_data array_to_native_data(JNIEnv* env, jbyteArray j_data);
  */
 jbyteArray native_data_to_array(JNIEnv* env, envoy_data data);
 
+/**
+ * Utility function that copies envoy_map to a java HashMap jobject.
+ *
+ * @param env, the JNI env pointer.
+ * @param envoy_map, the source to copy from.
+ *
+ * @return jobject, copied data. It is up to the function caller to clean up memory.
+ */
+jobject native_map_to_map(JNIEnv* env, envoy_map map);
+
 jstring native_data_to_string(JNIEnv* env, envoy_data data);
 
 envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data);
