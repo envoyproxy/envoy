@@ -41,7 +41,9 @@ class async_subprocess:  # noqa: N801
         # on the machine.
         with concurrent.futures.ProcessPoolExecutor() as pool:
             futures = asyncio.as_completed(
-                tuple(asyncio.ensure_future(cls.run(command, executor=pool, **kwargs)) for command in commands))
+                tuple(
+                    asyncio.ensure_future(cls.run(command, executor=pool, **kwargs))
+                    for command in commands))
             for result in futures:
                 yield await result
 
