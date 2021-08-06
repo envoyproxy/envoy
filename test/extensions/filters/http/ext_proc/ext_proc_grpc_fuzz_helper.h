@@ -1,5 +1,5 @@
-#ifndef TEST_EXTENSIONS_FILTERS_HTTP_EXT_PROC_EXT_PROC_GRPC_FUZZ_HELPER_H__
-#define TEST_EXTENSIONS_FILTERS_HTTP_EXT_PROC_EXT_PROC_GRPC_FUZZ_HELPER_H__
+#ifndef TEST_EXTENSIONS_FILTERS_HTTP_EXT_PROC_EXT_PROC_GRPC_FUZZ_HELPER_H_
+#define TEST_EXTENSIONS_FILTERS_HTTP_EXT_PROC_EXT_PROC_GRPC_FUZZ_HELPER_H_
 
 #include <mutex>
 
@@ -15,7 +15,6 @@
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/utility.h"
 
-// TODO(ikepolinsky): what namespace should this helper class be in?
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -129,5 +128,4 @@ public:
 } // namespace Extensions
 } // namespace Envoy
 
-
-#endif  // TEST_EXTENSIONS_FILTERS_HTTP_EXT_PROC_EXT_PROC_GRPC_FUZZ_HELPER_H__
+#endif  // TEST_EXTENSIONS_FILTERS_HTTP_EXT_PROC_EXT_PROC_GRPC_FUZZ_HELPER_H_
