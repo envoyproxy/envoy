@@ -264,7 +264,8 @@ message Bootstrap {
 
   // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
   // or any other DNS resolver types and the related parameters.
-  // For example, an object of :ref:`DnsResolutionConfig <envoy_v3_api_msg_config.core.v3.DnsResolutionConfig>`
+  // For example, an object of
+  // :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>'
   // can be packed into this *typed_dns_resolver_config*. This configuration will replace the
   // :ref:'dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>'
   // configuration eventually.
@@ -273,7 +274,6 @@ message Bootstrap {
   // this configuration is optional.
   // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
   // When *typed_dns_resolver_config* is missing, the default behavior is in place.
-  // [#not-implemented-hide:]
   core.v3.TypedExtensionConfig typed_dns_resolver_config = 31;
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.

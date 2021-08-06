@@ -128,7 +128,7 @@ private:
 
 class AppleDnsResolverFactoryImpl : public DnsResolverFactory {
 public:
-  std::string name() const override { return "envoy.dns_resolver.apple"; }
+  std::string name() const override { return apple_dns_resolver; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{
         new envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig()};

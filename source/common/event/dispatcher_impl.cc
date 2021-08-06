@@ -170,7 +170,7 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
   dns_resolver_factory =
       &Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(typed_dns_resolver_config);
 
-  ENVOY_LOG(info, "create DNS resolver type: {}", typed_dns_resolver_config.name());
+  ENVOY_LOG(debug, "create DNS resolver type: {}", typed_dns_resolver_config.name());
   return dns_resolver_factory->createDnsResolverCb(*this, api_, typed_dns_resolver_config);
 }
 

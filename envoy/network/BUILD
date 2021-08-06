@@ -70,6 +70,7 @@ envoy_cc_library(
         ":dns_interface",
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
+        "//source/common/config:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",

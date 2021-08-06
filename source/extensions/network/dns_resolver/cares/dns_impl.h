@@ -117,7 +117,7 @@ private:
 
 class CaresDnsResolverFactoryImpl : public DnsResolverFactory {
 public:
-  std::string name() const override { return "envoy.dns_resolver.cares"; }
+  std::string name() const override { return cares_dns_resolver; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{
