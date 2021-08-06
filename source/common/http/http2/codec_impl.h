@@ -300,7 +300,7 @@ protected:
     void addEncodedBytes(size_t newly_encoded_bytes) override {
       encoded_bytes_ += newly_encoded_bytes;
       if (info_) {
-        info_->setWireBytesSent(encoded_bytes_);
+        info_->addWireBytesSent(newly_encoded_bytes);
       }
       ENVOY_CONN_LOG(trace, "stream id {}:update encoded bytes {}\n", parent_.connection_,
                      stream_id_, encoded_bytes_);
@@ -317,7 +317,7 @@ protected:
       ENVOY_CONN_LOG(trace, "stream id {}:update decoded bytes {}\n", parent_.connection_,
                      stream_id_, decoded_bytes_);
       if (info_) {
-        info_->setWireBytesReceived(decoded_bytes_);
+        info_->addWireBytesReceived(newly_decoded_bytes);
       }
     }
 

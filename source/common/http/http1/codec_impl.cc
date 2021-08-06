@@ -104,7 +104,7 @@ void StreamEncoderImpl::addEncodedBytes(size_t newly_encoded_bytes) {
   ENVOY_CONN_LOG(trace, "h1: update encoded bytes {}\n", connection_.connection(), encoded_bytes_);
   encoded_bytes_ += newly_encoded_bytes;
   if (info_) {
-    info_->setWireBytesSent(encoded_bytes_);
+    info_->addWireBytesSent(newly_encoded_bytes);
   }
 }
 
@@ -117,7 +117,7 @@ void StreamEncoderImpl::addDecodedBytes(size_t newly_decoded_bytes) {
   ENVOY_CONN_LOG(trace, "h1: update decoded bytes {}\n", connection_.connection(), decoded_bytes_);
   decoded_bytes_ += newly_decoded_bytes;
   if (info_) {
-    info_->setWireBytesReceived(decoded_bytes_);
+    info_->addWireBytesReceived(newly_decoded_bytes);
   }
 }
 

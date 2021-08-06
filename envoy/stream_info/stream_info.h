@@ -297,7 +297,7 @@ public:
   /**
    * @param wire_bytes_received the total number of bytes decoded by the stream.
    */
-  virtual void setWireBytesReceived(uint64_t wire_bytes_received) PURE;
+  virtual void addWireBytesReceived(uint64_t wire_bytes_received) PURE;
 
   /**
    * @return the number of body bytes received by the stream.
@@ -430,7 +430,7 @@ public:
   /**
    * @param wire_bytes_sent the total number of bytes encoded by the stream.
    */
-  virtual void setWireBytesSent(uint64_t wire_bytes_sent) PURE;
+  virtual void addWireBytesSent(uint64_t wire_bytes_sent) PURE;
 
   /**
    * @return the number of body bytes sent in the response.

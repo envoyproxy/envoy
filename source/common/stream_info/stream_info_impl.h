@@ -128,8 +128,8 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
-  void setWireBytesReceived(const uint64_t wire_bytes_received) override {
-    wire_bytes_received_ = wire_bytes_received;
+  void addWireBytesReceived(const uint64_t wire_bytes_newly_received) override {
+    wire_bytes_received_ += wire_bytes_newly_received;
   }
 
   uint64_t wireBytesReceived() const override { return wire_bytes_received_; }
@@ -162,8 +162,8 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t bytesSent() const override { return bytes_sent_; }
 
-  void setWireBytesSent(const uint64_t wire_bytes_sent) override {
-    wire_bytes_sent_ = wire_bytes_sent;
+  void addWireBytesSent(const uint64_t wire_bytes_newly_sent) override {
+    wire_bytes_sent_ += wire_bytes_newly_sent;
   }
 
   uint64_t wireBytesSent() const override { return wire_bytes_sent_; }

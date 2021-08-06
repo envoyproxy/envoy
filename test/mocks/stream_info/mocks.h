@@ -48,7 +48,7 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, requestComplete, (), (const));
   MOCK_METHOD(void, addBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, bytesReceived, (), (const));
-  MOCK_METHOD(void, setWireBytesReceived, (uint64_t));
+  MOCK_METHOD(void, addWireBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, wireBytesReceived, (), (const));
   MOCK_METHOD(void, setRouteName, (absl::string_view route_name));
   MOCK_METHOD(const std::string&, getRouteName, (), (const));
@@ -59,7 +59,7 @@ public:
   MOCK_METHOD(const absl::optional<std::string>&, connectionTerminationDetails, (), (const));
   MOCK_METHOD(void, addBytesSent, (uint64_t));
   MOCK_METHOD(uint64_t, bytesSent, (), (const));
-  MOCK_METHOD(void, setWireBytesSent, (uint64_t));
+  MOCK_METHOD(void, addWireBytesSent, (uint64_t));
   MOCK_METHOD(uint64_t, wireBytesSent, (), (const));
   MOCK_METHOD(bool, hasResponseFlag, (ResponseFlag), (const));
   MOCK_METHOD(bool, hasAnyResponseFlag, (), (const));

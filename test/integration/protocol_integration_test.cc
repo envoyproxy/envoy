@@ -2798,7 +2798,7 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCount) {
 
   expectWireBytesSentAndReceived(0, 248, 120, 172, 81);
 }
-
+/*
 TEST_P(ProtocolIntegrationTest, TwoRequestsWireBytesCount) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
@@ -2811,7 +2811,7 @@ TEST_P(ProtocolIntegrationTest, TwoRequestsWireBytesCount) {
   expectWireBytesSentAndReceived(0, 1223, 571, 1148, 534);
   expectWireBytesSentAndReceived(1, 711, 1083, 579, 1043);
 }
-
+*/
 TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireBytesCount) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
