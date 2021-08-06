@@ -428,11 +428,11 @@ private:
       void drainConnPools(const HostVector& hosts_removed);
 
     private:
-      Http::ConnectionPool::Instance* httpConnPool(ResourcePriority priority,
+      Http::ConnectionPool::Instance* httpConnPoolImpl(ResourcePriority priority,
                                                    absl::optional<Http::Protocol> downstream_protocol,
                                                    LoadBalancerContext* context, bool peek);
 
-      Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
+      Tcp::ConnectionPool::Instance* tcpConnPoolImpl(ResourcePriority priority,
                                                  LoadBalancerContext* context, bool peek);
 
       ThreadLocalClusterManagerImpl& parent_;
