@@ -50,7 +50,8 @@ Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderM
 
   response_headers_ = &headers;
   if (end_stream) {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_bridge_convert_code_for_header_only_response")) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.grpc_bridge_convert_code_for_header_only_response")) {
       setupHttp1Status(headers.GrpcStatus(), headers.GrpcMessage());
     }
     return Http::FilterHeadersStatus::Continue;
@@ -65,7 +66,8 @@ Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance&, bool end
   }
 
   if (end_stream) {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_bridge_convert_code_for_header_only_response")) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.grpc_bridge_convert_code_for_header_only_response")) {
       setupHttp1Status(response_headers_->GrpcStatus(), response_headers_->GrpcMessage());
     }
     return Http::FilterDataStatus::Continue;
