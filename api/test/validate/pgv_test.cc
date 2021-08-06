@@ -4,13 +4,12 @@
 
 // We don't use all the headers in the test below, but including them anyway as
 // a cheap way to get some C++ compiler sanity checking.
-#include "envoy/api/v2/cluster.pb.validate.h"
-#include "envoy/api/v2/endpoint.pb.validate.h"
-#include "envoy/api/v2/listener.pb.validate.h"
-#include "envoy/api/v2/route.pb.validate.h"
-#include "envoy/api/v2/core/protocol.pb.validate.h"
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
+#include "envoy/config/cluster/v3/cluster.pb.validate.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/config/listener/v3/listener.pb.validate.h"
+#include "envoy/config/route/v3/route.pb.validate.h"
+#include "envoy/config/core/v3/protocol.pb.validate.h"
+#include "envoy/config/accesslog/v3/accesslog.pb.validate.h"
 #include "envoy/extensions/compression/gzip/decompressor/v3/gzip.pb.validate.h"
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.validate.h"
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.validate.h"
@@ -26,9 +25,7 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
-#include "envoy/api/v2/listener/listener.pb.validate.h"
-#include "envoy/api/v2/route/route.pb.validate.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 
 #include "google/protobuf/text_format.h"
 
@@ -53,8 +50,8 @@ template <class Proto> struct TestCase {
 
 // Basic protoc-gen-validate C++ validation header inclusion and Validate calls
 // from data plane API.
-int main(int argc, char* argv[]) {
-  envoy::config::bootstrap::v2::Bootstrap invalid_bootstrap;
+int main(int /*argc*/, char* /*argv*/[]) {
+  envoy::config::bootstrap::v3::Bootstrap invalid_bootstrap;
   invalid_bootstrap.mutable_static_resources()->add_clusters();
   // This is a baseline test of the validation features we care about. It's
   // probably not worth adding in every filter and field that we want to valid
@@ -68,12 +65,12 @@ int main(int argc, char* argv[]) {
     address { pipe { path: "/" } }
   }
   )EOF";
-  envoy::config::bootstrap::v2::Bootstrap valid_bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap valid_bootstrap;
   if (!google::protobuf::TextFormat::ParseFromString(valid_bootstrap_text, &valid_bootstrap)) {
     std::cerr << "Unable to parse text proto: " << valid_bootstrap_text << std::endl;
     exit(EXIT_FAILURE);
   }
-  TestCase<envoy::config::bootstrap::v2::Bootstrap>{invalid_bootstrap, valid_bootstrap}.run();
+  TestCase<envoy::config::bootstrap::v3::Bootstrap>{invalid_bootstrap, valid_bootstrap}.run();
 
   exit(EXIT_SUCCESS);
 }

@@ -54,7 +54,9 @@ api_proto_package($fields)
 IGNORED_V2_PROTOS = [
     "envoy/config/accesslog/v2",
     "envoy/config/cluster/aggregate/v2alpha",
+    "envoy/config/cluster/dynamic_forward_proxy/v2alpha",
     "envoy/config/cluster/redis",
+    "envoy/config/common/dynamic_forward_proxy/v2alpha",
     "envoy/config/common/tap/v2alpha",
     "envoy/config/filter/dubbo/router/v2alpha1",
     "envoy/config/filter/http/adaptive_concurrency/v2alpha",

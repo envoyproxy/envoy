@@ -157,6 +157,53 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 1);
 }
 
+// Make sure all workers pick up connections
+TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
+  concurrency_ = 2;
+  initialize();
+
+  std::string worker0_stat_name, worker1_stat_name;
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    worker0_stat_name = "listener.127.0.0.1_0.worker_0.downstream_cx_total";
+    worker1_stat_name = "listener.127.0.0.1_0.worker_1.downstream_cx_total";
+  } else {
+    worker0_stat_name = "listener.[__1]_0.worker_0.downstream_cx_total";
+    worker1_stat_name = "listener.[__1]_0.worker_1.downstream_cx_total";
+  }
+
+  test_server_->waitForCounterEq(worker0_stat_name, 0);
+  test_server_->waitForCounterEq(worker1_stat_name, 0);
+
+  // We set the counters for the two workers to see how many connections each handles.
+  uint64_t w0_ctr = 0;
+  uint64_t w1_ctr = 0;
+  constexpr int loops = 5;
+  for (int i = 0; i < loops; i++) {
+    constexpr int requests_per_loop = 4;
+    std::array<IntegrationCodecClientPtr, requests_per_loop> connections;
+    for (int j = 0; j < requests_per_loop; j++) {
+      connections[j] = makeHttpConnection(lookupPort("http"));
+    }
+
+    auto worker0_ctr = test_server_->counter(worker0_stat_name);
+    auto worker1_ctr = test_server_->counter(worker1_stat_name);
+    auto target = w0_ctr + w1_ctr + requests_per_loop;
+    while (test_server_->counter(worker0_stat_name)->value() +
+               test_server_->counter(worker1_stat_name)->value() <
+           target) {
+      timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+    }
+    w0_ctr = test_server_->counter(worker0_stat_name)->value();
+    w1_ctr = test_server_->counter(worker1_stat_name)->value();
+    for (int j = 0; j < requests_per_loop; j++) {
+      connections[j]->close();
+    }
+  }
+
+  EXPECT_TRUE(w0_ctr > 1);
+  EXPECT_TRUE(w1_ctr > 1);
+}
+
 TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
   const std::string body = "Response body";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
