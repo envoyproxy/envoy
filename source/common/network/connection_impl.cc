@@ -99,6 +99,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
   // TODO(soulxu): generate the connection id inside the addressProvider directly,
   // then we don't need a setter or any of the optional stuff.
   socket_->addressProvider().setConnectionID(id());
+  socket_->addressProvider().setSslConnection(transport_socket_->ssl());
 }
 
 ConnectionImpl::~ConnectionImpl() {

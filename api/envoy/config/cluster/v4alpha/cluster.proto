@@ -11,7 +11,7 @@ import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/core/v4alpha/health_check.proto";
 import "envoy/config/core/v4alpha/resolver.proto";
-import "envoy/config/endpoint/v3/endpoint.proto";
+import "envoy/config/endpoint/v4alpha/endpoint.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/any.proto";
@@ -744,7 +744,7 @@ message Cluster {
   //   Setting this allows non-EDS cluster types to contain embedded EDS equivalent
   //   :ref:`endpoint assignments<envoy_v3_api_msg_config.endpoint.v3.ClusterLoadAssignment>`.
   //
-  endpoint.v3.ClusterLoadAssignment load_assignment = 33;
+  endpoint.v4alpha.ClusterLoadAssignment load_assignment = 33;
 
   // Optional :ref:`active health checking <arch_overview_health_checking>`
   // configuration for the cluster. If no

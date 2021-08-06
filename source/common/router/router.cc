@@ -602,15 +602,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       headers.setEnvoyAttemptCount(attempt_count_);
     };
   }
+  callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
   // Inject the active span's tracing context into the request headers.
   callbacks_->activeSpan().injectContext(headers);
 
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
-  FilterUtility::setUpstreamScheme(headers,
-                                   callbacks_->streamInfo().downstreamSslConnection() != nullptr,
-                                   host->transportSocketFactory().implementsSecureTransport());
+  FilterUtility::setUpstreamScheme(
+      headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr,
+      host->transportSocketFactory().implementsSecureTransport());
 
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
@@ -1354,6 +1355,14 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   downstream_response_started_ = true;
   final_upstream_request_ = &upstream_request;
+  // In upstream request hedging scenarios the upstream connection ID set in onPoolReady might not
+  // be the connection ID of the upstream connection that ended up receiving upstream headers. Thus
+  // reset the upstream connection ID here with the ID of the connection that ultimately was the
+  // transport for the final upstream request.
+  if (final_upstream_request_->streamInfo().upstreamConnectionId().has_value()) {
+    callbacks_->streamInfo().setUpstreamConnectionId(
+        final_upstream_request_->streamInfo().upstreamConnectionId().value());
+  }
   resetOtherUpstreams(upstream_request);
   if (end_stream) {
     onUpstreamComplete(upstream_request);
@@ -1605,6 +1614,7 @@ void Filter::doRetry() {
 
   is_retry_ = true;
   attempt_count_++;
+  callbacks_->streamInfo().setAttemptCount(attempt_count_);
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
 

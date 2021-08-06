@@ -502,14 +502,16 @@ bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& s
   const TlsContextMatchCriteria& criteria = *tlsContextMatchCriteria();
 
   if (criteria.presented().has_value()) {
-    const bool peer_presented = stream_info.downstreamSslConnection() &&
-                                stream_info.downstreamSslConnection()->peerCertificatePresented();
+    const bool peer_presented =
+        stream_info.downstreamAddressProvider().sslConnection() &&
+        stream_info.downstreamAddressProvider().sslConnection()->peerCertificatePresented();
     matches &= criteria.presented().value() == peer_presented;
   }
 
   if (criteria.validated().has_value()) {
-    const bool peer_validated = stream_info.downstreamSslConnection() &&
-                                stream_info.downstreamSslConnection()->peerCertificateValidated();
+    const bool peer_validated =
+        stream_info.downstreamAddressProvider().sslConnection() &&
+        stream_info.downstreamAddressProvider().sslConnection()->peerCertificateValidated();
     matches &= criteria.validated().value() == peer_validated;
   }
 

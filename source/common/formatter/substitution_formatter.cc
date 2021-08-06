@@ -655,11 +655,11 @@ public:
   StreamInfoSslConnectionInfoFieldExtractor(FieldExtractor f) : field_extractor_(f) {}
 
   absl::optional<std::string> extract(const StreamInfo::StreamInfo& stream_info) const override {
-    if (stream_info.downstreamSslConnection() == nullptr) {
+    if (stream_info.downstreamAddressProvider().sslConnection() == nullptr) {
       return absl::nullopt;
     }
 
-    const auto value = field_extractor_(*stream_info.downstreamSslConnection());
+    const auto value = field_extractor_(*stream_info.downstreamAddressProvider().sslConnection());
     if (value && value->empty()) {
       return absl::nullopt;
     }
@@ -668,11 +668,11 @@ public:
   }
 
   ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
-    if (stream_info.downstreamSslConnection() == nullptr) {
+    if (stream_info.downstreamAddressProvider().sslConnection() == nullptr) {
       return unspecifiedValue();
     }
 
-    const auto value = field_extractor_(*stream_info.downstreamSslConnection());
+    const auto value = field_extractor_(*stream_info.downstreamAddressProvider().sslConnection());
     if (value && value->empty()) {
       return unspecifiedValue();
     }
@@ -1136,8 +1136,10 @@ GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&,
 
 MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
                                      const std::vector<std::string>& path,
-                                     absl::optional<size_t> max_length)
-    : filter_namespace_(filter_namespace), path_(path), max_length_(max_length) {}
+                                     absl::optional<size_t> max_length,
+                                     MetadataFormatter::GetMetadataFunction get_func)
+    : filter_namespace_(filter_namespace), path_(path), max_length_(max_length),
+      get_func_(get_func) {}
 
 absl::optional<std::string>
 MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metadata) const {
@@ -1177,54 +1179,46 @@ MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& 
   return val;
 }
 
+absl::optional<std::string> MetadataFormatter::format(const Http::RequestHeaderMap&,
+                                                      const Http::ResponseHeaderMap&,
+                                                      const Http::ResponseTrailerMap&,
+                                                      const StreamInfo::StreamInfo& stream_info,
+                                                      absl::string_view) const {
+  auto metadata = get_func_(stream_info);
+  return (metadata != nullptr) ? formatMetadata(*metadata) : absl::nullopt;
+}
+
+ProtobufWkt::Value MetadataFormatter::formatValue(const Http::RequestHeaderMap&,
+                                                  const Http::ResponseHeaderMap&,
+                                                  const Http::ResponseTrailerMap&,
+                                                  const StreamInfo::StreamInfo& stream_info,
+                                                  absl::string_view) const {
+  auto metadata = get_func_(stream_info);
+  return formatMetadataValue((metadata != nullptr) ? *metadata
+                                                   : envoy::config::core::v3::Metadata());
+}
 // TODO(glicht): Consider adding support for route/listener/cluster metadata as suggested by
 // @htuch. See: https://github.com/envoyproxy/envoy/issues/3006
 DynamicMetadataFormatter::DynamicMetadataFormatter(const std::string& filter_namespace,
                                                    const std::vector<std::string>& path,
                                                    absl::optional<size_t> max_length)
-    : MetadataFormatter(filter_namespace, path, max_length) {}
-
-absl::optional<std::string> DynamicMetadataFormatter::format(
-    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-    const StreamInfo::StreamInfo& stream_info, absl::string_view) const {
-  return MetadataFormatter::formatMetadata(stream_info.dynamicMetadata());
-}
-
-ProtobufWkt::Value DynamicMetadataFormatter::formatValue(const Http::RequestHeaderMap&,
-                                                         const Http::ResponseHeaderMap&,
-                                                         const Http::ResponseTrailerMap&,
-                                                         const StreamInfo::StreamInfo& stream_info,
-                                                         absl::string_view) const {
-  return MetadataFormatter::formatMetadataValue(stream_info.dynamicMetadata());
-}
+    : MetadataFormatter(filter_namespace, path, max_length,
+                        [](const StreamInfo::StreamInfo& stream_info) {
+                          return &stream_info.dynamicMetadata();
+                        }) {}
 
 ClusterMetadataFormatter::ClusterMetadataFormatter(const std::string& filter_namespace,
                                                    const std::vector<std::string>& path,
                                                    absl::optional<size_t> max_length)
-    : MetadataFormatter(filter_namespace, path, max_length) {}
-
-absl::optional<std::string> ClusterMetadataFormatter::format(
-    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-    const StreamInfo::StreamInfo& stream_info, absl::string_view) const {
-  auto cluster_info = stream_info.upstreamClusterInfo();
-  if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
-    return absl::nullopt;
-  }
-  return MetadataFormatter::formatMetadata(cluster_info.value()->metadata());
-}
-
-ProtobufWkt::Value ClusterMetadataFormatter::formatValue(const Http::RequestHeaderMap&,
-                                                         const Http::ResponseHeaderMap&,
-                                                         const Http::ResponseTrailerMap&,
-                                                         const StreamInfo::StreamInfo& stream_info,
-                                                         absl::string_view) const {
-  auto cluster_info = stream_info.upstreamClusterInfo();
-  if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
-    // Let the formatter do its thing with empty metadata.
-    return MetadataFormatter::formatMetadataValue(envoy::config::core::v3::Metadata());
-  }
-  return MetadataFormatter::formatMetadataValue(cluster_info.value()->metadata());
-}
+    : MetadataFormatter(filter_namespace, path, max_length,
+                        [](const StreamInfo::StreamInfo& stream_info)
+                            -> const envoy::config::core::v3::Metadata* {
+                          auto cluster_info = stream_info.upstreamClusterInfo();
+                          if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
+                            return nullptr;
+                          }
+                          return &cluster_info.value()->metadata();
+                        }) {}
 
 FilterStateFormatter::FilterStateFormatter(const std::string& key,
                                            absl::optional<size_t> max_length,
@@ -1335,7 +1329,8 @@ DownstreamPeerCertVStartFormatter::DownstreamPeerCertVStartFormatter(const std::
           parseFormat(token, sizeof("DOWNSTREAM_PEER_CERT_V_START(") - 1),
           std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
-                const auto connection_info = stream_info.downstreamSslConnection();
+                const auto connection_info =
+                    stream_info.downstreamAddressProvider().sslConnection();
                 return connection_info != nullptr ? connection_info->validFromPeerCertificate()
                                                   : absl::optional<SystemTime>();
               })) {}
@@ -1347,7 +1342,8 @@ DownstreamPeerCertVEndFormatter::DownstreamPeerCertVEndFormatter(const std::stri
           parseFormat(token, sizeof("DOWNSTREAM_PEER_CERT_V_END(") - 1),
           std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
-                const auto connection_info = stream_info.downstreamSslConnection();
+                const auto connection_info =
+                    stream_info.downstreamAddressProvider().sslConnection();
                 return connection_info != nullptr ? connection_info->expirationPeerCertificate()
                                                   : absl::optional<SystemTime>();
               })) {}
