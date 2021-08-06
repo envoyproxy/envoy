@@ -285,6 +285,8 @@ AssertionResult FakeStream::waitForReset(milliseconds timeout) {
 }
 
 void FakeStream::startGrpcStream() {
+  ASSERT(!grpc_stream_started_, "gRPC stream should not be started more than once");
+  grpc_stream_started_ = true;
   encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 }
 
