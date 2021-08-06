@@ -1556,7 +1556,6 @@ public:
 TEST_F(AsyncClientImplUnitTest, RouteImplInitTest) {
   EXPECT_EQ(nullptr, route_impl_.decorator());
   EXPECT_EQ(nullptr, route_impl_.tracingConfig());
-  EXPECT_EQ(nullptr, route_impl_.perFilterConfig(""));
   EXPECT_EQ(Code::InternalServerError, route_impl_.routeEntry()->clusterNotFoundResponseCode());
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->corsPolicy());
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->hashPolicy());
@@ -1573,13 +1572,11 @@ TEST_F(AsyncClientImplUnitTest, RouteImplInitTest) {
   EXPECT_TRUE(route_impl_.routeEntry()->metadata().filter_metadata().empty());
   EXPECT_EQ(nullptr,
             route_impl_.routeEntry()->typedMetadata().get<Config::TypedMetadata::Object>("bar"));
-  EXPECT_EQ(nullptr, route_impl_.routeEntry()->perFilterConfig("bar"));
   EXPECT_TRUE(route_impl_.routeEntry()->upgradeMap().empty());
   EXPECT_EQ(false, route_impl_.routeEntry()->internalRedirectPolicy().enabled());
   EXPECT_TRUE(route_impl_.routeEntry()->shadowPolicies().empty());
   EXPECT_TRUE(route_impl_.routeEntry()->virtualHost().rateLimitPolicy().empty());
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->virtualHost().corsPolicy());
-  EXPECT_EQ(nullptr, route_impl_.routeEntry()->virtualHost().perFilterConfig("bar"));
   EXPECT_FALSE(route_impl_.routeEntry()->virtualHost().includeAttemptCountInRequest());
   EXPECT_FALSE(route_impl_.routeEntry()->virtualHost().includeAttemptCountInResponse());
   EXPECT_FALSE(route_impl_.routeEntry()->virtualHost().routeConfig().usesVhds());

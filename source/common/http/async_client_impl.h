@@ -190,9 +190,6 @@ private:
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     const Router::Config& routeConfig() const override { return route_configuration_; }
-    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
-      return nullptr;
-    }
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
     uint32_t retryShadowBufferLimit() const override {
@@ -295,9 +292,6 @@ private:
       return path_match_criterion_;
     }
 
-    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
-      return nullptr;
-    }
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return connect_config_nullopt_;
     }
@@ -338,9 +332,13 @@ private:
     const Router::RouteEntry* routeEntry() const override { return &route_entry_; }
     const Router::Decorator* decorator() const override { return nullptr; }
     const Router::RouteTracing* tracingConfig() const override { return nullptr; }
-    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
+    const Router::RouteSpecificFilterConfig*
+    mostSpecificPerFilterConfig(const std::string&) const override {
       return nullptr;
     }
+    void traversePerFilterConfig(
+        const std::string&,
+        std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
 
     RouteEntryImpl route_entry_;
   };

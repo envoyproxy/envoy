@@ -127,9 +127,12 @@ public:
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
   const RouteTracing* tracingConfig() const override { return nullptr; }
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
+  const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override {
     return nullptr;
   }
+  void traversePerFilterConfig(
+      const std::string&,
+      std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
 
 private:
   static const SslRedirector SSL_REDIRECTOR;
@@ -207,7 +210,7 @@ public:
   Stats::StatName statName() const override { return stat_name_storage_.statName(); }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
+  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const;
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
   const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() const {
@@ -586,7 +589,14 @@ public:
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
   const RouteTracing* tracingConfig() const override { return route_tracing_.get(); }
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
+  const RouteSpecificFilterConfig*
+  mostSpecificPerFilterConfig(const std::string& name) const override {
+    auto* config = per_filter_configs_.get(name);
+    return config ? config : vhost_.perFilterConfig(name);
+  }
+  void traversePerFilterConfig(
+      const std::string& filter_name,
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
 protected:
   const bool case_sensitive_;
@@ -732,9 +742,14 @@ private:
     const RouteEntry* routeEntry() const override { return this; }
     const Decorator* decorator() const override { return parent_->decorator(); }
     const RouteTracing* tracingConfig() const override { return parent_->tracingConfig(); }
-
-    const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override {
-      return parent_->perFilterConfig(name);
+    const RouteSpecificFilterConfig*
+    mostSpecificPerFilterConfig(const std::string& name) const override {
+      return parent_->mostSpecificPerFilterConfig(name);
+    }
+    void traversePerFilterConfig(
+        const std::string& filter_name,
+        std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override {
+      parent_->traversePerFilterConfig(filter_name, cb);
     };
 
   private:
@@ -784,7 +799,15 @@ private:
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                     bool do_formatting = true) const override;
 
-    const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
+    const RouteSpecificFilterConfig*
+    mostSpecificPerFilterConfig(const std::string& name) const override {
+      auto* config = per_filter_configs_.get(name);
+      return config ? config : DynamicRouteEntry::mostSpecificPerFilterConfig(name);
+    }
+
+    void traversePerFilterConfig(
+        const std::string& filter_name,
+        std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
   private:
     const std::string runtime_key_;
