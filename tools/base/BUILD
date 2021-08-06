@@ -6,6 +6,8 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_py_library("tools.base.aio")
+
 envoy_py_library(
     "tools.base.runner",
     deps = [
