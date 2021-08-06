@@ -299,6 +299,9 @@ protected:
 
     void addEncodedBytes(size_t newly_encoded_bytes) override {
       encoded_bytes_ += newly_encoded_bytes;
+      if (info_) {
+        info_->setWireBytesSent(encoded_bytes_);
+      }
       ENVOY_CONN_LOG(trace, "stream id {}:update encoded bytes {}\n", parent_.connection_,
                      stream_id_, encoded_bytes_);
     }
@@ -313,14 +316,19 @@ protected:
       decoded_bytes_ += newly_decoded_bytes;
       ENVOY_CONN_LOG(trace, "stream id {}:update decoded bytes {}\n", parent_.connection_,
                      stream_id_, decoded_bytes_);
+      if (info_) {
+        info_->setWireBytesReceived(decoded_bytes_);
+      }
     }
 
+    void setStreamInfo(StreamInfo::StreamInfo& info) override { info_ = &info; }
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
     uint64_t encoded_bytes_{0};
     uint64_t decoded_bytes_{0};
+    StreamInfo::StreamInfo* info_{};
 
     Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
     // Note that in current implementation the watermark callbacks of the pending_recv_data_ are

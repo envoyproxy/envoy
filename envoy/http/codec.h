@@ -370,6 +370,8 @@ public:
   virtual uint64_t decodedBytes() PURE;
 
   virtual void addDecodedBytes(size_t newly_received_bytes) PURE;
+
+  virtual void setStreamInfo(StreamInfo::StreamInfo&) {}
 };
 
 /**

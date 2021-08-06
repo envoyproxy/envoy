@@ -91,6 +91,8 @@ public:
 
   void addDecodedBytes(size_t newly_received_bytes) override;
 
+  void setStreamInfo(StreamInfo::StreamInfo& info) override { info_ = &info; }
+
 protected:
   StreamEncoderImpl(ConnectionImpl& connection);
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, absl::optional<uint64_t> status,
@@ -140,6 +142,7 @@ private:
   absl::string_view details_;
   uint64_t encoded_bytes_{0};
   uint64_t decoded_bytes_{0};
+  StreamInfo::StreamInfo* info_{};
 };
 
 /**

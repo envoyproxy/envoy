@@ -199,7 +199,7 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
                     .value());
 
   Buffer::OwnedImpl data;
-  EXPECT_CALL(encoder_, getStream()).Times(2).WillRepeatedly(ReturnRef(stream_));
+  EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
   response_decoder_->decodeData(data, true);
 }
 

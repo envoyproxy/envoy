@@ -389,7 +389,6 @@ void UpstreamRequest::onPoolReady(
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
   upstream_ = std::move(upstream);
-  upstream_->setStreamInfo(stream_info_);
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
 
@@ -418,6 +417,7 @@ void UpstreamRequest::onPoolReady(
 
   stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
   parent_.callbacks()->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
+  upstream_->setStreamInfo(parent_.callbacks()->streamInfo());
 
   if (parent_.downstreamEndStream()) {
     setupPerTryTimeout();

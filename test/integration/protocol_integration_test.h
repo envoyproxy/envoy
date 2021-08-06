@@ -23,7 +23,7 @@ public:
                                       int h1_wire_bytes_received, int h2_wire_bytes_sent,
                                       int h2_wire_bytes_received) {
     auto integer_near = [](int x, int y) -> bool { return std::abs(x - y) <= (x / 30); };
-    std::string access_log = waitForAccessLog(upstream_access_log_name_, log_id);
+    std::string access_log = waitForAccessLog(access_log_name_, log_id);
     std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
     int wire_bytes_sent = std::stoi(log_entries[0]),
         wire_bytes_received = std::stoi(log_entries[1]);
