@@ -10,15 +10,8 @@ the :ref:`dynamic forward proxy <arch_overview_http_dynamic_forward_proxy>` syst
 composed of a cluster and a filter);
 the udp :ref:`dns filter <arch_overview_dns_filter>`, etc.
 Envoy uses `c-ares <https://github.com/c-ares/c-ares>`_ as a third party DNS resolution library.
-On Apple OSes Envoy additionally offers resolution using Apple specific APIs.
-
-Envoy DNS is an extension point. To use a specific DNS resolver, corresponding DNS library need to be enabled in
-source/extensions/extensions_build_config.bzl file. And appropriate configurations need to be added in the envoy
-running config. More details please follow documents (
-:ref:'CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>'
-:ref:'AppleDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig>'
-).
-
+On Apple OSes Envoy additionally offers resolution using Apple specific APIs via the
+``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime feature.
 
 The Apple-based DNS Resolver emits the following stats rooted in the ``dns.apple`` stats tree:
 
