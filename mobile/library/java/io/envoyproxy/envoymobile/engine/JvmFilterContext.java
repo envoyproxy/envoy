@@ -47,9 +47,10 @@ class JvmFilterContext {
    *
    * @param headerCount, the total number of headers included in this header block.
    * @param endStream,   whether this header block is the final remote frame.
+   * @param ignored,     StreamIntel not yet supported by filter callbacks.
    * @return Object[],   pair of HTTP filter status and optional modified headers.
    */
-  public Object onRequestHeaders(long headerCount, boolean endStream) {
+  public Object onRequestHeaders(long headerCount, boolean endStream, long[] ignored) {
     assert headerUtility.validateCount(headerCount);
     final Map headers = headerUtility.retrieveHeaders();
     return toJniFilterHeadersStatus(filter.onRequestHeaders(headers, endStream));
@@ -60,9 +61,10 @@ class JvmFilterContext {
    *
    * @param data,      chunk of body data from the HTTP request.
    * @param endStream, indicates this is the last remote frame of the stream.
+   * @param ignored,   StreamIntel not yet supported by filter callbacks.
    * @return Object[], pair of HTTP filter status and optional modified data.
    */
-  public Object onRequestData(byte[] data, boolean endStream) {
+  public Object onRequestData(byte[] data, boolean endStream, long[] ignored) {
     ByteBuffer dataBuffer = ByteBuffer.wrap(data);
     return toJniFilterDataStatus(filter.onRequestData(dataBuffer, endStream));
   }
@@ -71,9 +73,10 @@ class JvmFilterContext {
    * Invokes onTrailers callback using trailers passed via passHeaders.
    *
    * @param trailerCount, the total number of trailers included in this header block.
+   * @param ignored,      StreamIntel not yet supported by filter callbacks.
    * @return Object[],    pair of HTTP filter status and optional modified trailers.
    */
-  public Object onRequestTrailers(long trailerCount) {
+  public Object onRequestTrailers(long trailerCount, long[] ignored) {
     assert headerUtility.validateCount(trailerCount);
     final Map trailers = headerUtility.retrieveHeaders();
     return toJniFilterTrailersStatus(filter.onRequestTrailers(trailers));
@@ -84,9 +87,10 @@ class JvmFilterContext {
    *
    * @param headerCount, the total number of headers included in this header block.
    * @param endStream,   whether this header block is the final remote frame.
+   * @param ignored,     StreamIntel not yet supported by filter callbacks.
    * @return Object[],   pair of HTTP filter status and optional modified headers.
    */
-  public Object onResponseHeaders(long headerCount, boolean endStream) {
+  public Object onResponseHeaders(long headerCount, boolean endStream, long[] ignored) {
     assert headerUtility.validateCount(headerCount);
     final Map headers = headerUtility.retrieveHeaders();
     return toJniFilterHeadersStatus(filter.onResponseHeaders(headers, endStream));
@@ -97,9 +101,10 @@ class JvmFilterContext {
    *
    * @param data,      chunk of body data from the HTTP response.
    * @param endStream, indicates this is the last remote frame of the stream.
+   * @param ignored,   StreamIntel not yet supported by filter callbacks.
    * @return Object[], pair of HTTP filter status and optional modified data.
    */
-  public Object onResponseData(byte[] data, boolean endStream) {
+  public Object onResponseData(byte[] data, boolean endStream, long[] ignored) {
     ByteBuffer dataBuffer = ByteBuffer.wrap(data);
     return toJniFilterDataStatus(filter.onResponseData(dataBuffer, endStream));
   }
@@ -108,9 +113,10 @@ class JvmFilterContext {
    * Invokes onTrailers callback using trailers passed via passHeaders.
    *
    * @param trailerCount, the total number of trailers included in this header block.
+   * @param ignored,      StreamIntel not yet supported by filter callbacks.
    * @return Object[],    pair of HTTP filter status and optional modified trailers.
    */
-  public Object onResponseTrailers(long trailerCount) {
+  public Object onResponseTrailers(long trailerCount, long[] ignored) {
     assert headerUtility.validateCount(trailerCount);
     final Map trailers = headerUtility.retrieveHeaders();
     return toJniFilterTrailersStatus(filter.onResponseTrailers(trailers));
@@ -196,9 +202,10 @@ class JvmFilterContext {
    * @param errorCode,    the error code.
    * @param message,      the error message.
    * @param attemptCount, the number of times an operation was attempted before firing this error.
+   * @param ignored,      StreamIntel not yet supported by filter callbacks.
    * @return Object,      not used in HTTP filters.
    */
-  public Object onError(int errorCode, byte[] message, int attemptCount) {
+  public Object onError(int errorCode, byte[] message, int attemptCount, long[] ignored) {
     String errorMessage = new String(message);
     filter.onError(errorCode, errorMessage, attemptCount);
     return null;
@@ -207,9 +214,10 @@ class JvmFilterContext {
   /**
    * Dispatches cancellation notice up to the platform.
    *
+   * @param ignored  StreamIntel not yet supported by filter callbacks.
    * @return Object, not used in HTTP filters.
    */
-  public Object onCancel() {
+  public Object onCancel(long[] ignored) {
     filter.onCancel();
     return null;
   }

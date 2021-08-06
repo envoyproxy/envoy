@@ -181,7 +181,7 @@ static_resources:
 
     client
       .newStreamPrototype()
-      .setOnError { _ in
+      .setOnError { _, _ in
         timeoutExpectation.fulfill()
       }
       .start()

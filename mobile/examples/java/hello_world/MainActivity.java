@@ -103,7 +103,7 @@ public class MainActivity extends Activity {
                                         .build();
     engine.streamClient()
         .newStreamPrototype()
-        .setOnResponseHeaders((responseHeaders, endStream) -> {
+        .setOnResponseHeaders((responseHeaders, endStream, ignored) -> {
           Integer status = responseHeaders.getHttpStatus();
           String message = "received headers with status " + status;
 
@@ -125,7 +125,7 @@ public class MainActivity extends Activity {
           }
           return Unit.INSTANCE;
         })
-        .setOnError((error) -> {
+        .setOnError((error, ignored) -> {
           String message = "failed with error after " + error.getAttemptCount() +
                            " attempts: " + error.getMessage();
           Log.d("MainActivity", message);

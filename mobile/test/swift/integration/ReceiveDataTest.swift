@@ -66,16 +66,16 @@ static_resources:
 
     client
       .newStreamPrototype()
-      .setOnResponseHeaders { responseHeaders, _ in
+      .setOnResponseHeaders { responseHeaders, _, _ in
          XCTAssertEqual(200, responseHeaders.httpStatus)
          headersExpectation.fulfill()
       }
-      .setOnResponseData { data, _ in
+      .setOnResponseData { data, _, _ in
         let responseBody = String(data: data, encoding: .utf8)
         XCTAssertEqual(assertionResponseBody, responseBody)
         dataExpectation.fulfill()
       }
-      .setOnError { _ in
+      .setOnError { _, _ in
         XCTFail("Unexpected error")
       }
       .start()

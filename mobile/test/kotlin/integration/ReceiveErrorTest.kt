@@ -108,11 +108,11 @@ class ReceiveErrorTest {
 
     engine.streamClient()
       .newStreamPrototype()
-      .setOnResponseHeaders { _, _ -> fail("Headers received instead of expected error") }
-      .setOnResponseData { _, _ -> fail("Data received instead of expected error") }
+      .setOnResponseHeaders { _, _, _ -> fail("Headers received instead of expected error") }
+      .setOnResponseData { _, _, _ -> fail("Data received instead of expected error") }
       // The unmatched expectation will cause a local reply which gets translated in Envoy Mobile to
       // an error.
-      .setOnError { error ->
+      .setOnError { error, _ ->
         errorCode = error.errorCode
         callbackReceivedError.countDown()
       }

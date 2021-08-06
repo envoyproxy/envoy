@@ -9,6 +9,12 @@ import java.nio.ByteBuffer
 class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) : Stream(underlyingStream) {
   private val mockStream: MockEnvoyHTTPStream = underlyingStream
 
+  private val mockStreamIntel = object : StreamIntel {
+    override fun getStreamId(): Long { return 0 }
+    override fun getConnectionId(): Long { return 0 }
+    override fun getAttemptCount(): Long { return 0 }
+  }
+
   /**
    * Closure that will be called when request headers are sent.
    */
@@ -55,7 +61,7 @@ class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) : S
    * @param endStream Whether this is a headers-only response.
    */
   fun receiveHeaders(headers: ResponseHeaders, endStream: Boolean) {
-    mockStream.callbacks.onHeaders(headers.allHeaders(), endStream)
+    mockStream.callbacks.onHeaders(headers.allHeaders(), endStream, mockStreamIntel)
   }
 
   /**
@@ -65,7 +71,7 @@ class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) : S
    * @param endStream Whether this is the last data frame.
    */
   fun receiveData(data: ByteBuffer, endStream: Boolean) {
-    mockStream.callbacks.onData(data, endStream)
+    mockStream.callbacks.onData(data, endStream, mockStreamIntel)
   }
 
   /**
@@ -74,14 +80,14 @@ class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) : S
    * @param trailers Response trailers to receive.
    */
   fun receiveTrailers(trailers: ResponseTrailers) {
-    mockStream.callbacks.onTrailers(trailers.allHeaders())
+    mockStream.callbacks.onTrailers(trailers.allHeaders(), mockStreamIntel)
   }
 
   /**
    * Simulate the stream receiving a cancellation signal from Envoy.
    */
   fun receiveCancel() {
-    mockStream.callbacks.onCancel()
+    mockStream.callbacks.onCancel(mockStreamIntel)
   }
 
   /**
@@ -90,6 +96,6 @@ class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) : S
    * @param error The error to receive.
    */
   fun receiveError(error: EnvoyError) {
-    mockStream.callbacks.onError(error.errorCode, error.message, error.attemptCount ?: 0)
+    mockStream.callbacks.onError(error.errorCode, error.message, error.attemptCount ?: 0, mockStreamIntel)
   }
 }

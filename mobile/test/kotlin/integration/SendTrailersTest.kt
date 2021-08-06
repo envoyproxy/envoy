@@ -93,11 +93,11 @@ class SendTrailersTest {
 
     var responseStatus: Int? = null
     client.newStreamPrototype()
-      .setOnResponseHeaders { headers, _ ->
+      .setOnResponseHeaders { headers, _, _ ->
         responseStatus = headers.httpStatus
         expectation.countDown()
       }
-      .setOnError {
+      .setOnError { _, _ ->
         fail("Unexpected error")
       }
       .start()

@@ -68,7 +68,7 @@ final class ViewController: UITableViewController {
 
     streamClient
       .newStreamPrototype()
-      .setOnResponseHeaders { [weak self] headers, _ in
+      .setOnResponseHeaders { [weak self] headers, _, _ in
         let statusCode = headers.httpStatus.map(String.init) ?? "nil"
         let message = "received headers with status \(statusCode)"
 
@@ -89,7 +89,7 @@ final class ViewController: UITableViewController {
                                 headerMessage: headerMessage)
         self?.add(result: .success(response))
       }
-      .setOnError { [weak self] error in
+      .setOnError { [weak self] error, _ in
         let message: String
         if let attemptCount = error.attemptCount {
           message = "failed within Envoy library after \(attemptCount) attempts: \(error.message)"

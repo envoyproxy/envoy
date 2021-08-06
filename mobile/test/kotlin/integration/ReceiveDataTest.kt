@@ -85,15 +85,15 @@ class ReceiveDataTest {
     var status: Int? = null
     var body: ByteBuffer? = null
     client.newStreamPrototype()
-      .setOnResponseHeaders { responseHeaders, _ ->
+      .setOnResponseHeaders { responseHeaders, _, _ ->
         status = responseHeaders.httpStatus
         headersExpectation.countDown()
       }
-      .setOnResponseData { data, _ ->
+      .setOnResponseData { data, _, _ ->
         body = data
         dataExpectation.countDown()
       }
-      .setOnError { fail("Unexpected error") }
+      .setOnError { _, _ -> fail("Unexpected error") }
       .start()
       .sendHeaders(requestHeaders, true)
 

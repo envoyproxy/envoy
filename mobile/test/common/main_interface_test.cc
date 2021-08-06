@@ -123,7 +123,7 @@ TEST(MainInterfaceTest, BasicStream) {
 
   absl::Notification on_complete_notification;
   envoy_http_callbacks stream_cbs{
-      [](envoy_headers c_headers, bool end_stream, void*) -> void* {
+      [](envoy_headers c_headers, bool end_stream, envoy_stream_intel, void*) -> void* {
         auto response_headers = toResponseHeaders(c_headers);
         EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
         EXPECT_TRUE(end_stream);
@@ -133,7 +133,7 @@ TEST(MainInterfaceTest, BasicStream) {
       nullptr /* on_metadata */,
       nullptr /* on_trailers */,
       nullptr /* on_error */,
-      [](void* context) -> void* {
+      [](envoy_stream_intel, void* context) -> void* {
         auto* on_complete_notification = static_cast<absl::Notification*>(context);
         on_complete_notification->Notify();
         return nullptr;
@@ -230,7 +230,7 @@ TEST(MainInterfaceTest, ResetStream) {
                                   nullptr /* on_trailers */,
                                   nullptr /* on_error */,
                                   nullptr /* on_complete */,
-                                  [](void* context) -> void* {
+                                  [](envoy_stream_intel, void* context) -> void* {
                                     auto* on_cancel_notification =
                                         static_cast<absl::Notification*>(context);
                                     on_cancel_notification->Notify();

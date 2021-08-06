@@ -71,11 +71,11 @@ static_resources:
 
     client
       .newStreamPrototype()
-      .setOnResponseHeaders { responseHeaders, _ in
+      .setOnResponseHeaders { responseHeaders, _, _ in
          XCTAssertEqual(200, responseHeaders.httpStatus)
          expectation.fulfill()
       }
-      .setOnError { _ in
+      .setOnError { _, _ in
         XCTFail("Unexpected error")
       }
       .start()

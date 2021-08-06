@@ -103,7 +103,7 @@ class GRPCStreamTest {
 
     GRPCClient(streamClient)
       .newGRPCStreamPrototype()
-      .setOnResponseHeaders { headers, endStream ->
+      .setOnResponseHeaders { headers, endStream, _ ->
         assertThat(headers.allHeaders()).isEqualTo(expectedHeaders.allHeaders())
         assertThat(endStream).isTrue()
         countDownLatch.countDown()
@@ -123,7 +123,7 @@ class GRPCStreamTest {
 
     GRPCClient(streamClient)
       .newGRPCStreamPrototype()
-      .setOnResponseTrailers { trailers ->
+      .setOnResponseTrailers { trailers, _ ->
         assertThat(trailers.allHeaders()).isEqualTo(expectedTrailers.allHeaders())
         countDownLatch.countDown()
       }
@@ -141,7 +141,7 @@ class GRPCStreamTest {
 
     GRPCClient(streamClient)
       .newGRPCStreamPrototype()
-      .setOnResponseMessage { message ->
+      .setOnResponseMessage { message, _ ->
         assertThat(message.array()).isEqualTo(message1.array())
         countDownLatch.countDown()
       }
@@ -182,7 +182,7 @@ class GRPCStreamTest {
 
     GRPCClient(streamClient)
       .newGRPCStreamPrototype()
-      .setOnResponseMessage { message ->
+      .setOnResponseMessage { message, _ ->
         if (countDownLatch.count == 2L) {
           assertThat(message.array()).isEqualTo(firstMessage)
         } else {
@@ -206,7 +206,7 @@ class GRPCStreamTest {
 
     GRPCClient(streamClient)
       .newGRPCStreamPrototype()
-      .setOnResponseMessage { message ->
+      .setOnResponseMessage { message, _ ->
         assertThat(message.array()).hasSize(0)
         countDownLatch.countDown()
       }
@@ -246,7 +246,7 @@ class GRPCStreamTest {
 
     GRPCClient(streamClient)
       .newGRPCStreamPrototype()
-      .setOnResponseMessage { message ->
+      .setOnResponseMessage { message, _ ->
         if (countDownLatch.count == 2L) {
           assertThat(message.array()).hasSize(0)
         } else {
