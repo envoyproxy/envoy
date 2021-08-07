@@ -83,11 +83,7 @@ public:
 
   void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
 
-  uint64_t encodedBytes() override;
-
   void addEncodedBytes(size_t newly_sent_bytes) override;
-
-  uint64_t decodedBytes() override;
 
   void addDecodedBytes(size_t newly_received_bytes) override;
 
@@ -140,8 +136,6 @@ private:
   void flushOutput(bool end_encode = false);
 
   absl::string_view details_;
-  uint64_t encoded_bytes_{0};
-  uint64_t decoded_bytes_{0};
   StreamInfo::StreamInfo* info_{};
 };
 

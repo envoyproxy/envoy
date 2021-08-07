@@ -113,11 +113,7 @@ public:
 
   absl::string_view responseDetails() override { return details_; }
 
-  uint64_t encodedBytes() override { return 0; }
-
   void addEncodedBytes(size_t) override {}
-
-  uint64_t decodedBytes() override { return 0; }
 
   void addDecodedBytes(size_t) override {}
 

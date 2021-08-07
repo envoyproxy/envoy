@@ -95,27 +95,16 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection)
   }
 }
 
-uint64_t StreamEncoderImpl::encodedBytes() {
-  ENVOY_CONN_LOG(trace, "h1: get encoded bytes {}\n", connection_.connection(), encoded_bytes_);
-  return encoded_bytes_;
-}
-
 void StreamEncoderImpl::addEncodedBytes(size_t newly_encoded_bytes) {
-  ENVOY_CONN_LOG(trace, "h1: update encoded bytes {}\n", connection_.connection(), encoded_bytes_);
-  encoded_bytes_ += newly_encoded_bytes;
+  ENVOY_CONN_LOG(trace, "h1: update encoded bytes {}\n", connection_.connection(), newly_encoded_bytes);
   if (info_) {
     info_->addWireBytesSent(newly_encoded_bytes);
   }
 }
 
-uint64_t StreamEncoderImpl::decodedBytes() {
-  ENVOY_CONN_LOG(trace, "h1: get decoded bytes {}\n", connection_.connection(), decoded_bytes_);
-  return decoded_bytes_;
-}
 
 void StreamEncoderImpl::addDecodedBytes(size_t newly_decoded_bytes) {
-  ENVOY_CONN_LOG(trace, "h1: update decoded bytes {}\n", connection_.connection(), decoded_bytes_);
-  decoded_bytes_ += newly_decoded_bytes;
+  ENVOY_CONN_LOG(trace, "h1: update decoded bytes {}\n", connection_.connection(), newly_decoded_bytes);
   if (info_) {
     info_->addWireBytesReceived(newly_decoded_bytes);
   }

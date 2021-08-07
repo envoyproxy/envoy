@@ -291,31 +291,17 @@ protected:
     void encodeDataHelper(Buffer::Instance& data, bool end_stream,
                           bool skip_encoding_empty_trailers);
 
-    uint64_t encodedBytes() override {
-      ENVOY_CONN_LOG(trace, "stream id {}:get encoded bytes {}\n", parent_.connection_, stream_id_,
-                     encoded_bytes_);
-      return encoded_bytes_;
-    }
-
     void addEncodedBytes(size_t newly_encoded_bytes) override {
-      encoded_bytes_ += newly_encoded_bytes;
       if (info_) {
         info_->addWireBytesSent(newly_encoded_bytes);
       }
       ENVOY_CONN_LOG(trace, "stream id {}:update encoded bytes {}\n", parent_.connection_,
-                     stream_id_, encoded_bytes_);
-    }
-
-    uint64_t decodedBytes() override {
-      ENVOY_CONN_LOG(trace, "stream id {}:get rdecoded bytes {}\n", parent_.connection_, stream_id_,
-                     decoded_bytes_);
-      return decoded_bytes_;
+                     stream_id_, newly_encoded_bytes);
     }
 
     void addDecodedBytes(size_t newly_decoded_bytes) override {
-      decoded_bytes_ += newly_decoded_bytes;
       ENVOY_CONN_LOG(trace, "stream id {}:update decoded bytes {}\n", parent_.connection_,
-                     stream_id_, decoded_bytes_);
+                     stream_id_, newly_decoded_bytes);
       if (info_) {
         info_->addWireBytesReceived(newly_decoded_bytes);
       }
@@ -326,8 +312,6 @@ protected:
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
-    uint64_t encoded_bytes_{0};
-    uint64_t decoded_bytes_{0};
     StreamInfo::StreamInfo* info_{};
 
     Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
