@@ -1,5 +1,10 @@
 
-from unittest.mock import AsyncMock
+import asyncio
+import gc
+import inspect
+import types
+from typing import AsyncIterator, AsyncIterable
+from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
 
@@ -85,3 +90,1166 @@ async def test_async_subprocess_run(patches, loop, executor):
     assert (
         list(_loop.run_in_executor.call_args)
         == [(executor, m_partial.return_value), {}])
+
+
+@pytest.mark.parametrize("limit", ["XX", None, "", 0, -1, 73])
+@pytest.mark.parametrize("yield_exceptions", [None, True, False])
+def test_aio_parallel_constructor(limit, yield_exceptions):
+    kwargs = {}
+    if limit == "XX":
+        limit = None
+    else:
+        kwargs["limit"] = limit
+    if yield_exceptions is not None:
+        kwargs["yield_exceptions"] = yield_exceptions
+
+    parallel = aio.parallel(["CORO"], **kwargs)
+    assert parallel._coros == ["CORO"]
+    assert parallel._limit == limit
+    assert (
+        parallel.yield_exceptions
+        == (False
+            if yield_exceptions is None
+            else yield_exceptions))
+    assert parallel._running == []
+
+    assert parallel.running_tasks is parallel._running
+    assert "running_tasks" in parallel.__dict__
+
+
+def test_aio_parallel_dunder_aiter(patches):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "asyncio",
+        "parallel.output",
+        ("parallel.submit", dict(new_callable=MagicMock)),
+        prefix="tools.base.aio")
+
+    with patched as (m_asyncio, m_output, m_submit):
+        assert parallel.__aiter__() == m_output.return_value
+
+    assert parallel.submit_task == m_asyncio.create_task.return_value
+    assert (
+        list(m_submit.call_args)
+        == [(), {}])
+    assert (
+        list(m_asyncio.create_task.call_args)
+        == [(m_submit.return_value, ), {}])
+
+
+@pytest.mark.parametrize("running", [True, False])
+@pytest.mark.parametrize("submitting", [True, False])
+def test_aio_parallel_active(patches, running, submitting):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "asyncio",
+        ("parallel.submitting", dict(new_callable=PropertyMock)),
+        ("parallel.running", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    with patched as (m_asyncio, m_submit, m_run):
+        m_submit.return_value = submitting
+        m_run.return_value = running
+        assert parallel.active == (submitting or running)
+
+    assert "active" not in parallel.__dict__
+
+
+def test_aio_parallel_closing_lock(patches):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "asyncio",
+        prefix="tools.base.aio")
+
+    with patched as (m_asyncio, ):
+        assert parallel.closing_lock == m_asyncio.Lock.return_value
+
+    assert (
+        list(m_asyncio.Lock.call_args)
+        == [(), {}])
+    assert "closing_lock" in parallel.__dict__
+
+
+
+@pytest.mark.parametrize("locked", [True, False])
+def test_aio_parallel_closed(patches, locked):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        ("parallel.closing_lock", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    with patched as (m_closing_lock, ):
+        m_closing_lock.return_value.locked.return_value = locked
+        assert parallel.closed == locked
+
+    assert "closed" not in parallel.__dict__
+
+
+@pytest.mark.asyncio
+async def test_aio_parallel_coros(patches):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        ("parallel.iter_coros", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+    results = []
+    coros = [f"CORO{i}" for i in range(0, 3)]
+
+    async def _coros():
+        for coro in coros:
+            yield coro
+
+    with patched as (m_coros, ):
+        m_coros.return_value = _coros
+        async for coro in parallel.coros:
+            results.append(coro)
+
+    assert results == coros
+    assert "coros" not in parallel.__dict__
+
+
+def test_aio_parallel_running_queue(patches):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "asyncio",
+        prefix="tools.base.aio")
+
+    with patched as (m_asyncio, ):
+        assert parallel.running_queue == m_asyncio.Queue.return_value
+
+    assert (
+        list(m_asyncio.Queue.call_args)
+        == [(), {}])
+    assert "running_queue" in parallel.__dict__
+
+
+@pytest.mark.parametrize("cpus", [None, "", 0, 4, 73])
+def test_aio_parallel_default_limit(patches, cpus):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "min",
+        "os",
+        prefix="tools.base.aio")
+
+    with patched as (m_min, m_os):
+        m_os.cpu_count.return_value = cpus
+        assert parallel.default_limit == m_min.return_value
+
+    assert (
+        list(m_min.call_args)
+        == [(32, (cpus or 0) + 4), {}])
+    assert "default_limit" not in parallel.__dict__
+
+
+def test_aio_parallel_is_async(patches):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "isinstance",
+        prefix="tools.base.aio")
+
+    with patched as (m_inst, ):
+        assert parallel.is_async == m_inst.return_value
+
+    assert (
+        list(m_inst.call_args)
+        == [(["CORO"], (types.AsyncGeneratorType, AsyncIterator, AsyncIterable)), {}])
+    assert "is_async" in parallel.__dict__
+
+
+def test_aio_parallel_is_generator(patches):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "isinstance",
+        prefix="tools.base.aio")
+
+    with patched as (m_inst, ):
+        assert parallel.is_generator == m_inst.return_value
+
+    assert (
+        list(m_inst.call_args)
+        == [(["CORO"], (types.AsyncGeneratorType, types.GeneratorType)), {}])
+    assert "is_generator" in parallel.__dict__
+
+
+@pytest.mark.parametrize("limit", [None, "", 0, -1, 73])
+def test_aio_parallel_limit(patches, limit):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        ("parallel.default_limit", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+    parallel._limit = limit
+
+    with patched as (m_limit, ):
+        assert parallel.limit == (limit or m_limit.return_value)
+
+    if limit:
+        assert not m_limit.called
+
+    assert "limit" in parallel.__dict__
+
+
+@pytest.mark.parametrize("limit", [None, "", 0, -1, 73])
+def test_aio_parallel_nolimit(patches, limit):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        ("parallel.limit", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    with patched as (m_limit, ):
+        m_limit.return_value = limit
+        assert parallel.nolimit == (limit == -1)
+
+    assert "nolimit" in parallel.__dict__
+
+
+def test_aio_parallel_out(patches):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "asyncio",
+        prefix="tools.base.aio")
+
+    with patched as (m_asyncio, ):
+        assert parallel.out == m_asyncio.Queue.return_value
+
+    assert (
+        list(m_asyncio.Queue.call_args)
+        == [(), {}])
+    assert "out" in parallel.__dict__
+
+
+@pytest.mark.parametrize("empty", [True, False])
+def test_aio_parallel_running(patches, empty):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        ("parallel.running_queue", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    with patched as (m_running_queue, ):
+        m_running_queue.return_value.empty.return_value = empty
+        assert parallel.running == (not empty)
+
+    assert "running" not in parallel.__dict__
+
+
+def test_aio_parallel_sem(patches):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "asyncio",
+        ("parallel.limit", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    with patched as (m_asyncio, m_limit):
+        assert parallel.sem == m_asyncio.Semaphore.return_value
+
+    assert (
+        list(m_asyncio.Semaphore.call_args)
+        == [(m_limit.return_value, ), {}])
+    assert "sem" in parallel.__dict__
+
+
+def test_aio_parallel_submission_lock(patches):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "asyncio",
+        prefix="tools.base.aio")
+
+    with patched as (m_asyncio, ):
+        assert parallel.submission_lock == m_asyncio.Lock.return_value
+
+    assert (
+        list(m_asyncio.Lock.call_args)
+        == [(), {}])
+    assert "submission_lock" in parallel.__dict__
+
+
+@pytest.mark.parametrize("locked", [True, False])
+def test_aio_parallel_submitting(patches, locked):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        ("parallel.submission_lock", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    with patched as (m_submission_lock, ):
+        m_submission_lock.return_value.locked.return_value = locked
+        assert parallel.submitting == locked
+
+    assert "submitting" not in parallel.__dict__
+
+
+@pytest.mark.asyncio
+async def test_aio_parallel_cancel(patches):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        ("parallel.cancel_tasks", dict(new_callable=AsyncMock)),
+        ("parallel.close", dict(new_callable=AsyncMock)),
+        ("parallel.close_coros", dict(new_callable=AsyncMock)),
+        ("parallel.sem", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    waiter = MagicMock()
+
+    class SubmitTask:
+        def __init__(self):
+            self.cancel = MagicMock()
+
+        def __await__(self):
+            waiter()
+            yield
+
+    parallel.submit_task = SubmitTask()
+
+    with patched as (m_cancel, m_close, m_coros, m_sem):
+        assert not await parallel.cancel()
+
+    assert (
+        list(m_close.call_args)
+        == [(), {}])
+    assert (
+        list(m_sem.return_value.release.call_args)
+        == [(), {}])
+    assert (
+        list(m_cancel.call_args)
+        == [(), {}])
+    assert (
+        list(m_coros.call_args)
+        == [(), {}])
+    assert (
+        list(waiter.call_args)
+        == [(), {}])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad", range(0, 8))
+async def test_aio_parallel_cancel_tasks(patches, bad):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        ("parallel.running_tasks", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    _tasks = []
+    waiter = MagicMock()
+
+    class Task:
+        def __init__(self, i):
+            self.i = i
+            self.cancel = MagicMock()
+
+        def __await__(self):
+            waiter()
+            if self.i == bad:
+                raise BaseException("AN ERROR OCCURRED")
+
+    for i in range(0, 7):
+        _task = Task(i)
+        _tasks.append(_task)
+
+    with patched as (m_running, ):
+        m_running.return_value = _tasks
+        assert not await parallel.cancel_tasks()
+
+    assert (
+        list(list(c) for c in waiter.call_args_list)
+        == [[(), {}]] * 7)
+    for task in _tasks:
+        assert (
+            list(task.cancel.call_args)
+            == [(), {}])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("closed", [True, False])
+async def test_aio_parallel_close(patches, closed):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        ("parallel.closed", dict(new_callable=PropertyMock)),
+        ("parallel.closing_lock", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    with patched as (m_closed, m_lock):
+        m_closed.return_value = closed
+        m_lock.return_value.acquire = AsyncMock()
+        assert not await parallel.close()
+
+    if closed:
+        assert not m_lock.called
+    else:
+        assert (
+            list(m_lock.return_value.acquire.call_args)
+            == [(), {}])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("is_generator", [True, False])
+@pytest.mark.parametrize("bad", range(0, 8))
+async def test_aio_parallel_close_coros(patches, is_generator, bad):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "parallel.close",
+        ("parallel.iter_coros", dict(new_callable=PropertyMock)),
+        ("parallel.is_generator", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    _coros = []
+    for i in range(0, 7):
+        _coro = MagicMock()
+        if i == bad:
+            _coro.close.side_effect = BaseException("AN ERROR OCCURRED")
+        _coros.append(_coro)
+
+    async def _iter():
+        for coro in _coros:
+            yield coro
+
+    with patched as (m_close, m_iter, m_isgen):
+        m_isgen.return_value = is_generator
+        m_iter.return_value = _iter
+        assert not await parallel.close_coros()
+
+    if is_generator:
+        assert not m_iter.called
+        return
+    assert (
+        list(m_iter.call_args)
+        == [(), {}])
+    for coro in _coros:
+        assert (
+            list(coro.close.call_args)
+            == [(), {}])
+
+
+@pytest.mark.asyncio
+async def test_aio_parallel_create_task(patches):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "asyncio",
+        "parallel.remember_task",
+        ("parallel.task", dict(new_callable=MagicMock)),
+        ("parallel.running_queue", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    with patched as (m_asyncio, m_rem, m_task, m_running_queue):
+        assert not await parallel.create_task("CORO")
+
+    assert (
+        list(m_running_queue.return_value.put_nowait.call_args)
+        == [(None, ), {}])
+    assert (
+        list(m_task.call_args)
+        == [("CORO", ), {}])
+    assert (
+        list(m_asyncio.create_task.call_args)
+        == [(m_task.return_value, ), {}])
+    assert (
+        list(m_rem.call_args)
+        == [(m_asyncio.create_task.return_value, ), {}])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("closed", [True, False])
+@pytest.mark.parametrize("active", [True, False])
+async def test_aio_parallel_exit_on_completion(patches, active, closed):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        ("parallel.active", dict(new_callable=PropertyMock)),
+        ("parallel.closed", dict(new_callable=PropertyMock)),
+        ("parallel.out", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    with patched as (m_active, m_closed, m_out):
+        m_out.return_value.put = AsyncMock()
+        m_active.return_value = active
+        m_closed.return_value = closed
+        assert not await parallel.exit_on_completion()
+
+    if closed or active:
+        assert not m_out.called
+        return
+    assert (
+        list(m_out.return_value.put.call_args)
+        == [(aio._marker, ), {}])
+
+
+@pytest.mark.parametrize("closed", [True, False])
+def test_aio_parallel_forget_task(patches, closed):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        ("parallel.closed", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+    parallel._running = MagicMock()
+
+    with patched as (m_closed, ):
+        m_closed.return_value = closed
+        assert not parallel.forget_task("TASK")
+
+    if closed:
+        assert not parallel._running.remove.called
+        return
+    assert (
+        list(parallel._running.remove.call_args)
+        == [("TASK", ), {}])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("raises", [True, False])
+@pytest.mark.parametrize("is_async", [True, False])
+async def test_aio_parallel_iter_coros(patches, raises, is_async):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        ("parallel.is_async", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    _coros = [f"CORO{i}" for i in range(0, 7)]
+    _exception = BaseException("AN RAISES OCCURRED")
+
+    def coros():
+        if raises:
+            raise _exception
+        for coro in _coros:
+            yield coro
+
+    async def async_coros():
+        if raises:
+            raise _exception
+        for coro in _coros:
+            yield coro
+
+    parallel._coros = (
+        async_coros()
+        if is_async
+        else coros())
+    _results = []
+
+    with patched as (m_async, ):
+        m_async.return_value = is_async
+
+        async for result in parallel.iter_coros():
+            _results.append(result)
+
+    if raises:
+        error = _results[0]
+        assert isinstance(error, aio.AsyncParallelIteratorError)
+        assert error.args[0] is _exception
+        assert _results == [error]
+        return
+    assert _results == _coros
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("closed", [True, False])
+@pytest.mark.parametrize("nolimit", [True, False])
+@pytest.mark.parametrize("decrement", [None, True, False])
+async def test_aio_parallel_on_task_complete(patches, closed, nolimit, decrement):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        ("parallel.exit_on_completion", dict(new_callable=AsyncMock)),
+        ("parallel.closed", dict(new_callable=PropertyMock)),
+        ("parallel.out", dict(new_callable=PropertyMock)),
+        ("parallel.running_queue", dict(new_callable=PropertyMock)),
+        ("parallel.nolimit", dict(new_callable=PropertyMock)),
+        ("parallel.sem", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+    kwargs = {}
+    if decrement is not None:
+        kwargs["decrement"] = decrement
+
+    with patched as (m_complete, m_closed, m_out, m_running_queue, m_nolimit, m_sem):
+        m_nolimit.return_value = nolimit
+        m_closed.return_value = closed
+        m_out.return_value.put = AsyncMock()
+        assert not await parallel.on_task_complete("RESULT", **kwargs)
+
+    if closed:
+        assert not m_complete.called
+        assert not m_nolimit.called
+        assert not m_sem.called
+        assert not m_running_queue.called
+        assert not m_out.return_value.put.called
+        return
+
+    assert (
+        list(m_out.return_value.put.call_args)
+        == [("RESULT", ), {}])
+    if nolimit:
+        assert not m_sem.return_value.release.called
+    else:
+        assert (
+            list(m_sem.return_value.release.call_args)
+            == [(), {}])
+    if decrement or decrement is None:
+        assert (
+            list(m_running_queue.return_value.get_nowait.call_args)
+            == [(), {}])
+    else:
+        assert not m_running_queue.return_value.get_nowait.called
+    assert (
+        list(m_complete.call_args)
+        == [(), {}])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("results", range(0, 7))
+@pytest.mark.parametrize("error", [True, False])
+@pytest.mark.parametrize("should_error", [True, False])
+async def test_aio_parallel_output(patches, results, error, should_error):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "parallel.should_error",
+        ("parallel.cancel", dict(new_callable=AsyncMock)),
+        ("parallel.close", dict(new_callable=AsyncMock)),
+        ("parallel.out", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    _exception = Exception()
+
+    class DummyQueue:
+        _running_queue = 0
+
+        async def get(self):
+            if results == 0:
+                return aio._marker
+            if results > self._running_queue:
+                self._running_queue += 1
+                if error and results == self._running_queue:
+                    return _exception
+                return f"RESULT {self._running_queue}"
+            return aio._marker
+
+        def should_error(self, result):
+            return error and should_error and (results == self._running_queue)
+
+    q = DummyQueue()
+    _results = []
+
+    with patched as (m_error, m_cancel, m_close, m_out):
+        m_out.return_value.get.side_effect = q.get
+        m_error.side_effect = q.should_error
+        if results and error and should_error:
+            with pytest.raises(Exception):
+                async for result in parallel.output():
+                    _results.append(result)
+        else:
+            async for result in parallel.output():
+                _results.append(result)
+
+    if results and error and should_error:
+        # last one errored
+        assert _results == [f"RESULT {i}" for i in range(1, results)]
+        assert (
+            list(list(c) for c in m_error.call_args_list)
+            == [[(result,), {}] for result in _results] + [[(_exception,), {}]])
+        assert (
+            list(m_cancel.call_args)
+            == [(), {}])
+        assert not m_close.called
+        return
+
+    assert (
+        list(list(c) for c in m_close.call_args_list)
+        == [[(), {}]])
+    assert not m_cancel.called
+
+    if not results:
+        assert _results == []
+        return
+
+    if error:
+        assert (
+            _results
+            == [f"RESULT {i}" for i in range(1, results)] + [_exception])
+        return
+    # all results returned correctly
+    assert _results == [f"RESULT {i}" for i in range(1, results + 1)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("closed_before", [True, False])
+@pytest.mark.parametrize("closed_after", [True, False])
+@pytest.mark.parametrize("nolimit", [True, False])
+async def test_aio_parallel_ready(patches, closed_before, closed_after, nolimit):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        ("parallel.closed", dict(new_callable=PropertyMock)),
+        ("parallel.nolimit", dict(new_callable=PropertyMock)),
+        ("parallel.sem", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+
+    class DummyCloser:
+        order_mock = MagicMock()
+        close_calls = 0
+
+        async def _acquire(self):
+            self.order_mock("ACQUIRE")
+
+        def _nolimit(self):
+            self.order_mock("NOLIMIT")
+            return nolimit
+
+        def _closed(self):
+            self.order_mock("CLOSED")
+            self.close_calls += 1
+            if self.close_calls == 1:
+                return closed_before
+            if self.close_calls == 2:
+                return closed_after
+
+    closer = DummyCloser()
+
+    with patched as (m_closed, m_nolimit, m_sem):
+        m_nolimit.side_effect = closer._nolimit
+        m_closed.side_effect = closer._closed
+        m_sem.return_value.acquire = closer._acquire
+        assert (
+            await parallel.ready()
+            == ((not closed_before and not closed_after)
+                if not nolimit else not closed_before))
+
+    if closed_before:
+        assert not m_nolimit.called
+        assert not m_sem.called
+        assert (
+            list(list(c) for c in closer.order_mock.call_args_list)
+            == [[('CLOSED',), {}]])
+        return
+    if nolimit:
+        assert not m_sem.called
+        assert (
+            list(list(c) for c in closer.order_mock.call_args_list)
+            == [[('CLOSED',), {}],
+                [('NOLIMIT',), {}]])
+        return
+    assert (
+        list(list(c) for c in closer.order_mock.call_args_list)
+        == [[('CLOSED',), {}],
+            [('NOLIMIT',), {}],
+            [('ACQUIRE',), {}],
+            [('CLOSED',), {}]])
+
+
+def test_aio_parallel_remember_task():
+    parallel = aio.parallel(["CORO"])
+    parallel._running = MagicMock()
+    task = MagicMock()
+    assert not parallel.remember_task(task)
+    assert (
+        list(parallel._running.append.call_args)
+        == [(task, ), {}])
+    assert (
+        list(task.add_done_callback.call_args)
+        == [(parallel.forget_task, ), {}])
+
+
+@pytest.mark.parametrize("result", [None, "RESULT", aio.AsyncParallelError, aio.AsyncParallelExecutionError, aio.AsyncParallelIteratorError])
+@pytest.mark.parametrize("yield_exceptions", [True, False])
+def test_aio_parallel_should_error(result, yield_exceptions):
+    parallel = aio.parallel(["CORO"])
+    parallel.yield_exceptions = yield_exceptions
+
+    if isinstance(result, type) and issubclass(result, BaseException):
+        result = result()
+
+    assert (
+        parallel.should_error(result)
+        == ((isinstance(result, aio.AsyncParallelIteratorError)
+             or isinstance(result, aio.AsyncParallelError) and not yield_exceptions)))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("coros", range(0, 7))
+@pytest.mark.parametrize("unready", range(0, 10))
+@pytest.mark.parametrize("valid_raises", [None, Exception, aio.AsyncParallelError])
+@pytest.mark.parametrize("iter_errors", [True, False])
+async def test_aio_parallel_submit(patches, coros, unready, valid_raises, iter_errors):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "isinstance",
+        "parallel.validate_coro",
+        ("parallel.exit_on_completion", dict(new_callable=AsyncMock)),
+        ("parallel.create_task", dict(new_callable=AsyncMock)),
+        ("parallel.on_task_complete", dict(new_callable=AsyncMock)),
+        ("parallel.ready", dict(new_callable=AsyncMock)),
+        ("parallel.coros", dict(new_callable=PropertyMock)),
+        ("parallel.out", dict(new_callable=PropertyMock)),
+        ("parallel.submission_lock", dict(new_callable=PropertyMock)),
+        prefix="tools.base.aio")
+    m_order = MagicMock()
+
+    class DummyReady:
+        counter = 0
+
+        def ready(self):
+            if self.counter >= unready:
+                self.counter += 1
+                return False
+            self.counter += 1
+            return True
+
+    _ready = DummyReady()
+
+    async def _acquire():
+        m_order("ACQUIRE")
+
+    def _release():
+        m_order("RELEASE")
+
+    async def _coros():
+        for coro in range(1, coros):
+            coro = f"CORO{coro}"
+            m_order(coro)
+            yield coro
+
+    valid_errors = (
+        (valid_raises == Exception)
+        and coros > 1
+        and not unready == 0
+        and not iter_errors)
+
+    with patched as (m_inst, m_valid, m_exit, m_create, m_complete, m_ready, m_coros, m_out, m_lock):
+        m_out.return_value.put = AsyncMock()
+        m_inst.return_value = iter_errors
+        m_valid.side_effect = valid_raises
+        m_ready.side_effect = _ready.ready
+        m_coros.return_value = _coros()
+        m_lock.return_value.acquire.side_effect = _acquire
+        m_lock.return_value.release.side_effect = _release
+
+        if valid_errors:
+            with pytest.raises(Exception):
+                await parallel.submit()
+        else:
+            assert not await parallel.submit()
+
+    if valid_errors:
+        assert not m_lock.return_value.called
+        assert not m_exit.called
+    else:
+        assert (
+            list(m_lock.return_value.release.call_args)
+            == [(), {}])
+        assert (
+            list(m_exit.call_args)
+            == [(), {}])
+
+    if coros < 2:
+        assert not m_ready.called
+        assert not m_valid.called
+        assert not m_inst.called
+        assert not m_complete.called
+        assert not m_create.called
+        assert not m_out.return_value.put.called
+        return
+
+    if iter_errors:
+        assert (
+            list(list(c) for c in m_out.return_value.put.call_args_list)
+            == [[("CORO1", ), {}]])
+        assert (
+            list(list(c) for c in m_inst.call_args_list)
+            == [[("CORO1", aio.AsyncParallelIteratorError), {}]])
+        assert not m_ready.called
+        assert not m_valid.called
+        assert not m_complete.called
+        assert not m_create.called
+        return
+
+    if valid_errors:
+        assert (
+            list(list(c) for c in m_inst.call_args_list)
+            == [[("CORO1", aio.AsyncParallelIteratorError), {}]])
+        assert (
+            list(list(c) for c in m_ready.call_args_list)
+            == [[(), {}]])
+        assert (
+            list(list(c) for c in m_valid.call_args_list)
+            == [[(f"CORO1", ), {}]])
+        assert not m_complete.called
+        assert not m_create.called
+        assert (
+            list(list(c) for c in m_order.call_args_list)
+            == ([[('ACQUIRE',), {}],
+                 [('CORO1',), {}]]))
+        return
+
+    assert not m_out.return_value.put.called
+    assert (
+        list(list(c) for c in m_ready.call_args_list)
+        == [[(), {}]] * min(coros - 1, unready + 1 or 1))
+    assert (
+        list(list(c) for c in m_valid.call_args_list)
+        == [[(f"CORO{i}", ), {}] for i in range(1, min(coros, unready + 1))])
+    assert (
+        list(list(c) for c in m_order.call_args_list)
+        == ([[('ACQUIRE',), {}]]
+            + [[(f'CORO{i}',), {}] for i in range(1, min(coros, unready + 2))]
+            + [[('RELEASE',), {}]]))
+    if valid_raises:
+        assert len(m_complete.call_args_list) == max(min(coros - 1, unready), 0)
+        for c in m_complete.call_args_list:
+            error = list(c)[0][0]
+            assert isinstance(error, aio.AsyncParallelError)
+            assert (
+                list(c)
+                == [(error,), {'decrement': False}])
+        assert not m_create.called
+        return
+    assert not m_complete.called
+    assert (
+        list(list(c) for c in m_create.call_args_list)
+        == [[(f"CORO{i}",), {}] for i in range(1, min(coros, unready + 1))])
+
+
+class OtherException(BaseException):
+    pass
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("raises", [None, Exception, OtherException])
+async def test_aio_parallel_task(patches, raises):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "parallel.on_task_complete",
+        prefix="tools.base.aio")
+
+    if raises:
+        _raises = raises("AN ERROR OCCURRED")
+
+    async def _coro():
+        if raises:
+            raise _raises
+        return 23
+
+    with patched as (m_complete, ):
+        assert not await parallel.task(_coro())
+
+    result = m_complete.call_args[0][0]
+
+    if not raises:
+        assert result == 23
+    else:
+        assert isinstance(result, aio.AsyncParallelExecutionError)
+        assert result.args[0] is _raises
+    assert (
+        list(m_complete.call_args)
+        == [(result, ), {}])
+
+
+@pytest.mark.parametrize("awaitable", [True, False])
+@pytest.mark.parametrize(
+    "state",
+    [inspect.CORO_CLOSED,
+     inspect.CORO_CREATED,
+     inspect.CORO_RUNNING,
+     inspect.CORO_SUSPENDED])
+def test_aio_parallel_validate_coro(patches, awaitable, state):
+    parallel = aio.parallel(["CORO"])
+    patched = patches(
+        "inspect.getcoroutinestate",
+        prefix="tools.base.aio")
+
+    # we cant patch inspect.isawaitable without fooing unittest
+    def _unawaitable():
+        pass
+
+    async def _awaitable():
+        pass
+
+    coro = (
+        _awaitable()
+        if awaitable
+        else _unawaitable)
+
+    with patched as (m_state, ):
+        m_state.return_value = state
+
+        if awaitable and state == inspect.CORO_CREATED:
+            assert not parallel.validate_coro(coro)
+        else:
+            with pytest.raises(aio.AsyncParallelError) as e:
+                parallel.validate_coro(coro)
+
+    if not awaitable:
+        assert (
+            e.value.args[0]
+            == f'Provided input was not a coroutine: {coro}')
+        assert not m_state.called
+        return
+
+    coro.close()
+    assert (
+        list(m_state.call_args)
+        == [(coro, ), {}])
+
+    if state != inspect.CORO_CREATED:
+        assert (
+            e.value.args[0]
+            == f'Provided coroutine has already been fired: {coro}')
+
+
+async def aiter(items):
+    for item in items:
+        yield item
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("limit", list(range(0, 4)) + [-1])
+@pytest.mark.parametrize("yield_exceptions", [None, True, False])
+@pytest.mark.parametrize("iter_type", [list, tuple, set, iter, aiter])
+@pytest.mark.parametrize(
+    "coros",
+    [["HAPPY"],
+     ["HAPPY"] * 2 + ["SAD"] + ["HAPPY"] * 3,
+     ["HAPPY"] * 7,
+     ["HAPPY"] * 2 + ["RAISE"] + ["HAPPY"] * 3,
+     ["SAD"] * 2 + ["HAPPY"] * 3,
+     ["HAPPY"] * 2 + ["CABBAGE"] + ["HAPPY"] * 3,
+     ["HAPPY"] * 2 + ["FIRED"] + ["HAPPY"] * 3])
+async def test_aio_parallel_integration(limit, yield_exceptions, iter_type, coros):
+    # This is an integration/black-box test that only measures inputs/outputs and the
+    # effect of using the utility with them on them
+
+    # `HAPPY` - a happy coroutine ready to be fired
+    # `SAD` - a sad coroutine that will raise a `SadError` when fired
+    # `FIRED` - a coroutine that has already been fired
+    # `RAISE` - raise an error in the iterator
+    # `CABBAGE` - leafy vegetable of the brassica family
+
+    tasks_at_the_beginning = len(asyncio.all_tasks())
+
+    kwargs = {}
+
+    if yield_exceptions is not None:
+        kwargs["yield_exceptions"] = yield_exceptions
+
+    if limit:
+        kwargs["limit"] = limit
+
+    class SadError(Exception):
+        pass
+
+    class LoopError(Exception):
+        pass
+
+    async def happy():
+        # this makes happy return after sad (ie errors) and tests the ordering of responses
+        # and the handling of pending tasks when errors occur
+        await asyncio.sleep(.01)
+        return "HAPPY"
+
+    fired = happy()
+    await fired
+
+    async def sad():
+        raise SadError
+
+    def _coro_gen():
+        for coro in coros:
+            if coro == "RAISE":
+                raise LoopError()
+            if coro == "HAPPY":
+                yield happy()
+            elif coro == "SAD":
+                yield sad()
+            elif coro == "FIRED":
+                yield fired
+            else:
+                yield coro
+
+    all_good = all(coro == "HAPPY" for coro in coros)
+    iter_raises = any(coro == "RAISE" for coro in coros)
+
+    if iter_raises:
+        # we can only test the generator types for errors
+        # during iteration - ie if `list`, `tuple` etc contain
+        # errors, they would raise now.
+        if not iter_type in [iter, aiter]:
+            return
+        _generated_coros = _coro_gen()
+    else:
+        _generated_coros = list(_coro_gen())
+        err_index = next((i for i, x in enumerate(coros) if x != 'HAPPY'), None)
+
+    if iter_type is not None:
+        _coros = iter_type(_generated_coros)
+
+    _results = []
+    _parallel = aio.parallel(_coros, **kwargs)
+
+    if (not all_good and not yield_exceptions) or iter_raises:
+        if iter_raises:
+            with pytest.raises(aio.AsyncParallelIteratorError) as e:
+                async for result in _parallel:
+                    _results.append(result)
+            assert isinstance(e.value.args[0], LoopError)
+            return
+        else:
+            coro_fail = (
+                any(not inspect.isawaitable(coro) for coro in _generated_coros)
+                or any(coro == "FIRED" for coro in coros))
+            if coro_fail:
+                with pytest.raises(aio.AsyncParallelError):
+                    async for result in _parallel:
+                        _results.append(result)
+            else:
+                with pytest.raises(aio.AsyncParallelExecutionError):
+                    async for result in _parallel:
+                        _results.append(result)
+
+        # for iterators there is no way of knowing that more awaitables were
+        # on the way when failure happened, so these need to be closed here
+        if iter_type in (iter, aiter):
+            for coro in _generated_coros[err_index:]:
+                if not isinstance(coro, str):
+                    coro.close()
+
+        if limit < 1 and iter_type != set:
+            # as all jobs are submitted concurrently (the default is higher than
+            # tne number of test jobs, and -1 forces no limit) and as sad is
+            # faster than happy, we get no results
+            assert _results == []
+        elif iter_type != set:
+            # because the ordering on sets is indeterminate the results are unpredictable
+            # therefore the easiest thing is to just exclude them from this test
+            assert _results == coros[:err_index - (err_index % limit)]
+
+        # as we havent closed the loop, and raising an error took priority over cleaning up the
+        #  tasks, gc hasnt happened yet. Any sleep here at all should allow `all_tasks` to return
+        # to its original state. `gc.collect` is also run to encourage asyncio to cleanup (?)
+        await asyncio.sleep(.001)
+        gc.collect()
+        assert len(asyncio.all_tasks()) == tasks_at_the_beginning
+        return
+
+    async for result in _parallel:
+        _results.append(result)
+
+    assert len(asyncio.all_tasks()) == tasks_at_the_beginning
+
+    def _mangled_results():
+        # replace the errors with the test strings
+        for result in _results:
+            if isinstance(result, aio.AsyncParallelExecutionError):
+                yield "SAD"
+            elif isinstance(result, aio.AsyncParallelError):
+                if "CABBAGE" in result.args[0]:
+                    yield "CABBAGE"
+                else:
+                    yield "FIRED"
+            else:
+                yield result
+
+    if err_index:
+        _err_index = (
+            err_index
+            if limit == 0
+            else err_index - (err_index % limit))
+
+    if err_index and _err_index >= limit and limit not in [0, -1]:
+        # the error is at the beginning of whichever batch its in
+        expected = ["HAPPY"] * 6
+        expected[_err_index] = coros[err_index]
+    else:
+        # the error is in the first batch so its at the beginning
+        expected = [x for x in list(coros) if x != "HAPPY"] + [x for x in list(coros) if x == "HAPPY"]
+
+    if iter_type == set:
+        assert set(expected) == set(_mangled_results())
+    else:
+        assert expected == list(_mangled_results())
