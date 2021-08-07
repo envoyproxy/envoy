@@ -250,7 +250,7 @@ TEST_F(ShadowWriterTest, ShadowRequestPoolReady) {
   FieldType key_type;
   FieldType value_type;
   int16_t field_id;
-  bool bool_value;
+  bool bool_value = false;
   uint8_t byte_value;
   int16_t int16_value;
   int32_t int32_value;
@@ -314,7 +314,7 @@ TEST_F(ShadowWriterTest, ShadowRequestWriteBeforePoolReady) {
   FieldType key_type;
   FieldType value_type;
   int16_t field_id;
-  bool bool_value;
+  bool bool_value = false;
   uint8_t byte_value;
   int16_t int16_value;
   int32_t int32_value;
