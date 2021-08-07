@@ -4,9 +4,9 @@ import re
 import shutil
 from functools import cached_property
 from itertools import chain
-from typing import Callable, Iterable, List, Optional, Tuple, Type, Union
+from typing import Callable, Iterable, List, Optional, Tuple, Type
 
-import verboselogs
+import verboselogs  # type:ignore
 
 import aiodocker
 
@@ -91,7 +91,10 @@ class DistroTestConfig(object):
         This contains build information for different types of test image,
         and some defaults for specific test configuration.
         """
-        return utils.from_yaml(self.config_path)
+        result = utils.from_yaml(self.config_path)
+        if not isinstance(result, dict):
+            raise ConfigurationError(f"Unable to parse configuration: {self.config_path}")
+        return result
 
     @cached_property
     def config_path(self) -> pathlib.Path:
@@ -149,7 +152,8 @@ class DistroTestConfig(object):
         Copies the keyfile to the path on first access.
         """
         # Add the keyfile and return the path
-        return shutil.copyfile(self._keyfile, self.ctx_keyfile)
+        shutil.copyfile(self._keyfile, self.ctx_keyfile)
+        return self.ctx_keyfile
 
     @cached_property
     def keyfile_img_path(self) -> pathlib.PurePosixPath:
@@ -164,7 +168,8 @@ class DistroTestConfig(object):
 
         Packages are extracted on first access
         """
-        return utils.extract(self.rel_ctx_packages, self.tarball)
+        utils.extract(self.rel_ctx_packages, self.tarball)
+        return self.rel_ctx_packages
 
     @cached_property
     def testfile(self) -> pathlib.Path:
@@ -173,7 +178,8 @@ class DistroTestConfig(object):
         Copies the testfile to the path on first access.
         """
         # Add the testfile - distrotest.sh - and return the path
-        return shutil.copyfile(self._testfile, self.ctx_testfile)
+        shutil.copyfile(self._testfile, self.ctx_testfile)
+        return self.ctx_testfile
 
     @cached_property
     def testfile_img_path(self) -> pathlib.PurePosixPath:
@@ -437,7 +443,7 @@ class DistroTest(object):
         self.distro = name
         self.build_image = image
         self.rebuild = rebuild
-        self._failures = []
+        self._failures: List[str] = []
 
     @property
     def config(self) -> dict:
@@ -573,7 +579,7 @@ class DistroTest(object):
         elif _out:
             self.handle_test_output(_out)
 
-    def error(self, errors: Union[list, tuple]) -> int:
+    def error(self, errors: Optional[Iterable[str]]) -> int:
         """Fail a test and log the errors"""
         return self.checker.error(self.checker.active_check, errors)
 
@@ -641,8 +647,9 @@ class DistroTest(object):
         """Return the concatenated container logs, only called if the container fails to start"""
         return ''.join(await container.log(stdout=True, stderr=True))
 
-    async def on_test_complete(self, container: aiodocker.containers.DockerContainer,
-                               failed: bool) -> Optional[Tuple[str]]:
+    async def on_test_complete(
+            self, container: Optional[aiodocker.containers.DockerContainer],
+            failed: bool) -> Optional[Tuple[str]]:
         """Stop the container and record the results"""
         self.log_failures()
         await self.stop(container)
@@ -684,7 +691,7 @@ class DistroTest(object):
         await container.delete()
         self.run_log("Container stopped", test=self.package_name)
 
-    async def _run(self) -> Optional[Tuple[str]]:
+    async def _run(self) -> Optional[Tuple[str, ...]]:
         container = None
         # As `finally` is always called, regardless of any errors being
         # raised, we assume that something failed, unless build/start/exec

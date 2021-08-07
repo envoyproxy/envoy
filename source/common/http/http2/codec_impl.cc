@@ -808,7 +808,7 @@ Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
                  hd->stream_id, hd->length + 9);
   current_stream_id_ = hd->stream_id;
   StreamImpl* stream = getStream(hd->stream_id);
-  if (stream != nullptr) {
+  if (stream != nullptr && hd->type != METADATA_FRAME_TYPE) {
     stream->addDecodedBytes(hd->length + 9);
   }
   // Track all the frames without padding here, since this is the only callback we receive
@@ -943,7 +943,7 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "sent frame type={}, stream_id={}, length={}", connection_,
                  static_cast<uint64_t>(frame->hd.type), frame->hd.stream_id, frame->hd.length + 9);
   StreamImpl* stream = getStream(frame->hd.stream_id);
-  if (stream != nullptr) {
+  if (stream != nullptr && frame->hd.type != METADATA_FRAME_TYPE) {
     stream->addEncodedBytes(frame->hd.length + 9);
   }
   switch (frame->hd.type) {

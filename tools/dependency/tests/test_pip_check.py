@@ -1,4 +1,4 @@
-from unittest.mock import patch, PropertyMock
+from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
@@ -31,51 +31,67 @@ def test_pip_checker_config_requirements():
             == [('updates',), {}])
 
 
-def test_pip_checker_dependabot_config(patches):
+@pytest.mark.parametrize("isdict", [True, False])
+def test_pip_checker_dependabot_config(patches, isdict):
     checker = pip_check.PipChecker("path1", "path2", "path3")
     patched = patches(
         "utils",
         ("PipChecker.path", dict(new_callable=PropertyMock)),
-        "os.path.join",
         prefix="tools.dependency.pip_check")
 
-    with patched as (m_utils, m_path, m_join):
-        assert checker.dependabot_config == m_utils.from_yaml.return_value
+    with patched as (m_utils, m_path):
+        if isdict:
+            m_utils.from_yaml.return_value = {}
+
+        if isdict:
+            assert checker.dependabot_config == m_utils.from_yaml.return_value
+        else:
+            with pytest.raises(pip_check.PipConfigurationError) as e:
+                checker.dependabot_config
+
+            assert (
+                e.value.args[0]
+                == f'Unable to parse dependabot config: {checker.dependabot_config_path}')
 
     assert (
-        list(m_join.call_args)
-        == [(m_path.return_value, checker._dependabot_config), {}])
+        list(m_path.return_value.joinpath.call_args)
+        == [(checker._dependabot_config, ), {}])
     assert (
         list(m_utils.from_yaml.call_args)
-        == [(m_join.return_value,), {}])
+        == [(m_path.return_value.joinpath.return_value,), {}])
 
 
 def test_pip_checker_requirements_dirs(patches):
     checker = pip_check.PipChecker("path1", "path2", "path3")
-
-    dummy_walker = [
-        ["ROOT1", ["DIR1", "DIR2"], ["FILE1", "FILE2", "FILE3"]],
-        ["ROOT2", ["DIR1", "DIR2"], ["FILE1", "FILE2", "REQUIREMENTS_FILE", "FILE3"]],
-        ["ROOT3", ["DIR1", "DIR2"], ["FILE1", "FILE2", "REQUIREMENTS_FILE", "FILE3"]],
-        ["ROOT4", ["DIR1", "DIR2"], ["FILE1", "FILE2", "FILE3"]]]
-
+    dummy_glob = [
+        "FILE1", "FILE2", "FILE3",
+        "REQUIREMENTS_FILE", "FILE4",
+        "REQUIREMENTS_FILE", "FILE5"]
     patched = patches(
         ("PipChecker.requirements_filename", dict(new_callable=PropertyMock)),
         ("PipChecker.path", dict(new_callable=PropertyMock)),
-        "os.walk",
         prefix="tools.dependency.pip_check")
+    expected = []
 
-    with patched as (m_reqs, m_path, m_walk):
+    with patched as (m_reqs, m_path):
         m_reqs.return_value = "REQUIREMENTS_FILE"
-        m_path.return_value = "ROO"
-        m_walk.return_value = dummy_walker
-        assert checker.requirements_dirs == {'T3', 'T2'}
+        _glob = []
 
-    assert m_reqs.called
-    assert m_path.called
-    assert (
-        list(m_walk.call_args)
-        == [('ROO',), {}])
+        for fname in dummy_glob:
+            _mock = MagicMock()
+            _mock.name = fname
+            if fname == "REQUIREMENTS_FILE":
+                expected.append(_mock)
+            _glob.append(_mock)
+
+        m_path.return_value.glob.return_value = _glob
+        assert checker.requirements_dirs == {f"/{f.parent.relative_to.return_value}" for f in expected}
+
+    for exp in expected:
+        assert (
+            list(exp.parent.relative_to.call_args)
+            == [(m_path.return_value,), {}])
+    assert "requirements_dirs" in checker.__dict__
 
 
 TEST_REQS = (

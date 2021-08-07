@@ -557,7 +557,7 @@ TEST_F(ConnectionHandlerTest, SetsTransportSocketConnectTimeout) {
   EXPECT_CALL(*filter_chain_, transportSocketConnectTimeout)
       .WillOnce(Return(std::chrono::seconds(5)));
   EXPECT_CALL(*server_connection,
-              setTransportSocketConnectTimeout(std::chrono::milliseconds(5 * 1000)));
+              setTransportSocketConnectTimeout(std::chrono::milliseconds(5 * 1000), _));
   EXPECT_CALL(*access_log_, log(_, _, _, _));
 
   listener_callbacks->onAccept(std::make_unique<NiceMock<Network::MockConnectionSocket>>());

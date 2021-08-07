@@ -444,6 +444,8 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+.. _config_access_log_format_dynamic_metadata:
+
 %DYNAMIC_METADATA(NAMESPACE:KEY*):Z%
   HTTP
     :ref:`Dynamic Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
@@ -456,9 +458,9 @@ The following command operators are supported:
     ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
 
     * %DYNAMIC_METADATA(com.test.my_filter)% will log: ``{"test_key": "foo", "test_object": {"inner_key": "bar"}}``
-    * %DYNAMIC_METADATA(com.test.my_filter:test_key)% will log: ``"foo"``
+    * %DYNAMIC_METADATA(com.test.my_filter:test_key)% will log: ``foo``
     * %DYNAMIC_METADATA(com.test.my_filter:test_object)% will log: ``{"inner_key": "bar"}``
-    * %DYNAMIC_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``"bar"``
+    * %DYNAMIC_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``bar``
     * %DYNAMIC_METADATA(com.unknown_filter)% will log: ``-``
     * %DYNAMIC_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
     * %DYNAMIC_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
@@ -471,7 +473,13 @@ The following command operators are supported:
     For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
     when the referenced key is a simple value. If the referenced key is a struct or list value, a
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
-    length is ignored
+    length is ignored.
+
+  .. note::
+
+   DYNAMIC_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
+
+.. _config_access_log_format_cluster_metadata:
 
 %CLUSTER_METADATA(NAMESPACE:KEY*):Z%
   HTTP
@@ -484,9 +492,9 @@ The following command operators are supported:
     ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
 
     * %CLUSTER_METADATA(com.test.my_filter)% will log: ``{"test_key": "foo", "test_object": {"inner_key": "bar"}}``
-    * %CLUSTER_METADATA(com.test.my_filter:test_key)% will log: ``"foo"``
+    * %CLUSTER_METADATA(com.test.my_filter:test_key)% will log: ``foo``
     * %CLUSTER_METADATA(com.test.my_filter:test_object)% will log: ``{"inner_key": "bar"}``
-    * %CLUSTER_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``"bar"``
+    * %CLUSTER_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``bar``
     * %CLUSTER_METADATA(com.unknown_filter)% will log: ``-``
     * %CLUSTER_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
     * %CLUSTER_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
@@ -499,7 +507,11 @@ The following command operators are supported:
     For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
     when the referenced key is a simple value. If the referenced key is a struct or list value, a
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
-    length is ignored
+    length is ignored.
+
+  .. note::
+
+   CLUSTER_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
 
 .. _config_access_log_format_filter_state:
 

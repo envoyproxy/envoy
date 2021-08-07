@@ -838,17 +838,19 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedMultiChunk) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
-// Using a configuration with streaming set for the request and
-// response bodies, we should ignore a "buffered partial" body mode for now
-// because it is not implemented.
-TEST_F(HttpFilterTest, PostAndIgnoreStreamedBodiesUntilImplemented) {
+// Using a configuration with partial buffering set for the request and
+// response bodies but not the headers, and with each body
+// delivered as set of chunks, test the filter with a processor that
+// clears the request body and changes the response body. This works just
+// like buffering because the bodies are much smaller than the buffer limit.
+TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedPartialMultiChunk) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
-    request_header_mode: "SEND"
-    response_header_mode: "SEND"
+    request_header_mode: "SKIP"
+    response_header_mode: "SKIP"
     request_body_mode: "BUFFERED_PARTIAL"
     response_body_mode: "BUFFERED_PARTIAL"
     request_trailer_mode: "SKIP"
@@ -859,33 +861,202 @@ TEST_F(HttpFilterTest, PostAndIgnoreStreamedBodiesUntilImplemented) {
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
+  Buffer::OwnedImpl upstream_request_body;
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   Buffer::OwnedImpl req_data;
   TestUtility::feedBufferWithRandomCharacters(req_data, 100);
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  Buffer::OwnedImpl empty_data;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  upstream_request_body.move(req_data);
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(empty_data, true));
+  upstream_request_body.move(empty_data);
+
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, false))
+      .WillRepeatedly(Invoke([&upstream_request_body](Buffer::Instance& data, Unused) {
+        upstream_request_body.move(data);
+      }));
+
+  processRequestBody([](const HttpBody& req_body, ProcessingResponse&, BodyResponse& body_resp) {
+    EXPECT_TRUE(req_body.end_of_stream());
+    auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+    body_mut->set_body("Changed it!");
+  });
+
+  // Expect that all those bodies ended up being the same as the thing we
+  // replaced it with.
+  EXPECT_EQ("Changed it!", upstream_request_body.toString());
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
-  response_headers_.addCopy(LowerCaseString("content-length"), "100");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(false, absl::nullopt);
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
-  Buffer::OwnedImpl resp_data;
-  TestUtility::feedBufferWithRandomCharacters(resp_data, 100);
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, true));
+  Buffer::OwnedImpl expected_response_body;
+  Buffer::OwnedImpl resp_data_1;
+  TestUtility::feedBufferWithRandomCharacters(resp_data_1, 100);
+  expected_response_body.add(resp_data_1.toString());
+  Buffer::OwnedImpl resp_data_2;
+  TestUtility::feedBufferWithRandomCharacters(resp_data_2, 100);
+  expected_response_body.add(resp_data_2.toString());
+  Buffer::OwnedImpl resp_data_3;
+  TestUtility::feedBufferWithRandomCharacters(resp_data_3, 100);
+  expected_response_body.add(resp_data_3.toString());
 
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  Buffer::OwnedImpl downstream_response_body;
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, false))
+      .WillRepeatedly(Invoke([&downstream_response_body](Buffer::Instance& data, Unused) {
+        downstream_response_body.move(data);
+      }));
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data_1, false));
+  downstream_response_body.move(resp_data_1);
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data_2, false));
+  downstream_response_body.move(resp_data_2);
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data_3, true));
+  downstream_response_body.move(resp_data_3);
+
+  processResponseBody(
+      [&expected_response_body](const HttpBody& req_body, ProcessingResponse&, BodyResponse&) {
+        EXPECT_TRUE(req_body.end_of_stream());
+        EXPECT_EQ(expected_response_body.toString(), req_body.body());
+      });
+  // At this point, the whole thing should have been injected to the downstream
+  EXPECT_EQ(expected_response_body.toString(), downstream_response_body.toString());
+
   filter_->onDestroy();
-
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Using a configuration with partial buffering set for the request body,
+// test the filter when all the data comes in before the headers callback
+// response comes back.
+TEST_F(HttpFilterTest, PostFastRequestPartialBuffering) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "BUFFERED_PARTIAL"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  )EOF");
+
+  // Create synthetic HTTP request
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  request_headers_.addCopy(LowerCaseString("content-length"), 100);
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  Buffer::OwnedImpl req_data_1("Hello");
+  Buffer::OwnedImpl req_data_2(", World!");
+  Buffer::OwnedImpl buffered_data;
+  setUpDecodingBuffering(buffered_data);
+
+  // Buffering and callback isn't complete so we should watermark
+  EXPECT_CALL(decoder_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_1, false));
+  buffered_data.add(req_data_1);
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_2, true));
+  buffered_data.add(req_data_2);
+
+  // Now the headers response comes in and we are all done
+  EXPECT_CALL(decoder_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+  processRequestHeaders(true, absl::nullopt);
+
+  processRequestBody([](const HttpBody& req_body, ProcessingResponse&, BodyResponse&) {
+    EXPECT_TRUE(req_body.end_of_stream());
+    EXPECT_EQ("Hello, World!", req_body.body());
+  });
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "2");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl resp_data;
+  resp_data.add("ok");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, true));
+  filter_->onDestroy();
+}
+
+// Using a configuration with partial buffering set for the request body,
+// test the filter when the data that comes in before the headers callback
+// completes has exceeded the buffer limit.
+TEST_F(HttpFilterTest, PostFastAndBigRequestPartialBuffering) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "BUFFERED_PARTIAL"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  )EOF");
+
+  // Create synthetic HTTP request
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  request_headers_.addCopy(LowerCaseString("content-length"), 13000);
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  Buffer::OwnedImpl req_data_1;
+  TestUtility::feedBufferWithRandomCharacters(req_data_1, 5000);
+  Buffer::OwnedImpl req_data_2;
+  TestUtility::feedBufferWithRandomCharacters(req_data_2, 6000);
+  Buffer::OwnedImpl req_data_3;
+  TestUtility::feedBufferWithRandomCharacters(req_data_3, 2000);
+  Buffer::OwnedImpl buffered_data;
+  setUpDecodingBuffering(buffered_data);
+  Buffer::OwnedImpl expected_request_data;
+  expected_request_data.add(req_data_1);
+  expected_request_data.add(req_data_2);
+
+  // Buffering and callback isn't complete so we should watermark
+  EXPECT_CALL(decoder_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_1, false));
+  buffered_data.add(req_data_1);
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_2, false));
+  buffered_data.add(req_data_2);
+
+  // Now the headers response comes in. Since we are over the watermark we
+  // should send the callback.
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(10000));
+  processRequestHeaders(true, absl::nullopt);
+  EXPECT_CALL(decoder_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, false));
+  processRequestBody(
+      [&expected_request_data](const HttpBody& req_body, ProcessingResponse&, BodyResponse&) {
+        EXPECT_FALSE(req_body.end_of_stream());
+        EXPECT_EQ(expected_request_data.toString(), req_body.body());
+      });
+
+  // The rest of the data should continue as normal.
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data_3, true));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "2");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl resp_data;
+  resp_data.add("ok");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, true));
+  filter_->onDestroy();
 }
 
 // Using a configuration with streaming set for the request and
