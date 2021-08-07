@@ -322,17 +322,6 @@ public:
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limit_policy_entry_;
 };
 
-class MockRequestMirrorPolicy : public RequestMirrorPolicy {
-public:
-  MockRequestMirrorPolicy(const std::string& cluster_name);
-  ~MockRequestMirrorPolicy() override;
-
-  MOCK_METHOD(const std::string&, clusterName, (), (const));
-  MOCK_METHOD(bool, enabled, (Runtime::Loader&), (const));
-
-  std::string cluster_name_;
-};
-
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();

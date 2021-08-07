@@ -1495,9 +1495,8 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
             [&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state.swap(cs); }));
 
     // Set up policies.
-    auto policy = std::make_shared<MockRequestMirrorPolicy>(name);
-    EXPECT_CALL(*policy, clusterName()).WillOnce(ReturnRef(name));
-    EXPECT_CALL(*policy, enabled(_)).WillOnce(Return(true));
+    envoy::type::v3::FractionalPercent default_value;
+    auto policy = std::make_shared<RequestMirrorPolicyImpl>(name, "", default_value);
     route_entry_.policies_.push_back(policy);
   }
 

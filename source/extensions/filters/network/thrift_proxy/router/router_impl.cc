@@ -55,7 +55,9 @@ std::vector<std::shared_ptr<RequestMirrorPolicy>> RouteEntryImplBase::buildMirro
   const auto& proto_policies = route.request_mirror_policies();
   policies.reserve(proto_policies.size());
   for (const auto& policy : proto_policies) {
-    policies.push_back(std::make_shared<RequestMirrorPolicyImpl>(policy));
+    policies.push_back(std::make_shared<RequestMirrorPolicyImpl>(
+        policy.cluster(), policy.runtime_fraction().runtime_key(),
+        policy.runtime_fraction().default_value()));
   }
 
   return policies;

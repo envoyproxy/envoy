@@ -30,12 +30,9 @@ namespace Router {
 
 class RequestMirrorPolicyImpl : public RequestMirrorPolicy {
 public:
-  RequestMirrorPolicyImpl(
-      const envoy::extensions::filters::network::thrift_proxy::v3::RouteAction::RequestMirrorPolicy&
-          mirror_policy)
-      : cluster_name_(mirror_policy.cluster()),
-        runtime_key_(mirror_policy.runtime_fraction().runtime_key()),
-        default_value_(mirror_policy.runtime_fraction().default_value()) {}
+  RequestMirrorPolicyImpl(const std::string& cluster_name, const std::string& runtime_key,
+                          const envoy::type::v3::FractionalPercent& default_value)
+      : cluster_name_(cluster_name), runtime_key_(runtime_key), default_value_(default_value) {}
 
   // Router::RequestMirrorPolicy
   const std::string& clusterName() const override { return cluster_name_; }

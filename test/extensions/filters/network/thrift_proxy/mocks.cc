@@ -126,10 +126,6 @@ MockRateLimitPolicy::MockRateLimitPolicy() {
 }
 MockRateLimitPolicy::~MockRateLimitPolicy() = default;
 
-MockRequestMirrorPolicy::MockRequestMirrorPolicy(const std::string& cluster_name)
-    : cluster_name_(cluster_name) {}
-MockRequestMirrorPolicy::~MockRequestMirrorPolicy() = default;
-
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
