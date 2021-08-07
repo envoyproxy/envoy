@@ -21,7 +21,7 @@ namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
 
-void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
+void expectCorrectProtoGoogleGrpc(envoy::config::core::v3::ApiVersion api_version) {
   std::unique_ptr<TestDeprecatedV2Api> _deprecated_v2_api;
   if (api_version != envoy::config::core::v3::ApiVersion::V3) {
     _deprecated_v2_api = std::make_unique<TestDeprecatedV2Api>();
@@ -49,26 +49,73 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
   EXPECT_CALL(context, clusterManager());
   EXPECT_CALL(context, runtime());
   EXPECT_CALL(context, scope()).Times(2);
+
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
       .WillOnce(Invoke(
           [](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool, Grpc::CacheOption) {
             return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
           }));
+  cb(filter_callback);
+}
+
+void expectCorrectProtoEnvoyGrpc(envoy::config::core::v3::ApiVersion api_version) {
+  std::unique_ptr<TestDeprecatedV2Api> _deprecated_v2_api;
+  if (api_version != envoy::config::core::v3::ApiVersion::V3) {
+    _deprecated_v2_api = std::make_unique<TestDeprecatedV2Api>();
+  }
+  std::string yaml = R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    envoy_grpc:
+      cluster_name: ext_authz_server
+  failure_mode_allow: false
+  transport_api_version: {}
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(
+      fmt::format(yaml, TestUtility::getVersionStringFromApiVersion(api_version)), *proto_config);
+
+  testing::StrictMock<Server::Configuration::MockFactoryContext> context;
+  testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
+  EXPECT_CALL(context, getServerFactoryContext())
+      .WillRepeatedly(testing::ReturnRef(server_context));
+  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_CALL(context, clusterManager());
+  EXPECT_CALL(context, runtime());
+  EXPECT_CALL(context, scope()).Times(2);
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
+      .WillOnce(Invoke(
+          [](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool, Grpc::CacheOption) {
+            return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+          }));
   cb(filter_callback);
 }
 
 } // namespace
 
-TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
+TEST(HttpExtAuthzConfigTest, CorrectProtoGoogleGrpc) {
 #ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::AUTO);
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V2);
+  expectCorrectProtoGoogleGrpc(envoy::config::core::v3::ApiVersion::AUTO);
+  expectCorrectProtoGoogleGrpc(envoy::config::core::v3::ApiVersion::V2);
 #endif
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V3);
+  expectCorrectProtoGoogleGrpc(envoy::config::core::v3::ApiVersion::V3);
+}
+
+TEST(HttpExtAuthzConfigTest, CorrectProtoEnvoyGrpc) {
+#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
+  expectCorrectProtoEnvoyGrpc(envoy::config::core::v3::ApiVersion::AUTO);
+  expectCorrectProtoEnvoyGrpc(envoy::config::core::v3::ApiVersion::V2);
+#endif
+  expectCorrectProtoEnvoyGrpc(envoy::config::core::v3::ApiVersion::V3);
 }
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
