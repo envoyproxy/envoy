@@ -1509,7 +1509,6 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
   returnResponse();
   destroyRouter();
 
-  // TODO(rgs1): we need to exercise the response path for shadow requests here.
   shadow_writer_impl_ = nullptr;
 }
 
