@@ -469,18 +469,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     // Listener level traffic direction overrides the operation name
     switch (context.direction()) {
     case envoy::config::core::v3::UNSPECIFIED: {
-      switch (tracing_config.hidden_envoy_deprecated_operation_name()) {
-      case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-          Tracing::INGRESS:
-        tracing_operation_name = Tracing::OperationName::Ingress;
-        break;
-      case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-          Tracing::EGRESS:
-        tracing_operation_name = Tracing::OperationName::Egress;
-        break;
-      default:
-        NOT_REACHED_GCOVR_EXCL_LINE;
-      }
+      // Continuing legacy behavior; if unspecified, we treat this as ingress.
+      tracing_operation_name = Tracing::OperationName::Ingress;
       break;
     }
     case envoy::config::core::v3::INBOUND:
@@ -494,13 +484,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
 
     Tracing::CustomTagMap custom_tags;
-    for (const std::string& header :
-         tracing_config.hidden_envoy_deprecated_request_headers_for_tags()) {
-      envoy::type::tracing::v3::CustomTag::Header headerTag;
-      headerTag.set_name(header);
-      custom_tags.emplace(
-          header, std::make_shared<const Tracing::RequestHeaderCustomTag>(header, headerTag));
-    }
     for (const auto& tag : tracing_config.custom_tags()) {
       custom_tags.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
     }
@@ -661,11 +644,7 @@ void HttpConnectionManagerConfig::processFilter(
   ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
   ENVOY_LOG(debug, "    config: {}",
             MessageUtil::getJsonStringFromMessageOrError(
-                proto_config.has_typed_config()
-                    ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                    : static_cast<const Protobuf::Message&>(
-                          proto_config.hidden_envoy_deprecated_config()),
-                true));
+                static_cast<const Protobuf::Message&>(proto_config.typed_config()), true));
   filter_factories.push_back(std::move(filter_config_provider));
 }
 

@@ -5,7 +5,6 @@ import platform
 import re
 import sys
 import tarfile
-import tempfile
 from functools import cached_property
 from typing import Tuple
 
@@ -129,10 +128,6 @@ class SphinxRunner(runner.Runner):
         return (
             "-W", "--keep-going", "--color", "-b", "html", str(self.rst_dir), str(self.html_dir))
 
-    @cached_property
-    def tempdir(self) -> tempfile.TemporaryDirectory:
-        return tempfile.TemporaryDirectory()
-
     @property
     def validator_path(self) -> pathlib.Path:
         """Path to validator utility for validating snippets"""
@@ -156,6 +151,7 @@ class SphinxRunner(runner.Runner):
             if self.docs_tag else f"{self.version_number}-{self.build_sha[:6]}")
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        super().add_arguments(parser)
         parser.add_argument("--build_sha")
         parser.add_argument("--docs_tag")
         parser.add_argument("--version_file")
@@ -194,25 +190,12 @@ class SphinxRunner(runner.Runner):
             raise SphinxEnvError(
                 f"Git tag ({self.version_number}) not found in version_history/current.rst")
 
-    def cleanup(self):
-        if "tempdir" in self.__dict__:
-            self.tempdir.cleanup()
-            del self.__dict__["tempdir"]
-
     def create_tarball(self) -> None:
         with tarfile.open(self.output_filename, "w") as tar:
             tar.add(self.html_dir, arcname=".")
 
-    def run(self) -> int:
-        try:
-            return self._run()
-        finally:
-            self.cleanup()
-
-    def _color(self, msg, name=None):
-        return f"{self.colors[name or 'chrome']}{msg}{Style.RESET_ALL}"
-
-    def _run(self):
+    @runner.cleansup
+    def run(self):
         os.environ["ENVOY_DOCS_BUILD_CONFIG"] = str(self.config_file)
         try:
             self.check_env()
@@ -226,6 +209,9 @@ class SphinxRunner(runner.Runner):
             print(e)
             return 1
         self.create_tarball()
+
+    def _color(self, msg, name=None):
+        return f"{self.colors[name or 'chrome']}{msg}{Style.RESET_ALL}"
 
 
 def main(*args) -> int:
