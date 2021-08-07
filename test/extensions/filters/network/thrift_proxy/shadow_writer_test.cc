@@ -280,6 +280,9 @@ TEST_F(ShadowWriterTest, ShadowRequestPoolReady) {
   EXPECT_EQ(FilterStatus::Continue, request_owner.messageEnd());
   EXPECT_EQ(FilterStatus::Continue, request_owner.transportEnd());
 
+  // The following is a no-op, since no callbacks are pending.
+  request_owner.continueDecoding();
+
   EXPECT_CALL(connection, close(_));
   shadow_writer_ = nullptr;
 
