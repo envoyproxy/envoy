@@ -249,14 +249,14 @@ TEST_F(ShadowWriterTest, ShadowRequestPoolReady) {
   FieldType field_type;
   FieldType key_type;
   FieldType value_type;
-  int16_t field_id;
+  int16_t field_id = 0;
   bool bool_value = false;
-  uint8_t byte_value;
-  int16_t int16_value;
-  int32_t int32_value;
-  int64_t int64_value;
-  double double_value;
-  uint32_t container_size;
+  uint8_t byte_value = 0;
+  int16_t int16_value = 0;
+  int32_t int32_value = 0;
+  int64_t int64_value = 0;
+  double double_value = 0.0;
+  uint32_t container_size = 1;
 
   EXPECT_EQ(FilterStatus::Continue, request_owner.transportBegin(nullptr));
   EXPECT_EQ(FilterStatus::Continue, request_owner.passthroughData(passthrough_data));
@@ -313,14 +313,14 @@ TEST_F(ShadowWriterTest, ShadowRequestWriteBeforePoolReady) {
   FieldType field_type;
   FieldType key_type;
   FieldType value_type;
-  int16_t field_id;
+  int16_t field_id = 0;
   bool bool_value = false;
-  uint8_t byte_value;
-  int16_t int16_value;
-  int32_t int32_value;
-  int64_t int64_value;
-  double double_value;
-  uint32_t container_size;
+  uint8_t byte_value = 0;
+  int16_t int16_value = 0;
+  int32_t int32_value = 0;
+  int64_t int64_value = 0;
+  double double_value = 0.0;
+  uint32_t container_size = 1;
 
   EXPECT_EQ(FilterStatus::Continue, request_owner.transportBegin(nullptr));
   EXPECT_EQ(FilterStatus::Continue, request_owner.passthroughData(passthrough_data));
