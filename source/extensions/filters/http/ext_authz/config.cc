@@ -25,6 +25,8 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
   const auto filter_config = std::make_shared<FilterConfig>(
       proto_config, context.scope(), context.runtime(), context.httpContext(), stats_prefix,
       context.getServerFactoryContext().bootstrap());
+  // The callback is created in main thread and executed in worker thread, variables except factory
+  // context must be captured by value into the callback.
   Http::FilterFactoryCb callback;
 
   if (proto_config.has_http_service()) {
