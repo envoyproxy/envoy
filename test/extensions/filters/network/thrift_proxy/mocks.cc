@@ -146,18 +146,6 @@ MockShadowWriter::MockShadowWriter() {
 }
 MockShadowWriter::~MockShadowWriter() = default;
 
-MockRequestOwner::MockRequestOwner(Upstream::ClusterManager& cluster_manager,
-                                   const std::string& stat_prefix, Stats::Scope& scope)
-    : RequestOwner(cluster_manager, stat_prefix, scope) {}
-MockRequestOwner::~MockRequestOwner() = default;
-
-MockShadowRouter::MockShadowRouter() {
-  request_owner_ =
-      std::make_shared<NiceMock<MockRequestOwner>>(cluster_manager_, stat_prefix_, scope_);
-  ON_CALL(*this, requestOwner()).WillByDefault(ReturnRef(*request_owner_));
-}
-MockShadowRouter::~MockShadowRouter() = default;
-
 } // namespace Router
 } // namespace ThriftProxy
 } // namespace NetworkFilters

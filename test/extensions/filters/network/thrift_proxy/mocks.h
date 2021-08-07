@@ -380,62 +380,6 @@ public:
   absl::optional<std::reference_wrapper<ShadowRouterHandle>> router_handle_{absl::nullopt};
 };
 
-class MockRequestOwner : public RequestOwner {
-public:
-  MockRequestOwner(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
-                   Stats::Scope& scope);
-  ~MockRequestOwner() override;
-
-  MOCK_METHOD(Tcp::ConnectionPool::UpstreamCallbacks&, upstreamCallbacks, (), ());
-  MOCK_METHOD(Buffer::OwnedImpl&, buffer, (), ());
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), ());
-  MOCK_METHOD(void, addSize, (uint64_t), ());
-  MOCK_METHOD(void, continueDecoding, (), ());
-  MOCK_METHOD(void, resetDownstreamConnection, (), ());
-  MOCK_METHOD(void, sendLocalReply, (const ThriftProxy::DirectResponse& response, bool end_stream),
-              ());
-  MOCK_METHOD(void, recordResponseDuration, (uint64_t value, Stats::Histogram::Unit unit), ());
-
-  MOCK_METHOD(FilterStatus, transportBegin, (MessageMetadataSharedPtr), ());
-  MOCK_METHOD(FilterStatus, transportEnd, (), ());
-  MOCK_METHOD(FilterStatus, messageEnd, (), ());
-  MOCK_METHOD(FilterStatus, passthroughData, (Buffer::Instance & data), ());
-  MOCK_METHOD(FilterStatus, structBegin, (absl::string_view name), ());
-  MOCK_METHOD(FilterStatus, structEnd, (), ());
-  MOCK_METHOD(FilterStatus, fieldBegin,
-              (absl::string_view name, FieldType& field_type, int16_t& field_id), ());
-  MOCK_METHOD(FilterStatus, fieldEnd, (), ());
-  MOCK_METHOD(FilterStatus, boolValue, (bool& value), ());
-  MOCK_METHOD(FilterStatus, byteValue, (uint8_t & value), ());
-  MOCK_METHOD(FilterStatus, int16Value, (int16_t & value), ());
-  MOCK_METHOD(FilterStatus, int32Value, (int32_t & value), ());
-  MOCK_METHOD(FilterStatus, int64Value, (int64_t & value), ());
-  MOCK_METHOD(FilterStatus, doubleValue, (double& value), ());
-  MOCK_METHOD(FilterStatus, stringValue, (absl::string_view value), ());
-  MOCK_METHOD(FilterStatus, mapBegin, (FieldType & key_type, FieldType& value_type, uint32_t& size),
-              ());
-  MOCK_METHOD(FilterStatus, mapEnd, (), ());
-  MOCK_METHOD(FilterStatus, listBegin, (FieldType & elem_type, uint32_t& size), ());
-  MOCK_METHOD(FilterStatus, listEnd, (), ());
-  MOCK_METHOD(FilterStatus, setBegin, (FieldType & elem_type, uint32_t& size), ());
-  MOCK_METHOD(FilterStatus, setEnd, (), ());
-};
-
-class MockShadowRouter : public ShadowRouterHandle {
-public:
-  MockShadowRouter();
-  ~MockShadowRouter() override;
-
-  MOCK_METHOD(void, onRouterDestroy, (), ());
-  MOCK_METHOD(bool, waitingForConnection, (), (const));
-  MOCK_METHOD(RequestOwner&, requestOwner, (), ());
-
-  NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  std::string stat_prefix_{"test"};
-  NiceMock<Stats::MockIsolatedStatsStore> scope_;
-  std::shared_ptr<NiceMock<MockRequestOwner>> request_owner_;
-};
-
 } // namespace Router
 } // namespace ThriftProxy
 } // namespace NetworkFilters
