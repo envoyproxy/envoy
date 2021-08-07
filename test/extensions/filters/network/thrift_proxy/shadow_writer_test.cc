@@ -417,6 +417,7 @@ TEST_F(ShadowWriterTest, TestNullResponseDecoder) {
   decoder_ptr->newDecoderEventHandler();
   EXPECT_FALSE(decoder_ptr->passthroughEnabled());
 
+  metadata_->setMessageType(MessageType::Reply);
   EXPECT_EQ(FilterStatus::Continue, decoder_ptr->messageBegin(metadata_));
 
   Buffer::OwnedImpl buffer;
@@ -424,9 +425,14 @@ TEST_F(ShadowWriterTest, TestNullResponseDecoder) {
 
   EXPECT_EQ(FilterStatus::Continue, decoder_ptr->messageEnd());
 
-  FieldType field_type;
-  int16_t field_id;
-  EXPECT_EQ(FilterStatus::Continue, decoder_ptr->fieldBegin("", field_type, field_id));
+  // First reply field.
+  {
+    FieldType field_type;
+    int16_t field_id = 0;
+    EXPECT_EQ(FilterStatus::Continue, decoder_ptr->messageBegin(metadata_));
+    EXPECT_EQ(FilterStatus::Continue, decoder_ptr->fieldBegin("", field_type, field_id));
+    EXPECT_TRUE(decoder_ptr->responseSuccess());
+  }
 
   EXPECT_EQ(FilterStatus::Continue, decoder_ptr->transportBegin(nullptr));
   EXPECT_EQ(FilterStatus::Continue, decoder_ptr->transportEnd());
