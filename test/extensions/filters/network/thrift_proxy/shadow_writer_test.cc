@@ -417,7 +417,7 @@ TEST_F(ShadowWriterTest, TestNullResponseDecoder) {
   EXPECT_EQ(FilterStatus::Continue, decoder_ptr->messageBegin(metadata_));
 
   Buffer::OwnedImpl buffer;
-  EXPECT_EQ(ThriftFilters::ResponseStatus::MoreData, decoder_ptr->upstreamData(buffer));
+  decoder_ptr->upstreamData(buffer);
 
   EXPECT_EQ(FilterStatus::Continue, decoder_ptr->messageEnd());
 
