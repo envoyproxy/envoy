@@ -288,7 +288,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 
 FilterStatus Router::messageEnd() {
   ProtocolConverter::messageEnd();
-  request_size_ += upstream_request_->encodeAndWrite(upstream_request_buffer_);
+  const auto encode_size = upstream_request_->encodeAndWrite(upstream_request_buffer_);
+  addSize(encode_size);
   recordUpstreamRequestSize(*cluster_, request_size_);
 
   // Dispatch shadow requests, if any.

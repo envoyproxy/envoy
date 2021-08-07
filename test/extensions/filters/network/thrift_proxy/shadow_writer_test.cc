@@ -79,6 +79,13 @@ public:
                                    TransportType::Framed, ProtocolType::Binary);
     EXPECT_TRUE(shadow_router.createUpstreamRequest());
 
+    // Exercise methods are no-ops by design.
+    shadow_router.resetDownstreamConnection();
+    shadow_router.onAboveWriteBufferHighWatermark();
+    shadow_router.onBelowWriteBufferLowWatermark();
+    shadow_router.downstreamConnection();
+    shadow_router.metadataMatchCriteria();
+
     EXPECT_CALL(connection, write(_, false));
     shadow_router.messageEnd();
 
@@ -240,6 +247,8 @@ TEST_F(ShadowWriterTest, ShadowRequestPoolReady) {
 
   Buffer::OwnedImpl passthrough_data;
   FieldType field_type;
+  FieldType key_type;
+  FieldType value_type;
   int16_t field_id;
   bool bool_value;
   uint8_t byte_value;
@@ -247,6 +256,7 @@ TEST_F(ShadowWriterTest, ShadowRequestPoolReady) {
   int32_t int32_value;
   int64_t int64_value;
   double double_value;
+  uint32_t container_size;
 
   EXPECT_EQ(FilterStatus::Continue, request_owner.transportBegin(nullptr));
   EXPECT_EQ(FilterStatus::Continue, request_owner.passthroughData(passthrough_data));
@@ -261,6 +271,12 @@ TEST_F(ShadowWriterTest, ShadowRequestPoolReady) {
   EXPECT_EQ(FilterStatus::Continue, request_owner.int64Value(int64_value));
   EXPECT_EQ(FilterStatus::Continue, request_owner.doubleValue(double_value));
   EXPECT_EQ(FilterStatus::Continue, request_owner.stringValue(""));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.mapBegin(key_type, value_type, container_size));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.mapEnd());
+  EXPECT_EQ(FilterStatus::Continue, request_owner.listBegin(field_type, container_size));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.listEnd());
+  EXPECT_EQ(FilterStatus::Continue, request_owner.setBegin(field_type, container_size));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.setEnd());
   EXPECT_EQ(FilterStatus::Continue, request_owner.messageEnd());
   EXPECT_EQ(FilterStatus::Continue, request_owner.transportEnd());
 
@@ -295,6 +311,8 @@ TEST_F(ShadowWriterTest, ShadowRequestWriteBeforePoolReady) {
 
   Buffer::OwnedImpl passthrough_data;
   FieldType field_type;
+  FieldType key_type;
+  FieldType value_type;
   int16_t field_id;
   bool bool_value;
   uint8_t byte_value;
@@ -302,6 +320,7 @@ TEST_F(ShadowWriterTest, ShadowRequestWriteBeforePoolReady) {
   int32_t int32_value;
   int64_t int64_value;
   double double_value;
+  uint32_t container_size;
 
   EXPECT_EQ(FilterStatus::Continue, request_owner.transportBegin(nullptr));
   EXPECT_EQ(FilterStatus::Continue, request_owner.passthroughData(passthrough_data));
@@ -316,6 +335,12 @@ TEST_F(ShadowWriterTest, ShadowRequestWriteBeforePoolReady) {
   EXPECT_EQ(FilterStatus::Continue, request_owner.int64Value(int64_value));
   EXPECT_EQ(FilterStatus::Continue, request_owner.doubleValue(double_value));
   EXPECT_EQ(FilterStatus::Continue, request_owner.stringValue(""));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.mapBegin(key_type, value_type, container_size));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.mapEnd());
+  EXPECT_EQ(FilterStatus::Continue, request_owner.listBegin(field_type, container_size));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.listEnd());
+  EXPECT_EQ(FilterStatus::Continue, request_owner.setBegin(field_type, container_size));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.setEnd());
   EXPECT_EQ(FilterStatus::Continue, request_owner.messageEnd());
   EXPECT_EQ(FilterStatus::Continue, request_owner.transportEnd());
 
@@ -378,6 +403,30 @@ TEST_F(ShadowWriterTest, ShadowRequestOnUpstreamDataAppException) {
 
 TEST_F(ShadowWriterTest, ShadowRequestOnUpstreamDataRegularException) {
   testOnUpstreamData(MessageType::Reply, false, false, true);
+}
+
+TEST_F(ShadowWriterTest, TestNullResponseDecoder) {
+  auto transport_ptr =
+      NamedTransportConfigFactory::getFactory(TransportType::Framed).createTransport();
+  auto protocol_ptr = NamedProtocolConfigFactory::getFactory(ProtocolType::Binary).createProtocol();
+  auto decoder_ptr = std::make_unique<NullResponseDecoder>(*transport_ptr, *protocol_ptr);
+
+  decoder_ptr->newDecoderEventHandler();
+  EXPECT_FALSE(decoder_ptr->passthroughEnabled());
+
+  EXPECT_EQ(FilterStatus::Continue, decoder_ptr->messageBegin(metadata_));
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_EQ(ThriftFilters::ResponseStatus::MoreData, decoder_ptr->upstreamData(buffer));
+
+  EXPECT_EQ(FilterStatus::Continue, decoder_ptr->messageEnd());
+
+  FieldType field_type;
+  int16_t field_id;
+  EXPECT_EQ(FilterStatus::Continue, decoder_ptr->fieldBegin("", field_type, field_id));
+
+  EXPECT_EQ(FilterStatus::Continue, decoder_ptr->transportBegin(nullptr));
+  EXPECT_EQ(FilterStatus::Continue, decoder_ptr->transportEnd());
 }
 
 } // namespace Router
