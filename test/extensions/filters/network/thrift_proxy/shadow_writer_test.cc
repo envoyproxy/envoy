@@ -235,7 +235,34 @@ TEST_F(ShadowWriterTest, ShadowRequestPoolReady) {
                                               ProtocolType::Binary);
   EXPECT_NE(absl::nullopt, router_handle);
   EXPECT_CALL(connection, write(_, false));
-  router_handle.value().get().requestOwner().messageEnd();
+
+  auto& request_owner = router_handle.value().get().requestOwner();
+
+  Buffer::OwnedImpl passthrough_data;
+  FieldType field_type;
+  int16_t field_id;
+  bool bool_value;
+  uint8_t byte_value;
+  int16_t int16_value;
+  int32_t int32_value;
+  int64_t int64_value;
+  double double_value;
+
+  EXPECT_EQ(FilterStatus::Continue, request_owner.transportBegin(nullptr));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.passthroughData(passthrough_data));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.structBegin(""));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.fieldBegin("", field_type, field_id));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.fieldEnd());
+  EXPECT_EQ(FilterStatus::Continue, request_owner.structEnd());
+  EXPECT_EQ(FilterStatus::Continue, request_owner.boolValue(bool_value));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.byteValue(byte_value));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.int16Value(int16_value));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.int32Value(int32_value));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.int64Value(int64_value));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.doubleValue(double_value));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.stringValue(""));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.messageEnd());
+  EXPECT_EQ(FilterStatus::Continue, request_owner.transportEnd());
 
   EXPECT_CALL(connection, close(_));
   shadow_writer_ = nullptr;
@@ -264,7 +291,33 @@ TEST_F(ShadowWriterTest, ShadowRequestWriteBeforePoolReady) {
   EXPECT_NE(absl::nullopt, router_handle);
 
   // Write before connection is ready.
-  router_handle.value().get().requestOwner().messageEnd();
+  auto& request_owner = router_handle.value().get().requestOwner();
+
+  Buffer::OwnedImpl passthrough_data;
+  FieldType field_type;
+  int16_t field_id;
+  bool bool_value;
+  uint8_t byte_value;
+  int16_t int16_value;
+  int32_t int32_value;
+  int64_t int64_value;
+  double double_value;
+
+  EXPECT_EQ(FilterStatus::Continue, request_owner.transportBegin(nullptr));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.passthroughData(passthrough_data));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.structBegin(""));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.fieldBegin("", field_type, field_id));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.fieldEnd());
+  EXPECT_EQ(FilterStatus::Continue, request_owner.structEnd());
+  EXPECT_EQ(FilterStatus::Continue, request_owner.boolValue(bool_value));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.byteValue(byte_value));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.int16Value(int16_value));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.int32Value(int32_value));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.int64Value(int64_value));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.doubleValue(double_value));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.stringValue(""));
+  EXPECT_EQ(FilterStatus::Continue, request_owner.messageEnd());
+  EXPECT_EQ(FilterStatus::Continue, request_owner.transportEnd());
 
   NiceMock<Network::MockClientConnection> connection;
   auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
