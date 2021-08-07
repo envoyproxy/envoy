@@ -47,8 +47,9 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version,
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   // Expect the raw async client to be created inside the callback.
-  // The creation of the filter callback is in main thread while the execution of callback is in worker thread.
-  // Because of the thread local cache of async client, it must be created in worker thread inside the callback.
+  // The creation of the filter callback is in main thread while the execution of callback is in
+  // worker thread. Because of the thread local cache of async client, it must be created in worker
+  // thread inside the callback.
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
       .WillOnce(Invoke(
           [](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool, Grpc::CacheOption) {
