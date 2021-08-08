@@ -1,4 +1,3 @@
-#include <mutex>
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -9,8 +8,8 @@
 #include "source/common/network/address_impl.h"
 
 #include "test/common/http/common.h"
-#include "test/extensions/filters/http/ext_proc/test_processor.h"
 #include "test/extensions/filters/http/ext_proc/ext_proc_grpc_fuzz_helper.h"
+#include "test/extensions/filters/http/ext_proc/test_processor.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
@@ -20,6 +19,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+using envoy::config::core::v3::HeaderValue;
+using envoy::config::core::v3::HeaderValueOption;
 using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
 using envoy::service::ext_proc::v3alpha::BodyResponse;
 using envoy::service::ext_proc::v3alpha::CommonResponse;
@@ -32,9 +33,6 @@ using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
 using envoy::service::ext_proc::v3alpha::TrailersResponse;
 using envoy::type::v3::StatusCode;
-using envoy::config::core::v3::HeaderValueOption;
-using envoy::config::core::v3::HeaderValue;
-
 
 using Http::LowerCaseString;
 
@@ -166,24 +164,25 @@ public:
       // codec_client connection is still open. There are no locks protecting
       // the codec_client connection and cannot trust that it's safe to send
       // another chunk
-      std::unique_lock<std::mutex> lock(fh->immediate_resp_lock_);
+      fh->immediate_resp_lock_.lock();
       if (fh->immediate_resp_sent_) {
         ENVOY_LOG_MISC(trace, "Proxy closed connection, returning early");
+        fh->immediate_resp_lock_.unlock();
         return response;
       }
       ENVOY_LOG_MISC(trace, "Sending chunk of {} bytes", data.length());
       codec_client_->sendData(encoder, chunk, false);
-      lock.unlock();
+      fh->immediate_resp_lock_.unlock();
     }
 
     // See comment above
-    std::unique_lock<std::mutex> lock(fh->immediate_resp_lock_);
+    fh->immediate_resp_lock_.lock();
     if (!fh->immediate_resp_sent_) {
       ENVOY_LOG_MISC(trace, "Sending empty chunk to close stream");
       Buffer::OwnedImpl empty_chunk;
       codec_client_->sendData(encoder, empty_chunk, true);
     }
-    lock.unlock();
+    fh->immediate_resp_lock_.unlock();
     return response;
   }
 
@@ -194,20 +193,20 @@ public:
     // TODO(ikepolinsky): add random flag for sending trailers with a request
     //   using HttpIntegration::sendTrailers()
     switch (fh->consumeEnum<HttpMethod>()) {
-      case HttpMethod::GET:
-        ENVOY_LOG_MISC(trace, "Sending GET request");
-        return sendDownstreamRequest(absl::nullopt);
-      case HttpMethod::POST:
-        if (fh->consumeBool()) {
-          ENVOY_LOG_MISC(trace, "Sending POST request with body");
-          return sendDownstreamRequestWithBody(fh->consumeRandomLengthString(), absl::nullopt);
-        } else {
-          ENVOY_LOG_MISC(trace, "Sending POST request with chunked body");
-          return sendDownstreamRequestWithChunks(fh, absl::nullopt);
-        }
-      default:
-        ENVOY_LOG_MISC(error, "Unhandled HttpMethod");
-        exit(EXIT_FAILURE);
+    case HttpMethod::GET:
+      ENVOY_LOG_MISC(trace, "Sending GET request");
+      return sendDownstreamRequest(absl::nullopt);
+    case HttpMethod::POST:
+      if (fh->consumeBool()) {
+        ENVOY_LOG_MISC(trace, "Sending POST request with body");
+        return sendDownstreamRequestWithBody(fh->consumeRandomLengthString(), absl::nullopt);
+      } else {
+        ENVOY_LOG_MISC(trace, "Sending POST request with chunked body");
+        return sendDownstreamRequestWithChunks(fh, absl::nullopt);
+      }
+    default:
+      ENVOY_LOG_MISC(error, "Unhandled HttpMethod");
+      exit(EXIT_FAILURE);
     }
   }
 
@@ -256,7 +255,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
           if (fuzz_helper.consumeBool()) {
             ProcessingMode* msg = resp.mutable_mode_override();
             fuzz_helper.randomizeOverrideResponse(msg);
-           }
+          }
 
           ENVOY_LOG_MISC(trace, "Response generated, writing to stream.");
           stream->Write(resp);

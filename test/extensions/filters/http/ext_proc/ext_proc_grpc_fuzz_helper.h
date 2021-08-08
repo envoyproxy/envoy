@@ -1,33 +1,33 @@
 #pragma once
 
-#include <mutex>
-
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 
-#include "grpc++/server_builder.h"
-
+#include "source/common/common/thread.h"
 #include "source/common/grpc/common.h"
+
 #include "test/common/http/common.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/utility.h"
+
+#include "grpc++/server_builder.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+using envoy::config::core::v3::HeaderValue;
+using envoy::config::core::v3::HeaderValueOption;
 using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
 using envoy::service::ext_proc::v3alpha::CommonResponse;
+using envoy::service::ext_proc::v3alpha::HeaderMutation;
 using envoy::service::ext_proc::v3alpha::ImmediateResponse;
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
-using envoy::service::ext_proc::v3alpha::HeaderMutation;
 using envoy::type::v3::StatusCode;
-using envoy::config::core::v3::HeaderValueOption;
-using envoy::config::core::v3::HeaderValue;
 
 // TODO(ikepolinsky): integrate an upstream that can be controlled by the fuzzer
 // and responds appropriately to HTTP requests.
@@ -61,19 +61,14 @@ enum class ResponseType {
   kMaxValue = ResponseTrailers
 };
 
-enum class HeaderSendSetting {
-  Default,
-  Send,
-  Skip,
-  kMaxValue = Skip
-};
+enum class HeaderSendSetting { Default, Send, Skip, kMaxValue = Skip };
 
 enum class BodySendSetting {
   None,
   Buffered,
   Streamed,
   BufferedPartial,
-  kMaxValue = BUFFERED_PARTIAL
+  kMaxValue = BufferedPartial
 };
 
 // Helper class for fuzzing the ext_proc filter.
@@ -83,7 +78,6 @@ enum class BodySendSetting {
 // threads (e.g., in the fuzzer thread and the external processor thread).
 class ExtProcFuzzHelper {
 public:
-
   ExtProcFuzzHelper(FuzzedDataProvider* provider);
 
   // Wrapper functions for FuzzedDataProvider to make them thread safe
@@ -91,13 +85,17 @@ public:
   std::string consumeRandomLengthString();
 
   template <typename T> T consumeIntegralInRange(T min, T max) {
-    std::unique_lock<std::mutex> lock(provider_lock_);
-    return provider_->ConsumeIntegralInRange<T>(min, max);
+    provider_lock_.lock();
+    T ret_val = provider_->ConsumeIntegralInRange<T>(min, max);
+    provider_lock_.unlock();
+    return ret_val;
   }
 
   template <typename T> T consumeEnum() {
-    std::unique_lock<std::mutex> lock(provider_lock_);
-    return provider_->ConsumeEnum<T>();
+    provider_lock_.lock();
+    T ret_val = provider_->ConsumeEnum<T>();
+    provider_lock_.unlock();
+    return ret_val;
   }
 
   StatusCode randomHttpStatus();
@@ -112,10 +110,10 @@ public:
 
   FuzzedDataProvider* provider_;
   // Protects provider_
-  std::mutex provider_lock_;
+  Thread::MutexBasicLockable provider_lock_;
 
   // Protects immediate_resp_sent_
-  std::mutex immediate_resp_lock_;
+  Thread::MutexBasicLockable immediate_resp_lock_;
   // Flags if an immediate response was generated and sent
   bool immediate_resp_sent_;
 };
@@ -124,4 +122,3 @@ public:
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-
