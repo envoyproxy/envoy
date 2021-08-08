@@ -88,8 +88,8 @@ protected:
     return LookupRequest(request_headers_, current_time_, vary_allow_list_);
   }
 
-  AssertionResult expectLookupSuccessWithBody(LookupContext* lookup_context, absl::string_view body,
-                                              Http::TestResponseTrailerMapImpl trailers = {}) {
+  AssertionResult expectLookupSuccessWithBodyAndTrailers(LookupContext* lookup_context, absl::string_view body,
+                                         Http::TestResponseTrailerMapImpl trailers = {}) {
     if (lookup_result_.cache_entry_status_ != CacheEntryStatus::Ok) {
       return AssertionFailure() << "Expected: lookup_result_.cache_entry_status == "
                                    "CacheEntryStatus::Ok\n  Actual: "
@@ -105,12 +105,10 @@ protected:
     if (body != actual_body) {
       return AssertionFailure() << "Expected body == " << body << "\n  Actual:  " << actual_body;
     }
-    if (!trailers.empty()) {
-      const Http::TestResponseTrailerMapImpl actual_trailers = getTrailers(*lookup_context);
-      if (trailers != actual_trailers) {
-        return AssertionFailure() << "Expected trailers == " << trailers
-                                  << "\n  Actual:  " << actual_trailers;
-      }
+    const Http::TestResponseTrailerMapImpl actual_trailers = getTrailers(*lookup_context);
+    if (trailers != actual_trailers) {
+      return AssertionFailure() << "Expected trailers == " << trailers
+                                << "\n  Actual:  " << actual_trailers;
     }
     return AssertionSuccess();
   }
@@ -136,7 +134,7 @@ TEST_F(SimpleHttpCacheTest, PutGet) {
   const std::string body1("Value");
   insert(move(name_lookup_context), response_headers, body1);
   name_lookup_context = lookup(request_path1);
-  EXPECT_TRUE(expectLookupSuccessWithBody(name_lookup_context.get(), body1));
+  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(name_lookup_context.get(), body1));
 
   const std::string& request_path2("Another Name");
   LookupContextPtr another_name_lookup_context = lookup(request_path2);
@@ -144,7 +142,7 @@ TEST_F(SimpleHttpCacheTest, PutGet) {
 
   const std::string new_body1("NewValue");
   insert(move(name_lookup_context), response_headers, new_body1);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(request_path1).get(), new_body1));
+  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(lookup(request_path1).get(), new_body1));
 }
 
 TEST_F(SimpleHttpCacheTest, PrivateResponse) {
@@ -161,7 +159,7 @@ TEST_F(SimpleHttpCacheTest, PrivateResponse) {
   // inserted. However, if the insertion did happen, it would be served at the
   // time of lookup.
   insert(move(name_lookup_context), response_headers, Body);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(request_path).get(), Body));
+  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(lookup(request_path).get(), Body));
 }
 
 TEST_F(SimpleHttpCacheTest, Miss) {
@@ -200,7 +198,7 @@ TEST_F(SimpleHttpCacheTest, RequestSmallMinFresh) {
                                                    {"cache-control", "public, max-age=9000"}};
   const std::string Body("Value");
   insert(move(name_lookup_context), response_headers, Body);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(request_path).get(), Body));
+  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(lookup(request_path).get(), Body));
 }
 
 TEST_F(SimpleHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
@@ -216,7 +214,7 @@ TEST_F(SimpleHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
 
   const std::string Body("Value");
   insert(move(name_lookup_context), response_headers, Body);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(request_path).get(), Body));
+  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(lookup(request_path).get(), Body));
 }
 
 TEST_F(SimpleHttpCacheTest, StreamingPut) {
@@ -259,7 +257,7 @@ TEST_F(SimpleHttpCacheTest, VaryResponses) {
   const std::string Body1("accept is image/*");
   insert(move(first_value_vary), response_headers, Body1);
   first_value_vary = lookup(RequestPath);
-  EXPECT_TRUE(expectLookupSuccessWithBody(first_value_vary.get(), Body1));
+  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(first_value_vary.get(), Body1));
 
   // Second request with a different value for the varied header.
   request_headers_.setCopy(Http::LowerCaseString("accept"), "text/html");
@@ -269,10 +267,10 @@ TEST_F(SimpleHttpCacheTest, VaryResponses) {
   // Add second version and make sure we receive the correct one..
   const std::string Body2("accept is text/html");
   insert(move(second_value_vary), response_headers, Body2);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath).get(), Body2));
+  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(lookup(RequestPath).get(), Body2));
 
   // Looks up first version again to be sure it wasn't replaced with the second one.
-  EXPECT_TRUE(expectLookupSuccessWithBody(first_value_vary.get(), Body1));
+  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(first_value_vary.get(), Body1));
 }
 
 TEST_F(SimpleHttpCacheTest, PutGetWithTrailers) {
@@ -286,7 +284,7 @@ TEST_F(SimpleHttpCacheTest, PutGetWithTrailers) {
   Http::TestResponseTrailerMapImpl response_trailers{{"why", "is"}, {"sky", "blue"}};
   insert(move(name_lookup_context), response_headers, body1, response_trailers);
   name_lookup_context = lookup(request_path1);
-  EXPECT_TRUE(expectLookupSuccessWithBody(name_lookup_context.get(), body1, response_trailers));
+  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(name_lookup_context.get(), body1, response_trailers));
 
   const std::string& request_path2("Another Name");
   LookupContextPtr another_name_lookup_context = lookup(request_path2);
@@ -295,7 +293,7 @@ TEST_F(SimpleHttpCacheTest, PutGetWithTrailers) {
   const std::string new_body1("NewValue");
   insert(move(name_lookup_context), response_headers, new_body1, response_trailers);
   EXPECT_TRUE(
-      expectLookupSuccessWithBody(lookup(request_path1).get(), new_body1, response_trailers));
+      expectLookupSuccessWithBodyAndTrailers(lookup(request_path1).get(), new_body1, response_trailers));
 }
 
 } // namespace

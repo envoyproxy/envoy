@@ -387,8 +387,9 @@ TEST_P(LookupRequestTest, ResultWithBodyAndTrailersMatchesExpectation) {
       makeLookupResult(lookup_request, response_headers, content_length, /*has_trailers=*/true);
 
   EXPECT_EQ(GetParam().expected_cache_entry_status, lookup_response.cache_entry_status_);
-  ASSERT_TRUE(lookup_response.headers_);
+  ASSERT_TRUE(lookup_response.headers_ != nullptr);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  // Age is populated in LookupRequest::makeLookupResult, which is called in makeLookupResult.
   EXPECT_THAT(*lookup_response.headers_,
               HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, content_length);
