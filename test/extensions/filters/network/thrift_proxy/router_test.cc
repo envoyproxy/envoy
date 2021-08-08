@@ -344,6 +344,78 @@ public:
     }
   }
 
+  void sendTrivialMap() {
+    FieldType container_type = FieldType::I32;
+    uint32_t size = 2;
+
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeMapBegin(_, container_type, container_type, size));
+    }
+    EXPECT_EQ(FilterStatus::Continue, router_->mapBegin(container_type, container_type, size));
+
+    for (int i = 0; i < 2; i++) {
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeInt32(_, i));
+      }
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));
+
+      int j = i + 100;
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeInt32(_, j));
+      }
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(j));
+    }
+
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeMapEnd(_));
+    }
+    EXPECT_EQ(FilterStatus::Continue, router_->mapEnd());
+  }
+
+  void sendTrivialList() {
+    FieldType container_type = FieldType::I32;
+    uint32_t size = 3;
+
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeListBegin(_, container_type, size));
+    }
+    EXPECT_EQ(FilterStatus::Continue, router_->listBegin(container_type, size));
+
+    for (int i = 0; i < 3; i++) {
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeInt32(_, i));
+      }
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));
+    }
+
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeListEnd(_));
+    }
+    EXPECT_EQ(FilterStatus::Continue, router_->listEnd());
+  }
+
+  void sendTrivialSet() {
+    FieldType container_type = FieldType::I32;
+    uint32_t size = 4;
+
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeSetBegin(_, container_type, size));
+    }
+    EXPECT_EQ(FilterStatus::Continue, router_->setBegin(container_type, size));
+
+    for (int i = 0; i < 4; i++) {
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeInt32(_, i));
+      }
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));
+    }
+
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeSetEnd(_));
+    }
+    EXPECT_EQ(FilterStatus::Continue, router_->setEnd());
+  }
+
   void completeRequest() {
     for (auto& protocol : all_protocols_) {
       EXPECT_CALL(*protocol, writeMessageEnd(_));
@@ -1511,6 +1583,10 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
   for (const auto& field_type : field_types) {
     sendTrivialStruct(field_type);
   }
+
+  sendTrivialMap();
+  sendTrivialList();
+  sendTrivialSet();
 
   completeRequest();
   returnResponse();
