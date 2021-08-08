@@ -1504,7 +1504,14 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
 
   // Set sequence id to 0, since that's what the new connections used for shadow requests will use.
   startRequestWithExistingConnection(MessageType::Call, 0);
-  sendTrivialStruct(FieldType::I32);
+
+  std::vector<FieldType> field_types = {FieldType::Bool,  FieldType::Byte, FieldType::I16,
+                                        FieldType::I32,   FieldType::I64,  FieldType::Double,
+                                        FieldType::String};
+  for (const auto& field_type : field_types) {
+    sendTrivialStruct(field_type);
+  }
+
   completeRequest();
   returnResponse();
   destroyRouter();
