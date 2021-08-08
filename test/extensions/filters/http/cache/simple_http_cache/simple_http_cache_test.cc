@@ -88,7 +88,8 @@ protected:
     return LookupRequest(request_headers_, current_time_, vary_allow_list_);
   }
 
-  AssertionResult expectLookupSuccessWithBodyAndTrailers(LookupContext* lookup_context, absl::string_view body,
+  AssertionResult
+  expectLookupSuccessWithBodyAndTrailers(LookupContext* lookup_context, absl::string_view body,
                                          Http::TestResponseTrailerMapImpl trailers = {}) {
     if (lookup_result_.cache_entry_status_ != CacheEntryStatus::Ok) {
       return AssertionFailure() << "Expected: lookup_result_.cache_entry_status == "
@@ -284,7 +285,8 @@ TEST_F(SimpleHttpCacheTest, PutGetWithTrailers) {
   Http::TestResponseTrailerMapImpl response_trailers{{"why", "is"}, {"sky", "blue"}};
   insert(move(name_lookup_context), response_headers, body1, response_trailers);
   name_lookup_context = lookup(request_path1);
-  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(name_lookup_context.get(), body1, response_trailers));
+  EXPECT_TRUE(
+      expectLookupSuccessWithBodyAndTrailers(name_lookup_context.get(), body1, response_trailers));
 
   const std::string& request_path2("Another Name");
   LookupContextPtr another_name_lookup_context = lookup(request_path2);
@@ -292,8 +294,8 @@ TEST_F(SimpleHttpCacheTest, PutGetWithTrailers) {
 
   const std::string new_body1("NewValue");
   insert(move(name_lookup_context), response_headers, new_body1, response_trailers);
-  EXPECT_TRUE(
-      expectLookupSuccessWithBodyAndTrailers(lookup(request_path1).get(), new_body1, response_trailers));
+  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(lookup(request_path1).get(), new_body1,
+                                                     response_trailers));
 }
 
 } // namespace
