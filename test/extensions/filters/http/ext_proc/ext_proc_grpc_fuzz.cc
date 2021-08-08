@@ -156,7 +156,7 @@ public:
       chunk.add(data);
 
       // If proxy closes connection before body is fully sent it causes a
-      // seg fault. To address this, the external processor sets a flag to
+      // crash. To address this, the external processor sets a flag to
       // signal when it has generated an immediate response which will close
       // the connection in the future. We check this flag, which is protected
       // by a lock, before sending a chunk. If the flag is set, we don't attempt
@@ -224,7 +224,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
   // This starts an external processor in a separate thread. This allows for the
   // external process to consume messages in a loop without blocking the fuzz
-  // target from receiving the repsonse.
+  // target from receiving the response.
   fuzzer.test_processor_.start(
       [&fuzz_helper](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         while (true) {
@@ -278,7 +278,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     ENVOY_LOG_MISC(trace, "Response received.");
   } else {
     // TODO(ikepolinsky): investigate if there is anyway around this.
-    // Waiting 2 seconds for a fuzz case to fail will drasticially
+    // Waiting 2 seconds for a fuzz case to fail will drastically
     // reduce executions/second.
     ENVOY_LOG_MISC(trace, "Response timed out.");
   }

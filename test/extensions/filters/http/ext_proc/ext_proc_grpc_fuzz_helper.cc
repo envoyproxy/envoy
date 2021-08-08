@@ -348,9 +348,9 @@ grpc::Status ExtProcFuzzHelper::randomGrpcStatusWithMessage() {
 
 // TODO(ikepolinsky): implement this function
 // Randomizes a HeaderMutation taken as input. Header/Trailer values of the
-// request are availble in req which allows for more guided manipulation of the
+// request are available in req which allows for more guided manipulation of the
 // headers. The bool value should be false to manipulate headers and
-// true to manipulate trailers (which are also a headermap)
+// true to manipulate trailers (which are also a header map)
 void ExtProcFuzzHelper::randomizeHeaderMutation(HeaderMutation*, ProcessingRequest*, bool) {
   // Each of the following blocks generates random data for the 2 fields
   // of a HeaderMutation gRPC message
@@ -368,7 +368,7 @@ void ExtProcFuzzHelper::randomizeHeaderMutation(HeaderMutation*, ProcessingReque
   // 2. Randomize remove headers
   /* TODO(ikepolinsky): Randomly remove headers
   if (consumeBool()) {
-    msg->add_remove_headers(consumeRandomLenthString());
+    msg->add_remove_headers(consumeRandomLengthString());
   }*/
 }
 
@@ -410,7 +410,7 @@ void ExtProcFuzzHelper::randomizeCommonResponse(CommonResponse* msg, ProcessingR
     }
   }
 
-  // 4. TODO(ikepolinsky): Randomize trailers - [skipping because tailers not implemented]
+  // 4. TODO(ikepolinsky): Randomize trailers - [skipping because trailers not implemented]
 
   // 5. Randomize clear_route_cache
   if (consumeBool()) {
@@ -646,7 +646,7 @@ void ExtProcFuzzHelper::randomizeResponse(ProcessingResponse* resp, ProcessingRe
     // Since we are sending an immediate response, envoy will close the
     // mock connection with the downstream. As a result, the
     // codec_client_connection will be deleted and if the upstream is still
-    // sending data chunks (e.g., streaming mode) it will cause a seg fault
+    // sending data chunks (e.g., streaming mode) it will cause a crash
     // Note: At this point provider_lock_ is not held so deadlock is not
     // possible
 
