@@ -306,16 +306,12 @@ bool ShadowRouterImpl::requestInProgress() {
   const bool connection_waiting = upstream_request_->conn_pool_handle_ != nullptr;
 
   // Connection open and message sent.
-  if (connection_open && request_sent_) {
-    return true;
-  }
+  const bool message_sent = connection_open && request_sent_;
 
   // Request ready to go and connection ready or almost ready.
-  if (request_ready_ && (connection_open || connection_waiting)) {
-    return true;
-  }
+  const bool message_ready = request_ready_ && (connection_open || connection_waiting);
 
-  return false;
+  return message_sent || message_ready;
 }
 
 void ShadowRouterImpl::onRouterDestroy() {
