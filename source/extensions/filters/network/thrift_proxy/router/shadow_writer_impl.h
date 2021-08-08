@@ -34,7 +34,7 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
 
     bool underflow = false;
     try {
-      decoder_->onData(upstream_buffer_, underflow);
+      underflow = onData();
     } catch (const AppException&) {
       return ThriftFilters::ResponseStatus::Reset;
     } catch (const EnvoyException&) {
@@ -44,6 +44,11 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
     ASSERT(complete_ || underflow);
     return complete_ ? ThriftFilters::ResponseStatus::Complete
                      : ThriftFilters::ResponseStatus::MoreData;
+  }
+  virtual bool onData() {
+    bool underflow = false;
+    decoder_->onData(upstream_buffer_, underflow);
+    return underflow;
   }
   MessageMetadataSharedPtr& responseMetadata() { return metadata_; }
   bool responseSuccess() { return success_.value_or(false); }

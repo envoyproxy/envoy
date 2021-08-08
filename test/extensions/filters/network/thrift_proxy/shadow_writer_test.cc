@@ -407,6 +407,38 @@ TEST_F(ShadowWriterTest, TestNullResponseDecoder) {
   EXPECT_EQ(FilterStatus::Continue, decoder_ptr->transportEnd());
 }
 
+struct MockOnDataNullResponseDecoder : public NullResponseDecoder {
+  MockOnDataNullResponseDecoder(Transport& transport, Protocol& protocol)
+      : NullResponseDecoder(transport, protocol) {}
+
+  MOCK_METHOD(bool, onData, (), ());
+};
+
+TEST_F(ShadowWriterTest, NullResponseDecoderExceptionHandling) {
+  auto transport_ptr =
+      NamedTransportConfigFactory::getFactory(TransportType::Framed).createTransport();
+  auto protocol_ptr = NamedProtocolConfigFactory::getFactory(ProtocolType::Binary).createProtocol();
+  auto decoder_ptr = std::make_unique<MockOnDataNullResponseDecoder>(*transport_ptr, *protocol_ptr);
+
+  {
+    EXPECT_CALL(*decoder_ptr, onData()).WillOnce(Invoke([&]() -> bool {
+      throw EnvoyException("exception");
+    }));
+
+    Buffer::OwnedImpl buffer;
+    EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, decoder_ptr->upstreamData(buffer));
+  }
+
+  {
+    EXPECT_CALL(*decoder_ptr, onData()).WillOnce(Invoke([&]() -> bool {
+      throw AppException(AppExceptionType::InternalError, "exception");
+    }));
+
+    Buffer::OwnedImpl buffer;
+    EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, decoder_ptr->upstreamData(buffer));
+  }
+}
+
 } // namespace Router
 } // namespace ThriftProxy
 } // namespace NetworkFilters
