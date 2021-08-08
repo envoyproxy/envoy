@@ -1604,7 +1604,8 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 }
 
-// Test that authentication will do when the filter_callbacks has no route.
+// Test that authentication will do when the filter_callbacks has no route.(both
+// direct response and redirect have no route)
 TEST_P(HttpFilterTestParam, NoRoute) {
   EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
   prepareCheck();
@@ -1615,8 +1616,8 @@ TEST_P(HttpFilterTestParam, NoRoute) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 }
 
-// Test that the authentication will be skipped when the filter_callbacks has no route when
-// the runtime flag
+// Test that the authentication will be skipped when the filter_callbacks has no route(both
+// direct response and redirect have no route) when the runtime flag
 // `envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect` is false.
 TEST_P(HttpFilterTestParam, NoRouteWithSkipAuth) {
   TestScopedRuntime scoped_runtime;
