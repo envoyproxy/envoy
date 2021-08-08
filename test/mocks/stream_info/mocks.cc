@@ -79,8 +79,9 @@ MockStreamInfo::MockStreamInfo()
     bytes_received_ += bytes_received;
   }));
   ON_CALL(*this, addWireBytesReceived(_))
-      .WillByDefault(Invoke(
-          [this](uint64_t wire_bytes_newly_received) { wire_bytes_received_ = wire_bytes_newly_received; }));
+      .WillByDefault(Invoke([this](uint64_t wire_bytes_newly_received) {
+        wire_bytes_received_ = wire_bytes_newly_received;
+      }));
   ON_CALL(*this, bytesReceived()).WillByDefault(ReturnPointee(&bytes_received_));
   ON_CALL(*this, wireBytesReceived()).WillByDefault(ReturnPointee(&wire_bytes_received_));
   ON_CALL(*this, addBytesSent(_)).WillByDefault(Invoke([this](uint64_t bytes_sent) {

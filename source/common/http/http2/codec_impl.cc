@@ -805,11 +805,11 @@ Status ConnectionImpl::protocolErrorForTest() {
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
   ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}, stream_id={}, length={}",
                  connection_, static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags),
-                 hd->stream_id, hd->length + 9);
+                 hd->stream_id, hd->length);
   current_stream_id_ = hd->stream_id;
   StreamImpl* stream = getStream(hd->stream_id);
   if (stream != nullptr && hd->type != METADATA_FRAME_TYPE) {
-    stream->addDecodedBytes(hd->length + 9);
+    stream->addDecodedBytes(hd->length + H2_FRAME_HEADER_SIZE);
   }
   // Track all the frames without padding here, since this is the only callback we receive
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
@@ -941,10 +941,10 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   // In all cases however it will attempt to send a GOAWAY frame with an error status. If we see
   // an outgoing frame of this type, we will return an error code so that we can abort execution.
   ENVOY_CONN_LOG(trace, "sent frame type={}, stream_id={}, length={}", connection_,
-                 static_cast<uint64_t>(frame->hd.type), frame->hd.stream_id, frame->hd.length + 9);
+                 static_cast<uint64_t>(frame->hd.type), frame->hd.stream_id, frame->hd.length);
   StreamImpl* stream = getStream(frame->hd.stream_id);
   if (stream != nullptr && frame->hd.type != METADATA_FRAME_TYPE) {
-    stream->addEncodedBytes(frame->hd.length + 9);
+    stream->addEncodedBytes(frame->hd.length + H2_FRAME_HEADER_SIZE);
   }
   switch (frame->hd.type) {
   case NGHTTP2_GOAWAY: {
