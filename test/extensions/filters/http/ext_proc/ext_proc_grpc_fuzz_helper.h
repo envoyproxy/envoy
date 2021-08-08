@@ -1,5 +1,4 @@
-#ifndef TEST_EXTENSIONS_FILTERS_HTTP_EXT_PROC_EXT_PROC_GRPC_FUZZ_HELPER_H_
-#define TEST_EXTENSIONS_FILTERS_HTTP_EXT_PROC_EXT_PROC_GRPC_FUZZ_HELPER_H_
+#pragma once
 
 #include <mutex>
 
@@ -88,30 +87,28 @@ public:
   ExtProcFuzzHelper(FuzzedDataProvider* provider);
 
   // Wrapper functions for FuzzedDataProvider to make them thread safe
-  bool ConsumeBool();
-  std::string ConsumeRandomLengthString();
-  //template <typename T> T ConsumeIntegralInRange(T min, T max);
-  //template <typename T> T ConsumeEnum();
+  bool consumeBool();
+  std::string consumeRandomLengthString();
 
-  template <typename T> T ConsumeIntegralInRange(T min, T max) {
+  template <typename T> T consumeIntegralInRange(T min, T max) {
     std::unique_lock<std::mutex> lock(provider_lock_);
     return provider_->ConsumeIntegralInRange<T>(min, max);
   }
 
-  template <typename T> T ConsumeEnum() {
+  template <typename T> T consumeEnum() {
     std::unique_lock<std::mutex> lock(provider_lock_);
     return provider_->ConsumeEnum<T>();
   }
 
-  StatusCode RandomHttpStatus();
-  grpc::StatusCode RandomGrpcStatusCode();
-  grpc::Status RandomGrpcStatusWithMessage();
+  StatusCode randomHttpStatus();
+  grpc::StatusCode randomGrpcStatusCode();
+  grpc::Status randomGrpcStatusWithMessage();
 
-  void RandomizeHeaderMutation(HeaderMutation* headers, ProcessingRequest* req, bool trailers);
-  void RandomizeCommonResponse(CommonResponse* msg, ProcessingRequest* req);
-  void RandomizeImmediateResponse(ImmediateResponse* msg, ProcessingRequest* req);
-  void RandomizeOverrideResponse(ProcessingMode* msg);
-  void RandomizeResponse(ProcessingResponse* resp, ProcessingRequest* req);
+  void randomizeHeaderMutation(HeaderMutation* headers, ProcessingRequest* req, bool trailers);
+  void randomizeCommonResponse(CommonResponse* msg, ProcessingRequest* req);
+  void randomizeImmediateResponse(ImmediateResponse* msg, ProcessingRequest* req);
+  void randomizeOverrideResponse(ProcessingMode* msg);
+  void randomizeResponse(ProcessingResponse* resp, ProcessingRequest* req);
 
   FuzzedDataProvider* provider_;
   // Protects provider_
@@ -128,4 +125,3 @@ public:
 } // namespace Extensions
 } // namespace Envoy
 
-#endif  // TEST_EXTENSIONS_FILTERS_HTTP_EXT_PROC_EXT_PROC_GRPC_FUZZ_HELPER_H_

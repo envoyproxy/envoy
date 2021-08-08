@@ -151,10 +151,10 @@ public:
     IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
     auto& encoder = encoder_decoder.first;
 
-    uint32_t num_chunks = fh->ConsumeIntegralInRange<uint32_t>(0, 50);
+    uint32_t num_chunks = fh->consumeIntegralInRange<uint32_t>(0, 50);
     for (uint32_t i = 0; i < num_chunks; i++) {
       Buffer::OwnedImpl chunk;
-      std::string data = fh->ConsumeRandomLengthString();
+      std::string data = fh->consumeRandomLengthString();
       chunk.add(data);
 
       // If proxy closes connection before body is fully sent it causes a
@@ -193,14 +193,14 @@ public:
     // send back to the client.
     // TODO(ikepolinsky): add random flag for sending trailers with a request
     //   using HttpIntegration::sendTrailers()
-    switch (fh->ConsumeEnum<HttpMethod>()) {
+    switch (fh->consumeEnum<HttpMethod>()) {
       case HttpMethod::GET:
         ENVOY_LOG_MISC(trace, "Sending GET request");
         return sendDownstreamRequest(absl::nullopt);
       case HttpMethod::POST:
-        if (fh->ConsumeBool()) {
+        if (fh->consumeBool()) {
           ENVOY_LOG_MISC(trace, "Sending POST request with body");
-          return sendDownstreamRequestWithBody(fh->ConsumeRandomLengthString(), absl::nullopt);
+          return sendDownstreamRequestWithBody(fh->consumeRandomLengthString(), absl::nullopt);
         } else {
           ENVOY_LOG_MISC(trace, "Sending POST request with chunked body");
           return sendDownstreamRequestWithChunks(fh, absl::nullopt);
@@ -241,21 +241,21 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
           // If true, immediately close the connection with a random Grpc Status.
           // Otherwise randomize the response
           ProcessingResponse resp;
-          if (fuzz_helper.ConsumeBool()) {
-            return fuzz_helper.RandomGrpcStatusWithMessage();
+          if (fuzz_helper.consumeBool()) {
+            return fuzz_helper.randomGrpcStatusWithMessage();
           } else {
-            fuzz_helper.RandomizeResponse(&resp, &req);
+            fuzz_helper.randomizeResponse(&resp, &req);
           }
 
           // 8. Randomize dynamic_metadata
           /* TODO(ikepolinsky): Skipping - not implemented
-          if (provider.ConsumeBool()) {
+          if (provider.consumeBool()) {
           } */
 
           // 9. Randomize mode_override
-          if (fuzz_helper.ConsumeBool()) {
+          if (fuzz_helper.consumeBool()) {
             ProcessingMode* msg = resp.mutable_mode_override();
-            fuzz_helper.RandomizeOverrideResponse(msg);
+            fuzz_helper.randomizeOverrideResponse(msg);
            }
 
           ENVOY_LOG_MISC(trace, "Response generated, writing to stream.");
