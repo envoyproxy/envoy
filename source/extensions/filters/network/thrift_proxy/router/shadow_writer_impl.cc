@@ -277,11 +277,7 @@ FilterStatus ShadowRouterImpl::setEnd() {
 
 FilterStatus ShadowRouterImpl::messageEnd() {
   auto cb = [this]() {
-    const bool connection_open = upstream_request_->conn_data_ != nullptr;
-
-    if (!connection_open) {
-      return;
-    }
+    ASSERT(upstream_request_->conn_data_ != nullptr);
 
     ProtocolConverter::messageEnd();
     const auto encode_size = upstream_request_->encodeAndWrite(upstream_request_buffer_);
@@ -291,7 +287,6 @@ FilterStatus ShadowRouterImpl::messageEnd() {
     request_sent_ = true;
 
     if (metadata_->messageType() == MessageType::Oneway) {
-      // No response expected.
       upstream_request_->releaseConnection(false);
     }
   };
