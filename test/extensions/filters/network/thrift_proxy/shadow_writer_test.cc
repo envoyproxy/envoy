@@ -49,7 +49,8 @@ public:
 
   void testOnUpstreamData(MessageType message_type = MessageType::Reply, bool success = true,
                           bool on_data_throw_app_exception = false,
-                          bool on_data_throw_regular_exception = false) {
+                          bool on_data_throw_regular_exception = false,
+                          bool close_before_response = false) {
     NiceMock<Network::MockClientConnection> connection;
 
     EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(&cluster_));
@@ -88,6 +89,11 @@ public:
 
     EXPECT_CALL(connection, write(_, false));
     shadow_router.messageEnd();
+
+    if (close_before_response) {
+      shadow_router.onEvent(Network::ConnectionEvent::LocalClose);
+      return;
+    }
 
     // Prepare response metadata & data processing.
     MessageMetadataSharedPtr response_metadata = std::make_shared<MessageMetadata>();
@@ -375,6 +381,10 @@ TEST_F(ShadowWriterTest, ShadowRequestOnUpstreamDataAppException) {
 
 TEST_F(ShadowWriterTest, ShadowRequestOnUpstreamDataRegularException) {
   testOnUpstreamData(MessageType::Reply, false, false, true);
+}
+
+TEST_F(ShadowWriterTest, ShadowRequestOnUpstreamRemoteClose) {
+  testOnUpstreamData(MessageType::Reply, false, false, false, true);
 }
 
 TEST_F(ShadowWriterTest, TestNullResponseDecoder) {
