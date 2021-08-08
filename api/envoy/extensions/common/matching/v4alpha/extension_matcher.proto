@@ -2,8 +2,9 @@ syntax = "proto3";
 
 package envoy.extensions.common.matching.v4alpha;
 
-import "envoy/config/common/matcher/v4alpha/matcher.proto";
 import "envoy/config/core/v4alpha/extension.proto";
+
+import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -25,8 +26,12 @@ message ExtensionWithMatcher {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.common.matching.v3.ExtensionWithMatcher";
 
+  reserved 1;
+
+  reserved "matcher";
+
   // The associated matcher.
-  config.common.matcher.v4alpha.Matcher matcher = 1 [(validate.rules).message = {required: true}];
+  xds.type.matcher.v3.Matcher xds_matcher = 3;
 
   // The underlying extension config.
   config.core.v4alpha.TypedExtensionConfig extension_config = 2

@@ -1,48 +1,29 @@
 #include "source/common/common/regex.h"
 
 #include "envoy/common/exception.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
-#include "source/common/protobuf/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
-
-#include "re2/re2.h"
 
 namespace Envoy {
 namespace Regex {
-namespace {
 
-class CompiledGoogleReMatcher : public CompiledMatcher {
-public:
-  CompiledGoogleReMatcher(const envoy::type::matcher::v3::RegexMatcher& config)
-      : regex_(config.regex(), re2::RE2::Quiet) {
-    if (!regex_.ok()) {
-      throw EnvoyException(regex_.error());
-    }
+CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
+                                                 bool do_program_size_check)
+    : regex_(regex, re2::RE2::Quiet) {
+  if (!regex_.ok()) {
+    throw EnvoyException(regex_.error());
+  }
 
-    const uint32_t regex_program_size = static_cast<uint32_t>(regex_.ProgramSize());
-
-    // Check if the deprecated field max_program_size is set first, and follow the old logic if so.
-    if (config.google_re2().has_max_program_size()) {
-      const uint32_t max_program_size =
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.google_re2(), max_program_size, 100);
-      if (regex_program_size > max_program_size) {
-        throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
-                                         "{}. Increase configured max program size if necessary.",
-                                         config.regex(), regex_program_size, max_program_size));
-      }
-      return;
-    }
-
+  if (do_program_size_check) {
     Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting();
     if (runtime) {
       Stats::Scope& root_scope = runtime->getRootScope();
 
-      // TODO(perf): It would be more efficient to create the stats (program size histogram, warning
-      // counter) on startup and not with each regex match.
+      const uint32_t regex_program_size = static_cast<uint32_t>(regex_.ProgramSize());
+      // TODO(perf): It would be more efficient to create the stats (program size histogram,
+      // warning counter) on startup and not with each regex match.
       Stats::StatNameManagedStorage program_size_stat_name("re2.program_size",
                                                            root_scope.symbolTable());
       Stats::Histogram& program_size_stat = root_scope.histogramFromStatName(
@@ -59,8 +40,7 @@ public:
         throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
                                          "{} set for the error level threshold. Increase "
                                          "configured max program size if necessary.",
-                                         config.regex(), regex_program_size,
-                                         max_program_size_error_level));
+                                         regex, regex_program_size, max_program_size_error_level));
       }
 
       const uint32_t max_program_size_warn_level =
@@ -71,34 +51,27 @@ public:
             warn,
             "regex '{}' RE2 program size of {} > max program size of {} set for the warn "
             "level threshold. Increase configured max program size if necessary.",
-            config.regex(), regex_program_size, max_program_size_warn_level);
+            regex, regex_program_size, max_program_size_warn_level);
       }
     }
   }
+}
 
-  // CompiledMatcher
-  bool match(absl::string_view value) const override {
-    return re2::RE2::FullMatch(re2::StringPiece(value.data(), value.size()), regex_);
+CompiledGoogleReMatcher::CompiledGoogleReMatcher(
+    const envoy::type::matcher::v3::RegexMatcher& config)
+    : CompiledGoogleReMatcher(config.regex(), !config.google_re2().has_max_program_size()) {
+  const uint32_t regex_program_size = static_cast<uint32_t>(regex_.ProgramSize());
+
+  // Check if the deprecated field max_program_size is set first, and follow the old logic if so.
+  if (config.google_re2().has_max_program_size()) {
+    const uint32_t max_program_size =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.google_re2(), max_program_size, 100);
+    if (regex_program_size > max_program_size) {
+      throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
+                                       "{}. Increase configured max program size if necessary.",
+                                       config.regex(), regex_program_size, max_program_size));
+    }
   }
-
-  // CompiledMatcher
-  std::string replaceAll(absl::string_view value, absl::string_view substitution) const override {
-    std::string result = std::string(value);
-    re2::RE2::GlobalReplace(&result, regex_,
-                            re2::StringPiece(substitution.data(), substitution.size()));
-    return result;
-  }
-
-private:
-  const re2::RE2 regex_;
-};
-
-} // namespace
-
-CompiledMatcherPtr Utility::parseRegex(const envoy::type::matcher::v3::RegexMatcher& matcher) {
-  // Google Re is the only currently supported engine.
-  ASSERT(matcher.has_google_re2());
-  return std::make_unique<CompiledGoogleReMatcher>(matcher);
 }
 
 std::regex Utility::parseStdRegex(const std::string& regex, std::regex::flag_type flags) {

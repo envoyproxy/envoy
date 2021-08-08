@@ -31,7 +31,7 @@ std::string denyPrivateConfigWithMatcher() {
         "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
         prefix: "/private"
         code: 403
-    matcher:
+    xds_matcher:
       matcher_tree:
         input:
           name: request-headers
@@ -85,7 +85,7 @@ public:
                       typed_config:
                         "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
                         code: 403
-                    matcher:
+                    xds_matcher:
                       matcher_tree:
                         input:
                           name: request-headers
