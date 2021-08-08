@@ -73,7 +73,7 @@ enum class BodySendSetting {
   Buffered,
   Streamed,
   BufferedPartial,
-  kMaxValue = Streamed // TODO(ikepolinsky): update when BufferedPartial implemented
+  kMaxValue = BUFFERED_PARTIAL
 };
 
 // Helper class for fuzzing the ext_proc filter.
