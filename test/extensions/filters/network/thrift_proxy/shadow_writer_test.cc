@@ -47,6 +47,53 @@ public:
     host_ = std::make_shared<NiceMock<Upstream::MockHost>>();
   }
 
+  void testPoolReady(bool oneway = false) {
+    NiceMock<Network::MockClientConnection> connection;
+
+    EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(&cluster_));
+    EXPECT_CALL(*cluster_.cluster_.info_, maintenanceMode()).WillOnce(Return(false));
+    EXPECT_CALL(cluster_, tcpConnPool(_, _))
+        .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+    EXPECT_CALL(conn_pool_, newConnection(_))
+        .WillOnce(Invoke(
+            [&](Tcp::ConnectionPool::Callbacks& callbacks) -> Tcp::ConnectionPool::Cancellable* {
+              auto data =
+                  std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
+              EXPECT_CALL(*data, connectionState())
+                  .WillRepeatedly(Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* {
+                    return conn_state_.get();
+                  }));
+              EXPECT_CALL(*data, setConnectionState_(_))
+                  .WillOnce(Invoke([&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void {
+                    conn_state_.swap(cs);
+                  }));
+              EXPECT_CALL(*data, connection()).WillRepeatedly(ReturnRef(connection));
+              callbacks.onPoolReady(std::move(data), host_);
+              return nullptr;
+            }));
+
+    auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
+                                                ProtocolType::Binary);
+    EXPECT_NE(absl::nullopt, router_handle);
+    EXPECT_CALL(connection, write(_, false));
+
+    auto& request_owner = router_handle.value().get().requestOwner();
+    runRequestMethods(request_owner);
+
+    // The following is a no-op, since no callbacks are pending.
+    request_owner.continueDecoding();
+
+    if (!oneway) {
+      EXPECT_CALL(connection, close(_));
+    }
+
+    shadow_writer_ = nullptr;
+
+    const std::string counter_name =
+        oneway ? "thrift.upstream_rq_oneway" : "thrift.upstream_rq_call";
+    EXPECT_EQ(1UL, cluster_.cluster_.info_->statsScope().counterFromString(counter_name).value());
+  }
+
   void testOnUpstreamData(MessageType message_type = MessageType::Reply, bool success = true,
                           bool on_data_throw_app_exception = false,
                           bool on_data_throw_regular_exception = false,
@@ -257,47 +304,11 @@ TEST_F(ShadowWriterTest, SubmitConnectionNotReady) {
       cluster_.cluster_.info_->statsScope().counterFromString("thrift.upstream_rq_call").value());
 }
 
-TEST_F(ShadowWriterTest, ShadowRequestPoolReady) {
-  NiceMock<Network::MockClientConnection> connection;
+TEST_F(ShadowWriterTest, ShadowRequestPoolReady) { testPoolReady(); }
 
-  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(&cluster_));
-  EXPECT_CALL(*cluster_.cluster_.info_, maintenanceMode()).WillOnce(Return(false));
-  EXPECT_CALL(cluster_, tcpConnPool(_, _))
-      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
-  EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(Invoke(
-          [&](Tcp::ConnectionPool::Callbacks& callbacks) -> Tcp::ConnectionPool::Cancellable* {
-            auto data =
-                std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
-            EXPECT_CALL(*data, connectionState())
-                .WillRepeatedly(Invoke(
-                    [&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
-            EXPECT_CALL(*data, setConnectionState_(_))
-                .WillOnce(Invoke([&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void {
-                  conn_state_.swap(cs);
-                }));
-            EXPECT_CALL(*data, connection()).WillRepeatedly(ReturnRef(connection));
-            callbacks.onPoolReady(std::move(data), host_);
-            return nullptr;
-          }));
-
-  auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
-                                              ProtocolType::Binary);
-  EXPECT_NE(absl::nullopt, router_handle);
-  EXPECT_CALL(connection, write(_, false));
-
-  auto& request_owner = router_handle.value().get().requestOwner();
-  runRequestMethods(request_owner);
-
-  // The following is a no-op, since no callbacks are pending.
-  request_owner.continueDecoding();
-
-  EXPECT_CALL(connection, close(_));
-  shadow_writer_ = nullptr;
-
-  EXPECT_EQ(
-      1UL,
-      cluster_.cluster_.info_->statsScope().counterFromString("thrift.upstream_rq_call").value());
+TEST_F(ShadowWriterTest, ShadowRequestPoolReadyOneWay) {
+  metadata_->setMessageType(MessageType::Oneway);
+  testPoolReady(true);
 }
 
 TEST_F(ShadowWriterTest, ShadowRequestWriteBeforePoolReady) {
