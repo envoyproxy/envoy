@@ -46,6 +46,21 @@ public:
   DangerousDeprecatedTestTime test_time_;
 };
 
+TEST_F(EnvoyAsyncClientImplTest, ThreadSafe) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Api::ApiPtr api_(Api::createApiForTest());
+  Event::DispatcherPtr dispatcher_(api_->allocateDispatcher("worker"));
+
+  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([&]() {
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+    // Verify we have the expected dispatcher for the new worker thread.
+    EXPECT_DEATH(grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                                     Http::AsyncClient::StreamOptions()),
+                 "isThreadSafe");
+  });
+  thread->join();
+}
+
 // Validate that the host header is the cluster name in grpc config.
 TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;

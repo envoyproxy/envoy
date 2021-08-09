@@ -99,7 +99,7 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, ThreadSafe) {
     // Verify we have the expected dispatcher for the new worker thread.
     EXPECT_DEATH(grpc_client_->start(*method_descriptor_, grpc_callbacks,
                                      Http::AsyncClient::StreamOptions()),
-                 "assert failure: isThreadSafe().");
+                 "isThreadSafe");
   });
   thread->join();
 }
