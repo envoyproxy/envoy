@@ -220,8 +220,9 @@ void HttpConnectionManagerImplTest::sendRequestHeadersAndData() {
   conn_manager_->onData(fake_input, false);
 }
 
-ResponseHeaderMap*
-HttpConnectionManagerImplTest::sendResponseHeaders(ResponseHeaderMapPtr&& response_headers) {
+ResponseHeaderMap* HttpConnectionManagerImplTest::sendResponseHeaders(
+    ResponseHeaderMapPtr&& response_headers, absl::optional<StreamInfo::ResponseFlag> response_flag,
+    std::string response_code_details) {
   ResponseHeaderMap* altered_response_headers = nullptr;
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, _))
@@ -232,8 +233,12 @@ HttpConnectionManagerImplTest::sendResponseHeaders(ResponseHeaderMapPtr&& respon
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  if (response_flag.has_value()) {
+    decoder_filters_[0]->callbacks_->streamInfo().setResponseFlag(response_flag.value());
+  }
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false,
+                                                 response_code_details);
   return altered_response_headers;
 }
 

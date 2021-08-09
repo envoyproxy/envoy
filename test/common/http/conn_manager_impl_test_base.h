@@ -58,7 +58,10 @@ public:
 
   Event::MockTimer* setUpTimer();
   void sendRequestHeadersAndData();
-  ResponseHeaderMap* sendResponseHeaders(ResponseHeaderMapPtr&& response_headers);
+  ResponseHeaderMap*
+  sendResponseHeaders(ResponseHeaderMapPtr&& response_headers,
+                      absl::optional<StreamInfo::ResponseFlag> response_flag = absl::nullopt,
+                      std::string response_code_details = "details");
   void expectOnDestroy(bool deferred = true);
   void doRemoteClose(bool deferred = true);
   void testPathNormalization(const RequestHeaderMap& request_headers,
@@ -154,6 +157,9 @@ public:
     return ip_detection_extensions_;
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
+  const HttpConnectionManagerProto::ProxyStatusConfig& proxyStatusConfig() const override {
+    return proxy_status_config_;
+  }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -221,6 +227,7 @@ public:
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
   RequestIDExtensionSharedPtr request_id_extension_;
   std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
+  HttpConnectionManagerProto::ProxyStatusConfig proxy_status_config_;
 
   const LocalReply::LocalReplyPtr local_reply_;
 

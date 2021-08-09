@@ -333,6 +333,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       strip_trailing_host_dot_(config.strip_trailing_host_dot()),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_requests_per_connection, 0)) {
+  if (config.has_proxy_status_config()) {
+    proxy_status_config_ = config.proxy_status_config();
+  }
+
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {

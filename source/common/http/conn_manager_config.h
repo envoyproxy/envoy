@@ -500,6 +500,10 @@ public:
    * @return maximum requests for downstream.
    */
   virtual uint64_t maxRequestsPerConnection() const PURE;
+  /**
+   * @return the config describing if/how to write the Proxy-Status HTTP response header.
+   */
+  virtual const HttpConnectionManagerProto::ProxyStatusConfig& proxyStatusConfig() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

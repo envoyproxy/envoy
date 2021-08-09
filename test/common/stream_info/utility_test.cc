@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
 #include "source/common/network/address_impl.h"
 #include "source/common/stream_info/utility.h"
 
@@ -7,12 +9,17 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AllOf;
+using testing::HasSubstr;
 using testing::NiceMock;
+using testing::Not;
 using testing::Return;
 
 namespace Envoy {
 namespace StreamInfo {
 namespace {
+
+using envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
 
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   for (const auto& [flag_string, flag_enum] : ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS) {
@@ -55,6 +62,56 @@ TEST(UtilityTest, formatDownstreamAddressNoPort) {
             Utility::formatDownstreamAddressNoPort(Network::Address::Ipv4Instance("1.2.3.4")));
   EXPECT_EQ("/hello",
             Utility::formatDownstreamAddressNoPort(Network::Address::PipeInstance("/hello")));
+}
+
+class ProxyStatusTest : public ::testing::Test {
+protected:
+  void SetUp() {
+    proxy_status_config_.set_attach_proxy_status(true);
+    proxy_status_config_.set_attach_details(true);
+    proxy_status_config_.set_proxy_name(HttpConnectionManager::ProxyStatusConfig::ENVOY_LITERAL);
+  }
+
+  HttpConnectionManager::ProxyStatusConfig proxy_status_config_;
+  NiceMock<MockStreamInfo> stream_info_;
+};
+
+TEST_F(ProxyStatusTest, ToStringNoDetailsAvailable) {
+  proxy_status_config_.set_attach_details(true);
+  stream_info_.response_code_details_ = absl::nullopt;
+  EXPECT_THAT(ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
+                                         /*server_name=*/"UNUSED", proxy_status_config_),
+              Not(HasSubstr("details=")));
+}
+
+TEST_F(ProxyStatusTest, ToStringSetAttachDetailsFalse) {
+  proxy_status_config_.set_attach_details(false);
+  stream_info_.response_code_details_ = "some_response_code_details";
+  EXPECT_THAT(ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
+                                         /*server_name=*/"UNUSED", proxy_status_config_),
+              Not(HasSubstr("details=")));
+}
+
+TEST_F(ProxyStatusTest, ToStringWithDetails) {
+  proxy_status_config_.set_attach_details(true);
+  stream_info_.response_code_details_ = "some_response_code_details";
+  EXPECT_THAT(ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
+                                         /*server_name=*/"UNUSED", proxy_status_config_),
+              HasSubstr("details='some_response_code_details'"));
+}
+
+TEST_F(ProxyStatusTest, ToStringNoServerName) {
+  proxy_status_config_.set_proxy_name(HttpConnectionManager::ProxyStatusConfig::ENVOY_LITERAL);
+  EXPECT_THAT(ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
+                                         /*server_name=*/"UNUSED", proxy_status_config_),
+              AllOf(HasSubstr("envoy"), Not(HasSubstr("UNUSED"))));
+}
+
+TEST_F(ProxyStatusTest, ToStringServerName) {
+  proxy_status_config_.set_proxy_name(HttpConnectionManager::ProxyStatusConfig::SERVER_NAME);
+  EXPECT_THAT(ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
+                                         /*server_name=*/"foo", proxy_status_config_),
+              AllOf(HasSubstr("foo"), Not(HasSubstr("envoy"))));
 }
 
 } // namespace

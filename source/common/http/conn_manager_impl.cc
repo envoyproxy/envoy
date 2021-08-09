@@ -44,6 +44,7 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
+#include "source/common/stream_info/utility.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
@@ -1466,6 +1467,28 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   }
 
   chargeStats(headers);
+
+  if (auto& proxy_status_config = connection_manager_.config_.proxyStatusConfig();
+      proxy_status_config.attach_proxy_status()) {
+    // Writing the Proxy-Status header is gated on |attach_proxy_status|.
+    // The |details| field and other internals are generated in
+    // fromStreamInfo().
+    if (absl::optional<StreamInfo::ProxyStatusError> proxy_status =
+            StreamInfo::ProxyStatusUtils::fromStreamInfo(filter_manager_.streamInfo());
+        proxy_status.has_value()) {
+      headers.setProxyStatus(StreamInfo::ProxyStatusUtils::toString(
+          filter_manager_.streamInfo(), *proxy_status, connection_manager_.config_.serverName(),
+          proxy_status_config));
+      // Apply the recommended response code, if configured and applicable.
+      if (proxy_status_config.set_recommended_response_code()) {
+        if (absl::optional<uint32_t> response_code =
+                StreamInfo::ProxyStatusUtils::recommendedHttpStatusCode(*proxy_status);
+            response_code.has_value()) {
+          headers.setStatus(std::to_string(*response_code));
+        }
+      }
+    }
+  }
 
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);

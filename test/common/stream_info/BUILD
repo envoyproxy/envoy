@@ -64,6 +64,7 @@ envoy_cc_test(
     deps = [
         "//source/common/stream_info:utility_lib",
         "//test/mocks/stream_info:stream_info_mocks",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 

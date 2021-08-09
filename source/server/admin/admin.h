@@ -206,6 +206,9 @@ public:
     };
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
+  const HttpConnectionManagerProto::ProxyStatusConfig& proxyStatusConfig() const override {
+    return proxy_status_config_;
+  }
 
 private:
   /**
@@ -453,6 +456,7 @@ private:
   const LocalReply::LocalReplyPtr local_reply_;
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   const absl::optional<std::string> scheme_{};
+  HttpConnectionManagerProto::ProxyStatusConfig proxy_status_config_;
 };
 
 } // namespace Server
