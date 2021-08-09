@@ -52,6 +52,9 @@ build:asan-dev --copt -fsanitize=address
 build:asan-dev --linkopt -fsanitize=address
 build:asan-dev --platform_suffix=-asan
 
+build:clang-asan --linkopt --rtlib=compiler-rt
+build:clang-asan --linkopt --unwindlib=libgcc
+
 # Locally-runnable TSAN config
 build:tsan-dev --features=tsan
 build:tsan-dev --copt -fsanitize=thread
