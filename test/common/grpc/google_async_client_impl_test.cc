@@ -78,7 +78,6 @@ public:
   Stats::IsolatedStoreImpl* stats_store_; // Ownership transferred to scope_.
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  Event::DispatcherPtr another_dispatcher_;
   Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientThreadLocalPtr tls_;
   MockStubFactory stub_factory_;
@@ -87,16 +86,14 @@ public:
   AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
 };
 
-// Validate that grpc client check for thread consistency.
+// Verify that grpc client check for thread consistency.
 TEST_F(EnvoyGoogleAsyncClientImplTest, ThreadSafe) {
   initialize();
 
-  another_dispatcher_ = api_->allocateDispatcher("another");
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
 
   Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([&]() {
-    another_dispatcher_->run(Event::Dispatcher::RunType::Block);
-    // Verify we have the expected dispatcher for the new worker thread.
+    // Verify that using the grpc client in a different thread cause assertion failure.
     EXPECT_DEATH(grpc_client_->start(*method_descriptor_, grpc_callbacks,
                                      Http::AsyncClient::StreamOptions()),
                  "isThreadSafe");

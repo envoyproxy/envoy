@@ -48,11 +48,8 @@ public:
 
 TEST_F(EnvoyAsyncClientImplTest, ThreadSafe) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
-  Api::ApiPtr api_(Api::createApiForTest());
-  Event::DispatcherPtr dispatcher_(api_->allocateDispatcher("worker"));
 
   Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([&]() {
-    dispatcher_->run(Event::Dispatcher::RunType::Block);
     // Verify that using the grpc client in a different thread cause assertion failure.
     EXPECT_DEATH(grpc_client_->start(*method_descriptor_, grpc_callbacks,
                                      Http::AsyncClient::StreamOptions()),
