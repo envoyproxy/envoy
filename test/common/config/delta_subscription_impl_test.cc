@@ -1,4 +1,3 @@
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -7,7 +6,6 @@
 #include "source/common/config/api_version.h"
 
 #include "test/common/config/delta_subscription_test_harness.h"
-#include "test/config/v2_link_hacks.h"
 
 namespace Envoy {
 namespace Config {
@@ -113,7 +111,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   // All ACK sendMessage()s will happen upon calling resume().
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
       .WillRepeatedly(Invoke([this](Buffer::InstancePtr& buffer, bool) {
-        API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) message;
+        API_NO_BOOST(envoy::service::discovery::v3::DeltaDiscoveryRequest) message;
         EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
         const std::string nonce = message.response_nonce();
         if (!nonce.empty()) {
@@ -142,7 +140,7 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
 
   const Protobuf::MethodDescriptor* method_descriptor =
       Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
+          "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints");
   NewGrpcMuxImplSharedPtr xds_context = std::make_shared<NewGrpcMuxImpl>(
       std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
       envoy::config::core::v3::ApiVersion::AUTO, random, stats_store, rate_limit_settings,

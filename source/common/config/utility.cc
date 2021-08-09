@@ -93,8 +93,7 @@ void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path, Ap
   // watch addition.
   if (!api.fileSystem().fileExists(path)) {
     throw EnvoyException(fmt::format(
-        "envoy::api::v2::Path must refer to an existing path in the system: '{}' does not exist",
-        path));
+        "paths must refer to an existing path in the system: '{}' does not exist", path));
   }
 }
 
