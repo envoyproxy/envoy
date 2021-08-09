@@ -4,6 +4,7 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"

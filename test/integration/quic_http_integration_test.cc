@@ -70,7 +70,10 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam(),
                             ConfigHelper::quicHttpProxyConfig()),
         supported_versions_(quic::CurrentSupportedHttp3Versions()), conn_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
+        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {
+    // Enable this flag for test coverage.
+    SetQuicReloadableFlag(quic_tls_set_signature_algorithm_prefs, true);
+  }
 
   ~QuicHttpIntegrationTest() override {
     cleanupUpstreamAndDownstream();
@@ -411,6 +414,21 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
   codec_client_->close();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  std::string value = std::string(1, 2);
+  EXPECT_FALSE(Http::HeaderUtility::headerValueIsValid(value));
+  default_request_headers_.addCopy("illegal_header", value);
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForReset());
 }
 
 } // namespace Quic

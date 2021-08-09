@@ -157,6 +157,7 @@ envoy_cc_library(
     name = "active_tcp_listener_headers",
     hdrs = [
         "active_stream_listener_base.h",
+        "active_tcp_listener.h",
         "active_tcp_socket.h",
     ],
     deps = [
@@ -171,7 +172,10 @@ envoy_cc_library(
         "//envoy/network:listen_socket_interface",
         "//envoy/network:listener_interface",
         "//envoy/server:listener_manager_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
+        "//source/common/network:connection_lib",
+        "//source/common/stats:timespan_lib",
     ],
 )
 

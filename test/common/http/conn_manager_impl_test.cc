@@ -301,7 +301,7 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
   decoder_ = &conn_manager_->newStream(response_encoder_);
 
   EXPECT_EQ(requestIDExtension().get(), decoder_->streamInfo().getRequestIDProvider());
-  EXPECT_EQ(ssl_connection_, decoder_->streamInfo().downstreamSslConnection());
+  EXPECT_EQ(ssl_connection_, decoder_->streamInfo().downstreamAddressProvider().sslConnection());
   EXPECT_EQ(filter_callbacks_.connection_.id_,
             decoder_->streamInfo().downstreamAddressProvider().connectionID().value());
   EXPECT_EQ(server_name_, decoder_->streamInfo().downstreamAddressProvider().requestedServerName());
@@ -1078,8 +1078,6 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         EXPECT_EQ(default_route->routeEntry()->pathMatchCriterion().matchType(),
                   delegating_route_foo->routeEntry()->pathMatchCriterion().matchType());
 
-        EXPECT_EQ(default_route->routeEntry()->perFilterConfig("bar"),
-                  delegating_route_foo->routeEntry()->perFilterConfig("bar"));
         EXPECT_EQ(default_route->routeEntry()->includeAttemptCountInRequest(),
                   delegating_route_foo->routeEntry()->includeAttemptCountInRequest());
         EXPECT_EQ(default_route->routeEntry()->includeAttemptCountInResponse(),
@@ -2241,7 +2239,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamSslConnection());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().sslConnection());
         EXPECT_NE(nullptr, stream_info.route());
       }));
 

@@ -78,22 +78,21 @@ void ValidationInstance::initialize(const Options& options,
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  InstanceUtil::loadBootstrapConfig(bootstrap, options,
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
-  Config::Utility::createTagProducer(bootstrap);
-  bootstrap.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
+  Config::Utility::createTagProducer(bootstrap_);
+  bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      stats().symbolTable(), bootstrap.node(), bootstrap.node_context_params(), local_address,
+      stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      dispatcher(), stats(), threadLocal(), bootstrap.overload_manager(),
+      dispatcher(), stats(), threadLocal(), bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
-  Configuration::InitialImpl initial_config(bootstrap, options);
-  initial_config.initAdminAccessLog(bootstrap, *this);
+  Configuration::InitialImpl initial_config(bootstrap_, options);
+  initial_config.initAdminAccessLog(bootstrap_, *this);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
   listener_manager_ =
       std::make_unique<ListenerManagerImpl>(*this, *this, *this, false, quic_stat_names_);
@@ -107,7 +106,7 @@ void ValidationInstance::initialize(const Options& options,
       localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
       grpc_context_, router_context_, accessLogManager(), singletonManager(), options,
       quic_stat_names_);
-  config_.initialize(bootstrap, *this, *cluster_manager_factory_);
+  config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
   runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }

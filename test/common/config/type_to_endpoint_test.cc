@@ -3,6 +3,8 @@
 
 #include "source/common/config/type_to_endpoint.h"
 
+#include "test/config/v2_link_hacks.h"
+
 #include "gtest/gtest.h"
 
 // API_NO_BOOST_FILE

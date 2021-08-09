@@ -74,6 +74,21 @@ TrackedWatermarkBufferFactory::createBuffer(std::function<void()> below_low_wate
       below_low_watermark, above_high_watermark, above_overflow_watermark);
 }
 
+BufferMemoryAccountSharedPtr
+TrackedWatermarkBufferFactory::createAccount(Http::StreamResetHandler& reset_handler) {
+  auto account = WatermarkBufferFactory::createAccount(reset_handler);
+  absl::MutexLock lock(&mutex_);
+  ++total_accounts_created_;
+  return account;
+}
+
+void TrackedWatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPtr& account,
+                                                      int current_class) {
+  WatermarkBufferFactory::unregisterAccount(account, current_class);
+  absl::MutexLock lock(&mutex_);
+  ++total_accounts_unregistered_;
+}
+
 uint64_t TrackedWatermarkBufferFactory::numBuffersCreated() const {
   absl::MutexLock lock(&mutex_);
   return buffer_infos_.size();
@@ -139,6 +154,21 @@ std::pair<uint32_t, uint32_t> TrackedWatermarkBufferFactory::highWatermarkRange(
   return std::make_pair(min_watermark, max_watermark);
 }
 
+uint64_t TrackedWatermarkBufferFactory::numAccountsCreated() const {
+  absl::MutexLock lock(&mutex_);
+  return total_accounts_created_;
+}
+
+bool TrackedWatermarkBufferFactory::waitForExpectedAccountUnregistered(
+    uint64_t expected_accounts_unregistered, std::chrono::milliseconds timeout) {
+  absl::MutexLock lock(&mutex_);
+  auto predicate = [this, expected_accounts_unregistered]() ABSL_SHARED_LOCKS_REQUIRED(mutex_) {
+    mutex_.AssertHeld();
+    return expected_accounts_unregistered == total_accounts_unregistered_;
+  };
+  return mutex_.AwaitWithTimeout(absl::Condition(&predicate), absl::Milliseconds(timeout.count()));
+}
+
 bool TrackedWatermarkBufferFactory::waitUntilTotalBufferedExceeds(
     uint64_t byte_size, std::chrono::milliseconds timeout) {
   absl::MutexLock lock(&mutex_);
@@ -196,6 +226,11 @@ void TrackedWatermarkBufferFactory::inspectAccounts(
   done_notification.WaitForNotification();
 }
 
+void TrackedWatermarkBufferFactory::inspectMemoryClasses(
+    std::function<void(MemoryClassesToAccountsSet&)> func) {
+  func(size_class_account_sets_);
+}
+
 void TrackedWatermarkBufferFactory::setExpectedAccountBalance(uint64_t byte_size_per_account,
                                                               uint32_t num_accounts) {
   absl::MutexLock lock(&mutex_);
@@ -231,7 +266,7 @@ void TrackedWatermarkBufferFactory::checkIfExpectedBalancesMet() {
     // This is thread safe since this function should run on the only Envoy worker
     // thread.
     for (auto& acc : account_infos_) {
-      if (static_cast<Buffer::BufferMemoryAccountImpl*>(acc.first.get())->balance() <
+      if (static_cast<BufferMemoryAccountImpl*>(acc.first.get())->balance() <
           expected_balances_->balance_per_account_) {
         return;
       }

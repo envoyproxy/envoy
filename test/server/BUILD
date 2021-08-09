@@ -420,6 +420,7 @@ envoy_cc_test(
         "//source/server:server_lib",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/config:v2_link_hacks",
         "//test/integration:integration_lib",
         "//test/mocks/server:bootstrap_extension_factory_mocks",
         "//test/mocks/server:fatal_action_factory_mocks",

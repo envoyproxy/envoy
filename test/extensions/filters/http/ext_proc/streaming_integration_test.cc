@@ -200,7 +200,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBody) {
         EXPECT_EQ(body_req.request_body().body().size(), total_size);
 
         ProcessingResponse body_resp;
-        header_resp.mutable_request_body();
+        body_resp.mutable_request_body();
         stream->Write(body_resp);
       });
 
@@ -657,6 +657,89 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBodyTooBig) {
   ASSERT_TRUE(client_response_->waitForEndStream());
   EXPECT_TRUE(client_response_->complete());
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("413"));
+}
+
+// Send a body that's smaller than the buffer limit, and have the processor
+// request to see it in "buffered partial" form before allowing it to continue.
+TEST_P(StreamingIntegrationTest, PostAndProcessBufferedPartialRequestBody) {
+  const uint32_t num_chunks = 99;
+  const uint32_t chunk_size = 1000;
+  uint32_t total_size = num_chunks * chunk_size;
+
+  test_processor_.start(
+      [total_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+        ProcessingRequest header_req;
+        ASSERT_TRUE(stream->Read(&header_req));
+        ASSERT_TRUE(header_req.has_request_headers());
+
+        ProcessingResponse header_resp;
+        header_resp.mutable_request_headers();
+        auto* override = header_resp.mutable_mode_override();
+        override->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+        stream->Write(header_resp);
+
+        ProcessingRequest body_req;
+        ASSERT_TRUE(stream->Read(&body_req));
+        ASSERT_TRUE(body_req.has_request_body());
+        EXPECT_TRUE(body_req.request_body().end_of_stream());
+        EXPECT_EQ(body_req.request_body().body().size(), total_size);
+
+        ProcessingResponse body_resp;
+        body_resp.mutable_request_body();
+        stream->Write(body_resp);
+      });
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  sendPostRequest(num_chunks, chunk_size, [total_size](Http::HeaderMap& headers) {
+    headers.addCopy(LowerCaseString("expect_request_size_bytes"), total_size);
+  });
+
+  ASSERT_TRUE(client_response_->waitForEndStream());
+  EXPECT_TRUE(client_response_->complete());
+  EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
+}
+
+// Send a body that's larger than the buffer limit, and have the processor
+// request to see it in "buffered partial" form before allowing it to continue.
+// The processor should see only part of the message.
+TEST_P(StreamingIntegrationTest, PostAndProcessBufferedPartialBigRequestBody) {
+  const uint32_t num_chunks = 213;
+  const uint32_t chunk_size = 1000;
+  uint32_t total_size = num_chunks * chunk_size;
+
+  test_processor_.start(
+      [total_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+        ProcessingRequest header_req;
+        ASSERT_TRUE(stream->Read(&header_req));
+        ASSERT_TRUE(header_req.has_request_headers());
+
+        ProcessingResponse header_resp;
+        header_resp.mutable_request_headers();
+        auto* override = header_resp.mutable_mode_override();
+        override->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+        stream->Write(header_resp);
+
+        ProcessingRequest body_req;
+        ASSERT_TRUE(stream->Read(&body_req));
+        ASSERT_TRUE(body_req.has_request_body());
+        EXPECT_FALSE(body_req.request_body().end_of_stream());
+        EXPECT_LT(body_req.request_body().body().size(), total_size);
+
+        ProcessingResponse body_resp;
+        body_resp.mutable_request_body();
+        stream->Write(body_resp);
+      });
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  sendPostRequest(num_chunks, chunk_size, [total_size](Http::HeaderMap& headers) {
+    headers.addCopy(LowerCaseString("expect_request_size_bytes"), total_size);
+  });
+
+  ASSERT_TRUE(client_response_->waitForEndStream());
+  EXPECT_TRUE(client_response_->complete());
+  EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
 }
 
 } // namespace ExternalProcessing

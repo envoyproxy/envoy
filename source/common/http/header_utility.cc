@@ -69,7 +69,9 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
     header_match_type_ = HeaderMatchType::StringMatch;
-    string_match_ = std::make_unique<Matchers::StringMatcherImpl>(config.string_match());
+    string_match_ =
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            config.string_match());
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:
@@ -368,7 +370,7 @@ bool HeaderUtility::isModifiableHeader(absl::string_view header) {
 }
 
 HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscores(
-    const std::string& header_name,
+    absl::string_view header_name,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action,
     Stats::Counter& dropped_headers_with_underscores,

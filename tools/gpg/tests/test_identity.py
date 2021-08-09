@@ -11,7 +11,7 @@ from tools.gpg import identity
 def test_identity_constructor(name, email, log):
     gpg = identity.GPGIdentity(name, email, log)
     assert gpg.provided_name == name
-    assert gpg.provided_email == email
+    assert gpg.provided_email == (email or "")
     assert gpg._log == log
 
 
@@ -80,37 +80,47 @@ def test_identity_gpg(patches):
 def test_identity_gnupg_home(patches):
     gpg = identity.GPGIdentity()
     patched = patches(
-        "os",
         ("GPGIdentity.home", dict(new_callable=PropertyMock)),
         prefix="tools.gpg.identity")
 
-    with patched as (m_os, m_home):
-        assert gpg.gnupg_home == m_os.path.join.return_value
+    with patched as (m_home, ):
+        assert gpg.gnupg_home == m_home.return_value.joinpath.return_value
 
     assert (
-        list(m_os.path.join.call_args)
-        == [(m_home.return_value, '.gnupg'), {}])
+        list(m_home.return_value.joinpath.call_args)
+        == [('.gnupg', ), {}])
 
     assert "gnupg_home" not in gpg.__dict__
 
 
-@pytest.mark.parametrize("gpg", [None, "GPG"])
+@pytest.mark.parametrize("gpg1", [None, "GPG"])
 @pytest.mark.parametrize("gpg2", [None, "GPG2"])
-def test_identity_gpg_bin(patches, gpg, gpg2):
+def test_identity_gpg_bin(patches, gpg1, gpg2):
     gpg = identity.GPGIdentity()
     patched = patches(
+        "pathlib",
         "shutil",
         prefix="tools.gpg.identity")
 
     def _get_bin(_cmd):
         if _cmd == "gpg2" and gpg2:
             return gpg2
-        if _cmd == "gpg" and gpg:
-            return gpg
+        if _cmd == "gpg" and gpg1:
+            return gpg1
 
-    with patched as (m_shutil, ):
+    with patched as (m_plib, m_shutil):
         m_shutil.which.side_effect = _get_bin
-        assert gpg.gpg_bin == gpg2 or gpg
+        if gpg2 or gpg1:
+            assert gpg.gpg_bin == m_plib.Path.return_value
+        else:
+            assert not gpg.gpg_bin
+
+    if gpg2 or gpg1:
+        assert (
+            list(m_plib.Path.call_args)
+            == [(gpg2 or gpg1, ), {}])
+    else:
+        assert not m_plib.Path.called
 
     if gpg2:
         assert (
@@ -126,18 +136,17 @@ def test_identity_home(patches):
     gpg = identity.GPGIdentity()
     patched = patches(
         "os",
+        "pathlib",
         "pwd",
         prefix="tools.gpg.identity")
 
-    with patched as (m_os, m_pwd):
-        assert gpg.home == m_os.environ.__getitem__.return_value
+    with patched as (m_os, m_plib, m_pwd):
+        assert gpg.home == m_plib.Path.return_value
 
+    # m_os.environ.__getitem__.return_value
     assert (
-        list(m_os.environ.__getitem__.call_args)
-        == [('HOME', ), {}])
-    assert (
-        list(m_os.environ.__setitem__.call_args)
-        == [('HOME', m_os.environ.get.return_value), {}])
+        list(m_plib.Path.call_args)
+        == [(m_os.environ.get.return_value, ), {}])
     assert (
         list(m_os.environ.get.call_args)
         == [('HOME', m_pwd.getpwuid.return_value.pw_dir), {}])
@@ -191,7 +200,7 @@ def test_identity_identity_id(patches, name, email):
     if name and email:
         assert (
             list(m_format.call_args)
-            == [('NAME', 'EMAIL'), {}])
+            == [(('NAME', 'EMAIL'),), {}])
         assert result == m_format.return_value
         return
 

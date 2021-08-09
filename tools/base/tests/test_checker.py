@@ -3,7 +3,8 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from tools.base.checker import AsyncChecker, BazelChecker, Checker, CheckerSummary, ForkingChecker
+from tools.base.checker import (
+    AsyncChecker, BaseChecker, BazelChecker, Checker, CheckerSummary, ForkingChecker)
 from tools.base.runner import BazelRunner, ForkingRunner
 
 
@@ -50,7 +51,7 @@ def test_checker_constructor():
         == [('path1', 'path2', 'path3'), {}])
     assert checker.summary_class == CheckerSummary
 
-    assert checker.active_check is None
+    assert checker.active_check == ""
     assert "active_check" not in checker.__dict__
 
 
@@ -129,16 +130,16 @@ def test_checker_path(patches, path, paths, isdir):
         pass
     checker = Checker("path1", "path2", "path3")
     patched = patches(
+        "pathlib",
         ("Checker.args", dict(new_callable=PropertyMock)),
         ("Checker.parser", dict(new_callable=PropertyMock)),
-        "os.path.isdir",
         prefix="tools.base.checker")
 
-    with patched as (m_args, m_parser, m_isdir):
+    with patched as (m_plib, m_args, m_parser):
         m_parser.return_value.error = DummyError
         m_args.return_value.path = path
         m_args.return_value.paths = paths
-        m_isdir.return_value = isdir
+        m_plib.Path.return_value.is_dir.return_value = isdir
         if not path and not paths:
             with pytest.raises(DummyError) as e:
                 checker.path
@@ -152,12 +153,15 @@ def test_checker_path(patches, path, paths, isdir):
                 e.value.args
                 == ('Incorrect path: `path` must be a directory, set either as first arg or with --path',))
         else:
-            assert checker.path == path or paths[0]
+            assert checker.path == m_plib.Path.return_value
+            assert (
+                list(m_plib.Path.call_args)
+                == [(path or paths[0],), {}])
             assert "path" in checker.__dict__
     if path or paths:
         assert (
-            list(m_isdir.call_args)
-            == [(path or paths[0],), {}])
+            list(m_plib.Path.return_value.is_dir.call_args)
+            == [(), {}])
 
 
 @pytest.mark.parametrize("paths", [[], ["path1", "path2"]])
@@ -345,7 +349,7 @@ def test_checker_add_arguments(patches):
               'help': 'Paths to check. At least one path must be specified, or the `path` argument should be provided'}]])
 
 
-TEST_ERRORS = (
+TEST_ERRORS: tuple = (
     {},
     dict(myerror=[]),
     dict(myerror=["a", "b", "c"]),
@@ -416,7 +420,7 @@ def test_checker_exit(patches):
         == [('exiting', ['Keyboard exit']), {'log_type': 'fatal'}])
 
 
-TEST_CHECKS = (
+TEST_CHECKS: tuple = (
     None,
     (),
     ("check1", ),
@@ -477,7 +481,7 @@ def test_checker_on_check_run(patches, errors, warnings, exiting):
         m_exit.return_value = exiting
         assert not checker.on_check_run(check)
 
-    assert checker.active_check is None
+    assert checker.active_check == ""
 
     if exiting:
         assert not m_log.called
@@ -598,7 +602,7 @@ def test_checker_run(patches, raises):
         == [(), {}])
 
 
-TEST_WARNS = (
+TEST_WARNS: tuple = (
     {},
     dict(mywarn=[]),
     dict(mywarn=["a", "b", "c"]),
@@ -630,7 +634,7 @@ def test_checker_warn(patches, log, warns):
         assert not m_log.return_value.warn.called
 
 
-TEST_SUCCESS = (
+TEST_SUCCESS: tuple = (
     {},
     dict(mysuccess=[]),
     dict(mysuccess=["a", "b", "c"]),
@@ -702,7 +706,7 @@ def test_checker_summary_print_summary(patches):
     assert m_status.called
 
 
-TEST_SECTIONS = (
+TEST_SECTIONS: tuple = (
     ("MSG1", ["a", "b", "c"]),
     ("MSG2", []),
     ("MSG3", None))
@@ -831,7 +835,7 @@ def test_bazelchecker_constructor():
 
 def test_asynchecker_constructor():
     checker = AsyncChecker()
-    assert isinstance(checker, Checker)
+    assert isinstance(checker, BaseChecker)
 
 
 @pytest.mark.parametrize("raises", [None, KeyboardInterrupt, Exception])
@@ -840,7 +844,7 @@ def test_asynchecker_run(patches, raises):
 
     patched = patches(
         "asyncio",
-        "Checker.exit",
+        "BaseChecker.exit",
         ("AsyncChecker._run", dict(new_callable=MagicMock)),
         ("AsyncChecker.on_checks_complete", dict(new_callable=MagicMock)),
         prefix="tools.base.checker")
@@ -892,7 +896,7 @@ def test_asynchecker_run(patches, raises):
 async def test_asynchecker_on_check_begin(patches):
     checker = AsyncChecker()
     patched = patches(
-        "Checker.on_check_begin",
+        "BaseChecker.on_check_begin",
         prefix="tools.base.checker")
 
     with patched as (m_super, ):
@@ -907,7 +911,7 @@ async def test_asynchecker_on_check_begin(patches):
 async def test_asynchecker_on_check_run(patches):
     checker = AsyncChecker()
     patched = patches(
-        "Checker.on_check_run",
+        "BaseChecker.on_check_run",
         prefix="tools.base.checker")
 
     with patched as (m_super, ):
@@ -922,7 +926,7 @@ async def test_asynchecker_on_check_run(patches):
 async def test_asynchecker_on_checks_begin(patches):
     checker = AsyncChecker()
     patched = patches(
-        "Checker.on_checks_begin",
+        "BaseChecker.on_checks_begin",
         prefix="tools.base.checker")
 
     with patched as (m_super, ):
@@ -938,7 +942,7 @@ async def test_asynchecker_on_checks_complete(patches):
     checker = AsyncChecker()
 
     patched = patches(
-        "Checker.on_checks_complete",
+        "BaseChecker.on_checks_complete",
         prefix="tools.base.checker")
 
     with patched as (m_complete, ):
@@ -976,8 +980,8 @@ async def test_asynchecker__run(patches, raises, exiting):
     checker = AsyncCheckerWithChecks()
 
     patched = patches(
-        "Checker.log",
-        "Checker.get_checks",
+        "BaseChecker.log",
+        "BaseChecker.get_checks",
         "AsyncChecker.on_checks_begin",
         "AsyncChecker.on_check_begin",
         "AsyncChecker.on_check_run",

@@ -548,21 +548,6 @@ public:
   virtual const Config& routeConfig() const PURE;
 
   /**
-   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
-   *  the given filter name. If there is not per-filter config, or the filter factory returns
-   *  nullptr, nullptr is returned.
-   */
-  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
-
-  /**
-   * This is a helper on top of perFilterConfig() that casts the return object to the specified
-   * type.
-   */
-  template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
-    return dynamic_cast<const Derived*>(perFilterConfig(name));
-  }
-
-  /**
    * @return bool whether to include the request count header in upstream requests.
    */
   virtual bool includeAttemptCountInRequest() const PURE;
@@ -903,31 +888,6 @@ public:
   virtual const PathMatchCriterion& pathMatchCriterion() const PURE;
 
   /**
-   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
-   *  the given filter name. If there is not per-filter config, or the filter factory returns
-   *  nullptr, nullptr is returned.
-   */
-  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
-
-  /**
-   * This is a helper on top of perFilterConfig() that casts the return object to the specified
-   * type.
-   */
-  template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
-    return dynamic_cast<const Derived*>(perFilterConfig(name));
-  };
-
-  /**
-   * This is a helper to get the route's per-filter config if it exists, otherwise the virtual
-   * host's. Or nullptr if none of them exist.
-   */
-  template <class Derived>
-  const Derived* mostSpecificPerFilterConfigTyped(const std::string& name) const {
-    const Derived* config = perFilterConfigTyped<Derived>(name);
-    return config ? config : virtualHost().perFilterConfigTyped<Derived>(name);
-  }
-
-  /**
    * True if the virtual host this RouteEntry belongs to is configured to include the attempt
    * count header.
    * @return bool whether x-envoy-attempt-count should be included on the upstream request.
@@ -1050,19 +1010,21 @@ public:
   virtual const RouteTracing* tracingConfig() const PURE;
 
   /**
-   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
-   *  the given filter name. If there is not per-filter config, or the filter factory returns
-   *  nullptr, nullptr is returned.
+   * This is a helper to get the route's per-filter config if it exists, otherwise the virtual
+   * host's. Or nullptr if none of them exist.
    */
-  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
+  virtual const RouteSpecificFilterConfig*
+  mostSpecificPerFilterConfig(const std::string& name) const PURE;
 
   /**
-   * This is a helper on top of perFilterConfig() that casts the return object to the specified
-   * type.
+   * Fold all the available per route filter configs, invoking the callback with each config (if
+   * it is present). Iteration of the configs is in order of specificity. That means that the
+   * callback will be called first for a config on a Virtual host, then a route, and finally a route
+   * entry (weighted cluster). If a config is not present, the callback will not be invoked.
    */
-  template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
-    return dynamic_cast<const Derived*>(perFilterConfig(name));
-  }
+  virtual void traversePerFilterConfig(
+      const std::string& filter_name,
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
