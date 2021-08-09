@@ -135,8 +135,7 @@ public:
   }
 
   IntegrationStreamDecoderPtr sendDownstreamRequestWithChunks(
-      FuzzedDataProvider* fdp,
-      ExtProcFuzzHelper* fh,
+      FuzzedDataProvider* fdp, ExtProcFuzzHelper* fh,
       absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
       const std::string http_method = "POST") {
     auto conn = makeClientConnection(lookupPort("http"));
@@ -152,10 +151,6 @@ public:
 
     uint32_t num_chunks = fdp->ConsumeIntegralInRange<uint32_t>(0, 50);
     for (uint32_t i = 0; i < num_chunks; i++) {
-      Buffer::OwnedImpl chunk;
-      std::string data = fdp->ConsumeRandomLengthString();
-      chunk.add(data);
-
       // If proxy closes connection before body is fully sent it causes a
       // crash. To address this, the external processor sets a flag to
       // signal when it has generated an immediate response which will close
@@ -171,8 +166,9 @@ public:
         fh->immediate_resp_lock_.unlock();
         return response;
       }
-      ENVOY_LOG_MISC(trace, "Sending chunk of {} bytes", data.length());
-      codec_client_->sendData(encoder, chunk, false);
+      uint32_t data_size = fdp->ConsumeIntegral<uint32_t>();
+      ENVOY_LOG_MISC(trace, "Sending chunk of {} bytes", data_size);
+      codec_client_->sendData(encoder, data_size, false);
       fh->immediate_resp_lock_.unlock();
     }
 
@@ -201,7 +197,9 @@ public:
     case HttpMethod::POST:
       if (fdp->ConsumeBool()) {
         ENVOY_LOG_MISC(trace, "Sending POST request with body");
-        return sendDownstreamRequestWithBody(fdp->ConsumeRandomLengthString(), absl::nullopt);
+        uint32_t data_size = fdp->ConsumeIntegral<uint32_t>();
+        std::string data = std::string(data_size, 'a');
+        return sendDownstreamRequestWithBody(data, absl::nullopt);
       } else {
         ENVOY_LOG_MISC(trace, "Sending POST request with chunked body");
         return sendDownstreamRequestWithChunks(fdp, fh, absl::nullopt);
@@ -225,7 +223,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   }
 
   // External Process and downstream are on different threads so they should
-  // have separate FDP
+  // have separate data providers
   size_t downstream_buf_len = len / 2;
   size_t ext_proc_buf_len = len - downstream_buf_len;
 

@@ -37,6 +37,11 @@ ExtProcFuzzHelper::ExtProcFuzzHelper(FuzzedDataProvider* provider) {
   immediate_resp_sent_ = false;
 }
 
+std::string ExtProcFuzzHelper::consumeRepeatedString() {
+  uint32_t str_len = provider_->ConsumeIntegral<uint32_t>();
+  return std::string(str_len, 'b');
+}
+
 // TODO(ikepolinsky): should this function be put in a standard place?
 // Since FuzzedDataProvider requires enums to define a kMaxValue, we cannot
 // use the envoy::type::v3::StatusCode enum directly. Additionally this allows
@@ -328,7 +333,7 @@ grpc::StatusCode ExtProcFuzzHelper::randomGrpcStatusCode() {
 grpc::Status ExtProcFuzzHelper::randomGrpcStatusWithMessage() {
   grpc::StatusCode code = randomGrpcStatusCode();
   ENVOY_LOG_MISC(trace, "Closing stream with StatusCode {}", code);
-  return grpc::Status(code, provider_->ConsumeRandomLengthString());
+  return grpc::Status(code, consumeRepeatedString());
 }
 
 // TODO(ikepolinsky): implement this function
@@ -388,7 +393,7 @@ void ExtProcFuzzHelper::randomizeCommonResponse(CommonResponse* msg, ProcessingR
     auto* body_mutation = msg->mutable_body_mutation();
     if (provider_->ConsumeBool()) {
       ENVOY_LOG_MISC(trace, "CommonResponse setting body_mutation, replacing body with bytes");
-      body_mutation->set_body(provider_->ConsumeRandomLengthString());
+      body_mutation->set_body(consumeRepeatedString());
     } else {
       ENVOY_LOG_MISC(trace, "CommonResponse setting body_mutation, clearing body");
       body_mutation->set_clear_body(provider_->ConsumeBool());
@@ -420,7 +425,7 @@ void ExtProcFuzzHelper::randomizeImmediateResponse(ImmediateResponse* msg, Proce
   // 3. Randomize body
   if (provider_->ConsumeBool()) {
     ENVOY_LOG_MISC(trace, "ImmediateResponse setting body");
-    msg->set_body(provider_->ConsumeRandomLengthString());
+    msg->set_body(consumeRepeatedString());
   }
 
   // 4. Randomize grpc_status
@@ -432,7 +437,7 @@ void ExtProcFuzzHelper::randomizeImmediateResponse(ImmediateResponse* msg, Proce
   // 5. Randomize details
   if (provider_->ConsumeBool()) {
     ENVOY_LOG_MISC(trace, "ImmediateResponse setting details");
-    msg->set_details(provider_->ConsumeRandomLengthString());
+    msg->set_details(consumeRepeatedString());
   }
 }
 

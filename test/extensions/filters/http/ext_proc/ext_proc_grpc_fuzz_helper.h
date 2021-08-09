@@ -81,6 +81,7 @@ public:
   ExtProcFuzzHelper(FuzzedDataProvider* provider);
 
   StatusCode randomHttpStatus();
+  std::string consumeRepeatedString();
   grpc::StatusCode randomGrpcStatusCode();
   grpc::Status randomGrpcStatusWithMessage();
 
