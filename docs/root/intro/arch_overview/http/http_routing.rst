@@ -201,3 +201,47 @@ specify the route table. This is a more expressive matching engine than the orig
 for sublinear matching on arbitrary headers (unlike the original matching engine which could only
 do this for :authority in some cases).
 
+To use the generic matching tree, specify a ref:`matcher <fds>` on a virtual host with a RouteAction action:
+
+```
+  matcher:
+    "@type": type.googleapis.com/envoy.config.common.matcher.v3.Matcher
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      exact_match_map:
+        map:
+          "/new_endpoint/foo": 
+            action: 
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                route:
+                  cluster: cluster_foo
+                request_headers_to_add:
+                - header:
+                    key: x-route-header
+                    value: new-value
+          "/new_endpoint/bar": 
+            action: 
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                route:
+                  cluster: cluster_bar
+                request_headers_to_add:
+                - header:
+                    key: x-route-header
+                    value: new-value
+```
+
+This allows resolving the same Route proto message used for the `routes`-based routing using the additional
+matching flexibility provided by the generic matching framework.
+
+Known limiations:
+- The matching tree doesn't work with path rewrites. This is because this relies on rewriting the matched path
+  against the rewrite rule, but the matching engine allows matching on :path in many different ways, making it
+  ambiguous which path match should be used when rewriting.

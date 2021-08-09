@@ -17,6 +17,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/type/matcher/v3/matcher.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
@@ -83,12 +85,13 @@ message VirtualHost {
     items {string {well_known_regex: HTTP_HEADER_VALUE strict: false}}
   }];
 
-  // This is mega hacky but gets around the circular dependency between this file and the matcher file.
-  google.protobuf.Any matcher = 21;
-
   // The list of routes that will be matched, in order, for incoming requests.
   // The first route that matches will be used.
   repeated Route routes = 3;
+
+  // The match tree to use when resolving route actions for incoming requests. Onle one of this and `routes`
+  // can be specified.
+  xds.type.matcher.v3.Matcher matcher = 21;
 
   // Specifies the type of TLS enforcement the virtual host expects. If this option is not
   // specified, there is no TLS requirement for the virtual host.

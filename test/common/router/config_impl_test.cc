@@ -1225,7 +1225,7 @@ virtual_hosts:
       "virtual clusters must define 'headers'");
 }
 
-// Validates behavior of request_headers_to_add at router, vhost, and route levels.
+// Validates basic usage of the match tree to resolve route actions.
 TEST_F(RouteMatcherTest, TestMatchTree) {
   const std::string yaml = R"EOF(
 virtual_hosts:

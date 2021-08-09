@@ -67,13 +67,19 @@ class MatchTreeRouteEntryImpl : public RouteEntryImplBase {
 public:
   using RouteEntryImplBase::RouteEntryImplBase;
 
-  virtual absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
-    return absl::nullopt;
-  }
   RouteConstSharedPtr matches(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                               uint64_t) const override {
+    // This is used during match resolution for the old linear matcher, should never be called when
+    // we have a match tree defined.
     NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
+  // We can't support path rewrites since it requires us to have a single path that we match on,
+  // but the matcher tree affords too much flexibility here making that ambiguous.
+  // TODO(snowp): Can we use tree validation to prevent these fields from being set?
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
+    return absl::nullopt;
   }
   PathMatchType matchType() const override { return PathMatchType::None; }
   const std::string& matcher() const override { NOT_REACHED_GCOVR_EXCL_LINE; }
@@ -1331,16 +1337,17 @@ VirtualHostImpl::VirtualHostImpl(
     hedge_policy_ = virtual_host.hedge_policy();
   }
 
-  if (virtual_host.has_matcher()) {
-    envoy::config::common::matcher::v3::Matcher matcher;
-    MessageUtil::anyConvertAndValidate(virtual_host.matcher(), matcher, validator);
+  if (virtual_host.has_matcher() && !virtual_host.routes().empty()) {
+    throw EnvoyException("cannot set both matcher and routes on virtual host");
+  }
 
+  if (virtual_host.has_matcher()) {
     RouteActionContext context{*this, optional_http_filters, factory_context};
     RouteActionValidationVisitor validation_visitor;
     Matcher::MatchTreeFactory<Http::HttpMatchingData, RouteActionContext> factory(
         context, factory_context, validation_visitor);
 
-    matcher_ = factory.create(matcher)();
+    matcher_ = factory.create(virtual_host.matcher())();
   } else {
     for (const auto& route : virtual_host.routes()) {
       if (!route.has_match()) {
@@ -1478,8 +1485,12 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
 
     if (match.result_) {
-      return dynamic_cast<const RouteMatchAction&>(*match.result_).route();
+      ASSERT(dynamic_cast<RouteMatchAction*>(match.result_.get()));
+      return static_cast<const RouteMatchAction&>(*match.result_).route();
     }
+
+    // TODO(snowp): Add logger
+    // ENVOY_LOG(debug, "failed to match incoming request: {}", match.result_);
 
     return nullptr;
   } else {
