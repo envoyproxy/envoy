@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/router/router.h"
@@ -22,6 +23,7 @@ namespace ThriftProxy {
 namespace Router {
 
 class RateLimitPolicy;
+class RequestMirrorPolicy;
 
 /**
  * RouteEntry is an individual resolved route entry.
@@ -55,6 +57,13 @@ public:
    * @return const Http::LowerCaseString& the header used to determine the cluster.
    */
   virtual const Http::LowerCaseString& clusterHeader() const PURE;
+
+  /**
+   * @return const std::vector<RequestMirrorPolicy>& the mirror policies associated with this route,
+   * if any.
+   */
+  virtual const std::vector<std::shared_ptr<RequestMirrorPolicy>>&
+  requestMirrorPolicies() const PURE;
 };
 
 /**
@@ -394,6 +403,82 @@ private:
   const Stats::StatName upstream_rq_time_;
   const Stats::StatName upstream_rq_size_;
   const Stats::StatName upstream_resp_size_;
+};
+
+/**
+ * RequestMirrorPolicy is an individual mirroring rule for a route entry.
+ */
+class RequestMirrorPolicy {
+public:
+  virtual ~RequestMirrorPolicy() = default;
+
+  /**
+   * @return const std::string& the upstream cluster that should be used for the mirrored request.
+   */
+  virtual const std::string& clusterName() const PURE;
+
+  /**
+   * @return bool whether this policy is currently enabled.
+   */
+  virtual bool enabled(Runtime::Loader& runtime) const PURE;
+};
+
+/**
+ * ShadowRouterHandle is used to write a request or release a connection early if needed.
+ */
+class ShadowRouterHandle {
+public:
+  virtual ~ShadowRouterHandle() = default;
+
+  /**
+   * Called after the Router is destroyed.
+   */
+  virtual void onRouterDestroy() PURE;
+
+  /**
+   * Checks if the request is currently waiting for an upstream connection to become available.
+   */
+  virtual bool waitingForConnection() const PURE;
+
+  /**
+   * @return RequestOwner& the interface associated with this ShadowRouter.
+   */
+  virtual RequestOwner& requestOwner() PURE;
+};
+
+/**
+ * ShadowWriter is used for submitting requests and ignoring the response.
+ */
+class ShadowWriter {
+public:
+  virtual ~ShadowWriter() = default;
+
+  /**
+   * @return Upstream::ClusterManager& the cluster manager.
+   */
+  virtual Upstream::ClusterManager& clusterManager() PURE;
+
+  /**
+   * @return std::string& the stat prefix used by the router.
+   */
+  virtual const std::string& statPrefix() const PURE;
+
+  /**
+   * @return Stats::Scope& the Scope used by the router.
+   */
+  virtual Stats::Scope& scope() PURE;
+
+  /**
+   * @return Dispatcher& the dispatcher.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * Starts the shadow request by requesting an upstream connection.
+   */
+  virtual absl::optional<std::reference_wrapper<ShadowRouterHandle>>
+  submit(const std::string& cluster_name, MessageMetadataSharedPtr metadata,
+         TransportType original_transport, ProtocolType original_protocol) PURE;
 };
 
 } // namespace Router

@@ -157,6 +157,53 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 1);
 }
 
+// Make sure all workers pick up connections
+TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
+  concurrency_ = 2;
+  initialize();
+
+  std::string worker0_stat_name, worker1_stat_name;
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    worker0_stat_name = "listener.127.0.0.1_0.worker_0.downstream_cx_total";
+    worker1_stat_name = "listener.127.0.0.1_0.worker_1.downstream_cx_total";
+  } else {
+    worker0_stat_name = "listener.[__1]_0.worker_0.downstream_cx_total";
+    worker1_stat_name = "listener.[__1]_0.worker_1.downstream_cx_total";
+  }
+
+  test_server_->waitForCounterEq(worker0_stat_name, 0);
+  test_server_->waitForCounterEq(worker1_stat_name, 0);
+
+  // We set the counters for the two workers to see how many connections each handles.
+  uint64_t w0_ctr = 0;
+  uint64_t w1_ctr = 0;
+  constexpr int loops = 5;
+  for (int i = 0; i < loops; i++) {
+    constexpr int requests_per_loop = 4;
+    std::array<IntegrationCodecClientPtr, requests_per_loop> connections;
+    for (int j = 0; j < requests_per_loop; j++) {
+      connections[j] = makeHttpConnection(lookupPort("http"));
+    }
+
+    auto worker0_ctr = test_server_->counter(worker0_stat_name);
+    auto worker1_ctr = test_server_->counter(worker1_stat_name);
+    auto target = w0_ctr + w1_ctr + requests_per_loop;
+    while (test_server_->counter(worker0_stat_name)->value() +
+               test_server_->counter(worker1_stat_name)->value() <
+           target) {
+      timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+    }
+    w0_ctr = test_server_->counter(worker0_stat_name)->value();
+    w1_ctr = test_server_->counter(worker1_stat_name)->value();
+    for (int j = 0; j < requests_per_loop; j++) {
+      connections[j]->close();
+    }
+  }
+
+  EXPECT_TRUE(w0_ctr > 1);
+  EXPECT_TRUE(w1_ctr > 1);
+}
+
 TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
   const std::string body = "Response body";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
@@ -395,7 +442,74 @@ typed_config:
     typed_config:
       "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
       code: 403
-  matcher:
+  xds_matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: match-header
+      exact_match_map:
+        map:
+          match:
+            action:
+              name: skip
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), HttpStatusIs("403"));
+  }
+
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
+        {":authority", "host"}, {"match-header", "match"},   {"content-type", "application/grpc"}};
+    auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  }
+
+  auto second_codec = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},    {":path", "/test/long/url"},   {":scheme", "http"},
+      {":authority", "host"}, {"match-header", "not-match"}, {"content-type", "application/grpc"}};
+  auto response = second_codec->makeRequestWithBody(request_headers, 1024);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+
+  codec_client_->close();
+  second_codec->close();
+}
+
+// Verifies that we can construct a match tree with a filter using the new matcher tree proto, and
+// that we are able to skip filter invocation through the match tree.
+TEST_P(IntegrationTest, MatchingHttpFilterConstructionNewProto) {
+  concurrency_ = 2;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
+
+  config_helper_.addFilter(R"EOF(
+name: matcher
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+  extension_config:
+    name: set-response-code
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+      code: 403
+  xds_matcher:
     matcher_tree:
       input:
         name: request-headers

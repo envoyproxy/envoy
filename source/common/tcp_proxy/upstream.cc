@@ -185,9 +185,10 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
   Network::Connection& connection = conn_data->connection();
 
   auto upstream = std::make_unique<TcpUpstream>(std::move(conn_data), upstream_callbacks_);
-  callbacks_->onGenericPoolReady(&connection.streamInfo(), std::move(upstream), host,
-                                 latched_data->connection().addressProvider().localAddress(),
-                                 latched_data->connection().streamInfo().downstreamSslConnection());
+  callbacks_->onGenericPoolReady(
+      &connection.streamInfo(), std::move(upstream), host,
+      latched_data->connection().addressProvider().localAddress(),
+      latched_data->connection().streamInfo().downstreamAddressProvider().sslConnection());
 }
 
 HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -233,8 +234,8 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   upstream_handle_ = nullptr;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
-  upstream_->setConnPoolCallbacks(
-      std::make_unique<HttpConnPool::Callbacks>(*this, host, info.downstreamSslConnection()));
+  upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
+      *this, host, info.downstreamAddressProvider().sslConnection()));
 }
 
 void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,

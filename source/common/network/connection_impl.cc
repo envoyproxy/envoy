@@ -99,6 +99,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
   // TODO(soulxu): generate the connection id inside the addressProvider directly,
   // then we don't need a setter or any of the optional stuff.
   socket_->addressProvider().setConnectionID(id());
+  socket_->addressProvider().setSslConnection(transport_socket_->ssl());
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -581,7 +582,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   }
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
-  // In this case ignore write event processing.
+  // In this case ignore read event processing.
   if (ioHandle().isOpen() && (events & Event::FileReadyType::Read)) {
     onReadReady();
   }
