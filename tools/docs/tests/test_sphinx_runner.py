@@ -7,9 +7,6 @@ from tools.docs import sphinx_runner
 
 def test_sphinx_runner_constructor():
     runner = sphinx_runner.SphinxRunner()
-    assert runner.build_dir == "."
-    runner._build_dir = "foo"
-    assert runner.build_dir == "foo"
     assert runner._build_sha == "UNKNOWN"
     assert "blob_dir" not in runner.__dict__
 
@@ -29,6 +26,22 @@ def test_sphinx_runner_blob_sha(patches, docs_tag):
         else:
             assert runner.blob_sha == m_sha.return_value
     assert "blob_sha" not in runner.__dict__
+
+
+def test_sphinx_runner_build_dir(patches):
+    runner = sphinx_runner.SphinxRunner()
+    patched = patches(
+        "pathlib",
+        ("SphinxRunner.tempdir", dict(new_callable=PropertyMock)),
+        prefix="tools.docs.sphinx_runner")
+
+    with patched as (m_plib, m_temp):
+        assert runner.build_dir == m_plib.Path.return_value
+
+    assert (
+        list(m_plib.Path.call_args)
+        == [(m_temp.return_value.name, ), {}])
+    assert "build_dir" not in runner.__dict__
 
 
 @pytest.mark.parametrize("build_sha", [None, "", "SOME_BUILD_SHA"])
@@ -87,16 +100,15 @@ def test_sphinx_runner_config_file(patches):
 def test_sphinx_runner_config_file_path(patches):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
-        "os.path",
         ("SphinxRunner.build_dir", dict(new_callable=PropertyMock)),
         prefix="tools.docs.sphinx_runner")
 
-    with patched as (m_path, m_build):
-        assert runner.config_file_path == m_path.join.return_value
+    with patched as (m_build, ):
+        assert runner.config_file_path == m_build.return_value.joinpath.return_value
 
     assert (
-        list(m_path.join.call_args)
-        == [(m_build.return_value, 'build.yaml',), {}])
+        list(m_build.return_value.joinpath.call_args)
+        == [('build.yaml',), {}])
     assert "config_file_path" not in runner.__dict__
 
 
@@ -120,7 +132,10 @@ def test_sphinx_runner_configs(patches):
 
     _configs = {}
     for k, v in mapping.items():
-        _configs[k] = _mocks[list(mapping.values()).index(v)]
+        _v = _mocks[list(mapping.values()).index(v)]
+        if k in ["validator_path", "descriptor_path"]:
+            _v = str(_v)
+        _configs[k] = _v
     assert result == _configs
     assert "configs" in runner.__dict__
 
@@ -128,17 +143,17 @@ def test_sphinx_runner_configs(patches):
 def test_sphinx_runner_descriptor_path(patches):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
-        "os.path",
+        "pathlib",
         ("SphinxRunner.args", dict(new_callable=PropertyMock)),
         prefix="tools.docs.sphinx_runner")
 
-    with patched as (m_path, m_args):
+    with patched as (m_plib, m_args):
         assert (
             runner.descriptor_path
-            == m_path.abspath.return_value)
+            == m_plib.Path.return_value)
 
     assert (
-        list(m_path.abspath.call_args)
+        list(m_plib.Path.call_args)
         == [(m_args.return_value.descriptor_path,), {}])
     assert "descriptor_path" not in runner.__dict__
 
@@ -177,29 +192,31 @@ def test_sphinx_runner_docs_tag(patches):
 def test_sphinx_runner_html_dir(patches):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
-        "os.path",
         ("SphinxRunner.build_dir", dict(new_callable=PropertyMock)),
-        ("SphinxRunner.args", dict(new_callable=PropertyMock)),
         prefix="tools.docs.sphinx_runner")
 
-    with patched as (m_path, m_build, m_args):
-        assert runner.html_dir == m_path.join.return_value
+    with patched as (m_build, ):
+        assert runner.html_dir == m_build.return_value.joinpath.return_value
 
     assert (
-        list(m_path.join.call_args)
-        == [(m_build.return_value, 'generated/html'), {}])
-
+        list(m_build.return_value.joinpath.call_args)
+        == [('generated', 'html'), {}])
     assert "html_dir" in runner.__dict__
 
 
 def test_sphinx_runner_output_filename(patches):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
+        "pathlib",
         ("SphinxRunner.args", dict(new_callable=PropertyMock)),
         prefix="tools.docs.sphinx_runner")
 
-    with patched as (m_args, ):
-        assert runner.output_filename == m_args.return_value.output_filename
+    with patched as (m_plib, m_args):
+        assert runner.output_filename == m_plib.Path.return_value
+
+    assert (
+        list(m_plib.Path.call_args)
+        == [(m_args.return_value.output_filename, ), {}])
     assert "output_filename" not in runner.__dict__
 
 
@@ -246,24 +263,24 @@ def test_sphinx_runner_release_level(patches, docs_tag):
 def test_sphinx_runner_rst_dir(patches, rst_tar):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
-        "os.path",
+        "pathlib",
         "utils",
         ("SphinxRunner.build_dir", dict(new_callable=PropertyMock)),
         ("SphinxRunner.rst_tar", dict(new_callable=PropertyMock)),
         prefix="tools.docs.sphinx_runner")
 
-    with patched as (m_path, m_utils, m_dir, m_rst):
+    with patched as (m_plib, m_utils, m_dir, m_rst):
         m_rst.return_value = rst_tar
-        assert runner.rst_dir == m_path.join.return_value
+        assert runner.rst_dir == m_dir.return_value.joinpath.return_value
 
     assert (
-        list(m_path.join.call_args)
-        == [(m_dir.return_value, 'generated/rst'), {}])
+        list(m_dir.return_value.joinpath.call_args)
+        == [('generated', 'rst'), {}])
 
     if rst_tar:
         assert (
             list(m_utils.extract.call_args)
-            == [(m_path.join.return_value, rst_tar), {}])
+            == [(m_dir.return_value.joinpath.return_value, rst_tar), {}])
     else:
         assert not m_utils.extract.called
     assert "rst_dir" in runner.__dict__
@@ -272,12 +289,16 @@ def test_sphinx_runner_rst_dir(patches, rst_tar):
 def test_sphinx_runner_rst_tar(patches):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
+        "pathlib",
         ("SphinxRunner.args", dict(new_callable=PropertyMock)),
         prefix="tools.docs.sphinx_runner")
 
-    with patched as (m_args, ):
-        assert runner.rst_tar == m_args.return_value.rst_tar
+    with patched as (m_plib, m_args):
+        assert runner.rst_tar == m_plib.Path.return_value
 
+    assert (
+        list(m_plib.Path.call_args)
+        == [(m_args.return_value.rst_tar, ), {}])
     assert "rst_tar" not in runner.__dict__
 
 
@@ -291,27 +312,42 @@ def test_sphinx_runner_sphinx_args(patches):
     with patched as (m_html, m_rst):
         assert (
             runner.sphinx_args
-            == ['-W', '--keep-going', '--color', '-b', 'html',
-                m_rst.return_value,
-                m_html.return_value])
+            == ('-W', '--keep-going', '--color', '-b', 'html',
+                str(m_rst.return_value),
+                str(m_html.return_value)))
 
     assert "sphinx_args" not in runner.__dict__
+
+
+def test_sphinx_runner_tempdir(patches):
+    runner = sphinx_runner.SphinxRunner()
+    patched = patches(
+        "tempfile",
+        prefix="tools.docs.sphinx_runner")
+
+    with patched as (m_temp, ):
+        assert runner.tempdir == m_temp.TemporaryDirectory.return_value
+
+    assert (
+        list(m_temp.TemporaryDirectory.call_args)
+        == [(), {}])
+    assert "tempdir" in runner.__dict__
 
 
 def test_sphinx_runner_validator_path(patches):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
-        "os.path",
+        "pathlib",
         ("SphinxRunner.args", dict(new_callable=PropertyMock)),
         prefix="tools.docs.sphinx_runner")
 
-    with patched as (m_path, m_args):
+    with patched as (m_plib, m_args):
         assert (
             runner.validator_path
-            == m_path.abspath.return_value)
+            == m_plib.Path.return_value)
 
     assert (
-        list(m_path.abspath.call_args)
+        list(m_plib.Path.call_args)
         == [(m_args.return_value.validator_path,), {}])
     assert "validator_path" not in runner.__dict__
 
@@ -319,35 +355,35 @@ def test_sphinx_runner_validator_path(patches):
 def test_sphinx_runner_version_file(patches):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
+        "pathlib",
         ("SphinxRunner.args", dict(new_callable=PropertyMock)),
         prefix="tools.docs.sphinx_runner")
 
-    with patched as (m_args, ):
-        assert runner.version_file == m_args.return_value.version_file
+    with patched as (m_plib, m_args):
+        assert runner.version_file == m_plib.Path.return_value
 
+    assert (
+        list(m_plib.Path.call_args)
+        == [(m_args.return_value.version_file, ), {}])
     assert "version_file" not in runner.__dict__
 
 
 def test_sphinx_runner_version_number(patches):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
-        "open",
         ("SphinxRunner.version_file", dict(new_callable=PropertyMock)),
         prefix="tools.docs.sphinx_runner")
 
-    with patched as (m_open, m_file):
+    with patched as (m_file, ):
         assert (
             runner.version_number
-            == m_open.return_value.__enter__.return_value.read.return_value.strip.return_value)
+            == m_file.return_value.read_text.return_value.strip.return_value)
 
     assert (
-        list(m_open.call_args)
-        == [(m_file.return_value,), {}])
-    assert (
-        list(m_open.return_value.__enter__.return_value.read.call_args)
+        list(m_file.return_value.read_text.call_args)
         == [(), {}])
     assert (
-        list(m_open.return_value.__enter__.return_value.read.return_value.strip.call_args)
+        list(m_file.return_value.read_text.return_value.strip.call_args)
         == [(), {}])
 
     assert "version_number" in runner.__dict__
@@ -461,8 +497,6 @@ def test_sphinx_runner_build_summary(patches):
 def test_sphinx_runner_check_env(patches, py_compat, release_level, version_number, docs_tag, current):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
-        "open",
-        "os.path",
         "platform",
         ("SphinxRunner.configs", dict(new_callable=PropertyMock)),
         ("SphinxRunner.version_number", dict(new_callable=PropertyMock)),
@@ -477,12 +511,12 @@ def test_sphinx_runner_check_env(patches, py_compat, release_level, version_numb
             and (f"v{version_number}" != docs_tag
                  or version_number not in current)))
 
-    with patched as (m_open, m_path, m_platform, m_configs, m_version, m_tag, m_py, m_rst):
+    with patched as (m_platform, m_configs, m_version, m_tag, m_py, m_rst):
         m_py.return_value = py_compat
         m_configs.return_value.__getitem__.return_value = release_level
         m_version.return_value = version_number
         m_tag.return_value = docs_tag
-        m_open.return_value.__enter__.return_value.read.return_value = current
+        m_rst.return_value.joinpath.return_value.read_text.return_value = current
 
         if fails:
             with pytest.raises(sphinx_runner.SphinxEnvError) as e:
@@ -495,15 +529,12 @@ def test_sphinx_runner_check_env(patches, py_compat, release_level, version_numb
             e.value.args
             == ("ERROR: python version must be >= 3.8, "
                 f"you have {m_platform.python_version.return_value}", ))
-        assert not m_open.called
         return
 
     if release_level != "tagged":
-        assert not m_open.called
         return
 
     if f"v{version_number}" != docs_tag:
-        assert not m_open.called
         assert (
             e.value.args
             == ("Given git tag does not match the VERSION file content:"
@@ -511,19 +542,34 @@ def test_sphinx_runner_check_env(patches, py_compat, release_level, version_numb
         return
 
     assert (
-        list(m_open.call_args)
-        == [(m_path.join.return_value,), {}])
-    assert (
-        list(m_path.join.call_args)
-        == [(m_rst.return_value, "version_history/current.rst"), {}])
-    assert (
-        list(m_open.return_value.__enter__.return_value.read.call_args)
-        == [(), {}])
+        list(m_rst.return_value.joinpath.call_args)
+        == [("version_history", "current.rst"), {}])
 
     if version_number not in current:
         assert (
             e.value.args
             == (f"Git tag ({version_number}) not found in version_history/current.rst", ))
+
+
+@pytest.mark.parametrize("exists", [True, False])
+def test_sphinx_runner_cleanup(patches, exists):
+    runner = sphinx_runner.SphinxRunner()
+    patched = patches(
+        ("SphinxRunner.tempdir", dict(new_callable=PropertyMock)),
+        prefix="tools.docs.sphinx_runner")
+
+    with patched as (m_temp, ):
+        if exists:
+            runner.__dict__["tempdir"] = m_temp.return_value
+        assert not runner.cleanup()
+
+    assert not "tempdir" in runner.__dict__
+    if exists:
+        assert (
+            list(m_temp.return_value.cleanup.call_args)
+            == [(), {}])
+    else:
+        assert not m_temp.called
 
 
 def test_sphinx_runner_create_tarball(patches):
@@ -545,19 +591,30 @@ def test_sphinx_runner_create_tarball(patches):
         == [(m_html.return_value,), {'arcname': '.'}])
 
 
-def test_sphinx_runner_run(patches):
+@pytest.mark.parametrize("raises", [True, False])
+def test_sphinx_runner_run(patches, raises):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
-        "tempfile",
+        "SphinxRunner.cleanup",
         "SphinxRunner._run",
         prefix="tools.docs.sphinx_runner")
 
-    with patched as (m_tmp, m_run):
-        assert runner.run() == m_run.return_value
+    with patched as (m_cleanup, m_run):
+        if raises:
+            m_run.side_effect = Exception("AN ERROR OCCURRED")
+
+        if not raises:
+            assert runner.run() == m_run.return_value
+        else:
+            with pytest.raises(Exception):
+                runner.run()
 
     assert (
         list(m_run.call_args)
-        == [(m_tmp.TemporaryDirectory.return_value.__enter__.return_value,), {}])
+        == [(), {}])
+    assert (
+        list(m_cleanup.call_args)
+        == [(), {}])
 
 
 @pytest.mark.parametrize("color", [None, "COLOR"])
@@ -601,17 +658,14 @@ def test_sphinx_runner__run(patches, check_fails, build_fails):
         if build_fails:
             _build_error = sphinx_runner.SphinxBuildError("BUILD FAILED")
             m_build.side_effect = lambda: _raise(_build_error)
-        assert runner._run("BUILD_DIR") == (1 if (check_fails or build_fails) else None)
+        assert runner._run() == (1 if (check_fails or build_fails) else None)
 
-    assert (
-        runner._build_dir
-        == "BUILD_DIR")
     assert (
         list(m_check.call_args)
         == [(), {}])
     assert (
         list(m_os.environ.__setitem__.call_args)
-        == [('ENVOY_DOCS_BUILD_CONFIG', m_config.return_value), {}])
+        == [('ENVOY_DOCS_BUILD_CONFIG', str(m_config.return_value)), {}])
 
     if check_fails:
         assert (

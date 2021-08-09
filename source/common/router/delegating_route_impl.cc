@@ -14,10 +14,6 @@ const Decorator* DelegatingRoute::decorator() const { return base_route_->decora
 
 const RouteTracing* DelegatingRoute::tracingConfig() const { return base_route_->tracingConfig(); }
 
-const RouteSpecificFilterConfig* DelegatingRoute::perFilterConfig(const std::string& name) const {
-  return base_route_->perFilterConfig(name);
-}
-
 // Router:DelegatingRouteEntry
 void DelegatingRouteEntry::finalizeResponseHeaders(
     Http::ResponseHeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const {
@@ -148,11 +144,6 @@ const TlsContextMatchCriteria* DelegatingRouteEntry::tlsContextMatchCriteria() c
 
 const PathMatchCriterion& DelegatingRouteEntry::pathMatchCriterion() const {
   return base_route_->routeEntry()->pathMatchCriterion();
-}
-
-const RouteSpecificFilterConfig*
-DelegatingRouteEntry::perFilterConfig(const std::string& name) const {
-  return base_route_->routeEntry()->perFilterConfig(name);
 }
 
 bool DelegatingRouteEntry::includeAttemptCountInRequest() const {
