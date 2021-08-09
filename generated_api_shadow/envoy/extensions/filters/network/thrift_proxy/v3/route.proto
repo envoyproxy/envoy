@@ -81,10 +81,32 @@ message RouteMatch {
   repeated config.route.v3.HeaderMatcher headers = 4;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.thrift_proxy.v2alpha1.RouteAction";
+
+  // The router is capable of shadowing traffic from one cluster to another. The current
+  // implementation is "fire and forget," meaning Envoy will not wait for the shadow cluster to
+  // respond before returning the response from the primary cluster. All normal statistics are
+  // collected for the shadow cluster making this feature useful for testing.
+  //
+  // .. note::
+  //
+  //   Shadowing will not be triggered if the primary cluster does not exist.
+  message RequestMirrorPolicy {
+    // Specifies the cluster that requests will be mirrored to. The cluster must
+    // exist in the cluster manager configuration when the route configuration is loaded.
+    // If it disappears at runtime, the shadow request will silently be ignored.
+    string cluster = 1 [(validate.rules).string = {min_len: 1}];
+
+    // If not specified, all requests to the target cluster will be mirrored.
+    //
+    // For some fraction N/D, a random number in the range [0,D) is selected. If the
+    // number is <= the value of the numerator N, or if the key is not present, the default
+    // value, the request will be mirrored.
+    config.core.v3.RuntimeFractionalPercent runtime_fraction = 2;
+  }
 
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -123,6 +145,9 @@ message RouteAction {
   // Strip the service prefix from the method name, if there's a prefix. For
   // example, the method call Service:method would end up being just method.
   bool strip_service_name = 5;
+
+  // Indicates that the route has request mirroring policies.
+  repeated RequestMirrorPolicy request_mirror_policies = 7;
 }
 
 // Allows for specification of multiple upstream clusters along with weights that indicate the

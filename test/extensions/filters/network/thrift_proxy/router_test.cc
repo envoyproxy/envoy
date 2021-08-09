@@ -9,6 +9,7 @@
 #include "source/extensions/filters/network/thrift_proxy/config.h"
 #include "source/extensions/filters/network/thrift_proxy/router/config.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/router/shadow_writer_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
@@ -67,43 +68,72 @@ class ThriftRouterTestBase {
 public:
   ThriftRouterTestBase()
       : transport_factory_([&]() -> MockTransport* {
-          ASSERT(transport_ == nullptr);
-          transport_ = new NiceMock<MockTransport>();
-          if (mock_transport_cb_) {
-            mock_transport_cb_(transport_);
+          // Create shadow transports.
+          auto transport = new NiceMock<MockTransport>();
+          transports_requested_++;
+
+          // Ignore null response decoder transports.
+          bool is_response_transport = shadow_writer_impl_ != nullptr &&
+                                       (transports_requested_ == 1 || transports_requested_ == 3);
+          if (!is_response_transport) {
+            if (mock_transport_cb_) {
+              mock_transport_cb_(transport);
+            }
+            all_transports_.push_back(transport);
+            transport_ = transport;
           }
-          return transport_;
+
+          return transport;
         }),
         protocol_factory_([&]() -> MockProtocol* {
-          ASSERT(protocol_ == nullptr);
-          protocol_ = new NiceMock<MockProtocol>();
-          if (mock_protocol_cb_) {
-            mock_protocol_cb_(protocol_);
+          // Create shadow protocols.
+          auto protocol = new NiceMock<MockProtocol>();
+          protocols_requested_++;
+
+          // Ditto for protocols.
+          bool is_response_protocol = shadow_writer_impl_ != nullptr &&
+                                      (protocols_requested_ == 1 || protocols_requested_ == 3);
+          if (!is_response_protocol) {
+            if (mock_protocol_cb_) {
+              mock_protocol_cb_(protocol);
+            }
+            all_protocols_.push_back(protocol);
+            protocol_ = protocol;
           }
-          return protocol_;
+
+          return protocol;
         }),
         transport_register_(transport_factory_), protocol_register_(protocol_factory_) {
     context_.cluster_manager_.initializeThreadLocalClusters({"cluster"});
   }
 
-  void initializeRouter() {
+  void initializeRouter(bool use_real_shadow_writer = false) {
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope());
+    if (!use_real_shadow_writer) {
+      router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
+                                         context_.runtime(), shadow_writer_);
+    } else {
+      shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(context_.clusterManager(), "test",
+                                                               context_.scope(), dispatcher_);
+      router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
+                                         context_.runtime(), *shadow_writer_impl_);
+    }
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
     router_->setDecoderFilterCallbacks(callbacks_);
   }
 
-  void initializeMetadata(MessageType msg_type, std::string method = "method") {
+  void initializeMetadata(MessageType msg_type, std::string method = "method",
+                          int32_t sequence_id = 1) {
     msg_type_ = msg_type;
 
     metadata_ = std::make_shared<MessageMetadata>();
     metadata_->setMethodName(method);
     metadata_->setMessageType(msg_type_);
-    metadata_->setSequenceId(1);
+    metadata_->setSequenceId(sequence_id);
   }
 
   void startRequest(MessageType msg_type, std::string method = "method",
@@ -170,14 +200,14 @@ public:
     EXPECT_NE(nullptr, upstream_callbacks_);
   }
 
-  void startRequestWithExistingConnection(MessageType msg_type) {
+  void startRequestWithExistingConnection(MessageType msg_type, int32_t sequence_id = 1) {
     EXPECT_EQ(FilterStatus::Continue, router_->transportBegin({}));
 
     EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
     EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
     EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
 
-    initializeMetadata(msg_type);
+    initializeMetadata(msg_type, "method", sequence_id);
 
     EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
                 addUpstreamCallbacks(_))
@@ -233,20 +263,28 @@ public:
   }
 
   void sendTrivialStruct(FieldType field_type) {
-    EXPECT_CALL(*protocol_, writeStructBegin(_, ""));
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeStructBegin(_, ""));
+    }
     EXPECT_EQ(FilterStatus::Continue, router_->structBegin({}));
 
     int16_t id = 1;
-    EXPECT_CALL(*protocol_, writeFieldBegin(_, "", field_type, id));
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeFieldBegin(_, "", field_type, id));
+    }
     EXPECT_EQ(FilterStatus::Continue, router_->fieldBegin({}, field_type, id));
 
     sendTrivialValue(field_type);
 
-    EXPECT_CALL(*protocol_, writeFieldEnd(_));
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeFieldEnd(_));
+    }
     EXPECT_EQ(FilterStatus::Continue, router_->fieldEnd());
 
-    EXPECT_CALL(*protocol_, writeFieldBegin(_, "", FieldType::Stop, 0));
-    EXPECT_CALL(*protocol_, writeStructEnd(_));
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeFieldBegin(_, "", FieldType::Stop, 0));
+      EXPECT_CALL(*protocol, writeStructEnd(_));
+    }
     EXPECT_EQ(FilterStatus::Continue, router_->structEnd());
   }
 
@@ -254,37 +292,51 @@ public:
     switch (field_type) {
     case FieldType::Bool: {
       bool v = true;
-      EXPECT_CALL(*protocol_, writeBool(_, v));
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeBool(_, v));
+      }
       EXPECT_EQ(FilterStatus::Continue, router_->boolValue(v));
     } break;
     case FieldType::Byte: {
       uint8_t v = 2;
-      EXPECT_CALL(*protocol_, writeByte(_, v));
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeByte(_, v));
+      }
       EXPECT_EQ(FilterStatus::Continue, router_->byteValue(v));
     } break;
     case FieldType::I16: {
       int16_t v = 3;
-      EXPECT_CALL(*protocol_, writeInt16(_, v));
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeInt16(_, v));
+      }
       EXPECT_EQ(FilterStatus::Continue, router_->int16Value(v));
     } break;
     case FieldType::I32: {
       int32_t v = 4;
-      EXPECT_CALL(*protocol_, writeInt32(_, v));
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeInt32(_, v));
+      }
       EXPECT_EQ(FilterStatus::Continue, router_->int32Value(v));
     } break;
     case FieldType::I64: {
       int64_t v = 5;
-      EXPECT_CALL(*protocol_, writeInt64(_, v));
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeInt64(_, v));
+      }
       EXPECT_EQ(FilterStatus::Continue, router_->int64Value(v));
     } break;
     case FieldType::Double: {
       double v = 6.0;
-      EXPECT_CALL(*protocol_, writeDouble(_, v));
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeDouble(_, v));
+      }
       EXPECT_EQ(FilterStatus::Continue, router_->doubleValue(v));
     } break;
     case FieldType::String: {
       std::string v = "seven";
-      EXPECT_CALL(*protocol_, writeString(_, v));
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeString(_, v));
+      }
       EXPECT_EQ(FilterStatus::Continue, router_->stringValue(v));
     } break;
     default:
@@ -292,9 +344,87 @@ public:
     }
   }
 
+  void sendTrivialMap() {
+    FieldType container_type = FieldType::I32;
+    uint32_t size = 2;
+
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeMapBegin(_, container_type, container_type, size));
+    }
+    EXPECT_EQ(FilterStatus::Continue, router_->mapBegin(container_type, container_type, size));
+
+    for (int i = 0; i < 2; i++) {
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeInt32(_, i));
+      }
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));
+
+      int j = i + 100;
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeInt32(_, j));
+      }
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(j));
+    }
+
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeMapEnd(_));
+    }
+    EXPECT_EQ(FilterStatus::Continue, router_->mapEnd());
+  }
+
+  void sendTrivialList() {
+    FieldType container_type = FieldType::I32;
+    uint32_t size = 3;
+
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeListBegin(_, container_type, size));
+    }
+    EXPECT_EQ(FilterStatus::Continue, router_->listBegin(container_type, size));
+
+    for (int i = 0; i < 3; i++) {
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeInt32(_, i));
+      }
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));
+    }
+
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeListEnd(_));
+    }
+    EXPECT_EQ(FilterStatus::Continue, router_->listEnd());
+  }
+
+  void sendTrivialSet() {
+    FieldType container_type = FieldType::I32;
+    uint32_t size = 4;
+
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeSetBegin(_, container_type, size));
+    }
+    EXPECT_EQ(FilterStatus::Continue, router_->setBegin(container_type, size));
+
+    for (int i = 0; i < 4; i++) {
+      for (auto& protocol : all_protocols_) {
+        EXPECT_CALL(*protocol, writeInt32(_, i));
+      }
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));
+    }
+
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeSetEnd(_));
+    }
+    EXPECT_EQ(FilterStatus::Continue, router_->setEnd());
+  }
+
   void completeRequest() {
-    EXPECT_CALL(*protocol_, writeMessageEnd(_));
-    EXPECT_CALL(*transport_, encodeFrame(_, _, _));
+    for (auto& protocol : all_protocols_) {
+      EXPECT_CALL(*protocol, writeMessageEnd(_));
+    }
+
+    for (auto& transport : all_transports_) {
+      EXPECT_CALL(*transport, encodeFrame(_, _, _));
+    }
+
     EXPECT_CALL(upstream_connection_, write(_, false));
 
     if (msg_type_ == MessageType::Oneway) {
@@ -341,20 +471,28 @@ public:
   std::function<void(MockTransport*)> mock_transport_cb_{};
   std::function<void(MockProtocol*)> mock_protocol_cb_{};
 
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
-  NiceMock<Network::MockClientConnection> connection_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
+
+  std::unique_ptr<Router> router_;
+  MockShadowWriter shadow_writer_;
+  std::shared_ptr<ShadowWriterImpl> shadow_writer_impl_;
+
+  NiceMock<Network::MockClientConnection> connection_;
   NiceMock<MockTimeSystem> time_source_;
   NiceMock<ThriftFilters::MockDecoderFilterCallbacks> callbacks_;
   NiceMock<MockTransport>* transport_{};
   NiceMock<MockProtocol>* protocol_{};
+  std::vector<NiceMock<MockTransport>*> all_transports_{};
+  std::vector<NiceMock<MockProtocol>*> all_protocols_{};
+  int32_t transports_requested_{};
+  int32_t protocols_requested_{};
   NiceMock<MockRoute>* route_{};
   NiceMock<MockRouteEntry> route_entry_;
   NiceMock<Upstream::MockHostDescription>* host_{};
   Tcp::ConnectionPool::ConnectionStatePtr conn_state_;
 
   RouteConstSharedPtr route_ptr_;
-  std::unique_ptr<Router> router_;
 
   std::string cluster_name_{"cluster"};
 
@@ -1391,6 +1529,70 @@ TEST_F(ThriftRouterTest, RequestResponseSize) {
   completeRequest();
   returnResponse();
   destroyRouter();
+}
+
+TEST_F(ThriftRouterTest, ShadowRequests) {
+  struct ShadowClusterInfo {
+    NiceMock<Upstream::MockThreadLocalCluster> cluster;
+    NiceMock<Network::MockClientConnection> connection;
+    Tcp::ConnectionPool::ConnectionStatePtr conn_state;
+  };
+  using ShadowClusterInfoPtr = std::shared_ptr<ShadowClusterInfo>;
+  absl::flat_hash_map<std::string, ShadowClusterInfoPtr> shadow_clusters;
+
+  shadow_clusters.try_emplace("shadow_cluster_1", std::make_shared<ShadowClusterInfo>());
+  shadow_clusters.try_emplace("shadow_cluster_2", std::make_shared<ShadowClusterInfo>());
+
+  for (auto& [name, shadow_cluster_info] : shadow_clusters) {
+    auto& shadow_cluster = shadow_cluster_info->cluster;
+    auto& upstream_connection = shadow_cluster_info->connection;
+    auto& conn_state = shadow_cluster_info->conn_state;
+
+    ON_CALL(context_.cluster_manager_, getThreadLocalCluster(absl::string_view(name)))
+        .WillByDefault(Return(&shadow_cluster));
+    EXPECT_CALL(shadow_cluster.tcp_conn_pool_, newConnection(_))
+        .WillOnce(
+            Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+              shadow_cluster.tcp_conn_pool_.newConnectionImpl(cb);
+              shadow_cluster.tcp_conn_pool_.poolReady(upstream_connection);
+              return nullptr;
+            }));
+    EXPECT_CALL(upstream_connection, close(_));
+
+    EXPECT_CALL(*shadow_cluster.tcp_conn_pool_.connection_data_, connectionState())
+        .WillRepeatedly(
+            Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state.get(); }));
+    EXPECT_CALL(*shadow_cluster.tcp_conn_pool_.connection_data_, setConnectionState_(_))
+        .WillOnce(Invoke(
+            [&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state.swap(cs); }));
+
+    // Set up policies.
+    envoy::type::v3::FractionalPercent default_value;
+    auto policy = std::make_shared<RequestMirrorPolicyImpl>(name, "", default_value);
+    route_entry_.policies_.push_back(policy);
+  }
+
+  initializeRouter(true);
+
+  // Set sequence id to 0, since that's what the new connections used for shadow requests will use.
+  startRequestWithExistingConnection(MessageType::Call, 0);
+
+  std::vector<FieldType> field_types = {FieldType::Bool,  FieldType::Byte, FieldType::I16,
+                                        FieldType::I32,   FieldType::I64,  FieldType::Double,
+                                        FieldType::String};
+  for (const auto& field_type : field_types) {
+    sendTrivialStruct(field_type);
+  }
+
+  sendTrivialMap();
+  sendTrivialList();
+  sendTrivialSet();
+
+  completeRequest();
+  returnResponse();
+  destroyRouter();
+
+  shadow_writer_impl_ = nullptr;
 }
 
 } // namespace Router
