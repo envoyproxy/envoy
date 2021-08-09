@@ -40,7 +40,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 34]
+// [#next-free-field: 33]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -216,9 +216,6 @@ message Bootstrap {
     (udpa.annotations.security).configure_for_untrusted_downstream = true,
     (udpa.annotations.security).configure_for_untrusted_upstream = true
   ];
-
-  // Optional configuration for resource tracking.
-  ResourceTrackingConfig resource_tracking_config = 33;
 
   // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
   // Note that this records a value for each iteration of the event loop on every thread. This
@@ -648,23 +645,4 @@ message CustomInlineHeader {
 
   // The type of the header that is expected to be set as the inline header.
   InlineHeaderType inline_header_type = 2 [(validate.rules).enum = {defined_only: true}];
-}
-
-// Context object encapsulating resource tracking configuration for a variety of
-// components.
-message ResourceTrackingConfig {
-  // Configuration for which accounts the WatermarkBuffer Factories should track.
-  message BufferFactoryConfig {
-    // The minimum power of two at which Envoy starts tracking an account.
-    //
-    // Envoy has 8 power of two buckets starting with the provided exponent below.
-    // Concretely the 1st bucket contains accounts for streams that use
-    // [2^minimum_account_to_track_power_of_two,
-    // 2^(minimum_account_to_track_power_of_two + 1)) bytes.
-    // With the 8th bucket tracking accounts
-    // >= 128 * 2^minimum_account_to_track_power_of_two.
-    uint32 minimum_account_to_track_power_of_two = 1 [(validate.rules).uint32 = {lte: 63 gt: 0}];
-  }
-
-  BufferFactoryConfig buffer_factory_config = 1;
 }

@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/runtime/runtime_features.h"
@@ -11,13 +10,9 @@
 namespace Envoy {
 namespace Buffer {
 namespace {
-
-// TODO(kbaichoo): remove when msvc supports absl::bit_width as constexpr.
-#ifndef WIN32
-constexpr uint32_t kDefaultMinimumTrackingBytes = absl::bit_width(uint32_t(1024 * 256)) - 1;
-#else
-constexpr uint32_t kDefaultMinimumTrackingBytes = 18; // Computed from the expression above.
-#endif
+// Effectively disables tracking as this should zero out all reasonable account
+// balances when shifted by this amount.
+constexpr uint32_t kEffectivelyDisableTrackingBitshift = 63;
 } // end namespace
 
 void WatermarkBuffer::add(const void* data, uint64_t size) {
@@ -185,10 +180,10 @@ void WatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPt
 }
 
 WatermarkBufferFactory::WatermarkBufferFactory(
-    const envoy::config::bootstrap::v3::ResourceTrackingConfig::BufferFactoryConfig& config)
+    const envoy::config::overload::v3::BufferFactoryConfig& config)
     : bitshift_(config.minimum_account_to_track_power_of_two()
                     ? config.minimum_account_to_track_power_of_two() - 1
-                    : kDefaultMinimumTrackingBytes) {}
+                    : kEffectivelyDisableTrackingBitshift) {}
 
 WatermarkBufferFactory::~WatermarkBufferFactory() {
   for (auto& account_set : size_class_account_sets_) {

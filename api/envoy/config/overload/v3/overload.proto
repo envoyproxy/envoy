@@ -141,6 +141,23 @@ message OverloadAction {
   google.protobuf.Any typed_config = 3;
 }
 
+// Configuration for which accounts the WatermarkBuffer Factories should
+// track. If omitted, Envoy should not do any tracking.
+message BufferFactoryConfig {
+  // The minimum power of two at which Envoy starts tracking an account.
+  //
+  // Envoy has 8 power of two buckets starting with the provided exponent below.
+  // Concretely the 1st bucket contains accounts for streams that use
+  // [2^minimum_account_to_track_power_of_two,
+  // 2^(minimum_account_to_track_power_of_two + 1)) bytes.
+  // With the 8th bucket tracking accounts
+  // >= 128 * 2^minimum_account_to_track_power_of_two.
+  //
+  // Setting this to 63 effectively disables all tracking since the resulting
+  // bit shift would cause all reasonable account sizes to not be tracked.
+  uint32 minimum_account_to_track_power_of_two = 1 [(validate.rules).uint32 = {lte: 63 gte: 10}];
+}
+
 message OverloadManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.OverloadManager";
@@ -153,4 +170,7 @@ message OverloadManager {
 
   // The set of overload actions.
   repeated OverloadAction actions = 3;
+
+  // Configuration for buffer factory.
+  BufferFactoryConfig buffer_factory_config = 4;
 }

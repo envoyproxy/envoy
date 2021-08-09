@@ -8,6 +8,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/scope_tracker.h"
+#include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
@@ -59,11 +60,10 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                                const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                                const Buffer::WatermarkFactorySharedPtr& watermark_factory)
     : name_(name), api_(api),
-      buffer_factory_(
-          watermark_factory != nullptr
-              ? watermark_factory
-              : std::make_shared<Buffer::WatermarkBufferFactory>(
-                    api.bootstrap().resource_tracking_config().buffer_factory_config())),
+      buffer_factory_(watermark_factory != nullptr
+                          ? watermark_factory
+                          : std::make_shared<Buffer::WatermarkBufferFactory>(
+                                api.bootstrap().overload_manager().buffer_factory_config())),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       thread_local_delete_cb_(
           base_scheduler_.createSchedulableCallback([this]() -> void { runThreadLocalDelete(); })),
