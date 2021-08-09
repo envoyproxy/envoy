@@ -88,9 +88,10 @@ message VirtualHost {
 
   // The list of routes that will be matched, in order, for incoming requests.
   // The first route that matches will be used.
+  // Only one of this and `matcher` can be specified.
   repeated Route routes = 3;
 
-  // The match tree to use when resolving route actions for incoming requests. Onle one of this and `routes`
+  // The match tree to use when resolving route actions for incoming requests. Only one of this and `routes`
   // can be specified.
   xds.type.matcher.v3.Matcher matcher = 21;
 
