@@ -98,7 +98,7 @@ quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStr
 quic::QuicSpdyStream*
 EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
   // Envoy doesn't support server push.
-  return nullptr;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 bool EnvoyQuicClientSession::hasDataToWrite() { return HasDataToWrite(); }

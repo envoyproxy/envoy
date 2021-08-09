@@ -67,7 +67,7 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
 quic::QuicSpdyStream*
 EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
   // Only client side server push stream should trigger this call.
-  return nullptr;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {
