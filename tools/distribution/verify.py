@@ -1,3 +1,22 @@
+#!/usr/bin/env python3
+
+#
+# This tool allows you to test a tarball of built packages (eg debs, rpms)
+# against a configurable set of OS distributions.
+#
+# usage
+#
+# with bazel:
+#
+#  bazel run //tools/distribution:verify -- -h
+#
+# alternatively, if you have the necessary python deps available
+#
+#  PYTHONPATH=. ./tools/distribution/verify.py -h
+#
+# python requires: aiodocker, coloredlogs, frozendict, verboselogs
+#
+
 import argparse
 import pathlib
 import sys
@@ -9,6 +28,7 @@ import aiodocker
 from tools.base import checker, utils
 from tools.distribution import distrotest
 
+# TODO(phlax): make this configurable
 ENVOY_MAINTAINER = "Envoy maintainers <envoy-maintainers@googlegroups.com>"
 ENVOY_VERSION = "1.20.0"
 
@@ -35,7 +55,11 @@ class PackagesDistroChecker(checker.AsyncChecker):
         ```yaml
 
         debian_buster:
+          # Docker image tag name
           image: debian:buster-slim
+          # File extension of installable packages, for packages signed for
+          # particular distributions, this can be the distribution name and `.changes`
+          # extension.
           ext: buster.changes
 
         ubuntu_foo:
