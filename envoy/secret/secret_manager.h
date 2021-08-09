@@ -156,5 +156,7 @@ public:
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 };
 
+using SecretManagerPtr = std::unique_ptr<SecretManager>;
+
 } // namespace Secret
 } // namespace Envoy
