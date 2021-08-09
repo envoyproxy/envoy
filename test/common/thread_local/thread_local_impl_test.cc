@@ -322,25 +322,26 @@ TEST(ThreadLocalInstanceImplDispatcherTest, RaceConditionIfCompletionCallback) {
 
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr main_dispatcher(api->allocateDispatcher("test_main_thread"));
-  Event::DispatcherPtr thread_dispatcher(api->allocateDispatcher("test_worker_thread"));
+  Event::DispatcherPtr worker_thread_dispatcher(api->allocateDispatcher("test_worker_thread"));
 
   tls.registerThread(*main_dispatcher, true);
-  tls.registerThread(*thread_dispatcher, false);
+  tls.registerThread(*worker_thread_dispatcher, false);
 
   TypedSlotPtr<> slot1 = TypedSlot<>::makeUnique(tls);
 
-  absl::Notification thread_should_exit;
-  Event::TimerPtr thread_dispatcher_timer;
+  absl::Notification worker_thread_should_exit;
+  Event::TimerPtr worker_thread_check_should_exit_timer;
 
-  thread_dispatcher_timer = thread_dispatcher->createTimer(
-      [&thread_dispatcher, &thread_should_exit, &thread_dispatcher_timer]() {
-        if (thread_should_exit.HasBeenNotified()) {
-          thread_dispatcher->exit();
+  worker_thread_check_should_exit_timer =
+      worker_thread_dispatcher->createTimer([&worker_thread_dispatcher, &worker_thread_should_exit,
+                                             &worker_thread_check_should_exit_timer]() {
+        if (worker_thread_should_exit.HasBeenNotified()) {
+          worker_thread_dispatcher->exit();
         }
-        thread_dispatcher_timer->enableTimer(std::chrono::milliseconds(500));
+        worker_thread_check_should_exit_timer->enableTimer(std::chrono::milliseconds(500));
       });
 
-  thread_dispatcher_timer->enableTimer(std::chrono::milliseconds(500));
+  worker_thread_check_should_exit_timer->enableTimer(std::chrono::milliseconds(500));
 
   // Ensure that the dispatcher update in tls posted during the above registerThread
   // happens.
@@ -349,48 +350,32 @@ TEST(ThreadLocalInstanceImplDispatcherTest, RaceConditionIfCompletionCallback) {
   EXPECT_EQ(main_dispatcher.get(), &tls.dispatcher());
 
   Thread::ThreadPtr thread =
-      Thread::threadFactoryForTest().createThread([&thread_dispatcher, &tls]() {
+      Thread::threadFactoryForTest().createThread([&worker_thread_dispatcher, &tls]() {
         // Ensure that the dispatcher update in tls posted during the above registerThread happens.
-        thread_dispatcher->run(Event::Dispatcher::RunType::RunUntilExit);
+        worker_thread_dispatcher->run(Event::Dispatcher::RunType::RunUntilExit);
         // Verify we have the expected dispatcher for the new thread thread.
-        EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
+        EXPECT_EQ(worker_thread_dispatcher.get(), &tls.dispatcher());
         // Verify that it is inside the worker thread.
         EXPECT_FALSE(Thread::MainThread::isMainThread());
       });
 
-  absl::Notification slot_reset_called;
-  main_dispatcher->post([&slot1, &slot_reset_called, &main_dispatcher]() {
+  main_dispatcher->post([&slot1, &main_dispatcher]() {
     slot1->set(
         [](Envoy::Event::Dispatcher&) -> std::shared_ptr<Envoy::ThreadLocal::ThreadLocalObject> {
           return nullptr;
         });
-    // Race occurs between deletion of slot which should run after worker
-    // callbacks exit, but the shared_ptr to the cb_guard triggers it's dtor,
-    // triggering the destruction function to trigger (the completion callback)
-    // which reset the slot. The weak_ptr the worker has to the still_alive of
-    // the slot then notices no other entities point to the bool, and calls free
-    // again to free memory that was freed when the slot was reset.
-    slot1->runOnAllThreads(
-        [](OptRef<ThreadLocal::ThreadLocalObject>) {
-          if (Thread::MainThread::isMainThread()) {
-            std::cerr << "IS WORKER" << std::endl;
-          } else {
-            std::cerr << "IS MAIN" << std::endl;
-          }
-        },
-        [&slot1, &slot_reset_called, &main_dispatcher]() {
-          slot1.reset();
-          slot_reset_called.Notify();
-          main_dispatcher->exit();
-        });
+    // Delete the slot in the completion callback. If the update callback isn't
+    // yet deleted, it might have a lingering weak_ptr to some slot internals
+    // which can trigger a double free.
+    slot1->runOnAllThreads([](OptRef<ThreadLocal::ThreadLocalObject>) {},
+                           [&slot1, &main_dispatcher]() {
+                             slot1.reset();
+                             main_dispatcher->exit();
+                           });
   });
-
   main_dispatcher->run(Event::Dispatcher::RunType::RunUntilExit);
-  slot_reset_called.WaitForNotification();
 
-  thread_should_exit.Notify();
-  // Post to the main dispatcher to run on all threads
-  // Run main dispatcher on a thread??
+  worker_thread_should_exit.Notify();
   thread->join();
 
   tls.shutdownGlobalThreading();
