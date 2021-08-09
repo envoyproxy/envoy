@@ -1047,12 +1047,14 @@ public:
   bool supportsPathlessHeaders() const override { return true; }
 };
 
+// Contextual information used to construct the route actions for a match tree.
 struct RouteActionContext {
   const VirtualHostImpl& vhost;
   const OptionalHttpFilters& optional_http_filters;
   Server::Configuration::ServerFactoryContext& factory_context;
 };
 
+// Action used with the matching tree to specify route to use for an incoming stream.
 class RouteMatchAction : public Matcher::ActionBase<envoy::config::route::v3::Route> {
 public:
   explicit RouteMatchAction(RouteConstSharedPtr route) : route_(std::move(route)) {}
@@ -1063,6 +1065,7 @@ private:
   const RouteConstSharedPtr route_;
 };
 
+// Registered factory for RouteMatchAction.
 class RouteMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
 public:
   Matcher::ActionFactoryCb

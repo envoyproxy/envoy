@@ -63,6 +63,7 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
                                 src.headers_to_remove.end());
 }
 
+// A RouteEntry produced via a generic matching tree.
 class MatchTreeRouteEntryImpl : public RouteEntryImplBase {
 public:
   using RouteEntryImplBase::RouteEntryImplBase;
