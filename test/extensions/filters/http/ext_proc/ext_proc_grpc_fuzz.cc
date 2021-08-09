@@ -149,7 +149,7 @@ public:
     IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
     auto& encoder = encoder_decoder.first;
 
-    uint32_t num_chunks = fdp->ConsumeIntegralInRange<uint32_t>(0, 50);
+    uint32_t num_chunks = fdp->ConsumeIntegralInRange<uint32_t>(0, ext_proc_fuzz_max_stream_chunks);
     for (uint32_t i = 0; i < num_chunks; i++) {
       // If proxy closes connection before body is fully sent it causes a
       // crash. To address this, the external processor sets a flag to
@@ -166,7 +166,7 @@ public:
         fh->immediate_resp_lock_.unlock();
         return response;
       }
-      uint32_t data_size = fdp->ConsumeIntegral<uint32_t>();
+      uint32_t data_size = fdp->ConsumeIntegralInRange<uint32_t>(0, ext_proc_fuzz_max_data_size);
       ENVOY_LOG_MISC(trace, "Sending chunk of {} bytes", data_size);
       codec_client_->sendData(encoder, data_size, false);
       fh->immediate_resp_lock_.unlock();
@@ -197,7 +197,7 @@ public:
     case HttpMethod::POST:
       if (fdp->ConsumeBool()) {
         ENVOY_LOG_MISC(trace, "Sending POST request with body");
-        uint32_t data_size = fdp->ConsumeIntegral<uint32_t>();
+        uint32_t data_size = fdp->ConsumeIntegralInRange<uint32_t>(0, ext_proc_fuzz_max_data_size);
         std::string data = std::string(data_size, 'a');
         return sendDownstreamRequestWithBody(data, absl::nullopt);
       } else {

@@ -38,7 +38,7 @@ ExtProcFuzzHelper::ExtProcFuzzHelper(FuzzedDataProvider* provider) {
 }
 
 std::string ExtProcFuzzHelper::consumeRepeatedString() {
-  uint32_t str_len = provider_->ConsumeIntegral<uint32_t>();
+  uint32_t str_len = provider_->ConsumeIntegralInRange<uint32_t>(0, ext_proc_fuzz_max_data_size);
   return std::string(str_len, 'b');
 }
 
