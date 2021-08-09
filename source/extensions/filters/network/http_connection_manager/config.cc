@@ -373,6 +373,16 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     auto* extension = ip_detection_extensions.Add();
     extension->set_name("envoy.http.original_ip_detection.xff");
     extension->mutable_typed_config()->PackFrom(xff_config);
+  } else {
+    if (use_remote_address_) {
+      throw EnvoyException(
+          "Original IP detection extensions and use_remote_address may not be mixed");
+    }
+
+    if (xff_num_trusted_hops_ > 0) {
+      throw EnvoyException(
+          "Original IP detection extensions and xff_num_trusted_hops may not be mixed");
+    }
   }
 
   original_ip_detection_extensions_.reserve(ip_detection_extensions.size());
