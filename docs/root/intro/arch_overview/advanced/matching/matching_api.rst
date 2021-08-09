@@ -16,6 +16,9 @@ better performance than the linear list matching as seen in Envoy's HTTP routing
 use of extension points to make it easy to extend to different inputs based on protocol or
 environment data as well as custom sublinear matchers and direct matchers.
 
+Filter Integration
+##################
+
 Within supported environments (currently only HTTP filters), a wrapper proto can be used to
 instantiate a matching filter associated with the wrapped structure:
 
@@ -28,7 +31,7 @@ The above example wraps a HTTP filter (the
 allowing us to define a match tree to be evaluated in conjunction with evaluation of the wrapped
 filter. Prior to data being made available to the filter, it will be provided to the match tree,
 which will then attempt to evaluate the matching rules with the provided data, triggering an
-action if match evaluation completes in an action.
+action if match evaluation results in an action.
 
 In the above example, we are specifying that we want to match on the incoming request header
 ``some-header`` by setting the ``input`` to
@@ -54,7 +57,7 @@ the filter if ``some-header: skip_filter`` is present and ``second-header`` is s
 .. _arch_overview_matching_api_iteration_impact:
 
 HTTP Filter Iteration Impact
-============================
+****************************
 
 The above example only demonstrates matching on request headers, which ends up being the simplest
 case due to it happening before the associated filter receives any data. Matching on other HTTP
@@ -80,8 +83,15 @@ client will receive an invalid response back from Envoy. If the skip action was 
 trailers, the same gRPC-Web filter would consume all the data but never write it back out (as this
 happens when it sees the trailers), resulting in a gRPC-Web response with an empty body.
 
+HTTP Routing Integration
+########################
+
+The matching API can be used with HTTP routing, by specifying a match tree as part of the virtual host
+and specifying a Route as the resulting action. See examples in the above sections for how the match
+tree can be configured.
+
 Match Tree Validation
-=====================
+#####################
 
 As the match tree structure is very flexible, some filters might need to impose additional restrictions
 on what kind of match trees can be used. This system is somewhat inflexible at the moment, only supporting
@@ -91,7 +101,7 @@ will fail during configuration load, reporting back which data input was invalid
 
 This is done for example to limit the issues talked about in
 :ref:`the above section <arch_overview_matching_api_iteration_impact>` or to help users understand in what
-context a match tree can be used for a specific filter. Due to the limitations of the validations framework
+context a match tree can be used for a specific filter. Due to the limitations of the validation framework
 at the current time, it is not used for all filters.
 
 For HTTP filters, the restrictions are specified by the filter implementation, so consult the individual
