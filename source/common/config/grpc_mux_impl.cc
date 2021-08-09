@@ -301,6 +301,7 @@ void GrpcMuxImpl::onStreamEstablished() {
 }
 
 void GrpcMuxImpl::onEstablishmentFailure() {
+  first_stream_request_ = true;
   for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second->watches_) {
       watch->callbacks_.onConfigUpdateFailed(
