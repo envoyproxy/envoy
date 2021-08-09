@@ -37,27 +37,12 @@ ExtProcFuzzHelper::ExtProcFuzzHelper(FuzzedDataProvider* provider) {
   immediate_resp_sent_ = false;
 }
 
-// Wrapper functions for FuzzedDataProvider to make them thread safe
-bool ExtProcFuzzHelper::consumeBool() {
-  provider_lock_.lock();
-  bool ret_val = provider_->ConsumeBool();
-  provider_lock_.unlock();
-  return ret_val;
-}
-
-std::string ExtProcFuzzHelper::consumeRandomLengthString() {
-  provider_lock_.lock();
-  std::string ret_val = provider_->ConsumeRandomLengthString();
-  provider_lock_.unlock();
-  return ret_val;
-}
-
 // TODO(ikepolinsky): should this function be put in a standard place?
 // Since FuzzedDataProvider requires enums to define a kMaxValue, we cannot
 // use the envoy::type::v3::StatusCode enum directly. Additionally this allows
 // us to be more verbose in our logging for tracing.
 StatusCode ExtProcFuzzHelper::randomHttpStatus() {
-  switch (consumeIntegralInRange<uint32_t>(0, 55)) {
+  switch (provider_->ConsumeIntegralInRange<uint32_t>(0, 55)) {
   case 0:
     ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (Continue)", StatusCode::Continue);
     // TODO(ikepolinsky): switch this back after bug fix
@@ -272,7 +257,7 @@ StatusCode ExtProcFuzzHelper::randomHttpStatus() {
 // use the grpc::StatusCode enum directly. Additionally this allows us to be
 // more verbose in our logging for tracing.
 grpc::StatusCode ExtProcFuzzHelper::randomGrpcStatusCode() {
-  switch (consumeIntegralInRange<uint32_t>(0, 16)) {
+  switch (provider_->ConsumeIntegralInRange<uint32_t>(0, 16)) {
   case 0:
     ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (OK)", grpc::StatusCode::OK);
     return grpc::StatusCode::OK;
@@ -343,7 +328,7 @@ grpc::StatusCode ExtProcFuzzHelper::randomGrpcStatusCode() {
 grpc::Status ExtProcFuzzHelper::randomGrpcStatusWithMessage() {
   grpc::StatusCode code = randomGrpcStatusCode();
   ENVOY_LOG_MISC(trace, "Closing stream with StatusCode {}", code);
-  return grpc::Status(code, consumeRandomLengthString());
+  return grpc::Status(code, provider_->ConsumeRandomLengthString());
 }
 
 // TODO(ikepolinsky): implement this function
@@ -357,18 +342,18 @@ void ExtProcFuzzHelper::randomizeHeaderMutation(HeaderMutation*, ProcessingReque
 
   // 1. Randomize set_headers
   /* TODO(ikepolinsky): randomly add headers
-  if (consumeBool()) {
+  if (provider_->ConsumeBool()) {
     HeaderValueOption* set_header = msg->add_set_headers();
-    set_header->mutable_header()->set_key(consumeRandomLengthString());
-    set_header->mutable_header()->set_value(consumeRandomLengthString());
-    set_header->mutable_append()->set_value(consumeBool());
+    set_header->mutable_header()->set_key(provider_->ConsumeRandomLengthString());
+    set_header->mutable_header()->set_value(provider_->ConsumeRandomLengthString());
+    set_header->mutable_append()->set_value(provider_->ConsumeBool());
   }
   */
 
   // 2. Randomize remove headers
   /* TODO(ikepolinsky): Randomly remove headers
-  if (consumeBool()) {
-    msg->add_remove_headers(consumeRandomLengthString());
+  if (provider_->ConsumeBool()) {
+    msg->add_remove_headers(provider_->ConsumeRandomLengthString());
   }*/
 }
 
@@ -376,8 +361,8 @@ void ExtProcFuzzHelper::randomizeCommonResponse(CommonResponse* msg, ProcessingR
   // Each of the following blocks generates random data for the 5 fields
   // of CommonResponse gRPC message
   // 1. Randomize status
-  if (consumeBool()) {
-    switch (consumeIntegralInRange<uint32_t>(0, 1)) {
+  if (provider_->ConsumeBool()) {
+    switch (provider_->ConsumeIntegralInRange<uint32_t>(0, 1)) {
     case 0:
       ENVOY_LOG_MISC(trace, "CommonResponse status CONTINUE");
       msg->set_status(CommonResponse::CONTINUE);
@@ -393,27 +378,27 @@ void ExtProcFuzzHelper::randomizeCommonResponse(CommonResponse* msg, ProcessingR
   }
 
   // 2. Randomize header_mutation
-  if (consumeBool()) {
+  if (provider_->ConsumeBool()) {
     ENVOY_LOG_MISC(trace, "CommonResponse setting header_mutation");
     randomizeHeaderMutation(msg->mutable_header_mutation(), req, false);
   }
 
   // 3. Randomize body_mutation
-  if (consumeBool()) {
+  if (provider_->ConsumeBool()) {
     auto* body_mutation = msg->mutable_body_mutation();
-    if (consumeBool()) {
+    if (provider_->ConsumeBool()) {
       ENVOY_LOG_MISC(trace, "CommonResponse setting body_mutation, replacing body with bytes");
-      body_mutation->set_body(consumeRandomLengthString());
+      body_mutation->set_body(provider_->ConsumeRandomLengthString());
     } else {
       ENVOY_LOG_MISC(trace, "CommonResponse setting body_mutation, clearing body");
-      body_mutation->set_clear_body(consumeBool());
+      body_mutation->set_clear_body(provider_->ConsumeBool());
     }
   }
 
   // 4. TODO(ikepolinsky): Randomize trailers - [skipping because trailers not implemented]
 
   // 5. Randomize clear_route_cache
-  if (consumeBool()) {
+  if (provider_->ConsumeBool()) {
     ENVOY_LOG_MISC(trace, "CommonResponse clearing route cache");
     msg->set_clear_route_cache(true);
   }
@@ -427,27 +412,27 @@ void ExtProcFuzzHelper::randomizeImmediateResponse(ImmediateResponse* msg, Proce
   msg->mutable_status()->set_code(randomHttpStatus());
 
   // 2. Randomize headers
-  if (consumeBool()) {
+  if (provider_->ConsumeBool()) {
     ENVOY_LOG_MISC(trace, "ImmediateResponse setting headers");
     randomizeHeaderMutation(msg->mutable_headers(), req, false);
   }
 
   // 3. Randomize body
-  if (consumeBool()) {
+  if (provider_->ConsumeBool()) {
     ENVOY_LOG_MISC(trace, "ImmediateResponse setting body");
-    msg->set_body(consumeRandomLengthString());
+    msg->set_body(provider_->ConsumeRandomLengthString());
   }
 
   // 4. Randomize grpc_status
-  if (consumeBool()) {
+  if (provider_->ConsumeBool()) {
     ENVOY_LOG_MISC(trace, "ImmediateResponse setting grpc_status");
     msg->mutable_grpc_status()->set_status(randomGrpcStatusCode());
   }
 
   // 5. Randomize details
-  if (consumeBool()) {
+  if (provider_->ConsumeBool()) {
     ENVOY_LOG_MISC(trace, "ImmediateResponse setting details");
-    msg->set_details(consumeRandomLengthString());
+    msg->set_details(provider_->ConsumeRandomLengthString());
   }
 }
 
@@ -455,8 +440,8 @@ void ExtProcFuzzHelper::randomizeOverrideResponse(ProcessingMode* msg) {
   // Each of the following blocks generates random data for the 6 fields
   // of a ProcessingMode gRPC message
   // 1. Randomize request_header_mode
-  if (consumeBool()) {
-    switch (consumeEnum<HeaderSendSetting>()) {
+  if (provider_->ConsumeBool()) {
+    switch (provider_->ConsumeEnum<HeaderSendSetting>()) {
     case HeaderSendSetting::Default:
       ENVOY_LOG_MISC(trace, "Override ProcessingMode: setting request_header_mode DEFAULT");
       msg->set_request_header_mode(ProcessingMode::DEFAULT);
@@ -476,8 +461,8 @@ void ExtProcFuzzHelper::randomizeOverrideResponse(ProcessingMode* msg) {
   }
 
   // 2. Randomize response_header_mode
-  if (consumeBool()) {
-    switch (consumeEnum<HeaderSendSetting>()) {
+  if (provider_->ConsumeBool()) {
+    switch (provider_->ConsumeEnum<HeaderSendSetting>()) {
     case HeaderSendSetting::Default:
       ENVOY_LOG_MISC(trace, "Override ProcessingMode: setting response_header_mode DEFAULT");
       msg->set_response_header_mode(ProcessingMode::DEFAULT);
@@ -497,8 +482,8 @@ void ExtProcFuzzHelper::randomizeOverrideResponse(ProcessingMode* msg) {
   }
 
   // 3. Randomize request_body_mode
-  if (consumeBool()) {
-    switch (consumeEnum<BodySendSetting>()) {
+  if (provider_->ConsumeBool()) {
+    switch (provider_->ConsumeEnum<BodySendSetting>()) {
     case BodySendSetting::None:
       ENVOY_LOG_MISC(trace, "Override ProcessingMode: setting request_body_mode NONE");
       msg->set_request_body_mode(ProcessingMode::NONE);
@@ -523,8 +508,8 @@ void ExtProcFuzzHelper::randomizeOverrideResponse(ProcessingMode* msg) {
   }
 
   // 4. Randomize response_body_mode
-  if (consumeBool()) {
-    switch (consumeEnum<BodySendSetting>()) {
+  if (provider_->ConsumeBool()) {
+    switch (provider_->ConsumeEnum<BodySendSetting>()) {
     case BodySendSetting::None:
       ENVOY_LOG_MISC(trace, "Override ProcessingMode: setting response_body_mode NONE");
       msg->set_response_body_mode(ProcessingMode::NONE);
@@ -549,8 +534,8 @@ void ExtProcFuzzHelper::randomizeOverrideResponse(ProcessingMode* msg) {
   }
 
   // 5. Randomize request_trailer_mode
-  if (consumeBool()) {
-    switch (consumeEnum<HeaderSendSetting>()) {
+  if (provider_->ConsumeBool()) {
+    switch (provider_->ConsumeEnum<HeaderSendSetting>()) {
     case HeaderSendSetting::Default:
       ENVOY_LOG_MISC(trace, "Override ProcessingMode: setting request_trailer_mode DEFAULT");
       msg->set_request_trailer_mode(ProcessingMode::DEFAULT);
@@ -570,8 +555,8 @@ void ExtProcFuzzHelper::randomizeOverrideResponse(ProcessingMode* msg) {
   }
 
   // 6. Randomize response_trailer_mode
-  if (consumeBool()) {
-    switch (consumeEnum<HeaderSendSetting>()) {
+  if (provider_->ConsumeBool()) {
+    switch (provider_->ConsumeEnum<HeaderSendSetting>()) {
     case HeaderSendSetting::Default:
       ENVOY_LOG_MISC(trace, "Override ProcessingMode: setting response_trailer_mode DEFAULT");
       msg->set_response_trailer_mode(ProcessingMode::DEFAULT);
@@ -594,7 +579,7 @@ void ExtProcFuzzHelper::randomizeOverrideResponse(ProcessingMode* msg) {
 void ExtProcFuzzHelper::randomizeResponse(ProcessingResponse* resp, ProcessingRequest* req) {
   // Each of the following switch cases generate random data for 1 of the 7
   // ProcessingResponse.response fields
-  switch (consumeEnum<ResponseType>()) {
+  switch (provider_->ConsumeEnum<ResponseType>()) {
   // 1. Randomize request_headers message
   case ResponseType::RequestHeaders: {
     ENVOY_LOG_MISC(trace, "ProcessingResponse setting request_headers response");

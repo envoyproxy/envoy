@@ -80,24 +80,6 @@ class ExtProcFuzzHelper {
 public:
   ExtProcFuzzHelper(FuzzedDataProvider* provider);
 
-  // Wrapper functions for FuzzedDataProvider to make them thread safe
-  bool consumeBool();
-  std::string consumeRandomLengthString();
-
-  template <typename T> T consumeIntegralInRange(T min, T max) {
-    provider_lock_.lock();
-    T ret_val = provider_->ConsumeIntegralInRange<T>(min, max);
-    provider_lock_.unlock();
-    return ret_val;
-  }
-
-  template <typename T> T consumeEnum() {
-    provider_lock_.lock();
-    T ret_val = provider_->ConsumeEnum<T>();
-    provider_lock_.unlock();
-    return ret_val;
-  }
-
   StatusCode randomHttpStatus();
   grpc::StatusCode randomGrpcStatusCode();
   grpc::Status randomGrpcStatusWithMessage();
@@ -109,8 +91,6 @@ public:
   void randomizeResponse(ProcessingResponse* resp, ProcessingRequest* req);
 
   FuzzedDataProvider* provider_;
-  // Protects provider_
-  Thread::MutexBasicLockable provider_lock_;
 
   // Protects immediate_resp_sent_
   Thread::MutexBasicLockable immediate_resp_lock_;
