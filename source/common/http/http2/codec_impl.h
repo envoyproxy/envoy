@@ -181,25 +181,13 @@ protected:
    * Base class for client and server side streams.
    */
   struct StreamImpl : public virtual StreamEncoder,
-                      public Stream,
                       public LinkedObject<StreamImpl>,
                       public Event::DeferredDeletable,
-                      public StreamCallbackHelper,
+                      public Http::MultiplexedStreamImplBase,
                       public ScopeTrackedObject {
 
     StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit);
-    ~StreamImpl() override;
-    // TODO(mattklein123): Optimally this would be done in the destructor but there are currently
-    // deferred delete lifetime issues that need sorting out if the destructor of the stream is
-    // going to be able to refer to the parent connection.
-    virtual void destroy();
-    void disarmStreamIdleTimer() {
-      if (stream_idle_timer_ != nullptr) {
-        // To ease testing and the destructor assertion.
-        stream_idle_timer_->disableTimer();
-        stream_idle_timer_.reset();
-      }
-    }
+    void destroy() override;
 
     StreamImpl* base() { return this; }
     ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
@@ -217,8 +205,7 @@ protected:
     virtual HeaderMap& headers() PURE;
     virtual void allocTrailers() PURE;
     virtual HeaderMapPtr cloneTrailers(const HeaderMap& trailers) PURE;
-    virtual void createPendingFlushTimer() PURE;
-    void onPendingFlushTimer();
+    void onPendingFlushTimer() override;
 
     // Http::StreamEncoder
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -236,9 +223,6 @@ protected:
       return parent_.connection_.addressProvider().localAddress();
     }
     absl::string_view responseDetails() override { return details_; }
-    void setFlushTimeout(std::chrono::milliseconds timeout) override {
-      stream_idle_timeout_ = timeout;
-    }
     void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
 
     // ScopeTrackedObject
@@ -317,9 +301,11 @@ protected:
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
     absl::string_view details_;
-    // See HttpConnectionManager.stream_idle_timeout.
-    std::chrono::milliseconds stream_idle_timeout_{};
-    Event::TimerPtr stream_idle_timer_;
+
+  protected:
+    bool hasPendingData() override {
+      return pending_send_data_->length() > 0 || pending_trailers_to_encode_ != nullptr;
+    }
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;
@@ -333,6 +319,11 @@ protected:
         : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder),
           headers_or_trailers_(ResponseHeaderMapImpl::create()) {}
 
+    // Http::MultiplexedStreamImplBase
+    void setFlushTimeout(std::chrono::milliseconds /*timeout*/) override {
+      // Client streams do not need a flush timer because we currently assume that any failure
+      // to flush would be covered by a request/stream/etc. timeout.
+    }
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
@@ -357,10 +348,6 @@ protected:
     }
     HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
       return createHeaderMap<RequestTrailerMapImpl>(trailers);
-    }
-    void createPendingFlushTimer() override {
-      // Client streams do not create a flush timer because we currently assume that any failure
-      // to flush would be covered by a request/stream/etc. timeout.
     }
 
     // RequestEncoder
@@ -407,7 +394,6 @@ protected:
     HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
       return createHeaderMap<ResponseTrailerMapImpl>(trailers);
     }
-    void createPendingFlushTimer() override;
     void resetStream(StreamResetReason reason) override;
 
     // ResponseEncoder

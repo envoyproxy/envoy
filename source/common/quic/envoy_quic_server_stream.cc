@@ -383,5 +383,18 @@ void EnvoyQuicServerStream::onStreamError(absl::optional<bool> should_close_conn
   }
 }
 
+ void EnvoyQuicServerStream::onPendingFlushTimer() {
+ ENVOY_STREAM_LOG(debug, "pending stream flush timeout", *this);
+   Http::MultiplexedStreamImplBase::onPendingFlushTimer();
+  stats_.tx_flush_timeout_.inc();
+  ASSERT(local_end_stream_ && !fin_sent());
+  // Reset the stream locally. But no reset callbacks will be run because higher layers think the stream is already finished.
+  Reset(quic::QUIC_STREAM_CANCELLED);
+ }
+
+  bool EnvoyQuicServerStream::hasPendingData() {
+    return BufferedDataBytes() > 0;
+  }
+
 } // namespace Quic
 } // namespace Envoy
