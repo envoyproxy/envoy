@@ -14,7 +14,7 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-absl::optional<Matchers::StringMatcherImpl>
+absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
 maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& config) {
   switch (config.query_parameter_match_specifier_case()) {
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::

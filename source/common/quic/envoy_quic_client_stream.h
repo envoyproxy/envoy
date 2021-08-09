@@ -49,9 +49,6 @@ public:
   void resetStream(Http::StreamResetReason reason) override;
   void setFlushTimeout(std::chrono::milliseconds) override {}
 
-  void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
-    // TODO(kbaichoo): implement account tracking for QUIC.
-  }
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
