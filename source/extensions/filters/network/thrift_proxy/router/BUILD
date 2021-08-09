@@ -103,3 +103,44 @@ envoy_cc_library(
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "rds_interface",
+    hdrs = ["rds.h"],
+    deps = [
+        ":router_interface",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "rds_lib",
+    srcs = [
+        "rds_impl.cc",
+        "route_config_update_receiver_impl.cc",
+    ],
+    hdrs = [
+        "rds_impl.h",
+        "route_config_provider_manager.h",
+        "route_config_update_receiver.h",
+        "route_config_update_receiver_impl.h",
+    ],
+    deps = [
+        ":config",
+        ":rds_interface",
+        "//envoy/common:time_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/local_info:local_info_interface",
+        "//source/common/config:api_version_lib",
+        "//source/common/config:subscription_base_interface",
+        "//source/common/config:utility_lib",
+        "//source/common/init:manager_lib",
+        "//source/common/init:target_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)

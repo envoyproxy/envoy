@@ -10,6 +10,8 @@
 #include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "source/extensions/filters/network/thrift_proxy/protocol_options_config.h"
+#include "source/extensions/filters/network/thrift_proxy/router/rds.h"
+#include "source/extensions/filters/network/thrift_proxy/router/route_config_provider_manager.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
 

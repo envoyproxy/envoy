@@ -64,6 +64,7 @@ public:
     cb(connection);
   }
 
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   ThriftProxyFilterConfigFactory factory_;
 };
