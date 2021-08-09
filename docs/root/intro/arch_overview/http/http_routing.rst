@@ -192,3 +192,12 @@ upon configuration load and cache the contents.
 
 If **response_headers_to_add** has been set for the Route or the enclosing Virtual Host,
 Envoy will include the specified headers in the direct HTTP response.
+
+Routing Via Generic Matching
+----------------------------
+
+Envoy recently added support for utilzing a :ref:`generic match tree <envoy_v3_api_msg_config>` to
+specify the route table. This is a more expressive matching engine than the original one, allowing
+for sublinear matching on arbitrary headers (unlike the original matching engine which could only
+do this for :authority in some cases).
+

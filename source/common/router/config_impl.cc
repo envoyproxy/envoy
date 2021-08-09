@@ -1338,7 +1338,7 @@ VirtualHostImpl::VirtualHostImpl(
     RouteActionContext context{*this, optional_http_filters, factory_context};
     RouteActionValidationVisitor validation_visitor;
     Matcher::MatchTreeFactory<Http::HttpMatchingData, RouteActionContext> factory(
-        context, validator, validation_visitor);
+        context, factory_context, validation_visitor);
 
     matcher_ = factory.create(matcher)();
   } else {

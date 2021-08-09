@@ -72,9 +72,9 @@ template <class DataType> using DataInputFactoryCb = std::function<DataInputPtr<
 template <class DataType, class ActionFactoryContext> class MatchTreeFactory {
 public:
   MatchTreeFactory(ActionFactoryContext& context,
-                   ProtobufMessage::ValidationVisitor& proto_validation_visitor,
+                   Server::Configuration::ServerFactoryContext& factory_context,
                    MatchTreeValidationVisitor<DataType>& validation_visitor)
-      : action_factory_context_(context), proto_validation_visitor_(proto_validation_visitor),
+      : action_factory_context_(context), server_factory_context_(factory_context),
         validation_visitor_(validation_visitor) {}
 
   // TODO(snowp): Remove this type parameter once we only have one Matcher proto.
