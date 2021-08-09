@@ -202,8 +202,7 @@ void ConnectionImpl::ServerStreamImpl::encode100ContinueHeaders(const ResponseHe
   encodeHeaders(headers, false);
 }
 
-void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers,
-                                                   bool end_stream) {
+void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, bool end_stream) {
   nghttp2_data_provider provider;
   if (!end_stream) {
     provider.source.ptr = this;
@@ -471,8 +470,8 @@ void ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t
   parent_.connection_.write(output, false);
 }
 
-void ConnectionImpl::ClientStreamImpl::submitHeaders(
-    const HeaderMap& headers, nghttp2_data_provider* provider) {
+void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers,
+                                                     nghttp2_data_provider* provider) {
   ASSERT(stream_id_ == -1);
   std::vector<nghttp2_nv> final_headers;
   buildHeaders(final_headers, headers);
@@ -481,8 +480,8 @@ void ConnectionImpl::ClientStreamImpl::submitHeaders(
   ASSERT(stream_id_ > 0);
 }
 
-void ConnectionImpl::ServerStreamImpl::submitHeaders(
-    const HeaderMap& headers, nghttp2_data_provider* provider) {
+void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers,
+                                                     nghttp2_data_provider* provider) {
   ASSERT(stream_id_ != -1);
   std::vector<nghttp2_nv> final_headers;
   buildHeaders(final_headers, headers);
