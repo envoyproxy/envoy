@@ -168,19 +168,33 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
     return;
   }
 
-  for (auto& socket : sockets_) {
-    // TODO(mattklein123): At some point we lost error handling on this call which I think can
-    // technically fail (at least according to lingering code comments). Add error handling on this
-    // in a follow up.
-    socket->ioHandle().listen(tcp_backlog_size_);
-
+  ASSERT(!sockets_.empty());
+  auto listen_and_apply_options = [](Envoy::Network::SocketSharedPtr socket, int tcp_backlog_size) {
+    const auto rc = socket->ioHandle().listen(tcp_backlog_size);
+    if (rc.return_value_ != 0) {
+      throw EnvoyException(fmt::format("cannot listen() errno={}", rc.errno_));
+    }
     if (!Network::Socket::applyOptions(socket->options(), *socket,
                                        envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
       throw Network::SocketOptionException(
           fmt::format("cannot set post-listen socket option on socket: {}",
                       socket->addressProvider().localAddress()->asString()));
     }
+  };
+  // On all platforms we should listen on the first socket.
+  auto iterator = sockets_.begin();
+  listen_and_apply_options(*iterator, tcp_backlog_size_);
+  ++iterator;
+#ifndef WIN32
+  // With this implementation on Windows we only accept
+  // connections on Worker 1 and then we use the `ExactConnectionBalancer`
+  // to balance these connections to all workers.
+  // TODO(davinci26): We should update the behavior when socket duplication
+  // does not cause accepts to hang in the OS.
+  for (; iterator != sockets_.end(); ++iterator) {
+    listen_and_apply_options(*iterator, tcp_backlog_size_);
   }
+#endif
 }
 
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
@@ -193,7 +207,8 @@ ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
                       !config.stat_prefix().empty()
                           ? config.stat_prefix()
                           : Network::Address::resolveProtoAddress(config.address())->asString()))),
-      validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)) {}
+      validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)),
+      is_quic_(config.udp_listener_config().has_quic_options()) {}
 
 AccessLog::AccessLogManager& ListenerFactoryContextBaseImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -251,6 +266,7 @@ ListenerFactoryContextBaseImpl::getTransportSocketFactoryContext() const {
   return server_.transportSocketFactoryContext();
 }
 Stats::Scope& ListenerFactoryContextBaseImpl::listenerScope() { return *listener_scope_; }
+bool ListenerFactoryContextBaseImpl::isQuicListener() const { return is_quic_; }
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
 Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }
 
@@ -537,6 +553,19 @@ void ListenerImpl::buildFilterChains() {
 void ListenerImpl::buildSocketOptions() {
   // TCP specific setup.
   if (connection_balancer_ == nullptr) {
+#ifdef WIN32
+    // On Windows we use the exact connection balancer to dispatch connections
+    // from worker 1 to all workers. This is a perf hit but it is the only way
+    // to make all the workers do work.
+    // TODO(davinci26): We can be faster here if we create a balancer implementation
+    // that dispatches the connection to a random thread.
+    ENVOY_LOG(warn,
+              "ExactBalance was forced enabled for TCP listener '{}' because "
+              "Envoy is running on Windows."
+              "ExactBalance is used to load balance connections between workers on Windows.",
+              config_.name());
+    connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
+#else
     // Not in place listener update.
     if (config_.has_connection_balance_config()) {
       // Currently exact balance is the only supported type and there are no options.
@@ -545,6 +574,7 @@ void ListenerImpl::buildSocketOptions() {
     } else {
       connection_balancer_ = std::make_shared<Network::NopConnectionBalancerImpl>();
     }
+#endif
   }
 
   if (config_.has_tcp_fast_open_queue_length()) {
@@ -660,6 +690,9 @@ PerListenerFactoryContextImpl::getTransportSocketFactoryContext() const {
 }
 Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
   return listener_factory_context_base_->listenerScope();
+}
+bool PerListenerFactoryContextImpl::isQuicListener() const {
+  return listener_factory_context_base_->isQuicListener();
 }
 Init::Manager& PerListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 

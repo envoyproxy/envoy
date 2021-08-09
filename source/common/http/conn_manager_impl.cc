@@ -276,13 +276,15 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   // Set the account to start accounting if enabled. This is still a
   // work-in-progress, and will be removed when other features using the
   // accounting are implemented.
-  Buffer::BufferMemoryAccountSharedPtr downstream_request_account;
+  Buffer::BufferMemoryAccountSharedPtr downstream_stream_account;
   if (Runtime::runtimeFeatureEnabled("envoy.test_only.per_stream_buffer_accounting")) {
-    downstream_request_account = std::make_shared<Buffer::BufferMemoryAccountImpl>();
-    response_encoder.getStream().setAccount(downstream_request_account);
+    // Create account, wiring the stream to use it.
+    auto& buffer_factory = read_callbacks_->connection().dispatcher().getWatermarkFactory();
+    downstream_stream_account = buffer_factory.createAccount(response_encoder.getStream());
+    response_encoder.getStream().setAccount(downstream_stream_account);
   }
   ActiveStreamPtr new_stream(new ActiveStream(*this, response_encoder.getStream().bufferLimit(),
-                                              std::move(downstream_request_account)));
+                                              std::move(downstream_stream_account)));
 
   accumulated_requests_++;
   if (config_.maxRequestsPerConnection() > 0 &&
@@ -661,9 +663,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   } else {
     connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   }
-
-  filter_manager_.streamInfo().setDownstreamSslConnection(
-      connection_manager_.read_callbacks_->connection().ssl());
 
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
@@ -1190,10 +1189,11 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRoute(nullptr); }
 
 void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
-  if (!filter_manager_.streamInfo().route_entry_ || !request_headers_) {
+  if (!filter_manager_.streamInfo().route() ||
+      !filter_manager_.streamInfo().route()->routeEntry() || !request_headers_) {
     return;
   }
-  auto& route = filter_manager_.streamInfo().route_entry_;
+  const auto& route = filter_manager_.streamInfo().route()->routeEntry();
 
   auto grpc_timeout = Grpc::Common::getGrpcTimeout(*request_headers_);
   std::chrono::milliseconds timeout;
@@ -1516,6 +1516,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
   //       1) We TX an app level reset
   //       2) The codec TX a codec level reset
   //       3) The codec RX a reset
+  //       4) The overload manager reset the stream
   //       If we need to differentiate we need to do it inside the codec. Can start with this.
   ENVOY_STREAM_LOG(debug, "stream reset", *this);
   connection_manager_.stats_.named_.downstream_rq_rx_reset_.inc();
@@ -1528,6 +1529,14 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
   }
   if (!encoder_details.empty()) {
     filter_manager_.streamInfo().setResponseCodeDetails(encoder_details);
+  }
+
+  // Check if we're in the overload manager reset case.
+  // encoder_details should be empty in this case as we don't have a codec error.
+  if (encoder_details.empty() && reset_reason == StreamResetReason::OverloadManager) {
+    filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::OverloadManager);
+    filter_manager_.streamInfo().setResponseCodeDetails(
+        StreamInfo::ResponseCodeDetails::get().Overload);
   }
 
   connection_manager_.doDeferredStreamDestroy(*this);
@@ -1608,14 +1617,15 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
  * functions as a helper to refreshCachedRoute(const Router::RouteCallback& cb).
  */
 void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
-  filter_manager_.streamInfo().route_entry_ = route ? route->routeEntry() : nullptr;
+  filter_manager_.streamInfo().route_ = route;
   cached_route_ = std::move(route);
-  if (nullptr == filter_manager_.streamInfo().route_entry_) {
+  if (nullptr == filter_manager_.streamInfo().route() ||
+      nullptr == filter_manager_.streamInfo().route()->routeEntry()) {
     cached_cluster_info_ = nullptr;
   } else {
     Upstream::ThreadLocalCluster* local_cluster =
         connection_manager_.cluster_manager_.getThreadLocalCluster(
-            filter_manager_.streamInfo().route_entry_->clusterName());
+            filter_manager_.streamInfo().route()->routeEntry()->clusterName());
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
 

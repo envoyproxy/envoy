@@ -87,10 +87,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
-                  proto_config.has_typed_config()
-                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                      : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config())));
+                  static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -121,10 +118,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
-                  proto_config.has_typed_config()
-                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                      : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config())));
+                  static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -149,10 +143,7 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
-                  proto_config.has_typed_config()
-                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                      : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config())));
+                  static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -929,6 +920,15 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
                                      "transport socket config specified for quic transport socket: "
                                      "{}. \nUse QuicDownstreamTransport instead.",
                                      transport_socket.DebugString()));
+  }
+  const std::string hcm_str =
+      "type.googleapis.com/"
+      "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
+  if (is_quic && (filter_chain.filters().size() != 1 ||
+                  filter_chain.filters(0).typed_config().type_url() != hcm_str)) {
+    throw EnvoyException(fmt::format(
+        "error building network filter chain for quic listener: requires exactly one http_"
+        "connection_manager filter."));
   }
 #else
   // When QUIC is compiled out it should not be possible to configure either the QUIC transport

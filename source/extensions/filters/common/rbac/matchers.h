@@ -163,6 +163,18 @@ private:
   const uint32_t port_;
 };
 
+class PortRangeMatcher : public Matcher {
+public:
+  PortRangeMatcher(const ::envoy::type::v3::Int32Range& range);
+
+  bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+               const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const uint32_t start_;
+  const uint32_t end_;
+};
+
 /**
  * Matches the principal name as described in the peer certificate. Uses the URI SAN first. If that
  * field is not present, uses the subject instead.

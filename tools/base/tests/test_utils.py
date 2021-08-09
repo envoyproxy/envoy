@@ -1,6 +1,7 @@
 import importlib
 import sys
 from contextlib import contextmanager
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -53,7 +54,6 @@ def test_util_buffered_stdout_stderr():
 
 
 def test_util_buffered_no_stdout_stderr():
-
     with pytest.raises(utils.BufferUtilError):
         with utils.buffered():
             pass
@@ -119,31 +119,65 @@ def test_util_coverage_with_data_file(patches):
         == [(m_open.return_value.__enter__.return_value,), {}])
 
 
-def test_util_extract(patches):
+
+@pytest.mark.parametrize(
+    "tarballs",
+    [(), tuple("TARB{i}" for i in range(0, 3))])
+def test_util_extract(patches, tarballs):
     patched = patches(
-        "tempfile.TemporaryDirectory",
+        "nested",
+        "pathlib",
         "tarfile.open",
         prefix="tools.base.utils")
 
-    with patched as (m_tmp, m_open):
-        assert utils.extract("TARBALL", "PATH") == "PATH"
+    with patched as (m_nested, m_plib, m_open):
+        _extractions = [MagicMock(), MagicMock()]
+        m_nested.return_value.__enter__.return_value = _extractions
+
+        if tarballs:
+            assert utils.extract("PATH", *tarballs) == m_plib.Path.return_value
+        else:
+            with pytest.raises(utils.ExtractError) as e:
+                utils.extract("PATH", *tarballs)
+
+    if not tarballs:
+        assert (
+            e.value.args[0]
+            == 'No tarballs specified for extraction to PATH')
+        assert not m_nested.called
+        assert not m_open.called
+        for _extract in _extractions:
+            assert not _extract.extractall.called
+        return
 
     assert (
-        list(m_open.call_args)
-        == [('TARBALL',), {}])
+        list(m_plib.Path.call_args)
+        == [("PATH", ), {}])
+
+    for _extract in _extractions:
+        assert (
+            list(_extract.extractall.call_args)
+            == [(), dict(path="PATH")])
+
     assert (
-        list(m_open.return_value.__enter__.return_value.extractall.call_args)
-        == [(), {'path': "PATH"}])
+        list(m_open.call_args_list)
+        == [[(tarb, ), {}] for tarb in tarballs])
+    assert (
+        list(m_nested.call_args)
+        == [tuple(m_open.return_value for x in tarballs), {}])
 
 
-def test_util_untar(patches):
+@pytest.mark.parametrize(
+    "tarballs",
+    [(), tuple("TARB{i}" for i in range(0, 3))])
+def test_util_untar(patches, tarballs):
     patched = patches(
         "tempfile.TemporaryDirectory",
         "extract",
         prefix="tools.base.utils")
 
     with patched as (m_tmp, m_extract):
-        with utils.untar("PATH") as tmpdir:
+        with utils.untar(*tarballs) as tmpdir:
             assert tmpdir == m_extract.return_value
 
     assert (
@@ -151,44 +185,44 @@ def test_util_untar(patches):
         == [(), {}])
     assert (
         list(m_extract.call_args)
-        == [('PATH', m_tmp.return_value.__enter__.return_value), {}])
+        == [(m_tmp.return_value.__enter__.return_value, ) + tarballs, {}])
 
 
 def test_util_from_yaml(patches):
     patched = patches(
-        "open",
+        "pathlib",
         "yaml",
         prefix="tools.base.utils")
 
-    with patched as (m_open, m_yaml):
+    with patched as (m_plib, m_yaml):
         assert utils.from_yaml("PATH") == m_yaml.safe_load.return_value
 
     assert (
-        list(m_open.call_args)
+        list(m_plib.Path.call_args)
         == [("PATH", ), {}])
     assert (
         list(m_yaml.safe_load.call_args)
-        == [(m_open.return_value.__enter__.return_value.read.return_value, ), {}])
+        == [(m_plib.Path.return_value.read_text.return_value, ), {}])
     assert (
-        list(m_open.return_value.__enter__.return_value.read.call_args)
+        list(m_plib.Path.return_value.read_text.call_args)
         == [(), {}])
 
 
 def test_util_to_yaml(patches):
     patched = patches(
-        "open",
+        "pathlib",
         "yaml",
         prefix="tools.base.utils")
 
-    with patched as (m_open, m_yaml):
-        assert utils.to_yaml("DATA", "PATH") == "PATH"
+    with patched as (m_plib, m_yaml):
+        assert utils.to_yaml("DATA", "PATH") == m_plib.Path.return_value
 
-    assert (
-        list(m_open.call_args)
-        == [("PATH", "w"), {}])
     assert (
         list(m_yaml.dump.call_args)
         == [("DATA", ), {}])
     assert (
-        list(m_open.return_value.__enter__.return_value.write.call_args)
+        list(m_plib.Path.return_value.write_text.call_args)
         == [(m_yaml.dump.return_value, ), {}])
+    assert (
+        list(m_plib.Path.call_args)
+        == [("PATH", ), {}])

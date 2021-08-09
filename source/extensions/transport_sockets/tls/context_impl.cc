@@ -777,9 +777,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
 
     auto& ocsp_resp_bytes = tls_certificates[i].get().ocspStaple();
     if (ocsp_resp_bytes.empty()) {
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.require_ocsp_response_for_must_staple_certs") &&
-          ctx.is_must_staple_) {
+      if (ctx.is_must_staple_) {
         throw EnvoyException("OCSP response is required for must-staple certificate");
       }
       if (ocsp_staple_policy_ == Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple) {
@@ -1047,11 +1045,6 @@ OcspStapleAction ServerContextImpl::ocspStapleAction(const TlsContext& ctx,
   }
 
   auto& response = ctx.ocsp_response_;
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.check_ocsp_policy")) {
-    // Expiration check is disabled. Proceed as if the policy is LenientStapling and the response
-    // is not expired.
-    return response ? OcspStapleAction::Staple : OcspStapleAction::NoStaple;
-  }
 
   auto policy = ocsp_staple_policy_;
   if (ctx.is_must_staple_) {
