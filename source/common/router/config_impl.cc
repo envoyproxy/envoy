@@ -223,7 +223,9 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
                           ? config.hidden_envoy_deprecated_enabled().value()
                           : true) {
   for (const auto& string_match : config.allow_origin_string_match()) {
-    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_match));
+    allow_origins_.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            string_match));
   }
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
@@ -502,14 +504,16 @@ bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& s
   const TlsContextMatchCriteria& criteria = *tlsContextMatchCriteria();
 
   if (criteria.presented().has_value()) {
-    const bool peer_presented = stream_info.downstreamSslConnection() &&
-                                stream_info.downstreamSslConnection()->peerCertificatePresented();
+    const bool peer_presented =
+        stream_info.downstreamAddressProvider().sslConnection() &&
+        stream_info.downstreamAddressProvider().sslConnection()->peerCertificatePresented();
     matches &= criteria.presented().value() == peer_presented;
   }
 
   if (criteria.validated().has_value()) {
-    const bool peer_validated = stream_info.downstreamSslConnection() &&
-                                stream_info.downstreamSslConnection()->peerCertificateValidated();
+    const bool peer_validated =
+        stream_info.downstreamAddressProvider().sslConnection() &&
+        stream_info.downstreamAddressProvider().sslConnection()->peerCertificateValidated();
     matches &= criteria.validated().value() == peer_validated;
   }
 
@@ -1005,9 +1009,24 @@ void RouteEntryImplBase::validateClusters(
   }
 }
 
-const RouteSpecificFilterConfig*
-RouteEntryImplBase::perFilterConfig(const std::string& name) const {
-  return per_filter_configs_.get(name);
+void RouteEntryImplBase::traversePerFilterConfig(
+    const std::string& filter_name,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+  const Router::RouteEntry* route_entry = routeEntry();
+
+  // TODO(soulxu): This has similar bug with https://github.com/envoyproxy/envoy/issues/17377
+  // it should be fixed.
+  if (route_entry != nullptr) {
+    auto maybe_vhost_config = vhost_.perFilterConfig(filter_name);
+    if (maybe_vhost_config != nullptr) {
+      cb(*maybe_vhost_config);
+    }
+  }
+
+  auto maybe_route_config = per_filter_configs_.get(filter_name);
+  if (maybe_route_config != nullptr) {
+    cb(*maybe_route_config);
+  }
 }
 
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
@@ -1050,10 +1069,15 @@ Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderT
   return transforms;
 }
 
-const RouteSpecificFilterConfig*
-RouteEntryImplBase::WeightedClusterEntry::perFilterConfig(const std::string& name) const {
-  const auto cfg = per_filter_configs_.get(name);
-  return cfg != nullptr ? cfg : DynamicRouteEntry::perFilterConfig(name);
+void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
+    const std::string& filter_name,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+  DynamicRouteEntry::traversePerFilterConfig(filter_name, cb);
+
+  const auto* cfg = per_filter_configs_.get(filter_name);
+  if (cfg) {
+    cb(*cfg);
+  }
 }
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(

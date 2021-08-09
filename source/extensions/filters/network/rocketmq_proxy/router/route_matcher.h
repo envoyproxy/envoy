@@ -42,7 +42,7 @@ public:
 private:
   bool headersMatch(const Http::HeaderMap& headers) const;
 
-  const Matchers::StringMatcherImpl topic_name_;
+  const Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> topic_name_;
   const std::string cluster_name_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;

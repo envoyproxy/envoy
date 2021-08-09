@@ -623,23 +623,6 @@ TEST_F(SslServerContextImplOcspTest, TestMustStapleCertWithoutStapleConfigFails)
                             "OCSP response is required for must-staple certificate");
 }
 
-TEST_F(SslServerContextImplOcspTest, TestMustStapleCertWithoutStapleFeatureFlagOff) {
-  const std::string tls_context_yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/revoked_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/revoked_key.pem"
-  ocsp_staple_policy: lenient_stapling
-  )EOF";
-
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.require_ocsp_response_for_must_staple_certs", "false"}});
-  loadConfigYaml(tls_context_yaml);
-}
-
 TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
   const std::string yaml = R"EOF(
   common_tls_context:

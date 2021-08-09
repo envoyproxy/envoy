@@ -4,6 +4,7 @@
 #include "envoy/service/extension/v3/config_discovery.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/filters/set_is_terminal_filter_config.pb.h"
 #include "test/integration/filters/set_response_code_filter_config.pb.h"
 #include "test/integration/http_integration.h"
@@ -30,7 +31,7 @@ std::string denyPrivateConfigWithMatcher() {
         "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
         prefix: "/private"
         code: 403
-    matcher:
+    xds_matcher:
       matcher_tree:
         input:
           name: request-headers
@@ -84,7 +85,7 @@ public:
                       typed_config:
                         "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
                         code: 403
-                    matcher:
+                    xds_matcher:
                       matcher_tree:
                         input:
                           name: request-headers

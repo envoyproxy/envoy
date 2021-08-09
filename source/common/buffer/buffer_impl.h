@@ -7,6 +7,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/http/stream_reset_handler.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/non_copyable.h"
@@ -841,40 +842,6 @@ private:
 };
 
 using OwnedBufferFragmentImplPtr = std::unique_ptr<OwnedBufferFragmentImpl>;
-
-/**
- * A BufferMemoryAccountImpl tracks allocated bytes across associated buffers and
- * slices that originate from those buffers, or are untagged and pass through an
- * associated buffer.
- */
-class BufferMemoryAccountImpl : public BufferMemoryAccount {
-public:
-  BufferMemoryAccountImpl() = default;
-  ~BufferMemoryAccountImpl() override { ASSERT(buffer_memory_allocated_ == 0); }
-
-  // Make not copyable
-  BufferMemoryAccountImpl(const BufferMemoryAccountImpl&) = delete;
-  BufferMemoryAccountImpl& operator=(const BufferMemoryAccountImpl&) = delete;
-
-  // Make not movable.
-  BufferMemoryAccountImpl(BufferMemoryAccountImpl&&) = delete;
-  BufferMemoryAccountImpl& operator=(BufferMemoryAccountImpl&&) = delete;
-
-  uint64_t balance() const { return buffer_memory_allocated_; }
-  void charge(uint64_t amount) override {
-    // Check overflow
-    ASSERT(std::numeric_limits<uint64_t>::max() - buffer_memory_allocated_ >= amount);
-    buffer_memory_allocated_ += amount;
-  }
-
-  void credit(uint64_t amount) override {
-    ASSERT(buffer_memory_allocated_ >= amount);
-    buffer_memory_allocated_ -= amount;
-  }
-
-private:
-  uint64_t buffer_memory_allocated_ = 0;
-};
 
 } // namespace Buffer
 } // namespace Envoy

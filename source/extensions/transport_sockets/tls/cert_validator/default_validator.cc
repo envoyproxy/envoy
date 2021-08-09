@@ -228,7 +228,8 @@ int DefaultCertValidator::doVerifyCertChain(
 
 Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(
     X509* cert, const std::vector<std::string>& verify_san_list,
-    const std::vector<Matchers::StringMatcherImpl>& subject_alt_name_matchers) {
+    const std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>&
+        subject_alt_name_matchers) {
   Envoy::Ssl::ClientValidationStatus validated = Envoy::Ssl::ClientValidationStatus::NotValidated;
 
   if (!verify_san_list.empty()) {
@@ -307,7 +308,9 @@ bool DefaultCertValidator::dnsNameMatch(const absl::string_view dns_name,
 }
 
 bool DefaultCertValidator::matchSubjectAltName(
-    X509* cert, const std::vector<Matchers::StringMatcherImpl>& subject_alt_name_matchers) {
+    X509* cert,
+    const std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>&
+        subject_alt_name_matchers) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names == nullptr) {
