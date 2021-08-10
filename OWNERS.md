@@ -45,6 +45,8 @@ routing PRs, questions, etc. to the right place.
   * Event management, security, performance, data plane.
 * Sotiris Nanopoulos ([davinci26](https://github.com/davinci26)) (Sotiris.Nanopoulos@microsoft.com)
   * Windows, low level networking.
+* Dmitry Rozhkov ([rojkov](https://github.com/rojkov)) (dmitry.rozhkov@intel.com)
+  * Scalability and performance.
 
 # Senior extension maintainers
 
@@ -78,5 +80,3 @@ matter expert reviews. Feel free to loop them in as needed.
   * v2 xDS, listeners, filter chain discovery service.
 * Michael Payne ([moderation](https://github.com/moderation)) (m@m17e.org)
   * External dependencies, Envoy's supply chain and documentation.
-* Dmitry Rozhkov ([rojkov](https://github.com/rojkov)) (dmitry.rozhkov@intel.com)
-  * Scalability and performance.
