@@ -389,7 +389,6 @@ public:
   MOCK_METHOD(absl::optional<std::string>, currentUrlPathAfterRewrite,
               (const Http::RequestHeaderMap&), (const));
   MOCK_METHOD(const PathMatchCriterion&, pathMatchCriterion, (), (const));
-  MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
   MOCK_METHOD(const absl::optional<ConnectConfig>&, connectConfig, (), (const));

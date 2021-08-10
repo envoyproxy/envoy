@@ -442,7 +442,74 @@ typed_config:
     typed_config:
       "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
       code: 403
-  matcher:
+  xds_matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: match-header
+      exact_match_map:
+        map:
+          match:
+            action:
+              name: skip
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), HttpStatusIs("403"));
+  }
+
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
+        {":authority", "host"}, {"match-header", "match"},   {"content-type", "application/grpc"}};
+    auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  }
+
+  auto second_codec = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},    {":path", "/test/long/url"},   {":scheme", "http"},
+      {":authority", "host"}, {"match-header", "not-match"}, {"content-type", "application/grpc"}};
+  auto response = second_codec->makeRequestWithBody(request_headers, 1024);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+
+  codec_client_->close();
+  second_codec->close();
+}
+
+// Verifies that we can construct a match tree with a filter using the new matcher tree proto, and
+// that we are able to skip filter invocation through the match tree.
+TEST_P(IntegrationTest, MatchingHttpFilterConstructionNewProto) {
+  concurrency_ = 2;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
+
+  config_helper_.addFilter(R"EOF(
+name: matcher
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+  extension_config:
+    name: set-response-code
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+      code: 403
+  xds_matcher:
     matcher_tree:
       input:
         name: request-headers

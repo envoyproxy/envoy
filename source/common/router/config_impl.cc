@@ -223,7 +223,9 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
                           ? config.hidden_envoy_deprecated_enabled().value()
                           : true) {
   for (const auto& string_match : config.allow_origin_string_match()) {
-    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_match));
+    allow_origins_.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            string_match));
   }
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
