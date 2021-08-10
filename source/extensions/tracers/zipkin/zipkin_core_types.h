@@ -252,11 +252,6 @@ public:
   AnnotationType annotationType() const { return annotation_type_; }
 
   /**
-   * Sets the binary's annotation type.
-   */
-  void setAnnotationType(AnnotationType annotation_type) { annotation_type_ = annotation_type; }
-
-  /**
    * @return the annotation's endpoint attribute.
    */
   const Endpoint& endpoint() const { return endpoint_.value(); }
@@ -265,11 +260,6 @@ public:
    * Sets the annotation's endpoint attribute (copy semantics).
    */
   void setEndpoint(const Endpoint& endpoint) { endpoint_ = endpoint; }
-
-  /**
-   * Sets the annotation's endpoint attribute (move semantics).
-   */
-  void setEndpoint(const Endpoint&& endpoint) { endpoint_ = endpoint; }
 
   /**
    * @return true if the endpoint attribute is set, or false otherwise.

@@ -112,8 +112,12 @@ public:
 
   TimeSource& timeSource() { return time_source_; }
 
+  void setClearHopByHopResponseHeaders(bool value) { clear_hop_by_hop_response_headers_ = value; }
+  bool clearHopByHopResponseHeaders() const { return clear_hop_by_hop_response_headers_; }
+
 private:
   struct ActiveStream;
+  class MobileConnectionManagerImpl;
 
   class RdsRouteConfigUpdateRequester {
   public:
@@ -452,6 +456,11 @@ private:
   TimeSource& time_source_;
   bool remote_close_{};
   bool enable_internal_redirects_with_body_{};
+  // Hop by hop headers should always be cleared for Envoy-as-a-proxy but will
+  // not be for Envoy-mobile.
+  bool clear_hop_by_hop_response_headers_{true};
+  // The number of requests accumulated on the current connection.
+  uint64_t accumulated_requests_{};
 };
 
 } // namespace Http

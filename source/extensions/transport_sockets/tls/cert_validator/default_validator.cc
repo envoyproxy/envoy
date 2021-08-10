@@ -215,13 +215,21 @@ int DefaultCertValidator::doVerifyCertChain(
     }
   }
 
-  return allow_untrusted_certificate_ ? 1
-                                      : (validated != Envoy::Ssl::ClientValidationStatus::Failed);
+  // If `trusted_ca` exists, it is already verified in the code above. Thus, we just need to make
+  // sure the verification for other validation context configurations doesn't fail (i.e. either
+  // `NotValidated` or `Validated`). If `trusted_ca` doesn't exist, we will need to make sure other
+  // configurations are verified and the verification succeed.
+  int validation_status = verify_trusted_ca_
+                              ? validated != Envoy::Ssl::ClientValidationStatus::Failed
+                              : validated == Envoy::Ssl::ClientValidationStatus::Validated;
+
+  return allow_untrusted_certificate_ ? 1 : validation_status;
 }
 
 Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(
     X509* cert, const std::vector<std::string>& verify_san_list,
-    const std::vector<Matchers::StringMatcherImpl>& subject_alt_name_matchers) {
+    const std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>&
+        subject_alt_name_matchers) {
   Envoy::Ssl::ClientValidationStatus validated = Envoy::Ssl::ClientValidationStatus::NotValidated;
 
   if (!verify_san_list.empty()) {
@@ -300,7 +308,9 @@ bool DefaultCertValidator::dnsNameMatch(const absl::string_view dns_name,
 }
 
 bool DefaultCertValidator::matchSubjectAltName(
-    X509* cert, const std::vector<Matchers::StringMatcherImpl>& subject_alt_name_matchers) {
+    X509* cert,
+    const std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>&
+        subject_alt_name_matchers) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names == nullptr) {

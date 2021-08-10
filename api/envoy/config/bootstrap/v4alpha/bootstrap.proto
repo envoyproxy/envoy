@@ -37,7 +37,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 31]
+// [#next-free-field: 33]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v3.Bootstrap";
@@ -227,7 +227,24 @@ message Bootstrap {
   // This may be overridden on a per-cluster basis in cds_config, when
   // :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`
   // is specified.
+  // *dns_resolution_config* will be deprecated once
+  // :ref:'typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>'
+  // is fully supported.
   core.v4alpha.DnsResolutionConfig dns_resolution_config = 30;
+
+  // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
+  // or any other DNS resolver types and the related parameters.
+  // For example, an object of :ref:`DnsResolutionConfig <envoy_v3_api_msg_config.core.v3.DnsResolutionConfig>`
+  // can be packed into this *typed_dns_resolver_config*. This configuration will replace the
+  // :ref:'dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>'
+  // configuration eventually.
+  // TODO(yanjunxiang): Investigate the deprecation plan for *dns_resolution_config*.
+  // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
+  // this configuration is optional.
+  // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
+  // When *typed_dns_resolver_config* is missing, the default behavior is in place.
+  // [#not-implemented-hide:]
+  core.v4alpha.TypedExtensionConfig typed_dns_resolver_config = 31;
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.
   // Each item contains extension specific configuration.
@@ -272,6 +289,13 @@ message Bootstrap {
   // field.
   // [#not-implemented-hide:]
   map<string, core.v4alpha.TypedExtensionConfig> certificate_provider_instances = 25;
+
+  // Specifies a set of headers that need to be registered as inline header. This configuration
+  // allows users to customize the inline headers on-demand at Envoy startup without modifying
+  // Envoy's source code.
+  //
+  // Note that the 'set-cookie' header cannot be registered as inline header.
+  repeated CustomInlineHeader inline_headers = 32;
 }
 
 // Administration interface :ref:`operations documentation
@@ -550,4 +574,47 @@ message LayeredRuntime {
   // The :ref:`layers <config_runtime_layering>` of the runtime. This is ordered
   // such that later layers in the list overlay earlier entries.
   repeated RuntimeLayer layers = 1;
+}
+
+// Used to specify the header that needs to be registered as an inline header.
+//
+// If request or response contain multiple headers with the same name and the header
+// name is registered as an inline header. Then multiple headers will be folded
+// into one, and multiple header values will be concatenated by a suitable delimiter.
+// The delimiter is generally a comma.
+//
+// For example, if 'foo' is registered as an inline header, and the headers contains
+// the following two headers:
+//
+// .. code-block:: text
+//
+//   foo: bar
+//   foo: eep
+//
+// Then they will eventually be folded into:
+//
+// .. code-block:: text
+//
+//   foo: bar, eep
+//
+// Inline headers provide O(1) search performance, but each inline header imposes
+// an additional memory overhead on all instances of the corresponding type of
+// HeaderMap or TrailerMap.
+message CustomInlineHeader {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.bootstrap.v3.CustomInlineHeader";
+
+  enum InlineHeaderType {
+    REQUEST_HEADER = 0;
+    REQUEST_TRAILER = 1;
+    RESPONSE_HEADER = 2;
+    RESPONSE_TRAILER = 3;
+  }
+
+  // The name of the header that is expected to be set as the inline header.
+  string inline_header_name = 1
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // The type of the header that is expected to be set as the inline header.
+  InlineHeaderType inline_header_type = 2 [(validate.rules).enum = {defined_only: true}];
 }

@@ -5,7 +5,6 @@
 #include "source/extensions/common/wasm/wasm.h"
 #include "source/extensions/stat_sinks/wasm/config.h"
 #include "source/extensions/stat_sinks/wasm/wasm_stat_sink_impl.h"
-#include "source/extensions/stat_sinks/well_known_names.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"
@@ -42,8 +41,8 @@ protected:
   }
 
   void initializeWithConfig(const envoy::extensions::stat_sinks::wasm::v3::Wasm& config) {
-    auto factory = Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
-        StatsSinkNames::get().Wasm);
+    auto factory =
+        Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(WasmName);
     ASSERT_NE(factory, nullptr);
     api_ = Api::createApiForTest(stats_store_);
     EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(*api_));

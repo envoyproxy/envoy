@@ -22,7 +22,7 @@ bool SocketOptionImpl::setOption(Socket& socket,
 
     const Api::SysCallIntResult result =
         SocketOptionImpl::setSocketOption(socket, optname_, value_.data(), value_.size());
-    if (result.rc_ != 0) {
+    if (result.return_value_ != 0) {
       ENVOY_LOG(warn, "Setting {} option on socket failed: {}", optname_.name(),
                 errorDetails(result.errno_));
       return false;

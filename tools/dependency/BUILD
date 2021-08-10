@@ -1,5 +1,4 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
-load("@deps_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_py_binary")
 
@@ -46,6 +45,6 @@ envoy_py_binary(
     name = "tools.dependency.pip_check",
     deps = [
         "//tools/base:checker",
-        requirement("PyYaml"),
+        "//tools/base:utils",
     ],
 )

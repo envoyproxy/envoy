@@ -4,9 +4,11 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "source/common/common/macros.h"
+#include "source/server/config_validation/server.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
+#include "test/mocks/server/options.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -816,18 +818,20 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   HttpIntegrationTest::initialize();
 
   int expected_grpc_client_creation_count = 0;
+
+  initiateClientConnection(4, Headers{}, Headers{});
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+                       Http::TestRequestHeaderMapImpl{}, Headers{});
+
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
+
     // Make sure Google grpc client is created before the request coming in.
     // Since this is not laziness creation, it should create one client per
     // thread before the traffic comes.
     expected_grpc_client_creation_count =
         test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value();
   }
-
-  initiateClientConnection(4, Headers{}, Headers{});
-  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP2));
-  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                       Http::TestRequestHeaderMapImpl{}, Headers{});
 
   waitForSuccessfulUpstreamResponse("200");
 
@@ -883,6 +887,15 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   }
 
   cleanup();
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/17344
+TEST(ExtConfigValidateTest, Validate) {
+  Server::TestComponentFactory component_factory;
+  EXPECT_TRUE(validateConfig(testing::NiceMock<Server::MockOptions>(TestEnvironment::runfilesPath(
+                                 "test/extensions/filters/http/ext_authz/ext_authz.yaml")),
+                             Network::Address::InstanceConstSharedPtr(), component_factory,
+                             Thread::threadFactoryForTest(), Filesystem::fileSystemForTest()));
 }
 
 } // namespace Envoy

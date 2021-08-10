@@ -81,6 +81,7 @@ public:
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
+  bool isQuicListener() const override;
 
   void startDraining() override { is_draining_.store(true); }
 
@@ -135,7 +136,7 @@ class FactoryContextImpl : public Configuration::FactoryContext {
 public:
   FactoryContextImpl(Server::Instance& server, const envoy::config::listener::v3::Listener& config,
                      Network::DrainDecision& drain_decision, Stats::Scope& global_scope,
-                     Stats::Scope& listener_scope);
+                     Stats::Scope& listener_scope, bool is_quic);
 
   // Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
@@ -166,6 +167,7 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override;
   Network::DrainDecision& drainDecision() override;
   Stats::Scope& listenerScope() override;
+  bool isQuicListener() const override;
 
 private:
   Server::Instance& server_;
@@ -173,6 +175,7 @@ private:
   Network::DrainDecision& drain_decision_;
   Stats::Scope& global_scope_;
   Stats::Scope& listener_scope_;
+  bool is_quic_;
 };
 
 /**

@@ -1,0 +1,44 @@
+
+deb:
+  build:
+    env: DEBIAN_FRONTEND=noninteractive
+    command: |
+      chmod +x /tmp/distrotest.sh
+      apt-get update
+      apt-get install -y -qq -o=Dpkg::Use-Pty=0 --no-install-recommends curl devscripts gnupg2 procps sudo
+      mkdir /usr/share/debsign
+      gpg --no-default-keyring --keyring /usr/share/debsign/keyring.gpg --import /tmp/gpg/signing.key
+  binary_name:
+    # this transforms the `.changes` filename to the `.deb` filename
+    # eg `envoy.bullseye.changes` -> `envoy.deb`
+    match: (.*)\.[^.]+\.[^.]+$
+    replace: \1.deb
+  ext: changes
+  images:
+  - debian
+  - ubuntu
+  test:
+    install_command: apt-get install -y -qq -o=Dpkg::Use-Pty=0
+    uninstall_command: apt-get remove --purge -y -qq -o=Dpkg::Use-Pty=0
+    maintainer_command: dpkg-deb -f {ENVOY_INSTALL_BINARY} maintainer
+    verify_command: dscverify --keyring /usr/share/debsign/keyring.gpg
+    binary_permissions: 755 root root
+    config_permissions: 555 root root
+
+rpm:
+  build:
+    command: |
+      chmod +x /tmp/distrotest.sh
+      echo 'localpkg_gpgcheck=1' >> /etc/yum.conf
+      rpm --import /tmp/gpg/signing.key
+      yum -y install procps sudo
+  ext: rpm
+  images:
+  - registry.access.redhat.com/ubi8/ubi
+  test:
+    install_command: "yum install -y -qq"
+    uninstall_command: "yum remove -y -qq"
+    maintainer_command: "rpm -q --queryformat '%{{PACKAGER}}' {ENVOY_INSTALLABLE}"
+    verify_command: "rpm -K"
+    binary_permissions: "555 envoy envoy"
+    config_permissions: "555 envoy envoy"

@@ -56,7 +56,7 @@ struct TestStream {
 impl Context for TestStream {}
 
 impl HttpContext for TestStream {
-    fn on_http_request_headers(&mut self, _: usize) -> Action {
+    fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
         if self.resolve_shared_queue("", "bad_shared_queue").is_none() {
             warn!("onRequestHeaders not found self/bad_shared_queue");
         }

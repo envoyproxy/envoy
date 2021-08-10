@@ -165,15 +165,15 @@ def test_all_pytests_check_pytests(patches):
             [('check7',), {}]])
     assert (
         list(list(c) for c in m_error.call_args_list)
-        == [[('pytest', ['check3 failed']), {}],
-            [('pytest', ['check4 failed']), {}],
-            [('pytest', ['check6 failed']), {}]])
+        == [[('pytests', ['check3 failed']), {}],
+            [('pytests', ['check4 failed']), {}],
+            [('pytests', ['check6 failed']), {}]])
     assert (
         list(list(c) for c in m_succeed.call_args_list)
-        == [[('pytest', ['check1']), {}],
-            [('pytest', ['check2']), {}],
-            [('pytest', ['check5']), {}],
-            [('pytest', ['check7']), {}]])
+        == [[('pytests', ['check1']), {}],
+            [('pytests', ['check2']), {}],
+            [('pytests', ['check5']), {}],
+            [('pytests', ['check7']), {}]])
 
 
 @pytest.mark.parametrize("exists", [True, False])

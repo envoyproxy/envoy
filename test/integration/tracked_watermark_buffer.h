@@ -59,7 +59,7 @@ private:
 };
 
 // Factory that tracks how the created buffers are used.
-class TrackedWatermarkBufferFactory : public Buffer::WatermarkFactory {
+class TrackedWatermarkBufferFactory : public WatermarkBufferFactory {
 public:
   TrackedWatermarkBufferFactory() = default;
   ~TrackedWatermarkBufferFactory() override;
@@ -67,6 +67,8 @@ public:
   Buffer::InstancePtr createBuffer(std::function<void()> below_low_watermark,
                                    std::function<void()> above_high_watermark,
                                    std::function<void()> above_overflow_watermark) override;
+  BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) override;
+  void unregisterAccount(const BufferMemoryAccountSharedPtr& account, int current_class) override;
 
   // Number of buffers created.
   uint64_t numBuffersCreated() const;
@@ -81,6 +83,17 @@ public:
   // Get lower and upper bound on buffer high watermarks. A watermark of 0 indicates that watermark
   // functionality is disabled.
   std::pair<uint32_t, uint32_t> highWatermarkRange() const;
+
+  // Number of accounts created.
+  uint64_t numAccountsCreated() const;
+
+  // Waits for the expected number of accounts unregistered. Unlike
+  // numAccountsCreated, there are no pre-existing hooks into Envoy when an
+  // account unregistered call occurs as it depends upon deferred delete.
+  // This creates the synchronization needed.
+  bool waitForExpectedAccountUnregistered(
+      uint64_t expected_accounts_unregistered,
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Total bytes currently buffered across all known buffers.
   uint64_t totalBytesBuffered() const {
@@ -116,8 +129,16 @@ public:
   using AccountToBoundBuffersMap =
       absl::flat_hash_map<BufferMemoryAccountSharedPtr,
                           absl::flat_hash_set<TrackedWatermarkBuffer*>>;
+  // Used to inspect all accounts tied to any buffer created from this factory.
   void inspectAccounts(std::function<void(AccountToBoundBuffersMap&)> func,
                        Server::Instance& server);
+
+  // Used to inspect the memory class to accounts within that class structure.
+  // This differs from inspectAccounts as that has all accounts bounded to an
+  // active buffer, while this might not track certain accounts (e.g. below
+  // thresholds.) As implemented this is NOT thread-safe!
+  void inspectMemoryClasses(
+      std::function<void(WatermarkBufferFactory::MemoryClassesToAccountsSet&)> func);
 
 private:
   // Remove "dangling" accounts; accounts where the account_info map is the only
@@ -148,6 +169,10 @@ private:
   uint64_t active_buffer_count_ ABSL_GUARDED_BY(mutex_) = 0;
   // total bytes buffered across all buffers.
   uint64_t total_buffer_size_ ABSL_GUARDED_BY(mutex_) = 0;
+  // total number of accounts created
+  uint64_t total_accounts_created_ ABSL_GUARDED_BY(mutex_) = 0;
+  // total number of accounts unregistered
+  uint64_t total_accounts_unregistered_ ABSL_GUARDED_BY(mutex_) = 0;
   // Info about the buffer, by buffer idx.
   absl::node_hash_map<uint64_t, BufferInfo> buffer_infos_ ABSL_GUARDED_BY(mutex_);
   // The expected balances for the accounts. If set, when a buffer updates its

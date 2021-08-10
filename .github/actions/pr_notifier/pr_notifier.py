@@ -128,7 +128,11 @@ def track_prs():
         # If the PR is waiting, continue.
         if is_waiting(labels):
             continue
+        # Drafts are not covered by our SLO (repokitteh warns of this)
         if pr_info.draft:
+            continue
+        # Don't warn for dependabot.
+        if pr_info.user.login == 'dependabot[bot]':
             continue
 
         # Update the time based on the time zone delta from github's

@@ -160,37 +160,6 @@ TEST_P(ProxyProtoIntegrationTest, AccessLog) {
   EXPECT_EQ(tokens[1], "1.2.3.4:12345");
 }
 
-TEST_P(ProxyProtoIntegrationTest, DEPRECATED_FEATURE_TEST(OriginalDst)) {
-  // Change the cluster to an original destination cluster. An original destination cluster
-  // ignores the configured hosts, and instead uses the restored destination address from the
-  // incoming (server) connection as the destination address for the outgoing (client) connection.
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->clear_load_assignment();
-    cluster->set_type(envoy::config::cluster::v3::Cluster::ORIGINAL_DST);
-    cluster->set_lb_policy(
-        envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB);
-  });
-
-  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
-    Network::ClientConnectionPtr conn = makeClientConnection(lookupPort("http"));
-    // Create proxy protocol line that has the fake upstream address as the destination address.
-    // This address will become the "restored" address for the server connection and will
-    // be used as the destination address by the original destination cluster.
-    std::string proxyLine = fmt::format(
-        "PROXY {} {} 65535 {}\r\n",
-        GetParam() == Network::Address::IpVersion::v4 ? "TCP4 1.2.3.4" : "TCP6 1:2:3::4",
-        Network::Test::getLoopbackAddressString(GetParam()),
-        fake_upstreams_[0]->localAddress()->ip()->port());
-
-    Buffer::OwnedImpl buf(proxyLine);
-    conn->write(buf, false);
-    return conn;
-  };
-
-  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
-}
-
 TEST_P(ProxyProtoIntegrationTest, ClusterProvided) {
   // Change the cluster to an original destination cluster. An original destination cluster
   // ignores the configured hosts, and instead uses the restored destination address from the

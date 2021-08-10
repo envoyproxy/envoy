@@ -70,12 +70,6 @@ public:
   void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicRstStreamErrorCode error,
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
-  // quic::QuicSpdySession
-  void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
-  size_t WriteHeadersOnHeadersStream(
-      quic::QuicStreamId id, spdy::SpdyHeaderBlock headers, bool fin,
-      const spdy::SpdyStreamPrecedence& precedence,
-      quic::QuicReferenceCountedPointer<quic::QuicAckListenerInterface> ack_listener) override;
 
   void setHeadersWithUnderscoreAction(
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction

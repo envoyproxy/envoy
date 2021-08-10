@@ -13,8 +13,6 @@
 
 #include "gtest/gtest.h"
 #include "quiche/http2/platform/api/http2_bug_tracker.h"
-#include "quiche/http2/platform/api/http2_containers.h"
-#include "quiche/http2/platform/api/http2_estimate_memory_usage.h"
 #include "quiche/http2/platform/api/http2_flags.h"
 #include "quiche/http2/platform/api/http2_logging.h"
 #include "quiche/http2/platform/api/http2_macros.h"
@@ -33,18 +31,6 @@ TEST(Http2PlatformTest, Http2BugTracker) {
   EXPECT_DEBUG_DEATH(HTTP2_BUG(bug_1) << "Here is a bug,", " bug");
   EXPECT_DEBUG_DEATH(HTTP2_BUG_IF(bug_1, true) << "There is a bug,", " bug");
   EXPECT_LOG_NOT_CONTAINS("error", "", HTTP2_BUG_IF(bug_1, false) << "A feature is not a bug.");
-}
-
-TEST(Http2PlatformTest, Http2Deque) {
-  http2::Http2Deque<int> deque;
-  deque.push_back(10);
-  EXPECT_EQ(10, deque.back());
-}
-
-TEST(Http2PlatformTest, Http2EstimateMemoryUsage) {
-  std::string s = "foo";
-  // Stubbed out to always return 0.
-  EXPECT_EQ(0, http2::Http2EstimateMemoryUsage(s));
 }
 
 TEST(Http2PlatformTest, Http2Log) {

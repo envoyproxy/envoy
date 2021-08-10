@@ -37,7 +37,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 29]
+// [#next-free-field: 30]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.listener.v3.Listener";
 
@@ -97,9 +97,9 @@ message Listener {
         "envoy.config.listener.v3.Listener.InternalListenerConfig";
   }
 
-  reserved 14, 23, 7;
+  reserved 14, 23, 7, 21;
 
-  reserved "deprecated_v1";
+  reserved "deprecated_v1", "reuse_port";
 
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
@@ -260,14 +260,24 @@ message Listener {
   // When this flag is set to true, listeners set the *SO_REUSEPORT* socket option and
   // create one socket for each worker thread. This makes inbound connections
   // distribute among worker threads roughly evenly in cases where there are a high number
-  // of connections. When this flag is set to false, all worker threads share one socket.
+  // of connections. When this flag is set to false, all worker threads share one socket. This field
+  // defaults to true.
   //
-  // Before Linux v4.19-rc1, new TCP connections may be rejected during hot restart
-  // (see `3rd paragraph in 'soreuseport' commit message
-  // <https://github.com/torvalds/linux/commit/c617f398edd4db2b8567a28e89>`_).
-  // This issue was fixed by `tcp: Avoid TCP syncookie rejected by SO_REUSEPORT socket
-  // <https://github.com/torvalds/linux/commit/40a1227ea845a37ab197dd1caffb60b047fa36b1>`_.
-  bool reuse_port = 21;
+  // .. attention::
+  //
+  //   Although this field defaults to true, it has different behavior on different platforms. See
+  //   the following text for more information.
+  //
+  // * On Linux, reuse_port is respected for both TCP and UDP listeners. It also works correctly
+  //   with hot restart.
+  // * On macOS, reuse_port for TCP does not do what it does on Linux. Instead of load balancing,
+  //   the last socket wins and receives all connections/packets. For TCP, reuse_port is force
+  //   disabled and the user is warned. For UDP, it is enabled, but only one worker will receive
+  //   packets. For QUIC/H3, SW routing will send packets to other workers. For "raw" UDP, only
+  //   a single worker will currently receive packets.
+  // * On Windows, reuse_port for TCP has undefined behavior. It is force disabled and the user
+  //   is warned similar to macOS. It is left enabled for UDP with undefined behavior currently.
+  google.protobuf.BoolValue enable_reuse_port = 29;
 
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
   // emitted by this listener.

@@ -60,7 +60,10 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
 AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
                                                ThreadLocal::Instance& tls, TimeSource& time_source,
                                                Api::Api& api, const StatNames& stat_names)
-    : cm_(cm), tls_(tls), time_source_(time_source), api_(api), stat_names_(stat_names) {
+    : cm_(cm), tls_(tls), time_source_(time_source), api_(api), stat_names_(stat_names),
+      raw_async_client_cache_(tls_) {
+  raw_async_client_cache_.set(
+      [](Event::Dispatcher&) { return std::make_shared<RawAsyncClientCache>(); });
 #ifdef ENVOY_GOOGLE_GRPC
   google_tls_slot_ = tls.allocateSlot();
   google_tls_slot_->set(
@@ -70,7 +73,7 @@ AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
 #endif
 }
 
-RawAsyncClientPtr AsyncClientFactoryImpl::create() {
+RawAsyncClientPtr AsyncClientFactoryImpl::createUncachedRawAsyncClient() {
   return std::make_unique<AsyncClientImpl>(cm_, config_, time_source_);
 }
 
@@ -112,7 +115,7 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
   }
 }
 
-RawAsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
+RawAsyncClientPtr GoogleAsyncClientFactoryImpl::createUncachedRawAsyncClient() {
 #ifdef ENVOY_GOOGLE_GRPC
   GoogleGenericStubFactory stub_factory;
   return std::make_unique<GoogleAsyncClientImpl>(
@@ -136,6 +139,36 @@ AsyncClientManagerImpl::factoryForGrpcService(const envoy::config::core::v3::Grp
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   return nullptr;
+}
+
+RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
+    const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
+    bool skip_cluster_check, CacheOption cache_option) {
+  if (cache_option == CacheOption::CacheWhenRuntimeEnabled &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_grpc_async_client_cache")) {
+    return factoryForGrpcService(config, scope, skip_cluster_check)->createUncachedRawAsyncClient();
+  }
+  RawAsyncClientSharedPtr client = raw_async_client_cache_->getCache(config);
+  if (client != nullptr) {
+    return client;
+  }
+  client = factoryForGrpcService(config, scope, skip_cluster_check)->createUncachedRawAsyncClient();
+  raw_async_client_cache_->setCache(config, client);
+  return client;
+}
+
+RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
+    const envoy::config::core::v3::GrpcService& config) const {
+  auto it = cache_.find(config);
+  if (it == cache_.end()) {
+    return nullptr;
+  }
+  return it->second;
+}
+
+void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
+    const envoy::config::core::v3::GrpcService& config, const RawAsyncClientSharedPtr& client) {
+  cache_[config] = client;
 }
 
 } // namespace Grpc

@@ -53,6 +53,16 @@ public:
 };
 
 class ListenerManagerImplTest : public testing::Test {
+public:
+  // reuse_port is the default on Linux for TCP. On other platforms even if set it is disabled
+  // and the user is warned. For UDP it's always the default even if not effective.
+  static constexpr ListenerComponentFactory::BindType default_bind_type =
+#ifdef __linux__
+      ListenerComponentFactory::BindType::ReusePort;
+#else
+      ListenerComponentFactory::BindType::NoReusePort;
+#endif
+
 protected:
   ListenerManagerImplTest() : api_(Api::createApiForTest(server_.api_.random_)) {}
 
@@ -63,8 +73,9 @@ protected:
         .WillByDefault(ReturnRef(validation_visitor));
     ON_CALL(server_.validation_context_, dynamicValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor));
-    manager_ = std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
-                                                     enable_dispatcher_stats_);
+    manager_ =
+        std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
+                                              enable_dispatcher_stats_, server_.quic_stat_names_);
 
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
@@ -219,18 +230,20 @@ protected:
   void
   expectCreateListenSocket(const envoy::config::core::v3::SocketOption::SocketState& expected_state,
                            Network::Socket::Options::size_type expected_num_options,
-                           ListenSocketCreationParams expected_creation_params = {true, true}) {
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, expected_creation_params))
-        .WillOnce(Invoke([this, expected_num_options, &expected_state](
-                             const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,
-                             const Network::Socket::OptionsSharedPtr& options,
-                             const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
-          EXPECT_NE(options.get(), nullptr);
-          EXPECT_EQ(options->size(), expected_num_options);
-          EXPECT_TRUE(
-              Network::Socket::applyOptions(options, *listener_factory_.socket_, expected_state));
-          return listener_factory_.socket_;
-        }));
+                           ListenerComponentFactory::BindType bind_type = default_bind_type,
+                           uint32_t worker_index = 0) {
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, worker_index))
+        .WillOnce(
+            Invoke([this, expected_num_options, &expected_state](
+                       const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,
+                       const Network::Socket::OptionsSharedPtr& options,
+                       ListenerComponentFactory::BindType, uint32_t) -> Network::SocketSharedPtr {
+              EXPECT_NE(options.get(), nullptr);
+              EXPECT_EQ(options->size(), expected_num_options);
+              EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                                        expected_state));
+              return listener_factory_.socket_;
+            }));
   }
 
   /**
@@ -286,14 +299,6 @@ protected:
     envoy::admin::v3::ListenersConfigDump expected_listeners_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
-  }
-
-  ABSL_MUST_USE_RESULT
-  auto enableTlsInspectorInjectionForThisTest() {
-    auto scoped_runtime = std::make_unique<TestScopedRuntime>();
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.disable_tls_inspector_injection", "false"}});
-    return scoped_runtime;
   }
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;

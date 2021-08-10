@@ -27,7 +27,7 @@ public:
 
   void createEnvoy() override {
     createEnvoyServer({
-        "test/config/integration/server_xds.bootstrap.yaml",
+        "test/config/integration/server_xds.bootstrap.yml",
         "test/config/integration/server_xds.cds.yaml",
         "test/config/integration/server_xds.eds.yaml",
         "test/config/integration/server_xds.lds.yaml",
@@ -59,7 +59,7 @@ public:
 
   void createEnvoy() override {
     createEnvoyServer({
-        "test/config/integration/server_xds.bootstrap.yaml",
+        "test/config/integration/server_xds.bootstrap.yml",
         "test/config/integration/server_xds.cds.yaml",
         "test/config/integration/server_xds.eds.yaml",
         "test/config/integration/server_xds.lds.typed_struct.yaml",
@@ -567,6 +567,34 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
   std::string response2;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response2, false);
   EXPECT_THAT(response2, HasSubstr("HTTP/1.0 200 OK\r\n"));
+}
+
+// Verify that a listener that goes through the individual warming path (not server init) is
+// failed and removed correctly if there are issues with final pre-worker init.
+TEST_P(LdsIntegrationTest, NewListenerWithBadPostListenSocketOption) {
+  autonomous_upstream_ = true;
+  initialize();
+  // Given we're using LDS in this test, initialize() will not complete until
+  // the initial LDS file has loaded.
+  EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
+
+  // Reserve a port that we can then use on the integration listener with reuse_port.
+  auto addr_socket =
+      Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        listener->mutable_address()->mutable_socket_address()->set_port_value(
+            addr_socket.second->addressProvider().localAddress()->ip()->port());
+        auto socket_option = listener->add_socket_options();
+        socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
+        socket_option->set_level(10000);     // Invalid level.
+        socket_option->set_int_value(10000); // Invalid value.
+      });
+  new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
 }
 
 // Sample test making sure our config framework informs on listener failure.

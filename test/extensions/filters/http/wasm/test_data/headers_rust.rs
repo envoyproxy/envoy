@@ -22,7 +22,7 @@ struct TestStream {
 }
 
 impl HttpContext for TestStream {
-    fn on_http_request_headers(&mut self, _: usize) -> Action {
+    fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
         let mut msg = String::new();
         if let Ok(value) = std::env::var("ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV") {
             msg.push_str("ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV: ");
@@ -58,7 +58,7 @@ impl HttpContext for TestStream {
         Action::Continue
     }
 
-    fn on_http_response_headers(&mut self, _: usize) -> Action {
+    fn on_http_response_headers(&mut self, _: usize, _: bool) -> Action {
         self.set_http_response_header("test-status", Some("OK"));
         Action::Continue
     }

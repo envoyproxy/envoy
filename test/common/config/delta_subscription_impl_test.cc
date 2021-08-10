@@ -7,6 +7,7 @@
 #include "source/common/config/api_version.h"
 
 #include "test/common/config/delta_subscription_test_harness.h"
+#include "test/config/v2_link_hacks.h"
 
 namespace Envoy {
 namespace Config {

@@ -8,6 +8,7 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "source/common/common/macros.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
@@ -18,9 +19,29 @@
 #include "test/test_common/printers.h"
 
 namespace {
-const std::string
-toString(envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase specifier) {
-  switch (specifier) {
+
+const std::string toString(envoy::type::matcher::v3::StringMatcher::MatchPatternCase pattern) {
+  switch (pattern) {
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
+    return "exact";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix:
+    return "prefix";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
+    return "suffix";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
+    return "safe_regex";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
+    return "deprecated_regex";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains:
+    return "contains";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::MATCH_PATTERN_NOT_SET:
+    return "match_pattern_not_set";
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+const std::string toString(const envoy::config::route::v3::HeaderMatcher& header) {
+  switch (header.header_match_specifier_case()) {
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
     return "exact_match";
     break;
@@ -48,6 +69,9 @@ toString(envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase speci
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kContainsMatch:
     return "contains_match";
     break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
+    return "string_match." + ::toString(header.string_match().match_pattern_case());
+    break;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
@@ -71,6 +95,7 @@ ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem
   request_headers->addCopy(":path", check_config.input().path());
   request_headers->addCopy(":method", check_config.input().method());
   request_headers->addCopy("x-forwarded-proto", check_config.input().ssl() ? "https" : "http");
+  request_headers->addCopy(":scheme", check_config.input().ssl() ? "https" : "http");
 
   if (check_config.input().internal()) {
     request_headers->addCopy("x-envoy-internal", "true");
@@ -463,14 +488,8 @@ bool RouterCheckTool::matchHeaderField(const HeaderMap& header_map,
 
   // Test failed. Decide on what to log.
   std::string actual, expected;
-  std::string match_test_type{test_type + "." + ::toString(header.header_match_specifier_case())};
+  std::string match_test_type{test_type + "." + ::toString(header)};
   switch (header.header_match_specifier_case()) {
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
-    actual =
-        header.name() + ": " + ::toString(header_map.get(Http::LowerCaseString(header.name())));
-    expected = header.name() + ": " + header.exact_match();
-    reportFailure(actual, expected, match_test_type, !header.invert_match());
-    break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:
@@ -478,6 +497,16 @@ bool RouterCheckTool::matchHeaderField(const HeaderMap& header_map,
     expected = "has(" + header.name() + "):" + (header.invert_match() ? "false" : "true");
     reportFailure(actual, expected, match_test_type);
     break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
+    if (header.string_match().match_pattern_case() ==
+        envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact) {
+      actual =
+          header.name() + ": " + ::toString(header_map.get(Http::LowerCaseString(header.name())));
+      expected = header.name() + ": " + header.string_match().exact();
+      reportFailure(actual, expected, match_test_type, !header.invert_match());
+      break;
+    }
+    FALLTHRU;
   default:
     actual =
         header.name() + ": " + ::toString(header_map.get(Http::LowerCaseString(header.name())));
