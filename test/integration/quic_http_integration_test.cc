@@ -70,7 +70,10 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam(),
                             ConfigHelper::quicHttpProxyConfig()),
         supported_versions_(quic::CurrentSupportedHttp3Versions()), conn_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
+        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {
+    // Enable this flag for test coverage.
+    SetQuicReloadableFlag(quic_tls_set_signature_algorithm_prefs, true);
+  }
 
   ~QuicHttpIntegrationTest() override {
     cleanupUpstreamAndDownstream();
