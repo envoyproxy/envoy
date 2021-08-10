@@ -127,6 +127,7 @@ def envoy_cmake(
             "//conditions:default": cache_entries,
         }),
         generate_args = ["-GNinja"],
+        targets = ["", "install"],
         # TODO(lizan): Make this always true
         generate_crosstool_file = select({
             "@envoy//bazel:windows_x86_64": True,
