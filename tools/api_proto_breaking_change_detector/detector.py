@@ -130,7 +130,7 @@ class BufWrapper(ProtoBreakingChangeDetector):
                 )
 
             with open(lock_location, "r") as f:
-                initial_lock = f.readlines()
+                self._initial_lock = f.readlines()
 
             copyfile(self._path_to_after, target)
 
@@ -141,15 +141,13 @@ class BufWrapper(ProtoBreakingChangeDetector):
             if len(final_out) == len(final_err) == final_code == 0:
                 _, _, _ = run_command(' '.join([buf_path, f"build -o {lock_location}", *buf_args]))
             with open(lock_location, "r") as f:
-                final_lock = f.readlines()
+                self._final_lock = f.readlines()
 
-            self.initial_result = initial_code, initial_out, initial_err
-            self.final_result = final_code, final_out, final_err
-            self.initial_lock = initial_lock
-            self.final_lock = final_lock
+            self._initial_result = initial_code, initial_out, initial_err
+            self._final_result = final_code, final_out, final_err
 
     def is_breaking(self) -> bool:
-        final_code, final_out, final_err = self.final_result
+        final_code, final_out, final_err = self._final_result
 
         if final_code != 0:
             return True
@@ -160,4 +158,4 @@ class BufWrapper(ProtoBreakingChangeDetector):
         return False
 
     def lock_file_changed(self) -> bool:
-        return any(before != after for before, after in zip(self.initial_lock, self.final_lock))
+        return any(before != after for before, after in zip(self._initial_lock, self._final_lock))

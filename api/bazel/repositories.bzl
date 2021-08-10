@@ -166,6 +166,6 @@ filegroup(
     srcs = [
         "@com_github_bufbuild_buf//:bin/buf",
     ],
-    tags = ["manual"],
+    tags = ["manual"], # buf is downloaded as a linux binary; tagged manual to prevent build for non-linux users
 )
 """
