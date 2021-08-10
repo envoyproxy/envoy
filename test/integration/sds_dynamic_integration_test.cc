@@ -1087,9 +1087,9 @@ TEST_P(SdsCdsPrivateKeyIntegrationTest, BasicSdsCdsPrivateKeyProvider) {
       // CDS.
       AssertionResult result =
           fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, xds_connection_);
-      RELEASE_ASSERT(result, result.message());
+      EXPECT_TRUE(result);
       result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
-      RELEASE_ASSERT(result, result.message());
+      EXPECT_TRUE(result);
       xds_stream_->startGrpcStream();
       sendCdsResponse();
     }
@@ -1097,10 +1097,10 @@ TEST_P(SdsCdsPrivateKeyIntegrationTest, BasicSdsCdsPrivateKeyProvider) {
       // SDS.
       AssertionResult result =
           fake_upstreams_[2]->waitForHttpConnection(*dispatcher_, sds_connection_);
-      RELEASE_ASSERT(result, result.message());
+      EXPECT_TRUE(result);
 
       result = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
-      RELEASE_ASSERT(result, result.message());
+      EXPECT_TRUE(result);
       sds_stream_->startGrpcStream();
       sendSdsResponse2(getCurrentServerPrivateKeyProviderSecret(), *sds_stream_);
     }
