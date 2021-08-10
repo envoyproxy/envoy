@@ -92,9 +92,12 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, ThreadSafe) {
 
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
 
+  ON_CALL(grpc_callbacks, onCreateInitialMetadata(_));
+  ON_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_));
+  ON_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
   Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([&]() {
     // Verify that using the grpc client in a different thread cause assertion failure.
-    ASSERT_DEBUG_DEATH(grpc_client_->start(*method_descriptor_, grpc_callbacks,
+    EXPECT_DEBUG_DEATH(grpc_client_->start(*method_descriptor_, grpc_callbacks,
                                            Http::AsyncClient::StreamOptions()),
                        "isThreadSafe");
   });
