@@ -42,9 +42,7 @@ StatusCode ExtProcFuzzHelper::randomHttpStatus() {
   switch (provider_->ConsumeIntegralInRange<uint32_t>(0, 55)) {
   case 0:
     ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (Continue)", StatusCode::Continue);
-    // TODO(ikepolinsky): switch this back after bug fix
-    // return StatusCode::Continue;
-    return StatusCode::OK;
+    return StatusCode::Continue;
   case 1:
     ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (OK)", StatusCode::OK);
     return StatusCode::OK;
