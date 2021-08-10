@@ -2,51 +2,60 @@
 
 #include "source/common/singleton/threadsafe_singleton.h"
 
+#include "tools/protodoc/manifest.pb.h"
+
+#define PROTOBUF_GET_NUMBER_OR_PROFILE_DEFAULT(config, message, field_name, default_value)         \
+  ([&](const auto& msg) -> double {                                                                \
+    if (msg.has_##field_name()) {                                                                  \
+      printf("\n\n %s.%s = %d\n\n", config.GetDescriptor()->full_name().c_str(), #field_name,      \
+             msg.field_name().value());                                                            \
+      return msg.field_name().value();                                                             \
+    }                                                                                              \
+    return DefaultsProfile::get().get_number(config.GetDescriptor()->full_name(), #field_name,     \
+                                             default_value);                                       \
+  }((message)))
+
+#define PROTOBUF_GET_MS_OR_PROFILE_DEFAULT(config, message, field_name, default_value)             \
+  ([&](const auto& msg) -> std::chrono::milliseconds {                                             \
+    if (msg.has_##field_name()) {                                                                  \
+      printf("\n\n %s.%s = %lu\n\n", config.GetDescriptor()->full_name().c_str(), #field_name,     \
+             DurationUtil::durationToMilliseconds(msg.field_name()));                              \
+      return std::chrono::milliseconds(DurationUtil::durationToMilliseconds(msg.field_name()));    \
+    }                                                                                              \
+    return DefaultsProfile::get().get_ms(config.GetDescriptor()->full_name(), #field_name,         \
+                                         default_value);                                           \
+  }((message)))
+
+#define PROTOBUF_GET_BOOL_OR_PROFILE_DEFAULT(config, message, field_name, default_value)           \
+  ([&](const auto& msg) -> bool {                                                                  \
+    if (msg.has_##field_name()) {                                                                  \
+      printf("\n\n %s.%s = %s\n\n", config.GetDescriptor()->full_name().c_str(), #field_name,      \
+             msg.field_name().value() ? "true" : "false");                                         \
+      return msg.field_name().value();                                                             \
+    }                                                                                              \
+    return DefaultsProfile::get().get_bool(config.GetDescriptor()->full_name(), #field_name,       \
+                                           default_value);                                         \
+  }((message)))
+
 namespace Envoy {
 
 struct DefaultsProfile {
-  struct Cluster {
-    uint32_t max_buffer_size = 32768;
-  };
-
-  struct Http2 {
-    uint32_t initial_connection_window_size = 1048576; // 1 MiB
-    uint32_t max_concurrent_streams = 100;
-    uint32_t initial_stream_window_size = 65536; // 64 KiB
-  };
-
-  struct HttpConnectionManager {
-    bool merge_slashes = true;
-#ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
-    bool normalize_path = true;
-#else
-    bool normalize_path = false;
-#endif
-    uint64_t request_headers_timeout{10 * 1000};
-    uint64_t stream_idle_timeout{60 * 1000};
-    bool use_remote_address = true;
-  };
-
-  struct Listener {
-    uint32_t max_buffer_size = 32768;
-  };
-
-  struct Transport {
-    uint64_t transport_socket_connect_timeout{10 * 1000};
-  };
-
+  DefaultsProfile();
   static const DefaultsProfile& get();
 
-  Cluster cluster;
-  Http2 http2;
-  HttpConnectionManager httpConnectionManager;
-  Listener listener;
-  Transport transport;
+  double get_number(const std::string config_name, const std::string& field,
+                    double default_value) const;
+  std::chrono::milliseconds get_ms(const std::string config_name, const std::string& field,
+                                   int default_value) const;
+  bool get_bool(const std::string config_name, const std::string& field, bool default_value) const;
+
+private:
+  absl::optional<ProtobufWkt::Value> get_proto_value(const std::string config_name,
+                                                     const std::string& field) const;
+  tools::protodoc::Manifest defaults_manifest_;
 };
 
 using DefaultsProfileSingleton = InjectableSingleton<DefaultsProfile>;
 using ScopedDefaultsProfileSingleton = ScopedInjectableLoader<DefaultsProfile>;
-
-const DefaultsProfile& getDefaultsProfile();
 
 } // namespace Envoy

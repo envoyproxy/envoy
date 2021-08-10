@@ -11,6 +11,10 @@ load(
 
 licenses(["notice"])  # Apache 2
 
+exports_files([
+    "gen_sh_test_runner.sh",
+])
+
 envoy_package()
 
 envoy_cc_library(
@@ -38,12 +42,30 @@ envoy_cc_library(
     deps = [":assert_lib"],
 )
 
+genrule(
+    name = "manifest_to_cc",
+    srcs = ["//docs:protodoc_manifest.yaml"],
+    outs = ["manifest.cc"],
+    cmd = "$(location //source/common/common:yaml_to_cc.sh) $(SRCS) >> $@",
+    tools = ["//source/common/common:yaml_to_cc.sh"],
+)
+
+envoy_cc_library(
+    name = "manifest_lib",
+    srcs = [":manifest_to_cc"],
+    hdrs = ["manifest.h"],
+)
+
 envoy_cc_library(
     name = "envoy_defaults_lib",
     srcs = ["envoy_defaults.cc"],
     hdrs = ["envoy_defaults.h"],
     deps = [
+        ":manifest_lib",
+        "//source/common/protobuf:message_validator_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/singleton:threadsafe_singleton",
+        "//tools/protodoc:manifest_proto_cc_proto",
     ],
 )
 

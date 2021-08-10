@@ -50,6 +50,12 @@ fields:
       note: >
         This timeout is not compatible with streaming requests.
       example: 300s  # 5 mins
+  # envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager:
+  #   edge_config:
+  #     example:
+  #       stream_idle_timeout: 300s
+  #       request_headers_timeout: 10s
+  #       request_timeout: 300s
   envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address:
     edge_config: {example: true}
   envoy.config.listener.v3.QuicProtocolOptions.quic_protocol_options:

@@ -727,9 +727,8 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.preconnect_policy(), per_upstream_preconnect_ratio, 1.0)),
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
                                                        predictive_preconnect_ratio, 0)),
-      per_connection_buffer_limit_bytes_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes,
-                                          DefaultsProfileSingleton::get().cluster.max_buffer_size)),
+      per_connection_buffer_limit_bytes_(PROTOBUF_GET_NUMBER_OR_PROFILE_DEFAULT(
+          config, config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_, factory_context.clusterManager().clusterStatNames())),
       load_report_stats_store_(stats_scope_->symbolTable()),
