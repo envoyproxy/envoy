@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "header_to_metadata_filter_test",
     srcs = ["header_to_metadata_filter_test.cc"],
-    extension_name = "envoy.filters.http.header_to_metadata",
+    extension_names = ["envoy.filters.http.header_to_metadata"],
     deps = [
         "//source/common/common:base64_lib",
         "//source/extensions/filters/http/header_to_metadata:header_to_metadata_filter_lib",
@@ -26,7 +26,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.http.header_to_metadata",
+    extension_names = ["envoy.filters.http.header_to_metadata"],
     deps = [
         "//source/extensions/filters/http/header_to_metadata:config",
         "//test/mocks/server:factory_context_mocks",

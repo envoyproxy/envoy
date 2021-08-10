@@ -13,6 +13,10 @@
 #include "source/server/active_udp_listener.h"
 #include "source/server/connection_handler_impl.h"
 
+#if defined(__linux__)
+#include <linux/filter.h>
+#endif
+
 namespace Envoy {
 namespace Quic {
 
@@ -27,7 +31,7 @@ public:
   ActiveQuicListener(uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
                      Network::UdpConnectionHandler& parent,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-                     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
+                     bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
                      QuicStatNames& quic_stat_names,
                      uint32_t packets_to_read_to_connection_count_ratio,
@@ -37,7 +41,7 @@ public:
   ActiveQuicListener(uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
                      Network::UdpConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-                     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
+                     bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
                      QuicStatNames& quic_stat_names,
                      uint32_t packets_to_read_to_connection_count_ratio,
@@ -100,6 +104,7 @@ public:
   createActiveUdpListener(uint32_t worker_index, Network::UdpConnectionHandler& parent,
                           Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return false; }
+  const Network::Socket::OptionsSharedPtr& socketOptions() const override { return options_; }
 
 private:
   friend class ActiveQuicListenerFactoryPeer;
@@ -110,10 +115,16 @@ private:
       proof_source_factory_;
   quic::QuicConfig quic_config_;
   const uint32_t concurrency_;
-  absl::once_flag install_bpf_once_;
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;
   QuicStatNames& quic_stat_names_;
   const uint32_t packets_to_read_to_connection_count_ratio_;
+  const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
+  bool kernel_worker_routing_{};
+
+#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
+  sock_fprog prog_;
+  std::vector<sock_filter> filter_;
+#endif
 };
 
 } // namespace Quic

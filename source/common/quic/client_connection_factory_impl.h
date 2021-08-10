@@ -40,7 +40,6 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   Envoy::Ssl::ClientContextSharedPtr client_context_;
   // If client context changes, client config will be updated as well.
   std::shared_ptr<quic::QuicCryptoClientConfig> client_config_;
-  const quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedVersions()};
   quic::QuicConfig quic_config_;
   // The cluster buffer limits.
   const uint32_t buffer_limit_;
@@ -54,7 +53,8 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
 std::unique_ptr<Network::ClientConnection>
 createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& dispatcher,
                             Network::Address::InstanceConstSharedPtr server_addr,
-                            Network::Address::InstanceConstSharedPtr local_addr);
+                            Network::Address::InstanceConstSharedPtr local_addr,
+                            QuicStatNames& quic_stat_names, Stats::Scope& scope);
 
 } // namespace Quic
 } // namespace Envoy

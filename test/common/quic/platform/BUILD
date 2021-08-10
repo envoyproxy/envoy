@@ -61,18 +61,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "spdy_platform_test",
-    srcs = ["spdy_platform_test.cc"],
-    external_deps = ["quiche_spdy_platform"],
-    deps = [
-        "//source/common/quic/platform:quiche_flags_impl_lib",
-        "//test/test_common:logging_lib",
-        "//test/test_common:utility_lib",
-        "@com_googlesource_quiche//:spdy_platform",
-    ],
-)
-
 envoy_cc_test_library(
     name = "epoll_server_platform_impl_lib",
     hdrs = [

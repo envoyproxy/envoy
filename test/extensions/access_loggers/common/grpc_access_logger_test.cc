@@ -50,7 +50,7 @@ class MockGrpcAccessLoggerImpl
     : public Common::GrpcAccessLogger<ProtobufWkt::Struct, ProtobufWkt::Empty, ProtobufWkt::Struct,
                                       ProtobufWkt::Struct> {
 public:
-  MockGrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client,
+  MockGrpcAccessLoggerImpl(const Grpc::RawAsyncClientSharedPtr& client,
                            std::chrono::milliseconds buffer_flush_interval_msec,
                            uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                            Stats::Scope& scope, std::string access_log_prefix,
@@ -325,7 +325,7 @@ private:
   // Common::GrpcAccessLoggerCache
   MockGrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               envoy::config::core::v3::ApiVersion, Grpc::RawAsyncClientPtr&& client,
+               envoy::config::core::v3::ApiVersion, const Grpc::RawAsyncClientSharedPtr& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) override {
     return std::make_shared<MockGrpcAccessLoggerImpl>(
@@ -343,7 +343,7 @@ public:
     async_client_ = new Grpc::MockAsyncClient;
     EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, false))
         .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
+          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
           }));
           return Grpc::AsyncClientFactoryPtr{factory_};

@@ -19,10 +19,10 @@ namespace StatSinks {
 namespace MetricsService {
 
 GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(
-    Grpc::AsyncClientFactoryPtr&& factory, const LocalInfo::LocalInfo& local_info,
+    Grpc::RawAsyncClientSharedPtr raw_async_client, const LocalInfo::LocalInfo& local_info,
     envoy::config::core::v3::ApiVersion transport_api_version)
     : GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
-                          envoy::service::metrics::v3::StreamMetricsResponse>(*factory),
+                          envoy::service::metrics::v3::StreamMetricsResponse>(raw_async_client),
       local_info_(local_info),
       service_method_(
           Grpc::VersionedMethods("envoy.service.metrics.v3.MetricsService.StreamMetrics",

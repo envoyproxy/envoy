@@ -270,6 +270,10 @@ void ActiveStreamFilterBase::clearRouteCache() {
   parent_.filter_manager_callbacks_.clearRouteCache();
 }
 
+void ActiveStreamFilterBase::resetIdleTimer() {
+  parent_.filter_manager_callbacks_.resetIdleTimer();
+}
+
 void FilterMatchState::evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_func) {
   if (match_tree_evaluated_ || !matching_data_) {
     return;
@@ -913,8 +917,8 @@ void FilterManager::sendLocalReplyViaFilterChain(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route_entry_) {
-              streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
+            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
+              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
             }
             if (modify_headers) {
               modify_headers(headers);
@@ -952,8 +956,8 @@ void FilterManager::sendDirectLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route_entry_) {
-              streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
+            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
+              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
             }
             if (modify_headers) {
               modify_headers(headers);

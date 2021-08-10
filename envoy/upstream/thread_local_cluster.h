@@ -31,9 +31,7 @@ public:
   /**
    * See documentation of Envoy::ConnectionPool::Instance.
    */
-  void addDrainedCallback(ConnectionPool::Instance::DrainedCb cb) {
-    pool_->addDrainedCallback(cb);
-  };
+  void addIdleCallback(ConnectionPool::Instance::IdleCb cb) { pool_->addIdleCallback(cb); };
 
   Upstream::HostDescriptionConstSharedPtr host() const { return pool_->host(); }
 

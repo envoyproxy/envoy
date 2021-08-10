@@ -103,7 +103,6 @@ startSpanHelper(const std::string& name, bool traced, const Tracing::TraceContex
       }
       break;
     }
-
     case OpenCensusConfig::GRPC_TRACE_BIN: {
       const auto entry = trace_context.getTraceContext(Constants::get().GRPC_TRACE_BIN);
       if (entry.has_value()) {
@@ -114,7 +113,6 @@ startSpanHelper(const std::string& name, bool traced, const Tracing::TraceContex
       }
       break;
     }
-
     case OpenCensusConfig::CLOUD_TRACE_CONTEXT: {
       const auto entry = trace_context.getTraceContext(Constants::get().X_CLOUD_TRACE_CONTEXT);
       if (entry.has_value()) {
@@ -212,20 +210,17 @@ void Span::injectContext(Tracing::TraceContext& trace_context) {
       trace_context.setTraceContextReferenceKey(
           Constants::get().TRACEPARENT, ::opencensus::trace::propagation::ToTraceParentHeader(ctx));
       break;
-
     case OpenCensusConfig::GRPC_TRACE_BIN: {
       std::string val = ::opencensus::trace::propagation::ToGrpcTraceBinHeader(ctx);
       val = Base64::encode(val.data(), val.size(), /*add_padding=*/false);
       trace_context.setTraceContextReferenceKey(Constants::get().GRPC_TRACE_BIN, val);
       break;
     }
-
     case OpenCensusConfig::CLOUD_TRACE_CONTEXT:
       trace_context.setTraceContextReferenceKey(
           Constants::get().X_CLOUD_TRACE_CONTEXT,
           ::opencensus::trace::propagation::ToCloudTraceContextHeader(ctx));
       break;
-
     case OpenCensusConfig::B3:
       trace_context.setTraceContextReferenceKey(
           Constants::get().X_B3_TRACEID, ::opencensus::trace::propagation::ToB3TraceIdHeader(ctx));

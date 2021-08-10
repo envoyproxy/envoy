@@ -53,7 +53,8 @@
             "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
             pass_through_mode: false
             headers:
-              - exact_match: /healthcheck
+              - string_match:
+                  exact: /healthcheck
                 name: :path
         - name: envoy.filters.http.buffer
           typed_config:

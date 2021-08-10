@@ -12,9 +12,9 @@ public:
   MockWorker();
   ~MockWorker() override;
 
-  void callAddCompletion(bool success) {
+  void callAddCompletion() {
     EXPECT_NE(nullptr, add_listener_completion_);
-    add_listener_completion_(success);
+    add_listener_completion_();
     add_listener_completion_ = nullptr;
   }
 

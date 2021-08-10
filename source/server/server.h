@@ -33,6 +33,7 @@
 #include "source/common/init/manager_impl.h"
 #include "source/common/memory/heap_shrinker.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
@@ -191,6 +192,7 @@ public:
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
@@ -273,22 +275,21 @@ public:
   LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
   void flushStats() override;
-
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
-
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
-
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
   }
-
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
-
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
   }
+  bool enableReusePortDefault() override;
+
+  Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
   // ServerLifecycleNotifier
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
@@ -296,11 +297,13 @@ public:
   registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
 
 private:
+  enum class ReusePortDefault { True, False, Runtime };
+
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                  ComponentFactory& component_factory, ListenerHooks& hooks);
+                  ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
@@ -382,8 +385,9 @@ private:
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
   ListenerHooks& hooks_;
-
+  Quic::QuicStatNames quic_stat_names_;
   ServerFactoryContextImpl server_contexts_;
+  absl::optional<ReusePortDefault> enable_reuse_port_default_;
 
   bool stats_flush_in_progress_ : 1;
 

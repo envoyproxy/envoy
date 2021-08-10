@@ -7,6 +7,8 @@
 namespace Envoy {
 namespace Grpc {
 
+class AsyncClientFactoryImpl;
+
 // Per-service factory for Grpc::RawAsyncClients. This factory is thread aware and will instantiate
 // with thread local state. Clients will use ThreadLocal::Instance::dispatcher() for event handling.
 class AsyncClientFactory {
@@ -15,10 +17,22 @@ public:
 
   /**
    * Create a gRPC::RawAsyncClient.
+   * Prefer AsyncClientManager::getOrCreateRawAsyncClient() to creating uncached raw async client
+   * from factory directly. Only call this method when the raw async client must be owned
+   * exclusively. For example, some filters pass *this reference to raw client. In this case, the
+   * client must be destroyed before the filter instance. In this case, the grpc client must be
+   * owned by the filter instance exclusively.
    * @return RawAsyncClientPtr async client.
    */
-  virtual RawAsyncClientPtr create() PURE;
+  virtual RawAsyncClientPtr createUncachedRawAsyncClient() PURE;
+
+private:
+  friend class AsyncClientFactoryImpl;
 };
+
+// TODO(chaoqin-li1123): Remove this enum class when we verify that sharing async client is safe and
+// the "envoy.reloadable_features.enable_grpc_async_client_cache" runtime has been removed.
+enum class CacheOption { AlwaysCache, CacheWhenRuntimeEnabled };
 
 using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 
@@ -28,6 +42,22 @@ using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 class AsyncClientManager {
 public:
   virtual ~AsyncClientManager() = default;
+
+  /**
+   * Create a Grpc::RawAsyncClient. The async client is cached thread locally and shared across
+   * different filter instances.
+   * @param grpc_service envoy::config::core::v3::GrpcService configuration.
+   * @param scope stats scope.
+   * @param skip_cluster_check if set to true skips checks for cluster presence and being statically
+   * configured.
+   * @param cache_option always use cache or use cache when runtime is enabled.
+   * @return RawAsyncClientPtr a grpc async client.
+   * @throws EnvoyException when grpc_service validation fails.
+   */
+  virtual RawAsyncClientSharedPtr
+  getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& grpc_service,
+                            Stats::Scope& scope, bool skip_cluster_check,
+                            CacheOption cache_option) PURE;
 
   /**
    * Create a Grpc::AsyncClients factory for a service. Validation of the service is performed and

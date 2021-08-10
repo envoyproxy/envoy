@@ -22,7 +22,7 @@ envoy_proto_library(
 envoy_extension_cc_test_library(
     name = "config_test_base",
     srcs = ["config_test_base.h"],
-    extension_name = "envoy.filters.network.http_connection_manager",
+    extension_names = ["envoy.filters.network.http_connection_manager"],
     deps = [
         ":config_cc_proto",
         "//source/common/filter/http:filter_config_discovery_lib",
@@ -43,7 +43,7 @@ envoy_extension_cc_test_library(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.network.http_connection_manager",
+    extension_names = ["envoy.filters.network.http_connection_manager"],
     deps = [
         ":config_cc_proto",
         ":config_test_base",
@@ -65,7 +65,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_filter_chain_test",
     srcs = ["config_filter_chain_test.cc"],
-    extension_name = "envoy.filters.network.http_connection_manager",
+    extension_names = ["envoy.filters.network.http_connection_manager"],
     deps = [
         ":config_cc_proto",
         ":config_test_base",
@@ -76,7 +76,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_filter_dependencies_test",
     srcs = ["config_filter_dependencies_test.cc"],
-    extension_name = "envoy.filters.network.http_connection_manager",
+    extension_names = ["envoy.filters.network.http_connection_manager"],
     deps = [
         ":config_cc_proto",
         ":config_test_base",

@@ -63,7 +63,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
       decoder_callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
       check_request_, config_->maxRequestBytes(), config_->packAsBytes(),
-      config_->includePeerCertificate());
+      config_->includePeerCertificate(), config_->destinationLabels());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
   state_ = State::Calling;

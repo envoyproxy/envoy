@@ -17,7 +17,7 @@ namespace Http {
 
 /**
  * Tracks alternate protocols that can be used to make an HTTP connection to an origin server.
- * See https://tools.ietf.org/html/rfc7838 for HTTP Alternate Services and
+ * See https://tools.ietf.org/html/rfc7838 for HTTP Alternative Services and
  * https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04 for the
  * "HTTPS" DNS resource record.
  */

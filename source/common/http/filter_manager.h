@@ -145,6 +145,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   Tracing::Config& tracingConfig() override;
   const ScopeTrackedObject& scope() override;
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
+  void resetIdleTimer() override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -624,6 +625,12 @@ public:
   }
   absl::optional<uint64_t> connectionID() const override {
     return StreamInfoImpl::downstreamAddressProvider().connectionID();
+  }
+  Ssl::ConnectionInfoConstSharedPtr sslConnection() const override {
+    return StreamInfoImpl::downstreamAddressProvider().sslConnection();
+  }
+  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
+    return StreamInfoImpl::upstreamSslConnection();
   }
   void dumpState(std::ostream& os, int indent_level) const override {
     StreamInfoImpl::dumpState(os, indent_level);

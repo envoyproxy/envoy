@@ -1,5 +1,6 @@
 #include "source/common/filesystem/filesystem_impl.h"
 
+#include "test/config/v2_link_hacks.h"
 #include "test/config_test/config_test.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"

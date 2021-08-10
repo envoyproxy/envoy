@@ -1,3 +1,4 @@
+#include "envoy/grpc/async_client.h"
 #include "envoy/service/metrics/v3/metrics_service.pb.h"
 
 #include "source/extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
@@ -30,11 +31,8 @@ public:
       Grpc::AsyncStreamCallbacks<envoy::service::metrics::v3::StreamMetricsResponse>;
 
   GrpcMetricsStreamerImplTest() {
-    EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
-      return Grpc::RawAsyncClientPtr{async_client_};
-    }));
     streamer_ = std::make_unique<GrpcMetricsStreamerImpl>(
-        Grpc::AsyncClientFactoryPtr{factory_}, local_info_,
+        Grpc::RawAsyncClientSharedPtr{async_client_}, local_info_,
         envoy::config::core::v3::ApiVersion::AUTO);
   }
 
@@ -50,7 +48,6 @@ public:
 
   LocalInfo::MockLocalInfo local_info_;
   Grpc::MockAsyncClient* async_client_{new NiceMock<Grpc::MockAsyncClient>};
-  Grpc::MockAsyncClientFactory* factory_{new Grpc::MockAsyncClientFactory};
   GrpcMetricsStreamerImplPtr streamer_;
 };
 
@@ -93,9 +90,9 @@ class MockGrpcMetricsStreamer
     : public GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
                                  envoy::service::metrics::v3::StreamMetricsResponse> {
 public:
-  MockGrpcMetricsStreamer(Grpc::AsyncClientFactoryPtr&& factory)
+  MockGrpcMetricsStreamer(Grpc::RawAsyncClientSharedPtr async_client)
       : GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
-                            envoy::service::metrics::v3::StreamMetricsResponse>(*factory) {}
+                            envoy::service::metrics::v3::StreamMetricsResponse>(async_client) {}
 
   // GrpcMetricsStreamer
   MOCK_METHOD(void, send, (MetricsPtr && metrics));
@@ -133,7 +130,7 @@ public:
   std::vector<std::unique_ptr<NiceMock<Stats::MockGauge>>> gauge_storage_;
   std::vector<std::unique_ptr<NiceMock<Stats::MockParentHistogram>>> histogram_storage_;
   std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer(
-      Grpc::AsyncClientFactoryPtr{new NiceMock<Grpc::MockAsyncClientFactory>()})};
+      Grpc::RawAsyncClientSharedPtr{new NiceMock<Grpc::MockAsyncClient>()})};
 };
 
 TEST_F(MetricsServiceSinkTest, CheckSendCall) {

@@ -33,7 +33,7 @@ public:
       wasm = handle->wasmHandle()->wasm().get();
     }
     if (!wasm || wasm->isFailed()) {
-      if (plugin_->fail_open_) {
+      if (handle->plugin()->fail_open_) {
         // Fail open skips adding this filter to callbacks.
         return nullptr;
       } else {
@@ -47,7 +47,6 @@ public:
   Wasm* wasmForTest() { return tls_slot_->get()->handle()->wasmHandle()->wasm().get(); }
 
 private:
-  PluginSharedPtr plugin_;
   ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> tls_slot_;
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 };

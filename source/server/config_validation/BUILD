@@ -90,6 +90,7 @@ envoy_cc_library(
         "//source/common/grpc:common_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/quic:quic_stat_names_lib",
         "//source/common/router:context_lib",
         "//source/common/router:rds_lib",
         "//source/common/runtime:runtime_lib",

@@ -58,7 +58,7 @@ public:
 
 class AccessLogTest : public testing::Test {
 public:
-  void initAccessLog() {
+  void initAdminAccessLog() {
     ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
 
     TestUtility::loadFromYaml(R"EOF(
@@ -99,7 +99,7 @@ values:
 
   void expectLog(const std::string& expected_log_entry_yaml) {
     if (access_log_ == nullptr) {
-      initAccessLog();
+      initAdminAccessLog();
     }
 
     LogRecord expected_log_entry;

@@ -1,6 +1,7 @@
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 

@@ -39,7 +39,7 @@ public:
   void initialize(std::string yaml) {
     envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
-    config_ = std::make_shared<Config>(proto_config, stats_store_);
+    config_ = std::make_shared<Config>(proto_config, stats_store_, bootstrap_);
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -123,6 +123,7 @@ public:
 
   Stats::TestUtil::TestStore stats_store_;
   ConfigSharedPtr config_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Filters::Common::ExtAuthz::MockClient* client_;
   std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;

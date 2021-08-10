@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.stat_sinks.hystrix",
+    extension_names = ["envoy.stat_sinks.hystrix"],
     deps = [
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "hystrix_test",
     srcs = ["hystrix_test.cc"],
-    extension_name = "envoy.stat_sinks.hystrix",
+    extension_names = ["envoy.stat_sinks.hystrix"],
     deps = [
         "//source/common/json:json_loader_lib",
         "//source/common/stats:stats_lib",
@@ -48,7 +48,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "hystrix_integration_test",
     srcs = ["hystrix_integration_test.cc"],
-    extension_name = "envoy.stat_sinks.hystrix",
+    extension_names = ["envoy.stat_sinks.hystrix"],
     deps = [
         "//source/extensions/stat_sinks/hystrix:config",
         "//test/integration:http_protocol_integration_lib",

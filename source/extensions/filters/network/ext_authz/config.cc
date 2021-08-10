@@ -23,7 +23,8 @@ namespace ExtAuthz {
 Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::ext_authz::v3::ExtAuthz& proto_config,
     Server::Configuration::FactoryContext& context) {
-  ConfigSharedPtr ext_authz_config = std::make_shared<Config>(proto_config, context.scope());
+  ConfigSharedPtr ext_authz_config = std::make_shared<Config>(
+      proto_config, context.scope(), context.getServerFactoryContext().bootstrap());
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
 
   return [grpc_service = proto_config.grpc_service(), &context, ext_authz_config,
@@ -34,7 +35,7 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
             grpc_service, context.scope(), true);
 
     auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-        async_client_factory->create(), std::chrono::milliseconds(timeout_ms),
+        async_client_factory->createUncachedRawAsyncClient(), std::chrono::milliseconds(timeout_ms),
         transport_api_version);
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
         std::make_shared<Filter>(ext_authz_config, std::move(client))});

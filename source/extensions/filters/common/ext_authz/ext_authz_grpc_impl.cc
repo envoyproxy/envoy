@@ -16,7 +16,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientSharedPtr async_client,
+GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
                                envoy::config::core::v3::ApiVersion transport_api_version)
     : async_client_(async_client), timeout_(timeout),
