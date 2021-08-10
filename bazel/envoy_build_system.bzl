@@ -128,6 +128,8 @@ def envoy_cmake(
         }),
         generate_args = ["-GNinja"],
         targets = ["", "install"],
+        # TODO: Remove install target and make this work
+        install = False,
         # TODO(lizan): Make this always true
         generate_crosstool_file = select({
             "@envoy//bazel:windows_x86_64": True,
