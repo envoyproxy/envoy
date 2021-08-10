@@ -1,5 +1,3 @@
-#include <vector>
-
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
@@ -67,7 +65,7 @@ public:
                           ->mutable_endpoint()
                           ->mutable_address()
                           ->mutable_socket_address();
-      address->set_address("127.0.0.1");
+      address->set_address(Network::Test::getLoopbackAddressString(ipVersion()));
       address->set_port_value(test_processor_.port());
 
       // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC.
@@ -76,9 +74,17 @@ public:
       ConfigHelper::setHttp2(*processor_cluster);
 
       // Make sure both flavors of gRPC client use the right address.
-      const auto addr =
-          std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", test_processor_.port());
-      setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server", addr);
+      if (ipVersion() == Network::Address::IpVersion::v4) {
+        const auto addr =
+          std::make_shared<Network::Address::Ipv4Instance>(
+              Network::Test::getLoopbackAddressString(ipVersion()), test_processor_.port());
+        setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server", addr);
+      } else {
+        const auto addr =
+          std::make_shared<Network::Address::Ipv6Instance>(
+              Network::Test::getLoopbackAddressString(ipVersion()), test_processor_.port());
+        setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server", addr);
+      }
 
       // Merge the filter.
       envoy::config::listener::v3::Filter ext_proc_filter;
@@ -218,6 +224,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   FuzzedDataProvider downstream_provider(buf, downstream_buf_len);
   FuzzedDataProvider ext_proc_provider(&buf[downstream_buf_len], ext_proc_buf_len);
 
+  // TODO(ikepolinsky): get ip and grpc version from environment
   ExtProcIntegrationFuzz fuzzer(Network::Address::IpVersion::v4, Grpc::ClientType::GoogleGrpc);
   ExtProcFuzzHelper fuzz_helper(&ext_proc_provider);
 
