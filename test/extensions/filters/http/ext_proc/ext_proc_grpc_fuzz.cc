@@ -1,3 +1,10 @@
+// TODO(ikepolinsky): Major action items to improve this fuzzer
+// 1. Move external process from separate thread to have test all in one thread
+//    - Explore using mock gRPC client for this
+// 2. Implement sending trailers from downstream and mutating headers/trailers
+//    in the external process.
+// 3. Use an upstream that sends varying responses (also with trailers)
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
@@ -100,10 +107,10 @@ public:
 
   IntegrationStreamDecoderPtr sendDownstreamRequest(
       absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
-      const std::string http_method = "GET") {
+      absl::string_view http_method = "GET") {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    Http::TestRequestHeaderMapImpl headers{{":method", http_method}};
+    Http::TestRequestHeaderMapImpl headers{{":method", std::string(http_method)}};
     if (modify_headers) {
       (*modify_headers)(headers);
     }
@@ -114,10 +121,10 @@ public:
   IntegrationStreamDecoderPtr sendDownstreamRequestWithBody(
       absl::string_view body,
       absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
-      const std::string http_method = "POST") {
+      absl::string_view http_method = "POST") {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    Http::TestRequestHeaderMapImpl headers{{":method", http_method}};
+    Http::TestRequestHeaderMapImpl headers{{":method", std::string(http_method)}};
     HttpTestUtility::addDefaultHeaders(headers, false);
     if (modify_headers) {
       (*modify_headers)(headers);
@@ -128,10 +135,10 @@ public:
   IntegrationStreamDecoderPtr sendDownstreamRequestWithChunks(
       FuzzedDataProvider* fdp, ExtProcFuzzHelper* fh,
       absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
-      const std::string http_method = "POST") {
+      absl::string_view http_method = "POST") {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    Http::TestRequestHeaderMapImpl headers{{":method", http_method}};
+    Http::TestRequestHeaderMapImpl headers{{":method", std::string(http_method)}};
     HttpTestUtility::addDefaultHeaders(headers, false);
     if (modify_headers) {
       (*modify_headers)(headers);
@@ -140,7 +147,8 @@ public:
     IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
     auto& encoder = encoder_decoder.first;
 
-    uint32_t num_chunks = fdp->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxStreamChunks);
+    const uint32_t num_chunks =
+        fdp->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxStreamChunks);
     for (uint32_t i = 0; i < num_chunks; i++) {
       // If proxy closes connection before body is fully sent it causes a
       // crash. To address this, the external processor sets a flag to
@@ -157,7 +165,7 @@ public:
         fh->immediate_resp_lock_.unlock();
         return response;
       }
-      uint32_t data_size = fdp->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
+      const uint32_t data_size = fdp->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
       ENVOY_LOG_MISC(trace, "Sending chunk of {} bytes", data_size);
       codec_client_->sendData(encoder, data_size, false);
       fh->immediate_resp_lock_.unlock();
@@ -188,8 +196,8 @@ public:
     case HttpMethod::POST:
       if (fdp->ConsumeBool()) {
         ENVOY_LOG_MISC(trace, "Sending POST request with body");
-        uint32_t data_size = fdp->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
-        std::string data = std::string(data_size, 'a');
+        const uint32_t data_size = fdp->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
+        const std::string data = std::string(data_size, 'a');
         return sendDownstreamRequestWithBody(data, absl::nullopt);
       } else {
         ENVOY_LOG_MISC(trace, "Sending POST request with chunked body");
@@ -222,8 +230,9 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   FuzzedDataProvider downstream_provider(buf, downstream_buf_len);
   FuzzedDataProvider ext_proc_provider(&buf[downstream_buf_len], ext_proc_buf_len);
 
-  // TODO(ikepolinsky): get ip and grpc version from environment
-  ExtProcIntegrationFuzz fuzzer(Network::Address::IpVersion::v4, Grpc::ClientType::GoogleGrpc);
+  // Get IP and gRPC version from environment
+  ExtProcIntegrationFuzz fuzzer(TestEnvironment::getIpVersionsForTest()[0],
+                                TestEnvironment::getsGrpcVersionsForTest()[0]);
   ExtProcFuzzHelper fuzz_helper(&ext_proc_provider);
 
   // This starts an external processor in a separate thread. This allows for the
@@ -281,7 +290,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   // For fuzz testing we don't care about the response code, only that
   // the stream ended in some graceful manner
   ENVOY_LOG_MISC(trace, "Waiting for response.");
-  if (response->waitForEndStream(std::chrono::milliseconds(2000))) {
+  if (response->waitForEndStream(std::chrono::milliseconds(200))) {
     ENVOY_LOG_MISC(trace, "Response received.");
   } else {
     // TODO(ikepolinsky): investigate if there is anyway around this.

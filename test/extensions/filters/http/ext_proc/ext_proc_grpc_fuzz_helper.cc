@@ -30,7 +30,7 @@ ExtProcFuzzHelper::ExtProcFuzzHelper(FuzzedDataProvider* provider) {
 }
 
 std::string ExtProcFuzzHelper::consumeRepeatedString() {
-  uint32_t str_len = provider_->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
+  const uint32_t str_len = provider_->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
   return std::string(str_len, 'b');
 }
 
@@ -321,7 +321,7 @@ grpc::StatusCode ExtProcFuzzHelper::randomGrpcStatusCode() {
 }
 
 grpc::Status ExtProcFuzzHelper::randomGrpcStatusWithMessage() {
-  grpc::StatusCode code = randomGrpcStatusCode();
+  const grpc::StatusCode code = randomGrpcStatusCode();
   ENVOY_LOG_MISC(trace, "Closing stream with StatusCode {}", code);
   return grpc::Status(code, consumeRepeatedString());
 }
