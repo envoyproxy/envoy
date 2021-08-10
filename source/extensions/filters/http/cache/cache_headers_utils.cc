@@ -317,7 +317,9 @@ VaryHeader::createVaryIdentifier(const absl::btree_set<absl::string_view>& vary_
     }
     if (!allowsHeader(header)) {
       // The backend tried to vary on a header that we don't allow, so return
-      // absl::nullopt to indicate we are unable to cache this request.
+      // absl::nullopt to indicate we are unable to cache this request. This
+      // also may occur if the allow list has changed since an item was cached,
+      // rendering the cached vary value invalid.
       return absl::nullopt;
     }
     // TODO(cbdm): Can add some bucketing logic here based on header. For
