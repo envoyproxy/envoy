@@ -45,7 +45,7 @@ public:
     return shared_stub_;
   }
 
-  MockGenericStub* stub_ = new MockGenericStub();
+  NiceMock<MockGenericStub>* stub_ = new NiceMock<MockGenericStub>();
   GoogleStubSharedPtr shared_stub_{stub_};
 };
 
