@@ -23,7 +23,6 @@ using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
 
-
 // The buffer size for the listeners
 static const uint32_t BufferSize = 100000;
 
@@ -137,7 +136,7 @@ public:
     IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
     auto& encoder = encoder_decoder.first;
 
-    uint32_t num_chunks = fdp->ConsumeIntegralInRange<uint32_t>(0, ext_proc_fuzz_max_stream_chunks);
+    uint32_t num_chunks = fdp->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxStreamChunks);
     for (uint32_t i = 0; i < num_chunks; i++) {
       // If proxy closes connection before body is fully sent it causes a
       // crash. To address this, the external processor sets a flag to
@@ -154,7 +153,7 @@ public:
         fh->immediate_resp_lock_.unlock();
         return response;
       }
-      uint32_t data_size = fdp->ConsumeIntegralInRange<uint32_t>(0, ext_proc_fuzz_max_data_size);
+      uint32_t data_size = fdp->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
       ENVOY_LOG_MISC(trace, "Sending chunk of {} bytes", data_size);
       codec_client_->sendData(encoder, data_size, false);
       fh->immediate_resp_lock_.unlock();
@@ -185,7 +184,7 @@ public:
     case HttpMethod::POST:
       if (fdp->ConsumeBool()) {
         ENVOY_LOG_MISC(trace, "Sending POST request with body");
-        uint32_t data_size = fdp->ConsumeIntegralInRange<uint32_t>(0, ext_proc_fuzz_max_data_size);
+        uint32_t data_size = fdp->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
         std::string data = std::string(data_size, 'a');
         return sendDownstreamRequestWithBody(data, absl::nullopt);
       } else {
@@ -212,8 +211,8 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
   // External Process and downstream are on different threads so they should
   // have separate data providers
-  size_t downstream_buf_len = len / 2;
-  size_t ext_proc_buf_len = len - downstream_buf_len;
+  const size_t downstream_buf_len = len / 2;
+  const size_t ext_proc_buf_len = len - downstream_buf_len;
 
   // downstream buf starts at 0, ext_prob buf starts at buf[downstream_buf_len]
   FuzzedDataProvider downstream_provider(buf, downstream_buf_len);
@@ -241,8 +240,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
           // Otherwise randomize the response
           ProcessingResponse resp;
           if (fuzz_helper.provider_->ConsumeBool()) {
+            ENVOY_LOG_MISC(trace, "Immediately Closing gRPC connection");
             return fuzz_helper.randomGrpcStatusWithMessage();
           } else {
+            ENVOY_LOG_MISC(trace, "Generating Random ProcessingResponse");
             fuzz_helper.randomizeResponse(&resp, &req);
           }
 
@@ -253,6 +254,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
           // 9. Randomize mode_override
           if (fuzz_helper.provider_->ConsumeBool()) {
+            ENVOY_LOG_MISC(trace, "Generating Random ProcessingMode Override");
             ProcessingMode* msg = resp.mutable_mode_override();
             fuzz_helper.randomizeOverrideResponse(msg);
           }

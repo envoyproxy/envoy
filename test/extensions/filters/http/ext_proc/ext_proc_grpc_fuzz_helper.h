@@ -27,8 +27,8 @@ using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
 using envoy::type::v3::StatusCode;
 
-const uint32_t ext_proc_fuzz_max_data_size = 1024;
-const uint32_t ext_proc_fuzz_max_stream_chunks = 50;
+const uint32_t ExtProcFuzzMaxDataSize = 1024;
+const uint32_t ExtProcFuzzMaxStreamChunks = 50;
 
 // TODO(ikepolinsky): integrate an upstream that can be controlled by the fuzzer
 // and responds appropriately to HTTP requests.

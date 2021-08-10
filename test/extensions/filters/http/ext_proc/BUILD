@@ -139,7 +139,6 @@ envoy_extension_cc_test_library(
 
 envoy_cc_fuzz_test(
     name = "ext_proc_grpc_fuzz_test",
-    size = "enormous",
     srcs = ["ext_proc_grpc_fuzz.cc"],
     corpus = "ext_proc_grpc_corpus",
     deps = [
