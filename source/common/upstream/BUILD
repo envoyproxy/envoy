@@ -156,6 +156,7 @@ envoy_cc_library(
         "//envoy/common:random_generator_interface",
         "//envoy/upstream:scheduler_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 

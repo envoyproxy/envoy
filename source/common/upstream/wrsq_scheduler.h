@@ -11,6 +11,7 @@
 #include "envoy/upstream/scheduler.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -34,21 +35,24 @@ namespace Upstream {
 // round-robin. If all object weights are different, it behaves identical to weighted random
 // selection.
 //
-// NOTE: Unlike the EDF scheduler, this scheduler implementation does not mutate object weights at
-// the time of selection.
-template <class C> class WRSQScheduler : public Scheduler<C> {
+// NOTE: While the base scheduler interface allows for mutation of object weights with each pick,
+// this implementation is not meant for circumstances where the object weights change with each pick
+// (like in the least request LB). This scheduler implementation will perform quite poorly if the
+// object weights change often.
+template <class C>
+class WRSQScheduler : public Scheduler<C>, protected Logger::Loggable<Logger::Id::upstream> {
 public:
   WRSQScheduler(Random::RandomGenerator& random) : random_(random) {}
 
-  std::shared_ptr<C> peekAgain(std::function<double(const C&)>) override {
-    std::shared_ptr<C> picked{pickAndAddInternal()};
+  std::shared_ptr<C> peekAgain(std::function<double(const C&)> calculate_weight) override {
+    std::shared_ptr<C> picked{pickAndAddInternal(calculate_weight)};
     if (picked != nullptr) {
       prepick_queue_.emplace(picked);
     }
     return picked;
   }
 
-  std::shared_ptr<C> pickAndAdd(std::function<double(const C&)>) override {
+  std::shared_ptr<C> pickAndAdd(std::function<double(const C&)> calculate_weight) override {
     // Burn through the pre-pick queue.
     while (!prepick_queue_.empty()) {
       std::shared_ptr<C> prepicked_obj = prepick_queue_.front().lock();
@@ -58,7 +62,7 @@ public:
       }
     }
 
-    return pickAndAddInternal();
+    return pickAndAddInternal(calculate_weight);
   }
 
   void add(double weight, std::shared_ptr<C> entry) override {
@@ -132,7 +136,7 @@ private:
     return false;
   }
 
-  std::shared_ptr<C> pickAndAddInternal() {
+  std::shared_ptr<C> pickAndAddInternal(std::function<double(const C&)> calculate_weight) {
     while (!queue_map_.empty()) {
       QueueInfo& qinfo = chooseQueue();
       if (purgeExpired(qinfo)) {
@@ -140,11 +144,25 @@ private:
         continue;
       }
 
-      auto obj = qinfo.q.front();
-      ASSERT(!obj.expired());
+      auto obj = qinfo.q.front().lock();
       qinfo.q.pop();
-      qinfo.q.emplace(obj);
-      return std::shared_ptr<C>(obj);
+      if (obj == nullptr) {
+        // The object expired after the purge.
+        continue;
+      }
+
+      const double new_weight = calculate_weight ? calculate_weight(*obj) : qinfo.weight;
+      if (new_weight == qinfo.weight) {
+        qinfo.q.emplace(obj);
+      } else {
+        // The weight has changed for this object, so we must re-add it to the scheduler.
+        ENVOY_LOG_EVERY_POW_2(
+            warn, "WRSQ scheduler is used with a load balancer that mutates host weights with each "
+                  "selection, this will likely result in poor selection performance");
+        add(new_weight, obj);
+      }
+
+      return obj;
     }
 
     return nullptr;

@@ -15,8 +15,8 @@ namespace {
 TEST(WRSQSchedulerTest, Empty) {
   NiceMock<Random::MockRandomGenerator> random;
   WRSQScheduler<uint32_t> sched(random);
-  EXPECT_EQ(nullptr, sched.peekAgain([](const double&) { return 0; }));
-  EXPECT_EQ(nullptr, sched.pickAndAdd([](const double&) { return 0; }));
+  EXPECT_EQ(nullptr, sched.peekAgain([](const double&) { return 1; }));
+  EXPECT_EQ(nullptr, sched.pickAndAdd([](const double&) { return 1; }));
 }
 
 // Validate we get regular RR behavior when all weights are the same.
@@ -63,8 +63,8 @@ TEST(WRSQSchedulerTest, ProbabilityVerification) {
   for (uint32_t i = 0; i < weight_sum; ++i) {
     EXPECT_CALL(random, random()).WillOnce(Return(i));
     // The weights will not change with WRSQ, so the predicate does not matter.
-    auto peek = sched.peekAgain([](const double&) { return 1; });
-    auto p = sched.pickAndAdd([](const double&) { return 1; });
+    auto peek = sched.peekAgain([](const double& x) { return x + 1; });
+    auto p = sched.pickAndAdd([](const double& x) { return x + 1; });
     EXPECT_EQ(*p, *peek);
     ++pick_count[*p];
   }
@@ -87,9 +87,9 @@ TEST(WRSQSchedulerTest, Expired1) {
   }
 
   EXPECT_CALL(random, random()).WillOnce(Return(0)).WillOnce(Return(299)).WillOnce(Return(1337));
-  auto peek = sched.peekAgain([](const double&) { return 1; });
-  auto p1 = sched.pickAndAdd([](const double&) { return 1; });
-  auto p2 = sched.pickAndAdd([](const double&) { return 1; });
+  auto peek = sched.peekAgain({});
+  auto p1 = sched.pickAndAdd({});
+  auto p2 = sched.pickAndAdd({});
   EXPECT_EQ(*peek, *p1);
   EXPECT_EQ(*second_entry, *p1);
   EXPECT_EQ(*second_entry, *p2);
@@ -114,9 +114,9 @@ TEST(WRSQSchedulerTest, Expired2) {
       .WillOnce(Return(299))
       .WillOnce(Return(1337))
       .WillOnce(Return(8675309));
-  auto peek = sched.peekAgain([](const double&) { return 1; });
-  auto p1 = sched.pickAndAdd([](const double&) { return 1; });
-  auto p2 = sched.pickAndAdd([](const double&) { return 1; });
+  auto peek = sched.peekAgain({});
+  auto p1 = sched.pickAndAdd({});
+  auto p2 = sched.pickAndAdd({});
   EXPECT_EQ(*peek, *p1);
   EXPECT_EQ(*second_entry, *p1);
   EXPECT_EQ(*second_entry, *p2);
@@ -136,7 +136,7 @@ TEST(WRSQSchedulerTest, ExpiredPeek) {
   auto third_entry = std::make_shared<uint32_t>(37);
   sched.add(3, third_entry);
 
-  EXPECT_EQ(37, *sched.peekAgain([](const double&) { return 1; }));
+  EXPECT_EQ(37, *sched.peekAgain({}));
 }
 
 // Validate that expired entries are ignored.
@@ -150,12 +150,12 @@ TEST(WRSQSchedulerTest, ExpiredPeekedIsNotPicked) {
     sched.add(2, first_entry);
     sched.add(1, second_entry);
     for (int i = 0; i < 3; ++i) {
-      EXPECT_TRUE(sched.peekAgain([](const double&) { return 1; }) != nullptr);
+      EXPECT_TRUE(sched.peekAgain({}) != nullptr);
     }
   }
 
-  EXPECT_TRUE(sched.peekAgain([](const double&) { return 1; }) == nullptr);
-  EXPECT_TRUE(sched.pickAndAdd([](const double&) { return 1; }) == nullptr);
+  EXPECT_TRUE(sched.peekAgain({}) == nullptr);
+  EXPECT_TRUE(sched.pickAndAdd({}) == nullptr);
 }
 
 TEST(WRSQSchedulerTest, ManyPeekahead) {
@@ -173,11 +173,11 @@ TEST(WRSQSchedulerTest, ManyPeekahead) {
 
   std::vector<uint32_t> picks;
   for (uint32_t rounds = 0; rounds < 10; ++rounds) {
-    picks.push_back(*sched1.peekAgain([](const double&) { return 1; }));
+    picks.push_back(*sched1.peekAgain({}));
   }
   for (uint32_t rounds = 0; rounds < 10; ++rounds) {
-    auto p1 = sched1.pickAndAdd([](const double&) { return 1; });
-    auto p2 = sched2.pickAndAdd([](const double&) { return 1; });
+    auto p1 = sched1.pickAndAdd({});
+    auto p2 = sched2.pickAndAdd({});
     EXPECT_EQ(picks[rounds], *p1);
     EXPECT_EQ(*p2, *p1);
   }
@@ -210,7 +210,7 @@ TEST(WRSQSchedulerTest, ExpireAll) {
       uint32_t weight1pick{0}, weight5pick{0};
       for (int i = 0; i < 1000; ++i) {
         EXPECT_CALL(random, random()).WillOnce(Return(rnum++));
-        switch (*sched.pickAndAdd([](const double&) { return 1; })) {
+        switch (*sched.pickAndAdd({})) {
         case 42:
         case 37:
           ++weight1pick;
@@ -231,7 +231,7 @@ TEST(WRSQSchedulerTest, ExpireAll) {
     // expiring them and only returning the unexpired entries.
     for (int i = 0; i < 1000; ++i) {
       EXPECT_CALL(random, random()).WillRepeatedly(Return(rnum++));
-      switch (*sched.peekAgain([](const double&) { return 1; })) {
+      switch (*sched.peekAgain({})) {
       case 42:
       case 37:
         break;
@@ -243,7 +243,45 @@ TEST(WRSQSchedulerTest, ExpireAll) {
 
   // All values have expired, so only nullptr should be returned.
   EXPECT_CALL(random, random()).WillRepeatedly(Return(rnum++));
-  EXPECT_EQ(sched.peekAgain([](const double&) { return 1; }), nullptr);
+  EXPECT_EQ(sched.peekAgain({}), nullptr);
+}
+
+// Validate that a new requested weight is honored.
+TEST(WRSQSchedulerTest, ChangingWeight) {
+  NiceMock<Random::MockRandomGenerator> random;
+  WRSQScheduler<uint32_t> sched(random);
+
+  auto e1 = std::make_shared<uint32_t>(123);
+  auto e2 = std::make_shared<uint32_t>(456);
+  auto e3 = std::make_shared<uint32_t>(789);
+  sched.add(1, e1);
+  sched.add(0, e2);
+
+  std::function<double(const uint32_t v)> f = [e1, e2](const uint32_t v) {
+    if (v == *e1) {
+      return 0.0;
+    } else {
+      return 1.0;
+    }
+  };
+
+  // Expecting only e1 to be picked.
+  for (uint32_t rounds = 0; rounds < 128; ++rounds) {
+    auto peek = sched.peekAgain({});
+    auto p = sched.pickAndAdd({});
+    EXPECT_EQ(*e1, *p);
+    EXPECT_EQ(*peek, *p);
+  }
+
+  auto p = sched.pickAndAdd(f);
+  EXPECT_EQ(*e1, *p);
+  sched.add(1, e3);
+
+  // Now it should only be e3.
+  for (uint32_t rounds = 0; rounds < 128; ++rounds) {
+    auto p = sched.pickAndAdd({});
+    EXPECT_EQ(*e3, *p);
+  }
 }
 
 } // namespace
