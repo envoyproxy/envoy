@@ -1376,30 +1376,30 @@ TEST_P(HeaderMapImplTest, HttpTraceContextTest) {
     TestRequestHeaderMapImpl request_headers;
 
     // Protocol.
-    EXPECT_EQ(request_headers.contextProtocol(), "");
+    EXPECT_EQ(request_headers.protocol(), "");
     request_headers.addCopy(Http::Headers::get().Protocol, "HTTP/x");
-    EXPECT_EQ(request_headers.contextProtocol(), "HTTP/x");
+    EXPECT_EQ(request_headers.protocol(), "HTTP/x");
 
     // Authority.
-    EXPECT_EQ(request_headers.contextAuthority(), "");
+    EXPECT_EQ(request_headers.authority(), "");
     request_headers.addCopy(Http::Headers::get().Host, "test.com:233");
-    EXPECT_EQ(request_headers.contextAuthority(), "test.com:233");
+    EXPECT_EQ(request_headers.authority(), "test.com:233");
 
     // Path.
-    EXPECT_EQ(request_headers.contextPath(), "");
+    EXPECT_EQ(request_headers.path(), "");
     request_headers.addCopy(Http::Headers::get().Path, "/anything");
-    EXPECT_EQ(request_headers.contextPath(), "/anything");
+    EXPECT_EQ(request_headers.path(), "/anything");
 
     // Method.
-    EXPECT_EQ(request_headers.contextMethod(), "");
+    EXPECT_EQ(request_headers.method(), "");
     request_headers.addCopy(Http::Headers::get().Method, Http::Headers::get().MethodValues.Options);
-    EXPECT_EQ(request_headers.contextMethod(), Http::Headers::get().MethodValues.Options);
+    EXPECT_EQ(request_headers.method(), Http::Headers::get().MethodValues.Options);
   }
 
   {
     size_t size = 0;
     TestRequestHeaderMapImpl request_headers{{"host", "foo"}, {"bar", "var"}, {"ok", "no"}};
-    request_headers.iterateContext([&size](absl::string_view key, absl::string_view val) {
+    request_headers.forEach([&size](absl::string_view key, absl::string_view val) {
       size += key.size();
       size += val.size();
       return true;
@@ -1411,19 +1411,19 @@ TEST_P(HeaderMapImplTest, HttpTraceContextTest) {
 
   {
     TestRequestHeaderMapImpl request_headers{{"host", "foo"}};
-    EXPECT_EQ(request_headers.getTraceContext("host").value(), "foo");
+    EXPECT_EQ(request_headers.getByKey("host").value(), "foo");
 
-    request_headers.setTraceContext("trace_key", "trace_value");
-    EXPECT_EQ(request_headers.getTraceContext("trace_key").value(), "trace_value");
+    request_headers.setByKey("trace_key", "trace_value");
+    EXPECT_EQ(request_headers.getByKey("trace_key").value(), "trace_value");
 
     std::string trace_ref_key = "trace_ref_key";
-    request_headers.setTraceContextReferenceKey(trace_ref_key, "trace_value");
+    request_headers.setByReferenceKey(trace_ref_key, "trace_value");
     auto* header_entry = request_headers.get(Http::LowerCaseString(trace_ref_key))[0];
     EXPECT_EQ(reinterpret_cast<intptr_t>(trace_ref_key.data()),
               reinterpret_cast<intptr_t>(header_entry->key().getStringView().data()));
 
     std::string trace_ref_value = "trace_ref_key";
-    request_headers.setTraceContextReference(trace_ref_key, trace_ref_value);
+    request_headers.setByReference(trace_ref_key, trace_ref_value);
     header_entry = request_headers.get(Http::LowerCaseString(trace_ref_key))[0];
     EXPECT_EQ(reinterpret_cast<intptr_t>(trace_ref_key.data()),
               reinterpret_cast<intptr_t>(header_entry->key().getStringView().data()));

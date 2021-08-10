@@ -50,10 +50,9 @@ void Span::injectContext(Tracing::TraceContext& trace_context) {
   // corresponding trace header is generated correctly. For this reason, we cannot directly use host
   // as argument. We need create a copy of std::string based on host and std::string will
   // automatically add '\0' to the end of the string content.
-  auto sw8_header =
-      tracing_context_->createSW8HeaderValue(std::string(trace_context.contextAuthority()));
+  auto sw8_header = tracing_context_->createSW8HeaderValue(std::string(trace_context.authority()));
   if (sw8_header.has_value()) {
-    trace_context.setTraceContextReferenceKey(skywalkingPropagationHeaderKey(), sw8_header.value());
+    trace_context.setByReferenceKey(skywalkingPropagationHeaderKey(), sw8_header.value());
   }
 }
 

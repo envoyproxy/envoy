@@ -27,7 +27,7 @@ public:
    *
    * @return A string view representing the protocol of the traceable stream behind the context.
    */
-  virtual absl::string_view contextProtocol() const PURE;
+  virtual absl::string_view protocol() const PURE;
 
   /**
    * Get context authority.
@@ -35,7 +35,7 @@ public:
    * @return The authority of traceable stream. It generally consists of the host and an optional
    * user information and an optional port.
    */
-  virtual absl::string_view contextAuthority() const PURE;
+  virtual absl::string_view authority() const PURE;
 
   /**
    * Get context path.
@@ -43,7 +43,7 @@ public:
    * @return The path of traceable stream. The content and meaning of path are determined by
    * specific protocol itself.
    */
-  virtual absl::string_view contextPath() const PURE;
+  virtual absl::string_view path() const PURE;
 
   /**
    * Get context method.
@@ -51,14 +51,14 @@ public:
    * @return The method of traceable stream. The content and meaning of method are determined by
    * specific protocol itself.
    */
-  virtual absl::string_view contextMethod() const PURE;
+  virtual absl::string_view method() const PURE;
 
   /**
    * Iterate over all context entry.
    *
    * @param callback supplies the iteration callback.
    */
-  virtual void iterateContext(IterateCallback callback) const PURE;
+  virtual void forEach(IterateCallback callback) const PURE;
 
   /**
    * Get tracing context value by key.
@@ -66,7 +66,7 @@ public:
    * @param key The context key of string view type.
    * @return The optional context value of string_view type.
    */
-  virtual absl::optional<absl::string_view> getTraceContext(absl::string_view key) const PURE;
+  virtual absl::optional<absl::string_view> getByKey(absl::string_view key) const PURE;
 
   /**
    * Set new tracing context key/value pair.
@@ -74,7 +74,7 @@ public:
    * @param key The context key of string view type.
    * @param val The context value of string view type.
    */
-  virtual void setTraceContext(absl::string_view key, absl::string_view val) PURE;
+  virtual void setByKey(absl::string_view key, absl::string_view val) PURE;
 
   /**
    * Set new tracing context key/value pair. The key MUST point to data that will live beyond
@@ -83,11 +83,11 @@ public:
    * @param key The context key of string view type.
    * @param val The context value of string view type.
    */
-  virtual void setTraceContextReferenceKey(absl::string_view key, absl::string_view val) {
+  virtual void setByReferenceKey(absl::string_view key, absl::string_view val) {
     // The reference semantics of key and value are ignored by default. Derived classes that wish to
     // use reference semantics to improve performance or reduce memory overhead can override this
     // method.
-    setTraceContext(key, val);
+    setByKey(key, val);
   }
 
   /**
@@ -97,11 +97,11 @@ public:
    * @param key The context key of string view type.
    * @param val The context value of string view type.
    */
-  virtual void setTraceContextReference(absl::string_view key, absl::string_view val) {
+  virtual void setByReference(absl::string_view key, absl::string_view val) {
     // The reference semantics of key and value are ignored by default. Derived classes that wish to
     // use reference semantics to improve performance or reduce memory overhead can override this
     // method.
-    setTraceContext(key, val);
+    setByKey(key, val);
   }
 };
 

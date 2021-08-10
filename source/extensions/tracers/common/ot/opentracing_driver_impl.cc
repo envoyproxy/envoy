@@ -34,7 +34,7 @@ public:
   opentracing::expected<void> Set(opentracing::string_view key,
                                   opentracing::string_view value) const override {
     Http::LowerCaseString lowercase_key{{key.data(), key.size()}};
-    trace_context_.setTraceContext(lowercase_key, {value.data(), value.size()});
+    trace_context_.setByKey(lowercase_key, {value.data(), value.size()});
     return {};
   }
 
@@ -57,7 +57,7 @@ public:
   opentracing::expected<opentracing::string_view>
   LookupKey(opentracing::string_view key) const override {
     Http::LowerCaseString lowercase_key{{key.data(), key.size()}};
-    const auto entry = trace_context_.getTraceContext(lowercase_key);
+    const auto entry = trace_context_.getByKey(lowercase_key);
     if (entry.has_value()) {
       return opentracing::string_view{entry.value().data(), entry.value().length()};
     } else {
@@ -66,12 +66,11 @@ public:
   }
 
   opentracing::expected<void> ForeachKey(OpenTracingCb f) const override {
-    trace_context_.iterateContext(
-        [cb = std::move(f)](absl::string_view key, absl::string_view val) {
-          opentracing::string_view opentracing_key{key.data(), key.length()};
-          opentracing::string_view opentracing_val{val.data(), val.length()};
-          return static_cast<bool>(cb(opentracing_key, opentracing_val));
-        });
+    trace_context_.forEach([cb = std::move(f)](absl::string_view key, absl::string_view val) {
+      opentracing::string_view opentracing_key{key.data(), key.length()};
+      opentracing::string_view opentracing_val{val.data(), val.length()};
+      return static_cast<bool>(cb(opentracing_key, opentracing_val));
+    });
     return {};
   }
 
@@ -120,7 +119,7 @@ void OpenTracingSpan::injectContext(Tracing::TraceContext& trace_context) {
       return;
     }
     const std::string current_span_context = oss.str();
-    trace_context.setTraceContextReferenceKey(
+    trace_context.setByReferenceKey(
         Http::CustomHeaders::get().OtSpanContext,
         Base64::encode(current_span_context.c_str(), current_span_context.length()));
   } else {
@@ -161,7 +160,7 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
   std::unique_ptr<opentracing::Span> active_span;
   std::unique_ptr<opentracing::SpanContext> parent_span_ctx;
 
-  const auto entry = trace_context.getTraceContext(Http::CustomHeaders::get().OtSpanContext);
+  const auto entry = trace_context.getByKey(Http::CustomHeaders::get().OtSpanContext);
   if (propagation_mode == PropagationMode::SingleHeader && entry.has_value()) {
     opentracing::expected<std::unique_ptr<opentracing::SpanContext>> parent_span_ctx_maybe;
     std::string parent_context = Base64::decode(std::string(entry.value()));

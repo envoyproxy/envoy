@@ -870,25 +870,25 @@ public:
       context_map_[value.first] = value.second;
     }
   }
-  absl::string_view contextProtocol() const override { return context_protocol_; }
-  absl::string_view contextAuthority() const override { return context_authority_; }
-  absl::string_view contextPath() const override { return context_path_; }
-  absl::string_view contextMethod() const override { return context_method_; }
-  void iterateContext(IterateCallback callback) const override {
+  absl::string_view protocol() const override { return context_protocol_; }
+  absl::string_view authority() const override { return context_authority_; }
+  absl::string_view path() const override { return context_path_; }
+  absl::string_view method() const override { return context_method_; }
+  void forEach(IterateCallback callback) const override {
     for (const auto& pair : context_map_) {
       if (!callback(pair.first, pair.second)) {
         break;
       }
     }
   }
-  absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override {
+  absl::optional<absl::string_view> getByKey(absl::string_view key) const override {
     auto iter = context_map_.find(key);
     if (iter == context_map_.end()) {
       return absl::nullopt;
     }
     return iter->second;
   }
-  void setTraceContext(absl::string_view key, absl::string_view val) override {
+  void setByKey(absl::string_view key, absl::string_view val) override {
     context_map_.insert({std::string(key), std::string(val)});
   }
 
@@ -1116,11 +1116,11 @@ public:
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 
   // Tracing::TraceContext
-  absl::string_view contextProtocol() const override { return header_map_->getProtocolValue(); }
-  absl::string_view contextAuthority() const override { return header_map_->getHostValue(); }
-  absl::string_view contextPath() const override { return header_map_->getPathValue(); }
-  absl::string_view contextMethod() const override { return header_map_->getMethodValue(); }
-  void iterateContext(IterateCallback callback) const override {
+  absl::string_view protocol() const override { return header_map_->getProtocolValue(); }
+  absl::string_view authority() const override { return header_map_->getHostValue(); }
+  absl::string_view path() const override { return header_map_->getPathValue(); }
+  absl::string_view method() const override { return header_map_->getMethodValue(); }
+  void forEach(IterateCallback callback) const override {
     ASSERT(header_map_);
     header_map_->iterate([cb = std::move(callback)](const HeaderEntry& entry) {
       if (cb(entry.key().getStringView(), entry.value().getStringView())) {
@@ -1129,21 +1129,21 @@ public:
       return HeaderMap::Iterate::Break;
     });
   }
-  absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override {
+  absl::optional<absl::string_view> getByKey(absl::string_view key) const override {
     ASSERT(header_map_);
-    return header_map_->getTraceContext(key);
+    return header_map_->getByKey(key);
   }
-  void setTraceContext(absl::string_view key, absl::string_view value) override {
+  void setByKey(absl::string_view key, absl::string_view value) override {
     ASSERT(header_map_);
-    header_map_->setTraceContext(key, value);
+    header_map_->setByKey(key, value);
   }
-  void setTraceContextReferenceKey(absl::string_view key, absl::string_view val) override {
+  void setByReference(absl::string_view key, absl::string_view val) override {
     ASSERT(header_map_);
-    header_map_->setTraceContextReferenceKey(key, val);
+    header_map_->setByReference(key, val);
   }
-  void setTraceContextReference(absl::string_view key, absl::string_view val) override {
+  void setByReferenceKey(absl::string_view key, absl::string_view val) override {
     ASSERT(header_map_);
-    header_map_->setTraceContextReference(key, val);
+    header_map_->setByReferenceKey(key, val);
   }
 };
 

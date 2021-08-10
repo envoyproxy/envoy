@@ -658,15 +658,15 @@ HeaderMapImplUtility::getAllHeaderMapImplInfo() {
   return ret;
 }
 
-absl::string_view RequestHeaderMapImpl::contextProtocol() const { return getProtocolValue(); }
+absl::string_view RequestHeaderMapImpl::protocol() const { return getProtocolValue(); }
 
-absl::string_view RequestHeaderMapImpl::contextAuthority() const { return getHostValue(); }
+absl::string_view RequestHeaderMapImpl::authority() const { return getHostValue(); }
 
-absl::string_view RequestHeaderMapImpl::contextPath() const { return getPathValue(); }
+absl::string_view RequestHeaderMapImpl::path() const { return getPathValue(); }
 
-absl::string_view RequestHeaderMapImpl::contextMethod() const { return getMethodValue(); }
+absl::string_view RequestHeaderMapImpl::method() const { return getMethodValue(); }
 
-void RequestHeaderMapImpl::iterateContext(Tracing::TraceContext::IterateCallback callback) const {
+void RequestHeaderMapImpl::forEach(Tracing::TraceContext::IterateCallback callback) const {
   HeaderMapImpl::iterate([cb = std::move(callback)](const HeaderEntry& entry) {
     if (cb(entry.key().getStringView(), entry.value().getStringView())) {
       return HeaderMap::Iterate::Continue;
@@ -675,8 +675,7 @@ void RequestHeaderMapImpl::iterateContext(Tracing::TraceContext::IterateCallback
   });
 }
 
-absl::optional<absl::string_view>
-RequestHeaderMapImpl::getTraceContext(absl::string_view key) const {
+absl::optional<absl::string_view> RequestHeaderMapImpl::getByKey(absl::string_view key) const {
   ASSERT(validatedLowerCaseString(key));
   auto result = const_cast<RequestHeaderMapImpl*>(this)->getExisting(key);
 
@@ -686,7 +685,7 @@ RequestHeaderMapImpl::getTraceContext(absl::string_view key) const {
   return result[0]->value().getStringView();
 }
 
-void RequestHeaderMapImpl::setTraceContext(absl::string_view key, absl::string_view val) {
+void RequestHeaderMapImpl::setByKey(absl::string_view key, absl::string_view val) {
   ASSERT(validatedLowerCaseString(key));
   HeaderMapImpl::removeExisting(key);
 
@@ -698,8 +697,7 @@ void RequestHeaderMapImpl::setTraceContext(absl::string_view key, absl::string_v
   HeaderMapImpl::insertByKey(std::move(new_key), std::move(new_val));
 }
 
-void RequestHeaderMapImpl::setTraceContextReferenceKey(absl::string_view key,
-                                                       absl::string_view val) {
+void RequestHeaderMapImpl::setByReferenceKey(absl::string_view key, absl::string_view val) {
   ASSERT(validatedLowerCaseString(key));
   HeaderMapImpl::removeExisting(key);
 
@@ -709,7 +707,7 @@ void RequestHeaderMapImpl::setTraceContextReferenceKey(absl::string_view key,
   HeaderMapImpl::insertByKey(HeaderString(key), std::move(new_val));
 }
 
-void RequestHeaderMapImpl::setTraceContextReference(absl::string_view key, absl::string_view val) {
+void RequestHeaderMapImpl::setByReference(absl::string_view key, absl::string_view val) {
   ASSERT(validatedLowerCaseString(key));
   HeaderMapImpl::removeExisting(key);
 
