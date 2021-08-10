@@ -49,6 +49,11 @@ absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(absl::string_view
 
 const absl::optional<uint32_t>
 ProxyStatusUtils::recommendedHttpStatusCode(const ProxyStatusError proxy_status) {
+  // This switch statement was derived from the mapping from proxy error type to
+  // recommended HTTP status code in
+  // https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-05#section-2.3 and below.
+  //
+  // TODO(ambuc): Replace this with the non-draft URL when finalized.
   switch (proxy_status) {
   case ProxyStatusError::DnsTimeout:
     return 504;
@@ -221,7 +226,7 @@ const absl::optional<ProxyStatusError>
 ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
   // NB: This mapping from Envoy-specific ResponseFlag enum to Proxy-Status
   // error enum is lossy, since ResponseFlag is really a bitset of many
-  // responseflags. Here, we search the list of all known ResponseFlag values in
+  // ResponseFlag enums. Here, we search the list of all known ResponseFlag values in
   // enum order, returning the first matching ProxyStatusError.
   if (stream_info.hasResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
     return ProxyStatusError::DestinationUnavailable;

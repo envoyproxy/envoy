@@ -84,7 +84,7 @@ private:
   static absl::flat_hash_map<std::string, ResponseFlag> getFlagMap();
 };
 
-// Static utils for creating, consuming, and stringifiying the
+// Static utils for creating, consuming, and producing strings from the
 // Proxy-Status HTTP response header.
 class ProxyStatusUtils {
 public:
@@ -96,7 +96,7 @@ public:
   //   - server_name is either the method argument, or the name of the proxy
   //                 in |stream_info|,
   //   - error       is the error in |error|,
-  //   - detais      is |stream_info.responseCodeDetails()|, but the field is
+  //   - details     is |stream_info.responseCodeDetails()|, but the field is
   //                 present only if configured in |proxy_status_config|.
   static const std::string
   toString(const StreamInfo& stream_info, const ProxyStatusError error,
@@ -114,6 +114,13 @@ public:
 
   // Returns the recommended HTTP status code for a ProxyStatusError, or nullopt
   // if no HTTP status code is applicable.
+  //
+  // See
+  // https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-05#section-2.1.1 :
+  //
+  // > Each Proxy Error Type has a Recommended HTTP Status Code. When
+  // > generating a HTTP response containing "error", its HTTP status code
+  // > SHOULD be set to the Recommended HTTP Status Code.
   static const absl::optional<uint32_t>
   recommendedHttpStatusCode(const ProxyStatusError proxy_status);
 
