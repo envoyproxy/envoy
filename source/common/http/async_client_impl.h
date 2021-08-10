@@ -192,9 +192,6 @@ private:
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     const Router::Config& routeConfig() const override { return route_configuration_; }
-    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
-      return nullptr;
-    }
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
     uint32_t retryShadowBufferLimit() const override {
@@ -299,15 +296,10 @@ private:
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
-    const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
-    const Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
     const Router::PathMatchCriterion& pathMatchCriterion() const override {
       return path_match_criterion_;
     }
 
-    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
-      return nullptr;
-    }
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return connect_config_nullopt_;
     }
@@ -325,9 +317,6 @@ private:
     static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
-    static const envoy::config::core::v3::Metadata metadata_;
-    // Async client doesn't require metadata.
-    static const Config::TypedMetadataImpl<Config::TypedMetadataFactory> typed_metadata_;
     static const NullPathMatchCriterion path_match_criterion_;
 
     Router::RouteEntry::UpgradeMap upgrade_map_;
@@ -343,18 +332,26 @@ private:
               const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
                   hash_policy,
               const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy)
-        : route_entry_(cluster_name, timeout, hash_policy, retry_policy) {}
+        : route_entry_(cluster_name, timeout, hash_policy, retry_policy), typed_metadata_({}) {}
 
     // Router::Route
     const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }
     const Router::RouteEntry* routeEntry() const override { return &route_entry_; }
     const Router::Decorator* decorator() const override { return nullptr; }
     const Router::RouteTracing* tracingConfig() const override { return nullptr; }
-    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
+    const Router::RouteSpecificFilterConfig*
+    mostSpecificPerFilterConfig(const std::string&) const override {
       return nullptr;
     }
+    void traversePerFilterConfig(
+        const std::string&,
+        std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
+    const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
+    const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
 
     RouteEntryImpl route_entry_;
+    const envoy::config::core::v3::Metadata metadata_;
+    const Envoy::Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory> typed_metadata_;
   };
 
   void cleanup();

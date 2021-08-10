@@ -52,7 +52,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.jwt_authn.v3.JwtProvider";
@@ -220,6 +220,19 @@ message JwtProvider {
   // Specify the clock skew in seconds when verifying JWT time constraint,
   // such as `exp`, and `nbf`. If not specified, default is 60 seconds.
   uint32 clock_skew_seconds = 10;
+
+  // Enables JWT cache, its size is specified by *jwt_cache_size*.
+  // Only valid JWT tokens are cached.
+  JwtCacheConfig jwt_cache_config = 12;
+}
+
+// This message specifies JWT Cache configuration.
+message JwtCacheConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.filters.http.jwt_authn.v3.JwtCacheConfig";
+
+  // The unit is number of JWT tokens, default to 100.
+  uint32 jwt_cache_size = 1;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.

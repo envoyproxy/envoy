@@ -33,6 +33,7 @@
 #include "source/common/init/manager_impl.h"
 #include "source/common/memory/heap_shrinker.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
@@ -288,6 +289,8 @@ public:
   }
   bool enableReusePortDefault() override;
 
+  Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
+
   // ServerLifecycleNotifier
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
   ServerLifecycleNotifier::HandlePtr
@@ -382,6 +385,7 @@ private:
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
   ListenerHooks& hooks_;
+  Quic::QuicStatNames quic_stat_names_;
   ServerFactoryContextImpl server_contexts_;
   absl::optional<ReusePortDefault> enable_reuse_port_default_;
 

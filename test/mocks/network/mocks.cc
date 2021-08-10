@@ -132,7 +132,7 @@ MockFilterChainFactory::MockFilterChainFactory() {
 MockFilterChainFactory::~MockFilterChainFactory() = default;
 
 MockListenSocket::MockListenSocket()
-    : io_handle_(std::make_unique<IoSocketHandleImpl>()),
+    : io_handle_(std::make_unique<NiceMock<MockIoHandle>>()),
       address_provider_(std::make_shared<SocketAddressSetterImpl>(
           std::make_shared<Address::Ipv4Instance>(80), nullptr)) {
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));

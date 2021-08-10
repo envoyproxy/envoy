@@ -268,7 +268,7 @@ protected:
   Http::CodecType downstream_protocol_{Http::CodecType::HTTP1};
   std::string access_log_name_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
-
+  Quic::QuicStatNames quic_stat_names_;
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
 };
 

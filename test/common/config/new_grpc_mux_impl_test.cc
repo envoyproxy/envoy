@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/event/timer.h"
@@ -13,6 +14,7 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"

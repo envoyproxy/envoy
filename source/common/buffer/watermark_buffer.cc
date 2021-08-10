@@ -1,5 +1,9 @@
 #include "source/common/buffer/watermark_buffer.h"
 
+#include <memory>
+
+#include "envoy/buffer/buffer.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -133,6 +137,101 @@ void WatermarkBuffer::checkHighAndOverflowWatermarks() {
       OwnedImpl::length() > overflow_watermark_) {
     above_overflow_watermark_called_ = true;
     above_overflow_watermark_();
+  }
+}
+
+BufferMemoryAccountSharedPtr
+WatermarkBufferFactory::createAccount(Http::StreamResetHandler& reset_handler) {
+  return BufferMemoryAccountImpl::createAccount(this, reset_handler);
+}
+
+void WatermarkBufferFactory::updateAccountClass(const BufferMemoryAccountSharedPtr& account,
+                                                int current_class, int new_class) {
+  ASSERT(current_class != new_class, "Expected the current_class and new_class to be different");
+
+  if (current_class == -1 && new_class >= 0) {
+    // Start tracking
+    ASSERT(!size_class_account_sets_[new_class].contains(account));
+    size_class_account_sets_[new_class].insert(account);
+  } else if (current_class >= 0 && new_class == -1) {
+    // No longer track
+    ASSERT(size_class_account_sets_[current_class].contains(account));
+    size_class_account_sets_[current_class].erase(account);
+  } else {
+    // Moving between buckets
+    ASSERT(size_class_account_sets_[current_class].contains(account));
+    ASSERT(!size_class_account_sets_[new_class].contains(account));
+    size_class_account_sets_[new_class].insert(
+        std::move(size_class_account_sets_[current_class].extract(account).value()));
+  }
+}
+
+void WatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPtr& account,
+                                               int current_class) {
+  if (current_class >= 0) {
+    ASSERT(size_class_account_sets_[current_class].contains(account));
+    size_class_account_sets_[current_class].erase(account);
+  }
+}
+
+WatermarkBufferFactory::~WatermarkBufferFactory() {
+  for (auto& account_set : size_class_account_sets_) {
+    ASSERT(account_set.empty(),
+           "Expected all Accounts to have unregistered from the Watermark Factory.");
+  }
+}
+
+BufferMemoryAccountSharedPtr
+BufferMemoryAccountImpl::createAccount(WatermarkBufferFactory* factory,
+                                       Http::StreamResetHandler& reset_handler) {
+  // We use shared_ptr ctor directly rather than make shared since the
+  // constructor being invoked is private as we want users to use this static
+  // method to createAccounts.
+  auto account =
+      std::shared_ptr<BufferMemoryAccount>(new BufferMemoryAccountImpl(factory, reset_handler));
+  // Set shared_this_ in the account.
+  static_cast<BufferMemoryAccountImpl*>(account.get())->shared_this_ = account;
+  return account;
+}
+
+int BufferMemoryAccountImpl::balanceToClassIndex() {
+  const uint64_t shifted_balance = buffer_memory_allocated_ >> 20; // shift by 1MB.
+
+  if (shifted_balance == 0) {
+    return -1; // Not worth tracking anything < 1MB.
+  }
+
+  const int class_idx = absl::bit_width(shifted_balance) - 1;
+  return std::min<int>(class_idx, NUM_MEMORY_CLASSES_ - 1);
+}
+
+void BufferMemoryAccountImpl::updateAccountClass() {
+  const int new_class = balanceToClassIndex();
+  if (shared_this_ && new_class != current_bucket_idx_) {
+    factory_->updateAccountClass(shared_this_, current_bucket_idx_, new_class);
+    current_bucket_idx_ = new_class;
+  }
+}
+
+void BufferMemoryAccountImpl::credit(uint64_t amount) {
+  ASSERT(buffer_memory_allocated_ >= amount);
+  buffer_memory_allocated_ -= amount;
+  updateAccountClass();
+}
+
+void BufferMemoryAccountImpl::charge(uint64_t amount) {
+  // Check overflow
+  ASSERT(std::numeric_limits<uint64_t>::max() - buffer_memory_allocated_ >= amount);
+  buffer_memory_allocated_ += amount;
+  updateAccountClass();
+}
+
+void BufferMemoryAccountImpl::clearDownstream() {
+  if (reset_handler_.has_value()) {
+    reset_handler_.reset();
+    factory_->unregisterAccount(shared_this_, current_bucket_idx_);
+    current_bucket_idx_ = -1;
+    shared_this_ = nullptr;
   }
 }
 

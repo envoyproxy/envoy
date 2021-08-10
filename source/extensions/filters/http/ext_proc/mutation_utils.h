@@ -37,8 +37,13 @@ public:
   static void applyBodyMutations(const envoy::service::ext_proc::v3alpha::BodyMutation& mutation,
                                  Buffer::Instance& buffer);
 
+  // Determine if a particular HTTP status code is valid.
+  static bool isValidHttpStatus(int code);
+
 private:
-  static bool isSettableHeader(absl::string_view key, bool replacing_message);
+  static bool isSettableHeader(const envoy::config::core::v3::HeaderValueOption& header,
+                               bool replacing_message);
+  static bool isAppendableHeader(absl::string_view key);
 };
 
 } // namespace ExternalProcessing

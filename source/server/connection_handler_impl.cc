@@ -134,7 +134,8 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
   }
 }
 
-ActiveTcpListenerOptRef ConnectionHandlerImpl::ActiveListenerDetails::tcpListener() {
+ConnectionHandlerImpl::ActiveTcpListenerOptRef
+ConnectionHandlerImpl::ActiveListenerDetails::tcpListener() {
   auto* val = absl::get_if<std::reference_wrapper<ActiveTcpListener>>(&typed_listener_);
   return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
 }

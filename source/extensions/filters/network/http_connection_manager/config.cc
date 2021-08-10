@@ -333,12 +333,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       strip_trailing_host_dot_(config.strip_trailing_host_dot()),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_requests_per_connection, 0)) {
-  // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
-  // idle_timeout field.
-  // TODO(asraa): Remove when idle_timeout is removed.
-  if (!idle_timeout_) {
-    idle_timeout_ = PROTOBUF_GET_OPTIONAL_MS(config, hidden_envoy_deprecated_idle_timeout);
-  }
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -379,6 +373,16 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     auto* extension = ip_detection_extensions.Add();
     extension->set_name("envoy.http.original_ip_detection.xff");
     extension->mutable_typed_config()->PackFrom(xff_config);
+  } else {
+    if (use_remote_address_) {
+      throw EnvoyException(
+          "Original IP detection extensions and use_remote_address may not be mixed");
+    }
+
+    if (xff_num_trusted_hops_ > 0) {
+      throw EnvoyException(
+          "Original IP detection extensions and xff_num_trusted_hops may not be mixed");
+    }
   }
 
   original_ip_detection_extensions_.reserve(ip_detection_extensions.size());
@@ -475,18 +479,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     // Listener level traffic direction overrides the operation name
     switch (context.direction()) {
     case envoy::config::core::v3::UNSPECIFIED: {
-      switch (tracing_config.hidden_envoy_deprecated_operation_name()) {
-      case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-          Tracing::INGRESS:
-        tracing_operation_name = Tracing::OperationName::Ingress;
-        break;
-      case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-          Tracing::EGRESS:
-        tracing_operation_name = Tracing::OperationName::Egress;
-        break;
-      default:
-        NOT_REACHED_GCOVR_EXCL_LINE;
-      }
+      // Continuing legacy behavior; if unspecified, we treat this as ingress.
+      tracing_operation_name = Tracing::OperationName::Ingress;
       break;
     }
     case envoy::config::core::v3::INBOUND:
@@ -500,13 +494,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
 
     Tracing::CustomTagMap custom_tags;
-    for (const std::string& header :
-         tracing_config.hidden_envoy_deprecated_request_headers_for_tags()) {
-      envoy::type::tracing::v3::CustomTag::Header headerTag;
-      headerTag.set_name(header);
-      custom_tags.emplace(
-          header, std::make_shared<const Tracing::RequestHeaderCustomTag>(header, headerTag));
-    }
     for (const auto& tag : tracing_config.custom_tags()) {
       custom_tags.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
     }
@@ -571,12 +558,18 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     codec_type_ = CodecType::HTTP3;
+    if (!context_.isQuicListener()) {
+      throw EnvoyException("HTTP/3 codec configured on non-QUIC listener.");
+    }
 #else
     throw EnvoyException("HTTP3 configured but not enabled in the build.");
 #endif
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+  if (codec_type_ != CodecType::HTTP3 && context_.isQuicListener()) {
+    throw EnvoyException("Non-HTTP/3 codec configured on QUIC listener.");
   }
 
   const auto& filters = config.http_filters();
@@ -661,11 +654,7 @@ void HttpConnectionManagerConfig::processFilter(
   ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
   ENVOY_LOG(debug, "    config: {}",
             MessageUtil::getJsonStringFromMessageOrError(
-                proto_config.has_typed_config()
-                    ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                    : static_cast<const Protobuf::Message&>(
-                          proto_config.hidden_envoy_deprecated_config()),
-                true));
+                static_cast<const Protobuf::Message&>(proto_config.typed_config()), true));
   filter_factories.push_back(std::move(filter_config_provider));
 }
 

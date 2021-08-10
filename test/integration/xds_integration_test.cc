@@ -27,7 +27,7 @@ public:
 
   void createEnvoy() override {
     createEnvoyServer({
-        "test/config/integration/server_xds.bootstrap.yaml",
+        "test/config/integration/server_xds.bootstrap.yml",
         "test/config/integration/server_xds.cds.yaml",
         "test/config/integration/server_xds.eds.yaml",
         "test/config/integration/server_xds.lds.yaml",
@@ -59,7 +59,7 @@ public:
 
   void createEnvoy() override {
     createEnvoyServer({
-        "test/config/integration/server_xds.bootstrap.yaml",
+        "test/config/integration/server_xds.bootstrap.yml",
         "test/config/integration/server_xds.cds.yaml",
         "test/config/integration/server_xds.eds.yaml",
         "test/config/integration/server_xds.lds.typed_struct.yaml",

@@ -73,7 +73,7 @@ class MobileHttpConnectionManagerFilterConfigFactory
                                      EnvoyMobileHttpConnectionManager> {
 public:
   MobileHttpConnectionManagerFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
+      : FactoryBase(NetworkFilterNames::get().EnvoyMobileHttpConnectionManager, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

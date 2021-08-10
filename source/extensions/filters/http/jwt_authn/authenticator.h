@@ -4,6 +4,7 @@
 
 #include "source/extensions/filters/http/jwt_authn/extractor.h"
 #include "source/extensions/filters/http/jwt_authn/jwks_cache.h"
+#include "source/extensions/filters/http/jwt_authn/jwt_cache.h"
 
 #include "jwt_verify_lib/check_audience.h"
 #include "jwt_verify_lib/status.h"
