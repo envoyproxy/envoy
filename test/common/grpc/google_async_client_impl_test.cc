@@ -95,8 +95,8 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, ThreadSafe) {
   Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([&]() {
     // Verify that using the grpc client in a different thread cause assertion failure.
     ASSERT_DEBUG_DEATH(grpc_client_->start(*method_descriptor_, grpc_callbacks,
-                                     Http::AsyncClient::StreamOptions()),
-                 "isThreadSafe");
+                                           Http::AsyncClient::StreamOptions()),
+                       "isThreadSafe");
   });
   thread->join();
 }
