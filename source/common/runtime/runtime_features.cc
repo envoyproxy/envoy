@@ -72,6 +72,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster",
     "envoy.reloadable_features.http2_consume_stream_refused_errors",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
+    "envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.improved_stream_limit_handling",
     "envoy.reloadable_features.internal_redirects_with_body",

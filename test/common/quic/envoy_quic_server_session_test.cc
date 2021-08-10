@@ -151,8 +151,10 @@ public:
   EnvoyQuicServerSessionTest()
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
-        quic_version_({quic::CurrentSupportedHttp3Versions()[0]}),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_({[]() {
+          SetQuicReloadableFlag(quic_decline_server_push_stream, true);
+          return quic::CurrentSupportedHttp3Versions()[0];
+        }()}),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()),
         quic_connection_(new MockEnvoyQuicServerConnection(
             connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_)),
@@ -1021,6 +1023,23 @@ TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
 
   EXPECT_TRUE(stream1->write_side_closed());
   EXPECT_TRUE(stream2->write_side_closed());
+}
+
+TEST_F(EnvoyQuicServerSessionTest, IncomingUnidirectionalReadStream) {
+  installReadFilter();
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  // IETF stream 2 is client initiated uni-directional stream.
+  quic::QuicStreamId stream_id = 2u;
+  auto payload = std::make_unique<char[]>(8);
+  quic::QuicDataWriter payload_writer(8, payload.get());
+  EXPECT_TRUE(payload_writer.WriteVarInt62(1ul));
+  EXPECT_CALL(http_connection_callbacks_, newStream(_, false)).Times(0u);
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::QUIC_HTTP_RECEIVE_SERVER_PUSH, _,
+                                                           "Received server push stream"));
+  quic::QuicStreamFrame stream_frame(stream_id, false, 0, absl::string_view(payload.get(), 1));
+  envoy_quic_session_.OnStreamFrame(stream_frame);
 }
 
 } // namespace Quic
