@@ -16,20 +16,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-using envoy::config::core::v3::HeaderValue;
-using envoy::config::core::v3::HeaderValueOption;
 using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
-using envoy::service::ext_proc::v3alpha::BodyResponse;
 using envoy::service::ext_proc::v3alpha::CommonResponse;
 using envoy::service::ext_proc::v3alpha::HeaderMutation;
-using envoy::service::ext_proc::v3alpha::HeadersResponse;
-using envoy::service::ext_proc::v3alpha::HttpBody;
-using envoy::service::ext_proc::v3alpha::HttpHeaders;
-using envoy::service::ext_proc::v3alpha::HttpTrailers;
 using envoy::service::ext_proc::v3alpha::ImmediateResponse;
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
-using envoy::service::ext_proc::v3alpha::TrailersResponse;
 using envoy::type::v3::StatusCode;
 
 ExtProcFuzzHelper::ExtProcFuzzHelper(FuzzedDataProvider* provider) {

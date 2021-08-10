@@ -19,22 +19,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-using envoy::config::core::v3::HeaderValue;
-using envoy::config::core::v3::HeaderValueOption;
 using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
-using envoy::service::ext_proc::v3alpha::BodyResponse;
-using envoy::service::ext_proc::v3alpha::CommonResponse;
-using envoy::service::ext_proc::v3alpha::HeadersResponse;
-using envoy::service::ext_proc::v3alpha::HttpBody;
-using envoy::service::ext_proc::v3alpha::HttpHeaders;
-using envoy::service::ext_proc::v3alpha::HttpTrailers;
-using envoy::service::ext_proc::v3alpha::ImmediateResponse;
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
-using envoy::service::ext_proc::v3alpha::TrailersResponse;
-using envoy::type::v3::StatusCode;
 
-using Http::LowerCaseString;
 
 // The buffer size for the listeners
 static const uint32_t BufferSize = 100000;
@@ -52,7 +40,7 @@ public:
     client_type_ = client_type;
   }
 
-  void TearDown() {
+  void tearDown() {
     cleanupUpstreamAndDownstream();
     test_processor_.shutdown();
   }
@@ -294,7 +282,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     // reduce executions/second.
     ENVOY_LOG_MISC(trace, "Response timed out.");
   }
-  fuzzer.TearDown();
+  fuzzer.tearDown();
 }
 
 } // namespace ExternalProcessing

@@ -19,8 +19,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-using envoy::config::core::v3::HeaderValue;
-using envoy::config::core::v3::HeaderValueOption;
 using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
 using envoy::service::ext_proc::v3alpha::CommonResponse;
 using envoy::service::ext_proc::v3alpha::HeaderMutation;
