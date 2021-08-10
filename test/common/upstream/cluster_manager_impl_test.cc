@@ -10,6 +10,7 @@
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/upstream/cds_api.h"

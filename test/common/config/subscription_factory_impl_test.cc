@@ -11,6 +11,7 @@
 #include "source/common/config/subscription_factory_impl.h"
 #include "source/common/config/xds_resource.h"
 
+#include "test/config/v2_link_hacks.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
