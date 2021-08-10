@@ -12,9 +12,9 @@ coloredlogs==15.0.1 \
     --hash=sha256:612ee75c546f53e92e70049c9dbfcc18c935a2b9a53b66085ce9ef6a6e5c0934 \
     --hash=sha256:7c991aa71a4577af2f82600d8f8f3a89f936baeaf9b50a9c197da014e5bf16b0
     # via -r tools/base/requirements.txt
-frozendict==2.0.3 \
-    --hash=sha256:163c616188beb97fdc8ef6e73ec2ebd70a844d4cf19d2e383aa94d1b8376653d \
-    --hash=sha256:58143e2d3d11699bc295d9e7e05f10dde99a727e2295d7f43542ecdc42c5ec70
+frozendict==2.0.4 \
+    --hash=sha256:19105b0ac694d4bd092b0e7eca79fb480d4b40aaf2905f5d9afe9faad961ef72 \
+    --hash=sha256:cea5b526b8e6a69c14cdc2517616cb2446e00d759940e42670b91ac551802330
     # via -r tools/base/requirements.txt
 humanfriendly==9.2 \
     --hash=sha256:332da98c24cc150efcc91b5508b19115209272bfdf4b0764a56795932f854271 \
