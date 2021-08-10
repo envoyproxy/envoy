@@ -73,10 +73,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
             EXPECT_EQ(config.listenerTag(), 1UL);
             EXPECT_NE(current_thread_id, std::this_thread::get_id());
           }));
-  worker_.addListener(absl::nullopt, listener, [&ci](bool success) -> void {
-    EXPECT_TRUE(success);
-    ci.setReady();
-  });
+  worker_.addListener(absl::nullopt, listener, [&ci]() -> void { ci.setReady(); });
 
   NiceMock<Stats::MockStore> store;
   worker_.start(guard_dog_, emptyCallback);
@@ -92,10 +89,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
             EXPECT_EQ(config.listenerTag(), 2UL);
             EXPECT_NE(current_thread_id, std::this_thread::get_id());
           }));
-  worker_.addListener(absl::nullopt, listener2, [&ci](bool success) -> void {
-    EXPECT_TRUE(success);
-    ci.setReady();
-  });
+  worker_.addListener(absl::nullopt, listener2, [&ci]() -> void { ci.setReady(); });
   ci.waitReady();
 
   EXPECT_CALL(*handler_, stopListeners(2))
@@ -132,10 +126,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
             EXPECT_EQ(config.listenerTag(), 3UL);
             EXPECT_NE(current_thread_id, std::this_thread::get_id());
           }));
-  worker_.addListener(absl::nullopt, listener3, [&ci](bool success) -> void {
-    EXPECT_TRUE(success);
-    ci.setReady();
-  });
+  worker_.addListener(absl::nullopt, listener3, [&ci]() -> void { ci.setReady(); });
   ci.waitReady();
 
   EXPECT_CALL(*handler_, removeListeners(3))
@@ -146,19 +137,6 @@ TEST_F(WorkerImplTest, BasicFlow) {
     EXPECT_NE(current_thread_id, std::this_thread::get_id());
   });
 
-  worker_.stop();
-}
-
-TEST_F(WorkerImplTest, ListenerException) {
-  InSequence s;
-
-  NiceMock<Network::MockListenerConfig> listener;
-  ON_CALL(listener, listenerTag()).WillByDefault(Return(1UL));
-  EXPECT_CALL(*handler_, addListener(_, _))
-      .WillOnce(Throw(Network::CreateListenerException("failed")));
-  worker_.addListener(absl::nullopt, listener, [](bool success) -> void { EXPECT_FALSE(success); });
-
-  worker_.start(guard_dog_, emptyCallback);
   worker_.stop();
 }
 

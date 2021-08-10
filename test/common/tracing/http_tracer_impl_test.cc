@@ -131,7 +131,7 @@ TEST_F(HttpConnManFinalizerImplTest, OriginalAndLongPath) {
                                                  {"x-envoy-original-path", path},
                                                  {":method", "GET"},
                                                  {":path", ""},
-                                                 {"x-forwarded-proto", "http"}};
+                                                 {":scheme", "http"}};
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
 
@@ -161,10 +161,8 @@ TEST_F(HttpConnManFinalizerImplTest, NoGeneratedId) {
   const auto remote_address = Network::Address::InstanceConstSharedPtr{
       new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
 
-  Http::TestRequestHeaderMapImpl request_headers{{":path", ""},
-                                                 {"x-envoy-original-path", path},
-                                                 {":method", "GET"},
-                                                 {"x-forwarded-proto", "http"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", ""}, {"x-envoy-original-path", path}, {":method", "GET"}, {":scheme", "http"}};
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
 
@@ -194,8 +192,7 @@ TEST_F(HttpConnManFinalizerImplTest, Connect) {
   const auto remote_address = Network::Address::InstanceConstSharedPtr{
       new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
 
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "CONNECT"},
-                                                 {"x-forwarded-proto", "http"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "CONNECT"}, {":scheme", "http"}};
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
 
@@ -223,7 +220,7 @@ TEST_F(HttpConnManFinalizerImplTest, NullRequestHeadersAndNullRouteEntry) {
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, upstreamHost()).WillRepeatedly(Return(nullptr));
-  EXPECT_CALL(stream_info, routeEntry()).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(Return(nullptr));
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
@@ -318,10 +315,8 @@ TEST_F(HttpConnManFinalizerImplTest, UpstreamClusterTagSet) {
 }
 
 TEST_F(HttpConnManFinalizerImplTest, SpanOptionalHeaders) {
-  Http::TestRequestHeaderMapImpl request_headers{{"x-request-id", "id"},
-                                                 {":path", "/test"},
-                                                 {":method", "GET"},
-                                                 {"x-forwarded-proto", "https"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}, {":scheme", "https"}};
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
   const std::string expected_ip = "10.0.0.100";
@@ -362,10 +357,8 @@ TEST_F(HttpConnManFinalizerImplTest, SpanOptionalHeaders) {
 }
 
 TEST_F(HttpConnManFinalizerImplTest, UnixDomainSocketPeerAddressTag) {
-  Http::TestRequestHeaderMapImpl request_headers{{"x-request-id", "id"},
-                                                 {":path", "/test"},
-                                                 {":method", "GET"},
-                                                 {"x-forwarded-proto", "https"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}, {":scheme", "https"}};
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
   const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
@@ -388,7 +381,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanCustomTags) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-request-id", "id"},
                                                  {":path", "/test"},
                                                  {":method", "GET"},
-                                                 {"x-forwarded-proto", "https"},
+                                                 {":scheme", "https"},
                                                  {"x-bb", "b"}};
 
   ProtobufWkt::Struct fake_struct;
@@ -403,9 +396,9 @@ ree:
   emp: "")EOF";
   TestUtility::loadFromYaml(yaml, fake_struct);
   (*stream_info.metadata_.mutable_filter_metadata())["m.req"].MergeFrom(fake_struct);
-  NiceMock<Router::MockRouteEntry> route_entry;
-  EXPECT_CALL(stream_info, routeEntry()).WillRepeatedly(Return(&route_entry));
-  (*route_entry.metadata_.mutable_filter_metadata())["m.rot"].MergeFrom(fake_struct);
+  std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(Return(route));
+  (*route->metadata_.mutable_filter_metadata())["m.rot"].MergeFrom(fake_struct);
   std::shared_ptr<envoy::config::core::v3::Metadata> host_metadata =
       std::make_shared<envoy::config::core::v3::Metadata>();
   (*host_metadata->mutable_filter_metadata())["m.host"].MergeFrom(fake_struct);
@@ -502,10 +495,8 @@ metadata:
 }
 
 TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
-  Http::TestRequestHeaderMapImpl request_headers{{"x-request-id", "id"},
-                                                 {":path", "/test"},
-                                                 {":method", "GET"},
-                                                 {"x-forwarded-proto", "http"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-request-id", "id"}, {":path", "/test"}, {":method", "GET"}, {":scheme", "http"}};
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
   const std::string expected_ip = "10.0.0.100";
@@ -567,7 +558,6 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcOkStatus) {
                                                  {":path", "/pb.Foo/Bar"},
                                                  {":authority", "example.com:80"},
                                                  {"content-type", "application/grpc"},
-                                                 {"x-forwarded-proto", "http"},
                                                  {"te", "trailers"}};
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
@@ -618,7 +608,7 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
                                                  {":authority", "example.com:80"},
                                                  {"content-type", "application/grpc"},
                                                  {"grpc-timeout", "10s"},
-                                                 {"x-forwarded-proto", "http"},
+                                                 {":scheme", "http"},
                                                  {"te", "trailers"}};
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
@@ -662,7 +652,7 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
                                                  {":path", "/pb.Foo/Bar"},
                                                  {":authority", "example.com:80"},
                                                  {"content-type", "application/grpc"},
-                                                 {"x-forwarded-proto", "http"},
+                                                 {":scheme", "http"},
                                                  {"te", "trailers"}};
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},

@@ -134,10 +134,9 @@ protected:
     if (dispatcher_ == nullptr) {
       dispatcher_ = api_->allocateDispatcher("test_thread");
     }
-    socket_ = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ =
-        dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+    socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()));
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->addressProvider().localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), socket_options_);
@@ -376,8 +375,8 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   // Using a broadcast/multicast address as the connection destinations address causes an
   // immediate error return from connect().
   Address::InstanceConstSharedPtr broadcast_address;
-  socket_ = std::make_shared<Network::TcpListenSocket>(
-      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+  socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()));
   if (socket_->addressProvider().localAddress()->ip()->version() == Address::IpVersion::v4) {
     broadcast_address = std::make_shared<Address::Ipv4Instance>("224.0.0.1", 0);
   } else {
@@ -410,7 +409,9 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
       std::move(mocks.transport_socket_), stream_info_, true);
 
   EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(3 * 1000), _));
-  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3));
+  Stats::MockCounter timeout_counter;
+  EXPECT_CALL(timeout_counter, inc());
+  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3), timeout_counter);
   EXPECT_CALL(*transport_socket, closeSocket(ConnectionEvent::LocalClose));
   mock_timer->invokeCallback();
   EXPECT_THAT(stream_info_.connectionTerminationDetails(),
@@ -430,7 +431,9 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeoutAfterConnect) {
   transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
   // This should be a no-op. No timer should be created.
   EXPECT_CALL(*mocks.dispatcher_, createTimer_(_)).Times(0);
-  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3));
+  Stats::MockCounter timeout_counter;
+  EXPECT_CALL(timeout_counter, inc()).Times(0);
+  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3), timeout_counter);
 
   server_connection->close(ConnectionCloseType::NoFlush);
 }
@@ -453,7 +456,9 @@ TEST_P(ConnectionImplTest, ServerTransportSocketTimeoutDisabledOnConnect) {
   mock_timer->timer_destroyed_ = &timer_destroyed;
   EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(3 * 1000), _));
 
-  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3));
+  Stats::MockCounter timeout_counter;
+  EXPECT_CALL(timeout_counter, inc()).Times(0);
+  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3), timeout_counter);
 
   transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
   EXPECT_TRUE(timer_destroyed);
@@ -1340,10 +1345,9 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
         new Network::Address::Ipv6Instance(address_string, 0, nullptr)};
   }
   dispatcher_ = api_->allocateDispatcher("test_thread");
-  socket_ = std::make_shared<Network::TcpListenSocket>(
-      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-  listener_ =
-      dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+  socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()));
+  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
   client_connection_ = dispatcher_->createClientConnection(
       socket_->addressProvider().localAddress(), source_address_,
@@ -2811,10 +2815,9 @@ public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
     dispatcher_ = api_->allocateDispatcher("test_thread");
-    socket_ = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ =
-        dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+    socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()));
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
     client_connection_ = dispatcher_->createClientConnection(
         socket_->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),

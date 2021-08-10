@@ -16,6 +16,7 @@
 #include "source/common/grpc/common.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -354,8 +355,8 @@ MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRequest:
     return &info.dynamicMetadata();
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRoute: {
-    const Router::RouteEntry* route_entry = info.routeEntry();
-    return route_entry ? &route_entry->metadata() : nullptr;
+    Router::RouteConstSharedPtr route = info.route();
+    return route ? &route->metadata() : nullptr;
   }
   case envoy::type::metadata::v3::MetadataKind::KindCase::kCluster: {
     const auto& hostPtr = info.upstreamHost();

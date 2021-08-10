@@ -190,6 +190,7 @@ envoy_cc_library(
         ":http3_status_tracker",
         ":mixed_conn_pool",
         "//source/common/http/http3:conn_pool_lib",
+        "//source/common/quic:quic_stat_names_lib",
     ],
 )
 

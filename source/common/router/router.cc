@@ -51,7 +51,7 @@ uint32_t getLength(const Buffer::Instance* instance) { return instance ? instanc
 
 bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
                   const Network::Connection& connection) {
-  if (downstream_headers.getForwardedProtoValue() == Http::Headers::get().SchemeValues.Http) {
+  if (Http::Utility::getScheme(downstream_headers) == Http::Headers::get().SchemeValues.Http) {
     return true;
   }
   if (!connection.ssl()) {
@@ -83,8 +83,12 @@ void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool down
     if (Http::HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
       return;
     }
-    if (Http::HeaderUtility::schemeIsValid(headers.getForwardedProtoValue())) {
-      headers.setScheme(headers.getForwardedProtoValue());
+    // After all the changes in https://github.com/envoyproxy/envoy/issues/14587
+    // this path should only occur if a buggy filter has removed the :scheme
+    // header. In that case best-effort set from X-Forwarded-Proto.
+    absl::string_view xfp = headers.getForwardedProtoValue();
+    if (Http::HeaderUtility::schemeIsValid(xfp)) {
+      headers.setScheme(xfp);
       return;
     }
   }
@@ -598,15 +602,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       headers.setEnvoyAttemptCount(attempt_count_);
     };
   }
+  callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
   // Inject the active span's tracing context into the request headers.
   callbacks_->activeSpan().injectContext(headers);
 
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
-  FilterUtility::setUpstreamScheme(headers,
-                                   callbacks_->streamInfo().downstreamSslConnection() != nullptr,
-                                   host->transportSocketFactory().implementsSecureTransport());
+  FilterUtility::setUpstreamScheme(
+      headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr,
+      host->transportSocketFactory().implementsSecureTransport());
 
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
@@ -1350,6 +1355,14 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   downstream_response_started_ = true;
   final_upstream_request_ = &upstream_request;
+  // In upstream request hedging scenarios the upstream connection ID set in onPoolReady might not
+  // be the connection ID of the upstream connection that ended up receiving upstream headers. Thus
+  // reset the upstream connection ID here with the ID of the connection that ultimately was the
+  // transport for the final upstream request.
+  if (final_upstream_request_->streamInfo().upstreamConnectionId().has_value()) {
+    callbacks_->streamInfo().setUpstreamConnectionId(
+        final_upstream_request_->streamInfo().upstreamConnectionId().value());
+  }
   resetOtherUpstreams(upstream_request);
   if (end_stream) {
     onUpstreamComplete(upstream_request);
@@ -1516,7 +1529,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   }
 
   const auto& policy = route_entry_->internalRedirectPolicy();
-  // Don't allow serving TLS responses over plaintext unless allowed by policy.
+  // Don't change the scheme from the original request
   const bool scheme_is_http = schemeIsHttp(downstream_headers, *callbacks_->connection());
   const bool target_is_http = absolute_url.scheme() == Http::Headers::get().SchemeValues.Http;
   if (!policy.isCrossSchemeRedirectAllowed() && scheme_is_http != target_is_http) {
@@ -1601,6 +1614,7 @@ void Filter::doRetry() {
 
   is_retry_ = true;
   attempt_count_++;
+  callbacks_->streamInfo().setAttemptCount(attempt_count_);
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
 

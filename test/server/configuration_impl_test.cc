@@ -12,7 +12,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/cluster_manager_impl.h"
-#include "source/extensions/stat_sinks/well_known_names.h"
+#include "source/extensions/stat_sinks/statsd/config.h"
 #include "source/server/configuration_impl.h"
 
 #include "test/common/upstream/utility.h"
@@ -65,7 +65,8 @@ protected:
             server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
             server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
             server_.httpContext(), server_.grpcContext(), server_.routerContext(),
-            server_.accessLogManager(), server_.singletonManager(), server_.options()) {}
+            server_.accessLogManager(), server_.singletonManager(), server_.options(),
+            server_.quic_stat_names_) {}
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
@@ -467,7 +468,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  sink.set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
+  sink.set_name(Extensions::StatSinks::Statsd::StatsdName);
   addStatsdFakeClusterConfig(sink);
   server_.server_factory_context_->cluster_manager_.initializeClusters({"fake_cluster"}, {});
 

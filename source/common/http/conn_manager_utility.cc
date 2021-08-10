@@ -165,10 +165,12 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     request_headers.setReferenceForwardedProto(connection.ssl() ? Headers::get().SchemeValues.Https
                                                                 : Headers::get().SchemeValues.Http);
   }
+
   if (config.schemeToSet().has_value()) {
     request_headers.setScheme(config.schemeToSet().value());
     request_headers.setForwardedProto(config.schemeToSet().value());
   }
+
   // If :scheme is not set, sets :scheme based on X-Forwarded-Proto if a valid scheme,
   // else encryption level.
   // X-Forwarded-Proto and :scheme may still differ if different values are sent from downstream.

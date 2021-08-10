@@ -77,6 +77,10 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:clang_cl_build": ["-Wno-unused-result"] if test else [],
                "//conditions:default": [],
            }) + select({
+               # TODO: Remove once https://reviews.llvm.org/D73007 is in the lowest supported Xcode version
+               repository + "//bazel:apple": ["-Wno-range-loop-analysis"],
+               "//conditions:default": [],
+           }) + select({
                repository + "//bazel:no_debug_info": ["-g0"],
                "//conditions:default": [],
            }) + select({

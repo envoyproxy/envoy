@@ -54,6 +54,8 @@ without further review.
 
 * Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
   * Wasm
+* Raúl Gutiérrez Segalés ([rgs1](https://github.com/rgs1)) (rgs@pinterest.com)
+  * Thrift
 
 # Envoy security team
 

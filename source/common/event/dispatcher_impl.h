@@ -73,8 +73,8 @@ public:
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::TcpListenerCallbacks& cb, bool bind_to_port,
-                                      uint32_t backlog_size) override;
+                                      Network::TcpListenerCallbacks& cb,
+                                      bool bind_to_port) override;
   Network::UdpListenerPtr
   createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
                     const envoy::config::core::v3::UdpSocketConfig& config) override;

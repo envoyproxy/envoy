@@ -246,7 +246,7 @@ public:
   void addSslConfig() { addSslConfig({}); }
 
   // Add the default SSL configuration for QUIC downstream.
-  void addQuicDownstreamTransportSocketConfig(bool reuse_port);
+  void addQuicDownstreamTransportSocketConfig();
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.

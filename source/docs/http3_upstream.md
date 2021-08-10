@@ -26,7 +26,7 @@ HTTP/3 is marked as broken it will be for the initial 5 minutes.
 
 #### Alternate Protocols Cache
 The `AlternateProtocolsCache` is responsible for tracking servers which advertise HTTP/3.
-These advertisements may arrive via HTTP Altnernate Service (alt-svc) or soon via the HTTPS
+These advertisements may arrive via HTTP Alternative Service (alt-svc) or soon via the HTTPS
 DNS RR. Currently only advertisements which specify the same hostname and port are stored.
 
 #### Connectivity Grid

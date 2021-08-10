@@ -16,7 +16,7 @@ MockInstance::MockInstance()
       cluster_manager_(timeSource()), ssl_context_manager_(timeSource()),
       singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
-      router_context_(stats_store_.symbolTable()),
+      router_context_(stats_store_.symbolTable()), quic_stat_names_(stats_store_.symbolTable()),
       stats_config_(std::make_shared<NiceMock<Configuration::MockStatsConfig>>()),
       server_factory_context_(
           std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()),
@@ -50,6 +50,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(*server_factory_context_));
   ON_CALL(*this, transportSocketFactoryContext())
       .WillByDefault(ReturnRef(*transport_socket_factory_context_));
+  ON_CALL(*this, enableReusePortDefault()).WillByDefault(Return(true));
 }
 
 MockInstance::~MockInstance() = default;

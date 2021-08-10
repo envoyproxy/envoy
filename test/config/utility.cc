@@ -1116,12 +1116,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool reuse_port) {
-  for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
-    if (listener.udp_listener_config().has_quic_options()) {
-      listener.set_reuse_port(reuse_port);
-    }
-  }
+void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
   configDownstreamTransportSocketWithTls(
       bootstrap_,
       [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {

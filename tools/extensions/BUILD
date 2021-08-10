@@ -1,5 +1,4 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("@extensions_pip3//:requirements.bzl", "requirement")
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//tools/base:envoy_python.bzl", "envoy_py_binary")
 
@@ -16,6 +15,6 @@ envoy_py_binary(
     ] + envoy_all_extensions(),
     deps = [
         "//tools/base:checker",
-        requirement("pyyaml"),
+        "//tools/base:utils",
     ],
 )

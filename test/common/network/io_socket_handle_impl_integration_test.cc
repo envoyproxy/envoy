@@ -26,7 +26,7 @@ TEST(IoSocketHandleImplIntegration, LastRoundTripIntegrationTest) {
   Address::InstanceConstSharedPtr addr(new Address::Ipv4Instance(&server));
   auto socket_ = std::make_shared<Envoy::Network::ClientSocketImpl>(addr, nullptr);
   socket_->setBlockingForTest(true);
-  EXPECT_TRUE(socket_->connect(addr).rc_ == 0);
+  EXPECT_TRUE(socket_->connect(addr).return_value_ == 0);
 
   EXPECT_TRUE(socket_->ioHandle().lastRoundTripTime() != absl::nullopt);
 }

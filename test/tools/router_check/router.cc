@@ -95,6 +95,7 @@ ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem
   request_headers->addCopy(":path", check_config.input().path());
   request_headers->addCopy(":method", check_config.input().method());
   request_headers->addCopy("x-forwarded-proto", check_config.input().ssl() ? "https" : "http");
+  request_headers->addCopy(":scheme", check_config.input().ssl() ? "https" : "http");
 
   if (check_config.input().internal()) {
     request_headers->addCopy("x-envoy-internal", "true");

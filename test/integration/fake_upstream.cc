@@ -508,7 +508,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
     : http_type_(config.upstream_protocol_), http2_options_(config.http2_options_),
       http3_options_(config.http3_options_),
       socket_(Network::SocketSharedPtr(listen_socket.release())),
-      socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
+      socket_factory_(std::make_unique<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(config.time_system_),
       dispatcher_(api_->allocateDispatcher("fake_upstream")),
       handler_(new Server::ConnectionHandlerImpl(*dispatcher_, 0)), config_(config),
@@ -571,6 +571,7 @@ void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManage
 }
 
 void FakeUpstream::threadRoutine() {
+  socket_factory_->doFinalPreWorkerInit();
   handler_->addListener(absl::nullopt, listener_);
   server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -748,7 +749,7 @@ void FakeUpstream::sendUdpDatagram(const std::string& buffer,
   dispatcher_->post([this, buffer, peer] {
     const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
                                                     nullptr, *peer);
-    EXPECT_TRUE(rc.rc_ == buffer.length());
+    EXPECT_TRUE(rc.return_value_ == buffer.length());
   });
 }
 
@@ -765,6 +766,16 @@ testing::AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const 
         connection.write(buffer, end_stream);
       },
       timeout);
+}
+
+void FakeUpstream::FakeListenSocketFactory::doFinalPreWorkerInit() {
+  if (socket_->socketType() == Network::Socket::Type::Stream) {
+    ASSERT_EQ(0, socket_->ioHandle().listen(ENVOY_TCP_BACKLOG_SIZE).return_value_);
+  } else {
+    ASSERT(socket_->socketType() == Network::Socket::Type::Datagram);
+    ASSERT_TRUE(Network::Socket::applyOptions(socket_->options(), *socket_,
+                                              envoy::config::core::v3::SocketOption::STATE_BOUND));
+  }
 }
 
 FakeRawConnection::~FakeRawConnection() {

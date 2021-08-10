@@ -4,9 +4,11 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "source/common/common/macros.h"
+#include "source/server/config_validation/server.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
+#include "test/mocks/server/options.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -885,6 +887,15 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   }
 
   cleanup();
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/17344
+TEST(ExtConfigValidateTest, Validate) {
+  Server::TestComponentFactory component_factory;
+  EXPECT_TRUE(validateConfig(testing::NiceMock<Server::MockOptions>(TestEnvironment::runfilesPath(
+                                 "test/extensions/filters/http/ext_authz/ext_authz.yaml")),
+                             Network::Address::InstanceConstSharedPtr(), component_factory,
+                             Thread::threadFactoryForTest(), Filesystem::fileSystemForTest()));
 }
 
 } // namespace Envoy

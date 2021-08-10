@@ -25,9 +25,6 @@ const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
 const AsyncStreamImpl::NullConfig AsyncStreamImpl::NullVirtualHost::route_configuration_;
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
-const envoy::config::core::v3::Metadata AsyncStreamImpl::RouteEntryImpl::metadata_;
-const Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
-    AsyncStreamImpl::RouteEntryImpl::typed_metadata_({});
 const AsyncStreamImpl::NullPathMatchCriterion
     AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
 const absl::optional<envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig>
