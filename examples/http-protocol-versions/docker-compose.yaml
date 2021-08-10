@@ -1,0 +1,12 @@
+version: "3.7"
+services:
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile-front-proxy
+    ports:
+    - "9000:9000/tcp"
+    - "10000:10000/tcp"
+    - "10001:10001/tcp"
+    - "10002:10002/udp"

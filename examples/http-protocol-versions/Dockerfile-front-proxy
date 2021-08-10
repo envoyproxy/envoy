@@ -1,0 +1,17 @@
+FROM envoyproxy/envoy-dev:latest
+
+COPY ./envoy.yaml /etc/envoy.yaml
+COPY ./servercert.pem /etc/certs/servercert.pem
+COPY ./serverkey.pem /etc/certs/serverkey.pem
+
+# Don't bake secrets into the image in production.
+# This is meant for TESTING PURPOSES only
+RUN chmod go+r /etc/envoy.yaml \
+               /etc/certs/servercert.pem \
+               /etc/certs/serverkey.pem
+
+CMD ["/usr/local/bin/envoy", "-c", "/etc/envoy.yaml", \
+                             "--log-level", "debug", \
+                             "--concurrency", "1"]
+
+EXPOSE 9000/tcp 10000/tcp 10001/tcp 10002/udp
