@@ -38,6 +38,8 @@ const uint32_t ext_proc_fuzz_max_stream_chunks = 50;
 // use the same two send functions as GET and POST but with a different method value
 // (e.g., they just use sendDownstreamRequest and sendDownstreamRequestWithBody)
 // for simplicity I have excluded anything other than GET and POST for now.
+// As more HTTP methods are added, update kMaxValue as appropriate to include
+// the new enum as a fuzz choice
 enum class HttpMethod {
   GET,
   POST,
@@ -48,7 +50,7 @@ enum class HttpMethod {
   TRACE,
   HEAD,
   PUT,
-  kMaxValue = POST // TODO(ikepolinsky): update when methods supported
+  kMaxValue = POST // NOLINT: FuzzedDataProvider requires lowercase k
 };
 
 enum class ResponseType {
@@ -59,17 +61,22 @@ enum class ResponseType {
   ImmediateResponse,
   RequestTrailers,
   ResponseTrailers,
-  kMaxValue = ResponseTrailers
+  kMaxValue = ResponseTrailers // NOLINT: FuzzedDataProvider requires lowercase k
 };
 
-enum class HeaderSendSetting { Default, Send, Skip, kMaxValue = Skip };
+enum class HeaderSendSetting {
+  Default,
+  Send,
+  Skip,
+  kMaxValue = Skip // NOLINT: FuzzedDataProvider requires lowercase k
+};
 
 enum class BodySendSetting {
   None,
   Buffered,
   Streamed,
   BufferedPartial,
-  kMaxValue = BufferedPartial
+  kMaxValue = BufferedPartial // NOLINT: FuzzedDataProvider requires lowercase k
 };
 
 // Helper class for fuzzing the ext_proc filter.
