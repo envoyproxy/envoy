@@ -85,10 +85,15 @@ build:coverage --instrumentation_filter="//library/common[/:]"
 build:coverage --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build:coverage --javabase=@bazel_tools//tools/jdk:remote_jdk11
 
-# Experimental EngFlow Remote Execution Config
-# --config=remote also sets --auth_enabled=true to enable GCP authentication.
-# We are not using GCP authentication for the MacOS remote execution cluster,
-# so we have to override it to false here.
+#############################################################################
+# Experimental EngFlow Remote Execution Configs
+#############################################################################
+# remote-ci-macos: Flags to run CI using Engflow's remote execution. This
+# config is used for MacOS-specific flags.
+#############################################################################
+# --config=remote sets --auth_enabled=true to enable GCP authentication,
+# however, the MacOS remote execution cluster doesn't use GCP auth
+# so we have to override it to 'false' here.
 build:remote-ci-macos --config=remote
 build:remote-ci-macos --auth_enabled=false
 build:remote-ci-macos --remote_executor=grpcs://envoy.cluster.engflow.com
@@ -97,3 +102,6 @@ build:remote-ci-macos --bes_results_url=https://envoy.cluster.engflow.com/invoca
 build:remote-ci-macos --bes_lifecycle_events
 build:remote-ci-macos --jobs=40
 build:remote-ci-macos --verbose_failures
+#############################################################################
+# Experimental EngFlow Remote Execution Configs
+#############################################################################
