@@ -44,16 +44,6 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
          "Send buffer limit should be larger than 8KB.");
 }
 
-EnvoyQuicClientStream::EnvoyQuicClientStream(
-    quic::PendingStream* pending, quic::QuicSpdyClientSession* client_session,
-    quic::StreamType type, Http::Http3::CodecStats& stats,
-    const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
-    : quic::QuicSpdyClientStream(pending, client_session, type),
-      EnvoyQuicStream(
-          static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
-          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
-          stats, http3_options) {}
-
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
                                                   bool end_stream) {
   // Required headers must be present. This can only happen by some erroneous processing after the
