@@ -268,7 +268,9 @@ Other changes will likely include
 See [EXTENSION_POLICY.md](EXTENSION_POLICY.md) for more information on contrib. Adding a contrib
 extension mostly mirrors adding a normal extension above. Some differences are noted here:
 
-* API files should be added in `api/contrib/envoy/`
+* API files should be added in `api/contrib/envoy/`, but the protos' namespaces should still be as
+  in normal extensions (which will make file movement easier later if the extension gets promoted
+  to core).
 * Build config and metadata should be included in [contrib/contrib_build_config.bzl](contrib/contrib_build_config.bzl)
   and [contrib/extensions_metadata.yaml](contrib/extensions_metadata.yaml).
 

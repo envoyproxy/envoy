@@ -146,3 +146,5 @@ contrib extension is lower than a core extension, with the tradeoff that contrib
 included by default in the main image builds. Consumers need to pull directly from the contrib
 images described in the installation guide. Please read the linked document in detail to determine
 whether contrib extensions are the right choice for a newly proposed extension.
+
+**NOTE:** Contrib extensions are not eligible for Envoy security team coverage.
