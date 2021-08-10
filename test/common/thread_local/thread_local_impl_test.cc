@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "source/common/common/thread.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
@@ -5,6 +7,7 @@
 
 #include "test/mocks/event/mocks.h"
 
+#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 
 using testing::_;
@@ -309,6 +312,71 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
 
   // Verify we still have the expected dispatcher for the main thread.
   EXPECT_EQ(main_dispatcher.get(), &tls.dispatcher());
+
+  tls.shutdownGlobalThreading();
+  tls.shutdownThread();
+}
+
+TEST(ThreadLocalInstanceImplDispatcherTest, RaceConditionIfCompletionCallback) {
+  InstanceImpl tls;
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr main_dispatcher(api->allocateDispatcher("test_main_thread"));
+  Event::DispatcherPtr worker_thread_dispatcher(api->allocateDispatcher("test_worker_thread"));
+
+  tls.registerThread(*main_dispatcher, true);
+  tls.registerThread(*worker_thread_dispatcher, false);
+
+  TypedSlotPtr<> slot1 = TypedSlot<>::makeUnique(tls);
+
+  absl::Notification worker_thread_should_exit;
+  Event::TimerPtr worker_thread_check_should_exit_timer;
+
+  worker_thread_check_should_exit_timer =
+      worker_thread_dispatcher->createTimer([&worker_thread_dispatcher, &worker_thread_should_exit,
+                                             &worker_thread_check_should_exit_timer]() {
+        if (worker_thread_should_exit.HasBeenNotified()) {
+          worker_thread_dispatcher->exit();
+        }
+        worker_thread_check_should_exit_timer->enableTimer(std::chrono::milliseconds(500));
+      });
+
+  worker_thread_check_should_exit_timer->enableTimer(std::chrono::milliseconds(500));
+
+  // Ensure that the dispatcher update in tls posted during the above registerThread
+  // happens.
+  main_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  // Verify we have the expected dispatcher for the main thread.
+  EXPECT_EQ(main_dispatcher.get(), &tls.dispatcher());
+
+  Thread::ThreadPtr thread =
+      Thread::threadFactoryForTest().createThread([&worker_thread_dispatcher, &tls]() {
+        // Ensure that the dispatcher update in tls posted during the above registerThread happens.
+        worker_thread_dispatcher->run(Event::Dispatcher::RunType::RunUntilExit);
+        // Verify we have the expected dispatcher for the new thread thread.
+        EXPECT_EQ(worker_thread_dispatcher.get(), &tls.dispatcher());
+        // Verify that it is inside the worker thread.
+        EXPECT_FALSE(Thread::MainThread::isMainThread());
+      });
+
+  main_dispatcher->post([&slot1, &main_dispatcher]() {
+    slot1->set(
+        [](Envoy::Event::Dispatcher&) -> std::shared_ptr<Envoy::ThreadLocal::ThreadLocalObject> {
+          return nullptr;
+        });
+    // Delete the slot in the completion callback. If the update callback isn't
+    // yet deleted, it might have a lingering weak_ptr to some slot internals
+    // which can trigger a double free.
+    slot1->runOnAllThreads([](OptRef<ThreadLocal::ThreadLocalObject>) {},
+                           [&slot1, &main_dispatcher]() {
+                             slot1.reset();
+                             main_dispatcher->exit();
+                           });
+  });
+  main_dispatcher->run(Event::Dispatcher::RunType::RunUntilExit);
+
+  worker_thread_should_exit.Notify();
+  thread->join();
 
   tls.shutdownGlobalThreading();
   tls.shutdownThread();

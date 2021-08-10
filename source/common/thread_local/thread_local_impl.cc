@@ -168,8 +168,11 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_c
 
   Event::PostCbSharedPtr cb_guard(new Event::PostCb(cb),
                                   [this, all_threads_complete_cb](Event::PostCb* cb) {
-                                    main_thread_dispatcher_->post(all_threads_complete_cb);
+                                    // We need to delete the cb before posting
+                                    // to the main thread to avoid a race that
+                                    // can occur if the completion callback deletes the slot.
                                     delete cb;
+                                    main_thread_dispatcher_->post(all_threads_complete_cb);
                                   });
 
   for (Event::Dispatcher& dispatcher : registered_threads_) {
