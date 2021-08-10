@@ -71,6 +71,7 @@ std::vector<TestParams> getSdsTestsParams(bool disable_quic = false) {
         ret.push_back(TestParams{ip_version, sds_grpc_type, true});
       }
 #else
+      UNREFERENCED_PARAMETER(disable_quic);
       ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
 #endif
     }
