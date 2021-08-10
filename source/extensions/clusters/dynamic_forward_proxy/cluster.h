@@ -52,7 +52,7 @@ private:
   using HostInfoMap = absl::flat_hash_map<std::string, HostInfo>;
 
   class LoadBalancer : public Upstream::LoadBalancer {
-   public:
+  public:
     LoadBalancer(const Cluster& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancer
@@ -61,22 +61,24 @@ private:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
-   private:
+
+  private:
     const Cluster& cluster_;
   };
 
   class LoadBalancerFactory : public Upstream::LoadBalancerFactory {
-   public:
+  public:
     LoadBalancerFactory(Cluster& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancerFactory
     Upstream::LoadBalancerPtr create() override { return std::make_unique<LoadBalancer>(cluster_); }
-   private:
+
+  private:
     Cluster& cluster_;
   };
 
   class ThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
-   public:
+  public:
     ThreadAwareLoadBalancer(Cluster& cluster) : cluster_(cluster) {}
 
     // Upstream::ThreadAwareLoadBalancer
@@ -85,7 +87,7 @@ private:
     }
     void initialize() override {}
 
-   private:
+  private:
     Cluster& cluster_;
   };
 
