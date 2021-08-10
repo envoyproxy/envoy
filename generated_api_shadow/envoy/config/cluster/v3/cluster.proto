@@ -1111,25 +1111,26 @@ message Cluster {
 message LoadBalancingPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.LoadBalancingPolicy";
 
-  // Deprecated and replaced by TypedExtensionConfig.
   message Policy {
-    option deprecated = true;
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.LoadBalancingPolicy.Policy";
 
-    // Required. The name of the LB policy.
-    string name = 1;
+    core.v3.TypedExtensionConfig typed_extension_config = 4;
 
-    google.protobuf.Any typed_config = 3;
+    string hidden_envoy_deprecated_name = 1
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     google.protobuf.Struct hidden_envoy_deprecated_config = 2
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+    google.protobuf.Any hidden_envoy_deprecated_typed_config = 3
         [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 
   // Each client will iterate over the list in order and stop at the first policy that it
   // supports. This provides a mechanism for starting to use new LB policies that are not yet
   // supported by all clients.
-  repeated core.v3.TypedExtensionConfig policies = 1;
+  repeated Policy policies = 1;
 }
 
 // An extensible structure containing the address Envoy should bind to when

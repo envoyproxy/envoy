@@ -839,13 +839,13 @@ message Cluster {
 message LoadBalancingPolicy {
   message Policy {
     // Required. The name of the LB policy.
-    string name = 1;
+    string name = 1 [deprecated = true];
 
     // Optional config for the LB policy.
     // No more than one of these two fields may be populated.
     google.protobuf.Struct config = 2 [deprecated = true];
 
-    google.protobuf.Any typed_config = 3;
+    google.protobuf.Any typed_config = 3 [deprecated = true];
   }
 
   // Each client will iterate over the list in order and stop at the first policy that it

@@ -833,10 +833,8 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
     cluster_entry_it->second->thread_aware_lb_ = std::move(new_cluster_pair.second);
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
     const auto& policy = cluster_reference.info()->loadBalancingPolicy();
-    TypedLoadBalancerFactory* typed_lb_factory =
-        Registry::FactoryRegistry<TypedLoadBalancerFactory>::getFactory(policy.name());
-    RELEASE_ASSERT(typed_lb_factory != nullptr, "should have factory for selected LB policy");
-
+    TypedLoadBalancerFactory* typed_lb_factory = cluster_reference.info()->loadBalancerFactory();
+    RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
     cluster_entry_it->second->thread_aware_lb_ =
         typed_lb_factory->create(cluster_reference.prioritySet(), cluster_reference.info()->stats(),
                                  cluster_reference.info()->statsScope(), runtime_, random_, policy);

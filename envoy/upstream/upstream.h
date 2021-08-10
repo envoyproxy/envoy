@@ -692,6 +692,8 @@ using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOption
  */
 class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
+class TypedLoadBalancerFactory;
+
 /**
  * Information about a given upstream cluster.
  */
@@ -787,10 +789,17 @@ public:
   }
 
   /**
-   * @return const envoy::config::core::v3::TypedExtensionConfig& the load balancing policy to use
-   * for this cluster.
+   * @return const envoy::config::cluster::v3::LoadBalancingPolicy_Policy& the load balancing policy
+   * to use for this cluster.
    */
-  virtual const envoy::config::core::v3::TypedExtensionConfig& loadBalancingPolicy() const PURE;
+  virtual const envoy::config::cluster::v3::LoadBalancingPolicy_Policy&
+  loadBalancingPolicy() const PURE;
+
+  /**
+   * @return the load balancer factory for this cluster if the load balancing type is
+   * LOAD_BALANCING_POLICY_CONFIG.
+   */
+  virtual TypedLoadBalancerFactory* loadBalancerFactory() const PURE;
 
   /**
    * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for

@@ -761,7 +761,7 @@ public:
   ThreadAwareLoadBalancerPtr
   create(const PrioritySet&, ClusterStats&, Stats::Scope&, Runtime::Loader&,
          Random::RandomGenerator&,
-         const ::envoy::config::core::v3::TypedExtensionConfig&) override {
+         const ::envoy::config::cluster::v3::LoadBalancingPolicy_Policy&) override {
     return std::make_unique<ThreadAwareLbImpl>();
   }
 
@@ -810,7 +810,8 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfigCannotSpecifyCommonLbConfig) {
     lb_policy: LOAD_BALANCING_POLICY_CONFIG
     load_balancing_policy:
       policies:
-      - name: envoy.load_balancers.custom_lb
+      - typed_extension_config:
+          name: envoy.load_balancers.custom_lb
     common_lb_config:
       update_merge_window: 3s
     load_assignment:
@@ -879,8 +880,10 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
     lb_policy: LOAD_BALANCING_POLICY_CONFIG
     load_balancing_policy:
       policies:
-      - name: envoy.load_balancers.unknown_lb
-      - name: envoy.load_balancers.custom_lb
+      - typed_extension_config:
+          name: envoy.load_balancers.unknown_lb
+      - typed_extension_config:
+          name: envoy.load_balancers.custom_lb
     load_assignment:
       cluster_name: cluster_1
       endpoints:
@@ -900,7 +903,8 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
   create(parseBootstrapFromV3Yaml(yaml));
   const auto& cluster = cluster_manager_->clusters().getCluster("cluster_1");
   EXPECT_NE(cluster, absl::nullopt);
-  EXPECT_EQ(cluster->get().info()->loadBalancingPolicy().name(), "envoy.load_balancers.custom_lb");
+  EXPECT_EQ(cluster->get().info()->loadBalancingPolicy().typed_extension_config().name(),
+            "envoy.load_balancers.custom_lb");
 }
 
 // Verify that if Envoy does not have a factory for any of the load balancing policies specified in
@@ -915,8 +919,10 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfigThrowsExceptionIfNoLbPoliciesFound)
     lb_policy: LOAD_BALANCING_POLICY_CONFIG
     load_balancing_policy:
       policies:
-      - name: envoy.load_balancers.unknown_lb_1
-      - name: envoy.load_balancers.unknown_lb_2
+      - typed_extension_config:
+          name: envoy.load_balancers.unknown_lb_1
+      - typed_extension_config:
+          name: envoy.load_balancers.unknown_lb_2
     load_assignment:
       cluster_name: cluster_1
       endpoints:

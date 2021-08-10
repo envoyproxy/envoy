@@ -568,9 +568,11 @@ public:
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
-  const envoy::config::core::v3::TypedExtensionConfig& loadBalancingPolicy() const override {
+  const envoy::config::cluster::v3::LoadBalancingPolicy_Policy&
+  loadBalancingPolicy() const override {
     return load_balancing_policy_;
   }
+  TypedLoadBalancerFactory* loadBalancerFactory() const override { return load_balancer_factory_; }
   const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const override {
     return common_lb_config_;
   }
@@ -754,7 +756,8 @@ private:
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::config::core::v3::Metadata metadata_;
   Envoy::Config::TypedMetadataImpl<ClusterTypedMetadataFactory> typed_metadata_;
-  envoy::config::core::v3::TypedExtensionConfig load_balancing_policy_;
+  envoy::config::cluster::v3::LoadBalancingPolicy_Policy load_balancing_policy_;
+  TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;

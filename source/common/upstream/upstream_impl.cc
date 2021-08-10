@@ -818,22 +818,24 @@ ClusterInfoImpl::ClusterInfoImpl(
                       envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
     }
 
-    const auto& lb_policy =
-        std::find_if(config.load_balancing_policy().policies().begin(),
-                     config.load_balancing_policy().policies().end(),
-                     [](const envoy::config::core::v3::TypedExtensionConfig& policy) {
-                       return Registry::FactoryRegistry<TypedLoadBalancerFactory>::getFactory(
-                                  policy.name()) != nullptr;
-                     });
+    for (const auto& policy : config.load_balancing_policy().policies()) {
+      TypedLoadBalancerFactory* factory =
+          Config::Utility::getAndCheckFactory<TypedLoadBalancerFactory>(
+              policy.typed_extension_config(), /*is_optional=*/true);
+      if (factory != nullptr) {
+        load_balancing_policy_ = policy;
+        load_balancer_factory_ = factory;
+        break;
+      }
+    }
 
-    if (lb_policy == config.load_balancing_policy().policies().end()) {
+    if (load_balancer_factory_ == nullptr) {
       throw EnvoyException(fmt::format(
           "Didn't find a registered load balancer factory implementation for cluster: '{}'",
           name_));
     }
 
     lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
-    load_balancing_policy_ = *lb_policy;
     break;
   }
   default:
