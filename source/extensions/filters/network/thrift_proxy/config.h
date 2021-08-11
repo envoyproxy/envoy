@@ -67,7 +67,8 @@ class ConfigImpl : public Config,
                    Logger::Loggable<Logger::Id::config> {
 public:
   ConfigImpl(const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config,
-             Server::Configuration::FactoryContext& context);
+             Server::Configuration::FactoryContext& context,
+             Router::RouteConfigProviderManager& route_config_provider_manager);
 
   // ThriftFilters::FilterChainFactory
   void createFilterChain(ThriftFilters::FilterChainFactoryCallbacks& callbacks) override;
@@ -75,7 +76,7 @@ public:
   // Router::Config
   Router::RouteConstSharedPtr route(const MessageMetadata& metadata,
                                     uint64_t random_value) const override {
-    return route_matcher_->route(metadata, random_value);
+    return route_config_provider_->config()->route(metadata, random_value);
   }
 
   // Config
@@ -96,7 +97,7 @@ private:
   ThriftFilterStats stats_;
   const TransportType transport_;
   const ProtocolType proto_;
-  std::unique_ptr<Router::RouteMatcher> route_matcher_;
+  Router::RouteConfigProviderSharedPtr route_config_provider_;
 
   std::list<ThriftFilters::FilterFactoryCb> filter_factories_;
   const bool payload_passthrough_;
