@@ -304,7 +304,8 @@ message HttpConnectionManager {
   // Configures the manner in which the Proxy-Status HTTP response header is
   // populated.
   //
-  // See the Proxy-Status RFC: https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-05
+  // See the [Proxy-Status
+  // RFC](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-05).
   // TODO(ambuc): Update this with the non-draft URL when finalized.
   //
   // The Proxy-Status header is a string of the form:
