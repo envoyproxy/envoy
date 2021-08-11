@@ -84,6 +84,8 @@ UpstreamRequest::~UpstreamRequest() {
     max_stream_duration_timer_->disableTimer();
   }
   clearRequestEncoder();
+  stream_info_.addWireBytesSent(parent_.callbacks()->streamInfo().wireBytesSent());
+  stream_info_.addWireBytesReceived(parent_.callbacks()->streamInfo().wireBytesReceived());
 
   // If desired, fire the per-try histogram when the UpstreamRequest
   // completes.

@@ -19,11 +19,11 @@ public:
     }
   }
 
-  void expectWireBytesSentAndReceived(int log_id, int h1_wire_bytes_sent,
+  void expectWireBytesSentAndReceived(std::string log_name, int log_index, int h1_wire_bytes_sent,
                                       int h1_wire_bytes_received, int h2_wire_bytes_sent,
                                       int h2_wire_bytes_received) {
-    auto integer_near = [](int x, int y) -> bool { return std::abs(x - y) <= (x / 30); };
-    std::string access_log = waitForAccessLog(access_log_name_, log_id);
+    auto integer_near = [](int x, int y) -> bool { return std::abs(x - y) <= (x / 20); };
+    std::string access_log = waitForAccessLog(log_name, log_index);
     std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
     int wire_bytes_sent = std::stoi(log_entries[0]),
         wire_bytes_received = std::stoi(log_entries[1]);
@@ -34,8 +34,6 @@ public:
     if (upstreamProtocol() == Http::CodecType::HTTP2) {
       // Because of non-deterministic h2 compression, the same plain text length don't map to the
       // same number of wire bytes.
-      // EXPECT_EQ(h2_wire_bytes_sent, wire_bytes_sent);
-      // EXPECT_EQ(h2_wire_bytes_received, wire_bytes_received);
       EXPECT_TRUE(integer_near(h2_wire_bytes_sent, wire_bytes_sent));
       EXPECT_TRUE(integer_near(h2_wire_bytes_received, wire_bytes_received));
     }
