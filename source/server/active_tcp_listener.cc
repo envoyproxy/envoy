@@ -8,18 +8,17 @@
 #include "source/common/common/assert.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
-#include "source/common/stats/timespan_impl.h"
 
 namespace Envoy {
 namespace Server {
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerConfig& config, uint32_t worker_index)
-    : ActiveStreamListenerBase(parent, parent.dispatcher(),
-                               parent.dispatcher().createListener(
-                                   config.listenSocketFactory().getListenSocket(worker_index),
-                                   *this, config.bindToPort()),
-                               config),
+    : OwnedActiveStreamListenerBase(parent, parent.dispatcher(),
+                                    parent.dispatcher().createListener(
+                                        config.listenSocketFactory().getListenSocket(worker_index),
+                                        *this, config.bindToPort()),
+                                    config),
       tcp_conn_handler_(parent) {
   config.connectionBalancer().registerHandler(*this);
 }
@@ -27,7 +26,7 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerPtr&& listener,
                                      Network::ListenerConfig& config)
-    : ActiveStreamListenerBase(parent, parent.dispatcher(), std::move(listener), config),
+    : OwnedActiveStreamListenerBase(parent, parent.dispatcher(), std::move(listener), config),
       tcp_conn_handler_(parent) {
   config.connectionBalancer().registerHandler(*this);
 }
@@ -62,46 +61,10 @@ ActiveTcpListener::~ActiveTcpListener() {
                                                      config_->name(), numConnections()));
 }
 
-void ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
-  ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
-  ActiveConnections& active_connections = connection.active_connections_;
-  auto removed = connection.removeFromList(active_connections.connections_);
-  dispatcher().deferredDelete(std::move(removed));
-  // Delete map entry only iff connections becomes empty.
-  if (active_connections.connections_.empty()) {
-    auto iter = connections_by_context_.find(&active_connections.filter_chain_);
-    ASSERT(iter != connections_by_context_.end());
-    // To cover the lifetime of every single connection, Connections need to be deferred deleted
-    // because the previously contained connection is deferred deleted.
-    dispatcher().deferredDelete(std::move(iter->second));
-    // The erase will break the iteration over the connections_by_context_ during the deletion.
-    if (!is_deleting_) {
-      connections_by_context_.erase(iter);
-    }
-  }
-}
-
 void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
   ENVOY_LOG(trace, "replacing listener ", config_->listenerTag(), " by ", config.listenerTag());
   ASSERT(&config_->connectionBalancer() == &config.connectionBalancer());
   config_ = &config;
-}
-
-void ActiveTcpListener::removeFilterChain(const Network::FilterChain* filter_chain) {
-  auto iter = connections_by_context_.find(filter_chain);
-  if (iter == connections_by_context_.end()) {
-    // It is possible when listener is stopping.
-  } else {
-    auto& connections = iter->second->connections_;
-    while (!connections.empty()) {
-      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
-    }
-    // Since is_deleting_ is on, we need to manually remove the map value and drive the
-    // iterator. Defer delete connection container to avoid race condition in destroying
-    // connection.
-    dispatcher().deferredDelete(std::move(iter->second));
-    connections_by_context_.erase(iter);
-  }
 }
 
 void ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
@@ -177,15 +140,6 @@ void ActiveTcpListener::newActiveConnection(const Network::FilterChain& filter_c
     active_connection->connection_->addConnectionCallbacks(*active_connection);
     LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
   }
-}
-
-ActiveConnections&
-ActiveTcpListener::getOrCreateActiveConnections(const Network::FilterChain& filter_chain) {
-  ActiveConnectionCollectionPtr& connections = connections_by_context_[&filter_chain];
-  if (connections == nullptr) {
-    connections = std::make_unique<ActiveConnections>(*this, filter_chain);
-  }
-  return *connections;
 }
 
 void ActiveTcpListener::post(Network::ConnectionSocketPtr&& socket) {

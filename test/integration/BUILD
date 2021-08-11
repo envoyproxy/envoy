@@ -1099,11 +1099,43 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "fake_resource_monitor_lib",
+    srcs = [
+        "fake_resource_monitor.cc",
+    ],
+    hdrs = [
+        "fake_resource_monitor.h",
+    ],
+    deps = [
+        "//envoy/server:resource_monitor_config_interface",
+        "//test/common/config:dummy_config_proto_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "base_overload_integration_test_lib",
+    srcs = [
+        "base_overload_integration_test.cc",
+    ],
+    hdrs = [
+        "base_overload_integration_test.h",
+    ],
+    deps = [
+        ":fake_resource_monitor_lib",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "overload_integration_test",
     srcs = ["overload_integration_test.cc"],
     shard_count = 2,
     deps = [
+        ":base_overload_integration_test_lib",
         ":http_protocol_integration_lib",
         "//test/common/config:dummy_config_proto_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

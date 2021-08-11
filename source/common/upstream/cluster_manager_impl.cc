@@ -880,7 +880,7 @@ void ClusterManagerImpl::maybePreconnect(
     ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
     const ClusterConnectivityState& state,
     std::function<ConnectionPool::Instance*()> pick_preconnect_pool) {
-  auto peekahead_ratio = cluster_entry.cluster_info_->peekaheadRatio();
+  auto peekahead_ratio = cluster_entry.info()->peekaheadRatio();
   if (peekahead_ratio <= 1.0) {
     return;
   }
@@ -913,7 +913,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
     ResourcePriority priority, absl::optional<Http::Protocol> protocol,
     LoadBalancerContext* context) {
   // Select a host and create a connection pool for it if it does not already exist.
-  auto pool = connPool(priority, protocol, context, false);
+  auto pool = httpConnPoolImpl(priority, protocol, context, false);
   if (pool == nullptr) {
     return absl::nullopt;
   }
@@ -923,7 +923,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
         // Now that a new stream is being established, attempt to preconnect.
         maybePreconnect(*this, parent_.cluster_manager_state_,
                         [this, &priority, &protocol, &context]() {
-                          return connPool(priority, protocol, context, true);
+                          return httpConnPoolImpl(priority, protocol, context, true);
                         });
       },
       pool);
@@ -934,7 +934,7 @@ absl::optional<TcpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     ResourcePriority priority, LoadBalancerContext* context) {
   // Select a host and create a connection pool for it if it does not already exist.
-  auto pool = tcpConnPool(priority, context, false);
+  auto pool = tcpConnPoolImpl(priority, context, false);
   if (pool == nullptr) {
     return absl::nullopt;
   }
@@ -942,7 +942,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   TcpPoolData data(
       [this, priority, context]() -> void {
         maybePreconnect(*this, parent_.cluster_manager_state_, [this, &priority, &context]() {
-          return tcpConnPool(priority, context, true);
+          return tcpConnPoolImpl(priority, context, true);
         });
       },
       pool);
@@ -1044,6 +1044,29 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpAsyncClient
   return http_async_client_;
 }
 
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHosts(
+    const std::string& name, uint32_t priority,
+    PrioritySet::UpdateHostsParams&& update_hosts_params,
+    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
+    const HostVector& hosts_removed, absl::optional<uint32_t> overprovisioning_factor,
+    HostMapConstSharedPtr cross_priority_host_map) {
+  ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
+            hosts_added.size(), hosts_removed.size());
+  priority_set_.updateHosts(priority, std::move(update_hosts_params), std::move(locality_weights),
+                            hosts_added, hosts_removed, overprovisioning_factor,
+                            std::move(cross_priority_host_map));
+  // If an LB is thread aware, create a new worker local LB on membership changes.
+  if (lb_factory_ != nullptr) {
+    ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
+    lb_ = lb_factory_->create();
+  }
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnPools(
+    const HostVector& hosts_removed) {
+  parent_.drainConnPools(hosts_removed);
+}
+
 ClusterUpdateCallbacksHandlePtr
 ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
   ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
@@ -1098,7 +1121,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
     ENVOY_LOG(debug, "adding TLS local cluster {}", local_cluster_name);
     thread_local_clusters_[local_cluster_name] = std::make_unique<ClusterEntry>(
         *this, local_cluster_params->info_, local_cluster_params->load_balancer_factory_);
-    local_priority_set_ = &thread_local_clusters_[local_cluster_name]->priority_set_;
+    local_priority_set_ = &thread_local_clusters_[local_cluster_name]->prioritySet();
   }
 }
 
@@ -1113,7 +1136,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImp
   host_tcp_conn_pool_map_.clear();
   ASSERT(host_tcp_conn_map_.empty());
   for (auto& cluster : thread_local_clusters_) {
-    if (&cluster.second->priority_set_ != local_priority_set_) {
+    if (&cluster.second->prioritySet() != local_priority_set_) {
       cluster.second.reset();
     }
   }
@@ -1199,7 +1222,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(
   // We need to go through and purge any connection pools for hosts that got deleted.
   // Even if two hosts actually point to the same address this will be safe, since if a
   // host is readded it will be a different physical HostSharedPtr.
-  cluster_entry->parent_.drainConnPools(hosts_removed);
+  cluster_entry->drainConnPools(hosts_removed);
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
@@ -1209,17 +1232,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     HostMapConstSharedPtr cross_priority_host_map) {
   ASSERT(thread_local_clusters_.find(name) != thread_local_clusters_.end());
   const auto& cluster_entry = thread_local_clusters_[name];
-  ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
-            hosts_added.size(), hosts_removed.size());
-  cluster_entry->priority_set_.updateHosts(
-      priority, std::move(update_hosts_params), std::move(locality_weights), hosts_added,
-      hosts_removed, overprovisioning_factor, std::move(cross_priority_host_map));
-
-  // If an LB is thread aware, create a new worker local LB on membership changes.
-  if (cluster_entry->lb_factory_ != nullptr) {
-    ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
-    cluster_entry->lb_ = cluster_entry->lb_factory_->create();
-  }
+  cluster_entry->updateHosts(name, priority, std::move(update_hosts_params),
+                             std::move(locality_weights), hosts_added, hosts_removed,
+                             overprovisioning_factor, std::move(cross_priority_host_map));
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
@@ -1377,7 +1392,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
 }
 
 Http::ConnectionPool::Instance*
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImpl(
     ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
     LoadBalancerContext* context, bool peek) {
   HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
@@ -1442,7 +1457,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
             parent_.parent_.time_source_, parent_.cluster_manager_state_);
 
-        pool->addIdleCallback([&parent = parent_, host, priority, hash_key]() {
+        pool->addIdleCallback([& parent = parent_, host, priority, hash_key]() {
           parent.httpConnPoolIsIdle(host, priority, hash_key);
         });
 
@@ -1489,7 +1504,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
 }
 
 Tcp::ConnectionPool::Instance*
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl(
     ResourcePriority priority, LoadBalancerContext* context, bool peek) {
   HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
@@ -1537,7 +1552,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
             parent_.cluster_manager_state_));
     ASSERT(inserted);
     pool_iter->second->addIdleCallback(
-        [&parent = parent_, host, hash_key]() { parent.tcpConnPoolIsIdle(host, hash_key); });
+        [& parent = parent_, host, hash_key]() { parent.tcpConnPoolIsIdle(host, hash_key); });
   }
 
   return pool_iter->second.get();

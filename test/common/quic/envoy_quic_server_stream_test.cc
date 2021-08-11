@@ -7,6 +7,7 @@
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 #endif
 
+#include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
 
@@ -83,6 +84,11 @@ public:
   void SetUp() override {
     quic_session_.Initialize();
     setQuicConfigWithDefaultValues(quic_session_.config());
+    quic_connection_.SetEncrypter(
+        quic::ENCRYPTION_FORWARD_SECURE,
+        std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
+    quic_connection_.SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
+
     quic_session_.OnConfigNegotiated();
     spdy_request_headers_[":authority"] = host_;
     spdy_request_headers_[":method"] = "POST";

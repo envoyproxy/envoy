@@ -46,7 +46,8 @@ def test_config_dunder_getitem(patches):
 
 # props
 
-def test_config_config(patches):
+@pytest.mark.parametrize("isdict", [True, False])
+def test_config_config(patches, isdict):
     config = distrotest.DistroTestConfig(
         "DOCKER", "KEYFILE", "PATH", "TARBALL", "TESTFILE", "MAINTAINER", "VERSION")
     patched = patches(
@@ -55,12 +56,24 @@ def test_config_config(patches):
         prefix="tools.distribution.distrotest")
 
     with patched as (m_utils, m_path):
-        assert config.config == m_utils.from_yaml.return_value
+        if isdict:
+            m_utils.from_yaml.return_value = {}
+
+        if isdict:
+            assert config.config == m_utils.from_yaml.return_value
+        else:
+            with pytest.raises(distrotest.ConfigurationError) as e:
+                config.config
 
     assert (
         list(m_utils.from_yaml.call_args)
         == [(m_path.return_value,), {}])
-    assert "config" in config.__dict__
+    if isdict:
+        assert "config" in config.__dict__
+    else:
+        assert (
+            e.value.args[0]
+            == f"Unable to parse configuration: {m_path.return_value}")
 
 
 @pytest.mark.parametrize("config_path", [None, "CONFIG_PATH"])
@@ -173,7 +186,7 @@ def test_config_keyfile(patches):
         prefix="tools.distribution.distrotest")
 
     with patched as (m_shutil, m_key):
-        assert config.keyfile == m_shutil.copyfile.return_value
+        assert config.keyfile == m_key.return_value
 
     assert (
         list(m_shutil.copyfile.call_args)
@@ -206,7 +219,7 @@ def test_config_packages_dir(patches):
         prefix="tools.distribution.distrotest")
 
     with patched as (m_utils, m_packages):
-        assert config.packages_dir == m_utils.extract.return_value
+        assert config.packages_dir == m_packages.return_value
 
     assert (
         list(m_utils.extract.call_args)
@@ -223,7 +236,7 @@ def test_config_testfile(patches):
         prefix="tools.distribution.distrotest")
 
     with patched as (m_shutil, m_key):
-        assert config.testfile == m_shutil.copyfile.return_value
+        assert config.testfile == m_key.return_value
 
     assert (
         list(m_shutil.copyfile.call_args)
@@ -301,7 +314,6 @@ def test_config_get_package_type(patches, pkg_type, pkg_types):
         if pkg_type in pkg_types:
             assert config.get_package_type("IMAGE") == "Y"
         else:
-
             with pytest.raises(distrotest.ConfigurationError) as e:
                 config.get_package_type("IMAGE")
 
@@ -1355,7 +1367,6 @@ async def test_distrotest_start(patches, running):
         if running:
             assert await dtest.start() == m_create.return_value
         else:
-
             with pytest.raises(distrotest.ContainerError) as e:
                 await dtest.start()
 

@@ -79,8 +79,7 @@ def buffered(
         stderr.extend(mangle(_stderr.read().strip().split("\n")))
 
 
-def extract(path: Union[pathlib.Path, str], *tarballs: Union[pathlib.Path,
-                                                             str]) -> Union[pathlib.Path, str]:
+def extract(path: Union[pathlib.Path, str], *tarballs: Union[pathlib.Path, str]) -> pathlib.Path:
     if not tarballs:
         raise ExtractError(f"No tarballs specified for extraction to {path}")
     openers = nested(*tuple(tarfile.open(tarball) for tarball in tarballs))
@@ -88,11 +87,11 @@ def extract(path: Union[pathlib.Path, str], *tarballs: Union[pathlib.Path,
     with openers as tarfiles:
         for tar in tarfiles:
             tar.extractall(path=path)
-    return path
+    return pathlib.Path(path)
 
 
 @contextmanager
-def untar(*tarballs: str) -> Iterator[str]:
+def untar(*tarballs: Union[pathlib.Path, str]) -> Iterator[pathlib.Path]:
     """Untar a tarball into a temporary directory
 
     for example to list the contents of a tarball:
@@ -116,17 +115,16 @@ def untar(*tarballs: str) -> Iterator[str]:
         yield extract(tmpdir, *tarballs)
 
 
-def from_yaml(path: str) -> Union[dict, list, str, int]:
+def from_yaml(path: Union[pathlib.Path, str]) -> Union[dict, list, str, int]:
     """Returns the loaded python object from a yaml file given by `path`"""
-    with open(path) as f:
-        return yaml.safe_load(f.read())
+    return yaml.safe_load(pathlib.Path(path).read_text())
 
 
-def to_yaml(data: Union[dict, list, str, int], path: str) -> str:
+def to_yaml(data: Union[dict, list, str, int], path: Union[pathlib.Path, str]) -> pathlib.Path:
     """For given `data` dumps as yaml to provided `path`.
 
     Returns `path`
     """
-    with open(path, "w") as f:
-        f.write(yaml.dump(data))
+    path = pathlib.Path(path)
+    path.write_text(yaml.dump(data))
     return path

@@ -54,7 +54,6 @@ def test_util_buffered_stdout_stderr():
 
 
 def test_util_buffered_no_stdout_stderr():
-
     with pytest.raises(utils.BufferUtilError):
         with utils.buffered():
             pass
@@ -127,19 +126,19 @@ def test_util_coverage_with_data_file(patches):
 def test_util_extract(patches, tarballs):
     patched = patches(
         "nested",
+        "pathlib",
         "tarfile.open",
         prefix="tools.base.utils")
 
-    with patched as (m_nested, m_open):
+    with patched as (m_nested, m_plib, m_open):
         _extractions = [MagicMock(), MagicMock()]
         m_nested.return_value.__enter__.return_value = _extractions
 
         if tarballs:
-            assert utils.extract("PATH", *tarballs) == "PATH"
+            assert utils.extract("PATH", *tarballs) == m_plib.Path.return_value
         else:
-
             with pytest.raises(utils.ExtractError) as e:
-                utils.extract("PATH", *tarballs) == "PATH"
+                utils.extract("PATH", *tarballs)
 
     if not tarballs:
         assert (
@@ -150,6 +149,10 @@ def test_util_extract(patches, tarballs):
         for _extract in _extractions:
             assert not _extract.extractall.called
         return
+
+    assert (
+        list(m_plib.Path.call_args)
+        == [("PATH", ), {}])
 
     for _extract in _extractions:
         assert (
@@ -187,39 +190,39 @@ def test_util_untar(patches, tarballs):
 
 def test_util_from_yaml(patches):
     patched = patches(
-        "open",
+        "pathlib",
         "yaml",
         prefix="tools.base.utils")
 
-    with patched as (m_open, m_yaml):
+    with patched as (m_plib, m_yaml):
         assert utils.from_yaml("PATH") == m_yaml.safe_load.return_value
 
     assert (
-        list(m_open.call_args)
+        list(m_plib.Path.call_args)
         == [("PATH", ), {}])
     assert (
         list(m_yaml.safe_load.call_args)
-        == [(m_open.return_value.__enter__.return_value.read.return_value, ), {}])
+        == [(m_plib.Path.return_value.read_text.return_value, ), {}])
     assert (
-        list(m_open.return_value.__enter__.return_value.read.call_args)
+        list(m_plib.Path.return_value.read_text.call_args)
         == [(), {}])
 
 
 def test_util_to_yaml(patches):
     patched = patches(
-        "open",
+        "pathlib",
         "yaml",
         prefix="tools.base.utils")
 
-    with patched as (m_open, m_yaml):
-        assert utils.to_yaml("DATA", "PATH") == "PATH"
+    with patched as (m_plib, m_yaml):
+        assert utils.to_yaml("DATA", "PATH") == m_plib.Path.return_value
 
-    assert (
-        list(m_open.call_args)
-        == [("PATH", "w"), {}])
     assert (
         list(m_yaml.dump.call_args)
         == [("DATA", ), {}])
     assert (
-        list(m_open.return_value.__enter__.return_value.write.call_args)
+        list(m_plib.Path.return_value.write_text.call_args)
         == [(m_yaml.dump.return_value, ), {}])
+    assert (
+        list(m_plib.Path.call_args)
+        == [("PATH", ), {}])
