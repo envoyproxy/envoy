@@ -220,6 +220,7 @@ ProxyStatusUtils::proxyStatusErrorToString(const ProxyStatusError proxy_status) 
   case ProxyStatusError::ProxyLoopDetected:
     return PROXY_LOOP_DETECTED;
   }
+  return "-";
 }
 
 const absl::optional<ProxyStatusError>
