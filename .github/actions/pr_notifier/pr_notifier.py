@@ -29,6 +29,7 @@ MAINTAINERS = {
     'yanavlasov': 'UJHLR5KFS',
     'asraa': 'UKZKCFRTP',
     'davinci26': 'U013608CUDV',
+    'rojkov': 'UH5EXLYQK',
 }
 
 # Only notify API reviewers who aren't maintainers.
