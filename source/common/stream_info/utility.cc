@@ -145,7 +145,7 @@ ProxyStatusUtils::toString(const StreamInfo& stream_info, const ProxyStatusError
 
   retval.append(absl::StrFormat("; error=%s", proxyStatusErrorToString(error)));
 
-  if (proxy_status_config.attach_details() && stream_info.responseCodeDetails().has_value()) {
+  if (!proxy_status_config.remove_details() && stream_info.responseCodeDetails().has_value()) {
     retval.append(absl::StrFormat("; details='%s'", stream_info.responseCodeDetails().value()));
   }
 

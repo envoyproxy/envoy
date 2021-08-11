@@ -67,7 +67,7 @@ TEST(UtilityTest, formatDownstreamAddressNoPort) {
 class ProxyStatusTest : public ::testing::Test {
 protected:
   void SetUp() {
-    proxy_status_config_.set_attach_details(true);
+    proxy_status_config_.set_remove_details(false);
     proxy_status_config_.set_proxy_name(HttpConnectionManager::ProxyStatusConfig::ENVOY_LITERAL);
   }
 
@@ -76,15 +76,15 @@ protected:
 };
 
 TEST_F(ProxyStatusTest, ToStringNoDetailsAvailable) {
-  proxy_status_config_.set_attach_details(true);
+  proxy_status_config_.set_remove_details(false);
   stream_info_.response_code_details_ = absl::nullopt;
   EXPECT_THAT(ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
                                          /*server_name=*/"UNUSED", proxy_status_config_),
               Not(HasSubstr("details=")));
 }
 
-TEST_F(ProxyStatusTest, ToStringSetAttachDetailsFalse) {
-  proxy_status_config_.set_attach_details(false);
+TEST_F(ProxyStatusTest, ToStringSetRemoveDetailsTrue) {
+  proxy_status_config_.set_remove_details(true);
   stream_info_.response_code_details_ = "some_response_code_details";
   EXPECT_THAT(ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
                                          /*server_name=*/"UNUSED", proxy_status_config_),
@@ -92,7 +92,7 @@ TEST_F(ProxyStatusTest, ToStringSetAttachDetailsFalse) {
 }
 
 TEST_F(ProxyStatusTest, ToStringWithDetails) {
-  proxy_status_config_.set_attach_details(true);
+  proxy_status_config_.set_remove_details(false);
   stream_info_.response_code_details_ = "some_response_code_details";
   EXPECT_THAT(ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
                                          /*server_name=*/"UNUSED", proxy_status_config_),

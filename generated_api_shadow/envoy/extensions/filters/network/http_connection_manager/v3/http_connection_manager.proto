@@ -312,8 +312,9 @@ message HttpConnectionManager {
   // Configures the manner in which the Proxy-Status HTTP response header is
   // populated.
   //
-  // See the Proxy-Status RFC: https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-05
-  // TODO(ambuc): Update this with the non-draft URL when finalized.
+  // See the [Proxy-Status
+  // RFC](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-05).
+  // [#comment:TODO: Update this with the non-draft URL when finalized.]
   //
   // The Proxy-Status header is a string of the form:
   //
@@ -328,10 +329,9 @@ message HttpConnectionManager {
       SERVER_NAME = 1;
     }
 
-    // If true, populates the details field of the Proxy-Status header with
-    // stream_info.response_code_details.
-    // This value defaults to `false`, i.e. no `details` field is attached.
-    bool attach_details = 1;
+    // If true, the details field of the Proxy-Status header is not populated with stream_info.response_code_details.
+    // This value defaults to `false`, i.e. the `details` field is populated by default.
+    bool remove_details = 1;
 
     // If true, overwrites the existing Status header with the response code
     // recommended by the Proxy-Status spec.
@@ -751,7 +751,7 @@ message HttpConnectionManager {
 
   // Proxy-Status HTTP response header configuration.
   // If this config is set, the Proxy-Status HTTP response header field is
-  // populated. By default, the Proxy-Status HTTP response header field.
+  // populated. By default, it is not.
   ProxyStatusConfig proxy_status_config = 49;
 
   google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11 [

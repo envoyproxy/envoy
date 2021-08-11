@@ -321,10 +321,9 @@ message HttpConnectionManager {
       SERVER_NAME = 1;
     }
 
-    // If true, populates the details field of the Proxy-Status header with
-    // stream_info.response_code_details.
-    // This value defaults to `false`, i.e. no `details` field is attached.
-    bool attach_details = 1;
+    // If true, the details field of the Proxy-Status header is not populated with stream_info.response_code_details.
+    // This value defaults to `false`, i.e. the `details` field is populated by default.
+    bool remove_details = 1;
 
     // If true, overwrites the existing Status header with the response code
     // recommended by the Proxy-Status spec.
