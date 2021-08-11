@@ -56,12 +56,12 @@ message DiscoveryRequest {
   repeated string resource_names = 3;
 
   // [#not-implemented-hide:]
-  // Alternative to resource_names field that allows specifying cache
+  // Alternative to *resource_names* field that allows specifying cache
   // keys along with each resource name. If this is populated in the
-  // first request for a resource type on a stream, resource_names is ignored
+  // first request for a resource type on a stream, *resource_names* is ignored
   // for all subsequent requests for that resource type on that stream.
   // Clients that populate this field must be able to handle responses
-  // from the server where resources are wrapped in a Resource message.
+  // from the server where resources are wrapped in a *Resource* message.
   repeated ResourceLocator resource_locators = 7;
 
   // Type of the resource that is being requested, e.g.
@@ -200,18 +200,18 @@ message DeltaDiscoveryRequest {
   repeated string resource_names_unsubscribe = 4;
 
   // [#not-implemented-hide:]
-  // Alternative to resource_names_subscribe field that allows specifying cache
+  // Alternative to *resource_names_subscribe* field that allows specifying cache
   // keys along with each resource name. If this is populated in the
-  // first request for a resource type on a stream, resource_names_subscribe
-  // and resource_names_unsubscribe are ignored for all subsequent requests
+  // first request for a resource type on a stream, *resource_names_subscribe*
+  // and *resource_names_unsubscribe* are ignored for all subsequent requests
   // for that resource type on that stream.
   repeated ResourceLocator resource_locators_subscribe = 8;
 
   // [#not-implemented-hide:]
-  // Alternative to resource_names_unsubscribe field that allows specifying cache
-  // keys along with each resource name. If resource_locators_subscribe is
+  // Alternative to *resource_names_unsubscribe* field that allows specifying cache
+  // keys along with each resource name. If *resource_locators_subscribe* is
   // populated in the first request for a resource type on a stream,
-  // this field is used instead of resource_named_unsubscribe for all
+  // this field is used instead of *resource_named_unsubscribe* for all
   // subsequent requests for that resource type on that stream.
   repeated ResourceLocator resource_locators_unsubscribe = 9;
 
