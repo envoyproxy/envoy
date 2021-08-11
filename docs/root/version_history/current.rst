@@ -57,6 +57,7 @@ Removed Config or Runtime
 * listener: removed ``envoy.reloadable_features.disable_tls_inspector_injection`` runtime guard and legacy code paths.
 * ocsp: removed ``envoy.reloadable_features.check_ocsp_policy deprecation`` runtime guard and legacy code paths.
 * ocsp: removed ``envoy.reloadable_features.require_ocsp_response_for_must_staple_certs deprecation`` and legacy code paths.
+* quic: removed ``envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing`` runtime guard.
 
 New Features
 ------------
