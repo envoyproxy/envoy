@@ -2864,11 +2864,11 @@ TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeResponseCompleteWireBy
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
   }
-  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%\n");
+  useAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%\n");
 
   testRouterDownstreamDisconnectBeforeResponseComplete(nullptr);
 
-  expectWireBytesSentAndReceived(upstream_access_log_name_, 0, 159, 566, 113, 534);
+  expectWireBytesSentAndReceived(access_log_name_, 0, 159, 566, 114, 534);
 }
 
 TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireBytesCount) {
@@ -2888,11 +2888,11 @@ TEST_P(ProtocolIntegrationTest, DownstreamResetWireBytesCount) {
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
   }
-  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%\n");
+  useAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%\n");
 
   testDownstreamResetBeforeResponseComplete();
 
-  expectWireBytesSentAndReceived(upstream_access_log_name_, 0, 210, 566, 132, 534);
+  expectWireBytesSentAndReceived(access_log_name_, 0, 210, 566, 132, 534);
 }
 
 } // namespace Envoy
