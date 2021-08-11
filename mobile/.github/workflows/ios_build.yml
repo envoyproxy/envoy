@@ -54,10 +54,14 @@ jobs:
       - run: exit 1
         if: steps.check-cache.outputs.cache-hit != 'true'
         name: 'Short-circuit'
-      - run: bazelisk build --config=ios //examples/swift/hello_world:app
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bazelisk build --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/swift/hello_world:app
         name: 'Build swift app'
       # Run the app in the background and redirect logs.
-      - run: bazelisk run --config=ios //examples/swift/hello_world:app &> /tmp/envoy.log &
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bazelisk run --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/swift/hello_world:app &> /tmp/envoy.log &
         name: 'Run swift app'
       - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
         name: 'Check connectivity'
