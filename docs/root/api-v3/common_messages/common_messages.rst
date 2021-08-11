@@ -12,6 +12,7 @@ Common messages
   ../config/core/v3/protocol.proto
   ../config/core/v3/proxy_protocol.proto
   ../service/discovery/v3/discovery.proto
+  ../service/discovery/v3/dynamic_parameter_constraints.proto
   ../config/core/v3/config_source.proto
   ../config/core/v3/grpc_service.proto
   ../config/core/v3/grpc_method_list.proto
