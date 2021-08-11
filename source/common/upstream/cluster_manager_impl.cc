@@ -1457,7 +1457,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
             parent_.parent_.time_source_, parent_.cluster_manager_state_);
 
-        pool->addIdleCallback([& parent = parent_, host, priority, hash_key]() {
+        pool->addIdleCallback([&parent = parent_, host, priority, hash_key]() {
           parent.httpConnPoolIsIdle(host, priority, hash_key);
         });
 
@@ -1552,7 +1552,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl
             parent_.cluster_manager_state_));
     ASSERT(inserted);
     pool_iter->second->addIdleCallback(
-        [& parent = parent_, host, hash_key]() { parent.tcpConnPoolIsIdle(host, hash_key); });
+        [&parent = parent_, host, hash_key]() { parent.tcpConnPoolIsIdle(host, hash_key); });
   }
 
   return pool_iter->second.get();
