@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.thrift_proxy.v3;
 
-import "envoy/extensions/filters/network/thrift_proxy/v3/route.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/extensions/filters/network/thrift_proxy/v3/route.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -146,5 +146,6 @@ message ThriftProtocolOptions {
 
 message Rds {
   config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
   string route_config_name = 2;
 }
