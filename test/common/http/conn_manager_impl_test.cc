@@ -3698,8 +3698,8 @@ public:
     sendRequestHeadersAndData();
   }
   const ResponseHeaderMap*
-  send_request_with(int status, StreamInfo::ResponseFlag response_flag, std::string details,
-                    absl::optional<std::string> proxy_status = absl::nullopt) {
+  sendRequestWith(int status, StreamInfo::ResponseFlag response_flag, std::string details,
+                  absl::optional<std::string> proxy_status = absl::nullopt) {
     auto response_headers = new TestResponseHeaderMapImpl{{":status", std::to_string(status)}};
     if (proxy_status.has_value()) {
       response_headers->setProxyStatus(proxy_status.value());
@@ -3718,7 +3718,7 @@ TEST_F(ProxyStatusTest, NoPopulateProxyStatus) {
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      send_request_with(403, StreamInfo::ResponseFlag::FailedLocalHealthCheck, "foo");
+      sendRequestWith(403, StreamInfo::ResponseFlag::FailedLocalHealthCheck, "foo");
   ASSERT_TRUE(altered_headers);
   ASSERT_FALSE(altered_headers->ProxyStatus());
   EXPECT_EQ(altered_headers->getStatusValue(), "403"); // unchanged from request.
@@ -3735,7 +3735,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCodeAndServerNa
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      send_request_with(403, StreamInfo::ResponseFlag::FailedLocalHealthCheck, "foo");
+      sendRequestWith(403, StreamInfo::ResponseFlag::FailedLocalHealthCheck, "foo");
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
@@ -3758,7 +3758,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      send_request_with(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, "bar");
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, "bar");
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
@@ -3781,7 +3781,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      send_request_with(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, "bar");
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, "bar");
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
@@ -3805,7 +3805,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      send_request_with(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, "baz");
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, "baz");
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
@@ -3828,7 +3828,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      send_request_with(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, "baz", "SomeCDN");
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, "baz", "SomeCDN");
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
