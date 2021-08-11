@@ -62,7 +62,6 @@ TEST(WRSQSchedulerTest, ProbabilityVerification) {
   // number of times equal to its weight.
   for (uint32_t i = 0; i < weight_sum; ++i) {
     EXPECT_CALL(random, random()).WillOnce(Return(i));
-    // The weights will not change with WRSQ, so the predicate does not matter.
     auto peek = sched.peekAgain([](const double& x) { return x + 1; });
     auto p = sched.pickAndAdd([](const double& x) { return x + 1; });
     EXPECT_EQ(*p, *peek);
