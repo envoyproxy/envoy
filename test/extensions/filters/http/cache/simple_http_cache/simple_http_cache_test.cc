@@ -125,7 +125,7 @@ protected:
 
 // Simple flow of putting in an item, getting it, deleting it.
 TEST_F(SimpleHttpCacheTest, PutGet) {
-  const std::string request_path1("Name");
+  const std::string request_path1("/name");
   LookupContextPtr name_lookup_context = lookup(request_path1);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
@@ -137,7 +137,7 @@ TEST_F(SimpleHttpCacheTest, PutGet) {
   name_lookup_context = lookup(request_path1);
   EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(name_lookup_context.get(), body1));
 
-  const std::string& request_path2("Another Name");
+  const std::string& request_path2("/another-name");
   LookupContextPtr another_name_lookup_context = lookup(request_path2);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
@@ -150,7 +150,7 @@ TEST_F(SimpleHttpCacheTest, PrivateResponse) {
   Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                                    {"age", "2"},
                                                    {"cache-control", "private,max-age=3600"}};
-  const std::string request_path("Name");
+  const std::string request_path("/name");
 
   LookupContextPtr name_lookup_context = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
@@ -190,7 +190,7 @@ TEST_F(SimpleHttpCacheTest, Stale) {
 
 TEST_F(SimpleHttpCacheTest, RequestSmallMinFresh) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "min-fresh=1000");
-  const std::string request_path("Name");
+  const std::string request_path("/name");
   LookupContextPtr name_lookup_context = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
@@ -205,7 +205,7 @@ TEST_F(SimpleHttpCacheTest, RequestSmallMinFresh) {
 TEST_F(SimpleHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-stale=9000");
 
-  const std::string request_path("Name");
+  const std::string request_path("/name");
   LookupContextPtr name_lookup_context = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
@@ -222,13 +222,13 @@ TEST_F(SimpleHttpCacheTest, StreamingPut) {
   Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                                    {"age", "2"},
                                                    {"cache-control", "public, max-age=3600"}};
-  InsertContextPtr inserter = cache_.makeInsertContext(lookup("request_path"));
+  InsertContextPtr inserter = cache_.makeInsertContext(lookup("/request_path"));
   const ResponseMetadata metadata = {current_time_};
   inserter->insertHeaders(response_headers, metadata, false);
   inserter->insertBody(
       Buffer::OwnedImpl("Hello, "), [](bool ready) { EXPECT_TRUE(ready); }, false);
   inserter->insertBody(Buffer::OwnedImpl("World!"), nullptr, true);
-  LookupContextPtr name_lookup_context = lookup("request_path");
+  LookupContextPtr name_lookup_context = lookup("/request_path");
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
   EXPECT_NE(nullptr, lookup_result_.headers_);
   ASSERT_EQ(13, lookup_result_.content_length_);
@@ -246,7 +246,7 @@ TEST(Registration, GetFactory) {
 
 TEST_F(SimpleHttpCacheTest, VaryResponses) {
   // Responses will vary on accept.
-  const std::string RequestPath("some-resource");
+  const std::string RequestPath("/some-resource");
   Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                                    {"cache-control", "public,max-age=3600"},
                                                    {"vary", "accept"}};
@@ -275,7 +275,7 @@ TEST_F(SimpleHttpCacheTest, VaryResponses) {
 }
 
 TEST_F(SimpleHttpCacheTest, PutGetWithTrailers) {
-  const std::string request_path1("Name");
+  const std::string request_path1("/name");
   LookupContextPtr name_lookup_context = lookup(request_path1);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
@@ -288,7 +288,7 @@ TEST_F(SimpleHttpCacheTest, PutGetWithTrailers) {
   EXPECT_TRUE(
       expectLookupSuccessWithBodyAndTrailers(name_lookup_context.get(), body1, response_trailers));
 
-  const std::string& request_path2("Another Name");
+  const std::string& request_path2("/another-name");
   LookupContextPtr another_name_lookup_context = lookup(request_path2);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
