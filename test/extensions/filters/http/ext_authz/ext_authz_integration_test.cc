@@ -4,9 +4,11 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "source/common/common/macros.h"
+#include "source/server/config_validation/server.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
+#include "test/mocks/server/options.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -698,6 +700,47 @@ TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
   ASSERT_TRUE(header_entry.empty());
 }
 
+TEST_P(ExtAuthzHttpIntegrationTest, DirectReponse) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* virtual_hosts = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        virtual_hosts->mutable_routes(0)->clear_route();
+        envoy::config::route::v3::Route* route = virtual_hosts->mutable_routes(0);
+        route->mutable_direct_response()->set_status(204);
+      });
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+  waitForExtAuthzRequest();
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("204", response_->headers().Status()->value().getStringView());
+}
+
+TEST_P(ExtAuthzHttpIntegrationTest, RedirectResponse) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* virtual_hosts = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        virtual_hosts->mutable_routes(0)->clear_route();
+        envoy::config::route::v3::Route* route = virtual_hosts->mutable_routes(0);
+        route->mutable_redirect()->set_path_redirect("/redirect");
+      });
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+  waitForExtAuthzRequest();
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("301", response_->headers().Status()->value().getStringView());
+  EXPECT_EQ("http://host/redirect", response_->headers().getLocationValue());
+}
+
 class ExtAuthzLocalReplyIntegrationTest : public HttpIntegrationTest,
                                           public TestWithParam<Network::Address::IpVersion> {
 public:
@@ -885,6 +928,15 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   }
 
   cleanup();
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/17344
+TEST(ExtConfigValidateTest, Validate) {
+  Server::TestComponentFactory component_factory;
+  EXPECT_TRUE(validateConfig(testing::NiceMock<Server::MockOptions>(TestEnvironment::runfilesPath(
+                                 "test/extensions/filters/http/ext_authz/ext_authz.yaml")),
+                             Network::Address::InstanceConstSharedPtr(), component_factory,
+                             Thread::threadFactoryForTest(), Filesystem::fileSystemForTest()));
 }
 
 } // namespace Envoy

@@ -1,7 +1,7 @@
 import tarfile
 import tempfile
 from contextlib import asynccontextmanager
-from typing import Callable, Iterator, Optional
+from typing import AsyncIterator, Callable, Optional
 
 import aiodocker
 
@@ -11,7 +11,7 @@ class BuildError(Exception):
 
 
 async def _build_image(
-        tar: tempfile.NamedTemporaryFile,
+        tar,  #: IO[bytes] (`docker.images.build` expects `BinaryIO`)
         docker: aiodocker.Docker,
         context: str,
         tag: str,
@@ -75,7 +75,7 @@ async def build_image(*args, **kwargs) -> None:
 
 
 @asynccontextmanager
-async def docker_client(url: Optional[str] = "") -> Iterator[aiodocker.Docker]:
+async def docker_client(url: Optional[str] = "") -> AsyncIterator[aiodocker.Docker]:
     """Aiodocker client
 
     For example to dump the docker image data:

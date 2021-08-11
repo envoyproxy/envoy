@@ -163,6 +163,18 @@ private:
   const uint32_t port_;
 };
 
+class PortRangeMatcher : public Matcher {
+public:
+  PortRangeMatcher(const ::envoy::type::v3::Int32Range& range);
+
+  bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+               const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const uint32_t start_;
+  const uint32_t end_;
+};
+
 /**
  * Matches the principal name as described in the peer certificate. Uses the URI SAN first. If that
  * field is not present, uses the subject instead.
@@ -171,14 +183,17 @@ class AuthenticatedMatcher : public Matcher {
 public:
   AuthenticatedMatcher(const envoy::config::rbac::v3::Principal::Authenticated& auth)
       : matcher_(auth.has_principal_name()
-                     ? absl::make_optional<Matchers::StringMatcherImpl>(auth.principal_name())
+                     ? absl::make_optional<
+                           Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+                           auth.principal_name())
                      : absl::nullopt) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
-  const absl::optional<Matchers::StringMatcherImpl> matcher_;
+  const absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
+      matcher_;
 };
 
 /**
@@ -222,10 +237,13 @@ private:
  * Perform a match against the request server from the client's connection
  * request. This is typically TLS SNI.
  */
-class RequestedServerNameMatcher : public Matcher, Envoy::Matchers::StringMatcherImpl {
+class RequestedServerNameMatcher
+    : public Matcher,
+      Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> {
 public:
   RequestedServerNameMatcher(const envoy::type::matcher::v3::StringMatcher& requested_server_name)
-      : Envoy::Matchers::StringMatcherImpl(requested_server_name) {}
+      : Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>(
+            requested_server_name) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;

@@ -130,6 +130,7 @@ public:
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
+  bool isQuicListener() const override;
 
   // DrainDecision
   bool drainClose() const override { return drain_manager_->drainClose(); }
@@ -146,6 +147,7 @@ private:
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Server::DrainManagerPtr drain_manager_;
+  bool is_quic_;
 };
 
 class ListenerImpl;
@@ -199,6 +201,7 @@ public:
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
 
   Stats::Scope& listenerScope() override;
+  bool isQuicListener() const override;
 
   // ListenerFactoryContext
   const Network::ListenerConfig& listenerConfig() const override;

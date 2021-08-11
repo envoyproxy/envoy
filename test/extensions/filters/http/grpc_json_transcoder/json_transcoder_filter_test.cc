@@ -366,16 +366,6 @@ protected:
     return TestEnvironment::runfilesPath("test/proto/bookstore.descriptor");
   }
 
-  void routeLocalConfig(const Router::RouteSpecificFilterConfig* route_settings,
-                        const Router::RouteSpecificFilterConfig* vhost_settings) {
-    ON_CALL(decoder_callbacks_.route_->route_entry_,
-            perFilterConfig("envoy.filters.http.grpc_json_transcoder"))
-        .WillByDefault(Return(route_settings));
-    ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_,
-            perFilterConfig("envoy.filters.http.grpc_json_transcoder"))
-        .WillByDefault(Return(vhost_settings));
-  }
-
   // TODO(lizan): Add a mock of JsonTranscoderConfig and test more error cases.
   JsonTranscoderConfig config_;
   JsonTranscoderFilter filter_;
@@ -402,18 +392,10 @@ TEST_F(GrpcJsonTranscoderFilterTest, PerRouteDisabledConfigOverride) {
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder route_cfg;
   route_cfg.set_proto_descriptor_bin("");
   JsonTranscoderConfig route_config(route_cfg, *api_);
-  routeLocalConfig(&route_config, nullptr);
 
-  Http::TestRequestHeaderMapImpl headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
-}
-
-TEST_F(GrpcJsonTranscoderFilterTest, PerVHostDisabledConfigOverride) {
-  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder vhost_cfg;
-  vhost_cfg.set_proto_descriptor_bin("");
-  JsonTranscoderConfig vhost_config(vhost_cfg, *api_);
-  routeLocalConfig(nullptr, &vhost_config);
-
+  ON_CALL(*decoder_callbacks_.route_,
+          mostSpecificPerFilterConfig("envoy.filters.http.grpc_json_transcoder"))
+      .WillByDefault(Return(&route_config));
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
 }
@@ -1507,25 +1489,10 @@ TEST_F(GrpcJsonTranscoderDisabledFilterTest, PerRouteEnabledOverride) {
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder route_cfg =
       bookstoreProtoConfig();
   JsonTranscoderConfig route_config(route_cfg, *api_);
-  routeLocalConfig(&route_config, nullptr);
 
-  Http::TestRequestHeaderMapImpl request_headers{
-      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
-
-  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
-  EXPECT_EQ("/shelf", request_headers.get_("x-envoy-original-path"));
-  EXPECT_EQ("/bookstore.Bookstore/CreateShelf", request_headers.get_(":path"));
-  EXPECT_EQ("trailers", request_headers.get_("te"));
-}
-
-TEST_F(GrpcJsonTranscoderDisabledFilterTest, PerVhostEnabledOverride) {
-  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder vhost_cfg =
-      bookstoreProtoConfig();
-  JsonTranscoderConfig vhost_config(vhost_cfg, *api_);
-  routeLocalConfig(nullptr, &vhost_config);
+  ON_CALL(*decoder_callbacks_.route_,
+          mostSpecificPerFilterConfig("envoy.filters.http.grpc_json_transcoder"))
+      .WillByDefault(Return(&route_config));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};

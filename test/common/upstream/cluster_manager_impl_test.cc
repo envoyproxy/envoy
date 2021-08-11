@@ -10,6 +10,7 @@
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/upstream/cds_api.h"
@@ -1594,15 +1595,17 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_EQ(cluster2->info_, cluster_manager_->getThreadLocalCluster("fake_cluster")->info());
   EXPECT_EQ(1UL, cluster_manager_->clusters().active_clusters_.size());
   Http::ConnectionPool::MockInstance* cp = new Http::ConnectionPool::MockInstance();
+  Http::ConnectionPool::Instance::IdleCb idle_cb;
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(cp));
-  EXPECT_CALL(*cp, addIdleCallback(_));
+  EXPECT_CALL(*cp, addIdleCallback(_)).WillOnce(SaveArg<0>(&idle_cb));
   EXPECT_EQ(cp, HttpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("fake_cluster")
                                               ->httpConnPool(ResourcePriority::Default,
                                                              Http::Protocol::Http11, nullptr)));
 
   Tcp::ConnectionPool::MockInstance* cp2 = new Tcp::ConnectionPool::MockInstance();
+  Tcp::ConnectionPool::Instance::IdleCb idle_cb2;
   EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(cp2));
-  EXPECT_CALL(*cp2, addIdleCallback(_));
+  EXPECT_CALL(*cp2, addIdleCallback(_)).WillOnce(SaveArg<0>(&idle_cb2));
   EXPECT_EQ(cp2, TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("fake_cluster")
                                               ->tcpConnPool(ResourcePriority::Default, nullptr)));
 
@@ -1632,6 +1635,9 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 
   // Remove an unknown cluster.
   EXPECT_FALSE(cluster_manager_->removeCluster("foo"));
+
+  idle_cb();
+  idle_cb2();
 
   checkStats(1 /*added*/, 1 /*modified*/, 1 /*removed*/, 0 /*active*/, 0 /*warming*/);
 

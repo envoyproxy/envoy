@@ -10,6 +10,7 @@
 import os
 import sys
 from functools import cached_property
+from typing import Optional
 
 from tools.base import checker, runner
 
@@ -51,7 +52,7 @@ class PytestChecker(checker.BazelChecker):
             default=None,
             help="Specify a path to collect html coverage with")
 
-    def check_pytests(self) -> int:
+    def check_pytests(self) -> None:
         for target in self.pytest_targets:
             try:
                 self.bazel.run(target, *self.pytest_bazel_args)
@@ -71,7 +72,7 @@ class PytestChecker(checker.BazelChecker):
         return super().on_checks_complete()
 
 
-def main(*args: list) -> None:
+def main(*args: str) -> Optional[int]:
     return PytestChecker(*args).run()
 
 

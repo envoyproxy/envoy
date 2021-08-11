@@ -304,9 +304,9 @@ message HttpConnectionManager {
     type.http.v3.PathTransformation http_filter_transformation = 2;
   }
 
-  reserved 27, 11, 19;
+  reserved 27, 11;
 
-  reserved "idle_timeout", "xff_num_trusted_hops";
+  reserved "idle_timeout";
 
   // Supplies the type of codec that the connection manager should use.
   CodecType codec_type = 1 [(validate.rules).enum = {defined_only: true}];
@@ -498,6 +498,13 @@ message HttpConnectionManager {
   google.protobuf.BoolValue use_remote_address = 14
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
+  // The number of additional ingress proxy hops from the right side of the
+  // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header to trust when
+  // determining the origin client's IP address. The default is zero if this option
+  // is not specified. See the documentation for
+  // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
+  uint32 xff_num_trusted_hops = 19;
+
   // The configuration for the original IP detection extensions.
   //
   // When configured the extensions will be called along with the request headers
@@ -507,6 +514,12 @@ message HttpConnectionManager {
   // the request, the HCM will try the remaining extensions until one succeeds or rejects
   // the request. If the request isn't rejected nor any extension succeeds, the HCM will
   // fallback to using the remote address.
+  //
+  // .. WARNING::
+  //    Extensions cannot be used in conjunction with :ref:`use_remote_address
+  //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
+  //    nor :ref:`xff_num_trusted_hops
+  //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>`.
   //
   // [#extension-category: envoy.http.original_ip_detection]
   repeated config.core.v4alpha.TypedExtensionConfig original_ip_detection_extensions = 46;
