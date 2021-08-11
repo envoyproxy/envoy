@@ -79,7 +79,7 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
 
   ENVOY_LOG(debug, "[S{}] dispatching to platform response headers for stream (end_stream={}):\n{}",
             direct_stream_.stream_handle_, end_stream, headers);
-  bridge_callbacks_.on_headers(Utility::toBridgeHeaders(headers), end_stream, envoy_stream_intel{},
+  bridge_callbacks_.on_headers(Utility::toBridgeHeaders(headers), end_stream, streamIntel(),
                                bridge_callbacks_.context);
   response_headers_forwarded_ = true;
   if (end_stream) {
@@ -149,7 +149,7 @@ void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, boo
             direct_stream_.stream_handle_, bytes_to_send, send_end_stream);
 
   bridge_callbacks_.on_data(Data::Utility::toBridgeData(data, bytes_to_send), end_stream,
-                            envoy_stream_intel{}, bridge_callbacks_.context);
+                            streamIntel(), bridge_callbacks_.context);
   if (send_end_stream) {
     onComplete();
   }
@@ -181,7 +181,7 @@ void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMa
   ENVOY_LOG(debug, "[S{}] dispatching to platform response trailers for stream:\n{}",
             direct_stream_.stream_handle_, trailers);
 
-  bridge_callbacks_.on_trailers(Utility::toBridgeHeaders(trailers), envoy_stream_intel{},
+  bridge_callbacks_.on_trailers(Utility::toBridgeHeaders(trailers), streamIntel(),
                                 bridge_callbacks_.context);
   onComplete();
 }
@@ -239,7 +239,7 @@ void Client::DirectStreamCallbacks::onComplete() {
   } else {
     http_client_.stats().stream_failure_.inc();
   }
-  bridge_callbacks_.on_complete(envoy_stream_intel{}, bridge_callbacks_.context);
+  bridge_callbacks_.on_complete(streamIntel(), bridge_callbacks_.context);
 }
 
 void Client::DirectStreamCallbacks::onError() {
@@ -269,7 +269,7 @@ void Client::DirectStreamCallbacks::onError() {
   error_message_ = {};
   error_attempt_count_ = {};
 
-  bridge_callbacks_.on_error({code, message, attempt_count}, envoy_stream_intel{},
+  bridge_callbacks_.on_error({code, message, attempt_count}, streamIntel(),
                              bridge_callbacks_.context);
 }
 
@@ -277,7 +277,16 @@ void Client::DirectStreamCallbacks::onCancel() {
   ScopeTrackerScopeState scope(&direct_stream_, http_client_.scopeTracker());
   ENVOY_LOG(debug, "[S{}] dispatching to platform cancel stream", direct_stream_.stream_handle_);
   http_client_.stats().stream_cancel_.inc();
-  bridge_callbacks_.on_cancel(envoy_stream_intel{}, bridge_callbacks_.context);
+  bridge_callbacks_.on_cancel(streamIntel(), bridge_callbacks_.context);
+}
+
+envoy_stream_intel Client::DirectStreamCallbacks::streamIntel() {
+  const auto& info = direct_stream_.request_decoder_->streamInfo();
+  envoy_stream_intel stream_intel{};
+  stream_intel.connection_id = info.upstreamConnectionId().value_or(0);
+  stream_intel.stream_id = static_cast<uint64_t>(direct_stream_.stream_handle_);
+  stream_intel.attempt_count = info.attemptCount().value_or(0);
+  return stream_intel;
 }
 
 Client::DirectStream::DirectStream(envoy_stream_t stream_handle, Client& http_client)
