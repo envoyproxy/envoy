@@ -340,7 +340,6 @@ message WeightedCluster {
       // .. note::
       //
       //   If the header appears multiple times only the first value is used.
-      //string cluster_header = 12;
       string cluster_header = 12
           [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
     }
