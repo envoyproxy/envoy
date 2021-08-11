@@ -320,12 +320,16 @@ message WeightedCluster {
 
     reserved "per_filter_config";
 
+    // Only one of *name* and *cluster_header* may be specified.
     oneof cluster_specifier {
       option (validate.required) = true;
 
       // Name of the upstream cluster. The cluster must exist in the
       // :ref:`cluster manager configuration <config_cluster_manager>`.
-      string name = 1 [(validate.rules).string = {min_len: 1}];
+      string name = 1 [
+        (validate.rules).string = {min_len: 1},
+        (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
+      ];
 
       // Envoy will determine the cluster to route to by reading the value of the
       // HTTP header named by cluster_header from the request headers. If the

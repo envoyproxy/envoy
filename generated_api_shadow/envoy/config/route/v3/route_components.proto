@@ -321,12 +321,16 @@ message WeightedCluster {
 
     reserved 7;
 
+    // Only one of *name* and *cluster_header* may be specified.
     oneof cluster_specifier {
       option (validate.required) = true;
 
       // Name of the upstream cluster. The cluster must exist in the
       // :ref:`cluster manager configuration <config_cluster_manager>`.
-      string name = 1 [(validate.rules).string = {min_len: 1}];
+      string name = 1 [
+        (validate.rules).string = {min_len: 1},
+        (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
+      ];
 
       // Envoy will determine the cluster to route to by reading the value of the
       // HTTP header named by cluster_header from the request headers. If the
@@ -341,7 +345,6 @@ message WeightedCluster {
       // .. note::
       //
       //   If the header appears multiple times only the first value is used.
-      //string cluster_header = 12;
       string cluster_header = 12
           [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
     }
