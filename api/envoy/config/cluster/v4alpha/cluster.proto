@@ -994,9 +994,9 @@ message LoadBalancingPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.cluster.v3.LoadBalancingPolicy.Policy";
 
-    reserved 1, 2, 3;
+    reserved 2, 1, 3;
 
-    reserved "name", "config", "typed_config";
+    reserved "config", "name", "typed_config";
 
     core.v4alpha.TypedExtensionConfig typed_extension_config = 4;
   }
