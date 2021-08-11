@@ -178,17 +178,17 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPreconnect) {
   EXPECT_CALL(pool_, instantiateActiveClient).Times(AnyNumber());
 
   // With global preconnect off, we won't preconnect.
-  EXPECT_FALSE(pool_.maybePreconnect(0));
+  EXPECT_FALSE(pool_.maybePreconnectImpl(0));
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*connecting capacity*/);
   // With preconnect ratio of 1.1, we'll preconnect two connections.
   // Currently, no number of subsequent calls to preconnect will increase that.
-  EXPECT_TRUE(pool_.maybePreconnect(1.1));
-  EXPECT_TRUE(pool_.maybePreconnect(1.1));
-  EXPECT_FALSE(pool_.maybePreconnect(1.1));
+  EXPECT_TRUE(pool_.maybePreconnectImpl(1.1));
+  EXPECT_TRUE(pool_.maybePreconnectImpl(1.1));
+  EXPECT_FALSE(pool_.maybePreconnectImpl(1.1));
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 2 /*connecting capacity*/);
 
   // With a higher preconnect ratio, more connections may be preconnected.
-  EXPECT_TRUE(pool_.maybePreconnect(3));
+  EXPECT_TRUE(pool_.maybePreconnectImpl(3));
 
   pool_.destructAllConnections();
 }
@@ -199,7 +199,7 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPreconnectNotHealthy) {
 
   // Preconnect won't occur if the host is not healthy.
   host_->healthFlagSet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);
-  EXPECT_FALSE(pool_.maybePreconnect(1));
+  EXPECT_FALSE(pool_.maybePreconnectImpl(1));
 }
 
 // Remote close simulates the peer closing the connection.
