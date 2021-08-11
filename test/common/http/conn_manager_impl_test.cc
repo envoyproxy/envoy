@@ -7,7 +7,6 @@ using testing::An;
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Eq;
-using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -291,6 +290,26 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithDecoderPause) {
   EXPECT_EQ(2U, listener_stats_.downstream_rq_completed_.value());
 }
 
+// When create new stream, the stream info will be populated from the connection.
+TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
+  setup(true, "", false);
+
+  // Set up the codec.
+  Buffer::OwnedImpl fake_input("input");
+  conn_manager_->createCodec(fake_input);
+
+  decoder_ = &conn_manager_->newStream(response_encoder_);
+
+  EXPECT_EQ(requestIDExtension().get(), decoder_->streamInfo().getRequestIDProvider());
+  EXPECT_EQ(ssl_connection_, decoder_->streamInfo().downstreamAddressProvider().sslConnection());
+  EXPECT_EQ(filter_callbacks_.connection_.id_,
+            decoder_->streamInfo().downstreamAddressProvider().connectionID().value());
+  EXPECT_EQ(server_name_, decoder_->streamInfo().downstreamAddressProvider().requestedServerName());
+
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // By default, Envoy will set the server header to the server name, here "custom-value"
 TEST_F(HttpConnectionManagerImplTest, ServerHeaderOverwritten) {
   setup(false, "custom-value", false);
@@ -522,6 +541,103 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Paths with escaped slashes rejected with 400 when configured.
+TEST_F(HttpConnectionManagerImplTest, PathWithEscapedSlashesRejected) {
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::REJECT_REQUEST;
+  testPathNormalization(
+      TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/abc%5c../"}, {":method", "GET"}},
+      TestResponseHeaderMapImpl{{":status", "400"}, {"connection", "close"}});
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_failed_path_normalization_.value());
+}
+
+// Paths with escaped slashes redirected when configured.
+TEST_F(HttpConnectionManagerImplTest, PathWithEscapedSlashesRedirected) {
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::UNESCAPE_AND_REDIRECT;
+  testPathNormalization(
+      TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/abc%2f../"}, {":method", "GET"}},
+      TestResponseHeaderMapImpl{{":status", "307"}, {"location", "/abc/../"}});
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_redirected_with_normalized_path_.value());
+}
+
+// Paths with escaped slashes rejected with 400 instead of redirected for gRPC request.
+TEST_F(HttpConnectionManagerImplTest, PathWithEscapedSlashesRejectedIfGRPC) {
+  // This test is slightly weird as it sends gRPC "request" over H/1 client of the
+  // HttpConnectionManagerImplTest. However it is sufficient to test the behavior of path
+  // normalization as it is determined by the content type only.
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::UNESCAPE_AND_REDIRECT;
+  testPathNormalization(TestRequestHeaderMapImpl{{":authority", "host"},
+                                                 {":path", "/abc%2fdef"},
+                                                 {":method", "GET"},
+                                                 {"content-type", "application/grpc"}},
+                        TestResponseHeaderMapImpl{{":status", "200"},
+                                                  {"connection", "close"},
+                                                  {"grpc-status", "13"},
+                                                  {"content-type", "application/grpc"}});
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_failed_path_normalization_.value());
+}
+
+// Test that requests with escaped slashes are redirected when configured. Redirection
+// occurs after Chromium URL normalization or merge slashes operations.
+TEST_F(HttpConnectionManagerImplTest, EscapedSlashesRedirectedAfterOtherNormalizations) {
+  normalize_path_ = true;
+  merge_slashes_ = true;
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::UNESCAPE_AND_REDIRECT;
+  // Both Chromium URL normalization and merge slashes should happen if request is redirected
+  // due to escaped slash sequences.
+  testPathNormalization(TestRequestHeaderMapImpl{{":authority", "host"},
+                                                 {":path", "/abc%2f../%5cdef//"},
+                                                 {":method", "GET"}},
+                        TestResponseHeaderMapImpl{{":status", "307"}, {"location", "/def/"}});
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_redirected_with_normalized_path_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, AllNormalizationsWithEscapedSlashesForwarded) {
+  setup(false, "");
+  // Enable path sanitizer
+  normalize_path_ = true;
+  merge_slashes_ = true;
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::UNESCAPE_AND_FORWARD;
+  const std::string original_path = "/x/%2E%2e/z%2f%2Fabc%5C../def";
+  const std::string normalized_path = "/z/def";
+
+  auto* filter = new MockStreamFilter();
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
+      }));
+
+  EXPECT_CALL(*filter, decodeComplete());
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillRepeatedly(Invoke([&](RequestHeaderMap& header_map, bool) -> FilterHeadersStatus {
+        EXPECT_EQ(normalized_path, header_map.getPathValue());
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", original_path}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(*filter, onStreamComplete());
+  EXPECT_CALL(*filter, onDestroy());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
   setup(false, "");
 
@@ -581,8 +697,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
     EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
-          EXPECT_EQ(default_route->routeEntry(),
-                    decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
           // Not clearing cached route returns cached route and doesn't invoke cb.
@@ -633,8 +748,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
 
           EXPECT_EQ(default_route, route);
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
-          EXPECT_EQ(default_route->routeEntry(),
-                    decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
           return FilterHeadersStatus::Continue;
@@ -662,8 +776,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
     EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
           EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->route());
-          EXPECT_EQ(default_route->routeEntry(),
-                    decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
 
           int ctr = 0;
@@ -691,8 +804,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           decoder_filters_[1]->callbacks_->route(cb);
 
           EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->route());
-          EXPECT_EQ(foo_bar_route->routeEntry(),
-                    decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->streamInfo().route());
           EXPECT_EQ(foo_bar_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
 
           return FilterHeadersStatus::Continue;
@@ -770,8 +882,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
         EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
         EXPECT_EQ(default_cluster_name,
                   decoder_filters_[0]->callbacks_->route()->routeEntry()->clusterName());
-        EXPECT_EQ(default_route->routeEntry(),
-                  decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
         EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
         // Instantiate a DelegatingRoute child class object and invoke setRoute from
@@ -795,8 +906,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
         // clusterName() method.
         EXPECT_EQ(foo_cluster_name,
                   decoder_filters_[1]->callbacks_->route()->routeEntry()->clusterName());
-        EXPECT_EQ(foo_route_override->routeEntry(),
-                  decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(foo_route_override, decoder_filters_[1]->callbacks_->streamInfo().route());
         // Tests that setRoute correctly sets cached_cluster_info_
         EXPECT_EQ(foo_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
 
@@ -958,12 +1068,8 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         EXPECT_EQ(default_route->routeEntry()->includeVirtualHostRateLimits(),
                   delegating_route_foo->routeEntry()->includeVirtualHostRateLimits());
 
-        // NOTE: no coverage for routeEntry()->typedMetadata()
         // "The mock function has no default action set, and its return type has no default value
         // set"
-
-        EXPECT_EQ(default_route->routeEntry()->metadata().filter_metadata().size(),
-                  delegating_route_foo->routeEntry()->metadata().filter_metadata().size());
         EXPECT_EQ(default_route->routeEntry()->tlsContextMatchCriteria(),
                   delegating_route_foo->routeEntry()->tlsContextMatchCriteria());
 
@@ -972,8 +1078,6 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         EXPECT_EQ(default_route->routeEntry()->pathMatchCriterion().matchType(),
                   delegating_route_foo->routeEntry()->pathMatchCriterion().matchType());
 
-        EXPECT_EQ(default_route->routeEntry()->perFilterConfig("bar"),
-                  delegating_route_foo->routeEntry()->perFilterConfig("bar"));
         EXPECT_EQ(default_route->routeEntry()->includeAttemptCountInRequest(),
                   delegating_route_foo->routeEntry()->includeAttemptCountInRequest());
         EXPECT_EQ(default_route->routeEntry()->includeAttemptCountInResponse(),
@@ -1097,6 +1201,47 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Observe that we strip the trailing dot.
+TEST_F(HttpConnectionManagerImplTest, StripTrailingHostDot) {
+  setup(false, "");
+  // Enable removal of host's trailing dot.
+  strip_trailing_host_dot_ = true;
+  const std::string original_host = "host.";
+  const std::string updated_host = "host";
+  // Set up the codec.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->createCodec(fake_input);
+  // Create a new stream.
+  decoder_ = &conn_manager_->newStream(response_encoder_);
+  RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+      {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
+  RequestHeaderMap* updated_headers = headers.get();
+  decoder_->decodeHeaders(std::move(headers), true);
+  EXPECT_EQ(updated_host, updated_headers->getHostValue());
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(HttpConnectionManagerImplTest, HostWithoutTrailingDot) {
+  setup(false, "");
+  // Enable removal of host's trailing dot.
+  strip_trailing_host_dot_ = true;
+  const std::string original_host = "host";
+  const std::string updated_host = "host";
+  // Set up the codec.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->createCodec(fake_input);
+  // Create a new stream.
+  decoder_ = &conn_manager_->newStream(response_encoder_);
+  RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+      {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
+  RequestHeaderMap* updated_headers = headers.get();
+  decoder_->decodeHeaders(std::move(headers), true);
+  EXPECT_EQ(updated_host, updated_headers->getHostValue());
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(HttpConnectionManagerImplTest, DateHeaderNotPresent) {
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
@@ -1128,8 +1273,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
-                     const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const RequestHeaderMap&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
             return span;
@@ -1286,8 +1431,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
-                     const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const RequestHeaderMap&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
             return span;
@@ -1352,8 +1497,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
-                     const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const RequestHeaderMap&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
             return span;
@@ -1419,8 +1564,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
-                     const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const RequestHeaderMap&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
 
             return span;
@@ -1500,8 +1645,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
-                     const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const RequestHeaderMap&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
 
             return span;
@@ -1582,8 +1727,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
-                     const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const RequestHeaderMap&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
 
             return span;
@@ -1666,8 +1811,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
-          Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
-                     const Tracing::Decision) -> Tracing::Span* {
+          Invoke([&](const Tracing::Config& config, const RequestHeaderMap&,
+                     const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
             EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
 
             return span;
@@ -1805,7 +1950,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.routeEntry());
+        EXPECT_NE(nullptr, stream_info.route());
 
         EXPECT_EQ(stream_info.downstreamAddressProvider().remoteAddress()->ip()->addressAsString(),
                   xff_address);
@@ -1946,7 +2091,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.routeEntry());
+        EXPECT_NE(nullptr, stream_info.route());
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -1996,7 +2141,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_EQ(nullptr, stream_info.routeEntry());
+        EXPECT_EQ(nullptr, stream_info.route());
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -2094,8 +2239,8 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamSslConnection());
-        EXPECT_NE(nullptr, stream_info.routeEntry());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().sslConnection());
+        EXPECT_NE(nullptr, stream_info.route());
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))

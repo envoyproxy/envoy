@@ -11,7 +11,7 @@ AWS Lambda
 
   The AWS Lambda filter is currently under active development.
 
-The HTTP AWS Lambda filter is used to trigger an AWS Lambda function from a standard HTTP/1.x or HTTP/2 request.
+The HTTP AWS Lambda filter is used to trigger an AWS Lambda function from a standard HTTP request.
 It supports a few options to control whether to pass through the HTTP request payload as is or to wrap it in a JSON
 schema.
 

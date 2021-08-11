@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP Cache Filter]
 
-// [#extension: envoy.filters.http.cache.simple_http_cache]
+// [#extension: envoy.filters.http.cache]
 message CacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.cache.v2alpha.CacheConfig";
@@ -50,6 +50,7 @@ message CacheConfig {
   }
 
   // Config specific to the cache storage implementation.
+  // [#extension-category: envoy.filters.http.cache]
   google.protobuf.Any typed_config = 1 [(validate.rules).any = {required: true}];
 
   // List of matching rules that defines allowed *Vary* headers.

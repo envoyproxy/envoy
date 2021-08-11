@@ -26,7 +26,7 @@ The filter outputs generic routing error statistics in the *thrift.<stat_prefix>
 
 
 The filter is also responsible for cluster-level statistics derived from routed upstream clusters.
-Since these stats utilize the underlying cluster scope, we prefix with the `thrift` namespace.
+Since these stats utilize the underlying cluster scope, we prefix with the ``thrift`` namespace.
 
 .. csv-table::
   :header: Name, Type, Description
@@ -41,3 +41,10 @@ Since these stats utilize the underlying cluster scope, we prefix with the `thri
   thrift.upstream_resp_exception, Counter, Total responses with the "Exception" message type.
   thrift.upstream_resp_invalid_type, Counter, Total responses with an unsupported message type.
   thrift.upstream_rq_time, Histogram, total rq time from rq complete to resp complete; includes oneway messages.
+  thrift.upstream_rq_size, Histogram, Request message size in bytes per upstream
+  thrift.upstream_resp_size, Histogram, Response message size in bytes per upstream
+
+.. note::
+
+  The request and response size histograms include what's sent and received during protocol upgrade.
+  However, invalid responses are not included in the response size histogram.

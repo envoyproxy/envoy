@@ -8,7 +8,7 @@
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/stats/scope.h"
 
-#include "extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -10,7 +10,7 @@
 #include "envoy/service/accesslog/v3/als.pb.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "extensions/access_loggers/common/grpc_access_logger.h"
+#include "source/extensions/access_loggers/common/grpc_access_logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,7 +23,7 @@ class GrpcAccessLoggerImpl
                                       envoy::service::accesslog::v3::StreamAccessLogsMessage,
                                       envoy::service::accesslog::v3::StreamAccessLogsResponse> {
 public:
-  GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
+  GrpcAccessLoggerImpl(const Grpc::RawAsyncClientSharedPtr& client, std::string log_name,
                        std::chrono::milliseconds buffer_flush_interval_msec,
                        uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
@@ -54,7 +54,7 @@ private:
   GrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
                envoy::config::core::v3::ApiVersion transport_version,
-               Grpc::RawAsyncClientPtr&& client,
+               const Grpc::RawAsyncClientSharedPtr& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) override;
 

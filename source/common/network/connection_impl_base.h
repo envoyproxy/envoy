@@ -2,8 +2,8 @@
 
 #include "envoy/event/dispatcher.h"
 
-#include "common/common/logger.h"
-#include "common/network/filter_manager_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/filter_manager_impl.h"
 
 namespace Envoy {
 namespace Network {

@@ -1,12 +1,11 @@
-#include "extensions/transport_sockets/tls/config.h"
+#include "source/extensions/transport_sockets/tls/config.h"
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 namespace Envoy {
 namespace Extensions {

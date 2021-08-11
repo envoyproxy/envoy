@@ -1,8 +1,8 @@
 #pragma once
 
-#include "extensions/filters/http/cache/cache_headers_utils.h"
-#include "extensions/filters/http/cache/http_cache.h"
-#include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/http_cache.h"
+#include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
 namespace Envoy {
 namespace Extensions {

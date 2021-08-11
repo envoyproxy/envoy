@@ -1,4 +1,4 @@
-#include "extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
 
 #include <array>
 #include <chrono>
@@ -6,10 +6,9 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-
-#include "extensions/filters/http/cache/cache_custom_headers.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/extensions/filters/http/cache/cache_custom_headers.h"
 
 #include "absl/algorithm/container.h"
 #include "absl/strings/ascii.h"
@@ -235,7 +234,9 @@ VaryHeader::VaryHeader(
     const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list) {
 
   for (const auto& rule : allow_list) {
-    allow_list_.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(rule));
+    allow_list_.emplace_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            rule));
   }
 }
 

@@ -1,4 +1,4 @@
-#include "extensions/filters/http/cache/cache_custom_headers.h"
+#include "source/extensions/filters/http/cache/cache_custom_headers.h"
 
 #include "test/test_common/utility.h"
 
@@ -19,7 +19,7 @@ TEST(CacheCustomHeadersTest, EnsureCacheCustomHeadersGettersDoNotFail) {
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"},
       {":method", "GET"},
-      {"x-forwarded-proto", "https"},
+      {":scheme", "https"},
       {":authority", "example.com"},
       {"authorization", "Basic abc123def456"},
       {"pragma", "no-cache"},

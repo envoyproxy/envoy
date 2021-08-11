@@ -6,14 +6,13 @@
 #include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/base64.h"
-#include "common/json/json_loader.h"
-#include "common/secret/sds_api.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_impl.h"
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/common/base64.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/secret/sds_api.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_certs_test.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
@@ -624,23 +623,6 @@ TEST_F(SslServerContextImplOcspTest, TestMustStapleCertWithoutStapleConfigFails)
                             "OCSP response is required for must-staple certificate");
 }
 
-TEST_F(SslServerContextImplOcspTest, TestMustStapleCertWithoutStapleFeatureFlagOff) {
-  const std::string tls_context_yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/revoked_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/revoked_key.pem"
-  ocsp_staple_policy: lenient_stapling
-  )EOF";
-
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.require_ocsp_response_for_must_staple_certs", "false"}});
-  loadConfigYaml(tls_context_yaml);
-}
-
 TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
   const std::string yaml = R"EOF(
   common_tls_context:
@@ -669,13 +651,13 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
   for (const auto& detail : ocsp_text_details) {
     std::string::size_type pos = detail.find(this_update);
     if (pos != std::string::npos) {
-      valid_from = detail.substr(pos + this_update.size());
+      valid_from = std::string(detail.substr(pos + this_update.size()));
       continue;
     }
 
     pos = detail.find(next_update);
     if (pos != std::string::npos) {
-      expiration = detail.substr(pos + next_update.size());
+      expiration = std::string(detail.substr(pos + next_update.size()));
       continue;
     }
   }

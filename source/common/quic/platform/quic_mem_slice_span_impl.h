@@ -25,19 +25,24 @@ public:
    * @param buffer has to outlive the life time of this class.
    */
   explicit QuicMemSliceSpanImpl(Envoy::Buffer::Instance& buffer) : buffer_(&buffer) {}
-  explicit QuicMemSliceSpanImpl(QuicMemSliceImpl* slice) : buffer_(&slice->single_slice_buffer()) {}
+  explicit QuicMemSliceSpanImpl(QuicMemSliceImpl* slice)
+      : buffer_(&slice->getSingleSliceBuffer()), mem_slice_(slice) {}
 
   QuicMemSliceSpanImpl(const QuicMemSliceSpanImpl& other) = default;
   QuicMemSliceSpanImpl& operator=(const QuicMemSliceSpanImpl& other) = default;
 
-  QuicMemSliceSpanImpl(QuicMemSliceSpanImpl&& other) noexcept : buffer_(other.buffer_) {
+  QuicMemSliceSpanImpl(QuicMemSliceSpanImpl&& other) noexcept
+      : buffer_(other.buffer_), mem_slice_(other.mem_slice_) {
     other.buffer_ = nullptr;
+    other.mem_slice_ = nullptr;
   }
 
   QuicMemSliceSpanImpl& operator=(QuicMemSliceSpanImpl&& other) noexcept {
     if (this != &other) {
       buffer_ = other.buffer_;
+      mem_slice_ = other.mem_slice_;
       other.buffer_ = nullptr;
+      other.mem_slice_ = nullptr;
     }
     return *this;
   }
@@ -54,23 +59,33 @@ public:
   bool empty() const { return buffer_->length() == 0; }
 
 private:
+  // If constructed with a QuicMemSlice, mem_slice_ point to that object and this points to
+  // mem_slice_->getSingleSliceBuffer(). If constructed with an Envoy buffer, this points to the
+  // buffer itself.
   Envoy::Buffer::Instance* buffer_{nullptr};
+  // If this span is not constructed with a QuicMemSlice, this points to nullptr.
+  QuicMemSliceImpl* mem_slice_{nullptr};
 };
 
 template <typename ConsumeFunction>
 // NOLINTNEXTLINE(readability-identifier-naming)
 QuicByteCount QuicMemSliceSpanImpl::ConsumeAll(ConsumeFunction consume) {
   size_t saved_length = 0;
-  for (auto& slice : buffer_->getRawSlices()) {
-    if (slice.len_ == 0) {
-      continue;
+  if (mem_slice_ == nullptr) {
+    for (auto& slice : buffer_->getRawSlices()) {
+      if (slice.len_ == 0) {
+        continue;
+      }
+      // Move each slice into a stand-alone buffer.
+      // TODO(danzh): investigate the cost of allocating one buffer per slice.
+      // If it turns out to be expensive, add a new function to free data in the middle in buffer
+      // interface and re-design QuicMemSliceImpl.
+      consume(QuicMemSlice(QuicMemSliceImpl(*buffer_, slice.len_)));
+      saved_length += slice.len_;
     }
-    // Move each slice into a stand-alone buffer.
-    // TODO(danzh): investigate the cost of allocating one buffer per slice.
-    // If it turns out to be expensive, add a new function to free data in the middle in buffer
-    // interface and re-design QuicMemSliceImpl.
-    consume(QuicMemSlice(QuicMemSliceImpl(*buffer_, slice.len_)));
-    saved_length += slice.len_;
+  } else {
+    saved_length += mem_slice_->length();
+    consume(quic::QuicMemSlice(std::move(*mem_slice_)));
   }
   ASSERT(buffer_->length() == 0);
   return saved_length;

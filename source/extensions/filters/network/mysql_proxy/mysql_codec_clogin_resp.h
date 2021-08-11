@@ -4,10 +4,9 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
 
 namespace Envoy {
 namespace Extensions {

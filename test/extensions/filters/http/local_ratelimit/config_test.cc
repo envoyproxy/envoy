@@ -1,5 +1,5 @@
-#include "extensions/filters/http/local_ratelimit/config.h"
-#include "extensions/filters/http/local_ratelimit/local_ratelimit.h"
+#include "source/extensions/filters/http/local_ratelimit/config.h"
+#include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
 #include "test/mocks/server/mocks.h"
 

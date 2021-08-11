@@ -1,13 +1,12 @@
-#include "server/admin/runtime_handler.h"
+#include "source/server/admin/runtime_handler.h"
 
 #include <string>
 #include <vector>
 
-#include "common/common/empty_string.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-
-#include "server/admin/utils.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/server/admin/utils.h"
 
 #include "absl/container/node_hash_map.h"
 

@@ -3,8 +3,7 @@
 #include "envoy/extensions/filters/http/grpc_web/v3/grpc_web.pb.h"
 #include "envoy/extensions/filters/http/grpc_web/v3/grpc_web.pb.validate.h"
 
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,7 +13,7 @@ namespace GrpcWeb {
 class GrpcWebFilterConfig
     : public Common::FactoryBase<envoy::extensions::filters::http::grpc_web::v3::GrpcWeb> {
 public:
-  GrpcWebFilterConfig() : FactoryBase(HttpFilterNames::get().GrpcWeb) {}
+  GrpcWebFilterConfig() : FactoryBase("envoy.filters.http.grpc_web") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

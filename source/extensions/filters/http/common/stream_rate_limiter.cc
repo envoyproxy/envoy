@@ -1,12 +1,12 @@
-#include "extensions/filters/http/common/stream_rate_limiter.h"
+#include "source/extensions/filters/http/common/stream_rate_limiter.h"
 
 #include <chrono>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
-#include "common/common/assert.h"
-#include "common/common/token_bucket_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/token_bucket_impl.h"
 
 namespace Envoy {
 namespace Extensions {

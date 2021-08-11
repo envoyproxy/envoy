@@ -1,8 +1,7 @@
-#include "common/quic/envoy_quic_proof_verifier.h"
+#include "source/common/quic/envoy_quic_proof_verifier.h"
 
-#include "common/quic/envoy_quic_utils.h"
-
-#include "extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 
 #include "quiche/quic/core/crypto/certificate_view.h"
 
@@ -29,14 +28,22 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
       sk_X509_push(intermediates.get(), cert.release());
     }
   }
-  bool success = context_impl_.verifyCertChain(*leaf, *intermediates, *error_details);
+  std::unique_ptr<quic::CertificateView> cert_view =
+      quic::CertificateView::ParseSingleCertificate(certs[0]);
+  ASSERT(cert_view != nullptr);
+  int sign_alg = deduceSignatureAlgorithmFromPublicKey(cert_view->public_key(), error_details);
+  if (sign_alg == 0) {
+    return quic::QUIC_FAILURE;
+  }
+  // We down cast rather than add verifyCertChain to Envoy::Ssl::Context because
+  // verifyCertChain uses a bunch of SSL-specific structs which we want to keep
+  // out of the interface definition.
+  bool success = static_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get())
+                     ->verifyCertChain(*leaf, *intermediates, *error_details);
   if (!success) {
     return quic::QUIC_FAILURE;
   }
 
-  std::unique_ptr<quic::CertificateView> cert_view =
-      quic::CertificateView::ParseSingleCertificate(certs[0]);
-  ASSERT(cert_view != nullptr);
   for (const absl::string_view& config_san : cert_view->subject_alt_name_domains()) {
     if (Extensions::TransportSockets::Tls::DefaultCertValidator::dnsNameMatch(hostname,
                                                                               config_san)) {

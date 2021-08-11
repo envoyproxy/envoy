@@ -9,8 +9,8 @@ void H2FuzzIntegrationTest::initialize() {
   const std::string prefix("/");
   const Http::Code status(Http::Code::OK);
 
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
 
   config_helper_.addConfigModifier(
       [&body, &prefix](

@@ -2,9 +2,11 @@
 # config.
 
 import json
+import os
 import pathlib
 import string
 import sys
+import tarfile
 
 import protodoc
 
@@ -41,10 +43,19 @@ def generate_empty_extension_docs(extension, details, api_extensions_root):
     path.write_text(content)
 
 
-if __name__ == '__main__':
+def main():
     empty_extensions_path = sys.argv[1]
-    api_extensions_root = sys.argv[2]
+    output_filename = sys.argv[2]
+    generated_rst_dir = os.path.dirname(output_filename)
+    api_extensions_root = os.path.join(generated_rst_dir, "api-v3/config")
 
     empty_extensions = json.loads(pathlib.Path(empty_extensions_path).read_text())
     for extension, details in empty_extensions.items():
         generate_empty_extension_docs(extension, details, api_extensions_root)
+
+    with tarfile.open(output_filename, "w") as tar:
+        tar.add(generated_rst_dir, arcname=".")
+
+
+if __name__ == '__main__':
+    main()

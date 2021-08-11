@@ -1,4 +1,4 @@
-#include "extensions/filters/http/cache/cache_custom_headers.h"
+#include "source/extensions/filters/http/cache/cache_custom_headers.h"
 
 namespace Envoy {
 namespace Extensions {

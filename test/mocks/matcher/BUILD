@@ -12,6 +12,7 @@ envoy_cc_mock(
     name = "matcher_mocks",
     hdrs = ["mocks.h"],
     deps = [
+        "//source/common/common:matchers_lib",
         "//source/common/matcher:matcher_lib",
     ],
 )

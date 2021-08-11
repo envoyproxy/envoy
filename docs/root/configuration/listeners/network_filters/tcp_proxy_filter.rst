@@ -14,7 +14,7 @@ Dynamic cluster selection
 
 The upstream cluster used by the TCP proxy filter can be dynamically set by
 other network filters on a per-connection basis by setting a per-connection
-state object under the key `envoy.tcp_proxy.cluster`. See the
+state object under the key ``envoy.tcp_proxy.cluster``. See the
 implementation for the details.
 
 .. _config_network_filters_tcp_proxy_subset_lb:
@@ -34,8 +34,8 @@ To define metadata that a suitable upstream host must match, use one of the foll
    and :ref:`ClusterWeight.metadata_match<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.ClusterWeight.metadata_match>`
    to define required metadata for a weighted upstream cluster (metadata from the latter will be merged on top of the former).
 
-In addition, dynamic metadata can be set by earlier network filters on the `StreamInfo`. Setting the dynamic metadata
-must happen before `onNewConnection()` is called on the `TcpProxy` filter to affect load balancing.
+In addition, dynamic metadata can be set by earlier network filters on the ``StreamInfo``. Setting the dynamic metadata
+must happen before ``onNewConnection()`` is called on the ``TcpProxy`` filter to affect load balancing.
 
 .. _config_network_filters_tcp_proxy_stats:
 

@@ -4,12 +4,11 @@
 
 #include "envoy/common/time.h"
 
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-
-#include "extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/test_common/simulated_time_system.h"
@@ -464,7 +463,9 @@ TEST(GetAllMatchingHeaderNames, EmptyHeaderMap) {
 
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("accept");
-  ruleset.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+  ruleset.emplace_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          matcher));
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
@@ -478,7 +479,9 @@ TEST(GetAllMatchingHeaderNames, SingleMatchSingleValue) {
 
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("accept");
-  ruleset.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+  ruleset.emplace_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          matcher));
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
@@ -493,7 +496,9 @@ TEST(GetAllMatchingHeaderNames, SingleMatchMultiValue) {
 
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("accept");
-  ruleset.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+  ruleset.emplace_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          matcher));
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
@@ -508,9 +513,13 @@ TEST(GetAllMatchingHeaderNames, MultipleMatches) {
 
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("accept");
-  ruleset.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+  ruleset.emplace_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          matcher));
   matcher.set_exact("accept-language");
-  ruleset.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+  ruleset.emplace_back(
+      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+          matcher));
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 

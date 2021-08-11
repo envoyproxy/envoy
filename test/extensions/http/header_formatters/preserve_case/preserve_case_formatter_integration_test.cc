@@ -28,7 +28,7 @@ class PreserveCaseIntegrationTest : public testing::TestWithParam<Network::Addre
                                     public HttpIntegrationTest {
 public:
   PreserveCaseIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()), registration_(factory_) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()), registration_(factory_) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::extensions::filters::network::

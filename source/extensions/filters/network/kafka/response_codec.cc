@@ -1,6 +1,6 @@
-#include "extensions/filters/network/kafka/response_codec.h"
+#include "source/extensions/filters/network/kafka/response_codec.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

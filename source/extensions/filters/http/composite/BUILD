@@ -16,6 +16,7 @@ envoy_cc_library(
     srcs = ["action.cc"],
     hdrs = ["action.h"],
     deps = [
+        "//source/common/http/matching:data_impl_lib",
         "//source/common/matcher:matcher_lib",
         "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
     ],
@@ -33,7 +34,7 @@ envoy_cc_library(
     ],
     deps = [
         ":action_lib",
-        "//include/envoy/http:filter_interface",
+        "//envoy/http:filter_interface",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/matcher:matcher_lib",
@@ -45,12 +46,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/http:well_known_names",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/composite:filter_lib",
         "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",

@@ -7,10 +7,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/common/rbac/engine_impl.h"
-#include "extensions/filters/common/rbac/utility.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/common/rbac/engine_impl.h"
+#include "source/extensions/filters/common/rbac/utility.h"
 
 namespace Envoy {
 namespace Extensions {

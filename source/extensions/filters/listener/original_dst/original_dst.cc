@@ -1,11 +1,11 @@
-#include "extensions/filters/listener/original_dst/original_dst.h"
+#include "source/extensions/filters/listener/original_dst/original_dst.h"
 
 #include "envoy/network/listen_socket.h"
 
-#include "common/common/assert.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/upstream_socket_options_filter_state.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/upstream_socket_options_filter_state.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -38,7 +38,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
           auto status = socket.ioctl(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS, NULL, 0,
                                      redirect_records->buf_, sizeof(redirect_records->buf_),
                                      &redirect_records->buf_size_);
-          if (status.rc_ != 0) {
+          if (status.return_value_ != 0) {
             ENVOY_LOG(debug,
                       "closing connection: cannot broker connection to original destination "
                       "[Query redirect record failed] with error {}",

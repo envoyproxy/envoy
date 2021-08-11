@@ -1,10 +1,9 @@
 #include "envoy/common/exception.h"
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/filters/network/local_ratelimit/local_ratelimit.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/filters/network/local_ratelimit/local_ratelimit.h"
 
 #include "test/extensions/filters/network/local_ratelimit/local_ratelimit_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"

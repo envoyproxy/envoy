@@ -5,12 +5,11 @@
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/router/string_accessor_impl.h"
-
-#include "extensions/access_loggers/open_telemetry/access_log_impl.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/extensions/access_loggers/open_telemetry/access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -59,7 +58,7 @@ public:
 
 class AccessLogTest : public testing::Test {
 public:
-  void initAccessLog() {
+  void initAdminAccessLog() {
     ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
 
     TestUtility::loadFromYaml(R"EOF(
@@ -100,7 +99,7 @@ values:
 
   void expectLog(const std::string& expected_log_entry_yaml) {
     if (access_log_ == nullptr) {
-      initAccessLog();
+      initAdminAccessLog();
     }
 
     LogRecord expected_log_entry;

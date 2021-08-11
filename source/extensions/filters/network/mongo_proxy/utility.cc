@@ -1,10 +1,10 @@
-#include "extensions/filters/network/mongo_proxy/utility.h"
+#include "source/extensions/filters/network/mongo_proxy/utility.h"
 
 #include <string>
 
 #include "envoy/common/exception.h"
 
-#include "common/json/json_loader.h"
+#include "source/common/json/json_loader.h"
 
 namespace Envoy {
 namespace Extensions {

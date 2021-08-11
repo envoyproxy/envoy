@@ -14,12 +14,12 @@ namespace Common {
 template <class ConfigProto> class FactoryBase : public Server::Configuration::TracerFactory {
 public:
   // Server::Configuration::TracerFactory
-  Tracing::HttpTracerSharedPtr
-  createHttpTracer(const Protobuf::Message& config,
-                   Server::Configuration::TracerFactoryContext& context) override {
-    return createHttpTracerTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
-                                     config, context.messageValidationVisitor()),
-                                 context);
+  Tracing::DriverSharedPtr
+  createTracerDriver(const Protobuf::Message& config,
+                     Server::Configuration::TracerFactoryContext& context) override {
+    return createTracerDriverTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                       config, context.messageValidationVisitor()),
+                                   context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -32,9 +32,9 @@ protected:
   FactoryBase(const std::string& name) : name_(name) {}
 
 private:
-  virtual Tracing::HttpTracerSharedPtr
-  createHttpTracerTyped(const ConfigProto& proto_config,
-                        Server::Configuration::TracerFactoryContext& context) PURE;
+  virtual Tracing::DriverSharedPtr
+  createTracerDriverTyped(const ConfigProto& proto_config,
+                          Server::Configuration::TracerFactoryContext& context) PURE;
 
   const std::string name_;
 };

@@ -1,5 +1,6 @@
-#include "common/filesystem/filesystem_impl.h"
+#include "source/common/filesystem/filesystem_impl.h"
 
+#include "test/config/v2_link_hacks.h"
 #include "test/config_test/config_test.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -11,13 +12,7 @@ namespace Envoy {
 TEST(ExampleConfigsTest, All) {
   TestEnvironment::exec(
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
-
-#ifdef WIN32
-  Filesystem::InstanceImplWin32 file_system;
-#else
-  Filesystem::InstanceImplPosix file_system;
-#endif
-
+  Filesystem::InstanceImpl file_system;
   const auto config_file_count = std::stoi(
       file_system.fileReadToEnd(TestEnvironment::temporaryDirectory() + "/config-file-count.txt"));
 

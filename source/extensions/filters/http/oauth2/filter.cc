@@ -1,4 +1,4 @@
-#include "extensions/filters/http/oauth2/filter.h"
+#include "source/extensions/filters/http/oauth2/filter.h"
 
 #include <algorithm>
 #include <chrono>
@@ -6,19 +6,19 @@
 #include <string>
 #include <vector>
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/hex.h"
-#include "common/common/matchers.h"
-#include "common/crypto/utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/matchers.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
@@ -386,8 +386,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
 
-  const std::string new_path =
-      absl::StrCat(headers.ForwardedProto()->value().getStringView(), "://", host_, "/");
+  const std::string new_path = absl::StrCat(Http::Utility::getScheme(headers), "://", host_, "/");
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutCookieValue);
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutBearerTokenValue);
   response_headers->setLocation(new_path);

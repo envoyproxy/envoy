@@ -1,7 +1,7 @@
 #pragma once
 
-#include "extensions/filters/network/rocketmq_proxy/active_message.h"
-#include "extensions/filters/network/rocketmq_proxy/conn_manager.h"
+#include "source/extensions/filters/network/rocketmq_proxy/active_message.h"
+#include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"
 
 #include "test/mocks/upstream/cluster_manager.h"
 

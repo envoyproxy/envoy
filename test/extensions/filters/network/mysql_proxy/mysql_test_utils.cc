@@ -1,13 +1,12 @@
 #include "mysql_test_utils.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -121,6 +120,18 @@ std::string MySQLTestUtils::encodeMessage(uint32_t packet_len, uint8_t it, uint8
   }
   BufferHelper::encodeHdr(buffer, seq);
   return buffer.toString();
+}
+
+int MySQLTestUtils::bytesOfConnAtrributeLength(
+    const std::vector<std::pair<std::string, std::string>>& conn_attrs) {
+  int64_t total_len = 0;
+  for (const auto& kv : conn_attrs) {
+    total_len += sizeOfLengthEncodeInteger(kv.first.length());
+    total_len += kv.first.length();
+    total_len += sizeOfLengthEncodeInteger(kv.second.length());
+    total_len += kv.second.length();
+  }
+  return sizeOfLengthEncodeInteger(total_len);
 }
 
 int MySQLTestUtils::sizeOfLengthEncodeInteger(uint64_t val) {

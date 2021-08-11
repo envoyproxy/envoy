@@ -11,8 +11,8 @@
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/http_tracer.h"
 
-#include "common/http/headers.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/http/headers.h"
+#include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,9 +1,8 @@
 #include "envoy/event/dispatcher.h"
 
-#include "common/http/headers.h"
-
-#include "extensions/filters/http/cache/cache_filter.h"
-#include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/filters/http/cache/cache_filter.h"
+#include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/mocks/server/factory_context.h"
@@ -124,7 +123,7 @@ protected:
   Event::SimulatedTimeSystem time_source_;
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   Http::TestRequestHeaderMapImpl request_headers_{
-      {":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}};
+      {":path", "/"}, {":method", "GET"}, {":scheme", "https"}};
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
                                                     {"cache-control", "public,max-age=3600"}};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;

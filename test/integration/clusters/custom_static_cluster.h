@@ -11,10 +11,9 @@
 #include "envoy/http/codec.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/network/address_impl.h"
-#include "common/upstream/cluster_factory_impl.h"
-
-#include "server/transport_socket_config_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/clusters/cluster_factory_config.pb.h"

@@ -44,6 +44,7 @@ public:
   constexpr static absl::string_view DURATION_TIMEOUT = "DT";
   constexpr static absl::string_view UPSTREAM_PROTOCOL_ERROR = "UPE";
   constexpr static absl::string_view NO_CLUSTER_FOUND = "NC";
+  constexpr static absl::string_view OVERLOAD_MANAGER = "OM";
 
   static constexpr std::array ALL_RESPONSE_STRING_FLAGS{
       FlagStringAndEnum{FAILED_LOCAL_HEALTH_CHECK, ResponseFlag::FailedLocalHealthCheck},
@@ -74,6 +75,7 @@ public:
       FlagStringAndEnum{DURATION_TIMEOUT, ResponseFlag::DurationTimeout},
       FlagStringAndEnum{UPSTREAM_PROTOCOL_ERROR, ResponseFlag::UpstreamProtocolError},
       FlagStringAndEnum{NO_CLUSTER_FOUND, ResponseFlag::NoClusterFound},
+      FlagStringAndEnum{OVERLOAD_MANAGER, ResponseFlag::OverloadManager},
   };
 
 private:

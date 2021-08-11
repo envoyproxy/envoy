@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/hystrix/hystrix.h"
+#include "source/extensions/stat_sinks/hystrix/hystrix.h"
 
 #include <chrono>
 #include <ctime>
@@ -7,11 +7,11 @@
 
 #include "envoy/stats/scope.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-#include "common/config/well_known_names.h"
-#include "common/http/headers.h"
-#include "common/stats/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/http/headers.h"
+#include "source/common/stats/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"

@@ -5,14 +5,13 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/rocketmq_proxy/codec.h"
-#include "extensions/filters/network/rocketmq_proxy/protocol.h"
-#include "extensions/filters/network/rocketmq_proxy/router/router.h"
-#include "extensions/filters/network/rocketmq_proxy/topic_route.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/rocketmq_proxy/codec.h"
+#include "source/extensions/filters/network/rocketmq_proxy/protocol.h"
+#include "source/extensions/filters/network/rocketmq_proxy/router/router.h"
+#include "source/extensions/filters/network/rocketmq_proxy/topic_route.h"
 
 #include "absl/types/optional.h"
 

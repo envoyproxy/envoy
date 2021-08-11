@@ -10,12 +10,10 @@
 #include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/key.pb.h"
-
-#include "extensions/filters/http/cache/cache_headers_utils.h"
 
 #include "absl/strings/string_view.h"
 

@@ -1,4 +1,4 @@
-#include "extensions/filters/http/fault/fault_filter.h"
+#include "source/extensions/filters/http/fault/fault_filter.h"
 
 #include <chrono>
 #include <cstdint>
@@ -12,17 +12,15 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/utility.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -51,7 +49,8 @@ FaultSettings::FaultSettings(const envoy::extensions::filters::http::fault::v3::
           fault, max_active_faults_runtime, RuntimeKeys::get().MaxActiveFaultsKey)),
       response_rate_limit_percent_runtime_(
           PROTOBUF_GET_STRING_OR_DEFAULT(fault, response_rate_limit_percent_runtime,
-                                         RuntimeKeys::get().ResponseRateLimitPercentKey)) {
+                                         RuntimeKeys::get().ResponseRateLimitPercentKey)),
+      disable_downstream_cluster_stats_(fault.disable_downstream_cluster_stats()) {
   if (fault.has_abort()) {
     request_abort_config_ =
         std::make_unique<Filters::Common::Fault::FaultAbortConfig>(fault.abort());
@@ -89,8 +88,10 @@ FaultFilterConfig::FaultFilterConfig(
       stats_prefix_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault"))) {}
 
 void FaultFilterConfig::incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name) {
-  Stats::Utility::counterFromStatNames(scope_, {stats_prefix_, downstream_cluster, stat_name})
-      .inc();
+  if (!settings_.disableDownstreamClusterStats()) {
+    Stats::Utility::counterFromStatNames(scope_, {stats_prefix_, downstream_cluster, stat_name})
+        .inc();
+  }
 }
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
@@ -110,14 +111,9 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // faults. In other words, runtime is supported only when faults are
   // configured at the filter level.
   fault_settings_ = config_->settings();
-  if (decoder_callbacks_->route() && decoder_callbacks_->route()->routeEntry()) {
-    const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Fault;
-    const auto* route_entry = decoder_callbacks_->route()->routeEntry();
-
-    const auto* per_route_settings =
-        route_entry->mostSpecificPerFilterConfigTyped<FaultSettings>(name);
-    fault_settings_ = per_route_settings ? per_route_settings : fault_settings_;
-  }
+  const auto* per_route_settings = Http::Utility::resolveMostSpecificPerFilterConfig<FaultSettings>(
+      "envoy.filters.http.fault", decoder_callbacks_->route());
+  fault_settings_ = per_route_settings ? per_route_settings : fault_settings_;
 
   if (!matchesTargetUpstreamCluster()) {
     return Http::FilterHeadersStatus::Continue;
@@ -134,7 +130,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   if (headers.EnvoyDownstreamServiceCluster()) {
     downstream_cluster_ = std::string(headers.getEnvoyDownstreamServiceClusterValue());
-    if (!downstream_cluster_.empty()) {
+    if (!downstream_cluster_.empty() && !fault_settings_->disableDownstreamClusterStats()) {
       downstream_cluster_storage_ = std::make_unique<Stats::StatNameDynamicStorage>(
           downstream_cluster_, config_->scope().symbolTable());
     }
@@ -369,7 +365,7 @@ FaultFilter::abortGrpcStatus(const Http::RequestHeaderMap& request_headers) {
 
 void FaultFilter::recordDelaysInjectedStats() {
   // Downstream specific stats.
-  if (!downstream_cluster_.empty()) {
+  if (!downstream_cluster_.empty() && !fault_settings_->disableDownstreamClusterStats()) {
     config_->incDelays(downstream_cluster_storage_->statName());
   }
 
@@ -378,7 +374,7 @@ void FaultFilter::recordDelaysInjectedStats() {
 
 void FaultFilter::recordAbortsInjectedStats() {
   // Downstream specific stats.
-  if (!downstream_cluster_.empty()) {
+  if (!downstream_cluster_.empty() && !fault_settings_->disableDownstreamClusterStats()) {
     config_->incAborts(downstream_cluster_storage_->statName());
   }
 

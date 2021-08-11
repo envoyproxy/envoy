@@ -16,7 +16,7 @@ chosen to serve the request. If the default filter chain is not supplied, the co
 Filter chain only update
 ------------------------
 
-:ref:`Filter chains <envoy_v3_api_msg_config.listener.v3.FilterChain>` can be updated indepedently. Upon listener config
+:ref:`Filter chains <envoy_v3_api_msg_config.listener.v3.FilterChain>` can be updated independently. Upon listener config
 update, if the listener manager determines that the listener update is a filter chain only update, the listener update
 will be executed by adding, updating and removing filter chains. The connections owned by these destroying filter chains will
 be drained as described in listener drain.

@@ -69,10 +69,12 @@ expects a cluster name match of "instant-server".::
       path_redirect: ...,
       request_header_matches:
         - name: ...,
-          exact_match: ...
+          string_match:
+            exact: ...
       response_header_matches:
         - name: ...,
-          exact_match: ...
+          string_match:
+            exact: ...
         - name: ...,
           presence_match: ...
 
@@ -181,7 +183,7 @@ The router check tool will report route coverage at the end of a successful test
   Current route coverage: 0.0744863
 
 This reporting can be leveraged to enforce a minimum coverage percentage by using
-the `-f` or `--fail-under` flag. If coverage falls below this percentage the test
+the ``-f`` or ``--fail-under`` flag. If coverage falls below this percentage the test
 run will fail.
 
 .. code:: bash
@@ -194,7 +196,7 @@ run will fail.
 By default the coverage report measures test coverage by checking that at least one field is
 verified for every route. However, this can leave holes in the tests where fields
 aren't validated and later changed. For more comprehensive coverage you can add a flag,
-`--covall`, which will calculate coverage taking into account all of the possible
+``--covall``, which will calculate coverage taking into account all of the possible
 fields that could be tested.
 
 .. code:: bash

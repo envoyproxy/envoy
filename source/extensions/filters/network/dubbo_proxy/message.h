@@ -5,7 +5,7 @@
 
 #include "envoy/common/pure.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"

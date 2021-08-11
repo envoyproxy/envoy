@@ -3,7 +3,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/runtime/runtime.h"
 
-#include "common/common/interval_value.h"
+#include "source/common/common/interval_value.h"
 
 #include "absl/strings/string_view.h"
 #include "base_listener_impl.h"
@@ -17,9 +17,12 @@ namespace Network {
 class TcpListenerImpl : public BaseListenerImpl {
 public:
   TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
-                  SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port,
-                  uint32_t backlog_size);
-  ~TcpListenerImpl() override { socket_->ioHandle().resetFileEvents(); }
+                  SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port);
+  ~TcpListenerImpl() override {
+    if (bind_to_port_) {
+      socket_->ioHandle().resetFileEvents();
+    }
+  }
   void disable() override;
   void enable() override;
   void setRejectFraction(UnitFloat reject_fraction) override;
@@ -27,10 +30,7 @@ public:
   static const absl::string_view GlobalMaxCxRuntimeKey;
 
 protected:
-  void setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket);
-
   TcpListenerCallbacks& cb_;
-  const uint32_t backlog_size_;
 
 private:
   void onSocketEvent(short flags);
@@ -40,6 +40,7 @@ private:
   static bool rejectCxOverGlobalLimit();
 
   Random::RandomGenerator& random_;
+  bool bind_to_port_;
   UnitFloat reject_fraction_;
 };
 

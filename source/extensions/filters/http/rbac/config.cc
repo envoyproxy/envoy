@@ -1,10 +1,10 @@
-#include "extensions/filters/http/rbac/config.h"
+#include "source/extensions/filters/http/rbac/config.h"
 
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/rbac/rbac_filter.h"
+#include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 namespace Envoy {
 namespace Extensions {

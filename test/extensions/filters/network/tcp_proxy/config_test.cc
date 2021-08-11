@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 
-#include "extensions/filters/network/tcp_proxy/config.h"
+#include "source/extensions/filters/network/tcp_proxy/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/test_runtime.h"

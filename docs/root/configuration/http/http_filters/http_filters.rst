@@ -10,6 +10,7 @@ HTTP filters
   admission_control_filter
   aws_lambda_filter
   aws_request_signing_filter
+  bandwidth_limit_filter
   buffer_filter
   cdn_loop_filter
   compressor_filter
@@ -27,7 +28,6 @@ HTTP filters
   grpc_json_transcoder_filter
   grpc_stats_filter
   grpc_web_filter
-  gzip_filter
   health_check_filter
   header_to_metadata_filter
   ip_tagging_filter
@@ -41,6 +41,7 @@ HTTP filters
   rate_limit_filter
   rbac_filter
   router_filter
+  set_metadata_filter
   squash_filter
   tap_filter
   wasm_filter
@@ -55,4 +56,5 @@ HTTP filters
   ../../../api-v3/service/ext_proc/v3alpha/external_processor.proto
   ../../../api-v3/extensions/filters/http/oauth2/v3alpha/oauth.proto
   ../../../api-v3/extensions/filters/http/cache/v3alpha/cache.proto
+  ../../../api-v3/extensions/cache/simple_http_cache/v3alpha/config.proto
   ../../../api-v3/extensions/filters/http/cdn_loop/v3alpha/cdn_loop.proto

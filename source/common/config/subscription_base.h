@@ -2,8 +2,8 @@
 
 #include "envoy/config/subscription.h"
 
-#include "common/config/opaque_resource_decoder_impl.h"
-#include "common/config/resource_name.h"
+#include "source/common/config/opaque_resource_decoder_impl.h"
+#include "source/common/config/resource_name.h"
 
 namespace Envoy {
 namespace Config {

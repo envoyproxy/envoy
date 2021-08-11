@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "extensions/filters/common/lua/lua.h"
+#include "source/extensions/filters/common/lua/lua.h"
 
 #include "test/mocks/thread_local/mocks.h"
 

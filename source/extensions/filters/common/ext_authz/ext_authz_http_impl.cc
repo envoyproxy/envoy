@@ -1,16 +1,16 @@
-#include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/matchers.h"
-#include "common/http/async_client_impl.h"
-#include "common/http/codes.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/matchers.h"
+#include "source/common/http/async_client_impl.h"
+#include "source/common/http/codes.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -86,7 +86,9 @@ std::vector<Matchers::StringMatcherPtr>
 createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
   std::vector<Matchers::StringMatcherPtr> matchers;
   for (const auto& matcher : list.patterns()) {
-    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+    matchers.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            matcher));
   }
   return matchers;
 }
@@ -136,7 +138,9 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatche
   for (const auto& key : keys) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(key.get());
-    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+    matchers.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            matcher));
   }
 
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
@@ -157,7 +161,9 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
   if (matchers.empty()) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(Http::Headers::get().Host.get());
-    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+    matchers.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            matcher));
 
     return std::make_shared<NotHeaderKeyMatcher>(std::move(matchers));
   }
@@ -171,7 +177,9 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
   for (const auto& key : keys) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(key.get());
-    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+    matchers.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            matcher));
   }
 
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));

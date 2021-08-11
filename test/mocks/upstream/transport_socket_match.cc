@@ -1,6 +1,6 @@
 #include "test/mocks/upstream/transport_socket_match.h"
 
-#include "common/network/raw_buffer_socket.h"
+#include "source/common/network/raw_buffer_socket.h"
 
 using testing::_;
 using testing::Return;

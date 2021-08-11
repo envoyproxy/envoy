@@ -20,7 +20,7 @@ envoy_cc_library(
     ],
     deps = [
         ":skywalking_stats_lib",
-        "//include/envoy/grpc:async_client_manager_interface",
+        "//envoy/grpc:async_client_manager_interface",
         "//source/common/common:backoff_lib",
         "//source/common/grpc:async_client_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
@@ -42,9 +42,9 @@ envoy_cc_library(
     ],
     deps = [
         ":trace_segment_reporter_lib",
-        "//include/envoy/common:time_interface",
-        "//include/envoy/server:tracer_config_interface",
-        "//include/envoy/tracing:http_tracer_interface",
+        "//envoy/common:time_interface",
+        "//envoy/server:tracer_config_interface",
+        "//envoy/tracing:http_tracer_interface",
         "//source/common/common:macros",
         "//source/common/http:header_map_lib",
         "//source/common/runtime:runtime_lib",
@@ -59,7 +59,7 @@ envoy_cc_library(
         "skywalking_stats.h",
     ],
     deps = [
-        "//include/envoy/stats:stats_macros",
+        "//envoy/stats:stats_macros",
     ],
 )
 
@@ -67,9 +67,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.tracers",
-    security_posture = "robust_to_untrusted_downstream",
-    status = "wip",
     deps = [
         ":skywalking_tracer_lib",
         "//source/common/config:datasource_lib",

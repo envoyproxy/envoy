@@ -8,7 +8,7 @@
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 #include "envoy/http/filter.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

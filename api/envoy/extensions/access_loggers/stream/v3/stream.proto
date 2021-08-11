@@ -15,7 +15,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Standard Streams Access loggers]
 // [#extension: envoy.access_loggers.stream]
 
-// Custom configuration for an :ref:`AccessLog <envoy_api_msg_config.accesslog.v3.AccessLog>`
+// Custom configuration for an :ref:`AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`
 // that writes log entries directly to the operating system's standard output.
 message StdoutAccessLog {
   oneof access_log_format {
@@ -26,7 +26,7 @@ message StdoutAccessLog {
   }
 }
 
-// Custom configuration for an :ref:`AccessLog <envoy_api_msg_config.accesslog.v3.AccessLog>`
+// Custom configuration for an :ref:`AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`
 // that writes log entries directly to the operating system's standard error.
 message StderrAccessLog {
   oneof access_log_format {

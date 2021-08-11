@@ -2,7 +2,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/guarddog_config.h"
 
-#include "extensions/watchdog/profile_action/config.h"
+#include "source/extensions/watchdog/profile_action/config.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"

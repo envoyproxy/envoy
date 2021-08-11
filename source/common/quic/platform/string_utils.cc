@@ -1,4 +1,4 @@
-#include "common/quic/platform/string_utils.h"
+#include "source/common/quic/platform/string_utils.h"
 
 // NOLINT(namespace-envoy)
 //
@@ -13,7 +13,7 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_format.h"
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace quiche {
 

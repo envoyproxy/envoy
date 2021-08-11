@@ -1,11 +1,9 @@
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/stat_sinks/hystrix/config.h"
-#include "extensions/stat_sinks/hystrix/hystrix.h"
-#include "extensions/stat_sinks/well_known_names.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/stat_sinks/hystrix/config.h"
+#include "source/extensions/stat_sinks/hystrix/hystrix.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
@@ -24,12 +22,10 @@ namespace Hystrix {
 namespace {
 
 TEST(StatsConfigTest, ValidHystrixSink) {
-  const std::string name = StatsSinkNames::get().Hystrix;
-
   envoy::config::metrics::v3::HystrixSink sink_config;
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(HystrixName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();

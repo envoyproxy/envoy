@@ -1,6 +1,6 @@
 #include "test/extensions/filters/network/rocketmq_proxy/mocks.h"
 
-#include "extensions/filters/network/rocketmq_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/rocketmq_proxy/router/router_impl.h"
 
 #include "gtest/gtest.h"
 

@@ -4,7 +4,7 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/hex.h"
+#include "source/common/common/hex.h"
 
 #include "nghttp2/nghttp2.h"
 

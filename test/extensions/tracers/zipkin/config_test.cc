@@ -3,7 +3,7 @@
 #include "envoy/config/trace/v3/zipkin.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/tracers/zipkin/config.h"
+#include "source/extensions/tracers/zipkin/config.h"
 
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
@@ -39,7 +39,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   ZipkinTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr zipkin_tracer = factory.createHttpTracer(*message, context);
+  auto zipkin_tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
@@ -63,7 +63,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   ZipkinTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr zipkin_tracer = factory.createHttpTracer(*message, context);
+  auto zipkin_tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 

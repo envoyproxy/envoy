@@ -159,7 +159,7 @@ Values can be viewed at the
 :ref:`/runtime admin endpoint <operations_admin_interface_runtime>`. Values can be modified and
 added at the :ref:`/runtime_modify admin endpoint <operations_admin_interface_runtime_modify>`. If
 runtime is not configured, an empty provider is used which has the effect of using all defaults
-built into the code, except for any values added via `/runtime_modify`.
+built into the code, except for any values added via ``/runtime_modify``.
 
 .. attention::
 
@@ -256,7 +256,7 @@ as soon as possible. Fatal-by-default configuration indicates that the removal o
 imminent. It is far better for both Envoy users and for Envoy contributors if any bugs or feature gaps
 with the new code paths are flushed out ahead of time, rather than after the code is removed!
 
-By enabling the runtime key `envoy.features.fail_on_any_deprecated_feature`, Envoy users can
+By enabling the runtime key ``envoy.features.fail_on_any_deprecated_feature``, Envoy users can
 trigger a configuration load failure during the typical warn-by-default phase. This is a useful way to
 verify what fields you are using ahead of Envoy's deprecation schedule.
 

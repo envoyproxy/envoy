@@ -14,12 +14,11 @@ envoy_package()
 envoy_extension_cc_test(
     name = "ratelimit_test",
     srcs = ["ratelimit_test.cc"],
-    extension_name = "envoy.filters.thrift.ratelimit",
+    extension_names = ["envoy.filters.thrift.ratelimit"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/http:headers_lib",
-        "//source/extensions/filters/network/thrift_proxy/filters:well_known_names",
         "//source/extensions/filters/network/thrift_proxy/filters/ratelimit:ratelimit_lib",
         "//test/extensions/filters/common/ratelimit:ratelimit_mocks",
         "//test/extensions/filters/network/thrift_proxy:mocks",
@@ -35,7 +34,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.thrift.ratelimit",
+    extension_names = ["envoy.filters.thrift.ratelimit"],
     deps = [
         "//source/extensions/filters/network/thrift_proxy/filters/ratelimit:config",
         "//test/extensions/filters/network/thrift_proxy:mocks",

@@ -6,7 +6,7 @@
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
-#include "common/http/header_utility.h"
+#include "source/common/http/header_utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -22,32 +22,25 @@ public:
   virtual absl::optional<std::reference_wrapper<const HeaderType>>
   headerMap(const HttpMatchingData& data) const PURE;
 
-  Matcher::DataInputGetResult get(const HttpMatchingData& data) override {
+  Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
     const auto maybe_headers = headerMap(data);
 
     if (!maybe_headers) {
       return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
     }
 
-    auto header = maybe_headers->get().get(name_);
-    if (header.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-    }
+    auto header_string = HeaderUtility::getAllOfHeaderAsString(maybe_headers->get(), name_, ",");
 
-    if (header_as_string_result_) {
+    if (header_string.result()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              header_as_string_result_->result()};
+              std::string(header_string.result().value())};
     }
 
-    header_as_string_result_ = HeaderUtility::getAllOfHeaderAsString(header, ",");
-
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            header_as_string_result_->result()};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
 
 private:
   const LowerCaseString name_;
-  absl::optional<HeaderUtility::GetAllOfHeaderAsStringResult> header_as_string_result_;
 };
 
 /**
@@ -60,13 +53,15 @@ public:
 
   std::string name() const override { return name_; }
 
-  Matcher::DataInputPtr<HttpMatchingData>
-  createDataInput(const Protobuf::Message& config,
-                  Server::Configuration::FactoryContext& factory_context) override {
-    const auto& typed_config = MessageUtil::downcastAndValidate<const ProtoType&>(
-        config, factory_context.messageValidationVisitor());
+  Matcher::DataInputFactoryCb<HttpMatchingData>
+  createDataInputFactoryCb(const Protobuf::Message& config,
+                           ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    const auto& typed_config =
+        MessageUtil::downcastAndValidate<const ProtoType&>(config, validation_visitor);
 
-    return std::make_unique<DataInputType>(typed_config.header_name());
+    return [header_name = typed_config.header_name()] {
+      return std::make_unique<DataInputType>(header_name);
+    };
   };
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtoType>();

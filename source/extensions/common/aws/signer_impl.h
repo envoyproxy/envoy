@@ -1,11 +1,10 @@
 #pragma once
 
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/singleton/const_singleton.h"
-
-#include "extensions/common/aws/credentials_provider.h"
-#include "extensions/common/aws/signer.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/singleton/const_singleton.h"
+#include "source/extensions/common/aws/credentials_provider.h"
+#include "source/extensions/common/aws/signer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,23 +46,14 @@ class SignerImpl : public Signer, public Logger::Loggable<Logger::Id::http> {
 public:
   SignerImpl(absl::string_view service_name, absl::string_view region,
              const CredentialsProviderSharedPtr& credentials_provider, TimeSource& time_source)
-      : service_name_(service_name), region_(region),
-
-        // S3, Glacier, ES payloads require special treatment.
-        // S3:
-        // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html.
-        // ES:
-        // https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/es-request-signing.html.
-        // Glacier:
-        // https://docs.aws.amazon.com/amazonglacier/latest/dev/amazon-glacier-signing-requests.html.
-        require_content_hash_{service_name_ == "s3" || service_name_ == "glacier" ||
-                              service_name_ == "es"},
-        credentials_provider_(credentials_provider), time_source_(time_source),
-        long_date_formatter_(SignatureConstants::get().LongDateFormat),
+      : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
+        time_source_(time_source), long_date_formatter_(SignatureConstants::get().LongDateFormat),
         short_date_formatter_(SignatureConstants::get().ShortDateFormat) {}
 
   void sign(Http::RequestMessage& message, bool sign_body = false) override;
-  void sign(Http::RequestHeaderMap& headers) override;
+  void sign(Http::RequestHeaderMap& headers, const std::string& content_hash) override;
+  void signEmptyPayload(Http::RequestHeaderMap& headers) override;
+  void signUnsignedPayload(Http::RequestHeaderMap& headers) override;
 
 private:
   std::string createContentHash(Http::RequestMessage& message, bool sign_body) const;
@@ -81,12 +71,9 @@ private:
                                         const std::map<std::string, std::string>& canonical_headers,
                                         absl::string_view signature) const;
 
-  void sign(Http::RequestHeaderMap& headers, const std::string& content_hash) override;
-
   const std::string service_name_;
   const std::string region_;
 
-  const bool require_content_hash_;
   CredentialsProviderSharedPtr credentials_provider_;
   TimeSource& time_source_;
   DateFormatter long_date_formatter_;

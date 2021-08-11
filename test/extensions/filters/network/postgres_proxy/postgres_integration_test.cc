@@ -29,18 +29,18 @@ class PostgresBaseIntegrationTest : public testing::TestWithParam<Network::Addre
     if (add_start_tls_transport_socket) {
       main_config +=
           fmt::format(R"EOF(
-        transport_socket:
-          name: "starttls"
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig
-            cleartext_socket_config:
-            tls_socket_config:
-              common_tls_context:
-                tls_certificates:
-                  certificate_chain:
-                    filename: {}
-                  private_key:
-                    filename: {}
+      transport_socket:
+        name: "starttls"
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig
+          cleartext_socket_config:
+          tls_socket_config:
+            common_tls_context:
+              tls_certificates:
+                certificate_chain:
+                  filename: {}
+                private_key:
+                  filename: {}
    )EOF",
                       TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
                       TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));

@@ -1,6 +1,6 @@
 #include "envoy/config/core/v3/substitution_format_string.pb.validate.h"
 
-#include "common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_format_string.h"
 
 #include "test/common/formatter/command_extension.h"
 #include "test/mocks/http/mocks.h"
@@ -48,7 +48,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigText) {
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("plain text, path=/bar/foo, code=200",
             formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
                               body_));
@@ -65,7 +65,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   const auto out_json = formatter->format(request_headers_, response_headers_, response_trailers_,
                                           stream_info_, body_);
 
@@ -94,7 +94,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
   for (const auto& yaml : invalid_configs) {
     TestUtility::loadFromYaml(yaml, config_);
     EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api()), EnvoyException,
+        SubstitutionFormatStringUtils::fromProtoConfig(config_, context_), EnvoyException,
         "Only string values, nested structs and list values are supported in structured access log "
         "format.");
   }
@@ -114,7 +114,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtension)
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("plain text TestFormatter", formatter->format(request_headers_, response_headers_,
                                                           response_trailers_, stream_info_, body_));
 }
@@ -134,7 +134,7 @@ TEST_F(SubstitutionFormatStringUtilsTest,
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api()),
+  EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
                             EnvoyException,
                             "Failed to create command parser: envoy.formatter.FailFormatter");
 }
@@ -150,7 +150,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtensionU
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api()),
+  EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
                             EnvoyException,
                             "Formatter not found: envoy.formatter.TestFormatterUnknown");
 }
@@ -173,7 +173,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonWithExtension) 
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   const auto out_json = formatter->format(request_headers_, response_headers_, response_trailers_,
                                           stream_info_, body_);
 
@@ -209,7 +209,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonWithMultipleExt
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   const auto out_json = formatter->format(request_headers_, response_headers_, response_trailers_,
                                           stream_info_, body_);
 

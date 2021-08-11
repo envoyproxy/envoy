@@ -7,18 +7,17 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/stats/timespan_impl.h"
-#include "common/stream_info/stream_info_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/decoder.h"
-#include "extensions/filters/network/thrift_proxy/filters/filter.h"
-#include "extensions/filters/network/thrift_proxy/protocol.h"
-#include "extensions/filters/network/thrift_proxy/protocol_converter.h"
-#include "extensions/filters/network/thrift_proxy/stats.h"
-#include "extensions/filters/network/thrift_proxy/transport.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/decoder.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol_converter.h"
+#include "source/extensions/filters/network/thrift_proxy/stats.h"
+#include "source/extensions/filters/network/thrift_proxy/transport.h"
 
 #include "absl/types/any.h"
 
@@ -41,17 +40,6 @@ public:
   virtual Router::Config& routerConfig() PURE;
   virtual bool payloadPassthrough() const PURE;
   virtual uint64_t maxRequestsPerConnection() const PURE;
-};
-
-/**
- * Extends Upstream::ProtocolOptionsConfig with Thrift-specific cluster options.
- */
-class ProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {
-public:
-  ~ProtocolOptionsConfig() override = default;
-
-  virtual TransportType transport(TransportType downstream_transport) const PURE;
-  virtual ProtocolType protocol(ProtocolType downstream_protocol) const PURE;
 };
 
 /**

@@ -15,7 +15,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "matchers_test",
     srcs = ["matchers_test.cc"],
-    extension_name = "envoy.filters.http.rbac",
+    extension_names = ["envoy.filters.http.rbac"],
     deps = [
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/common/rbac:matchers_lib",
@@ -32,7 +32,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "engine_impl_test",
     srcs = ["engine_impl_test.cc"],
-    extension_name = "envoy.filters.http.rbac",
+    extension_names = ["envoy.filters.http.rbac"],
     deps = [
         "//source/extensions/filters/common/rbac:engine_lib",
         "//test/mocks/network:network_mocks",
@@ -47,7 +47,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    extension_name = "envoy.filters.http.rbac",
+    extension_names = ["envoy.filters.http.rbac"],
     deps = [
         "//source/extensions/filters/common/rbac:utility_lib",
     ],
@@ -56,7 +56,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_mock(
     name = "engine_mocks",
     hdrs = ["mocks.h"],
-    extension_name = "envoy.filters.http.rbac",
+    extension_names = ["envoy.filters.http.rbac"],
     deps = [
         "//source/extensions/filters/common/rbac:engine_lib",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",

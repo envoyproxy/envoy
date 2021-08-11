@@ -1,12 +1,12 @@
-#include "extensions/access_loggers/grpc/grpc_access_log_impl.h"
+#include "source/extensions/access_loggers/grpc/grpc_access_log_impl.h"
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
 
-#include "common/config/utility.h"
-#include "common/grpc/typed_async_client.h"
+#include "source/common/config/utility.h"
+#include "source/common/grpc/typed_async_client.h"
 
 const char GRPC_LOG_STATS_PREFIX[] = "access_logs.grpc_access_log.";
 
@@ -16,7 +16,7 @@ namespace AccessLoggers {
 namespace GrpcCommon {
 
 GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
-    Grpc::RawAsyncClientPtr&& client, std::string log_name,
+    const Grpc::RawAsyncClientSharedPtr& client, std::string log_name,
     std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
     Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
     envoy::config::core::v3::ApiVersion transport_api_version)
@@ -55,10 +55,11 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& a
 
 GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-    envoy::config::core::v3::ApiVersion transport_version, Grpc::RawAsyncClientPtr&& client,
+    envoy::config::core::v3::ApiVersion transport_version,
+    const Grpc::RawAsyncClientSharedPtr& client,
     std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
     Event::Dispatcher& dispatcher, Stats::Scope& scope) {
-  return std::make_shared<GrpcAccessLoggerImpl>(std::move(client), config.log_name(),
+  return std::make_shared<GrpcAccessLoggerImpl>(client, config.log_name(),
                                                 buffer_flush_interval_msec, max_buffer_size_bytes,
                                                 dispatcher, local_info_, scope, transport_version);
 }

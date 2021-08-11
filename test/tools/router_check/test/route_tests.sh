@@ -88,13 +88,13 @@ fi
 echo "testing error strings"
 FAILURE_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/TestRoutes.yaml" "-t" "${PATH_CONFIG}/TestRoutesFailures.golden.proto.json" "--only-show-failures" 2>&1) ||
   echo "${FAILURE_OUTPUT:-no-output}"
-if ! echo "${FAILURE_OUTPUT}" | grep -Fxq "expected: [content-type: text/plain], actual: NOT [content-type: text/plain], test type: response_header_matches.exact_match"; then
+if ! echo "${FAILURE_OUTPUT}" | grep -Fxq "expected: [content-type: text/plain], actual: NOT [content-type: text/plain], test type: response_header_matches.string_match.exact"; then
   exit 1
 fi
 if ! echo "${FAILURE_OUTPUT}" | grep -Fxq "actual: [content-length: 25], test type: response_header_matches.range_match"; then
   exit 1
 fi
-if ! echo "${FAILURE_OUTPUT}" | grep -Fxq "expected: [x-ping-response: pong], actual: [x-ping-response: yes], test type: response_header_matches.exact_match"; then
+if ! echo "${FAILURE_OUTPUT}" | grep -Fxq "expected: [x-ping-response: pong], actual: [x-ping-response: yes], test type: response_header_matches.string_match.exact"; then
   exit 1
 fi
 if ! echo "${FAILURE_OUTPUT}" | grep -Fxq "expected: [has(x-ping-response):false], actual: [has(x-ping-response):true], test type: response_header_matches.present_match"; then

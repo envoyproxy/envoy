@@ -99,7 +99,7 @@ envoy_cc_test_library(
         "abseil_strings",
     ],
     deps = [
-        "//include/envoy/stats:stats_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/memory:stats_lib",
         "//source/common/stats:isolated_store_lib",
@@ -131,7 +131,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "refcount_ptr_test",
     srcs = ["refcount_ptr_test.cc"],
-    deps = ["//include/envoy/stats:refcount_ptr_interface"],
+    deps = ["//envoy/stats:refcount_ptr_interface"],
 )
 
 envoy_cc_test(
@@ -282,6 +282,7 @@ envoy_cc_benchmark_binary(
         ":stat_test_utility_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
         "//test/test_common:simulated_time_system_lib",

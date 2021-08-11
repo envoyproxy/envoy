@@ -1,12 +1,11 @@
-#include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_command.h"
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/common/logger.h"
-#include "common/common/macros.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
-#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 namespace Envoy {
 namespace Extensions {

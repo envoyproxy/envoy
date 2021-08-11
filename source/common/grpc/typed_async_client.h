@@ -5,8 +5,8 @@
 
 #include "envoy/grpc/async_client.h"
 
-#include "common/common/empty_string.h"
-#include "common/config/version_converter.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/config/version_converter.h"
 
 namespace Envoy {
 namespace Grpc {

@@ -1,4 +1,4 @@
-#include "common/runtime/runtime_impl.h"
+#include "source/common/runtime/runtime_impl.h"
 
 #include <cstdint>
 #include <string>
@@ -12,20 +12,24 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/type/v3/percent.pb.validate.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/api_version.h"
-#include "common/filesystem/directory.h"
-#include "common/grpc/common.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/api_version.h"
+#include "source/common/filesystem/directory.h"
+#include "source/common/grpc/common.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/platform/quiche_flags_impl.h"
+#endif
 
 namespace Envoy {
 namespace Runtime {
@@ -37,6 +41,21 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
   // Similar to the above, but a gauge that isn't imported during a hot restart.
   stats.deprecated_feature_seen_since_process_start_.inc();
 }
+
+// TODO(12923): Document the Quiche reloadable flag setup.
+#ifdef ENVOY_ENABLE_QUIC
+void refreshQuicheReloadableFlags(const Snapshot::EntryMap& flag_map) {
+  absl::flat_hash_map<std::string, bool> quiche_flags_override;
+  for (const auto& it : flag_map) {
+    if (absl::StartsWith(it.first, quiche::EnvoyQuicheReloadableFlagPrefix) &&
+        it.second.bool_value_.has_value()) {
+      quiche_flags_override[it.first.substr(quiche::EnvoyFeaturePrefix.length())] =
+          it.second.bool_value_.value();
+    }
+  }
+  quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
+}
+#endif
 
 } // namespace
 
@@ -177,6 +196,8 @@ bool SnapshotImpl::getBoolean(absl::string_view key, bool default_value) const {
 const std::vector<Snapshot::OverrideLayerConstPtr>& SnapshotImpl::getLayers() const {
   return layers_;
 }
+
+const Snapshot::EntryMap& SnapshotImpl::values() const { return values_; }
 
 SnapshotImpl::SnapshotImpl(Random::RandomGenerator& generator, RuntimeStats& stats,
                            std::vector<OverrideLayerConstPtr>&& layers)
@@ -512,6 +533,10 @@ void LoaderImpl::loadNewSnapshot() {
   tls_->set([ptr](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);
   });
+
+#ifdef ENVOY_ENABLE_QUIC
+  refreshQuicheReloadableFlags(ptr->values());
+#endif
 
   {
     absl::MutexLock lock(&snapshot_mutex_);
