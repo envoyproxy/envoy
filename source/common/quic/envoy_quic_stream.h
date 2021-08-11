@@ -1,34 +1,18 @@
 #pragma once
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/codec.h"
 
-#include "common/http/codec_helper.h"
-#include "common/quic/envoy_quic_simulated_watermark_buffer.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/quic_filter_manager_connection_impl.h"
-#include "common/quic/send_buffer_monitor.h"
+#include "source/common/http/codec_helper.h"
+#include "source/common/quic/envoy_quic_simulated_watermark_buffer.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/send_buffer_monitor.h"
 
 namespace Envoy {
 namespace Quic {
-
-// Changes or additions to details should be reflected in
-// docs/root/configuration/http/http_conn_man/response_code_details_details.rst
-class Http3ResponseCodeDetailValues {
-public:
-  // Invalid HTTP header field was received and stream is going to be
-  // closed.
-  static constexpr absl::string_view invalid_http_header = "http3.invalid_header_field";
-  // The size of headers (or trailers) exceeded the configured limits.
-  static constexpr absl::string_view headers_too_large = "http3.headers_too_large";
-  // Envoy was configured to drop requests with header keys beginning with underscores.
-  static constexpr absl::string_view invalid_underscore = "http3.unexpected_underscore";
-  // The peer refused the stream.
-  static constexpr absl::string_view remote_refused = "http3.remote_refuse";
-  // The peer reset the stream.
-  static constexpr absl::string_view remote_reset = "http3.remote_reset";
-};
 
 // Base class for EnvoyQuicServer|ClientStream.
 class EnvoyQuicStream : public virtual Http::StreamEncoder,
@@ -96,6 +80,10 @@ public:
     return connection()->addressProvider().localAddress();
   }
 
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {
+    buffer_memory_account_ = account;
+  }
+
   // SendBufferMonitor
   void updateBytesBuffered(size_t old_buffered_bytes, size_t new_buffered_bytes) override {
     if (new_buffered_bytes == old_buffered_bytes) {
@@ -112,9 +100,12 @@ public:
   }
 
   Http::HeaderUtility::HeaderValidationResult
-  validateHeader(const std::string& header_name, absl::string_view header_value) override {
+  validateHeader(absl::string_view header_name, absl::string_view header_value) override {
     bool override_stream_error_on_invalid_http_message =
         http3_options_.override_stream_error_on_invalid_http_message().value();
+    if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
+      return Http::HeaderUtility::HeaderValidationResult::REJECT;
+    }
     if (header_name == "content-length") {
       return Http::HeaderUtility::validateContentLength(
           header_value, override_stream_error_on_invalid_http_message,
@@ -147,6 +138,9 @@ protected:
   const envoy::config::core::v3::Http3ProtocolOptions& http3_options_;
   bool close_connection_upon_invalid_header_{false};
   absl::string_view details_;
+  // TODO(kbaichoo): bind the account to the QUIC buffers to enable tracking of
+  // memory allocated within QUIC buffers.
+  Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_ = nullptr;
 
 private:
   // Keeps track of bytes buffered in the stream send buffer in QUICHE and reacts

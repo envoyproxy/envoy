@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.validate.h"
 
-#include "common/grpc/common.h"
-
-#include "extensions/filters/http/grpc_stats/grpc_stats_filter.h"
+#include "source/common/grpc/common.h"
+#include "source/extensions/filters/http/grpc_stats/grpc_stats_filter.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/common/stream_info/test_util.h"
@@ -95,7 +94,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {
                      ->statsScope()
                      .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
+  EXPECT_FALSE(stream_info_.filterState()->hasDataWithName("envoy.filters.http.grpc_stats"));
 }
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
@@ -115,7 +114,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
                      ->statsScope()
                      .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
+  EXPECT_FALSE(stream_info_.filterState()->hasDataWithName("envoy.filters.http.grpc_stats"));
 }
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
@@ -135,7 +134,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
                      ->statsScope()
                      .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
+  EXPECT_FALSE(stream_info_.filterState()->hasDataWithName("envoy.filters.http.grpc_stats"));
 }
 
 // Test that an allowlist match results in method-named stats.
@@ -366,8 +365,8 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
   EXPECT_TRUE(stats_store_.findCounterByString(
       "grpc.lyft.users.BadCompanions.GetBadCompanions.request_message_count"));
 
-  const auto& data = stream_info_.filterState()->getDataReadOnly<GrpcStatsObject>(
-      HttpFilterNames::get().GrpcStats);
+  const auto& data =
+      stream_info_.filterState()->getDataReadOnly<GrpcStatsObject>("envoy.filters.http.grpc_stats");
   EXPECT_EQ(2U, data.request_message_count);
   EXPECT_EQ(0U, data.response_message_count);
 

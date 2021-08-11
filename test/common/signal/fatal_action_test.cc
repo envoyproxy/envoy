@@ -3,8 +3,8 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/server/fatal_action_config.h"
 
-#include "common/signal/fatal_action.h"
-#include "common/signal/fatal_error_handler.h"
+#include "source/common/signal/fatal_action.h"
+#include "source/common/signal/fatal_error_handler.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"

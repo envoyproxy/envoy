@@ -1,4 +1,4 @@
-#include "extensions/filters/network/kafka/serialization.h"
+#include "source/extensions/filters/network/kafka/serialization.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -75,7 +75,6 @@ file_descriptor_set_text(
     name = "all_protos_with_ext_pb_text",
     with_external_deps = True,
     deps = [
-        "//source:protos",
         "@envoy_api_canonical//:all_protos",
     ],
 )

@@ -16,7 +16,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Metadata matcher]
 
 // MetadataMatcher provides a general interface to check if a given value is matched in
-// :ref:`Metadata <envoy_api_msg_config.core.v3.Metadata>`. It uses `filter` and `path` to retrieve the value
+// :ref:`Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`. It uses `filter` and `path` to retrieve the value
 // from the Metadata and then check if it's matched to the specified value.
 //
 // For example, for the following Metadata:
@@ -71,8 +71,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // An example use of MetadataMatcher is specifying additional metadata in envoy.filters.http.rbac to
 // enforce access control based on dynamic metadata in a request. See :ref:`Permission
-// <envoy_api_msg_config.rbac.v3.Permission>` and :ref:`Principal
-// <envoy_api_msg_config.rbac.v3.Principal>`.
+// <envoy_v3_api_msg_config.rbac.v3.Permission>` and :ref:`Principal
+// <envoy_v3_api_msg_config.rbac.v3.Principal>`.
 
 // [#next-major-version: MetadataMatcher should use StructMatcher]
 message MetadataMatcher {

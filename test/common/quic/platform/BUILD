@@ -61,18 +61,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "spdy_platform_test",
-    srcs = ["spdy_platform_test.cc"],
-    external_deps = ["quiche_spdy_platform"],
-    deps = [
-        "//source/common/quic/platform:quiche_flags_impl_lib",
-        "//test/test_common:logging_lib",
-        "//test/test_common:utility_lib",
-        "@com_googlesource_quiche//:spdy_platform",
-    ],
-)
-
 envoy_cc_test_library(
     name = "epoll_server_platform_impl_lib",
     hdrs = [
@@ -90,7 +78,7 @@ envoy_cc_test_library(
     deps = [
         ":quic_platform_expect_bug_impl_lib",
         ":quic_platform_thread_impl_lib",
-        "//include/envoy/network:address_interface",
+        "//envoy/network:address_interface",
         "//source/common/quic/platform:quic_platform_base_impl_lib",
         "//test/test_common:environment_lib",
     ],
@@ -143,16 +131,9 @@ envoy_cc_test_library(
     hdrs = ["quic_test_mem_slice_vector_impl.h"],
     tags = ["nofips"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
+        "//envoy/buffer:buffer_interface",
         "@com_googlesource_quiche//:quic_platform_mem_slice_span",
     ],
-)
-
-envoy_cc_test_library(
-    name = "quic_platform_sleep_impl_lib",
-    hdrs = ["quic_sleep_impl.h"],
-    tags = ["nofips"],
-    deps = ["@com_googlesource_quiche//:quic_core_time_lib"],
 )
 
 envoy_cc_test_library(
@@ -166,7 +147,7 @@ envoy_cc_test_library(
     hdrs = ["quic_thread_impl.h"],
     tags = ["nofips"],
     deps = [
-        "//include/envoy/thread:thread_interface",
+        "//envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
         "//test/test_common:thread_factory_for_test_lib",
     ],

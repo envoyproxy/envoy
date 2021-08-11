@@ -2,8 +2,8 @@
 // This is an Envoy driver for benchmarks.
 #include "test/benchmark/main.h"
 
-#include "common/common/logger.h"
-#include "common/common/thread.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"

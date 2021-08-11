@@ -1,6 +1,6 @@
 #include "tools/type_whisperer/api_type_db.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "tools/type_whisperer/api_type_db.pb.h"
 #include "udpa/annotations/migrate.pb.h"

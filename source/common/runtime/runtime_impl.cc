@@ -1,4 +1,4 @@
-#include "common/runtime/runtime_impl.h"
+#include "source/common/runtime/runtime_impl.h"
 
 #include <cstdint>
 #include <string>
@@ -12,15 +12,15 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/type/v3/percent.pb.validate.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/api_version.h"
-#include "common/filesystem/directory.h"
-#include "common/grpc/common.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/api_version.h"
+#include "source/common/filesystem/directory.h"
+#include "source/common/grpc/common.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
@@ -28,7 +28,7 @@
 #include "absl/strings/numbers.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/platform/quiche_flags_impl.h"
+#include "source/common/quic/platform/quiche_flags_impl.h"
 #endif
 
 namespace Envoy {

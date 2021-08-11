@@ -32,8 +32,12 @@ ENOTCONN
 EPIPE
 HEXDIG
 HEXDIGIT
+LRU
 OWS
 Preconnecting
+RCVBUF
+RTCP
+RTP
 STATNAME
 SkyWalking
 TIDs
@@ -179,6 +183,7 @@ Kille
 LBs
 LC
 LDS
+LEDS
 LEV
 LF
 LHS
@@ -441,6 +446,8 @@ benchmarked
 bidi
 bignum
 bitfield
+bitmask
+bitmasks
 bitset
 bitwise
 blackhole
@@ -677,6 +684,7 @@ hackery
 hacky
 handshaker
 hardcoded
+hardcodes
 hardcoding
 hasher
 hashtagging
@@ -792,6 +800,7 @@ megamiss
 mem
 memcmp
 memcpy
+memoize
 mergeable
 messagename
 metadata
@@ -932,6 +941,8 @@ preorder
 prepend
 prepended
 prepends
+preresolve
+preresolved
 prev
 probabilistically
 proc
@@ -1132,6 +1143,7 @@ subtypes
 subzone
 superclass
 superset
+svc
 symlink
 symlinked
 symlinks
@@ -1238,6 +1250,7 @@ virtualize
 vptr
 wakeup
 wakeups
+wamr
 wasmtime
 websocket
 wepoll

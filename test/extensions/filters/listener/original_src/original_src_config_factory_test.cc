@@ -1,6 +1,6 @@
-#include "extensions/filters/listener/original_src/config.h"
-#include "extensions/filters/listener/original_src/original_src.h"
-#include "extensions/filters/listener/original_src/original_src_config_factory.h"
+#include "source/extensions/filters/listener/original_src/config.h"
+#include "source/extensions/filters/listener/original_src/original_src.h"
+#include "source/extensions/filters/listener/original_src/original_src_config_factory.h"
 
 #include "test/mocks/server/listener_factory_context.h"
 

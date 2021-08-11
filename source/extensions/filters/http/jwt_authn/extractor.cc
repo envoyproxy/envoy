@@ -1,14 +1,14 @@
-#include "extensions/filters/http/jwt_authn/extractor.h"
+#include "source/extensions/filters/http/jwt_authn/extractor.h"
 
 #include <memory>
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "common/common/utility.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/singleton/const_singleton.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"

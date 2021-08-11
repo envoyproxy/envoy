@@ -7,9 +7,9 @@
 #include "envoy/common/exception.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/assert.h"
-#include "common/common/c_smart_ptr.h"
-#include "common/common/logger.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/c_smart_ptr.h"
+#include "source/common/common/logger.h"
 
 #include "lua.hpp"
 

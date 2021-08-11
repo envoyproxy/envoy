@@ -8,7 +8,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
 
-#include "common/buffer/watermark_buffer.h"
+#include "source/common/buffer/watermark_buffer.h"
 
 namespace Envoy {
 

@@ -1,4 +1,4 @@
-#include "common/upstream/maglev_lb.h"
+#include "source/common/upstream/maglev_lb.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 

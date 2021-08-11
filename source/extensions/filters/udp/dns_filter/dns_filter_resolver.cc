@@ -1,6 +1,6 @@
-#include "extensions/filters/udp/dns_filter/dns_filter_resolver.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_resolver.h"
 
-#include "common/network/utility.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Extensions {

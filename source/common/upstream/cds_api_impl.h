@@ -12,9 +12,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/config/subscription_base.h"
-#include "common/protobuf/protobuf.h"
-#include "common/upstream/cds_api_helper.h"
+#include "source/common/config/subscription_base.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/upstream/cds_api_helper.h"
 
 namespace Envoy {
 namespace Upstream {

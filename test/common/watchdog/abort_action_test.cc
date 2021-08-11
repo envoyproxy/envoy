@@ -8,8 +8,8 @@
 #include "envoy/thread/thread.h"
 #include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
-#include "common/watchdog/abort_action.h"
-#include "common/watchdog/abort_action_config.h"
+#include "source/common/watchdog/abort_action.h"
+#include "source/common/watchdog/abort_action_config.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/utility.h"

@@ -3,11 +3,10 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/message_impl.h"
-#include "common/stream_info/stream_info_impl.h"
-
-#include "extensions/filters/http/lua/lua_filter.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/filters/http/lua/lua_filter.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -115,8 +114,7 @@ public:
 
   void setupMetadata(const std::string& yaml) {
     TestUtility::loadFromYaml(yaml, metadata_);
-    EXPECT_CALL(decoder_callbacks_.route_->route_entry_, metadata())
-        .WillOnce(testing::ReturnRef(metadata_));
+    ON_CALL(*decoder_callbacks_.route_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
@@ -1795,8 +1793,8 @@ TEST_F(LuaHttpFilterTest, GetRequestedServerName) {
   setup(SCRIPT);
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
-  std::string server_name = "foo.example.com";
-  EXPECT_CALL(stream_info_, requestedServerName()).WillOnce(ReturnRef(server_name));
+  absl::string_view server_name = "foo.example.com";
+  stream_info_.downstream_address_provider_->setRequestedServerName(server_name);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo.example.com")));
@@ -1914,7 +1912,7 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
 
   const auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+  stream_info_.downstream_address_provider_->setSslConnection(connection_info);
 
   EXPECT_CALL(*connection_info, peerCertificatePresented()).WillOnce(Return(true));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("peerCertificatePresented")));
@@ -2012,7 +2010,7 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnectionOnPlainConnecti
   setup(SCRIPT);
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
+  stream_info_.downstream_address_provider_->setSslConnection(nullptr);
 
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("downstreamSslConnection is nil")));
 
@@ -2035,7 +2033,7 @@ TEST_F(LuaHttpFilterTest, SurviveMultipleDownstreamSslConnectionCalls) {
 
   const auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+  stream_info_.downstream_address_provider_->setSslConnection(connection_info);
 
   for (uint64_t i = 0; i < 200; i++) {
     EXPECT_CALL(*filter_,
@@ -2186,7 +2184,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
 
   EXPECT_CALL(decoder_callbacks_, clearRouteCache());
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(nullptr));
 
   Http::TestRequestHeaderMapImpl request_headers_1{{":path", "/"}};
@@ -2194,7 +2192,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_1, true));
   EXPECT_EQ("world", request_headers_1.get_("hello"));
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers_2{{":path", "/"}};
@@ -2230,7 +2228,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
@@ -2259,7 +2257,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodeNotExist) {
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};

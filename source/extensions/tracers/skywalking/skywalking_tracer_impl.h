@@ -3,13 +3,10 @@
 #include "envoy/config/trace/v3/skywalking.pb.h"
 #include "envoy/server/tracer_config.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/trace_driver.h"
 
-#include "common/tracing/http_tracer_impl.h"
-
+#include "source/extensions/tracers/skywalking/tracer.h"
 #include "source/tracing_context_impl.h"
-
-#include "extensions/tracers/skywalking/tracer.h"
 
 #include "cpp2sky/exception.h"
 
@@ -27,7 +24,7 @@ public:
   explicit Driver(const envoy::config::trace::v3::SkyWalkingConfig& config,
                   Server::Configuration::TracerFactoryContext& context);
 
-  Tracing::SpanPtr startSpan(const Tracing::Config& config, Http::RequestHeaderMap& request_headers,
+  Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
                              const std::string& operation, Envoy::SystemTime start_time,
                              const Tracing::Decision decision) override;
 

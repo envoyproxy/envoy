@@ -18,10 +18,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/logger.h"
-#include "common/config/subscription_base.h"
-#include "common/init/target_impl.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/subscription_base.h"
+#include "source/common/init/target_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/node_hash_set.h"
 

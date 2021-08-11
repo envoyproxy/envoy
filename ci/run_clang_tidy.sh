@@ -46,11 +46,6 @@ function exclude_check_format_testdata() {
   grep -v tools/testdata/check_format/
 }
 
-# Do not run clang-tidy on envoy_headersplit testdata files.
-function exclude_headersplit_testdata() {
-  grep -v tools/envoy_headersplit/
-}
-
 # Do not run clang-tidy against Chromium URL import, this needs to largely
 # reflect the upstream structure.
 function exclude_chromium_url() {
@@ -88,7 +83,7 @@ function exclude_wasm_examples() {
 }
 
 function filter_excludes() {
-  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data | exclude_wasm_examples
+  exclude_check_format_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data | exclude_wasm_examples
 }
 
 function run_clang_tidy() {

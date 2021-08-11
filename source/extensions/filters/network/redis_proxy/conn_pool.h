@@ -6,8 +6,8 @@
 
 #include "envoy/upstream/cluster_manager.h"
 
-#include "extensions/filters/network/common/redis/client.h"
-#include "extensions/filters/network/common/redis/codec.h"
+#include "source/extensions/filters/network/common/redis/client.h"
+#include "source/extensions/filters/network/common/redis/codec.h"
 
 #include "absl/types/variant.h"
 

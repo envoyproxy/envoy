@@ -4,10 +4,13 @@
 
 #include "envoy/network/connection.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Quic {
+
+// Read ~32k bytes per connection by default, which is about the same as TCP.
+static const uint32_t DEFAULT_PACKETS_TO_READ_PER_CONNECTION = 32u;
 
 // A base class of both the client and server connections which keeps stats and
 // connection socket.

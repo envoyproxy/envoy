@@ -1,4 +1,4 @@
-#include "extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
+#include "source/extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
 
 #include <chrono>
 #include <cstdint>
@@ -8,14 +8,14 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/json/json_loader.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Extensions {

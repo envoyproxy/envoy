@@ -3,8 +3,8 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "extensions/common/dynamic_forward_proxy/dns_cache.h"
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {

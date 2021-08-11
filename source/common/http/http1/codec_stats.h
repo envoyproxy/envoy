@@ -3,7 +3,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/thread.h"
+#include "source/common/common/thread.h"
 
 namespace Envoy {
 namespace Http {

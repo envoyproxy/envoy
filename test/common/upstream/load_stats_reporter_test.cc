@@ -3,7 +3,7 @@
 #include "envoy/config/endpoint/v3/load_report.pb.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 
-#include "common/upstream/load_stats_reporter.h"
+#include "source/common/upstream/load_stats_reporter.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"

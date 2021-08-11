@@ -94,8 +94,8 @@ following are the command line options that Envoy supports.
 .. option:: --component-log-level <string>
 
   *(optional)* The comma separated list of logging level per component. Non developers should generally
-  never set this option. For example, if you want `upstream` component to run at `debug` level and
-  `connection` component to run at `trace` level, you should pass ``upstream:debug,connection:trace`` to
+  never set this option. For example, if you want ``upstream`` component to run at ``debug`` level and
+  ``connection`` component to run at ``trace`` level, you should pass ``upstream:debug,connection:trace`` to
   this flag. See ``ALL_LOGGER_IDS`` in :repo:`/source/common/common/logger.h` for a list of components.
 
 .. option:: --cpuset-threads
@@ -178,10 +178,10 @@ following are the command line options that Envoy supports.
 .. option:: --enable-fine-grain-logging
 
   *(optional)* Enables fine-grain logger with file level log control and runtime update at administration
-  interface. If enabled, main log macros including `ENVOY_LOG`, `ENVOY_CONN_LOG`, `ENVOY_STREAM_LOG` and
-  `ENVOY_FLUSH_LOG` will use a per-file logger, and the usage doesn't need `Envoy::Logger::Loggable` any
-  more. The administration interface usage is similar. Please see `Administration interface
-  <https://www.envoyproxy.io/docs/envoy/latest/operations/admin>`_ for more detail.
+  interface. If enabled, main log macros including ``ENVOY_LOG``, ``ENVOY_CONN_LOG``, ``ENVOY_STREAM_LOG`` and
+  ``ENVOY_FLUSH_LOG`` will use a per-file logger, and the usage doesn't need ``Envoy::Logger::Loggable`` any
+  more. The administration interface usage is similar. Please see :ref:`Administration interface
+  <operations_admin_interface>` for more detail.
 
 .. option:: --socket-path <path string>
 

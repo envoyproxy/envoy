@@ -1,17 +1,17 @@
-#include "common/grpc/google_async_client_impl.h"
+#include "source/common/grpc/google_async_client_impl.h"
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/base64.h"
-#include "common/common/empty_string.h"
-#include "common/common/lock_guard.h"
-#include "common/config/datasource.h"
-#include "common/grpc/common.h"
-#include "common/grpc/google_grpc_creds_impl.h"
-#include "common/grpc/google_grpc_utils.h"
-#include "common/router/header_parser.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/config/datasource.h"
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/google_grpc_creds_impl.h"
+#include "source/common/grpc/google_grpc_utils.h"
+#include "source/common/router/header_parser.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 #include "grpcpp/support/proto_buffer_reader.h"
 

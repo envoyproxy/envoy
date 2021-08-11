@@ -1,6 +1,6 @@
 #pragma once
 
-#include "extensions/filters/network/dubbo_proxy/protocol.h"
+#include "source/extensions/filters/network/dubbo_proxy/protocol.h"
 
 namespace Envoy {
 namespace Extensions {

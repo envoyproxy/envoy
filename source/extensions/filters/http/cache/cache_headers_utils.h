@@ -4,11 +4,11 @@
 #include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/matchers.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/matchers.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"

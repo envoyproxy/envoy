@@ -8,12 +8,12 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/utility.h"
-#include "common/config/metadata.h"
-#include "common/config/well_known_names.h"
-#include "common/json/json_loader.h"
-#include "common/network/utility.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/test_common/utility.h"
 

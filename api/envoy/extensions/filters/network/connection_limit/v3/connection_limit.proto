@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.connection_limit.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.connection_limit.v3";
+option java_outer_classname = "ConnectionLimitProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Connection limit]
+// Connection limit :ref:`configuration overview <config_network_filters_connection_limit>`.
+// [#extension: envoy.filters.network.connection_limit]
+
+message ConnectionLimit {
+  // The prefix to use when emitting :ref:`statistics
+  // <config_network_filters_connection_limit_stats>`.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The max connections configuration to use for new incoming connections that are processed
+  // by the filter's filter chain. When max_connection is reached, the incoming connection
+  // will be closed after delay duration.
+  google.protobuf.UInt64Value max_connections = 2 [(validate.rules).uint64 = {gte: 1}];
+
+  // The delay configuration to use for rejecting the connection after some specified time duration
+  // instead of immediately rejecting the connection. That way, a malicious user is not able to
+  // retry as fast as possible which provides a better DoS protection for Envoy. If this is not present,
+  // the connection will be closed immediately.
+  google.protobuf.Duration delay = 3;
+
+  // Runtime flag that controls whether the filter is enabled or not. If not specified, defaults
+  // to enabled.
+  config.core.v3.RuntimeFeatureFlag runtime_enabled = 4;
+}

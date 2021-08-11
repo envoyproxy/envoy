@@ -4,8 +4,8 @@
 
 #include "envoy/init/manager.h"
 
-#include "common/common/logger.h"
-#include "common/init/watcher_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/init/watcher_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 

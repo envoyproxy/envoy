@@ -1,9 +1,7 @@
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/integration/http_protocol_integration.h"
 
@@ -18,7 +16,10 @@ typed_config:
     policies:
       foo:
         permissions:
-          - header: { name: ":method", exact_match: "GET" }
+          - header:
+              name: ":method"
+              string_match:
+                exact: "GET"
         principals:
           - any: true
 )EOF";
@@ -32,7 +33,10 @@ typed_config:
     policies:
       "deny policy":
         permissions:
-          - header: { name: ":method", exact_match: "GET" }
+          - header:
+              name: ":method"
+              string_match:
+                exact: "GET"
         principals:
           - any: true
 )EOF";
@@ -45,7 +49,10 @@ typed_config:
     policies:
       foo:
         permissions:
-          - header: { name: ":path", prefix_match: "/foo" }
+          - header:
+              name: ":path"
+              string_match:
+                prefix: "/foo"
         principals:
           - any: true
 )EOF";
@@ -87,7 +94,10 @@ typed_config:
     policies:
       foo:
         permissions:
-          - header: { name: ":method", exact_match: "GET" }
+          - header:
+              name: ":method"
+              string_match:
+                exact: "GET"
         principals:
           - any: true
 )EOF";
@@ -282,7 +292,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
                            ->Mutable(0)
                            ->mutable_typed_per_filter_config();
 
-        (*config)[Extensions::HttpFilters::HttpFilterNames::get().Rbac].PackFrom(per_route_config);
+        (*config)["envoy.filters.http.rbac"].PackFrom(per_route_config);
       });
   config_helper_.addFilter(RBAC_CONFIG);
 

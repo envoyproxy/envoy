@@ -4,8 +4,8 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 

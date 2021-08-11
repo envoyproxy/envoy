@@ -1,4 +1,4 @@
-#include "common/upstream/health_checker_impl.h"
+#include "source/common/upstream/health_checker_impl.h"
 
 #include <memory>
 
@@ -8,21 +8,21 @@
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/macros.h"
-#include "common/config/utility.h"
-#include "common/config/well_known_names.h"
-#include "common/grpc/common.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/socket_impl.h"
-#include "common/network/utility.h"
-#include "common/router/router.h"
-#include "common/runtime/runtime_features.h"
-#include "common/upstream/host_utility.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/macros.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/router/router.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/upstream/host_utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -197,13 +197,13 @@ bool HttpHealthCheckerImpl::HttpStatusChecker::inRange(uint64_t http_status) con
   return false;
 }
 
-Http::Protocol codecClientTypeToProtocol(Http::CodecClient::Type codec_client_type) {
+Http::Protocol codecClientTypeToProtocol(Http::CodecType codec_client_type) {
   switch (codec_client_type) {
-  case Http::CodecClient::Type::HTTP1:
+  case Http::CodecType::HTTP1:
     return Http::Protocol::Http11;
-  case Http::CodecClient::Type::HTTP2:
+  case Http::CodecType::HTTP2:
     return Http::Protocol::Http2;
-  case Http::CodecClient::Type::HTTP3:
+  case Http::CodecType::HTTP3:
     return Http::Protocol::Http3;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -422,15 +422,15 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   }
 }
 
-Http::CodecClient::Type
+Http::CodecType
 HttpHealthCheckerImpl::codecClientType(const envoy::type::v3::CodecClientType& type) {
   switch (type) {
   case envoy::type::v3::HTTP3:
-    return Http::CodecClient::Type::HTTP3;
+    return Http::CodecType::HTTP3;
   case envoy::type::v3::HTTP2:
-    return Http::CodecClient::Type::HTTP2;
+    return Http::CodecType::HTTP2;
   case envoy::type::v3::HTTP1:
-    return Http::CodecClient::Type::HTTP1;
+    return Http::CodecType::HTTP1;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -892,8 +892,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
 Http::CodecClientPtr
 ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   return std::make_unique<Http::CodecClientProd>(
-      Http::CodecClient::Type::HTTP2, std::move(data.connection_), data.host_description_,
-      dispatcher_, random_generator_);
+      Http::CodecType::HTTP2, std::move(data.connection_), data.host_description_, dispatcher_,
+      random_generator_);
 }
 
 std::ostream& operator<<(std::ostream& out, HealthState state) {

@@ -1,6 +1,6 @@
 #include "test/extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter_integration_test.h"
 
-#include "common/http/header_map_impl.h"
+#include "source/common/http/header_map_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/simulated_time_system.h"

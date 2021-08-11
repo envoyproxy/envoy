@@ -3,9 +3,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/grpc/status.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
+#include "source/common/grpc/status.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
 
 #include "eval/public/cel_value.h"
 #include "eval/public/cel_value_producer.h"

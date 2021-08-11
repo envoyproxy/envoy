@@ -1,7 +1,7 @@
 #include "envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.h"
 #include "envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.validate.h"
 
-#include "extensions/filters/network/rocketmq_proxy/config.h"
+#include "source/extensions/filters/network/rocketmq_proxy/config.h"
 
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/server/factory_context.h"

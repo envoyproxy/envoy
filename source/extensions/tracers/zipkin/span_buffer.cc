@@ -1,12 +1,11 @@
-#include "extensions/tracers/zipkin/span_buffer.h"
+#include "source/extensions/tracers/zipkin/span_buffer.h"
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/tracers/zipkin/util.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
-#include "extensions/tracers/zipkin/zipkin_json_field_names.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/tracers/zipkin/util.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/extensions/tracers/zipkin/zipkin_json_field_names.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"

@@ -2,8 +2,8 @@
 
 #include <vector>
 
-#include "extensions/filters/network/kafka/kafka_request.h"
-#include "extensions/filters/network/kafka/kafka_response.h"
+#include "source/extensions/filters/network/kafka/kafka_request.h"
+#include "source/extensions/filters/network/kafka/kafka_response.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,4 +1,4 @@
-#include "server/guarddog_impl.h"
+#include "source/server/guarddog_impl.h"
 
 #include <sys/types.h>
 
@@ -15,17 +15,17 @@
 #include "envoy/stats/scope.h"
 #include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/lock_guard.h"
-#include "common/common/logger.h"
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "server/watchdog_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/server/watchdog_impl.h"
 
 #include "absl/synchronization/mutex.h"
+#include "absl/synchronization/notification.h"
 
 namespace Envoy {
 namespace Server {
@@ -217,14 +217,21 @@ void GuardDogImpl::stopWatching(WatchDogSharedPtr wd) {
 
 void GuardDogImpl::start(Api::Api& api) {
   Thread::LockGuard guard(mutex_);
+
+  // Synchronize between calling thread and guarddog thread.
+  absl::Notification guarddog_thread_started;
+
   // See comments in WorkerImpl::start for the naming convention.
   Thread::Options options{absl::StrCat("dog:", dispatcher_->name())};
   thread_ = api.threadFactory().createThread(
-      [this]() -> void {
+      [this, &guarddog_thread_started]() -> void {
         loop_timer_->enableTimer(std::chrono::milliseconds(0));
+        dispatcher_->post([&guarddog_thread_started]() { guarddog_thread_started.Notify(); });
         dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
       },
       options);
+
+  guarddog_thread_started.WaitForNotification();
 }
 
 void GuardDogImpl::stop() {

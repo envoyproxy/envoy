@@ -7,7 +7,7 @@ ensuring an apples-to-apples comparison with other systems by configuring and lo
 appropriately. As a result, we can't provide a canonical benchmark configuration, but instead offer
 the following guidance:
 
-* A release Envoy binary should be used. If building, please ensure that `-c opt`
+* A release Envoy binary should be used. If building, please ensure that ``-c opt``
   is used on the Bazel command line. When consuming Envoy point releases, make
   sure you are using the latest point release; given the pace of Envoy development
   it's not reasonable to pick older versions when making a statement about Envoy
@@ -69,7 +69,7 @@ the following guidance:
   load generator and measurement tool. We are committed to building out
   benchmarking and latency measurement best practices in this tool.
 
-* Examine `perf` profiles of Envoy during the benchmark run, e.g. with `flame graphs
+* Examine ``perf`` profiles of Envoy during the benchmark run, e.g. with `flame graphs
   <http://www.brendangregg.com/flamegraphs.html>`_. Verify that Envoy is spending its time
   doing the expected essential work under test, rather than some unrelated or tangential
   work.

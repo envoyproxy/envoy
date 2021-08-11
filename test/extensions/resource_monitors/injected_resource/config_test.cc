@@ -2,11 +2,9 @@
 #include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/event/dispatcher_impl.h"
-
-#include "server/resource_monitor_config_impl.h"
-
-#include "extensions/resource_monitors/injected_resource/config.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/extensions/resource_monitors/injected_resource/config.h"
+#include "source/server/resource_monitor_config_impl.h"
 
 #include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"

@@ -116,10 +116,16 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Make sure that we gracefully fail if the user does not configure reuse port and concurrency is
+// Make sure that we gracefully fail if the user does not configure reuse_port and concurrency is
 // > 1.
 TEST_P(UdpProxyIntegrationTest, NoReusePort) {
   concurrency_ = 2;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_enable_reuse_port()
+        ->set_value(false);
+  });
   // Do not wait for listeners to start as the listener will fail.
   defer_listener_finalization_ = true;
   setup(1);
@@ -143,7 +149,7 @@ TEST_P(UdpProxyIntegrationTest, DownstreamDrop) {
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Test::UdpSyncPeer client(version_);
   const uint64_t large_datagram_size =
-      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_GRO_RECEIVE) + 1024;
+      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_RECEIVE) + 1024;
   client.write(std::string(large_datagram_size, 'a'), *listener_address);
   if (GetParam() == Network::Address::IpVersion::v4) {
     test_server_->waitForCounterEq("listener.0.0.0.0_0.udp.downstream_rx_datagram_dropped", 1);
@@ -166,7 +172,7 @@ TEST_P(UdpProxyIntegrationTest, UpstreamDrop) {
   EXPECT_EQ("hello", request_datagram.buffer_->toString());
 
   const uint64_t large_datagram_size =
-      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_GRO_RECEIVE) + 1024;
+      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_RECEIVE) + 1024;
   fake_upstreams_[0]->sendUdpDatagram(std::string(large_datagram_size, 'a'),
                                       request_datagram.addresses_.peer_);
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams_dropped", 1);
@@ -176,9 +182,9 @@ TEST_P(UdpProxyIntegrationTest, UpstreamDrop) {
 TEST_P(UdpProxyIntegrationTest, LargePacketSizesOnLoopback) {
   // The following tests large packets end to end. We use a size larger than
   // the default GRO receive buffer size of
-  // DEFAULT_UDP_MAX_DATAGRAM_SIZE x NUM_DATAGRAMS_PER_GRO_RECEIVE.
+  // DEFAULT_UDP_MAX_DATAGRAM_SIZE x NUM_DATAGRAMS_PER_RECEIVE.
   const uint64_t max_rx_datagram_size =
-      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_GRO_RECEIVE) + 1024;
+      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_RECEIVE) + 1024;
   setup(1, max_rx_datagram_size);
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(

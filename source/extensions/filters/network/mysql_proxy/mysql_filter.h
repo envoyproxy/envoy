@@ -7,16 +7,15 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
-#include "extensions/filters/network/mysql_proxy/mysql_session.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_command.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_decoder.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_session.h"
 
 namespace Envoy {
 namespace Extensions {

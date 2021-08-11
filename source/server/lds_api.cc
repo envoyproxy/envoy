@@ -1,4 +1,4 @@
-#include "server/lds_api.h"
+#include "source/server/lds_api.h"
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -7,11 +7,11 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/cleanup.h"
-#include "common/config/api_version.h"
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"

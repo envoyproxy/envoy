@@ -5,7 +5,7 @@
 #include "envoy/data/tap/v3/wrapper.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "extensions/common/matcher/matcher.h"
+#include "source/extensions/common/matcher/matcher.h"
 
 #include "absl/strings/string_view.h"
 

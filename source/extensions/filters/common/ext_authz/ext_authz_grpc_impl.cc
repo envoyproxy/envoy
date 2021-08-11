@@ -1,14 +1,14 @@
-#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
-#include "common/common/assert.h"
-#include "common/grpc/async_client_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/assert.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,7 +16,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientSharedPtr async_client,
+GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
                                envoy::config::core::v3::ApiVersion transport_api_version)
     : async_client_(async_client), timeout_(timeout),

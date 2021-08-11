@@ -8,8 +8,8 @@
 #include "envoy/json/json_object.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/logger.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 

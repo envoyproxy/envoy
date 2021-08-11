@@ -67,24 +67,55 @@ if [[ "${BAZEL_BUILD_EXTRA_OPTIONS[*]}" =~ "clang-cl" ]]; then
   FAIL_GROUP=clang_cl
 fi
 
-# Pre-Validate updates of all dependency libraries in bazel/foreign_cc and bazel/external
-# and complete envoy-static build
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //bazel/... //source/exe:envoy-static --build_tag_filters=-skip_on_windows
+# Optional arguments include //source/exe:envoy-static to build,
+# //test/... to test all with flake handling and test tag filters
+# (these are the default), either one or the other, or a list of
+# explicit tests or patterns which does not perform tag exclusions,
+# unless given as additional argument. (If we explicitly ask, we
+# are determined to fight a broken test, whether it is tagged
+# skip/fail on windows or not.)
 
-# Copy binary to delivery directory
-cp -f bazel-bin/source/exe/envoy-static.exe "${ENVOY_DELIVERY_DIR}/envoy.exe"
+if [[ $1 == "//source/exe:envoy-static" ]]; then
+  BUILD_ENVOY_STATIC=1
+  shift
+  TEST_TARGETS=$*
+elif [[ $# -gt 0 ]]; then
+  BUILD_ENVOY_STATIC=0
+  TEST_TARGETS=$*
+else
+  BUILD_ENVOY_STATIC=1
+  TEST_TARGETS='//test/...'
+fi
 
-# Copy for azp, creating a tar archive
-tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${ENVOY_DELIVERY_DIR}" envoy.exe
+# Complete envoy-static build
+if [[ $BUILD_ENVOY_STATIC -eq 1 ]]; then
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //source/exe:envoy-static
+
+  # Copy binary to delivery directory
+  cp -f bazel-bin/source/exe/envoy-static.exe "${ENVOY_DELIVERY_DIR}/envoy.exe"
+
+  # Copy for azp, creating a tar archive
+  tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${ENVOY_DELIVERY_DIR}" envoy.exe
+fi
 
 # Test invocations of known-working tests on Windows
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=-skip_on_windows,-fails_on_${FAIL_GROUP} --build_tests_only
+if [[ $TEST_TARGETS == "//test/..." ]]; then
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" $TEST_TARGETS --test_tag_filters=-skip_on_windows,-fails_on_${FAIL_GROUP} --build_tests_only
 
-echo "running flaky test reporting script"
-"${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
+  echo "running flaky test reporting script"
+  "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
 
-# Build tests that are known flaky or failing to ensure no compilation regressions
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=-skip_on_windows,fails_on_${FAIL_GROUP} --build_tests_only
+  # Build tests that are known flaky or failing to ensure no compilation regressions
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=fails_on_${FAIL_GROUP} --build_tests_only
+
+  if [[ $BUILD_ENVOY_STATIC -eq 1 ]]; then
+    # Validate introduction or updates of any dependency libraries in bazel/foreign_cc and bazel/external
+    # not triggered by envoy-static or //test/... targets and not deliberately tagged skip_on_windows
+    bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //bazel/... --build_tag_filters=-skip_on_windows
+  fi
+elif [[ -n "$TEST_TARGETS" ]]; then
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" $TEST_TARGETS --build_tests_only
+fi
 
 # Summarize known unbuildable or inapplicable tests (example)
 # bazel "${BAZEL_STARTUP_OPTIONS[@]}" query 'kind(".*test rule", attr("tags", "skip_on_windows", //test/...))' 2>/dev/null | sort

@@ -10,8 +10,8 @@ envoy_cc_test(
     name = "cluster_manager_test",
     srcs = ["cluster_manager_test.cc"],
     deps = [
-        "//include/envoy/upstream:resource_manager_interface",
-        "//include/envoy/upstream:upstream_interface",
+        "//envoy/upstream:resource_manager_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/api:api_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:stats_lib",
@@ -133,6 +133,7 @@ envoy_cc_test_library(
     deps = [
         ":xds_fuzz_proto_cc_proto",
         ":xds_verifier_lib",
+        "//source/common/common:matchers_lib",
         "//test/fuzz:utility_lib",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

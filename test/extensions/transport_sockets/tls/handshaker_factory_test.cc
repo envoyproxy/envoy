@@ -3,14 +3,12 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/handshaker.h"
 
-#include "common/stream_info/stream_info_impl.h"
-
-#include "server/process_context_impl.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/server/process_context_impl.h"
 
 #include "test/mocks/network/connection.h"
 #include "test/mocks/server/transport_socket_factory_context.h"

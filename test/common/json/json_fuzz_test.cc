@@ -1,5 +1,5 @@
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"

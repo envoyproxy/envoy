@@ -1,8 +1,7 @@
 #include <thread>
 
-#include "common/common/logger.h"
-
-#include "server/options_impl_platform.h"
+#include "source/common/common/logger.h"
+#include "source/server/options_impl_platform.h"
 
 namespace Envoy {
 

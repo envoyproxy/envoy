@@ -19,14 +19,14 @@ HTTP connection manager :ref:`configuration <config_http_conn_man>`.
 HTTP protocols
 --------------
 
-Envoy’s HTTP connection manager has native support for HTTP/1.1, WebSockets, and HTTP/2. It does not support
+Envoy’s HTTP connection manager has native support for HTTP/1.1, WebSockets, HTTP/2 and HTTP/3. It does not support
 SPDY. Envoy’s HTTP support was designed to first and foremost be an HTTP/2 multiplexing proxy.
 Internally, HTTP/2 terminology is used to describe system components. For example, an HTTP request
 and response take place on a *stream*. A codec API is used to translate from different wire
 protocols into a protocol agnostic form for streams, requests, responses, etc. In the case of
 HTTP/1.1, the codec translates the serial/pipelining capabilities of the protocol into something
 that looks like HTTP/2 to higher layers. This means that the majority of the code does not need to
-understand whether a stream originated on an HTTP/1.1 or HTTP/2 connection.
+understand whether a stream originated on an HTTP/1.1, HTTP/2, or HTTP/3 connection.
 
 HTTP header sanitizing
 ----------------------
@@ -245,3 +245,16 @@ Timeouts
 Various configurable timeouts apply to an HTTP connection and its constituent streams. Please see
 :ref:`this FAQ entry <faq_configuration_timeouts>` for an overview of important timeout
 configuration.
+
+.. _arch_overview_http_header_map_settings:
+
+HTTP header map settings
+------------------------
+
+Envoy maintains the insertion order of headers (and pseudo headers that begin with ":") in the
+HTTP header map using a linked list data-structure, which is very fast when the number of headers
+is small. In addition it can use a map data-structure to ensure fast access to the various headers.
+The map will be used once the number of headers in a HTTP request/response reaches the value of the
+``envoy.http.headermap.lazy_map_min_size`` runtime feature. The default threshold value is set to
+3, as previous experiments empirically showed that this value provides good performance for many
+use-cases.

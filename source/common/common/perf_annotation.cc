@@ -2,7 +2,7 @@
 #define ENVOY_PERF_ANNOTATION
 #endif
 
-#include "common/common/perf_annotation.h"
+#include "source/common/common/perf_annotation.h"
 
 #include <chrono>
 #include <iostream>
@@ -10,8 +10,8 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/lock_guard.h"
-#include "common/common/utility.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/utility.h"
 
 #include "absl/strings/str_cat.h"
 

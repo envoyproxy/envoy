@@ -68,7 +68,7 @@ public:
 
   void waitForTimeout(IntegrationStreamDecoder& response, absl::string_view stat_name = "",
                       absl::string_view stat_prefix = "http.config_test") {
-    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    if (downstream_protocol_ == Http::CodecType::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
     } else {
       ASSERT_TRUE(response.waitForReset());
@@ -357,7 +357,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTriggerOnBod
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestWithHeaders) {
   // Omitting \r\n\r\n does not indicate incomplete request in HTTP2
-  if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
+  if (downstreamProtocol() == Envoy::Http::CodecType::HTTP2) {
     return;
   }
   enable_request_timeout_ = true;
@@ -370,7 +370,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestW
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnRawCompleteRequestWithHeaders) {
-  if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
+  if (downstreamProtocol() == Envoy::Http::CodecType::HTTP2) {
     return;
   }
   enable_request_timeout_ = true;
@@ -409,6 +409,35 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsNotDisarmedByEncode100Continu
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("408", response->headers().getStatusValue());
   EXPECT_EQ("request timeout", response->body());
+}
+
+// Per-stream idle timeout reset from within a filter.
+TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutResetFromFilter) {
+  config_helper_.addFilter(R"EOF(
+  name: reset-idle-timer-filter
+  )EOF");
+  enable_per_stream_idle_timeout_ = true;
+
+  auto response = setupPerStreamIdleTimeoutTest();
+
+  sleep();
+  codec_client_->sendData(*request_encoder_, 1, false);
+
+  // Two sleeps should trigger the timer, as each advances time by timeout / 2. However, the data
+  // frame above would have caused the filter to reset the timer. Thus, the stream should not be
+  // reset yet.
+  sleep();
+
+  EXPECT_FALSE(response->complete());
+
+  sleep();
+
+  waitForTimeout(*response, "downstream_rq_idle_timeout");
+
+  // Now the timer should have triggered.
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("408", response->headers().getStatusValue());
+  EXPECT_EQ("stream timeout", response->body());
 }
 
 // TODO(auni53) create a test filter that hangs and does not send data upstream, which would

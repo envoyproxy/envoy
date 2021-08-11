@@ -11,7 +11,7 @@ fetch its own route configuration via the API. Optionally, the
 :ref:`virtual host discovery service <config_http_conn_man_vhds>`
 can be used to fetch virtual hosts separately from the route configuration.
 
-* :ref:`v2 API reference <v2_grpc_streaming_endpoints>`
+* :ref:`v3 API reference <v3_grpc_streaming_endpoints>`
 
 Statistics
 ----------

@@ -4,7 +4,7 @@ package envoy.service.metrics.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
 
-import "metrics.proto";
+import "io/prometheus/client/metrics.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";

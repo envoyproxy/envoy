@@ -13,9 +13,9 @@ envoy_cc_library(
     srcs = ["local_ratelimit_impl.cc"],
     hdrs = ["local_ratelimit_impl.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/ratelimit:ratelimit_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/ratelimit:ratelimit_interface",
         "//source/common/common:thread_synchronizer_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg_cc_proto",

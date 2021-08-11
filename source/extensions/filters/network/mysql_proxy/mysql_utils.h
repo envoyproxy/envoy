@@ -3,11 +3,10 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/byte_order.h"
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/byte_order.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
 
 namespace Envoy {
 namespace Extensions {

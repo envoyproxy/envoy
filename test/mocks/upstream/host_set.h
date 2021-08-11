@@ -2,8 +2,8 @@
 
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/callback_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/callback_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

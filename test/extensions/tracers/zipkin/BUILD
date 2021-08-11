@@ -20,11 +20,11 @@ envoy_extension_cc_test(
         "zipkin_core_types_test.cc",
         "zipkin_tracer_impl_test.cc",
     ],
-    extension_name = "envoy.tracers.zipkin",
+    extension_names = ["envoy.tracers.zipkin"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/common:time_interface",
-        "//include/envoy/runtime:runtime_interface",
+        "//envoy/common:time_interface",
+        "//envoy/runtime:runtime_interface",
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
@@ -50,7 +50,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.tracers.zipkin",
+    extension_names = ["envoy.tracers.zipkin"],
     deps = [
         "//source/extensions/tracers/zipkin:config",
         "//test/mocks/server:tracer_factory_context_mocks",

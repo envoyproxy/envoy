@@ -8,11 +8,10 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/metadata.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/upstream/transport_socket_match_impl.h"
-
-#include "server/transport_socket_config_impl.h"
+#include "source/common/config/metadata.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/upstream/transport_socket_match_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
@@ -33,7 +32,7 @@ public:
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
   MOCK_METHOD(bool, usesProxyProtocolOptions, (), (const));
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
-              (Network::TransportSocketOptionsSharedPtr), (const));
+              (Network::TransportSocketOptionsConstSharedPtr), (const));
   MOCK_METHOD(void, addReadyCb, (std::function<void()>));
   FakeTransportSocketFactory(std::string id) : id_(std::move(id)) {}
   std::string id() const { return id_; }
@@ -50,7 +49,7 @@ public:
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
   MOCK_METHOD(bool, usesProxyProtocolOptions, (), (const));
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
-              (Network::TransportSocketOptionsSharedPtr), (const));
+              (Network::TransportSocketOptionsConstSharedPtr), (const));
   MOCK_METHOD(void, addReadyCb, (std::function<void()>));
 
   Network::TransportSocketFactoryPtr

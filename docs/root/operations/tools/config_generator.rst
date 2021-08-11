@@ -22,14 +22,14 @@ To generate the example configurations run the following from the root of the re
   tar xvf $PWD/bazel-out/k8-fastbuild/bin/configs/example_configs.tar -C generated/configs
 
 The previous command will produce three fully expanded configurations using some variables
-defined inside of `configgen.py`. See the comments inside of `configgen.py` for detailed
+defined inside of ``configgen.py``. See the comments inside of ``configgen.py`` for detailed
 information on how the different expansions work.
 
 A few notes about the example configurations:
 
 * An instance of :ref:`endpoint discovery service <arch_overview_service_discovery_types_eds>` is assumed
-  to be running at `discovery.yourcompany.net`.
-* DNS for `yourcompany.net` is assumed to be setup for various things. Search the configuration
+  to be running at ``discovery.yourcompany.net``.
+* DNS for ``yourcompany.net`` is assumed to be setup for various things. Search the configuration
   templates for different instances of this.
 * Tracing is configured for `LightStep <https://lightstep.com/>`_. To
   disable this or enable `Zipkin <https://zipkin.io>`_ or `Datadog <https://datadoghq.com>`_ tracing, delete or
@@ -38,6 +38,6 @@ A few notes about the example configurations:
   <arch_overview_global_rate_limit>`. To disable this delete the :ref:`rate limit configuration
   <config_rate_limit_service>`.
 * :ref:`Route discovery service <config_http_conn_man_rds>` is configured for the service to service
-  reference configuration and it is assumed to be running at `rds.yourcompany.net`.
+  reference configuration and it is assumed to be running at ``rds.yourcompany.net``.
 * :ref:`Cluster discovery service <config_cluster_manager_cds>` is configured for the service to
-  service reference configuration and it is assumed that be running at `cds.yourcompany.net`.
+  service reference configuration and it is assumed that be running at ``cds.yourcompany.net``.

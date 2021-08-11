@@ -11,8 +11,8 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/backoff_strategy.h"
-#include "common/http/header_utility.h"
+#include "source/common/common/backoff_strategy.h"
+#include "source/common/http/header_utility.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

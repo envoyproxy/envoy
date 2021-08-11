@@ -1,10 +1,9 @@
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/tracers/zipkin/span_buffer.h"
-#include "extensions/tracers/zipkin/util.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/tracers/zipkin/span_buffer.h"
+#include "source/extensions/tracers/zipkin/util.h"
 
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"

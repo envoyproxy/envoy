@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "common/filesystem/file_shared_impl.h"
+#include "source/common/filesystem/file_shared_impl.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -84,6 +84,9 @@ public:
   PathSplitResult splitPathFromFilename(absl::string_view path) override;
   bool illegalPath(const std::string& path) override;
 };
+
+using FileImpl = FileImplWin32;
+using InstanceImpl = InstanceImplWin32;
 
 } // namespace Filesystem
 } // namespace Envoy

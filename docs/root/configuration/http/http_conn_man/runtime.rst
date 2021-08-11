@@ -31,3 +31,22 @@ tracing.random_sampling
   % of requests that will be randomly traced. See :ref:`here <arch_overview_tracing>` for more
   information. This runtime control is specified in the range 0-10000 and defaults to 10000. Thus,
   trace sampling can be specified in 0.01% increments.
+
+.. _config_http_conn_man_runtime_path_with_escaped_slashes_action:
+
+http_connection_manager.path_with_escaped_slashes_action
+  Overrides Envoy's default action taken when the
+  :ref:`path_with_escaped_slashes_action <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.path_with_escaped_slashes_action>`.
+  was not specified or set to the IMPLEMENTATION_SPECIFIC_DEFAULT value. Possible values:
+
+  - 2 sets action to the REJECT_REQUEST.
+  - 3 sets action to the UNESCAPE_AND_REDIRECT.
+  - 4 sets action to the UNESCAPE_AND_FORWARD.
+  - all other values set the action to KEEP_UNCHANGED.
+
+.. _config_http_conn_man_runtime_path_with_escaped_slashes_action_enabled:
+
+http_connection_manager.path_with_escaped_slashes_action_enabled
+  % of requests that will be subject to the
+  :ref:`path_with_escaped_slashes_action <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.path_with_escaped_slashes_action>`.
+  action. For all other requests the KEEP_UNCHANGED action will be applied. Defaults to 100.

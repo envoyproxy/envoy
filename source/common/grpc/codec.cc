@@ -1,11 +1,11 @@
-#include "common/grpc/codec.h"
+#include "source/common/grpc/codec.h"
 
 #include <array>
 #include <cstdint>
 #include <memory>
 #include <vector>
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "absl/container/fixed_array.h"
 

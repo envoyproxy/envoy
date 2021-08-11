@@ -1,9 +1,9 @@
-#include "extensions/filters/common/fault/fault_config.h"
+#include "source/extensions/filters/common/fault/fault_config.h"
 
 #include "envoy/extensions/filters/common/fault/v3/fault.pb.h"
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {

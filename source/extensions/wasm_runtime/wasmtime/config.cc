@@ -1,6 +1,6 @@
 #include "envoy/registry/registry.h"
 
-#include "extensions/common/wasm/wasm_runtime_factory.h"
+#include "source/extensions/common/wasm/wasm_runtime_factory.h"
 
 #include "include/proxy-wasm/wasmtime.h"
 
@@ -16,7 +16,7 @@ public:
   absl::string_view name() override { return "envoy.wasm.runtime.wasmtime"; }
 };
 
-#if defined(ENVOY_WASM_WASMTIME)
+#if defined(PROXY_WASM_HAS_RUNTIME_WASMTIME)
 REGISTER_FACTORY(WasmtimeRuntimeFactory, WasmRuntimeFactory);
 #endif
 

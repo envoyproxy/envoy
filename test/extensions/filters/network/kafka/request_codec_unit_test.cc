@@ -1,4 +1,4 @@
-#include "extensions/filters/network/kafka/request_codec.h"
+#include "source/extensions/filters/network/kafka/request_codec.h"
 
 #include "test/extensions/filters/network/kafka/buffer_based_test.h"
 

@@ -66,7 +66,7 @@ The control plane management server is generally trusted. We do not consider wir
 against the xDS transport protocol to be a concern as a result. However, the configuration delivered
 to Envoy over xDS may originate from untrusted sources and may not be fully sanitized. An example of
 this might be a service operator that hosts multiple tenants on an Envoy, where tenants may specify
-a regular expression on a header match in `RouteConfiguration`. In this case, we expect that Envoy
+a regular expression on a header match in ``RouteConfiguration``. In this case, we expect that Envoy
 is resilient against the risks posed by malicious configuration from a confidentiality, integrity
 and availability perspective, as described above.
 
@@ -77,9 +77,11 @@ case, an extension will explicitly state this in its documentation.
 Core and extensions
 -------------------
 
-Anything in the Envoy core may be used in both untrusted and trusted deployments. As a consequence,
-it should be hardened with this model in mind. Security issues related to core code will usually
-trigger the security release process as described in this document.
+Anything in the Envoy core may be used in both untrusted and trusted deployments, with the exception
+of features explicitly marked as alpha; alpha features are only supported in trusted deployments
+and do not qualify for treatment under the threat model below. As a consequence, the stable core should be hardened
+with this model in mind. Security issues related to core code will usually trigger the security release process as
+described in this document.
 
 The following extensions are intended to be hardened against untrusted downstream and upstreams:
 

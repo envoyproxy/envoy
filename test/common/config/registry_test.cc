@@ -3,7 +3,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/fmt.h"
+#include "source/common/common/fmt.h"
 
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"

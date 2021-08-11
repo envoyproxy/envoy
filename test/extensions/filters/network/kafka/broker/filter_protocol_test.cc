@@ -3,12 +3,11 @@
  * messages properly.
  */
 
-#include "common/common/utility.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/filters/network/kafka/broker/filter.h"
-#include "extensions/filters/network/kafka/external/requests.h"
-#include "extensions/filters/network/kafka/external/responses.h"
+#include "source/common/common/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/filters/network/kafka/broker/filter.h"
+#include "source/extensions/filters/network/kafka/external/requests.h"
+#include "source/extensions/filters/network/kafka/external/responses.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/kafka/buffer_based_test.h"

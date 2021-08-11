@@ -1,4 +1,4 @@
-#include "common/config/context_provider_impl.h"
+#include "source/common/config/context_provider_impl.h"
 
 #include "test/common/config/xds_test_utility.h"
 #include "test/test_common/utility.h"
@@ -46,7 +46,7 @@ TEST(ContextProviderTest, DynamicContextParameters) {
   auto callback_handle = context_provider.addDynamicContextUpdateCallback(
       [&update_count, &last_updated_resource](absl::string_view resource_type_url) {
         ++update_count;
-        last_updated_resource = resource_type_url;
+        last_updated_resource = std::string(resource_type_url);
       });
 
   // Default empty DCP for all types.

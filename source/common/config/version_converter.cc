@@ -1,12 +1,12 @@
-#include "common/config/version_converter.h"
+#include "source/common/config/version_converter.h"
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/macros.h"
-#include "common/config/api_type_oracle.h"
-#include "common/protobuf/visitor.h"
-#include "common/protobuf/well_known.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
+#include "source/common/config/api_type_oracle.h"
+#include "source/common/protobuf/visitor.h"
+#include "source/common/protobuf/well_known.h"
 
 #include "absl/strings/match.h"
 
@@ -110,7 +110,7 @@ void VersionConverter::annotateWithOriginalType(const Protobuf::Descriptor& prev
       // ClusterManagerImpl with type erasure, but protobuf doesn't free up memory
       // as expected, we probably need some arena level trick to address this.
       if (prev_descriptor->full_name() == "envoy.api.v2.Cluster" &&
-          (field.name() == "hidden_envoy_deprecated_hosts" || field.name() == "load_assignment")) {
+          field.name() == "load_assignment") {
         // This will cause the sub-message visit to abort early.
         return field.message_type();
       }

@@ -5,8 +5,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/listener/tls_inspector/tls_inspector.h"
-#include "extensions/filters/listener/well_known_names.h"
+#include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,7 +34,7 @@ public:
         envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector>();
   }
 
-  std::string name() const override { return ListenerFilterNames::get().TlsInspector; }
+  std::string name() const override { return "envoy.filters.listener.tls_inspector"; }
 };
 
 /**

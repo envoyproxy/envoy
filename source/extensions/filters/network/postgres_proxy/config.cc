@@ -1,4 +1,4 @@
-#include "extensions/filters/network/postgres_proxy/config.h"
+#include "source/extensions/filters/network/postgres_proxy/config.h"
 
 namespace Envoy {
 namespace Extensions {

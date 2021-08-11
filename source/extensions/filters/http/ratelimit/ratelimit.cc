@@ -1,19 +1,17 @@
-#include "extensions/filters/http/ratelimit/ratelimit.h"
+#include "source/extensions/filters/http/ratelimit/ratelimit.h"
 
 #include <string>
 #include <vector>
 
 #include "envoy/http/codes.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/http/codes.h"
-#include "common/http/header_utility.h"
-#include "common/router/config_impl.h"
-
-#include "extensions/filters/http/ratelimit/ratelimit_headers.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/router/config_impl.h"
+#include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -153,8 +151,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
 
   if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
-    callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().RateLimit,
-                                                *dynamic_metadata);
+    callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ratelimit", *dynamic_metadata);
   }
 
   switch (status) {
@@ -176,7 +173,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                                            empty_stat_name,
                                            empty_stat_name,
                                            false};
-    httpContext().codeStats().chargeResponseStat(info);
+    httpContext().codeStats().chargeResponseStat(info, false);
     if (config_->enableXEnvoyRateLimitedHeader()) {
       if (response_headers_to_add_ == nullptr) {
         response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
@@ -193,7 +190,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     if (response_headers_to_add_ == nullptr) {
       response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
     }
-    Http::HeaderUtility::addHeaders(*response_headers_to_add_, *rate_limit_headers);
+    Http::HeaderMapImpl::copyFrom(*response_headers_to_add_, *rate_limit_headers);
   } else {
     descriptor_statuses = nullptr;
   }
@@ -255,14 +252,14 @@ void Filter::populateResponseHeaders(Http::HeaderMap& response_headers, bool fro
     if (from_local_reply && !response_headers_to_add_->getContentTypeValue().empty()) {
       response_headers.remove(Http::Headers::get().ContentType);
     }
-    Http::HeaderUtility::addHeaders(response_headers, *response_headers_to_add_);
+    Http::HeaderMapImpl::copyFrom(response_headers, *response_headers_to_add_);
     response_headers_to_add_ = nullptr;
   }
 }
 
 void Filter::appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add) {
   if (request_headers_to_add && request_headers_) {
-    Http::HeaderUtility::addHeaders(*request_headers_, *request_headers_to_add);
+    Http::HeaderMapImpl::copyFrom(*request_headers_, *request_headers_to_add);
     request_headers_to_add = nullptr;
   }
 }
@@ -273,7 +270,7 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
   } else {
     const auto* specific_per_route_config =
         Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-            HttpFilterNames::get().RateLimit, route);
+            "envoy.filters.http.ratelimit", route);
     if (specific_per_route_config != nullptr) {
       switch (specific_per_route_config->virtualHostRateLimits()) {
       case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE:

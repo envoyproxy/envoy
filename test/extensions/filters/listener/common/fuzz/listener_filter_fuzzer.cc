@@ -5,7 +5,7 @@ namespace Extensions {
 namespace ListenerFilters {
 
 void ListenerFilterFuzzer::fuzz(
-    Network::ListenerFilter& filter,
+    Network::ListenerFilterPtr filter,
     const test::extensions::filters::listener::FilterFuzzTestCase& input) {
   try {
     socket_.addressProvider().setLocalAddress(
@@ -32,7 +32,7 @@ void ListenerFilterFuzzer::fuzz(
                                       testing::ReturnNew<NiceMock<Event::MockFileEvent>>()));
   }
 
-  filter.onAccept(cb_);
+  filter->onAccept(cb_);
 
   if (file_event_callback_ == nullptr) {
     // If filter does not call createFileEvent (i.e. original_dst and original_src)

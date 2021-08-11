@@ -3,9 +3,8 @@
 #include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.validate.h"
 
-#include "extensions/filters/common/ratelimit/ratelimit.h"
-#include "extensions/filters/network/thrift_proxy/filters/factory_base.h"
-#include "extensions/filters/network/thrift_proxy/filters/well_known_names.h"
+#include "source/extensions/filters/common/ratelimit/ratelimit.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,8 +20,7 @@ class RateLimitFilterConfig
     : public ThriftProxy::ThriftFilters::FactoryBase<
           envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit> {
 public:
-  RateLimitFilterConfig()
-      : FactoryBase(ThriftProxy::ThriftFilters::ThriftFilterNames::get().RATE_LIMIT) {}
+  RateLimitFilterConfig() : FactoryBase("envoy.filters.thrift.rate_limit") {}
 
 private:
   ThriftProxy::ThriftFilters::FilterFactoryCb createFilterFactoryFromProtoTyped(

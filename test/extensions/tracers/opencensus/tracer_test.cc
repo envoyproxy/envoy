@@ -7,9 +7,8 @@
 
 #include "envoy/config/trace/v3/opencensus.pb.h"
 
-#include "common/common/base64.h"
-
-#include "extensions/tracers/opencensus/opencensus_tracer_impl.h"
+#include "source/common/common/base64.h"
+#include "source/extensions/tracers/opencensus/opencensus_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"

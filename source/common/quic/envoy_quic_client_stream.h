@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/buffer/buffer.h"
+
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -12,7 +14,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_stream.h"
+#include "source/common/quic/envoy_quic_stream.h"
 
 namespace Envoy {
 namespace Quic {
@@ -23,9 +25,6 @@ class EnvoyQuicClientStream : public quic::QuicSpdyClientStream,
                               public Http::RequestEncoder {
 public:
   EnvoyQuicClientStream(quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session,
-                        quic::StreamType type, Http::Http3::CodecStats& stats,
-                        const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
-  EnvoyQuicClientStream(quic::PendingStream* pending, quic::QuicSpdyClientSession* client_session,
                         quic::StreamType type, Http::Http3::CodecStats& stats,
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
 
@@ -46,6 +45,7 @@ public:
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
   void setFlushTimeout(std::chrono::milliseconds) override {}
+
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
@@ -78,7 +78,8 @@ private:
 
   // Either reset the stream or close the connection according to
   // should_close_connection and configured http3 options.
-  void onStreamError(absl::optional<bool> should_close_connection);
+  void onStreamError(absl::optional<bool> should_close_connection,
+                     quic::QuicRstStreamErrorCode rst_code);
 
   Http::ResponseDecoder* response_decoder_{nullptr};
 

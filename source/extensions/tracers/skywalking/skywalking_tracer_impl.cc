@@ -1,10 +1,10 @@
-#include "extensions/tracers/skywalking/skywalking_tracer_impl.h"
+#include "source/extensions/tracers/skywalking/skywalking_tracer_impl.h"
 
 #include <memory>
 
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/http/path_utility.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/path_utility.h"
 
 #include "cpp2sky/propagation.h"
 
@@ -37,7 +37,7 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
   tls_slot_ptr_->set([proto_config, &factory_context, this](Event::Dispatcher& dispatcher) {
     TracerPtr tracer = std::make_unique<Tracer>(std::make_unique<TraceSegmentReporter>(
         factory_context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-            proto_config.grpc_service(), factory_context.scope(), false),
+            proto_config.grpc_service(), factory_context.scope(), true),
         dispatcher, factory_context.api().randomGenerator(), tracing_stats_,
         config_.delayed_buffer_size(), config_.token()));
     return std::make_shared<TlsTracer>(std::move(tracer));
@@ -45,14 +45,14 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
-                                   Http::RequestHeaderMap& request_headers,
+                                   Tracing::TraceContext& trace_context,
                                    const std::string& operation_name, Envoy::SystemTime start_time,
                                    const Tracing::Decision decision) {
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
   TracingContextPtr tracing_context;
   // TODO(shikugawa): support extension span header.
-  auto propagation_header = request_headers.get(skywalkingPropagationHeaderKey());
-  if (propagation_header.empty()) {
+  auto propagation_header = trace_context.getTraceContext(skywalkingPropagationHeaderKey());
+  if (!propagation_header.has_value()) {
     tracing_context = tracing_context_factory_->create();
     // Sampling status is always true on SkyWalking. But with disabling skip_analysis,
     // this span can't be analyzed.
@@ -60,9 +60,10 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
       tracing_context->setSkipAnalysis();
     }
   } else {
-    auto header_value_string = propagation_header[0]->value().getStringView();
+    auto header_value_string = propagation_header.value();
     try {
-      SpanContextPtr span_context = createSpanContext(header_value_string);
+      SpanContextPtr span_context =
+          createSpanContext(toStdStringView(header_value_string)); // NOLINT(std::string_view)
       tracing_context = tracing_context_factory_->create(span_context);
     } catch (TracerException& e) {
       ENVOY_LOG(warn, "New SkyWalking Span/Segment cannot be created for error: {}", e.what());

@@ -6,7 +6,7 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/json/json_loader.h"
+#include "source/common/json/json_loader.h"
 
 namespace Envoy {
 namespace Extensions {

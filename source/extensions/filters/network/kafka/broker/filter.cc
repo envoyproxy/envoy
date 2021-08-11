@@ -1,4 +1,4 @@
-#include "extensions/filters/network/kafka/broker/filter.h"
+#include "source/extensions/filters/network/kafka/broker/filter.h"
 
 namespace Envoy {
 namespace Extensions {

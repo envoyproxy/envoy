@@ -50,24 +50,21 @@ static_resources:
               content_type: application/grpc+proto
               withhold_grpc_frames: true
           - name: envoy.filters.http.router
-            typed_config: {}
   clusters:
   - name: other
-    connect_timeout: 5.00s
     type: LOGICAL_DNS
     dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: some_service
       endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: localhost
-                  port_value: 4630
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: localhost
+                port_value: 4630
   - name: grpc
-    connect_timeout: 5.00s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     typed_extension_protocol_options:
@@ -78,9 +75,9 @@ static_resources:
     load_assignment:
       cluster_name: grpc
       endpoints:
-        - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: localhost
-                    port_value: 10005
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: localhost
+                port_value: 10005

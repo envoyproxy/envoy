@@ -3,8 +3,8 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -16,10 +16,10 @@ class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Addres
                                    public Event::TestUsingSimulatedTime,
                                    public HttpIntegrationTest {
 public:
-  ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void setup(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024) {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    setUpstreamProtocol(Http::CodecType::HTTP1);
 
     const std::string filter = fmt::format(R"EOF(
 name: dynamic_forward_proxy
@@ -96,7 +96,7 @@ typed_config:
     if (upstream_tls_) {
       addFakeUpstream(Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_,
                                                         factory_context_),
-                      FakeHttpConnection::Type::HTTP1);
+                      Http::CodecType::HTTP1);
     } else {
       HttpIntegrationTest::createUpstreams();
     }

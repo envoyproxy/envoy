@@ -41,7 +41,7 @@ message Decompressor {
   }
 
   // A decompressor library to use for both request and response decompression. Currently only
-  // :ref:`envoy.compression.gzip.compressor<envoy_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`
+  // :ref:`envoy.compression.gzip.compressor<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`
   // is included in Envoy.
   // [#extension-category: envoy.compression.decompressor]
   config.core.v3.TypedExtensionConfig decompressor_library = 1

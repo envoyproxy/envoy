@@ -7,7 +7,7 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/simulated_time_system.h"

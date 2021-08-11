@@ -1,4 +1,4 @@
-#include "extensions/filters/http/cdn_loop/config.h"
+#include "source/extensions/filters/http/cdn_loop/config.h"
 
 #include <memory>
 
@@ -8,10 +8,9 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 
-#include "common/common/statusor.h"
-
-#include "extensions/filters/http/cdn_loop/filter.h"
-#include "extensions/filters/http/cdn_loop/parser.h"
+#include "source/common/common/statusor.h"
+#include "source/extensions/filters/http/cdn_loop/filter.h"
+#include "source/extensions/filters/http/cdn_loop/parser.h"
 
 namespace Envoy {
 namespace Extensions {

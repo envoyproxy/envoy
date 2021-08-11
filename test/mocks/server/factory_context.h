@@ -2,9 +2,8 @@
 
 #include "envoy/server/configuration.h"
 
-#include "common/router/context_impl.h"
-
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/router/context_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "admin.h"
 #include "drain_manager.h"
@@ -39,6 +38,7 @@ public:
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(Server::Admin&, admin, ());
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
+  MOCK_METHOD(bool, isQuicListener, (), (const));
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, listenerMetadata, (), (const));
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));

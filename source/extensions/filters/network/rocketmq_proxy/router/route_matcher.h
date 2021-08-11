@@ -6,11 +6,10 @@
 #include "envoy/extensions/filters/network/rocketmq_proxy/v3/route.pb.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/logger.h"
-#include "common/common/matchers.h"
-#include "common/http/header_utility.h"
-
-#include "extensions/filters/network/rocketmq_proxy/router/router.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
+#include "source/common/http/header_utility.h"
+#include "source/extensions/filters/network/rocketmq_proxy/router/router.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,7 +42,7 @@ public:
 private:
   bool headersMatch(const Http::HeaderMap& headers) const;
 
-  const Matchers::StringMatcherImpl topic_name_;
+  const Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> topic_name_;
   const std::string cluster_name_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;

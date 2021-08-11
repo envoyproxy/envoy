@@ -1,15 +1,13 @@
-#include "extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
+#include "source/extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 
 #include "envoy/http/header_map.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/grpc/codec.h"
-#include "common/grpc/common.h"
-#include "common/grpc/status.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/status.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -78,8 +76,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (decoder_callbacks_->route() != nullptr) {
     const auto* per_route_config =
         Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-            Extensions::HttpFilters::HttpFilterNames::get().GrpcHttp1ReverseBridge,
-            decoder_callbacks_->route());
+            "envoy.filters.http.grpc_http1_reverse_bridge", decoder_callbacks_->route());
     if (per_route_config != nullptr && per_route_config->disabled()) {
       enabled_ = false;
       return Http::FilterHeadersStatus::Continue;
