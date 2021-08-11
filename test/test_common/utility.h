@@ -41,6 +41,7 @@ using testing::_; // NOLINT(misc-unused-using-decls)
 using testing::AssertionFailure;
 using testing::AssertionResult;
 using testing::AssertionSuccess;
+using testing::get;
 using testing::Invoke; //  NOLINT(misc-unused-using-decls)
 
 namespace Envoy {
@@ -1165,6 +1166,20 @@ MATCHER_P(ProtoEq, expected, "") {
                      << expected.DebugString()
                      << "------------------is not equal to actual proto:---------------------\n"
                      << arg.DebugString()
+                     << "====================================================================\n";
+  }
+  return equal;
+}
+
+MATCHER(ProtoEqSingleArg, "") {
+  const bool equal =
+      TestUtility::protoEqual(get<1>(arg), get<0>(arg), /*ignore_repeated_field_ordering=*/false);
+  if (!equal) {
+    *result_listener << "\n"
+                     << "==========================Expected proto:===========================\n"
+                     << get<0>(arg).DebugString()
+                     << "------------------is not equal to actual proto:---------------------\n"
+                     << get<1>(arg).DebugString()
                      << "====================================================================\n";
   }
   return equal;
