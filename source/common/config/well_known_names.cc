@@ -1,5 +1,6 @@
 #include "source/common/config/well_known_names.h"
 
+#include "source/common/runtime/runtime_features.h"
 #include "absl/strings/str_replace.h"
 
 namespace Envoy {
@@ -120,8 +121,13 @@ TagNameValues::TagNameValues() {
   // http.(<stat_prefix>.)*
   addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");
 
-  // listener.(<address>.)*
-  addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>)\.))");
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.listener_stat_prefix_tag_extraction")) {
+    addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>|<NAME>)\.))");
+  } else {
+    // listener.(<address>.)*
+    addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>)\.))");
+  }
 
   // vhost.(<virtual host name>.)*
   addTokenized(VIRTUAL_HOST, "vhost.$.**");

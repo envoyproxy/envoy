@@ -35,6 +35,10 @@ Minor Behavior Changes
   to false. As part of this change, the use of reuse_port for TCP listeners on both macOS and
   Windows has been disabled due to suboptimal behavior. See the field documentation for more
   information.
+* listener: changed metric tag extraction so that :ref:`stat_prefix <v1.18.0:envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>`
+  is properly extracted. This also causes the admin listener stats to be extracted. Previously admin listener prometheus stat names would
+  be ``envoy_listener_admin_statname``. These will now be ``envoy_listener_statname{envoy_listener_address="admin"}``. This behavior can be temporarily
+  reverted by disabling runtime guard ``envoy.reloadable_features.listener_stat_prefix_tag_extraction``.
 
 Bug Fixes
 ---------

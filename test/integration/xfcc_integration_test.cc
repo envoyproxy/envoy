@@ -629,10 +629,10 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"cluster.cluster_1.upstream_flow_control_drained_total",
        "cluster.upstream_flow_control_drained_total"},
       {"cluster.cluster_1.membership_change", "cluster.membership_change"},
-      {"listener.admin.downstream_cx_destroy", "listener.admin.downstream_cx_destroy"},
-      {"listener.admin.downstream_cx_total", "listener.admin.downstream_cx_total"},
+      {"listener.admin.downstream_cx_destroy", "listener.downstream_cx_destroy"},
+      {"listener.admin.downstream_cx_total", "listener.downstream_cx_total"},
       {"listener.admin.downstream_cx_proxy_proto_error",
-       "listener.admin.downstream_cx_proxy_proto_error"},
+       "listener.downstream_cx_proxy_proto_error"},
       {"server.watchdog_mega_miss", "server.watchdog_mega_miss"},
       {"server.watchdog_miss", "server.watchdog_miss"},
       {"http.async-client.rq_total", "http.rq_total"},
@@ -721,7 +721,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"cluster.cluster_1.membership_total", "cluster.membership_total"},
       {"cluster.cluster_1.membership_healthy", "cluster.membership_healthy"},
       {"cluster.cluster_1.upstream_cx_active", "cluster.upstream_cx_active"},
-      {"listener.admin.downstream_cx_active", "listener.admin.downstream_cx_active"},
+      {"listener.admin.downstream_cx_active", "listener.downstream_cx_active"},
       {"cluster_manager.total_clusters", "cluster_manager.total_clusters"},
       {"listener_manager.total_listeners_warming", "listener_manager.total_listeners_warming"},
       {"listener_manager.total_listeners_active", "listener_manager.total_listeners_active"},
@@ -746,6 +746,64 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"server.seconds_until_first_ocsp_response_expiring",
        "server.seconds_until_first_ocsp_response_expiring"},
       {"server.version", "server.version"}};
+
+  auto test_name_against_mapping =
+      [](const absl::node_hash_map<std::string, std::string>& extracted_name_map,
+         const Stats::Metric& metric) {
+        auto it = extracted_name_map.find(metric.name());
+        // Ignore any metrics that are not found in the map for ease of addition
+        if (it != extracted_name_map.end()) {
+          // Check that the tag extracted name matches the "golden" state.
+          EXPECT_EQ(it->second, metric.tagExtractedName());
+        }
+      };
+
+  for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
+    test_name_against_mapping(tag_extracted_counter_map, *counter);
+  }
+
+  for (const Stats::GaugeSharedPtr& gauge : test_server_->gauges()) {
+    test_name_against_mapping(tag_extracted_gauge_map, *gauge);
+  }
+}
+
+// Test that the old setting works with the appropriate runtime override disabled.
+TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTestDeprecatedListenerStatPrefix) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.listener_stat_prefix_tag_extraction",
+                                    "false");
+  fcc_ = envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      FORWARD_ONLY;
+  initialize();
+
+  absl::node_hash_map<std::string, std::string> tag_extracted_counter_map;
+  absl::node_hash_map<std::string, std::string> tag_extracted_gauge_map;
+
+  tag_extracted_counter_map = {
+      {listenerStatPrefix("downstream_cx_total"), "listener.downstream_cx_total"},
+      {listenerStatPrefix("http.router.downstream_rq_5xx"), "listener.http.downstream_rq_xx"},
+      {listenerStatPrefix("http.router.downstream_rq_4xx"), "listener.http.downstream_rq_xx"},
+      {listenerStatPrefix("http.router.downstream_rq_3xx"), "listener.http.downstream_rq_xx"},
+      {listenerStatPrefix("downstream_cx_destroy"), "listener.downstream_cx_destroy"},
+      {listenerStatPrefix("downstream_cx_proxy_proto_error"),
+       "listener.downstream_cx_proxy_proto_error"},
+      {listenerStatPrefix("http.router.downstream_rq_2xx"), "listener.http.downstream_rq_xx"},
+      {listenerStatPrefix("ssl.connection_error"), "listener.ssl.connection_error"},
+      {listenerStatPrefix("ssl.handshake"), "listener.ssl.handshake"},
+      {listenerStatPrefix("ssl.session_reused"), "listener.ssl.session_reused"},
+      {listenerStatPrefix("ssl.fail_verify_san"), "listener.ssl.fail_verify_san"},
+      {listenerStatPrefix("ssl.no_certificate"), "listener.ssl.no_certificate"},
+      {listenerStatPrefix("ssl.fail_verify_no_cert"), "listener.ssl.fail_verify_no_cert"},
+      {listenerStatPrefix("ssl.fail_verify_error"), "listener.ssl.fail_verify_error"},
+      {listenerStatPrefix("ssl.fail_verify_cert_hash"), "listener.ssl.fail_verify_cert_hash"},
+      {"listener.admin.downstream_cx_destroy", "listener.admin.downstream_cx_destroy"},
+      {"listener.admin.downstream_cx_total", "listener.admin.downstream_cx_total"},
+      {"listener.admin.downstream_cx_proxy_proto_error",
+       "listener.admin.downstream_cx_proxy_proto_error"},
+  };
+  tag_extracted_gauge_map = {
+      {listenerStatPrefix("downstream_cx_active"), "listener.downstream_cx_active"},
+      {"listener.admin.downstream_cx_active", "listener.admin.downstream_cx_active"},
+  };
 
   auto test_name_against_mapping =
       [](const absl::node_hash_map<std::string, std::string>& extracted_name_map,
