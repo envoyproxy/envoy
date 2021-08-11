@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <string>
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/client_connection_factory_impl.h"
+#endif
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
