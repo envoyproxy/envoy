@@ -96,7 +96,7 @@ static_resources:
                 route:
                   host_rewrite_literal: quic.aiortc.org
                   prefix_rewrite: "/"
-                  cluster: google_http3   
+                  cluster: google_http3
 
   - name: http3_server
     address:
@@ -177,7 +177,7 @@ static_resources:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http_protocol_options: {}
-  
+
   - name: google_http2
     connect_timeout: 5s
     type: STRICT_DNS
@@ -203,7 +203,7 @@ static_resources:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
-          http2_protocol_options: {}  
+          http2_protocol_options: {}
 
   - name: google_http3
     connect_timeout: 5s
@@ -231,4 +231,4 @@ static_resources:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
-          http3_protocol_options: {} 
+          http3_protocol_options: {}
