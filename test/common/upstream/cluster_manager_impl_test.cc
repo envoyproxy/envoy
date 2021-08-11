@@ -779,6 +779,14 @@ private:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
+    absl::optional<Upstream::SelectedPoolAndConnection> selectPool(Upstream::LoadBalancerContext*,
+                                                                   Upstream::HostConstSharedPtr,
+                                                                   std::vector<uint8_t>&) override {
+      return absl::nullopt;
+    }
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
+    }
   };
 
   class LbFactory : public LoadBalancerFactory {

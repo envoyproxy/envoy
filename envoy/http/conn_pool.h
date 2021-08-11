@@ -47,6 +47,34 @@ public:
                            absl::optional<Http::Protocol> protocol) PURE;
 };
 
+class Instance;
+
+/**
+ * Pool callbacks invoked to track the lifetime of connections in the pool.
+ */
+class ConnectionLifetimeCallbacks {
+public:
+  virtual ~ConnectionLifetimeCallbacks() = default;
+
+  /**
+   * Called when a connection is open for requests in a pool.
+   * @param pool which the connection is associated with.
+   * @param hash_key the hash key used for this connection.
+   * @param connection newly open connection.
+   */
+  virtual void onConnectionOpen(Instance& pool, std::vector<uint8_t>& hash_key,
+                                const Network::Connection& connection) PURE;
+
+  /**
+   * Called when a connection is draining and may no longer be used for requests.
+   * @param pool which the connection is associated with.
+   * @param hash_key the hash key used for this connection.
+   * @param connection newly open connection.
+   */
+  virtual void onConnectionDraining(Instance& pool, std::vector<uint8_t>& hash_key,
+                                    const Network::Connection& connection) PURE;
+};
+
 /**
  * An instance of a generic connection pool.
  */

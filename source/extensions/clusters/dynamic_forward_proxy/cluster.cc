@@ -1,12 +1,16 @@
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
+#include <algorithm>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
+#include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/filters/network/common/utility.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,7 +29,8 @@ Cluster::Cluster(
                                        added_via_api, factory_context.dispatcher().timeSource()),
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
-      update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info) {}
+      update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
+      allow_coalesced_connections_(config.allow_coalesced_connections()) {}
 
 void Cluster::startPreInit() {
   // If we are attaching to a pre-populated cache we need to initialize our hosts.
@@ -167,6 +172,75 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
       return host_it->second.logical_host_;
     }
   }
+}
+
+absl::optional<Upstream::SelectedPoolAndConnection>
+Cluster::LoadBalancer::selectPool(Upstream::LoadBalancerContext* context,
+                                  Upstream::HostConstSharedPtr host,
+                                  std::vector<uint8_t>& hash_key) {
+  if (!context || !host) {
+    return absl::nullopt;
+  }
+
+  const std::string& hostname = host->hostname();
+  if (hostname.empty()) {
+    return absl::nullopt;
+  }
+
+  LookupKey key = {hash_key, *host->address()};
+  auto it = connection_info_map_.find(key);
+  if (it == connection_info_map_.end()) {
+    return absl::nullopt;
+  }
+
+  for (auto& info : it->second) {
+    Envoy::Ssl::ConnectionInfoConstSharedPtr ssl = info.connection_->ssl();
+    if (!ssl) {
+      continue;
+    }
+    for (const std::string& san : ssl->dnsSansPeerCertificate()) {
+      if (Extensions::TransportSockets::Tls::DefaultCertValidator::dnsNameMatch(hostname, san)) {
+        return Upstream::SelectedPoolAndConnection{*info.pool_, *info.connection_};
+      }
+    }
+  }
+
+  return absl::nullopt;
+}
+
+OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+Cluster::LoadBalancer::lifetimeCallbacks() {
+  if (!cluster_.allowCoalescedConnections()) {
+    return {};
+  }
+  return makeOptRef(
+      *(static_cast<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks*>(this)));
+}
+
+void Cluster::LoadBalancer::onConnectionOpen(Envoy::Http::ConnectionPool::Instance& pool,
+                                             std::vector<uint8_t>& hash_key,
+                                             const Network::Connection& connection) {
+  std::string alpn = connection.nextProtocol();
+  if (alpn != Http::Utility::AlpnNames::get().Http2 &&
+      alpn != Http::Utility::AlpnNames::get().Http3) {
+    // Only enable coalesced connections for HTTP/2 and HTTP/3.
+    return;
+  }
+  LookupKey key = {hash_key, *connection.addressProvider().remoteAddress()};
+  ConnectionInfo info = {&pool, &connection};
+  connection_info_map_[key].push_back(info);
+}
+
+void Cluster::LoadBalancer::onConnectionDraining(Envoy::Http::ConnectionPool::Instance& pool,
+                                                 std::vector<uint8_t>& hash_key,
+                                                 const Network::Connection& connection) {
+  LookupKey key = {hash_key, *connection.addressProvider().remoteAddress()};
+  connection_info_map_[key].erase(
+      std::remove_if(connection_info_map_[key].begin(), connection_info_map_[key].end(),
+                     [&pool, &connection](const ConnectionInfo& info) {
+                       return (info.pool_ == &pool && info.connection_ == &connection);
+                     }),
+      connection_info_map_[key].end());
 }
 
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>

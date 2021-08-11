@@ -76,6 +76,14 @@ public:
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+  absl::optional<Upstream::SelectedPoolAndConnection>
+  selectPool(Upstream::LoadBalancerContext* /*context*/, Upstream::HostConstSharedPtr /*host*/,
+             std::vector<uint8_t>& /*hash_key*/) override {
+    return absl::nullopt;
+  }
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    return {};
+  }
 };
 
 class LoadBalancerBaseTest : public LoadBalancerTestBase {

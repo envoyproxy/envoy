@@ -44,6 +44,14 @@ private:
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
+    absl::optional<Upstream::SelectedPoolAndConnection>
+    selectPool(Upstream::LoadBalancerContext* /*context*/, Upstream::HostConstSharedPtr /*host*/,
+               std::vector<uint8_t>& /*hash_key*/) override {
+      return absl::nullopt;
+    }
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
+    }
 
     const Upstream::HostSharedPtr host_;
   };

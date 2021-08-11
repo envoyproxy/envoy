@@ -10,6 +10,11 @@
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
+namespace Http {
+namespace ConnectionPool {
+class ConnectionLifetimeCallbacks;
+} // namespace ConnectionPool
+} // namespace Http
 namespace Upstream {
 
 /**
@@ -86,6 +91,14 @@ public:
 };
 
 /**
+ * Identifies a specific connection within a pool.
+ */
+struct SelectedPoolAndConnection {
+  Envoy::ConnectionPool::Instance& pool_;
+  const Network::Connection& connection_;
+};
+
+/**
  * Abstract load balancing interface.
  */
 class LoadBalancer {
@@ -107,6 +120,23 @@ public:
    * @param context supplies the context which is used in host selection.
    */
   virtual HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) PURE;
+
+  /**
+   * Returns connnection lifetime callbacks that may be used to inform the load balancer of
+   * connection events. Load balancers which do not intend to track connection lifetime events
+   * will return nullopt.
+   * @return optional lifetime callsbacks for this load balancer
+   */
+  virtual OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() PURE;
+
+  /**
+   * Returns a specific pool and connection to be used for the specified host.
+   *
+   * @return selected pool and connection to be used, or nullopt if no selection is made.
+   */
+  virtual absl::optional<SelectedPoolAndConnection> selectPool(LoadBalancerContext* context,
+                                                               HostConstSharedPtr host,
+                                                               std::vector<uint8_t>& hash_key) PURE;
 };
 
 using LoadBalancerPtr = std::unique_ptr<LoadBalancer>;
