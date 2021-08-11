@@ -40,7 +40,7 @@ jobs:
     name: java_helloworld
     needs: androidbuild
     runs-on: macOS-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v1
         with:
@@ -77,7 +77,7 @@ jobs:
     name: kotlin_helloworld
     needs: androidbuild
     runs-on: macOS-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v1
         with:
