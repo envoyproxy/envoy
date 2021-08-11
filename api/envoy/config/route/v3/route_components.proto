@@ -344,8 +344,10 @@ message WeightedCluster {
       // .. note::
       //
       //   If the header appears multiple times only the first value is used.
-      string cluster_header = 12
-          [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      string cluster_header = 12 [
+        (validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false},
+        (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
+      ];
     }
 
     // An integer between 0 and :ref:`total_weight
