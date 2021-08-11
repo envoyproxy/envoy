@@ -3697,11 +3697,14 @@ public:
     setUpEncoderAndDecoder(false, false);
     sendRequestHeadersAndData();
   }
-  const ResponseHeaderMap* send_request_with(int status, StreamInfo::ResponseFlag response_flag,
-                                             std::string details) {
-    return sendResponseHeaders(
-        ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", std::to_string(status)}}},
-        response_flag, details);
+  const ResponseHeaderMap*
+  send_request_with(int status, StreamInfo::ResponseFlag response_flag, std::string details,
+                    absl::optional<std::string> proxy_status = absl::nullopt) {
+    auto response_headers = new TestResponseHeaderMapImpl{{":status", std::to_string(status)}};
+    if (proxy_status.has_value()) {
+      response_headers->setProxyStatus(proxy_status.value());
+    }
+    return sendResponseHeaders(ResponseHeaderMapPtr{response_headers}, response_flag, details);
   }
   void teardown() { doRemoteClose(); }
 
@@ -3812,6 +3815,26 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
   // Since remove_details=true, we should not have "baz", the value of
   // response_code_details, in the Proxy-Status header.
   EXPECT_THAT(altered_headers->getProxyStatusValue(), Not(HasSubstr("baz")));
+
+  teardown();
+}
+
+TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_remove_details(false);
+  proxy_status_config_->set_proxy_name(
+      HttpConnectionManagerProto::ProxyStatusConfig::ENVOY_LITERAL);
+
+  initialize();
+
+  const ResponseHeaderMap* altered_headers =
+      send_request_with(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, "baz", "SomeCDN");
+
+  ASSERT_TRUE(altered_headers);
+  ASSERT_TRUE(altered_headers->ProxyStatus());
+  // Expect to see the appended previous value: "SomeCDN; envoy; ...".
+  EXPECT_EQ(altered_headers->getProxyStatusValue(),
+            "SomeCDN; envoy; error=connection_timeout; details='baz'");
 
   teardown();
 }
