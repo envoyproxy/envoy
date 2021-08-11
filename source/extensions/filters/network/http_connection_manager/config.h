@@ -218,8 +218,8 @@ public:
     return original_ip_detection_extensions_;
   }
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
-  const HttpConnectionManagerProto::ProxyStatusConfig& proxyStatusConfig() const override {
-    return proxy_status_config_;
+  const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
+    return proxy_status_config_.get();
   }
 
 private:
@@ -316,7 +316,7 @@ private:
       PathWithEscapedSlashesAction path_with_escaped_slashes_action_;
   const bool strip_trailing_host_dot_;
   const uint64_t max_requests_per_connection_;
-  HttpConnectionManagerProto::ProxyStatusConfig proxy_status_config_;
+  const std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
 };
 
 /**

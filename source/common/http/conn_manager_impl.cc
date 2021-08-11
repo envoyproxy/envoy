@@ -1468,8 +1468,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   chargeStats(headers);
 
-  if (auto& proxy_status_config = connection_manager_.config_.proxyStatusConfig();
-      proxy_status_config.attach_proxy_status()) {
+  if (auto* proxy_status_config = connection_manager_.config_.proxyStatusConfig();
+      proxy_status_config != nullptr) {
     // Writing the Proxy-Status header is gated on |attach_proxy_status|.
     // The |details| field and other internals are generated in
     // fromStreamInfo().
@@ -1478,9 +1478,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
         proxy_status.has_value()) {
       headers.setProxyStatus(StreamInfo::ProxyStatusUtils::toString(
           filter_manager_.streamInfo(), *proxy_status, connection_manager_.config_.serverName(),
-          proxy_status_config));
+          *proxy_status_config));
       // Apply the recommended response code, if configured and applicable.
-      if (proxy_status_config.set_recommended_response_code()) {
+      if (proxy_status_config->set_recommended_response_code()) {
         if (absl::optional<uint32_t> response_code =
                 StreamInfo::ProxyStatusUtils::recommendedHttpStatusCode(*proxy_status);
             response_code.has_value()) {

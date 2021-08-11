@@ -3710,13 +3710,7 @@ protected:
 };
 
 TEST_F(ProxyStatusTest, NoPopulateProxyStatus) {
-  proxy_status_config_.set_attach_proxy_status(false);
-  // Even if the rest of the config booleans are true, the above
-  // |attach_proxy_status| should be sufficient to disable writing Proxy-Status
-  // entirely.
-  proxy_status_config_.set_attach_details(true);
-  proxy_status_config_.set_set_recommended_response_code(true);
-  proxy_status_config_.set_proxy_name(HttpConnectionManagerProto::ProxyStatusConfig::SERVER_NAME);
+  proxy_status_config_ = nullptr;
 
   initialize();
 
@@ -3730,10 +3724,10 @@ TEST_F(ProxyStatusTest, NoPopulateProxyStatus) {
 }
 
 TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCodeAndServerName) {
-  proxy_status_config_.set_attach_proxy_status(true);
-  proxy_status_config_.set_attach_details(true);
-  proxy_status_config_.set_set_recommended_response_code(true);
-  proxy_status_config_.set_proxy_name(HttpConnectionManagerProto::ProxyStatusConfig::SERVER_NAME);
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_attach_details(true);
+  proxy_status_config_->set_set_recommended_response_code(true);
+  proxy_status_config_->set_proxy_name(HttpConnectionManagerProto::ProxyStatusConfig::SERVER_NAME);
 
   initialize();
 
@@ -3752,10 +3746,11 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCodeAndServerNa
 }
 
 TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
-  proxy_status_config_.set_attach_proxy_status(true);
-  proxy_status_config_.set_attach_details(true);
-  proxy_status_config_.set_set_recommended_response_code(true);
-  proxy_status_config_.set_proxy_name(HttpConnectionManagerProto::ProxyStatusConfig::ENVOY_LITERAL);
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_attach_details(true);
+  proxy_status_config_->set_set_recommended_response_code(true);
+  proxy_status_config_->set_proxy_name(
+      HttpConnectionManagerProto::ProxyStatusConfig::ENVOY_LITERAL);
 
   initialize();
 
@@ -3774,10 +3769,11 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
 }
 
 TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
-  proxy_status_config_.set_attach_proxy_status(true);
-  proxy_status_config_.set_set_recommended_response_code(false);
-  proxy_status_config_.set_attach_details(true);
-  proxy_status_config_.set_proxy_name(HttpConnectionManagerProto::ProxyStatusConfig::ENVOY_LITERAL);
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_attach_details(true);
+  proxy_status_config_->set_set_recommended_response_code(false);
+  proxy_status_config_->set_proxy_name(
+      HttpConnectionManagerProto::ProxyStatusConfig::ENVOY_LITERAL);
 
   initialize();
 
@@ -3797,10 +3793,11 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
 }
 
 TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
-  proxy_status_config_.set_attach_proxy_status(true);
-  proxy_status_config_.set_attach_details(false);
-  proxy_status_config_.set_set_recommended_response_code(false);
-  proxy_status_config_.set_proxy_name(HttpConnectionManagerProto::ProxyStatusConfig::ENVOY_LITERAL);
+  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
+  proxy_status_config_->set_attach_details(false);
+  proxy_status_config_->set_set_recommended_response_code(false);
+  proxy_status_config_->set_proxy_name(
+      HttpConnectionManagerProto::ProxyStatusConfig::ENVOY_LITERAL);
 
   initialize();
 

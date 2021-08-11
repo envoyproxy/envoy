@@ -157,8 +157,8 @@ public:
     return ip_detection_extensions_;
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
-  const HttpConnectionManagerProto::ProxyStatusConfig& proxyStatusConfig() const override {
-    return proxy_status_config_;
+  const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
+    return proxy_status_config_.get();
   }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
@@ -227,7 +227,7 @@ public:
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
   RequestIDExtensionSharedPtr request_id_extension_;
   std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
-  HttpConnectionManagerProto::ProxyStatusConfig proxy_status_config_;
+  std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
 
   const LocalReply::LocalReplyPtr local_reply_;
 
