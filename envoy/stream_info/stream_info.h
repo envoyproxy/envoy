@@ -605,7 +605,7 @@ public:
 };
 
 // An enum representation of the Proxy-Status error space.
-enum ProxyStatusError {
+enum class ProxyStatusError {
   DnsTimeout,
   DnsError,
   DestinationNotFound,
