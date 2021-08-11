@@ -1012,15 +1012,9 @@ void RouteEntryImplBase::validateClusters(
 void RouteEntryImplBase::traversePerFilterConfig(
     const std::string& filter_name,
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
-  const Router::RouteEntry* route_entry = routeEntry();
-
-  // TODO(soulxu): This has similar bug with https://github.com/envoyproxy/envoy/issues/17377
-  // it should be fixed.
-  if (route_entry != nullptr) {
-    auto maybe_vhost_config = vhost_.perFilterConfig(filter_name);
-    if (maybe_vhost_config != nullptr) {
-      cb(*maybe_vhost_config);
-    }
+  auto maybe_vhost_config = vhost_.perFilterConfig(filter_name);
+  if (maybe_vhost_config != nullptr) {
+    cb(*maybe_vhost_config);
   }
 
   auto maybe_route_config = per_filter_configs_.get(filter_name);

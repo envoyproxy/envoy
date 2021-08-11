@@ -24,6 +24,7 @@ using Http::ResponseHeaderMap;
 using Http::ResponseTrailerMap;
 
 static const std::string kErrorPrefix = "ext_proc error";
+static const int DefaultImmediateStatus = 200;
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -560,7 +561,11 @@ void Filter::cleanUpTimers() {
 }
 
 void Filter::sendImmediateResponse(const ImmediateResponse& response) {
-  const auto status_code = response.has_status() ? response.status().code() : 200;
+  auto status_code = response.has_status() ? response.status().code() : DefaultImmediateStatus;
+  if (!MutationUtils::isValidHttpStatus(status_code)) {
+    ENVOY_LOG(debug, "Ignoring attempt to set invalid HTTP status {}", status_code);
+    status_code = DefaultImmediateStatus;
+  }
   const auto grpc_status =
       response.has_grpc_status()
           ? absl::optional<Grpc::Status::GrpcStatus>(response.grpc_status().status())
@@ -572,6 +577,7 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   };
 
   sent_immediate_response_ = true;
+  ENVOY_LOG(debug, "Sending local reply with status code {}", status_code);
   encoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), response.body(),
                                      mutate_headers, grpc_status, response.details());
 }
