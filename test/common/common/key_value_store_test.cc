@@ -23,7 +23,6 @@ protected:
   }
 
   void createStore() {
-    store_.reset();
     store_ = std::make_unique<FileBasedKeyValueStore>(dispatcher_, std::chrono::seconds{5},
                                                       Filesystem::fileSystemForTest(), filename_);
   }
@@ -33,24 +32,24 @@ protected:
 };
 
 TEST_F(KeyValueStoreTest, Basic) {
-  EXPECT_EQ("", store_->getKey("foo"));
-  store_->addOrUpdateKey("foo", "bar");
-  EXPECT_EQ("bar", store_->getKey("foo"));
-  store_->addOrUpdateKey("foo", "eep");
-  EXPECT_EQ("eep", store_->getKey("foo"));
-  store_->removeKey("foo");
-  EXPECT_EQ("", store_->getKey("foo"));
+  EXPECT_EQ(absl::nullopt, store_->get("foo"));
+  store_->addOrUpdate("foo", "bar");
+  EXPECT_EQ("bar", store_->get("foo").value());
+  store_->addOrUpdate("foo", "eep");
+  EXPECT_EQ("eep", store_->get("foo").value());
+  store_->remove("foo");
+  EXPECT_EQ(absl::nullopt, store_->get("foo"));
 }
 
 TEST_F(KeyValueStoreTest, Persist) {
-  store_->addOrUpdateKey("foo", "bar");
-  store_->addOrUpdateKey("baz", "eep");
+  store_->addOrUpdate("foo", "bar");
+  store_->addOrUpdate("ba\nz", "ee\np");
   store_->flush();
 
   createStore();
 
-  EXPECT_EQ("bar", store_->getKey("foo"));
-  EXPECT_EQ("eep", store_->getKey("baz"));
+  EXPECT_EQ("bar", store_->get("foo").value());
+  EXPECT_EQ("ee\np", store_->get("ba\nz").value());
 }
 
 TEST_F(KeyValueStoreTest, HandleBadFile) {
@@ -59,12 +58,12 @@ TEST_F(KeyValueStoreTest, HandleBadFile) {
     EXPECT_LOG_CONTAINS("warn", error, createStore());
 
     // File will be parsed up until error.
-    EXPECT_EQ("bar", store_->getKey("foo"));
+    EXPECT_EQ("bar", store_->get("foo").value());
   };
   checkBadFile("3\nfoo3\nbar3", "Bad file: no newline");
   checkBadFile("3\nfoo3\nbar\n", "Bad file: no length");
   checkBadFile("3\nfoo3\nbarasd\n", "Bad file: no length");
-  checkBadFile("3\nfoo3\nbar3\n", "Bad file: insufficient contents");
+  checkBadFile("3\nfoo3\nbar3\na", "Bad file: insufficient contents");
 }
 
 TEST_F(KeyValueStoreTest, HandleInvalidFile) {
