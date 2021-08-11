@@ -146,7 +146,7 @@ message Policy {
 }
 
 // Permission defines an action (or actions) that a principal can take.
-// [#next-free-field: 14]
+// [#next-free-field: 13]
 message Permission {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Permission";
 
@@ -223,7 +223,7 @@ message Permission {
     // by dynamic forward proxy. If this field is present and the request did not have dynamic
     // forward proxy in its filter chain before it was processed by the rbac filter, the matcher
     // will evaluate the permission as `false`.
-    core.v3.CidrRange upstream_ip = 13;
+    core.v3.CidrRange upstream_ip = 12;
   }
 }
 
