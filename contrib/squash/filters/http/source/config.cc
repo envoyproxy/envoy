@@ -5,8 +5,8 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
-#include "contrib/envoy/extensions/squash/filters/http/v3/squash.pb.h"
-#include "contrib/envoy/extensions/squash/filters/http/v3/squash.pb.validate.h"
+#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.h"
+#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.validate.h"
 #include "contrib/squash/filters/http/source/squash_filter.h"
 
 namespace Envoy {

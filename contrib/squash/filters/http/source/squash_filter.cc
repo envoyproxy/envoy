@@ -15,7 +15,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/fixed_array.h"
-#include "contrib/envoy/extensions/squash/filters/http/v3/squash.pb.h"
+#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -29,7 +29,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//contrib/envoy/extensions/squash/filters/http/v3:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/filters/http/squash/v3:pkg_cc_proto",
     ],
 )
 
@@ -42,6 +42,6 @@ envoy_cc_contrib_extension(
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//contrib/envoy/extensions/squash/filters/http/v3:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/filters/http/squash/v3:pkg_cc_proto",
     ],
 )

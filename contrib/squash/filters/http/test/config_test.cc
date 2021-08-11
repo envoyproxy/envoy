@@ -1,8 +1,8 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
-#include "contrib/envoy/extensions/squash/filters/http/v3/squash.pb.h"
-#include "contrib/envoy/extensions/squash/filters/http/v3/squash.pb.validate.h"
+#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.h"
+#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.validate.h"
 #include "contrib/squash/filters/http/source/config.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
