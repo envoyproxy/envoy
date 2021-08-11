@@ -206,7 +206,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemSubscriptionNonExistentFile) {
   envoy::config::core::v3::ConfigSource config;
   config.set_path("/blahblah");
   EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}), EnvoyException,
-                            "envoy::api::v2::Path must refer to an existing path in the system: "
+                            "paths must refer to an existing path in the system: "
                             "'/blahblah' does not exist")
 }
 
@@ -224,7 +224,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
 TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile) {
   EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl("file:///blahblah", {})->start({}),
                             EnvoyException,
-                            "envoy::api::v2::Path must refer to an existing path in the system: "
+                            "paths must refer to an existing path in the system: "
                             "'/blahblah' does not exist");
 }
 

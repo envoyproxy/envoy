@@ -472,14 +472,14 @@ TEST_F(EdsTest, EndpointMetadata) {
   // New resources with Metadata updated.
   Config::Metadata::mutableMetadataValue(*canary->mutable_metadata(),
                                          Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("v2");
+      .set_string_value("v3");
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   auto& nhosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(nhosts.size(), 2);
   EXPECT_EQ(Config::Metadata::metadataValue(nhosts[1]->metadata().get(),
                                             Config::MetadataFilters::get().ENVOY_LB, "version")
                 .string_value(),
-            "v2");
+            "v3");
 }
 
 // Test verifies that updating metadata updates
@@ -534,7 +534,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   auto* endpoints = cluster_load_assignment.add_endpoints();
 
   // First check that EDS is correctly mapping
-  // envoy::api::v2::core::HealthStatus values to the expected health() status.
+  // HealthStatus values to the expected health() status.
   const std::vector<std::pair<envoy::config::core::v3::HealthStatus, Host::Health>>
       health_status_expected = {
           {envoy::config::core::v3::UNKNOWN, Host::Health::Healthy},

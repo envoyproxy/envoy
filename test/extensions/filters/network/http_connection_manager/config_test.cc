@@ -1996,6 +1996,46 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
   EXPECT_EQ(1, original_ip_detection_extensions.size());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionMixedWithUseRemoteAddress) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  use_remote_address: true
+  original_ip_detection_extensions:
+  - name: envoy.http.original_ip_detection.custom_header
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig
+      header_name: x-ip-header
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Original IP detection extensions and use_remote_address may not be mixed");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionMixedWithNumTrustedHops) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  xff_num_trusted_hops: 1
+  original_ip_detection_extensions:
+  - name: envoy.http.original_ip_detection.custom_header
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig
+      header_name: x-ip-header
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Original IP detection extensions and xff_num_trusted_hops may not be mixed");
+}
+
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterWarmingNoDefault) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
