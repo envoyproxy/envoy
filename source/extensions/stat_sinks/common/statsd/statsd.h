@@ -60,6 +60,7 @@ public:
   // Stats::Sink
   void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override;
+  void onHistogramCompleteFloat(const Stats::Histogram& histogram, double value) override;
 
   bool getUseTagForTest() { return use_tag_; }
   uint64_t getBufferSizeForTest() { return buffer_size_; }
@@ -85,7 +86,8 @@ private:
   void flushBuffer(Buffer::OwnedImpl& buffer, Writer& writer) const;
   void writeBuffer(Buffer::OwnedImpl& buffer, Writer& writer, const std::string& data) const;
 
-  const std::string buildMessage(const Stats::Metric& metric, uint64_t value,
+  template <typename ValueType>
+  const std::string buildMessage(const Stats::Metric& metric, ValueType value,
                                  const std::string& type) const;
   const std::string getName(const Stats::Metric& metric) const;
   const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;
@@ -115,6 +117,9 @@ public:
     tls_->getTyped<TlsSink>().onTimespanComplete(histogram.name(),
                                                  std::chrono::milliseconds(value));
   }
+  void onHistogramCompleteFloat(const Stats::Histogram& histogram, double value) override {
+    tls_->getTyped<TlsSink>().onHistogramCompleteFloat(histogram.name(), value);
+  }
 
   const std::string& getPrefix() { return prefix_; }
 
@@ -129,6 +134,7 @@ private:
     void flushGauge(const std::string& name, uint64_t value);
     void endFlush(bool do_write);
     void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms);
+    void onHistogramCompleteFloat(const std::string& name, double value);
     uint64_t usedBuffer() const;
     void write(Buffer::Instance& buffer);
 
