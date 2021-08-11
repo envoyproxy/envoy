@@ -78,7 +78,7 @@ public:
         obj_info = setup(sched);
       }
 
-      sched.pickAndAdd([&obj_info](const auto& i) { return i.weight; });
+      sched.pickAndAdd([](const auto& i) { return i.weight; });
     }
   }
 };

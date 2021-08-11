@@ -99,7 +99,7 @@ private:
     for (auto& it : queue_map_) {
       const auto weight_val = it.first;
       weight_sum += weight_val * it.second.size();
-      cumulative_weights_.emplace_back(QueueInfo{weight_sum, weight_val, it.second});
+      cumulative_weights_.push_back({weight_sum, weight_val, it.second});
     }
 
     rebuild_cumulative_weights_ = false;

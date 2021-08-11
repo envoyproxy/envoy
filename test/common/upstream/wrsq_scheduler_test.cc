@@ -133,10 +133,10 @@ TEST(WRSQSchedulerTest, ExpiredPeek) {
     sched.add(2, first_entry);
     sched.add(1, second_entry);
   }
-  auto third_entry = std::make_shared<uint32_t>(37);
+  auto third_entry = std::make_shared<uint32_t>(99);
   sched.add(3, third_entry);
 
-  EXPECT_EQ(37, *sched.peekAgain({}));
+  EXPECT_EQ(*third_entry, *sched.peekAgain({}));
 }
 
 // Validate that expired entries are ignored.
@@ -158,6 +158,9 @@ TEST(WRSQSchedulerTest, ExpiredPeekedIsNotPicked) {
   EXPECT_TRUE(sched.pickAndAdd({}) == nullptr);
 }
 
+// Ensure the multiple values that are peeked are the same ones returned via calls to `pickAndAdd`.
+// This test also verifies that the scheduler behavior is vanilla round-robin when all of the
+// weights are identical by ensuring the same values are selected across 2 different schedulers.
 TEST(WRSQSchedulerTest, ManyPeekahead) {
   NiceMock<Random::MockRandomGenerator> random;
   WRSQScheduler<uint32_t> sched1(random);
@@ -165,16 +168,21 @@ TEST(WRSQSchedulerTest, ManyPeekahead) {
   constexpr uint32_t num_entries = 128;
   std::shared_ptr<uint32_t> entries[num_entries];
 
+  // Populate the schedulers.
   for (uint32_t i = 0; i < num_entries; ++i) {
     entries[i] = std::make_shared<uint32_t>(i);
     sched1.add(1, entries[i]);
     sched2.add(1, entries[i]);
   }
 
+  // Peek values and store them for comparison later.
   std::vector<uint32_t> picks;
   for (uint32_t rounds = 0; rounds < 10; ++rounds) {
     picks.push_back(*sched1.peekAgain({}));
   }
+
+  // Verify the picked values are those we peeked earlier. We'll also verify both schedulers are
+  // returning the same values, since we expect vanilla round-robin behavior.
   for (uint32_t rounds = 0; rounds < 10; ++rounds) {
     auto p1 = sched1.pickAndAdd({});
     auto p2 = sched2.pickAndAdd({});
@@ -220,7 +228,7 @@ TEST(WRSQSchedulerTest, ExpireAll) {
           ++weight5pick;
           break;
         default:
-          EXPECT_TRUE(false) << "bogus value returned";
+          FAIL() << "bogus value returned";
         }
       }
       EXPECT_GT(weight5pick, 0);
@@ -236,7 +244,7 @@ TEST(WRSQSchedulerTest, ExpireAll) {
       case 37:
         break;
       default:
-        EXPECT_TRUE(false) << "bogus value returned";
+        FAIL() << "bogus value returned";
       }
     }
   }
@@ -257,15 +265,7 @@ TEST(WRSQSchedulerTest, ChangingWeight) {
   sched.add(1, e1);
   sched.add(0, e2);
 
-  std::function<double(const uint32_t v)> f = [e1, e2](const uint32_t v) {
-    if (v == *e1) {
-      return 0.0;
-    } else {
-      return 1.0;
-    }
-  };
-
-  // Expecting only e1 to be picked.
+  // Expecting only e1 to be picked. Weights are {e1=0, e2=1}.
   for (uint32_t rounds = 0; rounds < 128; ++rounds) {
     auto peek = sched.peekAgain({});
     auto p = sched.pickAndAdd({});
@@ -273,11 +273,14 @@ TEST(WRSQSchedulerTest, ChangingWeight) {
     EXPECT_EQ(*peek, *p);
   }
 
-  auto p = sched.pickAndAdd(f);
+  // Weights should be unchanged at this point. Still expect to pick e1, but now we'll change it to
+  // be 0.
+  auto p = sched.pickAndAdd([](auto) { return 0.0; });
   EXPECT_EQ(*e1, *p);
   sched.add(1, e3);
 
-  // Now it should only be e3.
+  // Weights are now {e1=0, e2=0, e3=1}. Without changing the weights, e3 should be the one picked
+  // repeatedly
   for (uint32_t rounds = 0; rounds < 128; ++rounds) {
     auto p = sched.pickAndAdd({});
     EXPECT_EQ(*e3, *p);
