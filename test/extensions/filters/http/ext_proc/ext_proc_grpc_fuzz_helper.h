@@ -93,6 +93,7 @@ public:
   grpc::StatusCode randomGrpcStatusCode();
   grpc::Status randomGrpcStatusWithMessage();
 
+  void logRequest(ProcessingRequest* req);
   void randomizeHeaderMutation(HeaderMutation* headers, ProcessingRequest* req, bool trailers);
   void randomizeCommonResponse(CommonResponse* msg, ProcessingRequest* req);
   void randomizeImmediateResponse(ImmediateResponse* msg, ProcessingRequest* req);

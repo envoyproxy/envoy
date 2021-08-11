@@ -1,9 +1,17 @@
 // TODO(ikepolinsky): Major action items to improve this fuzzer
 // 1. Move external process from separate thread to have test all in one thread
-//    - Explore using mock gRPC client for this
+//    - Explore using fake gRPC client for this
 // 2. Implement sending trailers from downstream and mutating headers/trailers
 //    in the external process.
 // 3. Use an upstream that sends varying responses (also with trailers)
+// 4. Explore performance optimizations:
+//    - Threads and fake gRPC client above might help
+//    - Local testing had almost 800k inline 8 bit counters resulting in ~3
+//      exec/s. How far can we reduce the number of counters?
+//    - At the loss of reproducibility use a persistent envoy
+// 5. Protobuf fuzzing would greatly increase crash test case readability
+//    - How will this impact speed?
+//    - Can it be done on single thread as well?
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
@@ -246,6 +254,8 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
             return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
           }
 
+          fuzz_helper.logRequest(&req);
+
           // The following blocks generate random data for the 9 fields of the
           // ProcessingResponse gRPC message
 
@@ -262,9 +272,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
           }
 
           // 8. Randomize dynamic_metadata
-          /* TODO(ikepolinsky): Skipping - not implemented
-          if (fuzz_helper.provider_->ConsumeBool()) {
-          } */
+          // TODO(ikepolinsky): ext_proc does not support dynamic_metadata
 
           // 9. Randomize mode_override
           if (fuzz_helper.provider_->ConsumeBool()) {
@@ -294,7 +302,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     ENVOY_LOG_MISC(trace, "Response received.");
   } else {
     // TODO(ikepolinsky): investigate if there is anyway around this.
-    // Waiting 2 seconds for a fuzz case to fail will drastically
+    // Waiting too long for a fuzz case to fail will drastically
     // reduce executions/second.
     ENVOY_LOG_MISC(trace, "Response timed out.");
   }

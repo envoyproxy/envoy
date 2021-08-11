@@ -24,6 +24,85 @@ using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
 using envoy::type::v3::StatusCode;
 
+const StatusCode HttpStatusCodes[] = {
+  StatusCode::Continue,
+  StatusCode::OK,
+  StatusCode::Created,
+  StatusCode::Accepted,
+  StatusCode::NonAuthoritativeInformation,
+  StatusCode::NoContent,
+  StatusCode::ResetContent,
+  StatusCode::PartialContent,
+  StatusCode::MultiStatus,
+  StatusCode::AlreadyReported,
+  StatusCode::IMUsed,
+  StatusCode::MultipleChoices,
+  StatusCode::MovedPermanently,
+  StatusCode::Found,
+  StatusCode::SeeOther,
+  StatusCode::NotModified,
+  StatusCode::UseProxy,
+  StatusCode::TemporaryRedirect,
+  StatusCode::PermanentRedirect,
+  StatusCode::BadRequest,
+  StatusCode::Unauthorized,
+  StatusCode::PaymentRequired,
+  StatusCode::Forbidden,
+  StatusCode::NotFound,
+  StatusCode::MethodNotAllowed,
+  StatusCode::NotAcceptable,
+  StatusCode::ProxyAuthenticationRequired,
+  StatusCode::RequestTimeout,
+  StatusCode::Conflict,
+  StatusCode::Gone,
+  StatusCode::LengthRequired,
+  StatusCode::PreconditionFailed,
+  StatusCode::PayloadTooLarge,
+  StatusCode::URITooLong,
+  StatusCode::UnsupportedMediaType,
+  StatusCode::RangeNotSatisfiable,
+  StatusCode::ExpectationFailed,
+  StatusCode::MisdirectedRequest,
+  StatusCode::UnprocessableEntity,
+  StatusCode::Locked,
+  StatusCode::FailedDependency,
+  StatusCode::UpgradeRequired,
+  StatusCode::PreconditionRequired,
+  StatusCode::TooManyRequests,
+  StatusCode::RequestHeaderFieldsTooLarge,
+  StatusCode::InternalServerError,
+  StatusCode::NotImplemented,
+  StatusCode::BadGateway,
+  StatusCode::ServiceUnavailable,
+  StatusCode::GatewayTimeout,
+  StatusCode::HTTPVersionNotSupported,
+  StatusCode::VariantAlsoNegotiates,
+  StatusCode::InsufficientStorage,
+  StatusCode::LoopDetected,
+  StatusCode::NotExtended,
+  StatusCode::NetworkAuthenticationRequired,
+};
+
+const grpc::StatusCode GrpcStatusCodes[] = {
+  grpc::StatusCode::OK,
+  grpc::StatusCode::CANCELLED,
+  grpc::StatusCode::UNKNOWN,
+  grpc::StatusCode::INVALID_ARGUMENT,
+  grpc::StatusCode::DEADLINE_EXCEEDED,
+  grpc::StatusCode::NOT_FOUND,
+  grpc::StatusCode::ALREADY_EXISTS,
+  grpc::StatusCode::PERMISSION_DENIED,
+  grpc::StatusCode::RESOURCE_EXHAUSTED,
+  grpc::StatusCode::FAILED_PRECONDITION,
+  grpc::StatusCode::ABORTED,
+  grpc::StatusCode::OUT_OF_RANGE,
+  grpc::StatusCode::UNIMPLEMENTED,
+  grpc::StatusCode::INTERNAL,
+  grpc::StatusCode::UNAVAILABLE,
+  grpc::StatusCode::DATA_LOSS,
+  grpc::StatusCode::UNAUTHENTICATED,
+};
+
 ExtProcFuzzHelper::ExtProcFuzzHelper(FuzzedDataProvider* provider) {
   provider_ = provider;
   immediate_resp_sent_ = false;
@@ -34,289 +113,37 @@ std::string ExtProcFuzzHelper::consumeRepeatedString() {
   return std::string(str_len, 'b');
 }
 
-// TODO(ikepolinsky): should this function be put in a standard place?
 // Since FuzzedDataProvider requires enums to define a kMaxValue, we cannot
-// use the envoy::type::v3::StatusCode enum directly. Additionally this allows
-// us to be more verbose in our logging for tracing.
+// use the envoy::type::v3::StatusCode enum directly.
 StatusCode ExtProcFuzzHelper::randomHttpStatus() {
-  switch (provider_->ConsumeIntegralInRange<uint32_t>(0, 55)) {
-  case 0:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (Continue)", StatusCode::Continue);
-    return StatusCode::Continue;
-  case 1:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (OK)", StatusCode::OK);
-    return StatusCode::OK;
-  case 2:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (Created)", StatusCode::Created);
-    return StatusCode::Created;
-  case 3:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (Accepted)", StatusCode::Accepted);
-    return StatusCode::Accepted;
-  case 4:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (NonAuthoritativeInformation)",
-                   StatusCode::NonAuthoritativeInformation);
-    return StatusCode::NonAuthoritativeInformation;
-  case 5:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (NoContent)", StatusCode::NoContent);
-    return StatusCode::NoContent;
-  case 6:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (ResetContent)", StatusCode::ResetContent);
-    return StatusCode::ResetContent;
-  case 7:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (PartialContent)",
-                   StatusCode::PartialContent);
-    return StatusCode::PartialContent;
-  case 8:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (MultiStatus)", StatusCode::MultiStatus);
-    return StatusCode::MultiStatus;
-  case 9:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (AlreadyReported)",
-                   StatusCode::AlreadyReported);
-    return StatusCode::AlreadyReported;
-  case 10:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (IMUsed)", StatusCode::IMUsed);
-    return StatusCode::IMUsed;
-  case 11:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (MultipleChoices)",
-                   StatusCode::MultipleChoices);
-    return StatusCode::MultipleChoices;
-  case 12:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (MovedPermanently)",
-                   StatusCode::MovedPermanently);
-    return StatusCode::MovedPermanently;
-  case 13:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (Found)", StatusCode::Found);
-    return StatusCode::Found;
-  case 14:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (SeeOther)", StatusCode::SeeOther);
-    return StatusCode::SeeOther;
-  case 15:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (NotModified)", StatusCode::NotModified);
-    return StatusCode::NotModified;
-  case 16:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (UseProxy)", StatusCode::UseProxy);
-    return StatusCode::UseProxy;
-  case 17:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (TemporaryRedirect)",
-                   StatusCode::TemporaryRedirect);
-    return StatusCode::TemporaryRedirect;
-  case 18:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (PermanentRedirect)",
-                   StatusCode::PermanentRedirect);
-    return StatusCode::PermanentRedirect;
-  case 19:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (BadRequest)", StatusCode::BadRequest);
-    return StatusCode::BadRequest;
-  case 20:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (Unauthorized)", StatusCode::Unauthorized);
-    return StatusCode::Unauthorized;
-  case 21:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (PaymentRequired)",
-                   StatusCode::PaymentRequired);
-    return StatusCode::PaymentRequired;
-  case 22:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (Forbidden)", StatusCode::Forbidden);
-    return StatusCode::Forbidden;
-  case 23:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (NotFound)", StatusCode::NotFound);
-    return StatusCode::NotFound;
-  case 24:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (MethodNotAllowed)",
-                   StatusCode::MethodNotAllowed);
-    return StatusCode::MethodNotAllowed;
-  case 25:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (NotAcceptable)",
-                   StatusCode::NotAcceptable);
-    return StatusCode::NotAcceptable;
-  case 26:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (ProxyAuthenticationRequired)",
-                   StatusCode::ProxyAuthenticationRequired);
-    return StatusCode::ProxyAuthenticationRequired;
-  case 27:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (RequestTimeout)",
-                   StatusCode::RequestTimeout);
-    return StatusCode::RequestTimeout;
-  case 28:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (Conflict)", StatusCode::Conflict);
-    return StatusCode::Conflict;
-  case 29:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (Gone)", StatusCode::Gone);
-    return StatusCode::Gone;
-  case 30:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (LengthRequired)",
-                   StatusCode::LengthRequired);
-    return StatusCode::LengthRequired;
-  case 31:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (PreconditionFailed)",
-                   StatusCode::PreconditionFailed);
-    return StatusCode::PreconditionFailed;
-  case 32:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (PayloadTooLarge)",
-                   StatusCode::PayloadTooLarge);
-    return StatusCode::PayloadTooLarge;
-  case 33:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (URITooLong)", StatusCode::URITooLong);
-    return StatusCode::URITooLong;
-  case 34:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (UnsupportedMediaType)",
-                   StatusCode::UnsupportedMediaType);
-    return StatusCode::UnsupportedMediaType;
-  case 35:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (RangeNotSatisfiable)",
-                   StatusCode::RangeNotSatisfiable);
-    return StatusCode::RangeNotSatisfiable;
-  case 36:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (ExpectationFailed)",
-                   StatusCode::ExpectationFailed);
-    return StatusCode::ExpectationFailed;
-  case 37:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (MisdirectedRequest)",
-                   StatusCode::MisdirectedRequest);
-    return StatusCode::MisdirectedRequest;
-  case 38:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (UnprocessableEntity)",
-                   StatusCode::UnprocessableEntity);
-    return StatusCode::UnprocessableEntity;
-  case 39:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (Locked)", StatusCode::Locked);
-    return StatusCode::Locked;
-  case 40:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (FailedDependency)",
-                   StatusCode::FailedDependency);
-    return StatusCode::FailedDependency;
-  case 41:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (UpgradeRequired)",
-                   StatusCode::UpgradeRequired);
-    return StatusCode::UpgradeRequired;
-  case 42:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (PreconditionRequired)",
-                   StatusCode::PreconditionRequired);
-    return StatusCode::PreconditionRequired;
-  case 43:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (TooManyRequests)",
-                   StatusCode::TooManyRequests);
-    return StatusCode::TooManyRequests;
-  case 44:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (RequestHeaderFieldsTooLarge)",
-                   StatusCode::RequestHeaderFieldsTooLarge);
-    return StatusCode::RequestHeaderFieldsTooLarge;
-  case 45:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (InternalServerError)",
-                   StatusCode::InternalServerError);
-    return StatusCode::InternalServerError;
-  case 46:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (NotImplemented)",
-                   StatusCode::NotImplemented);
-    return StatusCode::NotImplemented;
-  case 47:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (BadGateway)", StatusCode::BadGateway);
-    return StatusCode::BadGateway;
-  case 48:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (ServiceUnavailable)",
-                   StatusCode::ServiceUnavailable);
-    return StatusCode::ServiceUnavailable;
-  case 49:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (GatewayTimeout)",
-                   StatusCode::GatewayTimeout);
-    return StatusCode::GatewayTimeout;
-  case 50:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (HTTPVersionNotSupported)",
-                   StatusCode::HTTPVersionNotSupported);
-    return StatusCode::HTTPVersionNotSupported;
-  case 51:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (VariantAlsoNegotiates)",
-                   StatusCode::VariantAlsoNegotiates);
-    return StatusCode::VariantAlsoNegotiates;
-  case 52:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (InsufficientStorage)",
-                   StatusCode::InsufficientStorage);
-    return StatusCode::InsufficientStorage;
-  case 53:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (LoopDetected)", StatusCode::LoopDetected);
-    return StatusCode::LoopDetected;
-  case 54:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (NotExtended)", StatusCode::NotExtended);
-    return StatusCode::NotExtended;
-  case 55:
-    ENVOY_LOG_MISC(trace, "Selected HTTP Status Code {} (NetworkAuthenticationRequired)",
-                   StatusCode::NetworkAuthenticationRequired);
-    return StatusCode::NetworkAuthenticationRequired;
-  default:
-    ENVOY_LOG_MISC(error, "Unhandled HTTP Status Code");
-    exit(EXIT_FAILURE);
-  }
+  StatusCode rv = provider_->PickValueInArray(HttpStatusCodes);
+  ENVOY_LOG_MISC(trace, "Selected HTTP StatusCode {}", rv);
+  return rv;
 }
 
-// TODO(ikepolinsky): should this function be put in a standard place?
 // Since FuzzedDataProvider requires enums to define a kMaxValue, we cannot
-// use the grpc::StatusCode enum directly. Additionally this allows us to be
-// more verbose in our logging for tracing.
+// use the grpc::StatusCode enum directly.
 grpc::StatusCode ExtProcFuzzHelper::randomGrpcStatusCode() {
-  switch (provider_->ConsumeIntegralInRange<uint32_t>(0, 16)) {
-  case 0:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (OK)", grpc::StatusCode::OK);
-    return grpc::StatusCode::OK;
-  case 1:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (CANCELLED)", grpc::StatusCode::CANCELLED);
-    return grpc::StatusCode::CANCELLED;
-  case 2:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (UNKNOWN)", grpc::StatusCode::UNKNOWN);
-    return grpc::StatusCode::UNKNOWN;
-  case 3:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (INVALID_ARGUMENT)",
-                   grpc::StatusCode::INVALID_ARGUMENT);
-    return grpc::StatusCode::INVALID_ARGUMENT;
-  case 4:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (DEADLINE_EXCEEDED)",
-                   grpc::StatusCode::DEADLINE_EXCEEDED);
-    return grpc::StatusCode::DEADLINE_EXCEEDED;
-  case 5:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (NOT_FOUND)", grpc::StatusCode::NOT_FOUND);
-    return grpc::StatusCode::NOT_FOUND;
-  case 6:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (ALREADY_EXISTS)",
-                   grpc::StatusCode::ALREADY_EXISTS);
-    return grpc::StatusCode::ALREADY_EXISTS;
-  case 7:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (PERMISSION_DENIED)",
-                   grpc::StatusCode::PERMISSION_DENIED);
-    return grpc::StatusCode::PERMISSION_DENIED;
-  case 8:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (RESOURCE_EXHAUSTED)",
-                   grpc::StatusCode::RESOURCE_EXHAUSTED);
-    return grpc::StatusCode::RESOURCE_EXHAUSTED;
-  case 9:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (FAILED_PRECONDITION)",
-                   grpc::StatusCode::FAILED_PRECONDITION);
-    return grpc::StatusCode::FAILED_PRECONDITION;
-  case 10:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (ABORTED)", grpc::StatusCode::ABORTED);
-    return grpc::StatusCode::ABORTED;
-  case 11:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (OUT_OF_RANGE)",
-                   grpc::StatusCode::OUT_OF_RANGE);
-    return grpc::StatusCode::OUT_OF_RANGE;
-  case 12:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (UNIMPLEMMENTED)",
-                   grpc::StatusCode::UNIMPLEMENTED);
-    return grpc::StatusCode::UNIMPLEMENTED;
-  case 13:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (INTERNAL)", grpc::StatusCode::INTERNAL);
-    return grpc::StatusCode::INTERNAL;
-  case 14:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (UNAVAILABLE)",
-                   grpc::StatusCode::UNAVAILABLE);
-    return grpc::StatusCode::UNAVAILABLE;
-  case 15:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {} (DATA_LOSS)", grpc::StatusCode::DATA_LOSS);
-    return grpc::StatusCode::DATA_LOSS;
-  case 16:
-    ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode (UNAUTHENTICATED)",
-                   grpc::StatusCode::UNAUTHENTICATED);
-    return grpc::StatusCode::UNAUTHENTICATED;
-  default:
-    ENVOY_LOG_MISC(trace, "Unhandled gRPC status code");
-    exit(EXIT_FAILURE);
+  grpc::StatusCode rv = provider_->PickValueInArray(GrpcStatusCodes);
+  ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {}", rv);
+  return rv;
+}
+
+void ExtProcFuzzHelper::logRequest(ProcessingRequest* req) {
+  if (req->has_request_headers()) {
+    ENVOY_LOG_MISC(trace, "Received ProcessingRequest request_headers");
+  } else if (req->has_response_headers()) {
+    ENVOY_LOG_MISC(trace, "Received ProcessingRequest response_headers");
+  } else if (req->has_request_body()) {
+    ENVOY_LOG_MISC(trace, "Received ProcessingRequest request_body");
+  } else if (req->has_response_body()) {
+    ENVOY_LOG_MISC(trace, "Received ProcessingRequest response_body");
+  } else if (req->has_request_trailers()) {
+    ENVOY_LOG_MISC(trace, "Received ProcessingRequest request_trailers");
+  } else if (req->has_response_trailers()) {
+    ENVOY_LOG_MISC(trace, "Received ProcessingRequest response_trailers");
+  } else {
+    ENVOY_LOG_MISC(trace, "Received unexpected ProcessingRequest");
   }
 }
 
@@ -336,20 +163,10 @@ void ExtProcFuzzHelper::randomizeHeaderMutation(HeaderMutation*, ProcessingReque
   // of a HeaderMutation gRPC message
 
   // 1. Randomize set_headers
-  /* TODO(ikepolinsky): randomly add headers
-  if (provider_->ConsumeBool()) {
-    HeaderValueOption* set_header = msg->add_set_headers();
-    set_header->mutable_header()->set_key(provider_->ConsumeRandomLengthString());
-    set_header->mutable_header()->set_value(provider_->ConsumeRandomLengthString());
-    set_header->mutable_append()->set_value(provider_->ConsumeBool());
-  }
-  */
+  // TODO(ikepolinsky): randomly add headers
 
   // 2. Randomize remove headers
-  /* TODO(ikepolinsky): Randomly remove headers
-  if (provider_->ConsumeBool()) {
-    msg->add_remove_headers(provider_->ConsumeRandomLengthString());
-  }*/
+  // TODO(ikepolinsky): Randomly remove headers
 }
 
 void ExtProcFuzzHelper::randomizeCommonResponse(CommonResponse* msg, ProcessingRequest* req) {
@@ -390,7 +207,8 @@ void ExtProcFuzzHelper::randomizeCommonResponse(CommonResponse* msg, ProcessingR
     }
   }
 
-  // 4. TODO(ikepolinsky): Randomize trailers - [skipping because trailers not implemented]
+  // 4. Randomize trailers
+  // TODO(ikepolinsky) ext_proc currently does not support this field
 
   // 5. Randomize clear_route_cache
   if (provider_->ConsumeBool()) {
