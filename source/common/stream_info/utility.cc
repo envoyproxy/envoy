@@ -4,6 +4,8 @@
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "source/common/http/default_server_string.h"
+
 #include "absl/strings/str_format.h"
 
 namespace Envoy {
@@ -138,7 +140,7 @@ ProxyStatusUtils::toString(const StreamInfo& stream_info, const ProxyStatusError
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       ProxyStatusConfig::ENVOY_LITERAL:
   default: {
-    retval.append("envoy");
+    retval.append(Envoy::Http::DefaultServerString::get());
     break;
   }
   }
