@@ -83,12 +83,7 @@ public:
    * @param key The context key of string view type.
    * @param val The context value of string view type.
    */
-  virtual void setByReferenceKey(absl::string_view key, absl::string_view val) {
-    // The reference semantics of key and value are ignored by default. Derived classes that wish to
-    // use reference semantics to improve performance or reduce memory overhead can override this
-    // method.
-    setByKey(key, val);
-  }
+  virtual void setByReferenceKey(absl::string_view key, absl::string_view val) PURE;
 
   /**
    * Set new tracing context key/value pair. Both key and val MUST point to data that will live
@@ -97,12 +92,7 @@ public:
    * @param key The context key of string view type.
    * @param val The context value of string view type.
    */
-  virtual void setByReference(absl::string_view key, absl::string_view val) {
-    // The reference semantics of key and value are ignored by default. Derived classes that wish to
-    // use reference semantics to improve performance or reduce memory overhead can override this
-    // method.
-    setByKey(key, val);
-  }
+  virtual void setByReference(absl::string_view key, absl::string_view val) PURE;
 };
 
 } // namespace Tracing

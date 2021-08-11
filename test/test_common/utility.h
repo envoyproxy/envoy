@@ -891,6 +891,10 @@ public:
   void setByKey(absl::string_view key, absl::string_view val) override {
     context_map_.insert({std::string(key), std::string(val)});
   }
+  void setByReferenceKey(absl::string_view key, absl::string_view val) override {
+    setByKey(key, val);
+  }
+  void setByReference(absl::string_view key, absl::string_view val) override { setByKey(key, val); }
 
   std::string context_protocol_;
   std::string context_authority_;
