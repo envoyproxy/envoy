@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 // * HTTP :ref:`router filter <config_http_filters_router>`
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.RouteConfiguration";
 
@@ -119,6 +119,16 @@ message RouteConfiguration {
   //   is not subject to data plane buffering controls.
   //
   google.protobuf.UInt32Value max_direct_response_body_size_bytes = 11;
+
+  // The per_filter_config field can be used to provide 'global level' route
+  // configurations for filters. The key should match the filter name, such as
+  // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
+  // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
+  // for if and how it is utilized.
+  // [#comment: An entry's value may be wrapped in a
+  // :ref:`FilterConfig<envoy_v3_api_msg_config.route.v3.FilterConfig>`
+  // message to specify additional options.]
+  map<string, google.protobuf.Any> typed_per_filter_config = 12;
 }
 
 message Vhds {
