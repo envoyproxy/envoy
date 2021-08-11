@@ -170,6 +170,7 @@ private:
 
     void sendDataToBridge(Buffer::Instance& data, bool end_stream);
     void sendTrailersToBridge(const ResponseTrailerMap& trailers);
+    envoy_stream_intel streamIntel();
 
     DirectStream& direct_stream_;
     const envoy_http_callbacks bridge_callbacks_;

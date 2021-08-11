@@ -112,8 +112,8 @@ public:
   }
 
   void createStream() {
-    // Create a stream.
     ON_CALL(dispatcher_, isThreadSafe()).WillByDefault(Return(true));
+    ON_CALL(request_decoder_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
 
     // Grab the response encoder in order to dispatch responses on the stream.
     // Return the request decoder to make sure calls are dispatched to the decoder via the
@@ -134,7 +134,8 @@ public:
   }
 
   MockApiListener api_listener_;
-  MockRequestDecoder request_decoder_;
+  NiceMock<MockRequestDecoder> request_decoder_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   ResponseEncoder* response_encoder_{};
   NiceMock<Event::MockProvisionalDispatcher> dispatcher_;
   envoy_http_callbacks bridge_callbacks_;
@@ -566,6 +567,7 @@ TEST_P(ClientTest, MultipleStreams) {
   // Start stream2.
   // Setup bridge_callbacks_ to handle the response headers.
   NiceMock<MockRequestDecoder> request_decoder2;
+  ON_CALL(request_decoder2, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   ResponseEncoder* response_encoder2{};
   envoy_http_callbacks bridge_callbacks_2;
   callbacks_called cc2 = {0, 0, 0, 0, 0, 0, "200", true, ""};
