@@ -72,8 +72,8 @@ struct tcp_info Filter::querySocketInfo() {
   if (result.return_value_ == 0) {
     ASSERT(optlen == sizeof(info));
   } else {
-    ENVOY_LOG_MISC(info, "Failed TCP_INFO: {} {} {}", result.return_value_, result.errno_,
-                   strerror(result.errno_));
+    ENVOY_LOG(debug, "Failed TCP_INFO: {} {} {}", result.return_value_, result.errno_,
+              strerror(result.errno_));
     // On error, ensure that all values are zero for predictable results.
     memset(&info, 0, sizeof(info));
   }
@@ -81,6 +81,7 @@ struct tcp_info Filter::querySocketInfo() {
 }
 
 void Filter::updateCountersAndGauges(struct tcp_info& tcp_info) {
+  ENVOY_LOG(info, "updateCountersAndGauges");
   auto update_counter = [](Stats::Counter& counter, uint64_t& last_value, uint64_t current_value) {
     int64_t diff = static_cast<int64_t>(current_value) - static_cast<int64_t>(last_value);
     ASSERT(diff >= 0);
@@ -89,6 +90,7 @@ void Filter::updateCountersAndGauges(struct tcp_info& tcp_info) {
     }
     last_value = current_value;
   };
+
   auto update_gauge = [](Stats::Gauge& gauge, uint64_t& last_value, uint64_t current_value) {
     int64_t diff = static_cast<int64_t>(current_value) - static_cast<int64_t>(last_value);
     gauge.add(diff);
@@ -104,20 +106,14 @@ void Filter::updateCountersAndGauges(struct tcp_info& tcp_info) {
 }
 
 void Filter::recordHistograms(struct tcp_info& tcp_info) {
-  ENVOY_LOG_MISC(info, "tcp_info.tcpi_segs_out {}", tcp_info.tcpi_segs_out);
   if (tcp_info.tcpi_segs_out > 0) {
-    // This results in 100 meaning 1%, and 10000 meaning 100%. This isn't the most convenient units.
-    // However, it is expected that retransmission percent will usually be very low, and a single
-    // digit of precision will be inadequate. Note that histograms only support uint64_t data, not
-    // floating point.
-    constexpr uint64_t PrecisionFactor = 10000;
-    config_->stats_.cx_tx_percent_retransmitted_segments_.recordValue(
-        (static_cast<uint64_t>(tcp_info.tcpi_total_retrans) * PrecisionFactor) /
-        tcp_info.tcpi_segs_out);
+    config_->stats_.cx_tx_percent_retransmitted_segments_.recordFloatValue(
+        static_cast<float>(tcp_info.tcpi_total_retrans) /
+        static_cast<float>(tcp_info.tcpi_segs_out));
   }
 
   if (tcp_info.tcpi_min_rtt != 0) {
-    config_->stats_.cx_min_rtt_.recordValue(tcp_info.tcpi_min_rtt);
+    config_->stats_.cx_min_rtt_us_.recordValue(tcp_info.tcpi_min_rtt);
   }
 }
 

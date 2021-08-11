@@ -25,7 +25,7 @@ namespace LinuxNetworkStats {
   COUNTER(cx_tx_retransmitted_segments)                                                            \
   GAUGE(cx_tx_unsent_bytes, Accumulate)                                                            \
   HISTOGRAM(cx_tx_percent_retransmitted_segments, Unspecified)                                     \
-  HISTOGRAM(cx_min_rtt, Milliseconds)
+  HISTOGRAM(cx_min_rtt_us, Microseconds)
 
 struct LinuxNetworkStats {
   ALL_LINUX_NETWORK_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
