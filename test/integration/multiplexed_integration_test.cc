@@ -3,10 +3,6 @@
 #include <algorithm>
 #include <string>
 
-#ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/client_connection_factory_impl.h"
-#endif
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -150,7 +146,7 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeData(32 * 1024 + 100, true);
+  upstream_request_->encodeData(32 * 1024 + 2000, true);
   std::string flush_timeout_counter(downstreamProtocol() == Http::CodecType::HTTP3
                                         ? "http3.tx_flush_timeout"
                                         : "http2.tx_flush_timeout");
