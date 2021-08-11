@@ -33,24 +33,24 @@ static_resources:
           route_config:
             name: test_route
             virtual_hosts:
-            - name: cloudflare_service
+            - name: google_service
               domains: ["*"]
               routes:
               - match: { prefix: "/http11" }
                 route:
-                  auto_host_rewrite: true
+                  host_rewrite_literal: quic.aiortc.org
                   prefix_rewrite: "/"
-                  cluster: cloudflare_http11
+                  cluster: google_http11
               - match: { prefix: "/http2" }
                 route:
-                  auto_host_rewrite: true
+                  host_rewrite_literal: quic.aiortc.org
                   prefix_rewrite: "/"
-                  cluster: cloudflare_http2
+                  cluster: google_http2
               - match: { prefix: "/http3" }
                 route:
-                  auto_host_rewrite: true
+                  host_rewrite_literal: quic.aiortc.org
                   prefix_rewrite: "/"
-                  cluster: cloudflare_http3
+                  cluster: google_http3
 
   - name: http2_server
     address:
@@ -79,24 +79,24 @@ static_resources:
           route_config:
             name: test_route
             virtual_hosts:
-            - name: cloudflare_service
+            - name: google_service
               domains: ["*"]
               routes:
               - match: { prefix: "/http11" }
                 route:
-                  auto_host_rewrite: true
+                  host_rewrite_literal: quic.aiortc.org
                   prefix_rewrite: "/"
-                  cluster: cloudflare_http11
+                  cluster: google_http11
               - match: { prefix: "/http2" }
                 route:
-                  auto_host_rewrite: true
+                  host_rewrite_literal: quic.aiortc.org
                   prefix_rewrite: "/"
-                  cluster: cloudflare_http2
+                  cluster: google_http2
               - match: { prefix: "/http3" }
                 route:
-                  auto_host_rewrite: true
+                  host_rewrite_literal: quic.aiortc.org
                   prefix_rewrite: "/"
-                  cluster: cloudflare_http3   
+                  cluster: google_http3   
 
   - name: http3_server
     address:
@@ -131,45 +131,45 @@ static_resources:
           route_config:
             name: test_route
             virtual_hosts:
-            - name: cloudflare_service
+            - name: google_service
               domains: ["*"]
               routes:
               - match: { prefix: "/http11" }
                 route:
-                  auto_host_rewrite: true
+                  host_rewrite_literal: quic.aiortc.org
                   prefix_rewrite: "/"
-                  cluster: cloudflare_http11
+                  cluster: google_http11
               - match: { prefix: "/http2" }
                 route:
-                  auto_host_rewrite: true
+                  host_rewrite_literal: quic.aiortc.org
                   prefix_rewrite: "/"
-                  cluster: cloudflare_http2
+                  cluster: google_http2
               - match: { prefix: "/http3" }
                 route:
-                  auto_host_rewrite: true
+                  host_rewrite_literal: quic.aiortc.org
                   prefix_rewrite: "/"
-                  cluster: cloudflare_http3
+                  cluster: google_http3
 
   clusters:
-  - name: cloudflare_http11
+  - name: google_http11
     connect_timeout: 5s
     type: STRICT_DNS
     dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: cloudflare_http11
+      cluster_name: google_http11
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: www.cloudflare.com
+                address: quic.aiortc.org
                 port_value: 443
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        sni: www.cloudflare.com
+        sni: quic.aiortc.org
         common_tls_context:
           alpn_protocols: ["http/1.1"]
     typed_extension_protocol_options:
@@ -178,25 +178,25 @@ static_resources:
         explicit_http_config:
           http_protocol_options: {}
   
-  - name: cloudflare_http2
+  - name: google_http2
     connect_timeout: 5s
     type: STRICT_DNS
     dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: cloudflare_http2
+      cluster_name: google_http2
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: www.cloudflare.com
+                address: quic.aiortc.org
                 port_value: 443
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        sni: www.cloudflare.com
+        sni: quic.aiortc.org
         common_tls_context:
           alpn_protocols: ["h2"]
     typed_extension_protocol_options:
@@ -205,26 +205,26 @@ static_resources:
         explicit_http_config:
           http2_protocol_options: {}  
 
-  - name: cloudflare_http3
+  - name: google_http3
     connect_timeout: 5s
     type: STRICT_DNS
     dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: cloudflare_http3
+      cluster_name: google_http3
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: www.cloudflare.com
+                address: quic.aiortc.org
                 port_value: 443
     transport_socket:
       name: envoy.transport_sockets.quic
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
         upstream_tls_context:
-          sni: www.cloudflare.com
+          sni: quic.aiortc.org
           common_tls_context:
             alpn_protocols: ["h3"]
     typed_extension_protocol_options:

@@ -22,12 +22,8 @@ for path in "${path_list[@]}"; do
 done
 
 run_log "Test HTTP3 -> HTTP1.1/HTTP2/HTTP3"
-for path in "http3"; do
+for path in "${path_list[@]}"; do
     run_log "HTTP3 -> $path"
-    # TODO(su225): find an official image for security purposes. Because using 
-    #        random images found on the internet is a bad idea. Unfortunately,
-    #        it seems that the official curl image does not support HTTP/3 yet.
-    #        So using --http3 flag does not work
-    docker run -it --rm --network=host dalgibbard/curl-http3 \
-        -svk -o /dev/null --http3 --resolve test.proxy:10002:127.0.0.1 "https://test.proxy:10002/$path"
+    qcurl -svk -o /dev/null --http3 --resolve test.proxy:10002:127.0.0.1 \
+        "https://test.proxy:10002/$path" 2>&1 | grep "HTTP/3 200"
 done
