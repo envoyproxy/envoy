@@ -12,7 +12,7 @@ envoy_cc_test(
     name = "squash_filter_test",
     srcs = ["squash_filter_test.cc"],
     deps = [
-        "//contrib/filters/http/squash/source:squash_filter_lib",
+        "//contrib/squash/filters/http/source:squash_filter_lib",
         "//envoy/event:dispatcher_interface",
         "//source/common/http:header_map_lib",
         "//source/common/stats:stats_lib",
@@ -20,7 +20,7 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:environment_lib",
-        "@envoy_api//contrib/envoy/extensions/filters/http/squash/v3:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/squash/filters/http/v3:pkg_cc_proto",
     ],
 )
 
@@ -28,7 +28,7 @@ envoy_cc_test(
     name = "squash_filter_integration_test",
     srcs = ["squash_filter_integration_test.cc"],
     deps = [
-        "//contrib/filters/http/squash/source:config",
+        "//contrib/squash/filters/http/source:config",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
@@ -38,9 +38,9 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     deps = [
-        "//contrib/filters/http/squash/source:config",
+        "//contrib/squash/filters/http/source:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//contrib/envoy/extensions/filters/http/squash/v3:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/squash/filters/http/v3:pkg_cc_proto",
     ],
 )

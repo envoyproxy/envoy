@@ -1,4 +1,4 @@
-#include "contrib/filters/http/squash/source/squash_filter.h"
+#include "contrib/squash/filters/http/source/squash_filter.h"
 
 #include <memory>
 
@@ -15,7 +15,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/fixed_array.h"
-#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.h"
+#include "contrib/envoy/extensions/squash/filters/http/v3/squash.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -91,7 +91,7 @@ void SquashFilterConfig::updateTemplateInValue(ProtobufWkt::Value& curvalue) {
  To interpolate an environment variable named ENV, add '{{ ENV }}' (without the
   quotes, with the spaces) to the template string.
 
-  See api/envoy/extensions/filters/http/squash/v3/squash.proto for the motivation on why this is
+  See api/envoy/extensions/squash/filters/http/v3/squash.proto for the motivation on why this is
  needed.
 */
 std::string SquashFilterConfig::replaceEnv(const std::string& attachment_template) {

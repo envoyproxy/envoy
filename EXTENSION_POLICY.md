@@ -141,10 +141,12 @@ case we need to install an extension point, which can be done as follows:
 ## Contrib extensions
 
 As described in [this document](https://docs.google.com/document/d/1yl7GOZK1TDm_7vxQvt8UQEAu07UQFru1uEKXM6ZZg_g/edit#),
-Envoy allows an alternate path to adding extensions called "contrib." The barrier to entry for a
+Envoy allows an alternate path to adding extensions called `contrib/`. The barrier to entry for a
 contrib extension is lower than a core extension, with the tradeoff that contrib extensions are not
 included by default in the main image builds. Consumers need to pull directly from the contrib
 images described in the installation guide. Please read the linked document in detail to determine
 whether contrib extensions are the right choice for a newly proposed extension.
 
 **NOTE:** Contrib extensions are not eligible for Envoy security team coverage.
+**NOTE:** As per the linked Google Doc, contrib extensions generally should use `v3alpha` to avoid
+requiring API shepherd reviews.

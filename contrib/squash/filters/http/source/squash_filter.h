@@ -11,7 +11,7 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
-#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.h"
+#include "contrib/envoy/extensions/squash/filters/http/v3/squash.pb.h"
 
 namespace Envoy {
 namespace Extensions {

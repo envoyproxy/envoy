@@ -10,8 +10,8 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.h"
-#include "contrib/filters/http/squash/source/squash_filter.h"
+#include "contrib/envoy/extensions/squash/filters/http/v3/squash.pb.h"
+#include "contrib/squash/filters/http/source/squash_filter.h"
 #include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
