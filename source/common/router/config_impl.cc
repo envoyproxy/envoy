@@ -223,7 +223,9 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
                           ? config.hidden_envoy_deprecated_enabled().value()
                           : true) {
   for (const auto& string_match : config.allow_origin_string_match()) {
-    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_match));
+    allow_origins_.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            string_match));
   }
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
@@ -502,14 +504,16 @@ bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& s
   const TlsContextMatchCriteria& criteria = *tlsContextMatchCriteria();
 
   if (criteria.presented().has_value()) {
-    const bool peer_presented = stream_info.downstreamSslConnection() &&
-                                stream_info.downstreamSslConnection()->peerCertificatePresented();
+    const bool peer_presented =
+        stream_info.downstreamAddressProvider().sslConnection() &&
+        stream_info.downstreamAddressProvider().sslConnection()->peerCertificatePresented();
     matches &= criteria.presented().value() == peer_presented;
   }
 
   if (criteria.validated().has_value()) {
-    const bool peer_validated = stream_info.downstreamSslConnection() &&
-                                stream_info.downstreamSslConnection()->peerCertificateValidated();
+    const bool peer_validated =
+        stream_info.downstreamAddressProvider().sslConnection() &&
+        stream_info.downstreamAddressProvider().sslConnection()->peerCertificateValidated();
     matches &= criteria.validated().value() == peer_validated;
   }
 

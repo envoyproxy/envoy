@@ -38,6 +38,7 @@ using Http::FilterHeadersStatus;
 using Http::FilterTrailersStatus;
 using Http::LowerCaseString;
 
+using testing::AnyNumber;
 using testing::Eq;
 using testing::Invoke;
 using testing::ReturnRef;
@@ -57,6 +58,19 @@ protected:
     EXPECT_CALL(*client_, start(_)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+    EXPECT_CALL(dispatcher_, createTimer_(_))
+        .Times(AnyNumber())
+        .WillRepeatedly(Invoke([this](Unused) {
+          // Create a mock timer that we can check at destruction time to see if
+          // all timers were disabled no matter what. MockTimer has default
+          // actions that we just have to enable properly here.
+          auto* timer = new Event::MockTimer();
+          EXPECT_CALL(*timer, enableTimer(_, _)).Times(AnyNumber());
+          EXPECT_CALL(*timer, disableTimer()).Times(AnyNumber());
+          EXPECT_CALL(*timer, enabled()).Times(AnyNumber());
+          timers_.push_back(timer);
+          return timer;
+        }));
 
     envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor proto_config{};
     if (!yaml.empty()) {
@@ -70,6 +84,15 @@ protected:
     EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(BufferSize));
     HttpTestUtility::addDefaultHeaders(request_headers_);
     request_headers_.setMethod("POST");
+  }
+
+  void TearDown() override {
+    for (auto* t : timers_) {
+      // This will fail if, at the end of the test, we left any timers enabled.
+      // (This particular test suite does not actually let timers expire,
+      // although other test suites do.)
+      EXPECT_FALSE(t->enabled_);
+    }
   }
 
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks) {
@@ -214,13 +237,14 @@ protected:
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   std::unique_ptr<Filter> filter_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
+  std::vector<Event::MockTimer*> timers_;
 };
 
 // Using the default configuration, test the filter with a processor that

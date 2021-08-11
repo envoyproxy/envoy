@@ -172,7 +172,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*connection_info, subjectPeerCertificate())
       .WillByDefault(testing::ReturnRef(TestSubjectPeer));
-  test_stream_info->setDownstreamSslConnection(connection_info);
+  test_stream_info->downstream_address_provider_->setSslConnection(connection_info);
   return test_stream_info;
 }
 

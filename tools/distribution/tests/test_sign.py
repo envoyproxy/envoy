@@ -414,8 +414,7 @@ def test_packager_get_signing_util(patches):
 
 
 @pytest.mark.parametrize("extract", [True, False])
-@pytest.mark.parametrize("raises", [None, Exception, identity.GPGError, sign.SigningError])
-def test_packager_run(patches, extract, raises):
+def test_packager_run(patches, extract):
     packager = sign.PackageSigningRunner("x", "y", "z")
     patched = patches(
         "PackageSigningRunner.sign_tarball",
@@ -424,29 +423,13 @@ def test_packager_run(patches, extract, raises):
         ("PackageSigningRunner.log", dict(new_callable=PropertyMock)),
         prefix="tools.distribution.sign")
 
+    assert (
+        packager.run.__wrapped__.__catches__
+        == (identity.GPGError, sign.SigningError))
+
     with patched as (m_tarb, m_dir, m_extract, m_log):
         m_extract.return_value = extract
-        if raises:
-            _error = raises("AN ERROR OCCURRED")
-            m_extract.side_effect = _error
-
-        if raises == Exception:
-            with pytest.raises(raises):
-                packager.run()
-        else:
-            assert packager.run() == (1 if raises else None)
-
-    if raises:
-        assert not m_tarb.called
-        assert not m_dir.called
-        assert not m_log.return_value.success.called
-
-        if raises == Exception:
-            return
-        assert (
-            list(m_log.return_value.error.call_args)
-            == [(str(_error),), {}])
-        return
+        assert not packager.run()
 
     assert (
         list(m_log.return_value.success.call_args)
