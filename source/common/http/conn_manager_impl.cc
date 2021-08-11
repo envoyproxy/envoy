@@ -1470,8 +1470,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   if (auto* proxy_status_config = connection_manager_.config_.proxyStatusConfig();
       proxy_status_config != nullptr) {
-    // Writing the Proxy-Status header is gated on |attach_proxy_status|.
-    // The |details| field and other internals are generated in
+    // Writing the Proxy-Status header is gated on the existence of
+    // |proxy_status_config|. The |details| field and other internals are generated in
     // fromStreamInfo().
     if (absl::optional<StreamInfo::ProxyStatusError> proxy_status =
             StreamInfo::ProxyStatusUtils::fromStreamInfo(filter_manager_.streamInfo());
