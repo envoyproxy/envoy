@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -14,14 +15,50 @@ namespace Tracing {
  * Protocol-independent abstraction for traceable stream. It hides the differences between different
  * protocol and provides tracer driver with common methods for obtaining and setting the tracing
  * context.
- *
- * TODO(wbpcode): A new interface should be added to obtain general traceable stream information,
- * such as host, RPC method, protocol identification, etc. At the same time, a new interface needs
- * to be added to support traversal of all trace contexts.
  */
 class TraceContext {
 public:
   virtual ~TraceContext() = default;
+
+  using IterateCallback = std::function<bool(absl::string_view key, absl::string_view val)>;
+
+  /**
+   * Get context protocol.
+   *
+   * @return A string view representing the protocol of the traceable stream behind the context.
+   */
+  virtual absl::string_view protocol() const PURE;
+
+  /**
+   * Get context authority.
+   *
+   * @return The authority of traceable stream. It generally consists of the host and an optional
+   * user information and an optional port.
+   */
+  virtual absl::string_view authority() const PURE;
+
+  /**
+   * Get context path.
+   *
+   * @return The path of traceable stream. The content and meaning of path are determined by
+   * specific protocol itself.
+   */
+  virtual absl::string_view path() const PURE;
+
+  /**
+   * Get context method.
+   *
+   * @return The method of traceable stream. The content and meaning of method are determined by
+   * specific protocol itself.
+   */
+  virtual absl::string_view method() const PURE;
+
+  /**
+   * Iterate over all context entry.
+   *
+   * @param callback supplies the iteration callback.
+   */
+  virtual void forEach(IterateCallback callback) const PURE;
 
   /**
    * Get tracing context value by key.
@@ -29,7 +66,7 @@ public:
    * @param key The context key of string view type.
    * @return The optional context value of string_view type.
    */
-  virtual absl::optional<absl::string_view> getTraceContext(absl::string_view key) const PURE;
+  virtual absl::optional<absl::string_view> getByKey(absl::string_view key) const PURE;
 
   /**
    * Set new tracing context key/value pair.
@@ -37,7 +74,7 @@ public:
    * @param key The context key of string view type.
    * @param val The context value of string view type.
    */
-  virtual void setTraceContext(absl::string_view key, absl::string_view val) PURE;
+  virtual void setByKey(absl::string_view key, absl::string_view val) PURE;
 
   /**
    * Set new tracing context key/value pair. The key MUST point to data that will live beyond
@@ -46,12 +83,7 @@ public:
    * @param key The context key of string view type.
    * @param val The context value of string view type.
    */
-  virtual void setTraceContextReferenceKey(absl::string_view key, absl::string_view val) {
-    // The reference semantics of key and value are ignored by default. Derived classes that wish to
-    // use reference semantics to improve performance or reduce memory overhead can override this
-    // method.
-    setTraceContext(key, val);
-  }
+  virtual void setByReferenceKey(absl::string_view key, absl::string_view val) PURE;
 
   /**
    * Set new tracing context key/value pair. Both key and val MUST point to data that will live
@@ -60,12 +92,7 @@ public:
    * @param key The context key of string view type.
    * @param val The context value of string view type.
    */
-  virtual void setTraceContextReference(absl::string_view key, absl::string_view val) {
-    // The reference semantics of key and value are ignored by default. Derived classes that wish to
-    // use reference semantics to improve performance or reduce memory overhead can override this
-    // method.
-    setTraceContext(key, val);
-  }
+  virtual void setByReference(absl::string_view key, absl::string_view val) PURE;
 };
 
 } // namespace Tracing
