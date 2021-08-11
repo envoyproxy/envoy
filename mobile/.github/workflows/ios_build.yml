@@ -27,29 +27,6 @@ jobs:
       - run: ./ci/mac_ci_setup.sh
         if: steps.check-cache.outputs.cache-hit != 'true'
         name: 'Install dependencies'
-      - run: bazelisk build --config=ios //:ios_dist
-        if: steps.check-cache.outputs.cache-hit != 'true'
-        name: 'Build Envoy.framework distributable'
-  iosbuildshadow:
-    name: ios_build_shadow
-    runs-on: macOS-latest
-    timeout-minutes: 75
-    steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - uses: actions/cache@v2
-        id: check-cache
-        with:
-          key: framework-shadow-${{ github.sha }}
-          path: dist/Envoy.framework
-        name: 'Check cache'
-      - run: echo "Found Envoy.framework from previous run!"
-        if: steps.check-cache.outputs.cache-hit == 'true'
-        name: 'Build cache hit'
-      - run: ./ci/mac_ci_setup.sh
-        if: steps.check-cache.outputs.cache-hit != 'true'
-        name: 'Install dependencies'
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
