@@ -39,9 +39,9 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version,
   EXPECT_CALL(context, getServerFactoryContext())
       .WillRepeatedly(testing::ReturnRef(server_context));
   EXPECT_CALL(context, messageValidationVisitor());
-  EXPECT_CALL(context, clusterManager());
+  EXPECT_CALL(context, clusterManager()).Times(2);
   EXPECT_CALL(context, runtime());
-  EXPECT_CALL(context, scope()).Times(2);
+  EXPECT_CALL(context, scope()).Times(3);
 
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -56,6 +56,19 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version,
             return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
           }));
   cb(filter_callback);
+
+  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([&context, cb]() {
+    Http::MockFilterChainFactoryCallbacks filter_callback;
+    EXPECT_CALL(filter_callback, addStreamFilter(_));
+    // Execute the filter factory callback in another thread.
+    EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+                getOrCreateRawAsyncClient(_, _, _, _))
+        .WillOnce(Invoke(
+            [](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+               Grpc::CacheOption) { return std::make_unique<NiceMock<Grpc::MockAsyncClient>>(); }));
+    cb(filter_callback);
+  });
+  thread->join();
 }
 
 } // namespace
