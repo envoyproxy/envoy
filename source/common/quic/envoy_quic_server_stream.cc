@@ -76,6 +76,9 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
+  if (local_end_stream_) {
+    onLocalEndStream();
+  }
 }
 
 void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -94,6 +97,9 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
+  if (local_end_stream_) {
+    onLocalEndStream();
+  }
 }
 
 void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trailers) {
@@ -102,6 +108,7 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+  onLocalEndStream();
 }
 
 void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
@@ -285,8 +292,10 @@ void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
 void EnvoyQuicServerStream::Reset(quic::QuicRstStreamErrorCode error) {
   ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, error);
   stats_.tx_reset_.inc();
-  // Upper layers expect calling resetStream() to immediately raise reset callbacks.
-  runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error));
+  if (!local_end_stream_) {
+    // Upper layers expect calling resetStream() to immediately raise reset callbacks.
+    runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error));
+  }
   quic::QuicSpdyServerStreamBase::Reset(error);
 }
 
@@ -318,6 +327,7 @@ void EnvoyQuicServerStream::CloseWriteSide() {
 }
 
 void EnvoyQuicServerStream::OnClose() {
+  destroy();
   quic::QuicSpdyServerStreamBase::OnClose();
   if (isDoingWatermarkAccounting()) {
     return;
@@ -383,18 +393,17 @@ void EnvoyQuicServerStream::onStreamError(absl::optional<bool> should_close_conn
   }
 }
 
- void EnvoyQuicServerStream::onPendingFlushTimer() {
- ENVOY_STREAM_LOG(debug, "pending stream flush timeout", *this);
-   Http::MultiplexedStreamImplBase::onPendingFlushTimer();
+void EnvoyQuicServerStream::onPendingFlushTimer() {
+  ENVOY_STREAM_LOG(debug, "pending stream flush timeout", *this);
+  Http::MultiplexedStreamImplBase::onPendingFlushTimer();
   stats_.tx_flush_timeout_.inc();
   ASSERT(local_end_stream_ && !fin_sent());
-  // Reset the stream locally. But no reset callbacks will be run because higher layers think the stream is already finished.
+  // Reset the stream locally. But no reset callbacks will be run because higher layers think the
+  // stream is already finished.
   Reset(quic::QUIC_STREAM_CANCELLED);
- }
+}
 
-  bool EnvoyQuicServerStream::hasPendingData() {
-    return BufferedDataBytes() > 0;
-  }
+bool EnvoyQuicServerStream::hasPendingData() { return BufferedDataBytes() > 0; }
 
 } // namespace Quic
 } // namespace Envoy

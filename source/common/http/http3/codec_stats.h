@@ -18,7 +18,7 @@ namespace Http3 {
   COUNTER(rx_reset)                                                                                \
   COUNTER(tx_reset)                                                                                \
   COUNTER(metadata_not_supported_error)                                                            \
-  COUNTER(quic_version_rfc_v1) \
+  COUNTER(quic_version_rfc_v1)                                                                     \
   COUNTER(tx_flush_timeout)
 
 /**

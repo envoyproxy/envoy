@@ -321,9 +321,7 @@ void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_conn
   }
 }
 
-bool EnvoyQuicClientStream::hasPendingData() {
-  return BufferedDataBytes() > 0;
-}
+bool EnvoyQuicClientStream::hasPendingData() { return BufferedDataBytes() > 0; }
 
 } // namespace Quic
 } // namespace Envoy

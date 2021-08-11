@@ -83,7 +83,7 @@ protected:
   void OnHeadersTooLarge() override;
 
   // Http::MultiplexedStreamImplBase
- void onPendingFlushTimer() override;
+  void onPendingFlushTimer() override;
   bool hasPendingData() override;
 
 private:
