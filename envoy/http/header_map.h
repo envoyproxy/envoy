@@ -11,6 +11,7 @@
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_formatter.h"
+#include "envoy/tracing/trace_context.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/hash.h"
@@ -64,7 +65,7 @@ public:
     return *this;
   }
 
-  explicit LowerCaseString(const std::string& new_string) : string_(new_string) {
+  explicit LowerCaseString(absl::string_view new_string) : string_(new_string) {
     ASSERT(valid());
     lower();
   }
@@ -77,6 +78,9 @@ public:
   friend std::ostream& operator<<(std::ostream& os, const LowerCaseString& lower_case_string) {
     return os << lower_case_string.string_;
   }
+
+  // Implicit conversion to absl::string_view.
+  operator absl::string_view() const { return string_; }
 
 private:
   void lower() {
@@ -817,7 +821,8 @@ public:
 // Request headers.
 class RequestHeaderMap
     : public RequestOrResponseHeaderMap,
-      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestHeaders> {
+      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestHeaders>,
+      public Tracing::TraceContext {
 public:
   INLINE_REQ_STRING_HEADERS(DEFINE_INLINE_STRING_HEADER)
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)

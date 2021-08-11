@@ -29,7 +29,8 @@ using MetricsPtr =
 template <class RequestProto, class ResponseProto>
 class GrpcMetricsStreamer : public Grpc::AsyncStreamCallbacks<ResponseProto> {
 public:
-  explicit GrpcMetricsStreamer(Grpc::AsyncClientFactory& factory) : client_(factory.create()) {}
+  explicit GrpcMetricsStreamer(const Grpc::RawAsyncClientSharedPtr& raw_async_client)
+      : client_(raw_async_client) {}
   ~GrpcMetricsStreamer() override = default;
 
   /**
@@ -62,7 +63,7 @@ class GrpcMetricsStreamerImpl
       public GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
                                  envoy::service::metrics::v3::StreamMetricsResponse> {
 public:
-  GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
+  GrpcMetricsStreamerImpl(Grpc::RawAsyncClientSharedPtr raw_async_client,
                           const LocalInfo::LocalInfo& local_info,
                           envoy::config::core::v3::ApiVersion transport_api_version);
 

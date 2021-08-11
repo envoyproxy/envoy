@@ -12,6 +12,7 @@
 #include "source/common/config/version_converter.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -426,9 +427,6 @@ TEST_P(ListenerIntegrationTest, BasicSuccess) {
 TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
   on_server_init_function_ = [&]() {
     createLdsStream();
-    // Set reuse_port so that a new socket is created by the
-    // ListenSocketFactory.
-    listener_config_.set_reuse_port(true);
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
     createRdsStream(route_table_name_);
   };

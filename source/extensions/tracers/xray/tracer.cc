@@ -71,6 +71,9 @@ void Span::finishSpan() {
       time_point_cast<SecondsWithFraction>(time_source_.systemTime()).time_since_epoch().count());
   s.set_origin(origin());
   s.set_parent_id(parentId());
+  s.set_error(clientError());
+  s.set_fault(serverError());
+  s.set_throttle(isThrottled());
 
   auto* aws = s.mutable_aws()->mutable_fields();
   for (const auto& field : aws_metadata_) {
@@ -97,10 +100,10 @@ void Span::finishSpan() {
   broker_.send(json);
 } // namespace XRay
 
-void Span::injectContext(Http::RequestHeaderMap& request_headers) {
+void Span::injectContext(Tracing::TraceContext& trace_context) {
   const std::string xray_header_value =
       fmt::format("Root={};Parent={};Sampled={}", traceId(), id(), sampled() ? "1" : "0");
-  request_headers.setCopy(Http::LowerCaseString(XRayTraceHeader), xray_header_value);
+  trace_context.setTraceContextReferenceKey(XRayTraceHeader, xray_header_value);
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& operation_name,
@@ -161,48 +164,45 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   // https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html#api-segmentdocuments-http
   constexpr auto SpanContentLength = "content_length";
   constexpr auto SpanMethod = "method";
-  constexpr auto SpanStatus = "status";
-  constexpr auto SpanUserAgent = "user_agent";
   constexpr auto SpanUrl = "url";
   constexpr auto SpanClientIp = "client_ip";
   constexpr auto SpanXForwardedFor = "x_forwarded_for";
-
-  constexpr auto HttpUrl = "http.url";
-  constexpr auto HttpMethod = "http.method";
-  constexpr auto HttpStatusCode = "http.status_code";
-  constexpr auto HttpUserAgent = "user_agent";
-  constexpr auto HttpResponseSize = "response_size";
-  constexpr auto PeerAddress = "peer.address";
 
   if (name.empty() || value.empty()) {
     return;
   }
 
-  if (name == HttpUrl) {
+  if (name == Tracing::Tags::get().HttpUrl) {
     http_request_annotations_.emplace(SpanUrl, ValueUtil::stringValue(std::string(value)));
-  } else if (name == HttpMethod) {
+  } else if (name == Tracing::Tags::get().HttpMethod) {
     http_request_annotations_.emplace(SpanMethod, ValueUtil::stringValue(std::string(value)));
-  } else if (name == HttpUserAgent) {
-    http_request_annotations_.emplace(SpanUserAgent, ValueUtil::stringValue(std::string(value)));
-  } else if (name == HttpStatusCode) {
+  } else if (name == Tracing::Tags::get().UserAgent) {
+    http_request_annotations_.emplace(Tracing::Tags::get().UserAgent,
+                                      ValueUtil::stringValue(std::string(value)));
+  } else if (name == Tracing::Tags::get().HttpStatusCode) {
     uint64_t status_code;
     if (!absl::SimpleAtoi(value, &status_code)) {
-      ENVOY_LOG(debug, "{} must be a number, given: {}", HttpStatusCode, value);
+      ENVOY_LOG(debug, "{} must be a number, given: {}", Tracing::Tags::get().HttpStatusCode,
+                value);
       return;
     }
-    http_response_annotations_.emplace(SpanStatus, ValueUtil::numberValue(status_code));
-  } else if (name == HttpResponseSize) {
+    setResponseStatusCode(status_code);
+    http_response_annotations_.emplace(Tracing::Tags::get().Status,
+                                       ValueUtil::numberValue(status_code));
+  } else if (name == Tracing::Tags::get().ResponseSize) {
     uint64_t response_size;
     if (!absl::SimpleAtoi(value, &response_size)) {
-      ENVOY_LOG(debug, "{} must be a number, given: {}", HttpResponseSize, value);
+      ENVOY_LOG(debug, "{} must be a number, given: {}", Tracing::Tags::get().ResponseSize, value);
       return;
     }
     http_response_annotations_.emplace(SpanContentLength, ValueUtil::numberValue(response_size));
-  } else if (name == PeerAddress) {
+  } else if (name == Tracing::Tags::get().PeerAddress) {
     http_request_annotations_.emplace(SpanClientIp, ValueUtil::stringValue(std::string(value)));
     // In this case, PeerAddress refers to the client's actual IP address, not
     // the address specified in the HTTP X-Forwarded-For header.
     http_request_annotations_.emplace(SpanXForwardedFor, ValueUtil::boolValue(false));
+  } else if (name == Tracing::Tags::get().Error && value == Tracing::Tags::get().True) {
+    setServerError();
   } else {
     custom_annotations_.emplace(name, value);
   }

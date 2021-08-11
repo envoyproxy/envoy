@@ -13,11 +13,13 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 
+#include "matching/data_impl.h"
+
 namespace Envoy {
 namespace Http {
 
 namespace {
-REGISTER_FACTORY(SkipActionFactory, Matcher::ActionFactory);
+REGISTER_FACTORY(SkipActionFactory, Matcher::ActionFactory<Matching::HttpFilterActionContext>);
 
 template <class T> using FilterList = std::list<std::unique_ptr<T>>;
 
@@ -268,6 +270,10 @@ void ActiveStreamFilterBase::clearRouteCache() {
   parent_.filter_manager_callbacks_.clearRouteCache();
 }
 
+void ActiveStreamFilterBase::resetIdleTimer() {
+  parent_.filter_manager_callbacks_.resetIdleTimer();
+}
+
 void FilterMatchState::evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_func) {
   if (match_tree_evaluated_ || !matching_data_) {
     return;
@@ -298,7 +304,7 @@ bool ActiveStreamDecoderFilter::canContinue() {
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
-  auto buffer = dispatcher().getWatermarkFactory().create(
+  auto buffer = dispatcher().getWatermarkFactory().createBuffer(
       [this]() -> void { this->requestDataDrained(); },
       [this]() -> void { this->requestDataTooLarge(); },
       []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
@@ -911,8 +917,8 @@ void FilterManager::sendLocalReplyViaFilterChain(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route_entry_) {
-              streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
+            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
+              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
             }
             if (modify_headers) {
               modify_headers(headers);
@@ -950,8 +956,8 @@ void FilterManager::sendDirectLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route_entry_) {
-              streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
+            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
+              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
             }
             if (modify_headers) {
               modify_headers(headers);
@@ -1459,7 +1465,7 @@ absl::optional<Router::ConfigConstSharedPtr> ActiveStreamDecoderFilter::routeCon
 }
 
 Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
-  auto buffer = dispatcher().getWatermarkFactory().create(
+  auto buffer = dispatcher().getWatermarkFactory().createBuffer(
       [this]() -> void { this->responseDataDrained(); },
       [this]() -> void { this->responseDataTooLarge(); },
       []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });

@@ -63,6 +63,9 @@ else
       "--test_tag_filters=-nocoverage,-fuzz_target")
 fi
 
+# Don't block coverage on flakes.
+BAZEL_BUILD_OPTIONS+=("--flaky_test_attempts=2")
+
 bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
 
 # Collecting profile and testlogs

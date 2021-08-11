@@ -131,11 +131,11 @@ template <typename T> static T* removeConst(const void* object) {
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
     : parent_(parent),
-      pending_recv_data_(parent_.connection_.dispatcher().getWatermarkFactory().create(
+      pending_recv_data_(parent_.connection_.dispatcher().getWatermarkFactory().createBuffer(
           [this]() -> void { this->pendingRecvBufferLowWatermark(); },
           [this]() -> void { this->pendingRecvBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      pending_send_data_(parent_.connection_.dispatcher().getWatermarkFactory().create(
+      pending_send_data_(parent_.connection_.dispatcher().getWatermarkFactory().createBuffer(
           [this]() -> void { this->pendingSendBufferLowWatermark(); },
           [this]() -> void { this->pendingSendBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
@@ -155,6 +155,22 @@ void ConnectionImpl::StreamImpl::destroy() {
   disarmStreamIdleTimer();
   parent_.stats_.streams_active_.dec();
   parent_.stats_.pending_send_bytes_.sub(pending_send_data_->length());
+}
+
+void ConnectionImpl::ServerStreamImpl::destroy() {
+  // Only the downstream stream should clear the downstream of the
+  // memory account.
+  // This occurs in destroy as we want to ensure the Stream does not get
+  // reset called on it from the account.
+  //
+  // There are cases where a corresponding upstream stream dtor might
+  // be called, but the downstream stream isn't going to terminate soon
+  // such as StreamDecoderFilterCallbacks::recreateStream().
+  if (buffer_memory_account_) {
+    buffer_memory_account_->clearDownstream();
+  }
+
+  StreamImpl::destroy();
 }
 
 static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& header) {
@@ -528,6 +544,15 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
   if (local_end_stream_ && pending_send_data_->length() > 0) {
     createPendingFlushTimer();
   }
+}
+
+void ConnectionImpl::ServerStreamImpl::resetStream(StreamResetReason reason) {
+  // Clear the downstream on the account since we're resetting the downstream.
+  if (buffer_memory_account_) {
+    buffer_memory_account_->clearDownstream();
+  }
+
+  StreamImpl::resetStream(reason);
 }
 
 void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
@@ -1545,8 +1570,9 @@ void ConnectionImpl::StreamImpl::dumpState(std::ostream& os, int indent_level) c
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "ConnectionImpl::StreamImpl " << this << DUMP_MEMBER(stream_id_)
      << DUMP_MEMBER(unconsumed_bytes_) << DUMP_MEMBER(read_disable_count_)
-     << DUMP_MEMBER(local_end_stream_sent_) << DUMP_MEMBER(remote_end_stream_)
-     << DUMP_MEMBER(data_deferred_) << DUMP_MEMBER(received_noninformational_headers_)
+     << DUMP_MEMBER(local_end_stream_) << DUMP_MEMBER(local_end_stream_sent_)
+     << DUMP_MEMBER(remote_end_stream_) << DUMP_MEMBER(data_deferred_)
+     << DUMP_MEMBER(received_noninformational_headers_)
      << DUMP_MEMBER(pending_receive_buffer_high_watermark_called_)
      << DUMP_MEMBER(pending_send_buffer_high_watermark_called_)
      << DUMP_MEMBER(reset_due_to_messaging_error_)

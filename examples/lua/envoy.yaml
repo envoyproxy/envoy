@@ -38,7 +38,6 @@ static_resources:
                   response_handle:headers():add("response-body-size", tostring(body_size))
                 end
           - name: envoy.filters.http.router
-            typed_config: {}
 
   clusters:
   - name: web_service

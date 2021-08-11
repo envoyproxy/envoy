@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
-    extension_name = "envoy.filters.http.alternate_protocols_cache",
+    extension_names = ["envoy.filters.http.alternate_protocols_cache"],
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
         "//test/mocks/http:alternate_protocols_cache_mocks",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    extension_name = "envoy.filters.http.alternate_protocols_cache",
+    extension_names = ["envoy.filters.http.alternate_protocols_cache"],
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
         "//test/integration:http_integration_lib",

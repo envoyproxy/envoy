@@ -1370,5 +1370,29 @@ TEST_P(HeaderMapImplTest, ValidHeaderString) {
   EXPECT_FALSE(validHeaderString("abc\n"));
 }
 
+TEST_P(HeaderMapImplTest, HttpTraceContextTest) {
+  {
+    TestRequestHeaderMapImpl request_headers{{"host", "foo"}};
+    EXPECT_EQ(request_headers.getTraceContext("host").value(), "foo");
+
+    request_headers.setTraceContext("trace_key", "trace_value");
+    EXPECT_EQ(request_headers.getTraceContext("trace_key").value(), "trace_value");
+
+    std::string trace_ref_key = "trace_ref_key";
+    request_headers.setTraceContextReferenceKey(trace_ref_key, "trace_value");
+    auto* header_entry = request_headers.get(Http::LowerCaseString(trace_ref_key))[0];
+    EXPECT_EQ(reinterpret_cast<intptr_t>(trace_ref_key.data()),
+              reinterpret_cast<intptr_t>(header_entry->key().getStringView().data()));
+
+    std::string trace_ref_value = "trace_ref_key";
+    request_headers.setTraceContextReference(trace_ref_key, trace_ref_value);
+    header_entry = request_headers.get(Http::LowerCaseString(trace_ref_key))[0];
+    EXPECT_EQ(reinterpret_cast<intptr_t>(trace_ref_key.data()),
+              reinterpret_cast<intptr_t>(header_entry->key().getStringView().data()));
+    EXPECT_EQ(reinterpret_cast<intptr_t>(trace_ref_value.data()),
+              reinterpret_cast<intptr_t>(header_entry->value().getStringView().data()));
+  }
+}
+
 } // namespace Http
 } // namespace Envoy

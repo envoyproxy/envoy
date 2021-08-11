@@ -24,6 +24,7 @@ sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
+from tools.base import utils
 from tools.config_validation import validate_fragment
 
 from tools.protodoc import manifest_pb2
@@ -115,8 +116,7 @@ EXTENSION_STATUS_VALUES = {
 
 r = runfiles.Create()
 
-with open(r.Rlocation("envoy/source/extensions/extensions_metadata.yaml")) as f:
-    EXTENSION_DB = yaml.safe_load(f.read())
+EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/source/extensions/extensions_metadata.yaml"))
 
 # create an index of extension categories from extension db
 EXTENSION_CATEGORIES = {}
@@ -247,8 +247,8 @@ def format_extension(extension):
         categories = extension_metadata["categories"]
     except KeyError as e:
         sys.stderr.write(
-            f"\n\nDid you forget to add '{extension}' to source/extensions/extensions_build_config.bzl?\n\n"
-        )
+            f"\n\nDid you forget to add '{extension}' to source/extensions/extensions_build_config.bzl "
+            "or source/extensions/extensions_metadata.yaml?\n\n")
         exit(1)  # Raising the error buries the above message in tracebacks.
 
     return EXTENSION_TEMPLATE.render(
@@ -666,12 +666,12 @@ class RstFormatVisitor(visitor.Visitor):
         with open(r.Rlocation('envoy/docs/v2_mapping.json'), 'r') as f:
             self.v2_mapping = json.load(f)
 
-        with open(r.Rlocation('envoy/docs/protodoc_manifest.yaml'), 'r') as f:
-            # Load as YAML, emit as JSON and then parse as proto to provide type
-            # checking.
-            protodoc_manifest_untyped = yaml.safe_load(f.read())
-            self.protodoc_manifest = manifest_pb2.Manifest()
-            json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
+        # Load as YAML, emit as JSON and then parse as proto to provide type
+        # checking.
+        protodoc_manifest_untyped = utils.from_yaml(
+            r.Rlocation('envoy/docs/protodoc_manifest.yaml'))
+        self.protodoc_manifest = manifest_pb2.Manifest()
+        json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
 
     def visit_enum(self, enum_proto, type_context):
         normal_enum_type = normalize_type_context_name(type_context.name)

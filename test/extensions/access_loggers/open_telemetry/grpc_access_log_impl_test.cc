@@ -153,7 +153,7 @@ public:
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
     EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, false))
         .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
+          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
           }));
           return Grpc::AsyncClientFactoryPtr{factory_};

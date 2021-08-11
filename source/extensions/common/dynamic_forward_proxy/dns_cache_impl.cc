@@ -26,6 +26,7 @@ DnsCacheImpl::DnsCacheImpl(
       stats_(generateDnsCacheStats(*scope_)),
       resource_manager_(*scope_, loader, config.name(), config.dns_cache_circuit_breaker()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
+      timeout_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_query_timeout, 5000)),
       failure_backoff_strategy_(
           Config::Utility::prepareDnsRefreshStrategy<
               envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>(
@@ -57,7 +58,8 @@ DnsCacheImpl::DnsCacheImpl(
 DnsCacheImpl::~DnsCacheImpl() {
   for (const auto& primary_host : primary_hosts_) {
     if (primary_host.second->active_query_ != nullptr) {
-      primary_host.second->active_query_->cancel();
+      primary_host.second->active_query_->cancel(
+          Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
     }
   }
 
@@ -200,11 +202,32 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
                                               *this, std::string(host_attributes.host_),
                                               host_attributes.port_.value_or(default_port),
                                               host_attributes.is_ip_address_,
-                                              [this, host]() { onReResolve(host); }))
+                                              [this, host]() { onReResolve(host); },
+                                              [this, host]() { onResolveTimeout(host); }))
                        .first->second.get();
   }
 
   startResolve(host, *primary_host);
+}
+
+DnsCacheImpl::PrimaryHostInfo& DnsCacheImpl::getPrimaryHost(const std::string& host) {
+  // Functions modify primary_hosts_ are only called in the main thread so we
+  // know it is safe to use the PrimaryHostInfo pointers outside of the lock.
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
+  absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
+  const auto primary_host_it = primary_hosts_.find(host);
+  ASSERT(primary_host_it != primary_hosts_.end());
+  return *(primary_host_it->second.get());
+}
+
+void DnsCacheImpl::onResolveTimeout(const std::string& host) {
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
+
+  auto& primary_host = getPrimaryHost(host);
+  ENVOY_LOG(debug, "host='{}' resolution timeout", host);
+  stats_.dns_query_timeout_.inc();
+  primary_host.active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
+  finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, {});
 }
 
 void DnsCacheImpl::onReResolve(const std::string& host) {
@@ -214,18 +237,10 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
   // use-after-free issues
   PrimaryHostInfoPtr host_to_erase;
 
-  // Functions like this one that modify primary_hosts_ are only called in the main thread so we
-  // know it is safe to use the PrimaryHostInfo pointers outside of the lock.
-  auto* primary_host = [&]() {
-    absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
-    const auto primary_host_it = primary_hosts_.find(host);
-    ASSERT(primary_host_it != primary_hosts_.end());
-    return primary_host_it->second.get();
-  }();
-
+  auto& primary_host = getPrimaryHost(host);
   const std::chrono::steady_clock::duration now_duration =
       main_thread_dispatcher_.timeSource().monotonicTime().time_since_epoch();
-  auto last_used_time = primary_host->host_info_->lastUsedTime();
+  auto last_used_time = primary_host.host_info_->lastUsedTime();
   ENVOY_LOG(debug, "host='{}' TTL check: now={} last_used={}", host, now_duration.count(),
             last_used_time.count());
   if ((now_duration - last_used_time) > host_ttl_) {
@@ -233,7 +248,7 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
     // If the host has no address then that means that the DnsCacheImpl has never
     // runAddUpdateCallbacks for this host, and thus the callback targets are not aware of it.
     // Therefore, runRemoveCallbacks should only be ran if the host's address != nullptr.
-    if (primary_host->host_info_->address()) {
+    if (primary_host.host_info_->address()) {
       runRemoveCallbacks(host);
     }
     {
@@ -243,9 +258,9 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
       host_to_erase = std::move(host_it->second);
       primary_hosts_.erase(host_it);
     }
-    notifyThreads(host, primary_host->host_info_);
+    notifyThreads(host, primary_host.host_info_);
   } else {
-    startResolve(host, *primary_host);
+    startResolve(host, primary_host);
   }
 }
 
@@ -256,6 +271,7 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
 
   stats_.dns_query_attempt_.inc();
 
+  host_info.timeout_timer_->enableTimer(timeout_interval_, nullptr);
   host_info.active_query_ =
       resolver_->resolve(host_info.host_info_->resolvedHost(), dns_lookup_family_,
                          [this, host](Network::DnsResolver::ResolutionStatus status,
@@ -280,6 +296,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   }();
 
   const bool first_resolve = !primary_host_info->host_info_->firstResolveComplete();
+  primary_host_info->timeout_timer_->disableTimer();
   primary_host_info->active_query_ = nullptr;
 
   // If the DNS resolver successfully resolved with an empty response list, the dns cache does not
@@ -379,9 +396,12 @@ void DnsCacheImpl::ThreadLocalHostInfo::onHostMapUpdate(
 
 DnsCacheImpl::PrimaryHostInfo::PrimaryHostInfo(DnsCacheImpl& parent,
                                                absl::string_view host_to_resolve, uint16_t port,
-                                               bool is_ip_address, const Event::TimerCb& timer_cb)
+                                               bool is_ip_address,
+                                               const Event::TimerCb& refresh_timer_cb,
+                                               const Event::TimerCb& timeout_timer_cb)
     : parent_(parent), port_(port),
-      refresh_timer_(parent.main_thread_dispatcher_.createTimer(timer_cb)),
+      refresh_timer_(parent.main_thread_dispatcher_.createTimer(refresh_timer_cb)),
+      timeout_timer_(parent.main_thread_dispatcher_.createTimer(timeout_timer_cb)),
       host_info_(std::make_shared<DnsHostInfoImpl>(parent.main_thread_dispatcher_.timeSource(),
                                                    host_to_resolve, is_ip_address)) {
   parent_.stats_.host_added_.inc();

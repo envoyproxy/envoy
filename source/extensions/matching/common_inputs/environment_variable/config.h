@@ -18,7 +18,7 @@ class Config : public Envoy::Matcher::CommonProtocolInputFactory {
 public:
   Envoy::Matcher::CommonProtocolInputFactoryCb createCommonProtocolInputFactoryCb(
       const Protobuf::Message& config,
-      Server::Configuration::FactoryContext& factory_context) override;
+      ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   std::string name() const override { return "envoy.matching.common_inputs.environment_variable"; }
 

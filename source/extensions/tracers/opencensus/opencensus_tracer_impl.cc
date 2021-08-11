@@ -58,7 +58,7 @@ using Constants = ConstSingleton<ConstantValues>;
 class Span : public Tracing::Span {
 public:
   Span(const Tracing::Config& config, const envoy::config::trace::v3::OpenCensusConfig& oc_config,
-       Http::RequestHeaderMap& request_headers, const std::string& operation_name,
+       Tracing::TraceContext& trace_context, const std::string& operation_name,
        SystemTime start_time, const Tracing::Decision tracing_decision);
 
   // Used by spawnChild().
@@ -69,7 +69,7 @@ public:
   void setTag(absl::string_view name, absl::string_view value) override;
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
-  void injectContext(Http::RequestHeaderMap& request_headers) override;
+  void injectContext(Tracing::TraceContext& trace_context) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
@@ -86,7 +86,7 @@ private:
 };
 
 ::opencensus::trace::Span
-startSpanHelper(const std::string& name, bool traced, const Http::RequestHeaderMap& request_headers,
+startSpanHelper(const std::string& name, bool traced, const Tracing::TraceContext& trace_context,
                 const envoy::config::trace::v3::OpenCensusConfig& oc_config) {
   // Determine if there is a parent context.
   using OpenCensusConfig = envoy::config::trace::v3::OpenCensusConfig;
@@ -95,34 +95,30 @@ startSpanHelper(const std::string& name, bool traced, const Http::RequestHeaderM
     bool found = false;
     switch (incoming) {
     case OpenCensusConfig::TRACE_CONTEXT: {
-      const auto header = request_headers.get(Constants::get().TRACEPARENT);
-      if (!header.empty()) {
+      const auto entry = trace_context.getTraceContext(Constants::get().TRACEPARENT);
+      if (entry.has_value()) {
         found = true;
         // This is an implicitly untrusted header, so only the first value is used.
-        parent_ctx = ::opencensus::trace::propagation::FromTraceParentHeader(
-            header[0]->value().getStringView());
+        parent_ctx = ::opencensus::trace::propagation::FromTraceParentHeader(entry.value());
       }
       break;
     }
-
     case OpenCensusConfig::GRPC_TRACE_BIN: {
-      const auto header = request_headers.get(Constants::get().GRPC_TRACE_BIN);
-      if (!header.empty()) {
+      const auto entry = trace_context.getTraceContext(Constants::get().GRPC_TRACE_BIN);
+      if (entry.has_value()) {
         found = true;
         // This is an implicitly untrusted header, so only the first value is used.
         parent_ctx = ::opencensus::trace::propagation::FromGrpcTraceBinHeader(
-            Base64::decodeWithoutPadding(header[0]->value().getStringView()));
+            Base64::decodeWithoutPadding(entry.value()));
       }
       break;
     }
-
     case OpenCensusConfig::CLOUD_TRACE_CONTEXT: {
-      const auto header = request_headers.get(Constants::get().X_CLOUD_TRACE_CONTEXT);
-      if (!header.empty()) {
+      const auto entry = trace_context.getTraceContext(Constants::get().X_CLOUD_TRACE_CONTEXT);
+      if (entry.has_value()) {
         found = true;
         // This is an implicitly untrusted header, so only the first value is used.
-        parent_ctx = ::opencensus::trace::propagation::FromCloudTraceContextHeader(
-            header[0]->value().getStringView());
+        parent_ctx = ::opencensus::trace::propagation::FromCloudTraceContextHeader(entry.value());
       }
       break;
     }
@@ -132,27 +128,23 @@ startSpanHelper(const std::string& name, bool traced, const Http::RequestHeaderM
       absl::string_view b3_span_id;
       absl::string_view b3_sampled;
       absl::string_view b3_flags;
-      const auto h_b3_trace_id = request_headers.get(Constants::get().X_B3_TRACEID);
-      if (!h_b3_trace_id.empty()) {
-        // This is an implicitly untrusted header, so only the first value is used.
-        b3_trace_id = h_b3_trace_id[0]->value().getStringView();
+      const auto h_b3_trace_id = trace_context.getTraceContext(Constants::get().X_B3_TRACEID);
+      if (h_b3_trace_id.has_value()) {
+        b3_trace_id = h_b3_trace_id.value();
       }
-      const auto h_b3_span_id = request_headers.get(Constants::get().X_B3_SPANID);
-      if (!h_b3_span_id.empty()) {
-        // This is an implicitly untrusted header, so only the first value is used.
-        b3_span_id = h_b3_span_id[0]->value().getStringView();
+      const auto h_b3_span_id = trace_context.getTraceContext(Constants::get().X_B3_SPANID);
+      if (h_b3_span_id.has_value()) {
+        b3_span_id = h_b3_span_id.value();
       }
-      const auto h_b3_sampled = request_headers.get(Constants::get().X_B3_SAMPLED);
-      if (!h_b3_sampled.empty()) {
-        // This is an implicitly untrusted header, so only the first value is used.
-        b3_sampled = h_b3_sampled[0]->value().getStringView();
+      const auto h_b3_sampled = trace_context.getTraceContext(Constants::get().X_B3_SAMPLED);
+      if (h_b3_sampled.has_value()) {
+        b3_sampled = h_b3_sampled.value();
       }
-      const auto h_b3_flags = request_headers.get(Constants::get().X_B3_FLAGS);
-      if (!h_b3_flags.empty()) {
-        // This is an implicitly untrusted header, so only the first value is used.
-        b3_flags = h_b3_flags[0]->value().getStringView();
+      const auto h_b3_flags = trace_context.getTraceContext(Constants::get().X_B3_FLAGS);
+      if (h_b3_flags.has_value()) {
+        b3_flags = h_b3_flags.value();
       }
-      if (!h_b3_trace_id.empty() && !h_b3_span_id.empty()) {
+      if (h_b3_trace_id.has_value() && h_b3_span_id.has_value()) {
         found = true;
         parent_ctx = ::opencensus::trace::propagation::FromB3Headers(b3_trace_id, b3_span_id,
                                                                      b3_sampled, b3_flags);
@@ -183,9 +175,9 @@ startSpanHelper(const std::string& name, bool traced, const Http::RequestHeaderM
 
 Span::Span(const Tracing::Config& config,
            const envoy::config::trace::v3::OpenCensusConfig& oc_config,
-           Http::RequestHeaderMap& request_headers, const std::string& operation_name,
+           Tracing::TraceContext& trace_context, const std::string& operation_name,
            SystemTime /*start_time*/, const Tracing::Decision tracing_decision)
-    : span_(startSpanHelper(operation_name, tracing_decision.traced, request_headers, oc_config)),
+    : span_(startSpanHelper(operation_name, tracing_decision.traced, trace_context, oc_config)),
       oc_config_(oc_config) {
   span_.AddAttribute("OperationName", config.operationName() == Tracing::OperationName::Ingress
                                           ? "Ingress"
@@ -209,36 +201,33 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
 
 void Span::finishSpan() { span_.End(); }
 
-void Span::injectContext(Http::RequestHeaderMap& request_headers) {
+void Span::injectContext(Tracing::TraceContext& trace_context) {
   using OpenCensusConfig = envoy::config::trace::v3::OpenCensusConfig;
   const auto& ctx = span_.context();
   for (const auto& outgoing : oc_config_.outgoing_trace_context()) {
     switch (outgoing) {
     case OpenCensusConfig::TRACE_CONTEXT:
-      request_headers.setReferenceKey(Constants::get().TRACEPARENT,
-                                      ::opencensus::trace::propagation::ToTraceParentHeader(ctx));
+      trace_context.setTraceContextReferenceKey(
+          Constants::get().TRACEPARENT, ::opencensus::trace::propagation::ToTraceParentHeader(ctx));
       break;
-
     case OpenCensusConfig::GRPC_TRACE_BIN: {
       std::string val = ::opencensus::trace::propagation::ToGrpcTraceBinHeader(ctx);
       val = Base64::encode(val.data(), val.size(), /*add_padding=*/false);
-      request_headers.setReferenceKey(Constants::get().GRPC_TRACE_BIN, val);
+      trace_context.setTraceContextReferenceKey(Constants::get().GRPC_TRACE_BIN, val);
       break;
     }
-
     case OpenCensusConfig::CLOUD_TRACE_CONTEXT:
-      request_headers.setReferenceKey(
+      trace_context.setTraceContextReferenceKey(
           Constants::get().X_CLOUD_TRACE_CONTEXT,
           ::opencensus::trace::propagation::ToCloudTraceContextHeader(ctx));
       break;
-
     case OpenCensusConfig::B3:
-      request_headers.setReferenceKey(Constants::get().X_B3_TRACEID,
-                                      ::opencensus::trace::propagation::ToB3TraceIdHeader(ctx));
-      request_headers.setReferenceKey(Constants::get().X_B3_SPANID,
-                                      ::opencensus::trace::propagation::ToB3SpanIdHeader(ctx));
-      request_headers.setReferenceKey(Constants::get().X_B3_SAMPLED,
-                                      ::opencensus::trace::propagation::ToB3SampledHeader(ctx));
+      trace_context.setTraceContextReferenceKey(
+          Constants::get().X_B3_TRACEID, ::opencensus::trace::propagation::ToB3TraceIdHeader(ctx));
+      trace_context.setTraceContextReferenceKey(
+          Constants::get().X_B3_SPANID, ::opencensus::trace::propagation::ToB3SpanIdHeader(ctx));
+      trace_context.setTraceContextReferenceKey(
+          Constants::get().X_B3_SAMPLED, ::opencensus::trace::propagation::ToB3SampledHeader(ctx));
       // OpenCensus's trace context propagation doesn't produce the
       // "X-B3-Flags:" header.
       break;
@@ -384,10 +373,10 @@ void Driver::applyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& c
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
-                                   Http::RequestHeaderMap& request_headers,
+                                   Tracing::TraceContext& trace_context,
                                    const std::string& operation_name, SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
-  return std::make_unique<Span>(config, oc_config_, request_headers, operation_name, start_time,
+  return std::make_unique<Span>(config, oc_config_, trace_context, operation_name, start_time,
                                 tracing_decision);
 }
 

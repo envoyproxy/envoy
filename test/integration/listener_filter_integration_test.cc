@@ -48,20 +48,35 @@ filter_disabled:
     }
   }
 
-  void initializeWithListenerFilter(absl::optional<bool> listener_filter_disabled = absl::nullopt) {
+  void initializeWithListenerFilter(bool ssl_client,
+                                    absl::optional<bool> listener_filter_disabled = absl::nullopt) {
     config_helper_.renameListener("echo");
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
     if (listener_filter_disabled.has_value()) {
       tls_inspector_config = appendMatcher(tls_inspector_config, listener_filter_disabled.value());
     }
     config_helper_.addListenerFilter(tls_inspector_config);
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* filter_chain =
-          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-      auto* alpn = filter_chain->mutable_filter_chain_match()->add_application_protocols();
-      *alpn = "envoyalpn";
+
+    config_helper_.addConfigModifier([ssl_client](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      if (ssl_client) {
+        auto* filter_chain =
+            bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+        auto* alpn = filter_chain->mutable_filter_chain_match()->add_application_protocols();
+        *alpn = "envoyalpn";
+      }
+      auto* timeout = bootstrap.mutable_static_resources()
+                          ->mutable_listeners(0)
+                          ->mutable_listener_filters_timeout();
+      timeout->MergeFrom(ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+      bootstrap.mutable_static_resources()
+          ->mutable_listeners(0)
+          ->set_continue_on_listener_filters_timeout(true);
     });
-    config_helper_.addSslConfig();
+    if (ssl_client) {
+      config_helper_.addSslConfig();
+    }
+
     useListenerAccessLog("%RESPONSE_CODE_DETAILS%");
     BaseIntegrationTest::initialize();
 
@@ -69,23 +84,28 @@ filter_disabled:
         std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
   }
 
-  void setupConnections(bool listener_filter_disabled, bool expect_connection_open) {
-    initializeWithListenerFilter(listener_filter_disabled);
+  void setupConnections(bool listener_filter_disabled, bool expect_connection_open,
+                        bool ssl_client) {
+    initializeWithListenerFilter(ssl_client, listener_filter_disabled);
 
     // Set up the SSL client.
     Network::Address::InstanceConstSharedPtr address =
         Ssl::getSslAddress(version_, lookupPort("echo"));
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
-    ssl_client_ = dispatcher_->createClientConnection(
-        address, Network::Address::InstanceConstSharedPtr(),
-        context_->createTransportSocket(
-            // nullptr
-            std::make_shared<Network::TransportSocketOptionsImpl>(
-                absl::string_view(""), std::vector<std::string>(),
-                std::vector<std::string>{"envoyalpn"})),
-        nullptr);
-    ssl_client_->addConnectionCallbacks(connect_callbacks_);
-    ssl_client_->connect();
+    Network::TransportSocketPtr transport_socket;
+    if (ssl_client) {
+      transport_socket =
+          context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
+              absl::string_view(""), std::vector<std::string>(),
+              std::vector<std::string>{"envoyalpn"}));
+    } else {
+      auto transport_socket_factory = std::make_unique<Network::RawBufferSocketFactory>();
+      transport_socket = transport_socket_factory->createTransportSocket(nullptr);
+    }
+    client_ = dispatcher_->createClientConnection(
+        address, Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr);
+    client_->addConnectionCallbacks(connect_callbacks_);
+    client_->connect();
     while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }
@@ -98,25 +118,43 @@ filter_disabled:
       ASSERT(connect_callbacks_.closed());
     }
   }
+
   std::unique_ptr<Ssl::ContextManager> context_manager_;
   Network::TransportSocketFactoryPtr context_;
   ConnectionStatusCallbacks connect_callbacks_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
-  Network::ClientConnectionPtr ssl_client_;
+  Network::ClientConnectionPtr client_;
 };
 
 // Each listener filter is enabled by default.
 TEST_P(ListenerFilterIntegrationTest, AllListenerFiltersAreEnabledByDefault) {
-  setupConnections(/*listener_filter_disabled=*/false, /*expect_connection_open=*/true);
-  ssl_client_->close(Network::ConnectionCloseType::NoFlush);
+  setupConnections(/*listener_filter_disabled=*/false, /*expect_connection_open=*/true,
+                   /*ssl_client=*/true);
+  client_->close(Network::ConnectionCloseType::NoFlush);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::Eq("-"));
 }
 
 // The tls_inspector is disabled. The ALPN won't be sniffed out and no filter chain is matched.
 TEST_P(ListenerFilterIntegrationTest, DisabledTlsInspectorFailsFilterChainFind) {
-  setupConnections(/*listener_filter_disabled=*/true, /*expect_connection_open=*/false);
+  setupConnections(/*listener_filter_disabled=*/true, /*expect_connection_open=*/false,
+                   /*ssl_client=*/true);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::Eq(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound));
+}
+
+// trigger the tls inspect filter timeout, and continue create new connection after timeout
+TEST_P(ListenerFilterIntegrationTest, ContinueOnListenerTimeout) {
+  setupConnections(/*listener_filter_disabled=*/false, /*expect_connection_open=*/true,
+                   /*ssl_client=*/false);
+  // The length of tls hello message is defined as `TLS_MAX_CLIENT_HELLO = 64 * 1024`
+  // if tls inspect filter doesn't read the max length of hello message data, it
+  // will continue wait. Then the listener filter timeout timer will be triggered.
+  Buffer::OwnedImpl buffer("fake data");
+  client_->write(buffer, false);
+  // the timeout is set as one seconds, sleep 5 to trigger the timeout.
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(2000));
+  client_->close(Network::ConnectionCloseType::NoFlush);
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::Eq("-"));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerFilterIntegrationTest,

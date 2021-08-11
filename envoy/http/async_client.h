@@ -213,6 +213,12 @@ public:
       return *this;
     }
 
+    // this should be done with setBufferedBodyForRetry=true ?
+    StreamOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
+      retry_policy = p;
+      return *this;
+    }
+
     // For gmock test
     bool operator==(const StreamOptions& src) const {
       return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
@@ -239,6 +245,8 @@ public:
     ParentContext parent_context;
 
     envoy::config::core::v3::Metadata metadata;
+
+    absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
   };
 
   /**
@@ -272,6 +280,10 @@ public:
     }
     RequestOptions& setMetadata(const envoy::config::core::v3::Metadata& m) {
       StreamOptions::setMetadata(m);
+      return *this;
+    }
+    RequestOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
+      StreamOptions::setRetryPolicy(p);
       return *this;
     }
     RequestOptions& setParentSpan(Tracing::Span& parent_span) {

@@ -89,11 +89,16 @@ LogicalDnsCluster::LogicalDnsCluster(
   dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 }
 
-void LogicalDnsCluster::startPreInit() { startResolve(); }
+void LogicalDnsCluster::startPreInit() {
+  startResolve();
+  if (!wait_for_warm_on_init_) {
+    onPreInitComplete();
+  }
+}
 
 LogicalDnsCluster::~LogicalDnsCluster() {
   if (active_dns_query_) {
-    active_dns_query_->cancel();
+    active_dns_query_->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
   }
 }
 

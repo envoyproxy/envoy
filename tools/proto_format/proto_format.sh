@@ -20,12 +20,6 @@ read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
         exit 0
     }
 
-if [[ "$2" == "--test" ]]; then
-    echo "protoxform_test..."
-    BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
-    bazel test "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:merge_active_shadow_test
-fi
-
 # Generate //versioning:active_protos.
 ./tools/proto_format/active_protos_gen.py ./api > ./api/versioning/BUILD
 

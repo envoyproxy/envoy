@@ -166,12 +166,13 @@ void Utility::extractCommonAccessLogProperties(
         *stream_info.downstreamAddressProvider().localAddress(),
         *common_access_log.mutable_downstream_local_address());
   }
-  if (stream_info.downstreamSslConnection() != nullptr) {
+  if (stream_info.downstreamAddressProvider().sslConnection() != nullptr) {
     auto* tls_properties = common_access_log.mutable_tls_properties();
     const Ssl::ConnectionInfoConstSharedPtr downstream_ssl_connection =
-        stream_info.downstreamSslConnection();
+        stream_info.downstreamAddressProvider().sslConnection();
 
-    tls_properties->set_tls_sni_hostname(stream_info.requestedServerName());
+    tls_properties->set_tls_sni_hostname(
+        std::string(stream_info.downstreamAddressProvider().requestedServerName()));
 
     auto* local_properties = tls_properties->mutable_local_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanLocalCertificate()) {

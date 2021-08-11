@@ -26,7 +26,8 @@ mappers:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value
+          string_match:
+            exact: exact-match-value
     status_code: 550
     headers_to_add:
       - header:
@@ -92,7 +93,8 @@ mappers:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value
+          string_match:
+            exact: exact-match-value
     status_code: 550
 body_format:
   json_format:
@@ -203,13 +205,15 @@ mappers:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value-1
+          string_match:
+            exact: exact-match-value-1
     status_code: 550
   - filter:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value
+          string_match:
+            exact: exact-match-value
     status_code: 551
     headers_to_add:
       - header:
@@ -225,7 +229,8 @@ mappers:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value
+          string_match:
+            exact: exact-match-value
     status_code: 552
 body_format:
   json_format:
@@ -283,19 +288,22 @@ mappers:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value-1
+          string_match:
+            exact: exact-match-value-1
     status_code: 550
   - filter:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value-2
+          string_match:
+            exact: exact-match-value-2
     status_code: 551
   - filter:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value-3
+          string_match:
+            exact: exact-match-value-3
     status_code: 552
 body_format:
   json_format:
@@ -355,19 +363,22 @@ mappers:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value-1
+          string_match:
+            exact: exact-match-value-1
     status_code: 550
   - filter:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value-2
+          string_match:
+            exact: exact-match-value-2
     status_code: 551
   - filter:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value-3
+          string_match:
+            exact: exact-match-value-3
     status_code: 552
   )EOF";
   setLocalReplyConfig(yaml);

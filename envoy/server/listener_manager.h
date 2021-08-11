@@ -34,20 +34,6 @@ public:
 
 using LdsApiPtr = std::unique_ptr<LdsApi>;
 
-struct ListenSocketCreationParams {
-  ListenSocketCreationParams(bool bind_to_port, bool duplicate_parent_socket = true)
-      : bind_to_port(bind_to_port), duplicate_parent_socket(duplicate_parent_socket) {}
-
-  // For testing.
-  bool operator==(const ListenSocketCreationParams& rhs) const;
-  bool operator!=(const ListenSocketCreationParams& rhs) const;
-
-  // whether to actually bind the socket.
-  bool bind_to_port;
-  // whether to duplicate socket from hot restart parent.
-  bool duplicate_parent_socket;
-};
-
 /**
  * Factory for creating listener components.
  */
@@ -63,19 +49,29 @@ public:
   virtual LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
                                  const xds::core::v3::ResourceLocator* lds_resources_locator) PURE;
 
+  enum class BindType {
+    // The listener will not bind.
+    NoBind,
+    // The listener will bind a socket shared by all workers.
+    NoReusePort,
+    // The listener will use reuse_port sockets independently on each worker.
+    ReusePort
+  };
+
   /**
    * Creates a socket.
    * @param address supplies the socket's address.
    * @param socket_type the type of socket (stream or datagram) to create.
    * @param options to be set on the created socket just before calling 'bind()'.
-   * @param params used to control how a socket being created.
+   * @param bind_type supplies the bind type of the listen socket.
+   * @param worker_index supplies the socket/worker index of the new socket.
    * @return Network::SocketSharedPtr an initialized and potentially bound socket.
    */
   virtual Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address,
                      Network::Socket::Type socket_type,
-                     const Network::Socket::OptionsSharedPtr& options,
-                     const ListenSocketCreationParams& params) PURE;
+                     const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+                     uint32_t worker_index) PURE;
 
   /**
    * Creates a list of filter factories.

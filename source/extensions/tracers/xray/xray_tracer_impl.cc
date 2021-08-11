@@ -2,6 +2,7 @@
 
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
+#include "source/common/http/headers.h"
 #include "source/extensions/tracers/xray/localized_sampling.h"
 #include "source/extensions/tracers/xray/tracer.h"
 #include "source/extensions/tracers/xray/xray_configuration.h"
@@ -61,7 +62,7 @@ Driver::Driver(const XRayConfiguration& config,
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
-                                   Http::RequestHeaderMap& request_headers,
+                                   Tracing::TraceContext& trace_context,
                                    const std::string& operation_name, Envoy::SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
   // First thing is to determine whether this request will be sampled or not.
@@ -76,12 +77,12 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   UNREFERENCED_PARAMETER(config);
   // TODO(marcomagdy) - how do we factor this into the logic above
   UNREFERENCED_PARAMETER(tracing_decision);
-  const auto header = request_headers.get(Http::LowerCaseString(XRayTraceHeader));
+  const auto header = trace_context.getTraceContext(XRayTraceHeader);
   absl::optional<bool> should_trace;
   XRayHeader xray_header;
-  if (!header.empty()) {
+  if (header.has_value()) {
     // This is an implicitly untrusted header, so only the first value is used.
-    Http::LowerCaseString lowered_header_value{std::string(header[0]->value().getStringView())};
+    Http::LowerCaseString lowered_header_value{header.value()};
     xray_header = parseXRayHeader(lowered_header_value);
     // if the sample_decision in the x-ray header is unknown then we try to make a decision based
     // on the sampling strategy
@@ -97,9 +98,10 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   }
 
   if (!should_trace.has_value()) {
-    const SamplingRequest request{std::string{request_headers.getHostValue()},
-                                  std::string{request_headers.getMethodValue()},
-                                  std::string{request_headers.getPathValue()}};
+    const SamplingRequest request{
+        trace_context.getTraceContext(Http::Headers::get().HostLegacy).value_or(""),
+        trace_context.getTraceContext(Http::Headers::get().Method).value_or(""),
+        trace_context.getTraceContext(Http::Headers::get().Path).value_or("")};
 
     should_trace = sampling_strategy_->shouldTrace(request);
   }
@@ -107,8 +109,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   auto* tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
   if (should_trace.value()) {
     return tracer->startSpan(operation_name, start_time,
-                             !header.empty() ? absl::optional<XRayHeader>(xray_header)
-                                             : absl::nullopt);
+                             header.has_value() ? absl::optional<XRayHeader>(xray_header)
+                                                : absl::nullopt);
   }
 
   // instead of returning nullptr, we return a Span that is marked as not-sampled.

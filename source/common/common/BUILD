@@ -301,6 +301,7 @@ envoy_cc_library(
         "//envoy/common:regex_interface",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
         "@com_googlesource_code_re2//:re2",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
@@ -415,10 +416,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "callback_impl_lib",
+    srcs = ["callback_impl.cc"],
     hdrs = ["callback_impl.h"],
     deps = [
         ":assert_lib",
+        ":lock_guard_lib",
+        ":thread_lib",
         "//envoy/common:callback",
+        "//source/common/event:dispatcher_lib",
     ],
 )
 

@@ -53,14 +53,14 @@
             "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
             pass_through_mode: false
             headers:
-              - exact_match: /healthcheck
+              - string_match:
+                  exact: /healthcheck
                 name: :path
         - name: envoy.filters.http.buffer
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
             max_request_bytes: 5242880
         - name: envoy.filters.http.router
-          typed_config: {}
         {% if tracing %}
         tracing:
           provider:

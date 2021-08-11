@@ -176,7 +176,7 @@ public:
 };
 
 void StartTlsIntegrationTest::initialize() {
-  EXPECT_CALL(*mock_buffer_factory_, create_(_, _, _))
+  EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       // Connection constructor will first create write buffer.
       // Test tracks how many bytes are sent.
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,

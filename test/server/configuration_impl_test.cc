@@ -12,7 +12,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/cluster_manager_impl.h"
-#include "source/extensions/stat_sinks/well_known_names.h"
+#include "source/extensions/stat_sinks/statsd/config.h"
 #include "source/server/configuration_impl.h"
 
 #include "test/common/upstream/utility.h"
@@ -65,7 +65,8 @@ protected:
             server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
             server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
             server_.httpContext(), server_.grpcContext(), server_.routerContext(),
-            server_.accessLogManager(), server_.singletonManager(), server_.options()) {}
+            server_.accessLogManager(), server_.singletonManager(), server_.options(),
+            server_.quic_stat_names_) {}
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
@@ -467,7 +468,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  sink.set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
+  sink.set_name(Extensions::StatSinks::Statsd::StatsdName);
   addStatsdFakeClusterConfig(sink);
   server_.server_factory_context_->cluster_manager_.initializeClusters({"fake_cluster"}, {});
 
@@ -613,7 +614,7 @@ TEST(InitialImplTest, LayeredRuntime) {
   const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(yaml);
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server);
+  InitialImpl config(bootstrap, options);
   EXPECT_THAT(config.runtime(), ProtoEq(bootstrap.layered_runtime()));
 }
 
@@ -626,7 +627,7 @@ TEST(InitialImplTest, EmptyLayeredRuntime) {
       TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(bootstrap_yaml);
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server);
+  InitialImpl config(bootstrap, options);
 
   const std::string expected_yaml = R"EOF(
   layers:
@@ -677,7 +678,8 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server_);
+  InitialImpl config(bootstrap, options);
+  config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().socketOptions()->size(), 2);
@@ -717,7 +719,8 @@ TEST_F(ConfigurationImplTest, FileAccessLogOutput) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server_);
+  InitialImpl config(bootstrap, options);
+  config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);
@@ -1040,10 +1043,97 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWit
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server_);
+  InitialImpl config(bootstrap, options);
+  config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 2);
+}
+
+TEST_F(ConfigurationImplTest, AccessLogWithFilter) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          },
+          "filter": {
+            "not_health_check_filter":{
+            }
+          }
+        }
+      ],
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  InitialImpl config(bootstrap, options);
+  config.initAdminAccessLog(bootstrap, server_);
+
+  ASSERT_EQ(config.admin().accessLogs().size(), 1);
+}
+
+TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWithFilter)) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          },
+          "filter": {
+            "not_health_check_filter":{
+            }
+          }
+        }
+      ],
+      access_log_path: "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  InitialImpl config(bootstrap, options);
+  config.initAdminAccessLog(bootstrap, server_);
+
+  ASSERT_EQ(config.admin().accessLogs().size(), 2);
+}
+
+TEST_F(ConfigurationImplTest, EmptyAdmin) {
+  std::string json = R"EOF(
+  {
+    "admin": {}
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  InitialImpl config(bootstrap, options);
+  config.initAdminAccessLog(bootstrap, server_);
+
+  ASSERT_EQ(config.admin().accessLogs().size(), 0);
 }
 
 TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPath)) {
@@ -1064,7 +1154,8 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPath)) 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
-  InitialImpl config(bootstrap, options, server_);
+  InitialImpl config(bootstrap, options);
+  config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);

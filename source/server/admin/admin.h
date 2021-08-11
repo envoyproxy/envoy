@@ -146,6 +146,7 @@ public:
     return &scoped_route_config_provider_;
   }
   const std::string& serverName() const override { return Http::DefaultServerString::get(); }
+  const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
   HttpConnectionManagerProto::ServerHeaderTransformation
   serverHeaderTransformation() const override {
     return HttpConnectionManagerProto::OVERWRITE;
@@ -204,6 +205,7 @@ public:
       return runCallback(path_and_query, response_headers, response, filter);
     };
   }
+  uint64_t maxRequestsPerConnection() const override { return 0; }
 
 private:
   /**
@@ -316,19 +318,18 @@ private:
 
     // Network::ListenSocketFactory
     Network::Socket::Type socketType() const override { return socket_->socketType(); }
-
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
       return socket_->addressProvider().localAddress();
     }
-
-    Network::SocketSharedPtr getListenSocket() override {
+    Network::SocketSharedPtr getListenSocket(uint32_t) override {
       // This is only supposed to be called once.
       RELEASE_ASSERT(!socket_create_, "AdminListener's socket shouldn't be shared.");
       socket_create_ = true;
       return socket_;
     }
-
-    Network::SocketOptRef sharedSocket() const override { return absl::nullopt; }
+    Network::ListenSocketFactoryPtr clone() const override { return nullptr; }
+    void closeAllSockets() override {}
+    void doFinalPreWorkerInit() override {}
 
   private:
     Network::SocketSharedPtr socket_;
@@ -446,11 +447,12 @@ private:
   ConfigTrackerImpl config_tracker_;
   const Network::FilterChainSharedPtr admin_filter_chain_;
   Network::SocketSharedPtr socket_;
-  Network::ListenSocketFactorySharedPtr socket_factory_;
+  Network::ListenSocketFactoryPtr socket_factory_;
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
+  const absl::optional<std::string> scheme_{};
 };
 
 } // namespace Server

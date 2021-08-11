@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 licenses(["notice"])  # Apache 2
 
@@ -42,21 +43,6 @@ filegroup(
     srcs = glob(["root/**/*.pb"]),
 )
 
-filegroup(
-    name = "base_rst_files",
-    srcs = glob(
-        [
-            "conf.py",
-            "_ext/*",
-        ],
-    ),
-)
-
-filegroup(
-    name = "root_rst_files",
-    srcs = glob(["root/**/*"]),
-)
-
 genrule(
     name = "v2_redirects",
     outs = ["v2_redirects.txt"],
@@ -83,39 +69,48 @@ genrule(
     ],
 )
 
-genrule(
-    name = "google_vrp_config",
-    outs = ["google_vrp_config.tar"],
-    cmd = """
-    tar cfh $@ --transform='s/configs/configuration\\/best_practices/' \\
-        $(location //configs:google-vrp/envoy-edge.yaml)
-    """,
-    tools = ["//configs:google-vrp/envoy-edge.yaml"],
+pkg_tar(
+    name = "sphinx_base",
+    srcs = glob(
+        [
+            "conf.py",
+            "_ext/*",
+        ],
+    ) + [":redirects"],
+    extension = "tar",
+    strip_prefix = "/docs/",
 )
 
-genrule(
+pkg_tar(
+    name = "sphinx_root",
+    srcs = glob(["root/**/*"]),
+    extension = "tar",
+    strip_prefix = "/docs/root",
+)
+
+pkg_tar(
     name = "base_rst",
-    outs = ["base_rst.tar"],
-    cmd = """
-    tar cfh $@ --transform='s/docs\\///' $(locations base_rst_files) \\
-    && tar rhf $@ --transform='s/docs\\/root\\///' $(locations root_rst_files) \\
-    && tar rf $@ -C $$(dirname $(location redirects)) $$(basename $(location redirects))
-    """,
-    tools = [
-        ":base_rst_files",
-        ":redirects",
-        ":root_rst_files",
+    extension = "tar",
+    deps = [
+        ":sphinx_base.tar",
+        ":sphinx_root.tar",
     ],
 )
 
-genrule(
+pkg_tar(
+    name = "google_vrp_config",
+    srcs = ["//configs:google-vrp/envoy-edge.yaml"],
+    extension = "tar",
+    package_dir = "/best_practices",
+    strip_prefix = "/configs/configuration",
+)
+
+pkg_tar(
     name = "examples_rst",
-    outs = ["examples_rst.tar"],
-    cmd = """
-    tar cfh $@ --transform='s/examples/start\\/sandboxes\\/_include/' \\
-        $(locations //examples:files)
-    """,
-    tools = ["//examples:files"],
+    srcs = ["//examples:files"],
+    extension = "tar",
+    package_dir = "/start/sandboxes/_include",
+    strip_prefix = "/examples",
 )
 
 genrule(
@@ -172,22 +167,14 @@ genrule(
     tools = ["//tools/docs:generate_api_rst"],
 )
 
-genrule(
+pkg_tar(
     name = "rst",
-    outs = ["rst.tar"],
-    cmd = """
-    cat $(location base_rst) > $@ \\
-    && tar -Af $@ $(location api_rst) \\
-    && tar -Af $@ $(location examples_rst) \\
-    && tar -Af $@ $(location extensions_security_rst) \\
-    && tar -Af $@ $(location external_deps_rst) \\
-    && tar -Af $@ $(location empty_protos_rst)
-    """,
-    tools = [
+    extension = "tar",
+    deps = [
         ":api_rst",
-        ":base_rst",
+        ":base_rst.tar",
         ":empty_protos_rst",
-        ":examples_rst",
+        ":examples_rst.tar",
         ":extensions_security_rst",
         ":external_deps_rst",
     ],

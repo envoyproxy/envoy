@@ -165,10 +165,10 @@ envoy_cc_binary(
 ## Filter linking
 
 Filters are registered via static initializers at early runtime by modules in
-[`source/server/config`](../source/server/config). These require the `alwayslink
+[`source/extensions/filters`](../source/extensions/filters). These require the `alwayslink
 = 1` attribute to be set in the corresponding `envoy_cc_library` target to
 ensure they are correctly linked. See
-[`source/server/config/http/BUILD`](../source/server/config/http/BUILD) for
+[`source/extensions/filters/http/BUILD`](../source/extensions/filters/http/BUILD) for
 examples.
 
 ## Tests with environment dependencies

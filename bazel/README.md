@@ -113,17 +113,6 @@ for how to update or override dependencies.
     Envoy compiles and passes tests with the version of clang installed by Xcode 11.1:
     Apple clang version 11.0.0 (clang-1100.0.33.8).
 
-    In order for bazel to be aware of the tools installed by brew, the PATH
-    variable must be set for bazel builds. This can be accomplished by setting
-    this in your `user.bazelrc` file:
-
-    ```
-    build --action_env=PATH="/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
-    ```
-
-    Alternatively, you can pass `--action_env` on the command line when running
-    `bazel build`/`bazel test`.
-
     Having the binutils keg installed in Brew is known to cause issues due to putting an incompatible
     version of `ar` on the PATH, so if you run into issues building third party code like luajit
     consider uninstalling binutils.
@@ -863,7 +852,7 @@ TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 ```
 
 
-# Running clang-format without docker
+# Running format linting without docker
 
 The easiest way to run the clang-format check/fix commands is to run them via
 docker, which helps ensure the right toolchain is set up. However you may prefer
@@ -875,6 +864,8 @@ to run clang-format scripts on your workstation directly:
 To run the tools directly, you must install the correct version of clang. This
 may change over time, check the version of clang in the docker image. You must
 also have 'buildifier' installed from the bazel distribution.
+
+Note that if you run the `check_spelling.py` script you will need to have `aspell` installed.
 
 Edit the paths shown here to reflect the installation locations on your system:
 

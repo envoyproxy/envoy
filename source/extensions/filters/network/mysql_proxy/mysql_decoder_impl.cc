@@ -101,6 +101,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     case MYSQL_RESP_OK: {
       msg = std::make_unique<OkMessage>();
       state = MySQLSession::State::Req;
+      session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
       break;
     }
     case MYSQL_RESP_MORE: {
@@ -149,11 +150,7 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
   case MySQLSession::State::ReqResp: {
     CommandResponse command_resp{};
     command_resp.decode(message, seq, len);
-    session_.setState(MySQLSession::State::Req);
     callbacks_.onCommandResponse(command_resp);
-    if (session_.getState() == MySQLSession::State::Req) {
-      session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
-    }
     break;
   }
 
@@ -193,10 +190,16 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
 
   // Ignore duplicate and out-of-sync packets.
   if (seq != session_.getExpectedSeq()) {
-    callbacks_.onProtocolError();
-    ENVOY_LOG(info, "mysql_proxy: ignoring out-of-sync packet");
-    data.drain(len); // Ensure that the whole message was consumed
-    return true;
+    // case when server response is over, and client send req
+    if (session_.getState() == MySQLSession::State::ReqResp && seq == MYSQL_REQUEST_PKT_NUM) {
+      session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
+      session_.setState(MySQLSession::State::Req);
+    } else {
+      ENVOY_LOG(info, "mysql_proxy: ignoring out-of-sync packet");
+      callbacks_.onProtocolError();
+      data.drain(len); // Ensure that the whole message was consumed
+      return true;
+    }
   }
   session_.setExpectedSeq(seq + 1);
 

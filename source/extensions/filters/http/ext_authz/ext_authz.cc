@@ -63,7 +63,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
       decoder_callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
       check_request_, config_->maxRequestBytes(), config_->packAsBytes(),
-      config_->includePeerCertificate());
+      config_->includePeerCertificate(), config_->destinationLabels());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
   state_ = State::Calling;
@@ -374,7 +374,10 @@ void Filter::continueDecoding() {
 }
 
 Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr& route) const {
-  if (route == nullptr || route->routeEntry() == nullptr) {
+  if (route == nullptr ||
+      (!Runtime::runtimeFeatureEnabled(
+           "envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect") &&
+       route->routeEntry() == nullptr)) {
     return PerRouteFlags{true /*skip_check_*/, false /*skip_request_body_buffering_*/};
   }
 

@@ -139,13 +139,18 @@ public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               Network::TransportSocketOptionsSharedPtr transport_socket_options,
+               Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                Upstream::ClusterConnectivityState& state)
       : Envoy::ConnectionPool::ConnPoolImplBase(host, priority, dispatcher, options,
                                                 transport_socket_options, state) {}
   ~ConnPoolImpl() override { destructAllConnections(); }
 
-  void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
+  // Event::DeferredDeletable
+  void deleteIsPending() override { deleteIsPendingImpl(); }
+
+  void addIdleCallback(IdleCb cb) override { addIdleCallbackImpl(cb); }
+  bool isIdle() const override { return isIdleImpl(); }
+  void startDrain() override { startDrainImpl(); }
   void drainConnections() override {
     drainConnectionsImpl();
     // Legacy behavior for the TCP connection pool marks all connecting clients

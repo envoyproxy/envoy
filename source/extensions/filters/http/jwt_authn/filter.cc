@@ -14,7 +14,8 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 namespace {
-
+constexpr absl::string_view InvalidTokenErrorString = ", error=\"invalid_token\"";
+constexpr uint32_t MaximumUriLength = 256;
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     access_control_request_method_handle(Http::CustomHeaders::get().AccessControlRequestMethod);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
@@ -85,6 +86,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (verifier == nullptr) {
     onComplete(Status::Ok);
   } else {
+    original_uri_ = Http::Utility::buildOriginalUri(headers, MaximumUriLength);
     // Verify the JWT token, onComplete() will be called when completed.
     context_ = Verifier::createContext(headers, decoder_callbacks_->activeSpan(), this);
     verifier->verify(context_);
@@ -117,8 +119,15 @@ void Filter::onComplete(const Status& status) {
         status == Status::JwtAudienceNotAllowed ? Http::Code::Forbidden : Http::Code::Unauthorized;
     // return failure reason as message body
     decoder_callbacks_->sendLocalReply(
-        code, ::google::jwt_verify::getStatusString(status), nullptr, absl::nullopt,
-        generateRcDetails(::google::jwt_verify::getStatusString(status)));
+        code, ::google::jwt_verify::getStatusString(status),
+        [uri = this->original_uri_, status](Http::ResponseHeaderMap& headers) {
+          std::string value = absl::StrCat("Bearer realm=\"", uri, "\"");
+          if (status != Status::JwtMissed) {
+            absl::StrAppend(&value, InvalidTokenErrorString);
+          }
+          headers.setCopy(Http::Headers::get().WWWAuthenticate, value);
+        },
+        absl::nullopt, generateRcDetails(::google::jwt_verify::getStatusString(status)));
     return;
   }
   stats_.allowed_.inc();

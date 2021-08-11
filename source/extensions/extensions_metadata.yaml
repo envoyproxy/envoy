@@ -338,6 +338,11 @@ envoy.filters.network.http_connection_manager:
   - envoy.filters.network
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.filters.network.envoy_mobile_http_connection_manager:
+  categories:
+  - envoy.filters.network
+  security_posture: robust_to_untrusted_downstream
+  status: stable
 envoy.filters.network.kafka_broker:
   categories:
   - envoy.filters.network
@@ -433,6 +438,11 @@ envoy.filters.udp_listener.udp_proxy:
   - envoy.filters.udp_listener
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.formatter.metadata:
+  categories:
+  - envoy.formatter
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
 envoy.formatter.req_without_query:
   categories:
   - envoy.formatter
@@ -498,6 +508,11 @@ envoy.matching.input_matchers.consistent_hashing:
   categories:
   - envoy.matching.input_matchers
   security_posture: robust_to_untrusted_downstream
+  status: stable
+envoy.matching.input_matchers.ip:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
 envoy.quic.proof_source.filter_chain:
   categories:

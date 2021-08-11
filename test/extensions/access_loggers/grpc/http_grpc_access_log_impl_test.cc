@@ -388,8 +388,8 @@ response: {}
     const std::string tlsVersion = "TLSv1.3";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2CC0));
-    stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_address_provider_->setSslConnection(connection_info);
+    stream_info.downstream_address_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -448,8 +448,8 @@ response: {}
     const std::string tlsVersion = "TLSv1.2";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_address_provider_->setSslConnection(connection_info);
+    stream_info.downstream_address_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -498,8 +498,8 @@ response: {}
     const std::string tlsVersion = "TLSv1.1";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_address_provider_->setSslConnection(connection_info);
+    stream_info.downstream_address_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -548,8 +548,8 @@ response: {}
     const std::string tlsVersion = "TLSv1";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_address_provider_->setSslConnection(connection_info);
+    stream_info.downstream_address_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -598,8 +598,8 @@ response: {}
     const std::string tlsVersion = "TLSv1.4";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_address_provider_->setSslConnection(connection_info);
+    stream_info.downstream_address_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},

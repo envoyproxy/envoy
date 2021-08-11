@@ -72,7 +72,7 @@ public:
 
   void log(SystemTime timestamp, const std::string& event) override;
 
-  void injectContext(Http::RequestHeaderMap& request_headers) override;
+  void injectContext(Tracing::TraceContext& trace_context) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
                               SystemTime start_time) override;
 
@@ -122,7 +122,7 @@ public:
    * Thus, this implementation of the virtual function startSpan() ignores the operation name
    * ("ingress" or "egress") passed by the caller.
    */
-  Tracing::SpanPtr startSpan(const Tracing::Config&, Http::RequestHeaderMap& request_headers,
+  Tracing::SpanPtr startSpan(const Tracing::Config&, Tracing::TraceContext& trace_context,
                              const std::string&, SystemTime start_time,
                              const Tracing::Decision tracing_decision) override;
 
@@ -163,7 +163,7 @@ struct CollectorInfo {
   std::string endpoint_{DEFAULT_COLLECTOR_ENDPOINT};
 
   // The version of the collector. This is related to endpoint's supported payload specification and
-  // transport. Currently it defaults to envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1. In
+  // transport. Currently it defaults to envoy::config::trace::v3::ZipkinConfig::HTTP_JSON_V1. In
   // the future, we will throw when collector_endpoint_version is not specified.
   envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion version_{
       envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1};

@@ -49,51 +49,64 @@ FilterDataStatus BodyContext::onBody(WasmBufferType type, size_t buffer_length,
   size_t size;
   uint32_t flags;
   if (body_op_ == "ReadBody") {
-    auto body = getBufferBytes(type, 0, buffer_length);
-    logError("onBody " + std::string(body->view()));
+    logBody(type);
+    return FilterDataStatus::Continue;
 
   } else if (body_op_ == "PrependAndAppendToBody") {
-    setBuffer(WasmBufferType::HttpRequestBody, 0, 0, "prepend.");
-    getBufferStatus(WasmBufferType::HttpRequestBody, &size, &flags);
-    setBuffer(WasmBufferType::HttpRequestBody, size, 0, ".append");
-    getBufferStatus(WasmBufferType::HttpRequestBody, &size, &flags);
-    auto updated = getBufferBytes(WasmBufferType::HttpRequestBody, 0, size);
-    logError("onBody " + std::string(updated->view()));
+    setBuffer(type, 0, 0, "prepend.");
+    getBufferStatus(type, &size, &flags);
+    setBuffer(type, size, 0, ".append");
+    logBody(type);
     return FilterDataStatus::StopIterationNoBuffer;
+
   } else if (body_op_ == "ReplaceBody") {
-    setBuffer(WasmBufferType::HttpRequestBody, 0, buffer_length, "replace");
-    getBufferStatus(WasmBufferType::HttpRequestBody, &size, &flags);
-    auto replaced = getBufferBytes(WasmBufferType::HttpRequestBody, 0, size);
-    logError("onBody " + std::string(replaced->view()));
+    setBuffer(type, 0, buffer_length, "replace");
+    logBody(type);
     return FilterDataStatus::StopIterationAndWatermark;
+
+  } else if (body_op_ == "PartialReplaceBody") {
+    setBuffer(type, 0, 1, "partial.replace.");
+    logBody(type);
+    return FilterDataStatus::Continue;
+
   } else if (body_op_ == "RemoveBody") {
-    setBuffer(WasmBufferType::HttpRequestBody, 0, buffer_length, "");
-    getBufferStatus(WasmBufferType::HttpRequestBody, &size, &flags);
-    auto erased = getBufferBytes(WasmBufferType::HttpRequestBody, 0, size);
-    logError("onBody " + std::string(erased->view()));
+    setBuffer(type, 0, buffer_length, "");
+    logBody(type);
+    return FilterDataStatus::Continue;
+
+  } else if (body_op_ == "PartialRemoveBody") {
+    setBuffer(type, 0, 1, "");
+    logBody(type);
+    return FilterDataStatus::Continue;
 
   } else if (body_op_ == "BufferBody") {
     logBody(type);
     return end_of_stream ? FilterDataStatus::Continue : FilterDataStatus::StopIterationAndBuffer;
 
   } else if (body_op_ == "PrependAndAppendToBufferedBody") {
-    setBuffer(WasmBufferType::HttpRequestBody, 0, 0, "prepend.");
-    getBufferStatus(WasmBufferType::HttpRequestBody, &size, &flags);
-    setBuffer(WasmBufferType::HttpRequestBody, size, 0, ".append");
+    setBuffer(type, 0, 0, "prepend.");
+    getBufferStatus(type, &size, &flags);
+    setBuffer(type, size, 0, ".append");
     logBody(type);
     return end_of_stream ? FilterDataStatus::Continue : FilterDataStatus::StopIterationAndBuffer;
 
   } else if (body_op_ == "ReplaceBufferedBody") {
-    setBuffer(WasmBufferType::HttpRequestBody, 0, buffer_length, "replace");
-    getBufferStatus(WasmBufferType::HttpRequestBody, &size, &flags);
-    auto replaced = getBufferBytes(WasmBufferType::HttpRequestBody, 0, size);
+    setBuffer(type, 0, buffer_length, "replace");
+    logBody(type);
+    return end_of_stream ? FilterDataStatus::Continue : FilterDataStatus::StopIterationAndBuffer;
+
+  } else if (body_op_ == "PartialReplaceBufferedBody") {
+    setBuffer(type, 0, 1, "partial.replace.");
     logBody(type);
     return end_of_stream ? FilterDataStatus::Continue : FilterDataStatus::StopIterationAndBuffer;
 
   } else if (body_op_ == "RemoveBufferedBody") {
-    setBuffer(WasmBufferType::HttpRequestBody, 0, buffer_length, "");
-    getBufferStatus(WasmBufferType::HttpRequestBody, &size, &flags);
-    auto erased = getBufferBytes(WasmBufferType::HttpRequestBody, 0, size);
+    setBuffer(type, 0, buffer_length, "");
+    logBody(type);
+    return end_of_stream ? FilterDataStatus::Continue : FilterDataStatus::StopIterationAndBuffer;
+
+  } else if (body_op_ == "PartialRemoveBufferedBody") {
+    setBuffer(type, 0, 1, "");
     logBody(type);
     return end_of_stream ? FilterDataStatus::Continue : FilterDataStatus::StopIterationAndBuffer;
 

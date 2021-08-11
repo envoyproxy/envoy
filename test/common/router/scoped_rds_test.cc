@@ -19,6 +19,7 @@
 #include "source/common/router/scoped_rds.h"
 
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/matcher/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/instance.h"
@@ -30,6 +31,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::AnyNumber;
 using testing::Eq;
 using testing::InSequence;
@@ -42,6 +44,9 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Router {
 namespace {
+
+using ::Envoy::Matchers::MockStringMatcher;
+using ::Envoy::Matchers::UniversalStringMatcher;
 
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 
@@ -753,8 +758,10 @@ TEST_F(ScopedRdsTest, ConfigDump) {
   setup();
   init_watcher_.expectReady();
   context_init_manager_.initialize(init_watcher_);
+  UniversalStringMatcher universal_matcher;
   auto message_ptr =
-      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          universal_matcher);
   const auto& scoped_routes_config_dump =
       TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
           *message_ptr);
@@ -803,7 +810,8 @@ $1
                                                           inline_scoped_route_configs_yaml)),
       server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
   message_ptr =
-      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          universal_matcher);
   const auto& scoped_routes_config_dump2 =
       TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
           *message_ptr);
@@ -874,11 +882,75 @@ dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
   message_ptr =
-      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          universal_matcher);
   const auto& scoped_routes_config_dump3 =
       TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
           *message_ptr);
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump3));
+
+  NiceMock<MockStringMatcher> mock_matcher;
+  EXPECT_CALL(mock_matcher, match("foo")).WillOnce(Return(true));
+  EXPECT_CALL(mock_matcher, match("foo2")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("dynamic-foo")).WillOnce(Return(false));
+  TestUtility::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+  - name: foo-scoped-routes
+    scoped_route_configs:
+     - name: foo
+       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
+       route_configuration_name: foo-route-config
+       key:
+         fragments: { string_key: "172.10.10.10" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_scoped_route_configs:
+  - name: foo_scoped_routes
+    last_updated:
+      seconds: 1234567891
+      nanos: 567000000
+    version_info: "1"
+)EOF",
+                            expected_config_dump);
+  message_ptr =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          mock_matcher);
+  const auto& scoped_routes_config_dump4 =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
+          *message_ptr);
+  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump4));
+
+  EXPECT_CALL(mock_matcher, match("foo")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("foo2")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("dynamic-foo")).WillOnce(Return(true));
+  TestUtility::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+  - name: foo-scoped-routes
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_scoped_route_configs:
+  - name: foo_scoped_routes
+    scoped_route_configs:
+      - name: dynamic-foo
+        "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
+        route_configuration_name: dynamic-foo-route-config
+        key:
+          fragments: { string_key: "172.30.30.10" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 567000000
+    version_info: "1"
+)EOF",
+                            expected_config_dump);
+  message_ptr =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          mock_matcher);
+  const auto& scoped_routes_config_dump5 =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
+          *message_ptr);
+  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump5));
 
   srds_subscription_->onConfigUpdate({}, "2");
   TestUtility::loadFromYaml(R"EOF(
@@ -907,11 +979,12 @@ dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
   message_ptr =
-      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
-  const auto& scoped_routes_config_dump4 =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          universal_matcher);
+  const auto& scoped_routes_config_dump6 =
       TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
           *message_ptr);
-  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump4));
+  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump6));
 }
 
 // Tests that SRDS only allows creation of delta static config providers.

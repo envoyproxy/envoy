@@ -60,11 +60,7 @@ def _envoy_cc_test_infrastructure_library(
 # Compute the test linkopts based on various options.
 def _envoy_test_linkopts():
     return select({
-        "@envoy//bazel:apple": [
-            # See note here: https://luajit.org/install.html
-            "-pagezero_size 10000",
-            "-image_base 100000000",
-        ],
+        "@envoy//bazel:apple": [],
         "@envoy//bazel:windows_x86_64": [
             "-DEFAULTLIB:ws2_32.lib",
             "-DEFAULTLIB:iphlpapi.lib",

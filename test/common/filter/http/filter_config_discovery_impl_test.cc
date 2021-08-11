@@ -362,7 +362,7 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
   - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
     name: foo
     typed_config:
-      "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+      "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
       pass_through_mode: false
   )EOF";
   const auto response =
@@ -373,7 +373,8 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
   EXPECT_THROW_WITH_MESSAGE(
       callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
       EnvoyException,
-      "Error: filter config has type URL envoy.config.filter.http.health_check.v2.HealthCheck but "
+      "Error: filter config has type URL envoy.extensions.filters.http.health_check.v3.HealthCheck "
+      "but "
       "expect envoy.extensions.filters.http.router.v3.Router.");
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
 }

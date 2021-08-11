@@ -114,7 +114,7 @@ int StreamInfoWrapper::luaDynamicMetadata(lua_State* state) {
 }
 
 int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
-  const auto& ssl = stream_info_.downstreamSslConnection();
+  const auto& ssl = stream_info_.downstreamAddressProvider().sslConnection();
   if (ssl != nullptr) {
     if (downstream_ssl_connection_.get() != nullptr) {
       downstream_ssl_connection_.pushStack();
@@ -141,7 +141,7 @@ int StreamInfoWrapper::luaDownstreamDirectRemoteAddress(lua_State* state) {
 }
 
 int StreamInfoWrapper::luaRequestedServerName(lua_State* state) {
-  lua_pushstring(state, stream_info_.requestedServerName().c_str());
+  lua_pushstring(state, stream_info_.downstreamAddressProvider().requestedServerName().data());
   return 1;
 }
 

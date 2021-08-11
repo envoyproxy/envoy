@@ -178,6 +178,11 @@ const char ExpectedPayloadValue[] = "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3V
                                     "xlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXVkIjoiZXhhbXBsZV9zZXJ2"
                                     "aWNlIn0";
 
+const char ExpectedPayloadValueWithPadding[] =
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcG"
+    "xlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXVkIjoiZXhhbXBsZV9zZXJ2"
+    "aWNlIn0=";
+
 // Base64 decoded Payload JSON
 const char ExpectedPayloadJSON[] = R"(
 {

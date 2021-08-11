@@ -24,4 +24,9 @@ public:
   ProxyProtoTcpIntegrationTest();
 };
 
+class ProxyProtoFilterChainMatchIntegrationTest : public ProxyProtoTcpIntegrationTest {
+public:
+  ProxyProtoFilterChainMatchIntegrationTest();
+};
+
 } // namespace Envoy

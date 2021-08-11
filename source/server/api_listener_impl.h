@@ -44,6 +44,10 @@ public:
   // Network::DrainDecision
   // TODO(junr03): hook up draining to listener state management.
   bool drainClose() const override { return false; }
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
+    NOT_REACHED_GCOVR_EXCL_LINE;
+    return nullptr;
+  }
 
 protected:
   ApiListenerImplBase(const envoy::config::listener::v3::Listener& config,

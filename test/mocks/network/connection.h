@@ -102,7 +102,7 @@ public:
   DEFINE_MOCK_CONNECTION_MOCK_METHODS;
 
   // Network::ServerConnection
-  MOCK_METHOD(void, setTransportSocketConnectTimeout, (std::chrono::milliseconds));
+  MOCK_METHOD(void, setTransportSocketConnectTimeout, (std::chrono::milliseconds, Stats::Counter&));
 };
 
 /**

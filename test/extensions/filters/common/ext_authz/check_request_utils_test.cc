@@ -51,19 +51,26 @@ public:
     envoy::service::auth::v3::CheckRequest request;
     Protobuf::Map<std::string, std::string> context_extensions;
     context_extensions["key"] = "value";
+    Protobuf::Map<std::string, std::string> labels;
+    labels["label_1"] = "value_1";
+    labels["label_2"] = "value_2";
 
     envoy::config::core::v3::Metadata metadata_context;
     auto metadata_val = MessageUtil::keyValueStruct("foo", "bar");
     (*metadata_context.mutable_filter_metadata())["meta.key"] = metadata_val;
 
-    CheckRequestUtils::createHttpCheck(
-        &callbacks_, request_headers, std::move(context_extensions), std::move(metadata_context),
-        request, /*max_request_bytes=*/0, /*pack_as_bytes=*/false, include_peer_certificate);
+    CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
+                                       std::move(metadata_context), request,
+                                       /*max_request_bytes=*/0, /*pack_as_bytes=*/false,
+                                       include_peer_certificate, labels);
 
     EXPECT_EQ("source", request.attributes().source().principal());
     EXPECT_EQ("destination", request.attributes().destination().principal());
     EXPECT_EQ("foo", request.attributes().source().service());
     EXPECT_EQ("value", request.attributes().context_extensions().at("key"));
+    EXPECT_EQ("value_1", request.attributes().destination().labels().at("label_1"));
+    EXPECT_EQ("value_2", request.attributes().destination().labels().at("label_2"));
+
     EXPECT_EQ("bar", request.attributes()
                          .metadata_context()
                          .filter_metadata()
@@ -112,10 +119,14 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
-
-  CheckRequestUtils::createTcpCheck(&net_callbacks_, request, false);
+  Protobuf::Map<std::string, std::string> labels;
+  labels["label_1"] = "value_1";
+  labels["label_2"] = "value_2";
+  CheckRequestUtils::createTcpCheck(&net_callbacks_, request, false, labels);
 
   EXPECT_EQ(request.attributes().source().certificate().size(), 0);
+  EXPECT_EQ("value_1", request.attributes().destination().labels().at("label_1"));
+  EXPECT_EQ("value_2", request.attributes().destination().labels().at("label_2"));
 }
 
 // Verify that createTcpCheck's dependencies are invoked when it's called.
@@ -131,7 +142,8 @@ TEST_F(CheckRequestUtilsTest, TcpPeerCertificate) {
       .WillOnce(Return(std::vector<std::string>{"destination"}));
   EXPECT_CALL(*ssl_, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(cert_data_));
 
-  CheckRequestUtils::createTcpCheck(&net_callbacks_, request, true);
+  CheckRequestUtils::createTcpCheck(&net_callbacks_, request, true,
+                                    Protobuf::Map<std::string, std::string>());
 
   EXPECT_EQ(cert_data_, request.attributes().source().certificate());
 }
@@ -154,7 +166,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   CheckRequestUtils::createHttpCheck(&callbacks_, request_headers,
                                      Protobuf::Map<std::string, std::string>(),
                                      envoy::config::core::v3::Metadata(), request_, size,
-                                     /*pack_as_bytes=*/false, /*include_peer_certificate=*/false);
+                                     /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
+                                     Protobuf::Map<std::string, std::string>());
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ(request_.attributes().request().http().headers().end(),
@@ -176,7 +189,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
   CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
                                      Protobuf::Map<std::string, std::string>(),
                                      envoy::config::core::v3::Metadata(), request_, size,
-                                     /*pack_as_bytes=*/false, /*include_peer_certificate=*/false);
+                                     /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
+                                     Protobuf::Map<std::string, std::string>());
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ("true", request_.attributes().request().http().headers().at(
@@ -195,7 +209,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
   CheckRequestUtils::createHttpCheck(
       &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), request_, buffer_->length(), /*pack_as_bytes=*/false,
-      /*include_peer_certificate=*/false);
+      /*include_peer_certificate=*/false, Protobuf::Map<std::string, std::string>());
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().body());
@@ -227,7 +241,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBodyPackAsBytes) {
   CheckRequestUtils::createHttpCheck(
       &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), request_, buffer_->length(), /*pack_as_bytes=*/true,
-      /*include_peer_certificate=*/false);
+      /*include_peer_certificate=*/false, Protobuf::Map<std::string, std::string>());
 
   // TODO(dio): Find a way to test this without using function from testing::internal namespace.
   testing::internal::CaptureStderr();

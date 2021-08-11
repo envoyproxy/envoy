@@ -16,7 +16,10 @@ typed_config:
     policies:
       foo:
         permissions:
-          - header: { name: ":method", exact_match: "GET" }
+          - header:
+              name: ":method"
+              string_match:
+                exact: "GET"
         principals:
           - any: true
 )EOF";
@@ -30,7 +33,10 @@ typed_config:
     policies:
       "deny policy":
         permissions:
-          - header: { name: ":method", exact_match: "GET" }
+          - header:
+              name: ":method"
+              string_match:
+                exact: "GET"
         principals:
           - any: true
 )EOF";
@@ -43,7 +49,10 @@ typed_config:
     policies:
       foo:
         permissions:
-          - header: { name: ":path", prefix_match: "/foo" }
+          - header:
+              name: ":path"
+              string_match:
+                prefix: "/foo"
         principals:
           - any: true
 )EOF";
@@ -85,7 +94,10 @@ typed_config:
     policies:
       foo:
         permissions:
-          - header: { name: ":method", exact_match: "GET" }
+          - header:
+              name: ":method"
+              string_match:
+                exact: "GET"
         principals:
           - any: true
 )EOF";

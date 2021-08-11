@@ -22,6 +22,9 @@ namespace {
 // This includes the NULL (StringUtil::itoa technically only needs 21).
 constexpr size_t MaxIntegerLength{32};
 
+constexpr absl::string_view DelimiterForInlineHeaders{","};
+constexpr absl::string_view DelimiterForInlineCookies{"; "};
+
 void validateCapacity(uint64_t new_capacity) {
   // If the resizing will cause buffer overflow due to hitting uint32_t::max, an OOM is likely
   // imminent. Fast-fail rather than allow a buffer overflow attack (issue #1421)
@@ -40,6 +43,19 @@ InlineHeaderVector& getInVec(VariantHeader& buffer) {
 const InlineHeaderVector& getInVec(const VariantHeader& buffer) {
   return absl::get<InlineHeaderVector>(buffer);
 }
+
+bool validatedLowerCaseString(absl::string_view str) {
+  auto lower_case_str = LowerCaseString(str);
+  return lower_case_str == str;
+}
+
+absl::string_view delimiterByHeader(const LowerCaseString& key, bool correctly_coalesce_cookies) {
+  if (correctly_coalesce_cookies && key == Http::Headers::get().Cookie) {
+    return DelimiterForInlineCookies;
+  }
+  return DelimiterForInlineHeaders;
+}
+
 } // namespace
 
 // Initialize as a Type::Inline
@@ -362,8 +378,10 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
     if (*lookup.value().entry_ == nullptr) {
       maybeCreateInline(lookup.value().entry_, *lookup.value().key_, std::move(value));
     } else {
+      const auto delimiter =
+          delimiterByHeader(*lookup.value().key_, header_map_correctly_coalesce_cookies_);
       const uint64_t added_size =
-          appendToHeader((*lookup.value().entry_)->value(), value.getStringView());
+          appendToHeader((*lookup.value().entry_)->value(), value.getStringView(), delimiter);
       addSize(added_size);
       value.clear();
     }
@@ -428,10 +446,8 @@ void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view val
   // TODO(#9221): converge on and document a policy for coalescing multiple headers.
   auto entry = getExisting(key);
   if (!entry.empty()) {
-    const std::string delimiter = (key == Http::Headers::get().Cookie ? "; " : ",");
-    const uint64_t added_size = header_map_correctly_coalesce_cookies_
-                                    ? appendToHeader(entry[0]->value(), value, delimiter)
-                                    : appendToHeader(entry[0]->value(), value);
+    const auto delimiter = delimiterByHeader(key, header_map_correctly_coalesce_cookies_);
+    const uint64_t added_size = appendToHeader(entry[0]->value(), value, delimiter);
     addSize(added_size);
   } else {
     addCopy(key, value);
@@ -469,13 +485,13 @@ HeaderMap::GetResult HeaderMapImpl::get(const LowerCaseString& key) const {
   return HeaderMap::GetResult(const_cast<HeaderMapImpl*>(this)->getExisting(key));
 }
 
-HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(const LowerCaseString& key) {
+HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(absl::string_view key) {
   // Attempt a trie lookup first to see if the user is requesting an O(1) header. This may be
   // relatively common in certain header matching / routing patterns.
   // TODO(mattklein123): Add inline handle support directly to the header matcher code to support
   // this use case more directly.
   HeaderMap::NonConstGetResult ret;
-  auto lookup = staticLookup(key.get());
+  auto lookup = staticLookup(key);
   if (lookup.has_value()) {
     if (*lookup.value().entry_ != nullptr) {
       ret.push_back(*lookup.value().entry_);
@@ -486,7 +502,7 @@ HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(const LowerCaseString& k
   // If the requested header is not an O(1) header try using the lazy map to
   // search for it instead of iterating the headers list.
   if (headers_.maybeMakeMap()) {
-    HeaderList::HeaderLazyMap::iterator iter = headers_.mapFind(key.get());
+    HeaderList::HeaderLazyMap::iterator iter = headers_.mapFind(key);
     if (iter != headers_.mapEnd()) {
       const HeaderList::HeaderNodeVector& v = iter->second;
       ASSERT(!v.empty()); // It's impossible to have a map entry with an empty vector as its value.
@@ -502,7 +518,7 @@ HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(const LowerCaseString& k
   // scan. Doing the trie lookup is wasteful in the miss case, but is present for code consistency
   // with other functions that do similar things.
   for (HeaderEntryImpl& header : headers_) {
-    if (header.key() == key.get().c_str()) {
+    if (header.key() == key) {
       ret.push_back(&header);
     }
   }
@@ -556,16 +572,7 @@ size_t HeaderMapImpl::removeIf(const HeaderMap::HeaderMatchPredicate& predicate)
   return old_size - headers_.size();
 }
 
-size_t HeaderMapImpl::remove(const LowerCaseString& key) {
-  const size_t old_size = headers_.size();
-  auto lookup = staticLookup(key.get());
-  if (lookup.has_value()) {
-    removeInline(lookup.value().entry_);
-  } else {
-    subtractSize(headers_.remove(key.get()));
-  }
-  return old_size - headers_.size();
-}
+size_t HeaderMapImpl::remove(const LowerCaseString& key) { return removeExisting(key); }
 
 size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
   return HeaderMapImpl::removeIf([&prefix](const HeaderEntry& entry) -> bool {
@@ -610,6 +617,17 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
   return **entry;
 }
 
+size_t HeaderMapImpl::removeExisting(absl::string_view key) {
+  const size_t old_size = headers_.size();
+  auto lookup = staticLookup(key);
+  if (lookup.has_value()) {
+    removeInline(lookup.value().entry_);
+  } else {
+    subtractSize(headers_.remove(key));
+  }
+  return old_size - headers_.size();
+}
+
 size_t HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
   if (!*ptr_to_entry) {
     return 0;
@@ -648,6 +666,47 @@ HeaderMapImplUtility::getAllHeaderMapImplInfo() {
   ret.push_back(makeHeaderMapImplInfo<ResponseHeaderMapImpl>("response header map"));
   ret.push_back(makeHeaderMapImplInfo<ResponseTrailerMapImpl>("response trailer map"));
   return ret;
+}
+
+absl::optional<absl::string_view>
+RequestHeaderMapImpl::getTraceContext(absl::string_view key) const {
+  ASSERT(validatedLowerCaseString(key));
+  auto result = const_cast<RequestHeaderMapImpl*>(this)->getExisting(key);
+
+  if (result.empty()) {
+    return absl::nullopt;
+  }
+  return result[0]->value().getStringView();
+}
+
+void RequestHeaderMapImpl::setTraceContext(absl::string_view key, absl::string_view val) {
+  ASSERT(validatedLowerCaseString(key));
+  HeaderMapImpl::removeExisting(key);
+
+  HeaderString new_key;
+  new_key.setCopy(key);
+  HeaderString new_val;
+  new_val.setCopy(val);
+
+  HeaderMapImpl::insertByKey(std::move(new_key), std::move(new_val));
+}
+
+void RequestHeaderMapImpl::setTraceContextReferenceKey(absl::string_view key,
+                                                       absl::string_view val) {
+  ASSERT(validatedLowerCaseString(key));
+  HeaderMapImpl::removeExisting(key);
+
+  HeaderString new_val;
+  new_val.setCopy(val);
+
+  HeaderMapImpl::insertByKey(HeaderString(key), std::move(new_val));
+}
+
+void RequestHeaderMapImpl::setTraceContextReference(absl::string_view key, absl::string_view val) {
+  ASSERT(validatedLowerCaseString(key));
+  HeaderMapImpl::removeExisting(key);
+
+  HeaderMapImpl::insertByKey(HeaderString(key), HeaderString(val));
 }
 
 } // namespace Http

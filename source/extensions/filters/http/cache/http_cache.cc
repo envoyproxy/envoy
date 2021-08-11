@@ -9,6 +9,7 @@
 
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
@@ -29,17 +30,14 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   // CacheFilter doesn't create LookupRequests for such requests.
   ASSERT(request_headers.Path(), "Can't form cache lookup key for malformed Http::RequestHeaderMap "
                                  "with null Path.");
-  ASSERT(
-      request_headers.ForwardedProto(),
-      "Can't form cache lookup key for malformed Http::RequestHeaderMap with null ForwardedProto.");
   ASSERT(request_headers.Host(), "Can't form cache lookup key for malformed Http::RequestHeaderMap "
                                  "with null Host.");
-  const Http::HeaderString& forwarded_proto = request_headers.ForwardedProto()->value();
+  absl::string_view scheme = Http::Utility::getScheme(request_headers);
   const auto& scheme_values = Http::Headers::get().SchemeValues;
-  ASSERT(forwarded_proto == scheme_values.Http || forwarded_proto == scheme_values.Https);
+  ASSERT(scheme == scheme_values.Http || scheme == scheme_values.Https);
 
   initializeRequestCacheControl(request_headers);
-  // TODO(toddmgreer): Let config determine whether to include forwarded_proto, host, and
+  // TODO(toddmgreer): Let config determine whether to include scheme, host, and
   // query params.
   // TODO(toddmgreer): get cluster name.
   if (request_headers.getMethodValue() == Http::Headers::get().MethodValues.Get) {
@@ -51,7 +49,7 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   key_.set_cluster_name("cluster_name_goes_here");
   key_.set_host(std::string(request_headers.getHostValue()));
   key_.set_path(std::string(request_headers.getPathValue()));
-  key_.set_clear_http(forwarded_proto == scheme_values.Http);
+  key_.set_clear_http(scheme == scheme_values.Http);
 
   vary_headers_ = vary_allow_list.possibleVariedHeaders(request_headers);
 }

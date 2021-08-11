@@ -679,9 +679,11 @@ routes:
           exact: "add"
       headers:
       - name: custom
-        exact_match: "123"
+        string_match:
+          exact: "123"
       - name: custom1
-        exact_match: "123"
+        string_match:
+          exact: "123"
         invert_match: true
     route:
         cluster: user_service_dubbo_server

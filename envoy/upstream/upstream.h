@@ -92,10 +92,9 @@ public:
    *         will be returned along with the connection vs. the host the method was called on.
    *         If it matters, callers should not assume that the returned host will be the same.
    */
-  virtual CreateConnectionData
-  createConnection(Event::Dispatcher& dispatcher,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
+  virtual CreateConnectionData createConnection(
+      Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const PURE;
 
   /**
    * Create a health check connection for this host.
@@ -104,10 +103,10 @@ public:
    * connection.
    * @return the connection data.
    */
-  virtual CreateConnectionData
-  createHealthCheckConnection(Event::Dispatcher& dispatcher,
-                              Network::TransportSocketOptionsSharedPtr transport_socket_options,
-                              const envoy::config::core::v3::Metadata* metadata) const PURE;
+  virtual CreateConnectionData createHealthCheckConnection(
+      Event::Dispatcher& dispatcher,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      const envoy::config::core::v3::Metadata* metadata) const PURE;
 
   /**
    * @return host specific gauges.

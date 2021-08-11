@@ -175,7 +175,7 @@ void ActiveMessage::onQueryTopicRoute() {
         int32_t read_queue_num = 0;
         if (metadata_fields.contains(RocketmqConstants::get().ReadQueueNum)) {
           read_queue_num = static_cast<int32_t>(
-              metadata_fields.at(RocketmqConstants::get().WriteQueueNum).number_value());
+              metadata_fields.at(RocketmqConstants::get().ReadQueueNum).number_value());
         }
         int32_t write_queue_num = 0;
         if (metadata_fields.contains(RocketmqConstants::get().WriteQueueNum)) {

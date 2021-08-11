@@ -223,6 +223,7 @@ envoy_cc_library(
     srcs = ["stats_matcher_impl.cc"],
     hdrs = ["stats_matcher_impl.h"],
     deps = [
+        ":symbol_table_lib",
         "//envoy/stats:stats_interface",
         "//source/common/common:matchers_lib",
         "//source/common/protobuf",

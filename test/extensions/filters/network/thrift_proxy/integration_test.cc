@@ -41,19 +41,23 @@ public:
                     method_name: "execute"
                     headers:
                     - name: "x-header-1"
-                      exact_match: "x-value-1"
+                      string_match:
+                        exact: "x-value-1"
                     - name: "x-header-2"
-                      safe_regex_match:
-                        google_re2: {}
-                        regex: "0.[5-9]"
+                      string_match:
+                        safe_regex:
+                          google_re2: {}
+                          regex: "0.[5-9]"
                     - name: "x-header-3"
                       range_match:
                         start: 100
                         end: 200
                     - name: "x-header-4"
-                      prefix_match: "user_id:"
+                      string_match:
+                        prefix: "user_id:"
                     - name: "x-header-5"
-                      suffix_match: "asdf"
+                      string_match:
+                        suffix: "asdf"
                   route:
                     cluster: "cluster_1"
                 - match:

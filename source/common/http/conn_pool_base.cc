@@ -10,8 +10,8 @@
 namespace Envoy {
 namespace Http {
 
-Network::TransportSocketOptionsSharedPtr
-wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_socket_options,
+Network::TransportSocketOptionsConstSharedPtr
+wrapTransportSocketOptions(Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                            std::vector<Protocol> protocols) {
   std::vector<std::string> fallbacks;
   for (auto protocol : protocols) {
@@ -44,7 +44,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
 HttpConnPoolImplBase::HttpConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
     std::vector<Http::Protocol> protocols)
     : Envoy::ConnectionPool::ConnPoolImplBase(
@@ -141,7 +141,7 @@ void MultiplexedActiveClientBase::onStreamDestroy() {
   // wait until the connection has been fully drained of streams and then check in the connection
   // event callback.
   if (!closed_with_active_rq_) {
-    parent().checkForDrained();
+    parent().checkForIdleAndCloseIdleConnsIfDraining();
   }
 }
 

@@ -293,13 +293,67 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
       ->mutable_source_address()
       ->set_address("1.1.1.1");
 
+  // Test mixed case extension.
   const std::string filename =
-      TestEnvironment::writeStringToFileForTest("proto.pb", bootstrap.SerializeAsString());
+      TestEnvironment::writeStringToFileForTest("proto.pB", bootstrap.SerializeAsString());
 
   envoy::config::bootstrap::v3::Bootstrap proto_from_file;
   TestUtility::loadFromFile(filename, proto_from_file, *api_);
   EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
+}
+
+// Verify different YAML extensions using different cases.
+TEST_F(ProtobufUtilityTest, YamlExtensions) {
+  const std::string bootstrap_yaml = R"EOF(
+layered_runtime:
+  layers:
+  - name: static_layer
+    static_layer:
+      foo: true)EOF";
+
+  {
+    const std::string filename =
+        TestEnvironment::writeStringToFileForTest("proto.yAml", bootstrap_yaml);
+
+    envoy::config::bootstrap::v3::Bootstrap proto_from_file;
+    TestUtility::loadFromFile(filename, proto_from_file, *api_);
+    TestUtility::validate(proto_from_file);
+  }
+  {
+    const std::string filename =
+        TestEnvironment::writeStringToFileForTest("proto.yMl", bootstrap_yaml);
+
+    envoy::config::bootstrap::v3::Bootstrap proto_from_file;
+    TestUtility::loadFromFile(filename, proto_from_file, *api_);
+    TestUtility::validate(proto_from_file);
+  }
+}
+
+// Verify different JSON extensions using different cases.
+TEST_F(ProtobufUtilityTest, JsonExtensions) {
+  const std::string bootstrap_json = R"EOF(
+{
+   "layered_runtime": {
+      "layers": [
+         {
+            "name": "static_layer",
+            "static_layer": {
+               "foo": true
+            }
+         }
+      ]
+   }
+})EOF";
+
+  {
+    const std::string filename =
+        TestEnvironment::writeStringToFileForTest("proto.JSoN", bootstrap_json);
+
+    envoy::config::bootstrap::v3::Bootstrap proto_from_file;
+    TestUtility::loadFromFile(filename, proto_from_file, *api_);
+    TestUtility::validate(proto_from_file);
+  }
 }
 
 // Verify that a config with a deprecated field can be loaded with runtime global override.
@@ -364,8 +418,9 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile) {
 
   std::string bootstrap_text;
   ASSERT_TRUE(Protobuf::TextFormat::PrintToString(bootstrap, &bootstrap_text));
+  // Test mixed case extension.
   const std::string filename =
-      TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
+      TestEnvironment::writeStringToFileForTest("proto.pB_Text", bootstrap_text);
 
   envoy::config::bootstrap::v3::Bootstrap proto_from_file;
   TestUtility::loadFromFile(filename, proto_from_file, *api_);
@@ -986,6 +1041,19 @@ type_url: type.googleapis.com/envoy.test.Sensitive
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+TEST_F(ProtobufUtilityTest, RedactTypedStructWithNoTypeUrl) {
+  udpa::type::v1::TypedStruct actual;
+  TestUtility::loadFromYaml(R"EOF(
+value:
+  sensitive_string: This field is sensitive, but we have no way of knowing.
+)EOF",
+                            actual);
+
+  udpa::type::v1::TypedStruct expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
 // Messages packed into `TypedStruct` with unknown type URLs are skipped.
 TEST_F(ProtobufUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
   udpa::type::v1::TypedStruct actual;
@@ -998,6 +1066,20 @@ value:
 
   udpa::type::v1::TypedStruct expected = actual;
   MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlTypedStruct) {
+  udpa::type::v1::TypedStruct actual;
+  udpa::type::v1::TypedStruct expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlAny) {
+  ProtobufWkt::Any actual;
+  MessageUtil::redact(actual);
+  ProtobufWkt::Any expected = actual;
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 

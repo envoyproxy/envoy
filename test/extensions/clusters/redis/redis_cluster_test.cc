@@ -544,10 +544,9 @@ protected:
                              Network::DnsResolver::ResolveCb) -> Network::ActiveDnsQuery* {
           return &active_dns_query_;
         }));
-    ;
     resolver_target.startResolveDns();
 
-    EXPECT_CALL(active_dns_query_, cancel());
+    EXPECT_CALL(active_dns_query_, cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
   }
 
   Stats::TestUtil::TestStore stats_store_;

@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
 
 #include "absl/status/status.h"
@@ -103,9 +104,18 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
 
   MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
 
-  auto match_tree =
-      Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData>(prefix, context, validation_visitor)
-          .create(proto_config.matcher());
+  Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, context};
+  Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
+                            Envoy::Http::Matching::HttpFilterActionContext>
+      matcher_factory(action_context, context.getServerFactoryContext(), validation_visitor);
+  Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData> factory_cb;
+  if (proto_config.has_xds_matcher()) {
+    factory_cb = matcher_factory.create(proto_config.xds_matcher());
+  } else if (proto_config.has_matcher()) {
+    factory_cb = matcher_factory.create(proto_config.matcher());
+  } else {
+    throw EnvoyException("one of `matcher` and `matcher_tree` must be set.");
+  }
 
   if (!validation_visitor.errors().empty()) {
     // TODO(snowp): Output all violations.
@@ -113,8 +123,8 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
                                      validation_visitor.errors()[0]));
   }
 
-  return [filter_factory, match_tree](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    DelegatingFactoryCallbacks delegated_callbacks(callbacks, match_tree());
+  return [filter_factory, factory_cb](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    DelegatingFactoryCallbacks delegated_callbacks(callbacks, factory_cb());
 
     return filter_factory(delegated_callbacks);
   };

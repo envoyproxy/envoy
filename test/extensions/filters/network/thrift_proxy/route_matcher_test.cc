@@ -309,7 +309,8 @@ routes:
       method_name: "method1"
       headers:
       - name: "x-header-1"
-        exact_match: "x-value-1"
+        string_match:
+          exact: "x-value-1"
     route:
       cluster: "cluster1"
 )EOF";
@@ -340,9 +341,10 @@ routes:
       method_name: "method1"
       headers:
       - name: "x-version"
-        safe_regex_match:
-          google_re2: {}
-          regex: "0.[5-9]"
+        string_match:
+          safe_regex:
+            google_re2: {}
+            regex: "0.[5-9]"
     route:
       cluster: "cluster1"
 )EOF";
@@ -453,7 +455,8 @@ routes:
       method_name: "method1"
       headers:
       - name: "x-header-1"
-        prefix_match: "user_id:"
+        string_match:
+          prefix: "user_id:"
     route:
       cluster: "cluster1"
 )EOF";
@@ -489,7 +492,8 @@ routes:
       method_name: "method1"
       headers:
       - name: "x-header-1"
-        suffix_match: "asdf"
+        string_match:
+          suffix: "asdf"
     route:
       cluster: "cluster1"
 )EOF";

@@ -27,4 +27,5 @@ Common messages
   ../extensions/filters/common/dependency/v3/dependency.proto
   ../extensions/filters/common/matcher/action/v3/skip_action.proto
   ../extensions/matching/input_matchers/consistent_hashing/v3/consistent_hashing.proto
+  ../extensions/matching/input_matchers/ip/v3/ip.proto
   ../extensions/matching/common_inputs/environment_variable/v3/input.proto
