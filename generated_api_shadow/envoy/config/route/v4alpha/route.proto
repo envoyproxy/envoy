@@ -6,10 +6,7 @@ import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/route/v4alpha/route_components.proto";
 
-<<<<<<< HEAD
-=======
 import "google/protobuf/any.proto";
->>>>>>> 3ca024e190657d26bf8801abb65d4317f08ec653
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -25,11 +22,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 // * HTTP :ref:`router filter <config_http_filters_router>`
 
-<<<<<<< HEAD
-// [#next-free-field: 12]
-=======
 // [#next-free-field: 13]
->>>>>>> 3ca024e190657d26bf8801abb65d4317f08ec653
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.route.v3.RouteConfiguration";
@@ -128,8 +121,6 @@ message RouteConfiguration {
   //   is not subject to data plane buffering controls.
   //
   google.protobuf.UInt32Value max_direct_response_body_size_bytes = 11;
-<<<<<<< HEAD
-=======
 
   // The per_filter_config field can be used to provide 'global level' route
   // configurations for filters. The key should match the filter name, such as
@@ -140,7 +131,6 @@ message RouteConfiguration {
   // :ref:`FilterConfig<envoy_v3_api_msg_config.route.v3.FilterConfig>`
   // message to specify additional options.]
   map<string, google.protobuf.Any> typed_per_filter_config = 12;
->>>>>>> 3ca024e190657d26bf8801abb65d4317f08ec653
 }
 
 message Vhds {
