@@ -24,6 +24,7 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
 
+using envoy::extensions::filters::http::ext_proc::v3alpha::ExtProcPerRoute;
 using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
 using envoy::service::ext_proc::v3alpha::BodyResponse;
 using envoy::service::ext_proc::v3alpha::CommonResponse;
@@ -55,9 +56,11 @@ class HttpFilterTest : public testing::Test {
 protected:
   void initialize(std::string&& yaml) {
     client_ = std::make_unique<MockClient>();
+    route_ = std::make_shared<NiceMock<Router::MockRoute>>();
     EXPECT_CALL(*client_, start(_)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .Times(AnyNumber())
         .WillRepeatedly(Invoke([this](Unused) {
@@ -240,6 +243,7 @@ protected:
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
+  Router::RouteConstSharedPtr route_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
@@ -2015,6 +2019,70 @@ TEST_F(HttpFilterTest, OutOfOrder) {
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().spurious_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// When merging two configurations, ensure that the second processing mode
+// overrides the first.
+TEST(OverrideTest, OverrideProcessingMode) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()->mutable_processing_mode()->set_request_header_mode(
+      ProcessingMode::SKIP);
+  ExtProcPerRoute cfg2;
+  cfg2.mutable_overrides()->mutable_processing_mode()->set_request_body_mode(
+      ProcessingMode::STREAMED);
+  cfg2.mutable_overrides()->mutable_processing_mode()->set_response_body_mode(
+      ProcessingMode::BUFFERED);
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+  EXPECT_FALSE(route1.disabled());
+  EXPECT_EQ(route1.processingMode()->request_header_mode(), ProcessingMode::DEFAULT);
+  EXPECT_EQ(route1.processingMode()->request_body_mode(), ProcessingMode::STREAMED);
+  EXPECT_EQ(route1.processingMode()->response_body_mode(), ProcessingMode::BUFFERED);
+}
+
+// When merging two configurations, if the first processing mode is set, and
+// the second is disabled, then the filter should be disabled.
+TEST(OverrideTest, DisableOverridesFirstMode) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()->mutable_processing_mode()->set_request_header_mode(
+      ProcessingMode::SKIP);
+  ExtProcPerRoute cfg2;
+  cfg2.set_disabled(true);
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+  EXPECT_TRUE(route1.disabled());
+  EXPECT_FALSE(route1.processingMode());
+}
+
+// When merging two configurations, if the first override is disabled, and
+// the second has a new mode, then the filter should use the new mode.
+TEST(OverrideTest, ModeOverridesFirstDisable) {
+  ExtProcPerRoute cfg1;
+  cfg1.set_disabled(true);
+  ExtProcPerRoute cfg2;
+  cfg2.mutable_overrides()->mutable_processing_mode()->set_request_header_mode(
+      ProcessingMode::SKIP);
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+  EXPECT_FALSE(route1.disabled());
+  EXPECT_EQ(route1.processingMode()->request_header_mode(), ProcessingMode::SKIP);
+}
+
+// When merging two configurations, if both are disabled, then it's still
+// disabled.
+TEST(OverrideTest, DisabledThingsAreDisabled) {
+  ExtProcPerRoute cfg1;
+  cfg1.set_disabled(true);
+  ExtProcPerRoute cfg2;
+  cfg2.set_disabled(true);
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+  EXPECT_TRUE(route1.disabled());
+  EXPECT_FALSE(route1.processingMode());
 }
 
 } // namespace
