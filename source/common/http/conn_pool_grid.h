@@ -3,6 +3,7 @@
 #include "source/common/http/alternate_protocols_cache_impl.h"
 #include "source/common/http/conn_pool_base.h"
 #include "source/common/http/http3_status_tracker.h"
+#include "source/common/quic/quic_stat_names.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -134,14 +135,20 @@ public:
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
                    AlternateProtocolsCacheSharedPtr alternate_protocols,
                    std::chrono::milliseconds next_attempt_duration,
-                   ConnectivityOptions connectivity_options);
+                   ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
+                   Stats::Scope& scope);
   ~ConnectivityGrid() override;
+
+  // Event::DeferredDeletable
+  void deleteIsPending() override;
 
   // Http::ConnPool::Instance
   bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
-  void addDrainedCallback(DrainedCb cb) override;
+  void addIdleCallback(IdleCb cb) override;
+  bool isIdle() const override;
+  void startDrain() override;
   void drainConnections() override;
   Upstream::HostDescriptionConstSharedPtr host() const override;
   bool maybePreconnect(float preconnect_ratio) override;
@@ -165,12 +172,16 @@ public:
   // event that HTTP/3 is marked broken again.
   void markHttp3Confirmed();
 
+protected:
+  // Set the required idle callback on the pool.
+  void setupPool(ConnectionPool::Instance& pool);
+
 private:
   friend class ConnectivityGridForTest;
 
-  // Called by each pool as it drains. The grid is responsible for calling
-  // drained_callbacks_ once all pools have drained.
-  void onDrainReceived();
+  // Called by each pool as it idles. The grid is responsible for calling
+  // idle_callbacks_ once all pools have idled.
+  void onIdleReceived();
 
   // Returns true if HTTP/3 should be attempted because there is an alternate protocol
   // that specifies HTTP/3 and HTTP/3 is not broken.
@@ -194,22 +205,29 @@ private:
   // TODO(RyanTheOptimist): Make the alternate_protocols_ member non-optional.
   AlternateProtocolsCacheSharedPtr alternate_protocols_;
 
-  // Tracks how many drains are needed before calling drain callbacks. This is
-  // set to the number of pools when the first drain callbacks are added, and
-  // decremented as various pools drain.
-  uint32_t drains_needed_ = 0;
+  // True iff this pool is draining. No new streams or connections should be created
+  // in this state.
+  bool draining_{false};
+
   // Tracks the callbacks to be called on drain completion.
-  std::list<Instance::DrainedCb> drained_callbacks_;
+  std::list<Instance::IdleCb> idle_callbacks_;
 
   // The connection pools to use to create new streams, ordered in the order of
   // desired use.
   std::list<ConnectionPool::InstancePtr> pools_;
+
   // True iff under the stack of the destructor, to avoid calling drain
   // callbacks on deletion.
   bool destroying_{};
 
+  // True iff this pool is being being defer deleted.
+  bool deferred_deleting_{};
+
   // Wrapped callbacks are stashed in the wrapped_callbacks_ for ownership.
   std::list<WrapperCallbacksPtr> wrapped_callbacks_;
+
+  Quic::QuicStatNames& quic_stat_names_;
+  Stats::Scope& scope_;
 };
 
 } // namespace Http

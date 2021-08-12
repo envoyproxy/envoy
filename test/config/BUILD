@@ -44,3 +44,15 @@ envoy_cc_test_library(
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test_library(
+    name = "v2_link_hacks",
+    hdrs = ["v2_link_hacks.h"],
+    deps = [
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/ratelimit/v2:pkg_cc_proto",
+    ],
+    alwayslink = 1,
+)

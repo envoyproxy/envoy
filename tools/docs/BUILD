@@ -12,7 +12,7 @@ py_binary(
     srcs = ["generate_extensions_security_rst.py"],
     data = ["//source/extensions:extensions_metadata.yaml"],
     deps = [
-        requirement("pyyaml"),
+        "//tools/base:utils",
     ],
 )
 
@@ -38,6 +38,7 @@ envoy_py_binary(
     name = "tools.docs.sphinx_runner",
     deps = [
         "//tools/base:runner",
+        "//tools/base:utils",
         requirement("alabaster"),
         requirement("Babel"),
         requirement("certifi"),
@@ -54,7 +55,6 @@ envoy_py_binary(
         requirement("Pygments"),
         requirement("pyparsing"),
         requirement("pytz"),
-        requirement("pyyaml"),
         requirement("requests"),
         requirement("setuptools"),
         requirement("six"),

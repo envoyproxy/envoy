@@ -9,10 +9,11 @@ Envoy can fully reload itself (both code and configuration) without dropping exi
 during the :ref:`drain process <arch_overview_draining>`. The hot restart functionality has the
 following general architecture:
 
-* Statistics and some locks are kept in a shared memory region. This means that gauges will be
-  consistent across both processes as restart is taking place.
 * The two active processes communicate with each other over unix domain sockets using a basic RPC
-  protocol.
+  protocol. All counters are sent from the old process to the new process over the unix domain, and
+  gauges are transported except those marked with `NeverImport`. After hot restart is finished, the
+  gauges transported from the old process will be cleanup, but special gauge like
+  :ref:`server.hot_restart_generation statistic <server_statistics>` is retained.
 * The new process fully initializes itself (loads the configuration, does an initial service
   discovery and health checking phase, etc.) before it asks for copies of the listen sockets from
   the old process. The new process starts listening and then tells the old process to start

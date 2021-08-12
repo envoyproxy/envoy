@@ -63,7 +63,7 @@ void ActiveClient::StreamWrapper::onDecodeComplete() {
     pool->scheduleOnUpstreamReady();
     parent_.stream_wrapper_.reset();
 
-    pool->checkForDrained();
+    pool->checkForIdleAndCloseIdleConnsIfDraining();
   }
 }
 

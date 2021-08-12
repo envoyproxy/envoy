@@ -12,12 +12,24 @@ def test_python_checker_constructor():
     assert checker.args.paths == ['path1', 'path2', 'path3']
 
 
-def test_python_diff_path():
+@pytest.mark.parametrize("diff_path", ["", None, "PATH"])
+def test_python_diff_path(patches, diff_path):
     checker = python_check.PythonChecker("path1", "path2", "path3")
-    args_mock = patch("tools.code_format.python_check.PythonChecker.args", new_callable=PropertyMock)
+    patched = patches(
+        "pathlib",
+        ("PythonChecker.args", dict(new_callable=PropertyMock)),
+        prefix="tools.code_format.python_check")
 
-    with args_mock as m_args:
-        assert checker.diff_file_path == m_args.return_value.diff_file
+    with patched as (m_plib, m_args):
+        m_args.return_value.diff_file = diff_path
+        assert checker.diff_file_path == (m_plib.Path.return_value if diff_path else None)
+
+    if diff_path:
+        assert (
+            list(m_plib.Path.call_args)
+            == [(m_args.return_value.diff_file, ), {}])
+    else:
+        assert not m_plib.Path.called
 
 
 def test_python_flake8_app(patches):
@@ -48,38 +60,37 @@ def test_python_flake8_args(patches):
     with patched as (m_flake8_config, m_path):
         assert (
             checker.flake8_args
-            == ['--config',
-                m_flake8_config.return_value, m_path.return_value])
+            == ('--config',
+                str(m_flake8_config.return_value),
+                str(m_path.return_value)))
 
 
 def test_python_flake8_config_path(patches):
     checker = python_check.PythonChecker("path1", "path2", "path3")
     patched = patches(
         ("PythonChecker.path", dict(new_callable=PropertyMock)),
-        "os.path.join",
         prefix="tools.code_format.python_check")
 
-    with patched as (m_path, m_join):
-        assert checker.flake8_config_path == m_join.return_value
+    with patched as (m_path, ):
+        assert checker.flake8_config_path == m_path.return_value.joinpath.return_value
 
     assert (
-        list(m_join.call_args)
-        == [(m_path.return_value, python_check.FLAKE8_CONFIG), {}])
+        list(m_path.return_value.joinpath.call_args)
+        == [(python_check.FLAKE8_CONFIG, ), {}])
 
 
 def test_python_yapf_config_path(patches):
     checker = python_check.PythonChecker("path1", "path2", "path3")
     patched = patches(
         ("PythonChecker.path", dict(new_callable=PropertyMock)),
-        "os.path.join",
         prefix="tools.code_format.python_check")
 
-    with patched as (m_path, m_join):
-        assert checker.yapf_config_path == m_join.return_value
+    with patched as (m_path, ):
+        assert checker.yapf_config_path == m_path.return_value.joinpath.return_value
 
     assert (
-        list(m_join.call_args)
-        == [(m_path.return_value, python_check.YAPF_CONFIG), {}])
+        list(m_path.return_value.joinpath.call_args)
+        == [(python_check.YAPF_CONFIG, ), {}])
 
 
 def test_python_yapf_files(patches):
@@ -102,7 +113,7 @@ def test_python_yapf_files(patches):
              'exclude': m_yapf_exclude.return_value}])
     assert (
         list(m_yapf_exclude.call_args)
-        == [(m_path.return_value,), {}])
+        == [(str(m_path.return_value),), {}])
 
 
 def test_python_add_arguments(patches):
@@ -194,7 +205,7 @@ def test_python_check_yapf(patches):
         == [[('file1',), {}], [('file2',), {}], [('file3',), {}]])
 
 
-TEST_CHECK_RESULTS = (
+TEST_CHECK_RESULTS: tuple = (
     ("check1", [], []),
     ("check1", ["check2", "check3"], ["check4", "check5"]),
     ("check1", ["check1", "check3"], ["check4", "check5"]),
@@ -238,15 +249,15 @@ def test_python_on_checks_complete(patches, results):
     checker = python_check.PythonChecker("path1", "path2", "path3")
     diff_path, failed = results
     patched = patches(
-        "open",
         "checker.ForkingChecker.subproc_run",
         "checker.Checker.on_checks_complete",
         ("PythonChecker.diff_file_path", dict(new_callable=PropertyMock)),
         ("PythonChecker.has_failed", dict(new_callable=PropertyMock)),
         prefix="tools.code_format.python_check")
 
-    with patched as (m_open, m_fork, m_super, m_diff, m_failed):
-        m_diff.return_value = diff_path
+    with patched as (m_fork, m_super, m_diff, m_failed):
+        if not diff_path:
+            m_diff.return_value = None
         m_failed.return_value = failed
         assert checker.on_checks_complete() == m_super.return_value
 
@@ -255,14 +266,10 @@ def test_python_on_checks_complete(patches, results):
             list(m_fork.call_args)
             == [(['git', 'diff', 'HEAD'],), {}])
         assert (
-            list(m_open.call_args)
-            == [(diff_path, 'wb'), {}])
-        assert (
-            list(m_open.return_value.__enter__.return_value.write.call_args)
+            list(m_diff.return_value.write_bytes.call_args)
             == [(m_fork.return_value.stdout,), {}])
     else:
         assert not m_fork.called
-        assert not m_open.called
 
     assert (
         list(m_super.call_args)
@@ -285,7 +292,7 @@ def test_python_yapf_format(patches, fix):
     assert (
         list(m_format.call_args)
         == [('FILENAME',),
-            {'style_config': m_config.return_value,
+            {'style_config': str(m_config.return_value),
              'in_place': fix,
              'print_diff': not fix}])
     assert (

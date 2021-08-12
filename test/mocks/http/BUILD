@@ -108,3 +108,11 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_mock(
+    name = "stream_reset_handler_mock",
+    hdrs = ["stream_reset_handler.h"],
+    deps = [
+        "//envoy/http:stream_reset_handler_interface",
+    ],
+)

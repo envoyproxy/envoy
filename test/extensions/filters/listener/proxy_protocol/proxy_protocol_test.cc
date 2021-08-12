@@ -335,7 +335,8 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
-            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
+                .return_value_;
           }));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
@@ -395,7 +396,8 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
-            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
+                .return_value_;
           }));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
@@ -605,7 +607,7 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t n, int flags) {
         const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
-        if (x.rc_ == sizeof(tlv)) {
+        if (x.return_value_ == sizeof(tlv)) {
           return Api::SysCallSizeResult{-1, 0};
         } else {
           return x;
@@ -630,7 +632,8 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
-            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
+                .return_value_;
           }));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
@@ -782,7 +785,8 @@ TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
-            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
+                .return_value_;
           }));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
@@ -848,7 +852,8 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
-            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
+                .return_value_;
           }));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())

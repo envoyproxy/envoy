@@ -21,7 +21,6 @@ envoy_cc_extension(
         "//envoy/server:factory_context_interface",
         "//envoy/server:instance_interface",
         "//source/extensions/common/wasm:wasm_lib",
-        "//source/extensions/stat_sinks:well_known_names",
         "//source/server:configuration_lib",
         "@envoy_api//envoy/extensions/stat_sinks/wasm/v3:pkg_cc_proto",
     ],

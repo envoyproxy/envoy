@@ -286,8 +286,8 @@ TEST_F(ProxyFilterTest, HostRewrite) {
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
-  EXPECT_CALL(callbacks_.route_->route_entry_,
-              perFilterConfig("envoy.filters.http.dynamic_forward_proxy"))
+  EXPECT_CALL(*callbacks_.route_,
+              mostSpecificPerFilterConfig("envoy.filters.http.dynamic_forward_proxy"))
       .WillOnce(Return(&config));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar"), 80, _))
       .WillOnce(Return(
@@ -315,8 +315,8 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
-  EXPECT_CALL(callbacks_.route_->route_entry_,
-              perFilterConfig("envoy.filters.http.dynamic_forward_proxy"))
+  EXPECT_CALL(*callbacks_.route_,
+              mostSpecificPerFilterConfig("envoy.filters.http.dynamic_forward_proxy"))
       .WillOnce(Return(&config));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar:82"), 80, _))
       .WillOnce(Return(

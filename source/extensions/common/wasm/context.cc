@@ -524,8 +524,8 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   case PropertyToken::CLUSTER_NAME:
     if (info && info->upstreamHost()) {
       return CelValue::CreateString(&info->upstreamHost()->cluster().name());
-    } else if (info && info->routeEntry()) {
-      return CelValue::CreateString(&info->routeEntry()->clusterName());
+    } else if (info && info->route() && info->route()->routeEntry()) {
+      return CelValue::CreateString(&info->route()->routeEntry()->clusterName());
     } else if (info && info->upstreamClusterInfo().has_value() &&
                info->upstreamClusterInfo().value()) {
       return CelValue::CreateString(&info->upstreamClusterInfo().value()->name());
@@ -551,8 +551,8 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     break;
   case PropertyToken::ROUTE_METADATA:
-    if (info && info->routeEntry()) {
-      return CelProtoWrapper::CreateMessage(&info->routeEntry()->metadata(), arena);
+    if (info && info->route()) {
+      return CelProtoWrapper::CreateMessage(&info->route()->metadata(), arena);
     }
     break;
   case PropertyToken::PLUGIN_NAME:

@@ -20,5 +20,8 @@ The Apple-based DNS Resolver emits the following stats rooted in the ``dns.apple
     :widths: 1, 1, 2
 
     connection_failure, Counter, Number of failed attempts to connect to the DNS server
-    socket_failure, Counter, Number of failed attempts to obtain a file descriptor to the socket to the DNS server
+    get_addr_failure, Counter, Number of general failures when calling GetAddrInfo API
+    network_failure, Counter, Number of failures due to network connectivity
     processing_failure, Counter, Number of failures when processing data from the DNS server
+    socket_failure, Counter, Number of failed attempts to obtain a file descriptor to the socket to the DNS server
+    timeout, Counter, Number of queries that resulted in a timeout

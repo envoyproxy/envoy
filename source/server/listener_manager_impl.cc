@@ -87,10 +87,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
-                  proto_config.has_typed_config()
-                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                      : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config())));
+                  static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -121,10 +118,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
-                  proto_config.has_typed_config()
-                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                      : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config())));
+                  static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -149,10 +143,7 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
-                  proto_config.has_typed_config()
-                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                      : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config())));
+                  static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -243,7 +234,8 @@ DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& drain
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
                                          WorkerFactory& worker_factory,
-                                         bool enable_dispatcher_stats)
+                                         bool enable_dispatcher_stats,
+                                         Quic::QuicStatNames& quic_stat_names)
     : server_(server), factory_(listener_factory),
       scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
       config_tracker_entry_(server.admin().getConfigTracker().add(
@@ -251,8 +243,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
           [this](const Matchers::StringMatcher& name_matcher) {
             return dumpListenerConfigs(name_matcher);
           })),
-      enable_dispatcher_stats_(enable_dispatcher_stats),
-      quic_stat_names_(server_.stats().symbolTable()) {
+      enable_dispatcher_stats_(enable_dispatcher_stats), quic_stat_names_(quic_stat_names) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
         worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));
@@ -448,7 +439,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     // In this case we can just replace inline.
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
-    if (*(*existing_warming_listener)->address() != *new_listener->address()) {
+    if (!(*existing_warming_listener)->hasCompatibleAddress(*new_listener)) {
       setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
     } else {
       new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory().clone());
@@ -457,7 +448,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not.
-    if (*(*existing_active_listener)->address() != *new_listener->address()) {
+    if (!(*existing_active_listener)->hasCompatibleAddress(*new_listener)) {
       setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
     } else {
       new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory().clone());
@@ -495,10 +486,10 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   return true;
 }
 
-bool ListenerManagerImpl::hasListenerWithAddress(const ListenerList& list,
-                                                 const Network::Address::Instance& address) {
-  for (const auto& listener : list) {
-    if (*listener->address() == address) {
+bool ListenerManagerImpl::hasListenerWithCompatibleAddress(const ListenerList& list,
+                                                           const ListenerImpl& listener) {
+  for (const auto& existing_listener : list) {
+    if (existing_listener->hasCompatibleAddress(listener)) {
       return true;
     }
   }
@@ -930,6 +921,15 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
                                      "{}. \nUse QuicDownstreamTransport instead.",
                                      transport_socket.DebugString()));
   }
+  const std::string hcm_str =
+      "type.googleapis.com/"
+      "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
+  if (is_quic && (filter_chain.filters().size() != 1 ||
+                  filter_chain.filters(0).typed_config().type_url() != hcm_str)) {
+    throw EnvoyException(fmt::format(
+        "error building network filter chain for quic listener: requires exactly one http_"
+        "connection_manager filter."));
+  }
 #else
   // When QUIC is compiled out it should not be possible to configure either the QUIC transport
   // socket or the QUIC listener and get to this point.
@@ -962,8 +962,8 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
   // is an edge case and nothing will explicitly break, but there is no possibility that two
   // listeners that do not bind will ever be used. Only the first one will be used when searched for
   // by address. Thus we block it.
-  if (!listener.bindToPort() && (hasListenerWithAddress(warming_listeners_, *listener.address()) ||
-                                 hasListenerWithAddress(active_listeners_, *listener.address()))) {
+  if (!listener.bindToPort() && (hasListenerWithCompatibleAddress(warming_listeners_, listener) ||
+                                 hasListenerWithCompatibleAddress(active_listeners_, listener))) {
     const std::string message =
         fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
                     name, listener.address()->asString());
@@ -980,8 +980,7 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
       draining_listeners_.cbegin(), draining_listeners_.cend(),
       [&listener](const DrainingListener& draining_listener) {
         return draining_listener.listener_->listenSocketFactory().getListenSocket(0)->isOpen() &&
-               *listener.address() ==
-                   *draining_listener.listener_->listenSocketFactory().localAddress();
+               listener.hasCompatibleAddress(*draining_listener.listener_);
       });
 
   if (existing_draining_listener != draining_listeners_.cend()) {

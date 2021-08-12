@@ -139,19 +139,9 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                           config.http_health_check().request_headers_to_remove())),
       http_status_checker_(config.http_health_check().expected_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
-      codec_client_type_(
-          codecClientType(config.http_health_check().hidden_envoy_deprecated_use_http2()
-                              ? envoy::type::v3::HTTP2
-                              : config.http_health_check().codec_client_type())),
+      codec_client_type_(codecClientType(config.http_health_check().codec_client_type())),
       random_generator_(random) {
-  // The deprecated service_name field was previously being used to compare with the health checked
-  // cluster name using a StartsWith comparison. Since StartsWith is essentially a prefix
-  // comparison, representing the intent by using a StringMatcher prefix is a more natural way.
-  if (!config.http_health_check().hidden_envoy_deprecated_service_name().empty()) {
-    envoy::type::matcher::v3::StringMatcher matcher;
-    matcher.set_prefix(config.http_health_check().hidden_envoy_deprecated_service_name());
-    service_name_matcher_.emplace(matcher);
-  } else if (config.http_health_check().has_service_name_matcher()) {
+  if (config.http_health_check().has_service_name_matcher()) {
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
   }
 }
