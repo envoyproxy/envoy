@@ -56,10 +56,15 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "ext_authz_integration_test",
     srcs = ["ext_authz_integration_test.cc"],
+    data = [
+        "ext_authz.yaml",
+    ],
     extension_names = ["envoy.filters.http.ext_authz"],
     deps = [
         "//source/extensions/filters/http/ext_authz:config",
+        "//source/server/config_validation:server_lib",
         "//test/integration:http_integration_lib",
+        "//test/mocks/server:options_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
