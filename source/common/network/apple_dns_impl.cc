@@ -79,6 +79,7 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
     if (error != kDNSServiceErr_NoError) {
       ENVOY_LOG(warn, "DNS resolver error ({}) in dnsServiceGetAddrInfo for {}", error, dns_name);
       chargeGetAddrInfoErrorStats(error);
+      callback(DnsResolver::ResolutionStatus::Failure, {});
       return nullptr;
     }
 
@@ -91,6 +92,7 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
     // Otherwise, hook up the query's UDS socket to the event loop to process updates.
     if (!pending_resolution->dnsServiceRefSockFD()) {
       ENVOY_LOG(warn, "DNS resolver error in dnsServiceRefSockFD for {}", dns_name);
+      callback(DnsResolver::ResolutionStatus::Failure, {});
       return nullptr;
     }
 

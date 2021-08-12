@@ -273,9 +273,9 @@ public:
 
     EXPECT_EQ(nullptr, resolver_->resolve(
                            "foo.com", Network::DnsLookupFamily::Auto,
-                           [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) -> void {
-                             // This callback should never be executed.
-                             FAIL();
+                           [](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& responses) -> void {
+                             EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
+                             EXPECT_TRUE(responses.empty());
                            }));
 
     checkErrorStat(error_code);
