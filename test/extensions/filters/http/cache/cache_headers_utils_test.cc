@@ -23,7 +23,7 @@ namespace Cache {
 namespace {
 
 Protobuf::RepeatedPtrField<::envoy::type::matcher::v3::StringMatcher>
-ToStringMatchers(std::initializer_list<absl::string_view> allow_list) {
+toStringMatchers(std::initializer_list<absl::string_view> allow_list) {
   Protobuf::RepeatedPtrField<::envoy::type::matcher::v3::StringMatcher> proto_allow_list;
   for (const auto& rule : allow_list) {
     ::envoy::type::matcher::v3::StringMatcher* matcher = proto_allow_list.Add();
@@ -535,12 +535,12 @@ struct ParseCommaDelimitedHeaderTestCase {
   std::vector<absl::string_view> expected_values;
 };
 
-std::string GetParseCommaDelimitedHeaderTestName(
+std::string getParseCommaDelimitedHeaderTestName(
     const testing::TestParamInfo<ParseCommaDelimitedHeaderTestCase>& info) {
   return std::string(info.param.name);
 }
 
-std::vector<ParseCommaDelimitedHeaderTestCase> ParseCommaDelimitedHeaderTestParams() {
+std::vector<ParseCommaDelimitedHeaderTestCase> parseCommaDelimitedHeaderTestParams() {
   return {
       {
           "Null",
@@ -604,8 +604,8 @@ class ParseCommaDelimitedHeaderTest
     : public testing::TestWithParam<ParseCommaDelimitedHeaderTestCase> {};
 
 INSTANTIATE_TEST_SUITE_P(ParseCommaDelimitedHeaderTest, ParseCommaDelimitedHeaderTest,
-                         testing::ValuesIn(ParseCommaDelimitedHeaderTestParams()),
-                         GetParseCommaDelimitedHeaderTestName);
+                         testing::ValuesIn(parseCommaDelimitedHeaderTestParams()),
+                         getParseCommaDelimitedHeaderTestName);
 
 TEST_P(ParseCommaDelimitedHeaderTest, ParseCommaDelimitedHeader) {
   ParseCommaDelimitedHeaderTestCase test_case = GetParam();
@@ -622,8 +622,8 @@ TEST_P(ParseCommaDelimitedHeaderTest, ParseCommaDelimitedHeader) {
 }
 
 TEST(CreateVaryIdentifier, IsStableForAllowListOrder) {
-  VaryHeader vary_allow_list1(ToStringMatchers({"width", "accept", "accept-language"}));
-  VaryHeader vary_allow_list2(ToStringMatchers({"accept", "width", "accept-language"}));
+  VaryHeader vary_allow_list1(toStringMatchers({"width", "accept", "accept-language"}));
+  VaryHeader vary_allow_list2(toStringMatchers({"accept", "width", "accept-language"}));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "image/*"}, {"accept-language", "en-us"}, {"width", "640"}};
@@ -681,14 +681,14 @@ TEST(HasVary, NotEmpty) {
 
 TEST(CreateVaryIdentifier, EmptyVaryEntry) {
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}};
-  VaryHeader vary_allow_list(ToStringMatchers({"accept", "accept-language", "width"}));
+  VaryHeader vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
   EXPECT_EQ(vary_allow_list.createVaryIdentifier({}, request_headers), "vary-id\n");
 }
 
 TEST(CreateVaryIdentifier, SingleHeaderExists) {
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}};
-  VaryHeader vary_allow_list(ToStringMatchers({"accept", "accept-language", "width"}));
+  VaryHeader vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
   EXPECT_EQ(vary_allow_list.createVaryIdentifier({"accept"}, request_headers), "vary-id\naccept\r"
                                                                                "image/*\n");
@@ -696,7 +696,7 @@ TEST(CreateVaryIdentifier, SingleHeaderExists) {
 
 TEST(CreateVaryIdentifier, SingleHeaderMissing) {
   Http::TestRequestHeaderMapImpl request_headers;
-  VaryHeader vary_allow_list(ToStringMatchers({"accept", "accept-language", "width"}));
+  VaryHeader vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
   EXPECT_EQ(vary_allow_list.createVaryIdentifier({"accept"}, request_headers),
             "vary-id\naccept\r\n");
@@ -705,7 +705,7 @@ TEST(CreateVaryIdentifier, SingleHeaderMissing) {
 TEST(CreateVaryIdentifier, MultipleHeadersAllExist) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "image/*"}, {"accept-language", "en-us"}, {"width", "640"}};
-  VaryHeader vary_allow_list(ToStringMatchers({"accept", "accept-language", "width"}));
+  VaryHeader vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
   EXPECT_EQ(
       vary_allow_list.createVaryIdentifier({"accept", "accept-language", "width"}, request_headers),
@@ -717,7 +717,7 @@ TEST(CreateVaryIdentifier, MultipleHeadersAllExist) {
 TEST(CreateVaryIdentifier, MultipleHeadersSomeExist) {
   Http::TestResponseHeaderMapImpl response_headers{{"vary", "accept, accept-language, width"}};
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}, {"width", "640"}};
-  VaryHeader vary_allow_list(ToStringMatchers({"accept", "accept-language", "width"}));
+  VaryHeader vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
   EXPECT_EQ(
       vary_allow_list.createVaryIdentifier({"accept", "accept-language", "width"}, request_headers),
@@ -728,7 +728,7 @@ TEST(CreateVaryIdentifier, MultipleHeadersSomeExist) {
 TEST(CreateVaryIdentifier, ExtraRequestHeaders) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "image/*"}, {"heigth", "1280"}, {"width", "640"}};
-  VaryHeader vary_allow_list(ToStringMatchers({"accept", "accept-language", "width"}));
+  VaryHeader vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
   EXPECT_EQ(vary_allow_list.createVaryIdentifier({"accept", "width"}, request_headers),
             "vary-id\naccept\r"
@@ -737,7 +737,7 @@ TEST(CreateVaryIdentifier, ExtraRequestHeaders) {
 
 TEST(CreateVaryIdentifier, MultipleHeadersNoneExist) {
   Http::TestRequestHeaderMapImpl request_headers;
-  VaryHeader vary_allow_list(ToStringMatchers({"accept", "accept-language", "width"}));
+  VaryHeader vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
   EXPECT_EQ(
       vary_allow_list.createVaryIdentifier({"accept", "accept-language", "width"}, request_headers),
@@ -747,7 +747,7 @@ TEST(CreateVaryIdentifier, MultipleHeadersNoneExist) {
 TEST(CreateVaryIdentifier, DifferentHeadersSameValue) {
   // Two requests with the same value for different headers must have different
   // vary-ids.
-  VaryHeader vary_allow_list(ToStringMatchers({"accept", "accept-language", "width"}));
+  VaryHeader vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
   Http::TestRequestHeaderMapImpl request_headers1{{"accept", "foo"}};
   absl::optional<std::string> vary_identifier1 =
@@ -764,7 +764,7 @@ TEST(CreateVaryIdentifier, DifferentHeadersSameValue) {
 
 TEST(CreateVaryIdentifier, MultiValueSameHeader) {
   Http::TestRequestHeaderMapImpl request_headers{{"width", "foo"}, {"width", "bar"}};
-  VaryHeader vary_allow_list(ToStringMatchers({"accept", "accept-language", "width"}));
+  VaryHeader vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
   EXPECT_EQ(vary_allow_list.createVaryIdentifier({"width"}, request_headers), "vary-id\nwidth\r"
                                                                               "foo\r"
@@ -773,14 +773,14 @@ TEST(CreateVaryIdentifier, MultiValueSameHeader) {
 
 TEST(CreateVaryIdentifier, DisallowedHeader) {
   Http::TestRequestHeaderMapImpl request_headers{{"width", "foo"}};
-  VaryHeader vary_allow_list(ToStringMatchers({"accept", "accept-language", "width"}));
+  VaryHeader vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
   EXPECT_EQ(vary_allow_list.createVaryIdentifier({"disallowed"}, request_headers), absl::nullopt);
 }
 
 TEST(CreateVaryIdentifier, DisallowedHeaderWithAllowedHeader) {
   Http::TestRequestHeaderMapImpl request_headers{{"width", "foo"}};
-  VaryHeader vary_allow_list(ToStringMatchers({"accept", "accept-language", "width"}));
+  VaryHeader vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
   EXPECT_EQ(vary_allow_list.createVaryIdentifier({"disallowed,width"}, request_headers),
             absl::nullopt);

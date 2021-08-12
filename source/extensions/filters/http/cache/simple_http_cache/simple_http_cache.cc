@@ -49,9 +49,9 @@ public:
   SimpleInsertContext(LookupContext& lookup_context, SimpleHttpCache& cache)
       : key_(dynamic_cast<SimpleLookupContext&>(lookup_context).request().key()),
         request_headers_(
-            dynamic_cast<SimpleLookupContext&>(lookup_context).request().request_headers()),
+            dynamic_cast<SimpleLookupContext&>(lookup_context).request().requestHeaders()),
         vary_allow_list_(
-            dynamic_cast<SimpleLookupContext&>(lookup_context).request().vary_allow_list()),
+            dynamic_cast<SimpleLookupContext&>(lookup_context).request().varyAllowList()),
         cache_(cache) {}
 
   void insertHeaders(const Http::ResponseHeaderMap& response_headers,
@@ -152,7 +152,7 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
 
   Key varied_request_key = request.key();
   const absl::optional<std::string> vary_identifier =
-      request.vary_allow_list().createVaryIdentifier(vary_header_values, request.request_headers());
+      request.varyAllowList().createVaryIdentifier(vary_header_values, request.requestHeaders());
   if (!vary_identifier.has_value()) {
     // The vary allow list has changed and has made the vary header of this
     // cached value not cacheable.

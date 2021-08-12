@@ -206,8 +206,8 @@ public:
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
                                 ResponseMetadata&& metadata, uint64_t content_length) const;
 
-  const Http::RequestHeaderMap& request_headers() const { return *request_headers_; }
-  const VaryHeader& vary_allow_list() const { return vary_allow_list_; }
+  const Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
+  const VaryHeader& varyAllowList() const { return vary_allow_list_; }
 
 private:
   void initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers);
