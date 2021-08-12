@@ -89,7 +89,7 @@ private:
 class MultiplexedStreamImplBase : public Stream, public StreamCallbackHelper {
 public:
   MultiplexedStreamImplBase(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
-  virtual ~MultiplexedStreamImplBase() { ASSERT(stream_idle_timer_ == nullptr); }
+  ~MultiplexedStreamImplBase() override { ASSERT(stream_idle_timer_ == nullptr); }
   // TODO(mattklein123): Optimally this would be done in the destructor but there are currently
   // deferred delete lifetime issues that need sorting out if the destructor of the stream is
   // going to be able to refer to the parent connection.

@@ -140,12 +140,14 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions());
   http2_options.mutable_initial_stream_window_size()->set_value(32 * 1024);
+#ifdef ENVOY_ENABLE_QUIC
   if (downstream_protocol_ == Http::CodecType::HTTP3) {
     dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
         .quic_config_.SetInitialStreamFlowControlWindowToSend(32 * 1024);
     dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
         .quic_config_.SetInitialSessionFlowControlWindowToSend(32 * 1024);
   }
+#endif
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
