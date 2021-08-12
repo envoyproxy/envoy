@@ -1,5 +1,6 @@
 #include "test/integration/tracked_watermark_buffer.h"
 
+#include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/thread/thread.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/thread_local/thread_local_object.h"
@@ -8,6 +9,18 @@
 
 namespace Envoy {
 namespace Buffer {
+
+TrackedWatermarkBufferFactory::TrackedWatermarkBufferFactory() : TrackedWatermarkBufferFactory(0) {}
+
+TrackedWatermarkBufferFactory::TrackedWatermarkBufferFactory(
+    uint32_t minimum_account_to_track_power_of_two)
+    : WatermarkBufferFactory([minimum_account_to_track_power_of_two]() {
+        auto config = envoy::config::overload::v3::BufferFactoryConfig();
+        if (minimum_account_to_track_power_of_two > 0) {
+          config.set_minimum_account_to_track_power_of_two(minimum_account_to_track_power_of_two);
+        }
+        return config;
+      }()) {}
 
 TrackedWatermarkBufferFactory::~TrackedWatermarkBufferFactory() {
   ASSERT(active_buffer_count_ == 0);

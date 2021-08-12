@@ -582,7 +582,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   }
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
-  // In this case ignore write event processing.
+  // In this case ignore read event processing.
   if (ioHandle().isOpen() && (events & Event::FileReadyType::Read)) {
     onReadReady();
   }

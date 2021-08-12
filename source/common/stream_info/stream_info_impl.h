@@ -68,6 +68,10 @@ struct StreamInfoImpl : public StreamInfo {
                                                                 start_time_monotonic_);
   }
 
+  void setUpstreamConnectionId(uint64_t id) override { upstream_connection_id_ = id; }
+
+  absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
+
   absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const override {
     return duration(last_downstream_rx_byte_received);
   }
@@ -251,10 +255,10 @@ struct StreamInfoImpl : public StreamInfo {
 
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
-       << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
-       << DUMP_OPTIONAL_MEMBER(attempt_count_) << DUMP_MEMBER(health_check_request_)
-       << DUMP_MEMBER(route_name_) << "\n";
+    os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(upstream_connection_id_)
+       << DUMP_OPTIONAL_MEMBER(protocol_) << DUMP_OPTIONAL_MEMBER(response_code_)
+       << DUMP_OPTIONAL_MEMBER(response_code_details_) << DUMP_OPTIONAL_MEMBER(attempt_count_)
+       << DUMP_MEMBER(health_check_request_) << DUMP_MEMBER(route_name_) << "\n";
   }
 
   void setUpstreamClusterInfo(
@@ -297,6 +301,7 @@ struct StreamInfoImpl : public StreamInfo {
   FilterStateSharedPtr filter_state_;
   FilterStateSharedPtr upstream_filter_state_;
   std::string route_name_;
+  absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
 
 private:

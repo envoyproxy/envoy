@@ -211,6 +211,10 @@ public:
 
   const std::string& filterChainName() const override { return filter_chain_name_; }
 
+  void setUpstreamConnectionId(uint64_t id) override { upstream_connection_id_ = id; }
+
+  absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
+
   void setAttemptCount(uint32_t attempt_count) override { attempt_count_ = attempt_count; }
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
@@ -254,9 +258,9 @@ public:
   Envoy::Event::SimulatedTimeSystem test_time_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_{};
   Http::RequestIdStreamInfoProviderSharedPtr request_id_provider_;
-  absl::optional<uint64_t> connection_id_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_{Tracing::Reason::NotTraceable};
+  absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
 };
 
