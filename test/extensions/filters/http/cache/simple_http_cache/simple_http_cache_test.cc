@@ -107,7 +107,7 @@ protected:
     if (body != actual_body) {
       return AssertionFailure() << "Expected body == " << body << "\n  Actual:  " << actual_body;
     }
-    std::cout << "I am before getting trailers\n"; 
+    std::cout << "I am before getting trailers\n";
     const Http::TestResponseTrailerMapImpl actual_trailers = getTrailers(*lookup_context);
     std::cout << "I am after getting trailers\n";
     if (trailers != actual_trailers) {
