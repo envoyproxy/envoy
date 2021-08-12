@@ -16,8 +16,9 @@
 namespace Envoy {
 namespace Network {
 
-constexpr char cares_dns_resolver[] = "envoy.dns_resolver.cares";
-constexpr char apple_dns_resolver[] = "envoy.dns_resolver.apple";
+const std::string cares_dns_resolver = "envoy.dns_resolver.cares";
+const std::string apple_dns_resolver = "envoy.dns_resolver.apple";
+const std::string dns_resolver       = "envoy.network_dnsresolvers";
 
 class DnsResolverFactory : public Config::TypedFactory {
 public:
@@ -29,7 +30,7 @@ public:
       Event::Dispatcher& dispatcher, const Api::Api& api,
       const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) PURE;
 
-  std::string category() const override { return "envoy.network_dnsresolvers"; }
+  std::string category() const override { return dns_resolver; }
 };
 
 // Retrieve the DNS related configurations in the passed in @param config, and store the data into
@@ -74,11 +75,15 @@ makeDnsResolverConfig(const T& config,
                       envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   // If the config has typed_dns_resolver_config, and the corresponding DNS resolver factory
   // is registered, copy it into typed_dns_resolver_config and return.
-  if (config.has_typed_dns_resolver_config() &&
-      Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(config.typed_dns_resolver_config(),
-                                                                       true)) {
-    typed_dns_resolver_config.MergeFrom(config.typed_dns_resolver_config());
-    return;
+  if (config.has_typed_dns_resolver_config()) {
+    Network::DnsResolverFactory* dns_resolver_factory;
+    dns_resolver_factory = Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(config.typed_dns_resolver_config(),
+                                                                                            true);
+    if (dns_resolver_factory != nullptr &&
+        dns_resolver_factory->category() == dns_resolver) {
+      typed_dns_resolver_config.MergeFrom(config.typed_dns_resolver_config());
+      return;
+    }
   }
   // Otherwise, fall back to default behavior:
   // If Envoy is built in MacOS and "envoy.dns_resolver.apple" extension is enabled in build file,
@@ -105,11 +110,8 @@ makeDnsResolverConfig(const T& config,
     if (!config.dns_resolution_config().resolvers().empty()) {
       cares.mutable_resolvers()->MergeFrom(config.dns_resolution_config().resolvers());
     }
-    // Copy dns_resolver_options if config has it.
-    if (config.dns_resolution_config().has_dns_resolver_options()) {
-      cares.mutable_dns_resolver_options()->MergeFrom(
-          config.dns_resolution_config().dns_resolver_options());
-    }
+    cares.mutable_dns_resolver_options()->MergeFrom(
+        config.dns_resolution_config().dns_resolver_options());
   } else {
     // Skipping copying these fields for DnsFilterConfig.
     if constexpr (!(std::is_same_v<T, envoy::extensions::filters::udp::dns_filter::v3alpha::

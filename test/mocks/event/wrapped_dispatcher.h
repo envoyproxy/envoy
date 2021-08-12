@@ -51,9 +51,8 @@ public:
   }
 
   Network::DnsResolverSharedPtr createDnsResolver(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-      const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) override {
-    return impl_.createDnsResolver(resolvers, dns_resolver_options);
+        const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) override {
+    return impl_.createDnsResolver(typed_dns_resolver_config);
   }
 
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,

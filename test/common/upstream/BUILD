@@ -41,6 +41,7 @@ envoy_cc_test(
     deps = [
         ":test_cluster_manager",
         "//source/common/router:context_lib",
+        "//source/extensions/network/dns_resolver/cares:dns_lib",
         "//source/extensions/transport_sockets/tls:config",
         "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/upstream:cds_api_mocks",

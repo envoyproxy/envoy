@@ -15,6 +15,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/dns.h"
+#include "envoy/network/dns_factory.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
@@ -131,8 +132,7 @@ public:
                Network::TransportSocketPtr& transport_socket,
                const Network::ConnectionSocket::OptionsSharedPtr& options));
   MOCK_METHOD(Network::DnsResolverSharedPtr, createDnsResolver,
-              (const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-               const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options));
+              (const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config));
   MOCK_METHOD(FileEvent*, createFileEvent_,
               (os_fd_t fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
   MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());

@@ -12,6 +12,7 @@ envoy_cc_extension(
     name = "dns_lib",
     srcs = ["dns_impl.cc"],
     hdrs = ["dns_impl.h"],
+    visibility = ["//visibility:public"],
     external_deps = ["ares"],
     deps = [
         "//envoy/event:dispatcher_interface",
