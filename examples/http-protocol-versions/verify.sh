@@ -21,9 +21,16 @@ for path in "${path_list[@]}"; do
     curl -svk -o /dev/null --http2 --http2-prior-knowledge "https://localhost:10001/${path}" 2>&1 | grep "HTTP/2 200"
 done
 
+run_log "Build simple HTTP/3 client container"
+pushd ./http3-client
+docker build -t h3client:test .
+popd
+
 run_log "Test HTTP3 -> HTTP1.1/HTTP2/HTTP3"
 for path in "${path_list[@]}"; do
     run_log "HTTP3 -> $path"
-    qcurl -svk -o /dev/null --http3 --resolve test.proxy:10002:127.0.0.1 \
-        "https://test.proxy:10002/$path" 2>&1 | grep "HTTP/3 200"
+    # SNI parameter needs to be set explicitly because when hostname is localhost
+    # crypto handshake fails because it could not figure out the value for SNI parameter
+    docker run -it --name h3client --rm --network=host h3client:test /root/h3client \
+        --sni "test.proxy" --address "https://localhost:10002/${path}" | grep "SUCCESS"
 done
