@@ -79,6 +79,12 @@ enum class BodySendSetting {
   kMaxValue = BufferedPartial // NOLINT: FuzzedDataProvider requires lowercase k
 };
 
+enum class CommonResponseStatus {
+  Continue,
+  ContinueAndReplace,
+  kMaxValue = ContinueAndReplace // NOLINT: FuzzedDataProvider requires lowercase k
+};
+
 // Helper class for fuzzing the ext_proc filter.
 // This class exposes functions for randomizing fields of ProcessingResponse
 // messages and sub-messages. Further, this class exposes wrappers for
@@ -93,12 +99,13 @@ public:
   grpc::StatusCode randomGrpcStatusCode();
   grpc::Status randomGrpcStatusWithMessage();
 
-  void logRequest(ProcessingRequest* req);
-  void randomizeHeaderMutation(HeaderMutation* headers, ProcessingRequest* req, bool trailers);
-  void randomizeCommonResponse(CommonResponse* msg, ProcessingRequest* req);
-  void randomizeImmediateResponse(ImmediateResponse* msg, ProcessingRequest* req);
+  void logRequest(const ProcessingRequest* req);
+  void randomizeHeaderMutation(HeaderMutation* headers, const ProcessingRequest* req,
+                               const bool trailers);
+  void randomizeCommonResponse(CommonResponse* msg, const ProcessingRequest* req);
+  void randomizeImmediateResponse(ImmediateResponse* msg, const ProcessingRequest* req);
   void randomizeOverrideResponse(ProcessingMode* msg);
-  void randomizeResponse(ProcessingResponse* resp, ProcessingRequest* req);
+  void randomizeResponse(ProcessingResponse* resp, const ProcessingRequest* req);
 
   FuzzedDataProvider* provider_;
 

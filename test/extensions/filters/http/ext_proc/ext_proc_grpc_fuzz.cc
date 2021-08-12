@@ -212,8 +212,7 @@ public:
         return sendDownstreamRequestWithChunks(fdp, fh, absl::nullopt);
       }
     default:
-      ENVOY_LOG_MISC(error, "Unhandled HttpMethod");
-      exit(EXIT_FAILURE);
+      RELEASE_ASSERT(false, "Unhandled HttpMethod");
     }
   }
 
@@ -293,7 +292,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   fuzzer.initializeFuzzer(true);
   ENVOY_LOG_MISC(trace, "Fuzzer initialized");
 
-  auto response = fuzzer.randomDownstreamRequest(&downstream_provider, &fuzz_helper);
+  const auto response = fuzzer.randomDownstreamRequest(&downstream_provider, &fuzz_helper);
 
   // For fuzz testing we don't care about the response code, only that
   // the stream ended in some graceful manner

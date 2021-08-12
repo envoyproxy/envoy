@@ -116,7 +116,7 @@ std::string ExtProcFuzzHelper::consumeRepeatedString() {
 // Since FuzzedDataProvider requires enums to define a kMaxValue, we cannot
 // use the envoy::type::v3::StatusCode enum directly.
 StatusCode ExtProcFuzzHelper::randomHttpStatus() {
-  StatusCode rv = provider_->PickValueInArray(HttpStatusCodes);
+  const StatusCode rv = provider_->PickValueInArray(HttpStatusCodes);
   ENVOY_LOG_MISC(trace, "Selected HTTP StatusCode {}", rv);
   return rv;
 }
@@ -124,12 +124,12 @@ StatusCode ExtProcFuzzHelper::randomHttpStatus() {
 // Since FuzzedDataProvider requires enums to define a kMaxValue, we cannot
 // use the grpc::StatusCode enum directly.
 grpc::StatusCode ExtProcFuzzHelper::randomGrpcStatusCode() {
-  grpc::StatusCode rv = provider_->PickValueInArray(GrpcStatusCodes);
+  const grpc::StatusCode rv = provider_->PickValueInArray(GrpcStatusCodes);
   ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {}", rv);
   return rv;
 }
 
-void ExtProcFuzzHelper::logRequest(ProcessingRequest* req) {
+void ExtProcFuzzHelper::logRequest(const ProcessingRequest* req) {
   if (req->has_request_headers()) {
     ENVOY_LOG_MISC(trace, "Received ProcessingRequest request_headers");
   } else if (req->has_response_headers()) {
@@ -158,7 +158,8 @@ grpc::Status ExtProcFuzzHelper::randomGrpcStatusWithMessage() {
 // request are available in req which allows for more guided manipulation of the
 // headers. The bool value should be false to manipulate headers and
 // true to manipulate trailers (which are also a header map)
-void ExtProcFuzzHelper::randomizeHeaderMutation(HeaderMutation*, ProcessingRequest*, bool) {
+void ExtProcFuzzHelper::randomizeHeaderMutation(HeaderMutation*, const ProcessingRequest*,
+                                                const bool) {
   // Each of the following blocks generates random data for the 2 fields
   // of a HeaderMutation gRPC message
 
@@ -169,23 +170,22 @@ void ExtProcFuzzHelper::randomizeHeaderMutation(HeaderMutation*, ProcessingReque
   // TODO(ikepolinsky): Randomly remove headers
 }
 
-void ExtProcFuzzHelper::randomizeCommonResponse(CommonResponse* msg, ProcessingRequest* req) {
+void ExtProcFuzzHelper::randomizeCommonResponse(CommonResponse* msg, const ProcessingRequest* req) {
   // Each of the following blocks generates random data for the 5 fields
   // of CommonResponse gRPC message
   // 1. Randomize status
   if (provider_->ConsumeBool()) {
-    switch (provider_->ConsumeIntegralInRange<uint32_t>(0, 1)) {
-    case 0:
+    switch (provider_->ConsumeEnum<CommonResponseStatus>()) {
+    case CommonResponseStatus::Continue:
       ENVOY_LOG_MISC(trace, "CommonResponse status CONTINUE");
       msg->set_status(CommonResponse::CONTINUE);
       break;
-    case 1:
+    case CommonResponseStatus::ContinueAndReplace:
       ENVOY_LOG_MISC(trace, "CommonResponse status CONTINUE_AND_REPLACE");
       msg->set_status(CommonResponse::CONTINUE_AND_REPLACE);
       break;
     default:
-      ENVOY_LOG_MISC(trace, "Unhandled case in random CommonResponse Status");
-      exit(EXIT_FAILURE);
+      RELEASE_ASSERT(false, "Unhandled case in random CommonResponse Status");
     }
   }
 
@@ -217,7 +217,8 @@ void ExtProcFuzzHelper::randomizeCommonResponse(CommonResponse* msg, ProcessingR
   }
 }
 
-void ExtProcFuzzHelper::randomizeImmediateResponse(ImmediateResponse* msg, ProcessingRequest* req) {
+void ExtProcFuzzHelper::randomizeImmediateResponse(ImmediateResponse* msg,
+                                                   const ProcessingRequest* req) {
   // Each of the following blocks generates random data for the 5 fields
   // of an ImmediateResponse gRPC message
   // 1. Randomize HTTP status (required)
@@ -268,8 +269,7 @@ void ExtProcFuzzHelper::randomizeOverrideResponse(ProcessingMode* msg) {
       msg->set_request_header_mode(ProcessingMode::SKIP);
       break;
     default:
-      ENVOY_LOG_MISC(error, "HeaderSendSetting not handled");
-      exit(EXIT_FAILURE);
+      RELEASE_ASSERT(false, "HeaderSendSetting not handled");
     }
   }
 
@@ -289,8 +289,7 @@ void ExtProcFuzzHelper::randomizeOverrideResponse(ProcessingMode* msg) {
       msg->set_response_header_mode(ProcessingMode::SKIP);
       break;
     default:
-      ENVOY_LOG_MISC(error, "HeaderSendSetting not handled");
-      exit(EXIT_FAILURE);
+      RELEASE_ASSERT(false, "HeaderSendSetting not handled");
     }
   }
 
@@ -315,8 +314,7 @@ void ExtProcFuzzHelper::randomizeOverrideResponse(ProcessingMode* msg) {
       msg->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
       break;
     default:
-      ENVOY_LOG_MISC(error, "BodySendSetting not handled");
-      exit(EXIT_FAILURE);
+      RELEASE_ASSERT(false, "BodySendSetting not handled");
     }
   }
 
@@ -341,8 +339,7 @@ void ExtProcFuzzHelper::randomizeOverrideResponse(ProcessingMode* msg) {
       msg->set_response_body_mode(ProcessingMode::BUFFERED_PARTIAL);
       break;
     default:
-      ENVOY_LOG_MISC(error, "BodySendSetting not handled");
-      exit(EXIT_FAILURE);
+      RELEASE_ASSERT(false, "BodySendSetting not handled");
     }
   }
 
@@ -362,8 +359,7 @@ void ExtProcFuzzHelper::randomizeOverrideResponse(ProcessingMode* msg) {
       msg->set_request_trailer_mode(ProcessingMode::SKIP);
       break;
     default:
-      ENVOY_LOG_MISC(error, "HeaderSendSetting not handled");
-      exit(EXIT_FAILURE);
+      RELEASE_ASSERT(false, "HeaderSendSetting not handled");
     }
   }
 
@@ -383,13 +379,12 @@ void ExtProcFuzzHelper::randomizeOverrideResponse(ProcessingMode* msg) {
       msg->set_response_trailer_mode(ProcessingMode::SKIP);
       break;
     default:
-      ENVOY_LOG_MISC(error, "HeaderSendSetting not handled");
-      exit(EXIT_FAILURE);
+      RELEASE_ASSERT(false, "HeaderSendSetting not handled");
     }
   }
 }
 
-void ExtProcFuzzHelper::randomizeResponse(ProcessingResponse* resp, ProcessingRequest* req) {
+void ExtProcFuzzHelper::randomizeResponse(ProcessingResponse* resp, const ProcessingRequest* req) {
   // Each of the following switch cases generate random data for 1 of the 7
   // ProcessingResponse.response fields
   switch (provider_->ConsumeEnum<ResponseType>()) {
@@ -454,8 +449,7 @@ void ExtProcFuzzHelper::randomizeResponse(ProcessingResponse* resp, ProcessingRe
     break;
   }
   default:
-    ENVOY_LOG_MISC(error, "ProcessingResponse Action not handled");
-    exit(EXIT_FAILURE);
+    RELEASE_ASSERT(false, "ProcessingResponse Action not handled");
   }
 }
 
