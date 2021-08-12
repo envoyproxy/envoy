@@ -1086,6 +1086,7 @@ TEST_P(HeaderIntegrationTest, TestForwardingPathNormalizationVisibleToUpstream) 
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
               )EOF");
   filter_transformation_ = std::string(
       R"EOF(
@@ -1126,6 +1127,7 @@ TEST_P(HeaderIntegrationTest, TestFilterPathNormalizationInvisibleToUpstream) {
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
               )EOF");
   initializeFilter(HeaderMode::Append, false);
   performRequest(
@@ -1160,6 +1162,7 @@ TEST_P(HeaderIntegrationTest, TestOldPathNormalizationApiIgnoreWhenNewApiConfigu
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
               )EOF");
   filter_transformation_ = std::string(
       R"EOF(
@@ -1197,7 +1200,9 @@ TEST_P(HeaderIntegrationTest, TestDuplicateOperationInPathTransformation) {
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
               )EOF");
   filter_transformation_ = std::string(
       R"EOF(
@@ -1214,6 +1219,7 @@ TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
               )EOF");
   initializeFilter(HeaderMode::Append, false);
   performRequest(
@@ -1246,6 +1252,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesByDefaultUnchanghed) {
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE      
               )EOF");
   initializeFilter(HeaderMode::Append, false);
   performRequest(
@@ -1281,6 +1288,7 @@ TEST_P(HeaderIntegrationTest, EscapedSlashesAndPathTransformationConfigurationCo
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
               )EOF");
   EXPECT_DEATH(initializeFilter(HeaderMode::Append, false), "Details: Lds update failed.");
 }
@@ -1365,6 +1373,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesUnmodified) {
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
               )EOF");
   initializeFilter(HeaderMode::Append, false);
   performRequest(
@@ -1396,8 +1405,11 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesAndNormalizationForwarded) {
   forwarding_transformation_ = R"EOF(
       operations:
       - unescape_slashes: {}
+        normalize_path_action: CONTINUE
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
       - merge_slashes: {}
+        normalize_path_action: CONTINUE
 )EOF";
   initializeFilter(HeaderMode::Append, false);
   performRequest(

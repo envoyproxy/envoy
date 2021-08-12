@@ -22,9 +22,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message PathTransformation {
   // Action to take on a http request when the request path url has been modified by a transformation.
   enum NormalizePathAction {
-    CONTINUE = 0;
-    REJECT = 1;
-    REDIRECT = 2;
+    DEFAULT = 0;
+    CONTINUE = 1;
+    REJECT = 2;
+    REDIRECT = 3;
   }
 
   // A type of operation to alter text.

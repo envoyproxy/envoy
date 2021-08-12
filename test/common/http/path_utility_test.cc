@@ -235,6 +235,7 @@ TEST_F(PathTransformerTest, MergeSlashes) {
   std::string path_transformation_config = R"EOF(
       operations:
       - merge_slashes: {}
+        normalize_path_action: CONTINUE
 )EOF";
   setPathTransformer(path_transformation_config);
   PathTransformer const& path_transformer = pathTransformer();
@@ -263,6 +264,7 @@ TEST_F(PathTransformerTest, RfcNormalize) {
   std::string path_transformation_config = R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
 )EOF";
   setPathTransformer(path_transformation_config);
   PathTransformer const& path_transformer = pathTransformer();
@@ -298,6 +300,7 @@ TEST_F(PathTransformerTest, UnescapeSlashes) {
   std::string path_transformation_config = R"EOF(
       operations:
       - unescape_slashes: {}
+        normalize_path_action: CONTINUE
 )EOF";
   setPathTransformer(path_transformation_config);
   PathTransformer const& path_transformer = pathTransformer();
@@ -393,15 +396,21 @@ TEST_F(PathTransformerTest, DuplicateTransformation) {
   std::string path_transformation_config = R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
       - merge_slashes: {}
+        normalize_path_action: CONTINUE
 )EOF";
   EXPECT_THROW(setPathTransformer(path_transformation_config), EnvoyException);
   path_transformation_config = R"EOF(
       operations:
       - unescape_slashes: {}
+        normalize_path_action: CONTINUE
       - merge_slashes: {}
+        normalize_path_action: CONTINUE
       - merge_slashes: {}
+        normalize_path_action: CONTINUE
 )EOF";
   EXPECT_THROW(setPathTransformer(path_transformation_config), EnvoyException);
 }

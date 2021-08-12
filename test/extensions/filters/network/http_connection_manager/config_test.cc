@@ -1094,7 +1094,9 @@ TEST_F(HttpConnectionManagerConfigTest, ForwadingTransformation) {
     forwarding_transformation:
       operations:
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
       - merge_slashes: {}
+        normalize_path_action: CONTINUE
     http_filter_transformation:
       operations:
   merge_slashes: true
@@ -1126,7 +1128,9 @@ TEST_F(HttpConnectionManagerConfigTest, FilterTransformation) {
     http_filter_transformation:
       operations:
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
       - merge_slashes: {}
+        normalize_path_action: CONTINUE
   merge_slashes: true
   normalize_path: true
   http_filters:
@@ -1154,7 +1158,9 @@ TEST_F(HttpConnectionManagerConfigTest, DuplicatePathTransformation) {
     forwarding_transformation:
       operations:
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
       - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
     http_filter_transformation:
       operations:
   merge_slashes: true

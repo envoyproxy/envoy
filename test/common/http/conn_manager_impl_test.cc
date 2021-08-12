@@ -608,6 +608,7 @@ TEST_F(HttpConnectionManagerImplTest, PathRejectedAfterRfcNormalize) {
   const std::string path_transformer_yaml = R"EOF(
       operations:
       - unescape_slashes: {}
+        normalize_path_action: CONTINUE
       - normalize_path_rfc_3986: {}
         normalize_path_action: REJECT
       - merge_slashes: {}
@@ -672,6 +673,7 @@ TEST_F(HttpConnectionManagerImplTest, PathRedirectAfterMergeSlashesIfGRPC) {
   const std::string path_transformer_yaml = R"EOF(
       operations:
       - unescape_slashes: {}
+        normalize_path_action: CONTINUE
       - normalize_path_rfc_3986: {}
         normalize_path_action: CONTINUE
       - merge_slashes: {}
@@ -723,6 +725,7 @@ TEST_F(HttpConnectionManagerImplTest, RedirectedSpecifiedForMergeSlashes) {
   const std::string path_transformer_yaml = R"EOF(
       operations:
       - unescape_slashes: {}
+        normalize_path_action: CONTINUE
       - normalize_path_rfc_3986: {}
         normalize_path_action: CONTINUE
       - merge_slashes: {}
@@ -770,6 +773,7 @@ TEST_F(HttpConnectionManagerImplTest, AllNormalizationsWithEscapedSlashesForward
   const std::string path_transformer_yaml = R"EOF(
       operations:
       - unescape_slashes: {}
+        normalize_path_action: CONTINUE
       - normalize_path_rfc_3986: {}
         normalize_path_action: CONTINUE
       - merge_slashes: {}
