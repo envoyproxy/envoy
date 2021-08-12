@@ -152,7 +152,7 @@ bool DeltaSubscriptionState::isHeartbeatResource(
   if (const auto itr = ambiguous_resource_state_.find(resource.name());
       itr != wildcard_resource_state_.end()) {
     // In theory we should move the ambiguous resource to wildcard, because probably we shouldn't be
-    // getting hearbeat responses about resources that we are not interested in, but the server
+    // getting heartbeat responses about resources that we are not interested in, but the server
     // could have sent this heartbeat before it learned about our lack of interest in the resource.
     return resource.version() == itr->second;
   }
