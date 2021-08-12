@@ -171,13 +171,13 @@ void ProxyFilter::addHostAddressToFilterState(
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(
-    const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& hostInfo) {
+    const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   ENVOY_STREAM_LOG(debug, "load DNS cache complete, continuing after adding resolved host: {}",
-                   *decoder_callbacks_, hostInfo->resolvedHost());
+                   *decoder_callbacks_, host_info->resolvedHost());
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();
 
-  addHostAddressToFilterState(hostInfo->address());
+  addHostAddressToFilterState(host_info->address());
 
   decoder_callbacks_->continueDecoding();
 }
