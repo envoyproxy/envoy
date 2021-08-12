@@ -55,6 +55,23 @@ AppleDnsResolverStats AppleDnsResolverImpl::generateAppleDnsResolverStats(Stats:
 AppleDnsResolverImpl::StartResolutionResult
 AppleDnsResolverImpl::startResolution(const std::string& dns_name,
                                       DnsLookupFamily dns_lookup_family, ResolveCb callback) {
+  ENVOY_LOG(debug, "DNS resolver resolve={}", dns_name);
+
+  // When an IP address is submitted to c-ares in DnsResolverImpl, c-ares synchronously returns
+  // the IP without submitting a DNS query. Because Envoy has come to rely on this behavior, this
+  // resolver implements a similar resolution path to avoid making improper DNS queries for
+  // resolved IPs.
+  auto address = Utility::parseInternetAddressNoThrow(dns_name);
+
+  if (address != nullptr) {
+    ENVOY_LOG(debug, "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
+              dns_name, address->asString());
+    callback(DnsResolver::ResolutionStatus::Success,
+             {DnsResponse(address, std::chrono::seconds(60))});
+    return {nullptr, true};
+  }
+
+  ENVOY_LOG(trace, "Performing DNS resolution via Apple APIs");
   auto pending_resolution =
       std::make_unique<PendingResolution>(*this, callback, dispatcher_, dns_name);
 
@@ -81,23 +98,6 @@ AppleDnsResolverImpl::startResolution(const std::string& dns_name,
 ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
                                               DnsLookupFamily dns_lookup_family,
                                               ResolveCb callback) {
-  ENVOY_LOG(debug, "DNS resolver resolve={}", dns_name);
-
-  // When an IP address is submitted to c-ares in DnsResolverImpl, c-ares synchronously returns
-  // the IP without submitting a DNS query. Because Envoy has come to rely on this behavior, this
-  // resolver implements a similar resolution path to avoid making improper DNS queries for
-  // resolved IPs.
-  auto address = Utility::parseInternetAddressNoThrow(dns_name);
-
-  if (address != nullptr) {
-    ENVOY_LOG(debug, "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
-              dns_name, address->asString());
-    callback(DnsResolver::ResolutionStatus::Success,
-             {DnsResponse(address, std::chrono::seconds(60))});
-    return nullptr;
-  }
-
-  ENVOY_LOG(trace, "Performing DNS resolution via Apple APIs");
   auto pending_resolution_and_success = startResolution(dns_name, dns_lookup_family, callback);
 
   // If we synchronously failed the resolution, trigger a failure callback.
