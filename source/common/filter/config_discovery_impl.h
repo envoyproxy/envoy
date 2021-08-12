@@ -22,7 +22,6 @@
 
 namespace Envoy {
 namespace Filter {
-namespace Http {
 
 class FilterConfigProviderManagerImpl;
 class FilterConfigSubscription;
@@ -211,6 +210,7 @@ private:
   friend class FilterConfigSubscription;
 };
 
-} // namespace Http
+class HttpFilterConfigProviderManagerImpl : public FilterConfigProviderManagerImpl {};
+
 } // namespace Filter
 } // namespace Envoy

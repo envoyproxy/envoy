@@ -16,7 +16,6 @@
 
 namespace Envoy {
 namespace Filter {
-namespace Http {
 
 namespace {
 void validateTypeUrlHelper(const std::string& type_url,
@@ -339,6 +338,5 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
   return provider;
 }
 
-} // namespace Http
 } // namespace Filter
 } // namespace Envoy
