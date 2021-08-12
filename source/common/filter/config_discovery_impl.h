@@ -4,7 +4,7 @@
 #include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/config/extension_config_provider.h"
 #include "envoy/config/subscription.h"
-#include "envoy/filter/http/filter_config_provider.h"
+#include "envoy/filter/config_provider_manager.h"
 #include "envoy/http/filter.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/factory_context.h"

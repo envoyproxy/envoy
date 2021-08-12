@@ -11,7 +11,7 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
-#include "envoy/filter/http/filter_config_provider.h"
+#include "envoy/filter/config_provider_manager.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"

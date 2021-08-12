@@ -9,7 +9,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/utility.h"
-#include "source/common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/json/json_loader.h"
 
 #include "test/mocks/init/mocks.h"

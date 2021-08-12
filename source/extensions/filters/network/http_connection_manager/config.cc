@@ -20,7 +20,7 @@
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
-#include "source/common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/default_server_string.h"

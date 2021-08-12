@@ -1,4 +1,4 @@
-#include "source/common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/filter/config_discovery_impl.h"
 
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/extension.pb.validate.h"
