@@ -93,7 +93,7 @@ public:
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
                 Http::CodecType::HTTP3)) {
-    config_helper_.addRuntimeOverride("envoy.test_only.per_stream_buffer_accounting",
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.per_stream_buffer_accounting",
                                       streamBufferAccounting() ? "true" : "false");
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
@@ -279,7 +279,7 @@ public:
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
                 Http::CodecType::HTTP3)) {
-    config_helper_.addRuntimeOverride("envoy.test_only.per_stream_buffer_accounting",
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.per_stream_buffer_accounting",
                                       streamBufferAccounting() ? "true" : "false");
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
@@ -406,6 +406,8 @@ protected:
   void initializeOverloadManagerInBootstrap(
       const envoy::config::overload::v3::OverloadAction& overload_action) {
     setupOverloadManagerConfig(overload_action);
+    overload_manager_config_.mutable_buffer_factory_config()
+        ->set_minimum_account_to_track_power_of_two(absl::bit_width(4096u));
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
     });

@@ -1,6 +1,6 @@
-#include "envoy/config/overload/v3/overload.pb.h"
-
 #include <memory>
+
+#include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/http/codec.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -493,14 +493,14 @@ TEST(WatermarkBufferFactoryTest, DefaultsToEffectivelyNotTracking) {
 }
 
 TEST(WatermarkBufferFactoryTest, ShouldOnlyResetAllStreamsGreatThanOrEqualToProvidedIndex) {
-  TrackedWatermarkBufferFactory factory(kMinimumBalanceToTrack);
+  TrackedWatermarkBufferFactory factory(absl::bit_width(kMinimumBalanceToTrack));
   Http::MockStreamResetHandler largest_stream_to_reset;
   Http::MockStreamResetHandler stream_to_reset;
   Http::MockStreamResetHandler stream_that_should_not_be_reset;
 
-  auto largest_account_to_reset = factory.createAccount(&largest_stream_to_reset);
-  auto account_to_reset = factory.createAccount(&stream_to_reset);
-  auto account_to_not_reset = factory.createAccount(&stream_that_should_not_be_reset);
+  auto largest_account_to_reset = factory.createAccount(largest_stream_to_reset);
+  auto account_to_reset = factory.createAccount(stream_to_reset);
+  auto account_to_not_reset = factory.createAccount(stream_that_should_not_be_reset);
 
   largest_account_to_reset->charge(kThresholdForFinalBucket);
   account_to_reset->charge(2 * kMinimumBalanceToTrack);
@@ -532,7 +532,7 @@ TEST(WatermarkBufferFactoryTest, ShouldOnlyResetAllStreamsGreatThanOrEqualToProv
 }
 
 TEST(WatermarkBufferFactoryTest, ComputesBucketToResetCorrectly) {
-  TrackedWatermarkBufferFactory factory(kMinimumBalanceToTrack);
+  TrackedWatermarkBufferFactory factory(absl::bit_width(kMinimumBalanceToTrack));
 
   // Create vector of accounts and handlers
   std::vector<std::unique_ptr<Http::MockStreamResetHandler>> reset_handlers;
@@ -541,7 +541,7 @@ TEST(WatermarkBufferFactoryTest, ComputesBucketToResetCorrectly) {
 
   for (uint32_t i = 0; i < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_; ++i) {
     reset_handlers.emplace_back(std::make_unique<Http::MockStreamResetHandler>());
-    accounts.emplace_back(factory.createAccount(reset_handlers.back().get()));
+    accounts.emplace_back(factory.createAccount(*(reset_handlers.back())));
     accounts.back()->charge(seed_account_balance);
     seed_account_balance *= 2;
   }
