@@ -10,10 +10,10 @@ during the :ref:`drain process <arch_overview_draining>`. The hot restart functi
 following general architecture:
 
 * The two active processes communicate with each other over unix domain sockets using a basic RPC
-  protocol. All counters are from the old process to the new process over the unix domain, while part
-  of gauges are transported. After hot restart finished, the gauges transported from the old process
-  will be cleanup, but special gauge like :ref:`server.hot_restart_generation statistic
-  <server_statistics>` is retained.
+  protocol. All counters are sent from the old process to the new process over the unix domain, and
+  gauges are transported except those marked with `NeverImport`. After hot restart is finished, the
+  gauges transported from the old process will be cleanup, but special gauge like
+  :ref:`server.hot_restart_generation statistic <server_statistics>` is retained.
 * The new process fully initializes itself (loads the configuration, does an initial service
   discovery and health checking phase, etc.) before it asks for copies of the listen sockets from
   the old process. The new process starts listening and then tells the old process to start
