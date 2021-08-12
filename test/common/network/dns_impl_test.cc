@@ -441,6 +441,7 @@ public:
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     listener_ = dispatcher_->createListener(socket_, *server_, true);
     updateDnsResolverOptions();
+    // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
     envoy::config::core::v3::DnsResolverOptions dns_resolver_options = dns_resolver_options_;
     if (setResolverInConstructor()) {
       resolver_ = dispatcher_->createDnsResolver({socket_->addressProvider().localAddress()},
