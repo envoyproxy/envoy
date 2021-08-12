@@ -47,6 +47,7 @@ envoy_cc_library(
         "//source/common/network:dns_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:listener_lib",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ] + select({
         "//bazel:apple": ["//source/common/network:apple_dns_lib"],
         "//conditions:default": [],

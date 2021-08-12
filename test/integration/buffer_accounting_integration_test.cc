@@ -97,7 +97,8 @@ public:
 
 protected:
   std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_ =
-      std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
+      std::make_shared<Buffer::TrackedWatermarkBufferFactory>(
+          absl::bit_width(1024u * 1024u)); // Track >= 1MB
 
   bool streamBufferAccounting() { return std::get<1>(GetParam()); }
 
