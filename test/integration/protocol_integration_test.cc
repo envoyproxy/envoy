@@ -2840,11 +2840,11 @@ TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireByt
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
   }
-  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%\n");
+  useAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%\n");
 
   testRouterDownstreamDisconnectBeforeRequestComplete(nullptr);
 
-  expectWireBytesSentAndReceived(upstream_access_log_name_, 0, 187, 0, 114, 0);
+  expectWireBytesSentAndReceived(access_log_name_, 0, 187, 0, 114, 0);
 }
 
 TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytesCount) {
@@ -2858,6 +2858,7 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytes
 
   expectWireBytesSentAndReceived(upstream_access_log_name_, 0, 187, 0, 114, 0);
 }
+
 
 TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeResponseCompleteWireBytesCount) {
   // we only care about upstream protocol.
@@ -2876,11 +2877,11 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireByte
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
   }
-  useUpstreamAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%\n");
+  useAccessLog("%WIRE_BYTES_SENT% %WIRE_BYTES_RECEIVED%\n");
 
   testRouterUpstreamDisconnectBeforeResponseComplete();
 
-  expectWireBytesSentAndReceived(upstream_access_log_name_, 0, 159, 47, 113, 13);
+  expectWireBytesSentAndReceived(access_log_name_, 0, 159, 47, 113, 13);
 }
 
 TEST_P(ProtocolIntegrationTest, DownstreamResetWireBytesCount) {
