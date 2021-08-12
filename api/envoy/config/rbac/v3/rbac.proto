@@ -219,10 +219,12 @@ message Permission {
     // setup SNI.
     type.matcher.v3.StringMatcher requested_server_name = 9;
 
-    // A CIDR block that describes the upstream IP. This field is only applicable if the request is routed
-    // by dynamic forward proxy. If this field is present and the request did not have dynamic
-    // forward proxy in its filter chain before it was processed by the rbac filter, the matcher
-    // will evaluate the permission as `false`.
+    // A CIDR block that will be used to match the upstream IP. This field is only applicable if the
+    // request is routed by dynamic forward proxy. If this field is present and the request did not
+    // have dynamic forward proxy in its filter chain before it was processed by the RBAC filter,
+    // the matcher will evaluate the permission as `false`. Dynamic forward proxy caches the
+    // upstream ip address in filter state and the state is invalidated after each request. Both
+    // Ipv4 and Ipv6 ranges can be matched.
     core.v3.CidrRange upstream_ip = 12;
   }
 }
