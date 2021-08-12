@@ -1,3 +1,4 @@
+#include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/http/codec.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -34,7 +35,7 @@ static void noAccountsTracked(MemoryClassesToAccountsSet& memory_classes_to_acco
 
 class BufferMemoryAccountTest : public testing::Test {
 protected:
-  TrackedWatermarkBufferFactory factory_;
+  TrackedWatermarkBufferFactory factory_{absl::bit_width(kMinimumBalanceToTrack)};
   Http::MockStreamResetHandler mock_reset_handler_;
 };
 
@@ -474,6 +475,19 @@ TEST_F(BufferMemoryAccountTest, RemainsInSameBucketIfChangesWithinThreshold) {
 
   account->credit(getBalance(account));
   account->clearDownstream();
+}
+
+TEST(WatermarkBufferFactoryTest, CanConfigureMinimumTrackingAmount) {
+  auto config = envoy::config::overload::v3::BufferFactoryConfig();
+  config.set_minimum_account_to_track_power_of_two(3);
+  WatermarkBufferFactory factory(config);
+  EXPECT_EQ(factory.bitshift(), 2);
+}
+
+TEST(WatermarkBufferFactoryTest, DefaultsToEffectivelyNotTracking) {
+  auto config = envoy::config::overload::v3::BufferFactoryConfig();
+  WatermarkBufferFactory factory(config);
+  EXPECT_EQ(factory.bitshift(), 63); // Too large for any reasonable account size.
 }
 
 } // namespace
