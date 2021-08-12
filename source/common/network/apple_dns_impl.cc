@@ -92,6 +92,10 @@ AppleDnsResolverImpl::startResolution(const std::string& dns_name,
     return {nullptr, false};
   }
 
+  // Return the active resolution query, giving it ownership over itself so that it can
+  // can clean itself up once it's done.
+  pending_resolution->owned_ = true;
+
   return {std::move(pending_resolution), true};
 }
 
@@ -106,14 +110,6 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
     return nullptr;
   }
 
-  // We might have synchronously resolved the query, in which case return nullptr.
-  if (!pending_resolution_and_success.first) {
-    return nullptr;
-  }
-
-  // Otherwise return the active resolution query, giving it ownership over itself so that it can
-  // can clean itself up once it's done.
-  pending_resolution_and_success.first->owned_ = true;
   return pending_resolution_and_success.first.release();
 }
 
