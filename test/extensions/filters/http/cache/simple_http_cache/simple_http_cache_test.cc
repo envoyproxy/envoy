@@ -266,6 +266,23 @@ TEST_F(SimpleHttpCacheTest, VaryResponses) {
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 }
 
+TEST_F(SimpleHttpCacheTest, VaryOnDisallowedKey) {
+  // Responses will vary on accept.
+  const std::string RequestPath("some-resource");
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"cache-control", "public,max-age=3600"},
+                                                   {"vary", "user-agent"}};
+
+  // First request.
+  request_headers_.setCopy(Http::LowerCaseString("user-agent"), "user_agent_one");
+  LookupContextPtr first_value_vary = lookup(RequestPath);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+  const std::string Body1("one");
+  insert(move(first_value_vary), response_headers, Body1);
+  first_value_vary = lookup(RequestPath);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+}
+
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters
