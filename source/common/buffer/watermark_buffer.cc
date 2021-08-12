@@ -150,6 +150,9 @@ void WatermarkBuffer::checkHighAndOverflowWatermarks() {
 
 BufferMemoryAccountSharedPtr
 WatermarkBufferFactory::createAccount(Http::StreamResetHandler& reset_handler) {
+  if (bitshift_ == kEffectivelyDisableTrackingBitshift) {
+    return nullptr; // No tracking
+  }
   return BufferMemoryAccountImpl::createAccount(this, reset_handler);
 }
 

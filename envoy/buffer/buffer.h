@@ -518,7 +518,8 @@ public:
    *
    * @param reset_handler supplies the stream_reset_handler the account will
    * invoke to reset the stream.
-   * @return a BufferMemoryAccountSharedPtr of the newly created account.
+   * @return a BufferMemoryAccountSharedPtr of the newly created account or
+   * nullptr if tracking is disabled.
    */
   virtual BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) PURE;
 

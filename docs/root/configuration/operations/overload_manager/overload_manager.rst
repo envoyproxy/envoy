@@ -174,28 +174,35 @@ Reset Streams
 
 The ``envoy.overload_actions.reset_streams`` overload action will reset
 expensive streams. This works in conjuction with the
-``envoy.reloadable_features.per_stream_buffer_accounting`` flag which enables
-per stream buffer accounting.
+`minimum_threshold_for_tracking`, which can be configured via
+:ref:`buffer_factory_config
+<envoy_v3_api_field_config.overload.v3.OverloadManager.buffer_factory_config>`.
+If the `minimum_threshold_for_tracking` isn't configured, Envoy *won't* track
+per stream allocated bytes which is needed for this action to work.
 
-As an example, here is a single overload action entry that enables reset streams:
+As an example, here is partial Overload Manager configuration with minimum
+threshold for tracking and a single overload action entry that enables reset
+streams:
 
 .. code-block:: yaml
 
-  name: "envoy.overload_actions.reset_streams"
-  triggers:
-    - name: "envoy.resource_monitors.fixed_heap"
-      scaled:
-        scaling_threshold: 0.85
-        saturation_threshold: 0.95
+  buffer_factory_config:
+    minimum_account_to_track_power_of_two: 20
+  actions:
+    name: "envoy.overload_actions.reset_streams"
+    triggers:
+      - name: "envoy.resource_monitors.fixed_heap"
+        scaled:
+          scaling_threshold: 0.85
+          saturation_threshold: 0.95
+  ...
 
 It configures the overload manager to reset certain streams depending on the
 heap size.  When the heap usage is less than 85%, no streams will be reset.
 When heap usage is at or above 85%, we start to reset certain memory classes
 (e.g. streams using memory within a power of two range). There are 8 buckets,
 with the last bucket capturing all of the streams using :math:`>= 128 *
-minimum_threshold_for_tracking`.  The `minimum_threshold_for_tracking` can be
-configured via :ref:`buffer_factory_config
-<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.buffer_factory_config>`.
+minimum_threshold_for_tracking`.  In this example the `minimum_threshold_for_tracking` is 1MB.
 
 Given that there are only 8 buckets, we partition the space with a gradation of
 :math:`gradation = (saturation_threshold - scaling_threshold)/8`. Hence at 85%

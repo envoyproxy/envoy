@@ -93,16 +93,20 @@ public:
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
                 Http::CodecType::HTTP3)) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.per_stream_buffer_accounting",
-                                      streamBufferAccounting() ? "true" : "false");
+    if (streamBufferAccounting()) {
+      buffer_factory_ =
+          std::make_shared<Buffer::TrackedWatermarkBufferFactory>(absl::bit_width(4096u));
+    } else {
+      buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
+    }
+
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
   }
 
 protected:
   // For testing purposes, track >= 4096B accounts.
-  std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_ =
-      std::make_shared<Buffer::TrackedWatermarkBufferFactory>(absl::bit_width(4096u));
+  std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_;
 
   bool streamBufferAccounting() { return std::get<1>(GetParam()); }
 
@@ -279,15 +283,18 @@ public:
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
                 Http::CodecType::HTTP3)) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.per_stream_buffer_accounting",
-                                      streamBufferAccounting() ? "true" : "false");
+    if (streamBufferAccounting()) {
+      buffer_factory_ =
+          std::make_shared<Buffer::TrackedWatermarkBufferFactory>(absl::bit_width(4096u));
+    } else {
+      buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
+    }
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
   }
 
 protected:
-  std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_ =
-      std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
+  std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_;
 
   bool streamBufferAccounting() { return std::get<1>(GetParam()); }
 };
