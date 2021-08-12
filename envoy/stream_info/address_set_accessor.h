@@ -15,7 +15,7 @@ public:
   virtual void add(Network::Address::InstanceConstSharedPtr address) PURE;
 
   virtual void
-  iterate(const std::function<void(const Network::Address::InstanceConstSharedPtr& address)>&)
+  iterate(const std::function<bool(const Network::Address::InstanceConstSharedPtr& address)>&)
       const PURE;
 };
 

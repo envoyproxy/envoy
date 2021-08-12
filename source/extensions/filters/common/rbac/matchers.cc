@@ -147,8 +147,8 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
     break;
   case Upstream: {
     if (!info.filterState().hasDataWithName(StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR)) {
-      ENVOY_LOG_MISC(info, "Did not find dynamic forward proxy cookie. Do you have dynamic "
-                           "forward proxy in the filter chain?");
+      ENVOY_LOG_MISC(warn, "Did not find dynamic forward proxy metadata. Do you have dynamic "
+                           "forward proxy in the filter chain before the RBAC filter ?");
       return false;
     }
 
@@ -159,6 +159,11 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
             StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR);
     address_set.iterate([&, this](Network::Address::InstanceConstSharedPtr address) {
       ipMatch = range_.isInRange(*address.get());
+      if (ipMatch) {
+        return false;
+      }
+
+      return true;
     });
 
     ENVOY_LOG_MISC(debug, "UpstreamIp matcher evaluated to: {}", ipMatch);

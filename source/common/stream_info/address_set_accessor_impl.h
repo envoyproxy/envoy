@@ -16,10 +16,12 @@ public:
     addresses_.emplace(address);
   }
 
-  void iterate(const std::function<void(const Network::Address::InstanceConstSharedPtr& address)>&
+  void iterate(const std::function<bool(const Network::Address::InstanceConstSharedPtr& address)>&
                    fn) const override {
     for (const auto& address : addresses_) {
-      fn(address);
+      if (!fn(address)) {
+        break;
+      }
     }
   }
 
