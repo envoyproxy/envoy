@@ -15,7 +15,7 @@ namespace {
 
 // Usable with maps and sets. Used for ASSERTs, to avoid too much typing.
 template <typename Container, typename Key>
-bool container_contains(const Container& container, const Key& key) {
+bool containerContains(const Container& container, const Key& key) {
   return container.find(key) != container.end();
 }
 
@@ -68,9 +68,9 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     } else {
       requested_resource_state_.insert_or_assign(a, ResourceState::waitingForServer());
     }
-    ASSERT(container_contains(requested_resource_state_, a));
-    ASSERT(!container_contains(wildcard_resource_state_, a));
-    ASSERT(!container_contains(ambiguous_resource_state_, a));
+    ASSERT(containerContains(requested_resource_state_, a));
+    ASSERT(!containerContains(wildcard_resource_state_, a));
+    ASSERT(!containerContains(ambiguous_resource_state_, a));
     // If interest in a resource is removed-then-added (all before a discovery request
     // can be sent), we must treat it as a "new" addition: our user may have forgotten its
     // copy of the resource after instructing us to remove it, and need to be reminded of it.
@@ -95,9 +95,9 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     } else {
       requested_resource_state_.erase(r);
     }
-    ASSERT(!container_contains(requested_resource_state_, r));
+    ASSERT(!containerContains(requested_resource_state_, r));
     // This function shouldn't ever be called for resources that came from wildcard subscription.
-    ASSERT(!container_contains(wildcard_resource_state_, r));
+    ASSERT(!containerContains(wildcard_resource_state_, r));
     // Ideally, when interest in a resource is added-then-removed in between requests,
     // we would avoid putting a superfluous "unsubscribe [resource that was never subscribed]"
     // in the request. However, the removed-then-added case *does* need to go in the request,
@@ -278,9 +278,9 @@ DeltaSubscriptionState::getNextRequestAckless() {
     bool is_legacy_wildcard = in_initial_legacy_wildcard_;
     if (is_legacy_wildcard) {
       requested_resource_state_.insert_or_assign(Wildcard, ResourceState::waitingForServer());
-      ASSERT(container_contains(requested_resource_state_, Wildcard));
-      ASSERT(!container_contains(wildcard_resource_state_, Wildcard));
-      ASSERT(!container_contains(ambiguous_resource_state_, Wildcard));
+      ASSERT(containerContains(requested_resource_state_, Wildcard));
+      ASSERT(!containerContains(wildcard_resource_state_, Wildcard));
+      ASSERT(!containerContains(ambiguous_resource_state_, Wildcard));
     } else {
       // If we are here, this means that we lost our initial wildcard mode, because we subscribed to
       // something in the past. We could still be in the situation now that all we are subscribed to
@@ -368,18 +368,18 @@ void DeltaSubscriptionState::addResourceStateFromServer(
       maybe_resource.has_value()) {
     // It is a resource that we requested.
     maybe_resource->setVersion(resource.version());
-    ASSERT(container_contains(requested_resource_state_, resource.name()));
-    ASSERT(!container_contains(wildcard_resource_state_, resource.name()));
-    ASSERT(!container_contains(ambiguous_resource_state_, resource.name()));
+    ASSERT(containerContains(requested_resource_state_, resource.name()));
+    ASSERT(!containerContains(wildcard_resource_state_, resource.name()));
+    ASSERT(!containerContains(ambiguous_resource_state_, resource.name()));
   } else {
     // It is a resource that is a part of our wildcard request.
     wildcard_resource_state_.insert({resource.name(), resource.version()});
     // The resource could be ambiguous before, but now the ambiguity
     // is resolved.
     ambiguous_resource_state_.erase(resource.name());
-    ASSERT(!container_contains(requested_resource_state_, resource.name()));
-    ASSERT(container_contains(wildcard_resource_state_, resource.name()));
-    ASSERT(!container_contains(ambiguous_resource_state_, resource.name()));
+    ASSERT(!containerContains(requested_resource_state_, resource.name()));
+    ASSERT(containerContains(wildcard_resource_state_, resource.name()));
+    ASSERT(!containerContains(ambiguous_resource_state_, resource.name()));
   }
 }
 
