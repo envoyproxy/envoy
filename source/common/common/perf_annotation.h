@@ -5,8 +5,8 @@
 #include <chrono>
 #include <cstdint>
 
-#include "common/common/thread.h"
-#include "common/common/utility.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/utility.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"

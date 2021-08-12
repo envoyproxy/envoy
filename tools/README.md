@@ -10,7 +10,7 @@ We will assume that `sometools` does not yet exist and will also need a `require
 and `bazel` rule to configure the dependencies.
 
 In most cases of adding a tool, it is likely you will not need to create a new set of dependencies, and
-you can skip to the ("Add Python requirements")[#add-python-requirements] section.
+you can skip to the ["Add Python requirements"](#add-python-requirements) section.
 
 We will also assume that you have `python3` and `pip` installed and working in your local environment.
 
@@ -149,8 +149,6 @@ add a test runner to ensure the file is tested.
 ```starlark
 envoy_py_binary(
     name = "tools.sometools.mytool",
-    srcs = ["mytool.py"],
-    visibility = ["//visibility:public"],
     deps = [
         requirement("requests"),
         requirement("pyyaml"),
@@ -229,7 +227,7 @@ def test_mytool_main():
 This example use the mock library to patch all of the method calls, and
 then tests that they have been called with the expected values.
 
-You can run the test as follows:
+You can run the test using the (automatically generated) `//tools/sometools:pytest_mytool` target as follows:
 
 ```console
 $ bazel run //tools/sometools:pytest_mytool
@@ -314,15 +312,13 @@ This will drop you into the Python debugger (`pdb`) at the breakpoint.
 
 A base class for writing tools that need to parse command line arguments has been provided.
 
-To make use of it in this example we will need to add the runner as a dependency to the `tools.base.mytool` target.
+To make use of it in this example we will need to add the runner as a dependency to the `tools.sometools.mytool` target.
 
-Edit `tools/sometools/BUILD` and change the `tools.base.mytool` target to the following:
+Edit `tools/sometools/BUILD` and change the `tools.sometools.mytool` target to the following:
 
 ```starlark
 envoy_py_binary(
-    name = "tools.base.mytool",
-    srcs = ["mytool.py"],
-    visibility = ["//visibility:public"],
+    name = "tools.sometools.mytool",
     deps = [
         "//tools/base:runner",
         requirement("requests"),
@@ -389,3 +385,90 @@ or directly with `python`:
 $ ./tools/sometools/mytool.py -h
 ...
 ```
+
+### Using the `tools.base.checker.Checker` class
+
+A base class for writing checkers (for example, linting tools) has also been provided.
+
+Any classes subclassing `tools.base.checker.Checker` should provide a tuple of `__class__.checks`.
+
+For each named check in `checks` the `Checker` will expect a method of the same name with the prefix `check_`.
+
+For example, setting `checks` to the tuple `("check1", "check2")` the `Checker` will run the methods `check_check1` and `check_check2` in order.
+
+Let's look at an example.
+
+First, we need to add the bazel target.
+
+Edit `tools/sometools/BUILD` and add a `tools.sometools.mychecker` target with a dependency on the base `Checker`.
+
+```starlark
+envoy_py_binary(
+    name = "tools.sometools.mychecker",
+    deps = [
+        "//tools/base:checker",
+    ],
+)
+```
+
+Next add the `MyChecker` class to `tools/sometools/mychecker.py` as follows:
+
+```python
+#!/usr/bin/env python3
+
+import sys
+
+from tools.base.checker import Checker
+
+
+class MyChecker(Checker):
+    checks = ("check1", "check2")
+
+    def check_check1(self) -> None:
+        # checking code for check1
+        try:
+            do_something()
+        except NotSuchABadError:
+            self.warn("check1", ["Doing something didn't work out quite as expected 8/"])
+        except ATerribleError:
+            self.error("check1", ["Oh noes, something went badly wrong! 8("])
+        else:
+            self.succeed("check1", ["All good 8)"])
+
+    def check_check2(self) -> None:
+        # checking code for check2
+        try:
+            do_something_else()
+        except NotSuchABadError:
+            self.warn("check2", ["Doing something else didn't work out quite as expected 8/"])
+        except ATerribleError:
+            self.error("check2", ["Oh noes, something else went badly wrong! 8("])
+        else:
+            self.succeed("check2", ["All good 8)"])
+
+
+def main(*args) -> int:
+    return MyChecker(*args).run()
+
+
+if __name__ == "__main__":
+    sys.exit(main(*sys.argv[1:]))
+```
+
+Just like with the `Runner` class described [above](#using-the-toolsbaserunnerrunner-class) you can
+use both with and without `bazel`. To use without, you will need make it executable, and the end
+user will need to have any dependencies locally installed.
+
+Notice in the check methods the results of the check are logged to one of `self.error`, `self.warn`,
+or `self.succeed`. Each takes a `list` of outcomes. The results will be summarized to the user at the
+end of all checks.
+
+Just like with `Runner` a help menu is automatically created, and you can add custom arguments if
+required.
+
+Also like `Runner`, any added `Checker` classes are expected to have unit tests, and a `pytest_mychecker` bazel target
+is automatically added. With the above example, the test file should be located at `tools/sometools/tests/test_mychecker.py`.
+
+One key difference with the `Checker` tools and its derivatives is that it expects a `path` either specified
+with `--path` or as an argument. This is used as a context (for example the Envoy src directory) for
+running the checks.

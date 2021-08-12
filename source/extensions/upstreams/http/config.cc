@@ -1,4 +1,4 @@
-#include "extensions/upstreams/http/config.h"
+#include "source/extensions/upstreams/http/config.h"
 
 #include <chrono>
 #include <memory>
@@ -9,10 +9,10 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/utility.h"
-#include "common/http/http1/settings.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/http1/settings.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,6 +47,9 @@ getHttp3Options(const envoy::extensions::upstreams::http::v3::HttpProtocolOption
   if (options.has_use_downstream_protocol_config() &&
       options.use_downstream_protocol_config().has_http3_protocol_options()) {
     return options.use_downstream_protocol_config().http3_protocol_options();
+  }
+  if (options.has_auto_config()) {
+    return options.auto_config().http3_protocol_options();
   }
   return options.explicit_http_config().http3_protocol_options();
 }
@@ -107,6 +110,10 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
   if (options.has_auto_config()) {
     use_http2_ = true;
     use_alpn_ = true;
+    use_http3_ = options.auto_config().has_http3_protocol_options();
+    if (options.auto_config().has_alternate_protocols_cache_options()) {
+      alternate_protocol_cache_options_ = options.auto_config().alternate_protocols_cache_options();
+    }
   }
 }
 

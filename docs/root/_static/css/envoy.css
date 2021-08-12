@@ -28,3 +28,11 @@ table.docutils div.line-block {
 .rst-content .sidebar {
   clear: right;
 }
+
+/* make code.literals more muted - dont use red! */
+.rst-content code.literal {
+    color: #555;
+    background-color: rgba(27, 31, 35, 0.05);
+    padding: 2px 2px;
+    border: solid #eee 1px;
+}

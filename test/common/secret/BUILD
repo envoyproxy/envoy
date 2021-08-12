@@ -19,6 +19,7 @@ envoy_cc_test(
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
+        "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/server:config_tracker_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:transport_socket_factory_context_mocks",

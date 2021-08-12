@@ -17,10 +17,10 @@ envoy_cc_library(
         "private_key_manager_impl.h",
     ],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/registry",
-        "//include/envoy/ssl/private_key:private_key_config_interface",
-        "//include/envoy/ssl/private_key:private_key_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/registry",
+        "//envoy/ssl/private_key:private_key_config_interface",
+        "//envoy/ssl/private_key:private_key_interface",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

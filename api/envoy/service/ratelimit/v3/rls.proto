@@ -7,9 +7,11 @@ import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.ratelimit.v3";
 option java_outer_classname = "RlsProto";
@@ -101,6 +103,20 @@ message RateLimitResponse {
     Unit unit = 2;
   }
 
+  // Cacheable quota for responses, see documentation for the :ref:`quota
+  // <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.quota>` field.
+  // [#not-implemented-hide:]
+  message Quota {
+    // Number of matching requests granted in quota. Must be 1 or more.
+    uint32 requests = 1 [(validate.rules).uint32 = {gt: 0}];
+
+    oneof expiration_specifier {
+      // Point in time at which the quota expires.
+      google.protobuf.Timestamp valid_until = 2;
+    }
+  }
+
+  // [#next-free-field: 6]
   message DescriptorStatus {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.ratelimit.v2.RateLimitResponse.DescriptorStatus";
@@ -116,6 +132,39 @@ message RateLimitResponse {
 
     // Duration until reset of the current limit window.
     google.protobuf.Duration duration_until_reset = 4;
+
+    // Quota granted for the descriptor. This is a certain number of requests over a period of time.
+    // The client may cache this result and apply the effective RateLimitResponse to future matching
+    // requests containing a matching descriptor without querying rate limit service.
+    //
+    // Quota is available for a request if its descriptor set has cached quota available for all
+    // descriptors.
+    //
+    // If quota is available, a RLS request will not be made and the quota will be reduced by 1 for
+    // all matching descriptors.
+    //
+    // If there is not sufficient quota, there are three cases:
+    // 1. A cached entry exists for a RLS descriptor that is out-of-quota, but not expired.
+    //    In this case, the request will be treated as OVER_LIMIT.
+    // 2. Some RLS descriptors have a cached entry that has valid quota but some RLS descriptors
+    //    have no cached entry. This will trigger a new RLS request.
+    //    When the result is returned, a single unit will be consumed from the quota for all
+    //    matching descriptors.
+    //    If the server did not provide a quota, such as the quota message is empty for some of
+    //    the descriptors, then the request admission is determined by the
+    //    :ref:`overall_code <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.overall_code>`.
+    // 3. All RLS descriptors lack a cached entry, this will trigger a new RLS request,
+    //    When the result is returned, a single unit will be consumed from the quota for all
+    //    matching descriptors.
+    //    If the server did not provide a quota, such as the quota message is empty for some of
+    //    the descriptors, then the request admission is determined by the
+    //    :ref:`overall_code <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.overall_code>`.
+    //
+    // When quota expires due to timeout, a new RLS request will also be made.
+    // The implementation may choose to preemptively query the rate limit server for more quota on or
+    // before expiration or before the available quota runs out.
+    // [#not-implemented-hide:]
+    Quota quota = 5;
   }
 
   // The overall response code which takes into account all of the descriptors that were passed

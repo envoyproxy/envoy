@@ -6,6 +6,8 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 
+#include "source/common/common/matchers.h"
+
 namespace Envoy {
 
 // Helper functions to build API responses.
@@ -56,7 +58,7 @@ void XdsFuzzTest::updateRoute(
 XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& input,
                          envoy::config::core::v3::ApiVersion api_version)
     : HttpIntegrationTest(
-          Http::CodecClient::Type::HTTP2, TestEnvironment::getIpVersionsForTest()[0],
+          Http::CodecType::HTTP2, TestEnvironment::getIpVersionsForTest()[0],
           ConfigHelper::adsBootstrap(input.config().sotw_or_delta() ==
                                              test::server::config_validation::Config::SOTW
                                          ? "GRPC"
@@ -92,7 +94,7 @@ void XdsFuzzTest::initialize() {
     ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
     ads_cluster->set_name("ads_cluster");
   });
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
   if (xds_stream_ == nullptr) {
     createXdsConnection();
@@ -380,8 +382,8 @@ void XdsFuzzTest::verifyState() {
 }
 
 envoy::admin::v3::ListenersConfigDump XdsFuzzTest::getListenersConfigDump() {
-  auto message_ptr =
-      test_server_->server().admin().getConfigTracker().getCallbacksMap().at("listeners")();
+  auto message_ptr = test_server_->server().admin().getConfigTracker().getCallbacksMap().at(
+      "listeners")(Matchers::UniversalStringMatcher());
   return dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
 }
 
@@ -393,7 +395,7 @@ std::vector<envoy::config::route::v3::RouteConfiguration> XdsFuzzTest::getRoutes
     return {};
   }
 
-  auto message_ptr = map.at("routes")();
+  auto message_ptr = map.at("routes")(Matchers::UniversalStringMatcher());
   auto dump = dynamic_cast<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
 
   // Since the route config dump gives the RouteConfigurations as an Any, go through and cast them

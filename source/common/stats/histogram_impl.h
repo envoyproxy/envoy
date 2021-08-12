@@ -8,9 +8,9 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 
-#include "common/common/matchers.h"
-#include "common/common/non_copyable.h"
-#include "common/stats/metric_impl.h"
+#include "source/common/common/matchers.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/stats/metric_impl.h"
 
 #include "circllhist.h"
 
@@ -28,7 +28,8 @@ public:
   static ConstSupportedBuckets& defaultBuckets();
 
 private:
-  using Config = std::pair<Matchers::StringMatcherImpl, ConstSupportedBuckets>;
+  using Config = std::pair<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>,
+                           ConstSupportedBuckets>;
   const std::vector<Config> configs_{};
 };
 

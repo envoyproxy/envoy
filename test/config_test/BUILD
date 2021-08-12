@@ -15,6 +15,7 @@ exports_files(["example_configs_test_setup.sh"])
 
 envoy_cc_test(
     name = "example_configs_test",
+    size = "large",
     srcs = [
         "example_configs_test.cc",
     ],
@@ -25,6 +26,7 @@ envoy_cc_test(
     deps = [
         ":config_test_lib",
         "//source/common/filesystem:filesystem_lib",
+        "//test/config:v2_link_hacks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],

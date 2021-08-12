@@ -2,21 +2,20 @@
 
 #include <memory>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/logger.h"
-#include "common/config/api_version.h"
-#include "common/config/delta_subscription_state.h"
-#include "common/config/grpc_stream.h"
-#include "common/config/pausable_ack_queue.h"
-#include "common/config/watch_map.h"
-#include "common/grpc/common.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/delta_subscription_state.h"
+#include "source/common/config/grpc_stream.h"
+#include "source/common/config/pausable_ack_queue.h"
+#include "source/common/config/watch_map.h"
+#include "source/common/grpc/common.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
@@ -38,6 +37,17 @@ public:
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 
+  ~NewGrpcMuxImpl() override;
+
+  // Causes all NewGrpcMuxImpl objects to stop sending any messages on `grpc_stream_` to fix a crash
+  // on Envoy shutdown due to dangling pointers. This may not be the ideal fix; it is probably
+  // preferable for the `ServerImpl` to cause all configuration subscriptions to be shutdown, which
+  // would then cause all `NewGrpcMuxImpl` to be destructed.
+  // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
+  static void shutdownAll();
+
+  void shutdown() { shutdown_ = true; }
+
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
                            const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
@@ -49,8 +59,6 @@ public:
 
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
-
-  void registerVersionedTypeUrl(const std::string& type_url);
 
   void onDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
@@ -67,14 +75,22 @@ public:
   // TODO(fredlas) remove this from the GrpcMux interface.
   void start() override;
 
+  GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+             envoy::service::discovery::v3::DeltaDiscoveryResponse>&
+  grpcStreamForTest() {
+    return grpc_stream_;
+  }
+
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
-                      const bool use_namespace_matching, Event::Dispatcher& dispatcher)
+                      const bool use_namespace_matching, Event::Dispatcher& dispatcher,
+                      const bool wildcard)
         : watch_map_(use_namespace_matching),
-          sub_state_(type_url, watch_map_, local_info, dispatcher) {}
+          sub_state_(type_url, watch_map_, local_info, dispatcher, wildcard) {}
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
+    std::string control_plane_identifier_{};
 
     SubscriptionStuff(const SubscriptionStuff&) = delete;
     SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;
@@ -123,7 +139,9 @@ private:
                    const absl::flat_hash_set<std::string>& resources,
                    const SubscriptionOptions& options);
 
-  void addSubscription(const std::string& type_url, bool use_namespace_matching);
+  // Adds a subscription for the type_url to the subscriptions map and order list.
+  void addSubscription(const std::string& type_url, bool use_namespace_matching,
+                       const bool wildcard);
 
   void trySendDiscoveryRequests();
 
@@ -163,7 +181,9 @@ private:
   const envoy::config::core::v3::ApiVersion transport_api_version_;
   Event::Dispatcher& dispatcher_;
 
-  const bool enable_type_url_downgrade_and_upgrade_;
+  // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
+  // true because it may contain dangling pointers.
+  std::atomic<bool> shutdown_{false};
 };
 
 using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;

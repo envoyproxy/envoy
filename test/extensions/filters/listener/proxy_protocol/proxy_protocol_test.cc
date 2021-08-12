@@ -6,19 +6,16 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/network/connection_balancer_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/network/tcp_listener_impl.h"
-#include "common/network/utility.h"
-
-#include "server/connection_handler_impl.h"
-
-#include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
-#include "extensions/filters/listener/well_known_names.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/connection_balancer_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/tcp_listener_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
+#include "source/server/connection_handler_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
@@ -58,15 +55,15 @@ public:
   ProxyProtocolTest()
       : api_(Api::createApiForTest(stats_store_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        socket_(std::make_shared<Network::TcpListenSocket>(
-            Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
+        socket_(std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+            Network::Test::getCanonicalLoopbackAddress(GetParam()))),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
         init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
     EXPECT_CALL(socket_factory_, localAddress())
         .WillOnce(ReturnRef(socket_->addressProvider().localAddress()));
-    EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
+    EXPECT_CALL(socket_factory_, getListenSocket(_)).WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this);
     conn_ = dispatcher_->createClientConnection(socket_->addressProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
@@ -338,7 +335,8 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
-            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
+                .return_value_;
           }));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
@@ -398,7 +396,8 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
-            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
+                .return_value_;
           }));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
@@ -608,7 +607,7 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t n, int flags) {
         const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
-        if (x.rc_ == sizeof(tlv)) {
+        if (x.return_value_ == sizeof(tlv)) {
           return Api::SysCallSizeResult{-1, 0};
         } else {
           return x;
@@ -633,7 +632,8 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
-            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
+                .return_value_;
           }));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
@@ -785,7 +785,8 @@ TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
-            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
+                .return_value_;
           }));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
@@ -851,7 +852,8 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
-            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
+                .return_value_;
           }));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
@@ -926,6 +928,8 @@ TEST_P(ProxyProtocolTest, V2PartialRead) {
   disconnect();
 }
 
+const std::string ProxyProtocol = "envoy.filters.listener.proxy_protocol";
+
 TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
@@ -954,9 +958,9 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
-  EXPECT_EQ(1, metadata.count(ListenerFilters::ListenerFilterNames::get().ProxyProtocol));
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
 
-  auto fields = metadata.at(ListenerFilters::ListenerFilterNames::get().ProxyProtocol).fields();
+  auto fields = metadata.at(ProxyProtocol).fields();
   EXPECT_EQ(1, fields.size());
   EXPECT_EQ(1, fields.count("PP2 type authority"));
 
@@ -1047,9 +1051,9 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
-  EXPECT_EQ(1, metadata.count(ListenerFilters::ListenerFilterNames::get().ProxyProtocol));
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
 
-  auto fields = metadata.at(ListenerFilters::ListenerFilterNames::get().ProxyProtocol).fields();
+  auto fields = metadata.at(ProxyProtocol).fields();
   EXPECT_EQ(2, fields.size());
   EXPECT_EQ(1, fields.count("PP2 type authority"));
   EXPECT_EQ(1, fields.count("PP2 vpc id"));
@@ -1101,9 +1105,9 @@ TEST_P(ProxyProtocolTest, V2WillNotOverwriteTLV) {
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
-  EXPECT_EQ(1, metadata.count(ListenerFilters::ListenerFilterNames::get().ProxyProtocol));
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
 
-  auto fields = metadata.at(ListenerFilters::ListenerFilterNames::get().ProxyProtocol).fields();
+  auto fields = metadata.at(ProxyProtocol).fields();
   EXPECT_EQ(1, fields.size());
   EXPECT_EQ(1, fields.count("PP2 type authority"));
 
@@ -1282,8 +1286,8 @@ public:
   WildcardProxyProtocolTest()
       : api_(Api::createApiForTest(stats_store_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        socket_(std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
-                                                           nullptr, true)),
+        socket_(std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+            Network::Test::getAnyAddress(GetParam()))),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_->addressProvider().localAddress()->ip()->port())),
@@ -1293,7 +1297,7 @@ public:
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
     EXPECT_CALL(socket_factory_, localAddress())
         .WillOnce(ReturnRef(socket_->addressProvider().localAddress()));
-    EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
+    EXPECT_CALL(socket_factory_, getListenSocket(_)).WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this);
     conn_ = dispatcher_->createClientConnection(local_dst_address_,
                                                 Network::Address::InstanceConstSharedPtr(),
@@ -1439,11 +1443,10 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
 }
 
 TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
-  Server::Configuration::NamedListenerFilterConfigFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::NamedListenerFilterConfigFactory>::
-          getFactory(ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
+  Server::Configuration::NamedListenerFilterConfigFactory* factory = Registry::FactoryRegistry<
+      Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(ProxyProtocol);
 
-  EXPECT_EQ(factory->name(), ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
+  EXPECT_EQ(factory->name(), ProxyProtocol);
 
   const std::string yaml = R"EOF(
       rules:

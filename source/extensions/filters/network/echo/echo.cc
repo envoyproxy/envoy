@@ -1,9 +1,9 @@
-#include "extensions/filters/network/echo/echo.h"
+#include "source/extensions/filters/network/echo/echo.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Extensions {

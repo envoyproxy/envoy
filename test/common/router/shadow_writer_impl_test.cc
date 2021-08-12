@@ -1,9 +1,9 @@
 #include <chrono>
 #include <string>
 
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/router/shadow_writer_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/router/shadow_writer_impl.h"
 
 #include "test/mocks/upstream/cluster_manager.h"
 

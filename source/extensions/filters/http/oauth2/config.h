@@ -5,8 +5,7 @@
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.validate.h"
 
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,7 +15,7 @@ namespace Oauth2 {
 class OAuth2Config : public Extensions::HttpFilters::Common::FactoryBase<
                          envoy::extensions::filters::http::oauth2::v3alpha::OAuth2> {
 public:
-  OAuth2Config() : FactoryBase(HttpFilterNames::get().OAuth) {}
+  OAuth2Config() : FactoryBase("envoy.filters.http.oauth2") {}
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::oauth2::v3alpha::OAuth2&, const std::string&,

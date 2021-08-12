@@ -1,7 +1,7 @@
 #pragma once
 
-#include "extensions/filters/network/rocketmq_proxy/config.h"
-#include "extensions/filters/network/rocketmq_proxy/conn_manager.h"
+#include "source/extensions/filters/network/rocketmq_proxy/config.h"
+#include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"
 
 #include "gtest/gtest.h"
 

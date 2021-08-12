@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 
-#include "extensions/filters/network/tcp_proxy/config.h"
+#include "source/extensions/filters/network/tcp_proxy/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/test_runtime.h"
@@ -148,7 +148,7 @@ TEST(ConfigTest, ConfigTest) {
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");
 
-  EXPECT_TRUE(factory.isTerminalFilter());
+  EXPECT_TRUE(factory.isTerminalFilterByProto(config, context));
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;

@@ -1,11 +1,11 @@
 #include "envoy/common/platform.h"
 
-#include "common/grpc/common.h"
-#include "common/grpc/context_impl.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/context_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/global.h"

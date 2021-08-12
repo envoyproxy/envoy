@@ -2,7 +2,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "xds/core/v3/context_params.pb.h"

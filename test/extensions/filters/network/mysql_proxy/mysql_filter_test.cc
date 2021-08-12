@@ -1,8 +1,7 @@
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
-#include "extensions/filters/network/mysql_proxy/mysql_filter.h"
-#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_filter.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 #include "test/mocks/network/mocks.h"
 
@@ -997,7 +996,7 @@ TEST_F(MySQLFilterTest, MySqlLoginAndQueryTest) {
   srv_resp_data = encodeClientLoginResp(MYSQL_RESP_OK, 0, 1);
   Buffer::InstancePtr request_resp_data(new Buffer::OwnedImpl(srv_resp_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*request_resp_data, false));
-  EXPECT_EQ(MySQLSession::State::Req, filter_->getSession().getState());
+  EXPECT_EQ(MySQLSession::State::ReqResp, filter_->getSession().getState());
 
   mysql_cmd_encode.setCmd(Command::Cmd::Query);
   query = "show databases";
@@ -1013,7 +1012,7 @@ TEST_F(MySQLFilterTest, MySqlLoginAndQueryTest) {
   srv_resp_data = encodeClientLoginResp(MYSQL_RESP_OK, 0, 1);
   Buffer::InstancePtr show_resp_data(new Buffer::OwnedImpl(srv_resp_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*show_resp_data, false));
-  EXPECT_EQ(MySQLSession::State::Req, filter_->getSession().getState());
+  EXPECT_EQ(MySQLSession::State::ReqResp, filter_->getSession().getState());
 
   mysql_cmd_encode.setCmd(Command::Cmd::Query);
   query = "CREATE TABLE students (name TEXT, student_number INTEGER, city TEXT)";
@@ -1030,7 +1029,7 @@ TEST_F(MySQLFilterTest, MySqlLoginAndQueryTest) {
   srv_resp_data = encodeClientLoginResp(MYSQL_RESP_OK, 0, 1);
   Buffer::InstancePtr create_resp_data(new Buffer::OwnedImpl(srv_resp_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*create_resp_data, false));
-  EXPECT_EQ(MySQLSession::State::Req, filter_->getSession().getState());
+  EXPECT_EQ(MySQLSession::State::ReqResp, filter_->getSession().getState());
 
   mysql_cmd_encode.setCmd(Command::Cmd::Query);
   query = "CREATE index index1";
@@ -1048,7 +1047,7 @@ TEST_F(MySQLFilterTest, MySqlLoginAndQueryTest) {
   Buffer::InstancePtr create_index_resp_data(new Buffer::OwnedImpl(srv_resp_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue,
             filter_->onData(*create_index_resp_data, false));
-  EXPECT_EQ(MySQLSession::State::Req, filter_->getSession().getState());
+  EXPECT_EQ(MySQLSession::State::ReqResp, filter_->getSession().getState());
 
   mysql_cmd_encode.setCmd(Command::Cmd::FieldList);
   query = "";
@@ -1065,7 +1064,7 @@ TEST_F(MySQLFilterTest, MySqlLoginAndQueryTest) {
   srv_resp_data = encodeClientLoginResp(MYSQL_RESP_OK, 0, 1);
   Buffer::InstancePtr field_list_resp_data(new Buffer::OwnedImpl(srv_resp_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*field_list_resp_data, false));
-  EXPECT_EQ(MySQLSession::State::Req, filter_->getSession().getState());
+  EXPECT_EQ(MySQLSession::State::ReqResp, filter_->getSession().getState());
 }
 
 } // namespace MySQLProxy

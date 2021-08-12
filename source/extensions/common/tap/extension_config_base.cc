@@ -1,4 +1,4 @@
-#include "extensions/common/tap/extension_config_base.h"
+#include "source/extensions/common/tap/extension_config_base.h"
 
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/extensions/common/tap/v3/common.pb.h"

@@ -26,7 +26,8 @@ mappers:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value
+          string_match:
+            exact: exact-match-value
     status_code: 550
     headers_to_add:
       - header:
@@ -66,7 +67,7 @@ body_format:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -92,7 +93,8 @@ mappers:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value
+          string_match:
+            exact: exact-match-value
     status_code: 550
 body_format:
   json_format:
@@ -125,7 +127,7 @@ body_format:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -177,7 +179,7 @@ body_format:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -203,13 +205,15 @@ mappers:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value-1
+          string_match:
+            exact: exact-match-value-1
     status_code: 550
   - filter:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value
+          string_match:
+            exact: exact-match-value
     status_code: 551
     headers_to_add:
       - header:
@@ -225,7 +229,8 @@ mappers:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value
+          string_match:
+            exact: exact-match-value
     status_code: 552
 body_format:
   json_format:
@@ -256,7 +261,7 @@ body_format:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -283,19 +288,22 @@ mappers:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value-1
+          string_match:
+            exact: exact-match-value-1
     status_code: 550
   - filter:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value-2
+          string_match:
+            exact: exact-match-value-2
     status_code: 551
   - filter:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value-3
+          string_match:
+            exact: exact-match-value-3
     status_code: 552
 body_format:
   json_format:
@@ -330,7 +338,7 @@ body_format:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -355,19 +363,22 @@ mappers:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value-1
+          string_match:
+            exact: exact-match-value-1
     status_code: 550
   - filter:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value-2
+          string_match:
+            exact: exact-match-value-2
     status_code: 551
   - filter:
       header_filter:
         header:
           name: test-header
-          exact_match: exact-match-value-3
+          string_match:
+            exact: exact-match-value-3
     status_code: 552
   )EOF";
   setLocalReplyConfig(yaml);
@@ -391,7 +402,7 @@ mappers:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -449,7 +460,7 @@ body_format:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -507,7 +518,7 @@ body_format:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();

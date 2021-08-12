@@ -24,8 +24,8 @@ static_resources:
             - name: local_service
               domains: ["*"]
               routes:
-              - match: { prefix: "/" }
-                route: { cluster: service_local }
+              - match: {prefix: "/"}
+                route: {cluster: service_local}
           http_filters:
           - name: envoy.filters.http.router
   clusters:

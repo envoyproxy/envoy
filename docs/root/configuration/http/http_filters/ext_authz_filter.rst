@@ -133,7 +133,7 @@ Per-Route Configuration
 -----------------------
 
 A sample virtual host and route filter configuration.
-In this example we add additional context on the virtual host, and disabled the filter for `/static` prefixed routes.
+In this example we add additional context on the virtual host, and disabled the filter for ``/static`` prefixed routes.
 
 .. code-block:: yaml
 

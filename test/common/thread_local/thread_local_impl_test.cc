@@ -1,7 +1,7 @@
-#include "common/common/thread.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/stats/isolated_store_impl.h"
-#include "common/thread_local/thread_local_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/thread_local/thread_local_impl.h"
 
 #include "test/mocks/event/mocks.h"
 
@@ -18,11 +18,13 @@ namespace ThreadLocal {
 TEST(MainThreadVerificationTest, All) {
   // Before threading is on, assertion on main thread should be true.
   EXPECT_TRUE(Thread::MainThread::isMainThread());
+  EXPECT_TRUE(Thread::MainThread::isWorkerThread());
   {
     InstanceImpl tls;
     // Tls instance has been initialized.
     // Call to main thread verification should succeed in main thread.
     EXPECT_TRUE(Thread::MainThread::isMainThread());
+    EXPECT_FALSE(Thread::MainThread::isWorkerThread());
     tls.shutdownGlobalThreading();
     tls.shutdownThread();
   }

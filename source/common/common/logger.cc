@@ -1,4 +1,4 @@
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include <cassert> // use direct system-assert to avoid cyclic dependency.
 #include <cstdint>
@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "common/common/json_escape_string.h"
-#include "common/common/lock_guard.h"
+#include "source/common/common/json_escape_string.h"
+#include "source/common/common/lock_guard.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"

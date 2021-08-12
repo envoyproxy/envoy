@@ -1,12 +1,11 @@
-#include "extensions/tracers/zipkin/span_buffer.h"
+#include "source/extensions/tracers/zipkin/span_buffer.h"
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/tracers/zipkin/util.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
-#include "extensions/tracers/zipkin/zipkin_json_field_names.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/tracers/zipkin/util.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/extensions/tracers/zipkin/zipkin_json_field_names.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
@@ -133,7 +132,7 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
       auto* annotation_entry_fields = annotation_entry.mutable_fields();
       (*annotation_entry_fields)[ANNOTATION_VALUE] = ValueUtil::stringValue(annotation.value());
       (*annotation_entry_fields)[ANNOTATION_TIMESTAMP] =
-          Util::uint64Value(annotation.timestamp(), annotation.value(), replacements);
+          Util::uint64Value(annotation.timestamp(), ANNOTATION_TIMESTAMP, replacements);
       annotation_entries.push_back(ValueUtil::structValue(annotation_entry));
       continue;
     }

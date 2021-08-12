@@ -1,9 +1,8 @@
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/network/rocketmq_proxy/codec.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/rocketmq_proxy/codec.h"
 
 #include "test/extensions/filters/network/rocketmq_proxy/utility.h"
 

@@ -7,11 +7,10 @@
 #include "envoy/common/platform.h"
 #include "envoy/network/filter.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/network/rocketmq_proxy/protocol.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/rocketmq_proxy/protocol.h"
 
 namespace Envoy {
 namespace Extensions {

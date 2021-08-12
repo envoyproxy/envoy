@@ -1,9 +1,9 @@
-#include "common/config/xds_resource.h"
+#include "source/common/config/xds_resource.h"
 
 #include <algorithm>
 
-#include "common/common/fmt.h"
-#include "common/http/utility.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"

@@ -5,16 +5,15 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/common/random_generator.h"
-#include "common/common/thread.h"
-#include "common/local_info/local_info_impl.h"
-#include "common/network/utility.h"
-#include "common/stats/thread_local_store.h"
-#include "common/thread_local/thread_local_impl.h"
-
-#include "server/hot_restart_nop_impl.h"
-#include "server/options_impl.h"
-#include "server/process_context_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/common/thread.h"
+#include "source/common/local_info/local_info_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
+#include "source/server/hot_restart_nop_impl.h"
+#include "source/server/options_impl.h"
+#include "source/server/process_context_impl.h"
 
 #include "test/common/runtime/utility.h"
 #include "test/integration/utility.h"
@@ -42,7 +41,7 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
   test_options.setDrainTime(drain_time);
   test_options.setParentShutdownTime(std::chrono::seconds(2));
   test_options.setDrainStrategy(drain_strategy);
-  test_options.setAllowUnkownFields(validation_config.allow_unknown_static_fields);
+  test_options.setAllowUnknownFields(validation_config.allow_unknown_static_fields);
   test_options.setRejectUnknownFieldsDynamic(validation_config.reject_unknown_dynamic_fields);
   test_options.setIgnoreUnknownFieldsDynamic(validation_config.ignore_unknown_dynamic_fields);
   test_options.setConcurrency(concurrency);
@@ -255,7 +254,7 @@ IntegrationTestServerImpl::~IntegrationTestServerImpl() {
     Network::Address::InstanceConstSharedPtr admin_address(admin_address_);
     if (admin_address != nullptr) {
       BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-          admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
+          admin_address, "POST", "/quitquitquit", "", Http::CodecType::HTTP1);
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("200", response->headers().getStatusValue());
       server_gone_.WaitForNotification();

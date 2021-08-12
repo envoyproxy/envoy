@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.data.dns.v4alpha;
 
-import "envoy/type/matcher/v4alpha/string.proto";
-
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
@@ -148,15 +146,14 @@ message DnsTable {
     google.protobuf.Duration answer_ttl = 3 [(validate.rules).duration = {gte {seconds: 30}}];
   }
 
+  reserved 3;
+
+  reserved "known_suffixes";
+
   // Control how many times Envoy makes an attempt to forward a query to an external DNS server
   uint32 external_retry_count = 1 [(validate.rules).uint32 = {lte: 3}];
 
   // Fully qualified domain names for which Envoy will respond to DNS queries. By leaving this
   // list empty, Envoy will forward all queries to external resolvers
   repeated DnsVirtualDomain virtual_domains = 2;
-
-  // This field serves to help Envoy determine whether it can authoritatively answer a query
-  // for a name matching a suffix in this list. If the query name does not match a suffix in
-  // this list, Envoy will forward the query to an upstream DNS server
-  repeated type.matcher.v4alpha.StringMatcher known_suffixes = 3;
 }

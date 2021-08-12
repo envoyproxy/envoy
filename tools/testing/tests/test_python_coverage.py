@@ -80,17 +80,7 @@ def test_coverage_run(patches, cov_data):
             == [(m_cov_args.return_value,), {}])
 
 
-def test_coverage_main():
-    class_mock = patch("tools.testing.python_coverage.CoverageRunner")
-
-    with class_mock as m_class:
-        assert (
-            python_coverage.main("arg0", "arg1", "arg2")
-            == m_class.return_value.run.return_value)
-
-    assert (
-        list(m_class.call_args)
-        == [('arg0', 'arg1', 'arg2'), {}])
-    assert (
-        list(m_class.return_value.run.call_args)
-        == [(), {}])
+def test_coverage_main(command_main):
+    command_main(
+        python_coverage.main,
+        "tools.testing.python_coverage.CoverageRunner")

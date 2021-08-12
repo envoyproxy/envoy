@@ -2,12 +2,11 @@
 
 #include "envoy/http/filter.h"
 
-#include "common/common/lock_guard.h"
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-
-#include "extensions/filters/http/jwt_authn/filter_config.h"
-#include "extensions/filters/http/jwt_authn/matcher.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/extensions/filters/http/jwt_authn/filter_config.h"
+#include "source/extensions/filters/http/jwt_authn/matcher.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,6 +49,8 @@ private:
   FilterConfigSharedPtr config_;
   // Verify context for current request.
   ContextSharedPtr context_;
+
+  std::string original_uri_;
 };
 
 } // namespace JwtAuthn

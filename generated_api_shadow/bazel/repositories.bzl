@@ -55,7 +55,7 @@ load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 api_cc_py_proto_library(
     name = "client_model",
     srcs = [
-        "metrics.proto",
+        "io/prometheus/client/metrics.proto",
     ],
     visibility = ["//visibility:public"],
 )

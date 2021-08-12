@@ -12,10 +12,6 @@ envoy_extension_package()
 envoy_cc_extension(
     name = "config",
     srcs = ["config.h"],
-    category = "envoy.io_socket",
-    security_posture = "unknown",
-    status = "wip",
-    undocumented = True,
     deps = [
     ],
 )
@@ -40,7 +36,7 @@ envoy_cc_library(
     ],
     deps = [
         ":io_handle_lib",
-        "//include/envoy/event:dispatcher_interface",
+        "//envoy/event:dispatcher_interface",
     ],
 )
 

@@ -1,8 +1,7 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/compression/brotli/compressor/brotli_compressor_impl.h"
-#include "extensions/compression/brotli/decompressor/config.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/compression/brotli/compressor/brotli_compressor_impl.h"
+#include "source/extensions/compression/brotli/decompressor/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"

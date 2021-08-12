@@ -32,8 +32,8 @@ envoy_cc_library(
     hdrs = ["message_validator_impl.h"],
     external_deps = ["protobuf"],
     deps = [
-        "//include/envoy/protobuf:message_validator_interface",
-        "//include/envoy/stats:stats_interface",
+        "//envoy/protobuf:message_validator_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/common:documentation_url_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:logger_lib",
@@ -61,11 +61,10 @@ envoy_cc_library(
     deps = [
         ":message_validator_lib",
         ":protobuf",
-        ":type_util_lib",
         ":well_known_lib",
-        "//include/envoy/api:api_interface",
-        "//include/envoy/protobuf:message_validator_interface",
-        "//include/envoy/runtime:runtime_interface",
+        "//envoy/api:api_interface",
+        "//envoy/protobuf:message_validator_interface",
+        "//envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:documentation_url_lib",
         "//source/common/common:hash_lib",
@@ -78,16 +77,6 @@ envoy_cc_library(
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "type_util_lib",
-    srcs = ["type_util.cc"],
-    hdrs = ["type_util.h"],
-    deps = [
-        "//source/common/protobuf",
-        "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
     ],
 )
 

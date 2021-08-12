@@ -4,11 +4,11 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "common/quic/platform/quic_hostname_utils_impl.h"
+#include "source/common/quic/platform/quic_hostname_utils_impl.h"
 
 #include <string>
 
-#include "common/http/utility.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"

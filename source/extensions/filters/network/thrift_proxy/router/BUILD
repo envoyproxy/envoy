@@ -13,14 +13,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.thrift_proxy.filters",
-    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":router_lib",
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/extensions/filters/network/thrift_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_config_interface",
-        "//source/extensions/filters/network/thrift_proxy/filters:well_known_names",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/router/v3:pkg_cc_proto",
     ],
 )
@@ -30,8 +27,15 @@ envoy_cc_library(
     hdrs = ["router.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/router:router_interface",
+        "//envoy/router:router_interface",
+        "//envoy/tcp:conn_pool_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:logger_lib",
+        "//source/extensions/filters/network:well_known_names",
+        "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
+        "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
+        "//source/extensions/filters/network/thrift_proxy:protocol_options_config_lib",
     ],
 )
 
@@ -40,8 +44,47 @@ envoy_cc_library(
     hdrs = ["router_ratelimit.h"],
     deps = [
         ":router_interface",
-        "//include/envoy/router:router_ratelimit_interface",
+        "//envoy/router:router_ratelimit_interface",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_request_lib",
+    srcs = ["upstream_request.cc"],
+    hdrs = ["upstream_request.h"],
+    deps = [
+        ":router_interface",
+        "//envoy/tcp:conn_pool_interface",
+        "//source/common/common:logger_lib",
+        "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
+        "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
+        "//source/extensions/filters/network/thrift_proxy:thrift_object_interface",
+        "//source/extensions/filters/network/thrift_proxy:transport_interface",
+        "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "shadow_writer_lib",
+    srcs = ["shadow_writer_impl.cc"],
+    hdrs = ["shadow_writer_impl.h"],
+    deps = [
+        ":router_interface",
+        ":upstream_request_lib",
+        "//envoy/tcp:conn_pool_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:load_balancer_interface",
+        "//envoy/upstream:thread_local_cluster_interface",
+        "//source/common/common:linked_object",
+        "//source/common/upstream:load_balancer_lib",
+        "//source/extensions/filters/network:well_known_names",
+        "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
+        "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
+        "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
+        "//source/extensions/filters/network/thrift_proxy:protocol_interface",
+        "//source/extensions/filters/network/thrift_proxy:thrift_object_interface",
+        "//source/extensions/filters/network/thrift_proxy:transport_interface",
     ],
 )
 
@@ -52,15 +95,15 @@ envoy_cc_library(
     deps = [
         ":router_interface",
         ":router_ratelimit_lib",
-        "//include/envoy/tcp:conn_pool_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//include/envoy/upstream:load_balancer_interface",
-        "//include/envoy/upstream:thread_local_cluster_interface",
-        "//source/common/common:logger_lib",
+        ":shadow_writer_lib",
+        ":upstream_request_lib",
+        "//envoy/tcp:conn_pool_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:load_balancer_interface",
+        "//envoy/upstream:thread_local_cluster_interface",
         "//source/common/http:header_utility_lib",
         "//source/common/router:metadatamatchcriteria_lib",
         "//source/common/upstream:load_balancer_lib",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",

@@ -1,5 +1,5 @@
 #pragma once
-#include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_decoder.h"
 
 namespace Envoy {
 namespace Extensions {

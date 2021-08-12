@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.network.tcp_proxy",
+    extension_names = ["envoy.filters.network.tcp_proxy"],
     deps = [
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/mocks/server:factory_context_mocks",

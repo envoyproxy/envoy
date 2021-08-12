@@ -6,12 +6,11 @@
 #include "envoy/common/time.h"
 #include "envoy/network/address.h"
 
-#include "common/common/assert.h"
-#include "common/common/hex.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/tracers/zipkin/tracer_interface.h"
-#include "extensions/tracers/zipkin/util.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/hex.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/tracers/zipkin/tracer_interface.h"
+#include "source/extensions/tracers/zipkin/util.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
@@ -253,11 +252,6 @@ public:
   AnnotationType annotationType() const { return annotation_type_; }
 
   /**
-   * Sets the binary's annotation type.
-   */
-  void setAnnotationType(AnnotationType annotation_type) { annotation_type_ = annotation_type; }
-
-  /**
    * @return the annotation's endpoint attribute.
    */
   const Endpoint& endpoint() const { return endpoint_.value(); }
@@ -266,11 +260,6 @@ public:
    * Sets the annotation's endpoint attribute (copy semantics).
    */
   void setEndpoint(const Endpoint& endpoint) { endpoint_ = endpoint; }
-
-  /**
-   * Sets the annotation's endpoint attribute (move semantics).
-   */
-  void setEndpoint(const Endpoint&& endpoint) { endpoint_ = endpoint; }
 
   /**
    * @return true if the endpoint attribute is set, or false otherwise.

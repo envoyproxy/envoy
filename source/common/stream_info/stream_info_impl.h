@@ -11,11 +11,11 @@
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/trace_reason.h"
 
-#include "common/common/assert.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/macros.h"
-#include "common/network/socket_impl.h"
-#include "common/stream_info/filter_state_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/macros.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "absl/strings/str_replace.h"
 
@@ -67,6 +67,10 @@ struct StreamInfoImpl : public StreamInfo {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(time.value() -
                                                                 start_time_monotonic_);
   }
+
+  void setUpstreamConnectionId(uint64_t id) override { upstream_connection_id_ = id; }
+
+  absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
 
   absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const override {
     return duration(last_downstream_rx_byte_received);
@@ -197,15 +201,6 @@ struct StreamInfoImpl : public StreamInfo {
     return *downstream_address_provider_;
   }
 
-  void
-  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
-    downstream_ssl_info_ = connection_info;
-  }
-
-  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
-    return downstream_ssl_info_;
-  }
-
   void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
     upstream_ssl_info_ = connection_info;
   }
@@ -214,7 +209,7 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_ssl_info_;
   }
 
-  const Router::RouteEntry* routeEntry() const override { return route_entry_; }
+  Router::RouteConstSharedPtr route() const override { return route_; }
 
   envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
   const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return metadata_; };
@@ -232,12 +227,6 @@ struct StreamInfoImpl : public StreamInfo {
   void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) override {
     upstream_filter_state_ = filter_state;
   }
-
-  void setRequestedServerName(absl::string_view requested_server_name) override {
-    requested_server_name_ = std::string(requested_server_name);
-  }
-
-  const std::string& requestedServerName() const override { return requested_server_name_; }
 
   void setUpstreamTransportFailureReason(absl::string_view failure_reason) override {
     upstream_transport_failure_reason_ = std::string(failure_reason);
@@ -266,8 +255,9 @@ struct StreamInfoImpl : public StreamInfo {
 
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
-       << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
+    os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(upstream_connection_id_)
+       << DUMP_OPTIONAL_MEMBER(protocol_) << DUMP_OPTIONAL_MEMBER(response_code_)
+       << DUMP_OPTIONAL_MEMBER(response_code_details_) << DUMP_OPTIONAL_MEMBER(attempt_count_)
        << DUMP_MEMBER(health_check_request_) << DUMP_MEMBER(route_name_) << "\n";
   }
 
@@ -280,15 +270,15 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_cluster_info_;
   }
 
-  void setConnectionID(uint64_t id) override { connection_id_ = id; }
-
-  absl::optional<uint64_t> connectionID() const override { return connection_id_; }
-
   void setFilterChainName(absl::string_view filter_chain_name) override {
-    filter_chain_name_ = filter_chain_name;
+    filter_chain_name_ = std::string(filter_chain_name);
   }
 
   const std::string& filterChainName() const override { return filter_chain_name_; }
+
+  void setAttemptCount(uint32_t attempt_count) override { attempt_count_ = attempt_count; }
+
+  absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
   TimeSource& time_source_;
   const SystemTime start_time_;
@@ -306,11 +296,13 @@ struct StreamInfoImpl : public StreamInfo {
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
-  const Router::RouteEntry* route_entry_{};
+  Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
   FilterStateSharedPtr upstream_filter_state_;
   std::string route_name_;
+  absl::optional<uint64_t> upstream_connection_id_;
+  absl::optional<uint32_t> attempt_count_;
 
 private:
   static Network::SocketAddressProviderSharedPtr emptyDownstreamAddressProvider() {
@@ -334,7 +326,6 @@ private:
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   const Network::SocketAddressProviderSharedPtr downstream_address_provider_;
-  Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
@@ -342,7 +333,6 @@ private:
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
-  absl::optional<uint64_t> connection_id_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
 };

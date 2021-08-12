@@ -1,7 +1,7 @@
 #include "mocks.h"
 
-#include "common/common/assert.h"
-#include "common/common/lock_guard.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/lock_guard.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

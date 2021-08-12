@@ -4,11 +4,10 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-
-#include "extensions/filters/network/kafka/kafka_request.h"
-#include "extensions/filters/network/kafka/parser.h"
-#include "extensions/filters/network/kafka/tagged_fields.h"
+#include "source/common/common/assert.h"
+#include "source/extensions/filters/network/kafka/kafka_request.h"
+#include "source/extensions/filters/network/kafka/parser.h"
+#include "source/extensions/filters/network/kafka/tagged_fields.h"
 
 namespace Envoy {
 namespace Extensions {

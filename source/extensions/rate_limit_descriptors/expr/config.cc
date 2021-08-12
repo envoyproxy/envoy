@@ -1,9 +1,9 @@
-#include "extensions/rate_limit_descriptors/expr/config.h"
+#include "source/extensions/rate_limit_descriptors/expr/config.h"
 
 #include "envoy/extensions/rate_limit_descriptors/expr/v3/expr.pb.h"
 #include "envoy/extensions/rate_limit_descriptors/expr/v3/expr.pb.validate.h"
 
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #if defined(USE_CEL_PARSER)
 #include "parser/parser.h"

@@ -1,8 +1,7 @@
 #include "envoy/common/random_generator.h"
 
-#include "common/common/assert.h"
-
-#include "extensions/filters/network/common/redis/fault_impl.h"
+#include "source/common/common/assert.h"
+#include "source/extensions/filters/network/common/redis/fault_impl.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/mocks/runtime/mocks.h"

@@ -4,7 +4,7 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/singleton/const_singleton.h"
+#include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Extensions {

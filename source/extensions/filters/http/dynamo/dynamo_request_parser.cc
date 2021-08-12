@@ -1,11 +1,11 @@
-#include "extensions/filters/http/dynamo/dynamo_request_parser.h"
+#include "source/extensions/filters/http/dynamo/dynamo_request_parser.h"
 
 #include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 #include "absl/strings/match.h"
 

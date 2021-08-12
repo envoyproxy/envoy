@@ -9,20 +9,20 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/compiler_requirements.h"
-#include "common/common/logger.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/filesystem/directory.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/compiler_requirements.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/filesystem/directory.h"
 
 #include "absl/container/node_hash_map.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "common/signal/signal_action.h"
+#include "source/common/signal/signal_action.h"
 #endif
 
-#include "server/options_impl.h"
+#include "source/server/options_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/network_utility.h"
@@ -254,6 +254,14 @@ Server::Options& TestEnvironment::getOptions() {
   return *options;
 }
 
+std::vector<Grpc::ClientType> TestEnvironment::getsGrpcVersionsForTest() {
+#ifdef ENVOY_GOOGLE_GRPC
+  return {Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc};
+#else
+  return {Grpc::ClientType::EnvoyGrpc};
+#endif
+}
+
 const std::string& TestEnvironment::temporaryDirectory() {
   CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
 }
@@ -362,9 +370,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   out_json_string = substitute(out_json_string, version);
 
   auto name = Filesystem::fileSystemForTest().splitPathFromFilename(path).file_;
-  const std::string extension = absl::EndsWith(name, ".yaml")      ? ".yaml"
-                                : absl::EndsWith(name, ".pb_text") ? ".pb_text"
-                                                                   : ".json";
+  const std::string extension = std::string(name.substr(name.rfind('.')));
   const std::string out_json_path =
       TestEnvironment::temporaryPath(name) + ".with.ports" + extension;
   {
@@ -406,9 +412,9 @@ std::string TestEnvironment::writeStringToFileForTest(const std::string& filenam
   const Filesystem::FlagSet flags{1 << Filesystem::File::Operation::Write |
                                   1 << Filesystem::File::Operation::Create};
   const Api::IoCallBoolResult open_result = file->open(flags);
-  EXPECT_TRUE(open_result.rc_);
+  EXPECT_TRUE(open_result.return_value_);
   const Api::IoCallSizeResult result = file->write(contents);
-  EXPECT_EQ(contents.length(), result.rc_);
+  EXPECT_EQ(contents.length(), result.return_value_);
   return out_path;
 }
 

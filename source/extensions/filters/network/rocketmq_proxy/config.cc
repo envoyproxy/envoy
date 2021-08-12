@@ -1,4 +1,4 @@
-#include "extensions/filters/network/rocketmq_proxy/config.h"
+#include "source/extensions/filters/network/rocketmq_proxy/config.h"
 
 #include <cstdlib>
 
@@ -6,9 +6,9 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/network/rocketmq_proxy/conn_manager.h"
-#include "extensions/filters/network/rocketmq_proxy/stats.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"
+#include "source/extensions/filters/network/rocketmq_proxy/stats.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -13,7 +13,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/init:manager_interface",
+        "//envoy/init:manager_interface",
         "//source/common/init:target_lib",
         "//source/common/init:watcher_lib",
     ],

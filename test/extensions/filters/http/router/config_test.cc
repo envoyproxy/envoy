@@ -4,7 +4,7 @@
 #include "envoy/extensions/filters/http/router/v3/router.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/router/config.h"
+#include "source/extensions/filters/http/router/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"

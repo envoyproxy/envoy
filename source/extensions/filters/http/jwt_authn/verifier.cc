@@ -1,4 +1,4 @@
-#include "extensions/filters/http/jwt_authn/verifier.h"
+#include "source/extensions/filters/http/jwt_authn/verifier.h"
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 

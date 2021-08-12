@@ -3,13 +3,12 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/kafka/external/request_metrics.h"
-#include "extensions/filters/network/kafka/external/response_metrics.h"
-#include "extensions/filters/network/kafka/parser.h"
-#include "extensions/filters/network/kafka/request_codec.h"
-#include "extensions/filters/network/kafka/response_codec.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/kafka/external/request_metrics.h"
+#include "source/extensions/filters/network/kafka/external/response_metrics.h"
+#include "source/extensions/filters/network/kafka/parser.h"
+#include "source/extensions/filters/network/kafka/request_codec.h"
+#include "source/extensions/filters/network/kafka/response_codec.h"
 
 #include "absl/container/flat_hash_map.h"
 

@@ -12,7 +12,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_stream.h"
+#include "source/common/quic/envoy_quic_stream.h"
 
 namespace Envoy {
 namespace Quic {
@@ -23,12 +23,6 @@ class EnvoyQuicServerStream : public quic::QuicSpdyServerStreamBase,
                               public Http::ResponseEncoder {
 public:
   EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
-                        quic::StreamType type, Http::Http3::CodecStats& stats,
-                        const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
-                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                            headers_with_underscores_action);
-
-  EnvoyQuicServerStream(quic::PendingStream* pending, quic::QuicSpdySession* session,
                         quic::StreamType type, Http::Http3::CodecStats& stats,
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -54,6 +48,7 @@ public:
   void setFlushTimeout(std::chrono::milliseconds) override {
     // TODO(mattklein123): Actually implement this for HTTP/3 similar to HTTP/2.
   }
+
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   bool OnStopSending(quic::QuicRstStreamErrorCode error) override;
@@ -63,16 +58,17 @@ public:
   void OnCanWrite() override;
   // quic::QuicSpdyServerStreamBase
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
+  void CloseWriteSide() override;
 
   void clearWatermarkBuffer();
 
   // EnvoyQuicStream
   Http::HeaderUtility::HeaderValidationResult
-  validateHeader(const std::string& header_name, absl::string_view header_value) override;
+  validateHeader(absl::string_view header_name, absl::string_view header_value) override;
 
 protected:
   // EnvoyQuicStream
-  void switchStreamBlockState(bool should_block) override;
+  void switchStreamBlockState() override;
   uint32_t streamId() override;
   Network::Connection* connection() override;
 

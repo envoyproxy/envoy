@@ -3,11 +3,10 @@
 
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
 
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/secret/secret_provider_impl.h"
-
-#include "extensions/filters/http/oauth2/config.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/secret/secret_provider_impl.h"
+#include "source/extensions/filters/http/oauth2/config.h"
 
 #include "test/mocks/server/factory_context.h"
 

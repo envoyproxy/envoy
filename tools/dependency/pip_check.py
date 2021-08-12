@@ -1,44 +1,38 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
-import os
+# usage
+#
+# with bazel:
+#
+#  bazel //tools/dependency:pip_check -- -h
+#
+# alternatively, if you have the necessary python deps available
+#
+#  ./tools/dependency/pip_check.py -h
+#
+
 import sys
 from functools import cached_property
+from typing import Iterable, Set
 
-import yaml
+from tools.base import checker, utils
 
 DEPENDABOT_CONFIG = ".github/dependabot.yml"
+REQUIREMENTS_FILENAME = "requirements.txt"
 
 # TODO(phlax): add checks for:
 #      - requirements can be installed together
-#      - pip-compile formatting (maybe do that in code_format)
+#      - pip-compile formatting
 
 
-# TODO(phlax): move this to a base module
-class Checker(object):
-    """Runs check methods prefixed with `check_` and named in `self.checks`
-
-    check methods should return the count of errors and handle writing to stderr
-    """
-    checks = ()
-
-    def __init__(self, path: str):
-        self.path = path
-
-    def error_lines(self, errors: list) -> str:
-        """Transform a list of errors to a string for output"""
-        return "\n - ".join([""] + errors)
-
-    def run_checks(self) -> int:
-        """Run all configured checks and return the sum of their error counts"""
-        return sum(getattr(self, f"check_{check}")() for check in self.checks)
-
-    def write_errors(self, errors: list, pre: str, post: str) -> None:
-        """Write errors to stderr with pre/post ambles"""
-        sys.stderr.write(f"\n{pre}: \n{self.error_lines(errors)}\n\n{post}\n\n")
+class PipConfigurationError(Exception):
+    pass
 
 
-class PipChecker(Checker):
+class PipChecker(checker.Checker):
     checks = ("dependabot",)
+    _dependabot_config = DEPENDABOT_CONFIG
+    _requirements_filename = REQUIREMENTS_FILENAME
 
     @cached_property
     def config_requirements(self) -> set:
@@ -51,44 +45,56 @@ class PipChecker(Checker):
     @cached_property
     def dependabot_config(self) -> dict:
         """Parsed dependabot config"""
-        with open(os.path.join(self.path, DEPENDABOT_CONFIG)) as f:
-            return yaml.safe_load(f.read())
+        result = utils.from_yaml(self.path.joinpath(self.dependabot_config_path))
+        if not isinstance(result, dict):
+            raise PipConfigurationError(
+                f"Unable to parse dependabot config: {self.dependabot_config_path}")
+        return result
+
+    @property
+    def dependabot_config_path(self) -> str:
+        return self._dependabot_config
 
     @cached_property
-    def requirements_dirs(self) -> set:
+    def requirements_dirs(self) -> Set[str]:
         """Set of found directories in the repo containing requirements.txt"""
         return set(
-            root[len(self.path):]
-            for root, dirs, files in os.walk(self.path)
-            if "requirements.txt" in files)
+            f"/{f.parent.relative_to(self.path)}" for f in self.path.glob("**/*")
+            if f.name == self.requirements_filename)
 
-    def check_dependabot(self) -> int:
+    @property
+    def requirements_filename(self) -> str:
+        return self._requirements_filename
+
+    def check_dependabot(self) -> None:
         """Check that dependabot config matches requirements.txt files found in repo"""
-        missing_dirs = self.config_requirements - self.requirements_dirs
-        missing_config = self.requirements_dirs - self.config_requirements
-
-        if missing_config:
-            self.write_errors(
-                sorted(missing_config), "Missing requirements config for",
-                "Either add the missing config or remove the file/s")
-
+        missing_dirs = self.config_requirements.difference(self.requirements_dirs)
+        missing_config = self.requirements_dirs.difference(self.config_requirements)
+        correct = self.requirements_dirs.intersection(self.config_requirements)
+        if correct:
+            self.dependabot_success(correct)
         if missing_dirs:
-            self.write_errors(
-                sorted(missing_dirs), "Missing requirements files for",
-                "Either add the missing file/s or remove the config")
+            self.dependabot_errors(
+                missing_dirs,
+                f"Missing {self.requirements_filename} dir, specified in dependabot config")
+        if missing_config:
+            self.dependabot_errors(
+                missing_config,
+                f"Missing dependabot config for {self.requirements_filename} in dir")
 
-        return len(missing_config | missing_dirs)
+    def dependabot_success(self, correct: Iterable) -> None:
+        self.succeed(
+            "dependabot",
+            ([f"{self.requirements_filename}: {dirname}" for dirname in sorted(correct)]))
+
+    def dependabot_errors(self, missing: Iterable, msg: str) -> None:
+        for dirname in sorted(missing):
+            self.error("dependabot", [f"{msg}: {dirname}"])
 
 
-def main(path: str) -> None:
-    errors = PipChecker(path).run_checks()
-    if errors:
-        raise SystemExit(f"Pip checks failed: {errors} errors")
+def main(*args) -> int:
+    return PipChecker(*args).run()
 
 
 if __name__ == "__main__":
-    try:
-        path = sys.argv[1]
-    except IndexError:
-        raise SystemExit("Pip check tool must be called with a path argument")
-    main(path)
+    sys.exit(main(*sys.argv[1:]))

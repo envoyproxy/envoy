@@ -7,7 +7,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include "xds/core/v3/resource_locator.pb.h"
 

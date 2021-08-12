@@ -1,12 +1,12 @@
-#include "common/upstream/cds_api_helper.h"
+#include "source/common/upstream/cds_api_helper.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/grpc_mux.h"
 
-#include "common/common/fmt.h"
-#include "common/config/resource_name.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/resource_name.h"
 
 #include "absl/container/flat_hash_set.h"
 

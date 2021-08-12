@@ -36,7 +36,7 @@ envoy_cc_test_library(
 envoy_extension_cc_test(
     name = "protocol_test",
     srcs = ["protocol_test.cc"],
-    extension_name = "envoy.filters.network.rocketmq_proxy",
+    extension_names = ["envoy.filters.network.rocketmq_proxy"],
     deps = [
         "//source/extensions/filters/network/rocketmq_proxy:config",
         "//test/test_common:utility_lib",
@@ -46,7 +46,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "router_test",
     srcs = ["router_test.cc"],
-    extension_name = "envoy.filters.network.rocketmq_proxy",
+    extension_names = ["envoy.filters.network.rocketmq_proxy"],
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -59,7 +59,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "topic_route_test",
     srcs = ["topic_route_test.cc"],
-    extension_name = "envoy.filters.network.rocketmq_proxy",
+    extension_names = ["envoy.filters.network.rocketmq_proxy"],
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/rocketmq_proxy:config",
@@ -70,7 +70,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "conn_manager_test",
     srcs = ["conn_manager_test.cc"],
-    extension_name = "envoy.filters.network.rocketmq_proxy",
+    extension_names = ["envoy.filters.network.rocketmq_proxy"],
     deps = [
         ":utility_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -86,7 +86,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "active_message_test",
     srcs = ["active_message_test.cc"],
-    extension_name = "envoy.filters.network.rocketmq_proxy",
+    extension_names = ["envoy.filters.network.rocketmq_proxy"],
     deps = [
         ":utility_lib",
         "//source/common/network:address_lib",
@@ -101,7 +101,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.network.rocketmq_proxy",
+    extension_names = ["envoy.filters.network.rocketmq_proxy"],
     deps = [
         "//source/extensions/filters/network/rocketmq_proxy:config",
         "//test/mocks/local_info:local_info_mocks",
@@ -115,7 +115,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "codec_test",
     srcs = ["codec_test.cc"],
-    extension_name = "envoy.filters.network.rocketmq_proxy",
+    extension_names = ["envoy.filters.network.rocketmq_proxy"],
     deps = [
         ":utility_lib",
         "//source/common/network:address_lib",
@@ -128,7 +128,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "route_matcher_test",
     srcs = ["route_matcher_test.cc"],
-    extension_name = "envoy.filters.network.rocketmq_proxy",
+    extension_names = ["envoy.filters.network.rocketmq_proxy"],
     deps = [
         "//source/extensions/filters/network/rocketmq_proxy/router:route_matcher",
         "//test/test_common:utility_lib",

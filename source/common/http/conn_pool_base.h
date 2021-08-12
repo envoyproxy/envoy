@@ -5,10 +5,10 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/common/linked_object.h"
-#include "common/conn_pool/conn_pool_base.h"
-#include "common/http/codec_client.h"
-#include "common/http/utility.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/conn_pool/conn_pool_base.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/string_view.h"
 
@@ -47,17 +47,21 @@ class ActiveClient;
 class HttpConnPoolImplBase : public Envoy::ConnectionPool::ConnPoolImplBase,
                              public Http::ConnectionPool::Instance {
 public:
-  HttpConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
-                       Event::Dispatcher& dispatcher,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                       Random::RandomGenerator& random_generator,
-                       Upstream::ClusterConnectivityState& state,
-                       std::vector<Http::Protocol> protocols);
+  HttpConnPoolImplBase(
+      Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+      Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
+      std::vector<Http::Protocol> protocols);
   ~HttpConnPoolImplBase() override;
 
+  // Event::DeferredDeletable
+  void deleteIsPending() override { deleteIsPendingImpl(); }
+
   // ConnectionPool::Instance
-  void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
+  void addIdleCallback(IdleCb cb) override { addIdleCallbackImpl(cb); }
+  bool isIdle() const override { return isIdleImpl(); }
+  void startDrain() override { startDrainImpl(); }
   void drainConnections() override { drainConnectionsImpl(); }
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
@@ -143,13 +147,12 @@ public:
   using CreateCodecFn = std::function<CodecClientPtr(Upstream::Host::CreateConnectionData& data,
                                                      HttpConnPoolImplBase* pool)>;
 
-  FixedHttpConnPoolImpl(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
-                        Event::Dispatcher& dispatcher,
-                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                        Random::RandomGenerator& random_generator,
-                        Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
-                        CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols)
+  FixedHttpConnPoolImpl(
+      Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+      Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
+      CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols)
       : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
                              random_generator, state, protocols),
         codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]) {

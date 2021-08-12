@@ -1,6 +1,6 @@
 #include "test/mocks/upstream/host.h"
 
-#include "common/network/utility.h"
+#include "source/common/network/utility.h"
 
 using testing::_;
 using testing::Invoke;

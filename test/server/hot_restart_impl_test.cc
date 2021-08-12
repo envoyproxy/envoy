@@ -1,10 +1,9 @@
 #include <memory>
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/api/os_sys_calls_impl_hot_restart.h"
-#include "common/common/hex.h"
-
-#include "server/hot_restart_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/api/os_sys_calls_impl_hot_restart.h"
+#include "source/common/common/hex.h"
+#include "source/server/hot_restart_impl.h"
 
 #include "test/mocks/api/hot_restart.h"
 #include "test/mocks/api/mocks.h"

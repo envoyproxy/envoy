@@ -1,7 +1,9 @@
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/service/route/v3/rds.pb.h"
 
-#include "common/config/type_to_endpoint.h"
+#include "source/common/config/type_to_endpoint.h"
+
+#include "test/config/v2_link_hacks.h"
 
 #include "gtest/gtest.h"
 

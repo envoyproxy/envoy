@@ -1,9 +1,8 @@
-#include "extensions/filters/network/rocketmq_proxy/protocol.h"
+#include "source/extensions/filters/network/rocketmq_proxy/protocol.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-
-#include "extensions/filters/network/rocketmq_proxy/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/extensions/filters/network/rocketmq_proxy/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

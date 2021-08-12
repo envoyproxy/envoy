@@ -1,4 +1,4 @@
-#include "server/config_validation/dns.h"
+#include "source/server/config_validation/dns.h"
 
 namespace Envoy {
 namespace Network {

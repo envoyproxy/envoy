@@ -1,8 +1,8 @@
-#include "extensions/filters/http/grpc_web/config.h"
+#include "source/extensions/filters/http/grpc_web/config.h"
 
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/grpc_web/grpc_web_filter.h"
+#include "source/extensions/filters/http/grpc_web/grpc_web_filter.h"
 
 namespace Envoy {
 namespace Extensions {

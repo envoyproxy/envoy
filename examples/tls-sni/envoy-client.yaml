@@ -35,7 +35,6 @@ static_resources:
 
   clusters:
   - name: proxy-client-domain1
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -54,7 +53,6 @@ static_resources:
         sni: domain1.example.com
 
   - name: proxy-client-domain2
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -73,7 +71,6 @@ static_resources:
         sni: domain2.example.com
 
   - name: proxy-client-domain3
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:

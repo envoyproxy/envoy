@@ -37,3 +37,18 @@ independently.
 .. note::
 
  This feature is not supported on Windows.
+
+Socket handling
+---------------
+
+By default, Envoy uses :ref:`reuse_port
+<envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>` sockets on Linux for better
+performance. This feature workers correctly during hot restart because Envoy passes each socket
+to the new process by worker index. Thus, no connections are dropped in the accept queues of
+the draining process.
+
+.. attention::
+
+  In the uncommon case in which concurrency changes during hot restart, no connections will be
+  dropped if concurrency increases. However, if concurrency decreases some connections may be
+  dropped in the accept queues of the old process workers.

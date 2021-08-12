@@ -12,18 +12,60 @@ pub fn _start() {
 struct TestStream;
 
 impl HttpContext for TestStream {
-    fn on_http_request_headers(&mut self, _: usize) -> Action {
-        match self.dispatch_http_call(
-            "cluster",
-            vec![(":method", "POST"), (":path", "/"), (":authority", "foo")],
-            Some(b"hello world"),
-            vec![("trail", "cow")],
-            Duration::from_secs(5),
-        ) {
-            Ok(_) => info!("onRequestHeaders"),
-            Err(_) => info!("async_call rejected"),
-        };
-        Action::Pause
+    fn on_http_request_headers(&mut self, _: usize, end_of_stream: bool) -> Action {
+        if end_of_stream {
+            self.dispatch_http_call(
+                "cluster",
+                vec![(":method", "POST"), (":path", "/"), (":authority", "foo")],
+                Some(b"hello world"),
+                vec![("trail", "cow")],
+                Duration::from_secs(1),
+            )
+            .unwrap_err();
+            Action::Continue
+        } else {
+            // bogus cluster name
+            self.dispatch_http_call(
+                "bogus cluster",
+                vec![(":method", "POST"), (":path", "/"), (":authority", "foo")],
+                Some(b"hello world"),
+                vec![("trail", "cow")],
+                Duration::from_secs(1),
+            )
+            .unwrap_err();
+
+            // bogus duration
+            self.dispatch_http_call(
+                "cluster",
+                vec![(":method", "POST"), (":path", "/"), (":authority", "foo")],
+                Some(b"hello world"),
+                vec![("trail", "cow")],
+                Duration::new(u64::MAX, 0),
+            )
+            .unwrap_err();
+
+            // missing :path
+            self.dispatch_http_call(
+                "cluster",
+                vec![(":method", "POST"), (":authority", "foo")],
+                Some(b"hello world"),
+                vec![("trail", "cow")],
+                Duration::from_secs(1),
+            )
+            .unwrap_err();
+
+            match self.dispatch_http_call(
+                "cluster",
+                vec![(":method", "POST"), (":path", "/"), (":authority", "foo")],
+                Some(b"hello world"),
+                vec![("trail", "cow")],
+                Duration::from_secs(5),
+            ) {
+                Ok(_) => info!("onRequestHeaders"),
+                Err(_) => info!("async_call rejected"),
+            };
+            Action::Pause
+        }
     }
 }
 

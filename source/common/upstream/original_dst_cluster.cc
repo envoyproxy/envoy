@@ -1,4 +1,4 @@
-#include "common/upstream/original_dst_cluster.h"
+#include "source/common/upstream/original_dst_cluster.h"
 
 #include <chrono>
 #include <list>
@@ -11,11 +11,11 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/http/headers.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -119,9 +119,8 @@ OriginalDstCluster::OriginalDstCluster(
                            ? info_->lbOriginalDstConfig().value().use_http_header()
                            : false),
       host_map_(std::make_shared<HostMap>()) {
-  // TODO(dio): Remove hosts check once the hosts field is removed.
-  if (config.has_load_assignment() || !config.hidden_envoy_deprecated_hosts().empty()) {
-    throw EnvoyException("ORIGINAL_DST clusters must have no load assignment or hosts configured");
+  if (config.has_load_assignment()) {
+    throw EnvoyException("ORIGINAL_DST clusters must have no load assignment configured");
   }
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
@@ -184,14 +183,12 @@ OriginalDstClusterFactory::createClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
-  if (cluster.lb_policy() !=
-          envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB &&
-      cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
-    throw EnvoyException(fmt::format(
-        "cluster: LB policy {} is not valid for Cluster type {}. Only 'CLUSTER_PROVIDED' or "
-        "'ORIGINAL_DST_LB' is allowed with cluster type 'ORIGINAL_DST'",
-        envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy()),
-        envoy::config::cluster::v3::Cluster::DiscoveryType_Name(cluster.type())));
+  if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+    throw EnvoyException(
+        fmt::format("cluster: LB policy {} is not valid for Cluster type {}. Only "
+                    "'CLUSTER_PROVIDED' is allowed with cluster type 'ORIGINAL_DST'",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy()),
+                    envoy::config::cluster::v3::Cluster::DiscoveryType_Name(cluster.type())));
   }
 
   // TODO(mattklein123): The original DST load balancer type should be deprecated and instead

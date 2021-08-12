@@ -1,12 +1,12 @@
-#include "extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
+#include "source/extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 
 #include <algorithm>
 
 #include "envoy/common/exception.h"
 #include "envoy/grpc/status.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
 
 namespace Envoy {
 namespace Extensions {

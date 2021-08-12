@@ -1,7 +1,7 @@
 #pragma once
 
-#include "extensions/common/aws/credentials_provider.h"
-#include "extensions/common/aws/signer.h"
+#include "source/extensions/common/aws/credentials_provider.h"
+#include "source/extensions/common/aws/signer.h"
 
 #include "gmock/gmock.h"
 
@@ -24,8 +24,9 @@ public:
   ~MockSigner() override;
 
   MOCK_METHOD(void, sign, (Http::RequestMessage&, bool));
-  MOCK_METHOD(void, sign, (Http::RequestHeaderMap&));
   MOCK_METHOD(void, sign, (Http::RequestHeaderMap&, const std::string&));
+  MOCK_METHOD(void, signEmptyPayload, (Http::RequestHeaderMap&));
+  MOCK_METHOD(void, signUnsignedPayload, (Http::RequestHeaderMap&));
 };
 
 class MockMetadataFetcher {

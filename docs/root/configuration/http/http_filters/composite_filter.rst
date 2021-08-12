@@ -3,6 +3,11 @@
 Composite Filter
 ================
 
+.. attention::
+
+   The composite filter is in alpha and is currently under active development.
+   Capabilities will be expanded over time and the configuration structures are likely to change.
+
 The composite filter allows delegating filter actions to a filter specified by a
 :ref:`match result <arch_overview_matching_api>`. The purpose of this is to allow different filters
 or filter configurations to be selected based on the incoming request, allowing for more dynamic
@@ -15,7 +20,7 @@ this, in order to delegate all the data to the specified filter, the decision mu
 on just the request headers.
 
 Delegation can fail if the filter factory attempted to use a callback not supported by the
-composite filter. In either case, the `<stat_prefix>.composite.delegation_error` stat will be
+composite filter. In either case, the ``<stat_prefix>.composite.delegation_error`` stat will be
 incremented.
 
 Sample Envoy configuration
@@ -23,8 +28,8 @@ Sample Envoy configuration
 
 Here's a sample Envoy configuration that makes use of the composite filter to inject a different
 latency via the :ref:`fault filter <config_http_filters_fault_injection>`. It uses the header
-`x-fault-category` to determine which fault configuration to use: if the header is equal to the
-string `huge fault`, a 10s latency is injected while if the header contains `tiny string` a 1s
+``x-fault-category`` to determine which fault configuration to use: if the header is equal to the
+string ``huge fault``, a 10s latency is injected while if the header contains ``tiny string`` a 1s
 latency is injected. If the header is absent or contains a different value, no filter is
 instantiated.
 

@@ -1,8 +1,7 @@
-#include "server/config_validation/api.h"
+#include "source/server/config_validation/api.h"
 
-#include "common/common/assert.h"
-
-#include "server/config_validation/dispatcher.h"
+#include "source/common/common/assert.h"
+#include "source/server/config_validation/dispatcher.h"
 
 namespace Envoy {
 namespace Api {

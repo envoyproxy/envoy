@@ -7,6 +7,7 @@ import "envoy/config/route/v4alpha/route_components.proto";
 import "envoy/type/matcher/v4alpha/metadata.proto";
 import "envoy/type/matcher/v4alpha/path.proto";
 import "envoy/type/matcher/v4alpha/string.proto";
+import "envoy/type/v3/range.proto";
 
 import "google/api/expr/v1alpha1/checked.proto";
 import "google/api/expr/v1alpha1/syntax.proto";
@@ -23,9 +24,9 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // [#protodoc-title: Role Based Access Control (RBAC)]
 
 // Role Based Access Control (RBAC) provides service-level and method-level access control for a
-// service. RBAC policies are additive. The policies are examined in order. Requests are allowed
-// or denied based on the `action` and whether a matching policy is found. For instance, if the
-// action is ALLOW and a matching policy is found the request should be allowed.
+// service. Requests are allowed or denied based on the `action` and whether a matching policy is
+// found. For instance, if the action is ALLOW and a matching policy is found the request should be
+// allowed.
 //
 // RBAC can also be used to make access logging decisions by communicating with access loggers
 // through dynamic metadata. When the action is LOG and at least one policy matches, the
@@ -58,7 +59,10 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //       permissions:
 //           - and_rules:
 //               rules:
-//                 - header: { name: ":method", exact_match: "GET" }
+//                 - header:
+//                     name: ":method"
+//                     string_match:
+//                       exact: "GET"
 //                 - url_path:
 //                     path: { prefix: "/products" }
 //                 - or_rules:
@@ -103,6 +107,7 @@ message RBAC {
   Action action = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Maps from policy name to policy. A match occurs when at least one policy matches the request.
+  // The policies are evaluated in lexicographic order of the policy name.
   map<string, Policy> policies = 2;
 }
 
@@ -139,7 +144,7 @@ message Policy {
 }
 
 // Permission defines an action (or actions) that a principal can take.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message Permission {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v3.Permission";
 
@@ -179,6 +184,9 @@ message Permission {
     // A port number that describes the destination port connecting to.
     uint32 destination_port = 6 [(validate.rules).uint32 = {lte: 65535}];
 
+    // A port number range that describes a range of destination ports connecting to.
+    type.v3.Int32Range destination_port_range = 11;
+
     // Metadata that describes additional information about the action.
     type.matcher.v4alpha.MetadataMatcher metadata = 7;
 
@@ -198,7 +206,7 @@ message Permission {
     //   * If the :ref:`TLS Inspector <config_listener_filters_tls_inspector>`
     //     filter is not added, and if a `FilterChainMatch` is not defined for
     //     the :ref:`server name
-    //     <envoy_api_field_config.listener.v4alpha.FilterChainMatch.server_names>`,
+    //     <envoy_v3_api_field_config.listener.v3.FilterChainMatch.server_names>`,
     //     a TLS connection's requested SNI server name will be treated as if it
     //     wasn't present.
     //
@@ -262,7 +270,7 @@ message Principal {
 
     // A CIDR block that describes the downstream remote/origin address.
     // Note: This is always the physical peer even if the
-    // :ref:`remote_ip <envoy_api_field_config.rbac.v4alpha.Principal.remote_ip>` is
+    // :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>` is
     // inferred from for example the x-forwarder-for header, proxy protocol,
     // etc.
     core.v4alpha.CidrRange direct_remote_ip = 10;
@@ -270,7 +278,7 @@ message Principal {
     // A CIDR block that describes the downstream remote/origin address.
     // Note: This may not be the physical peer and could be different from the
     // :ref:`direct_remote_ip
-    // <envoy_api_field_config.rbac.v4alpha.Principal.direct_remote_ip>`. E.g, if the
+    // <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`. E.g, if the
     // remote ip is inferred from for example the x-forwarder-for header, proxy
     // protocol, etc.
     core.v4alpha.CidrRange remote_ip = 11;

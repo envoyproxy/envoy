@@ -156,7 +156,6 @@ public:
   MOCK_METHOD(const std::string&, caCertPath, (), (const));
   MOCK_METHOD(const std::string&, certificateRevocationList, (), (const));
   MOCK_METHOD(const std::string&, certificateRevocationListPath, (), (const));
-  MOCK_METHOD(const std::vector<std::string>&, verifySubjectAltNameList, (), (const));
   MOCK_METHOD(const std::vector<envoy::type::matcher::v3::StringMatcher>&, subjectAltNameMatchers,
               (), (const));
   MOCK_METHOD(const std::vector<std::string>&, verifyCertificateHashList, (), (const));

@@ -1,4 +1,4 @@
-#include "extensions/access_loggers/open_telemetry/access_log_impl.h"
+#include "source/extensions/access_loggers/open_telemetry/access_log_impl.h"
 
 #include <chrono>
 
@@ -7,14 +7,14 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
 
-#include "common/common/assert.h"
-#include "common/config/utility.h"
-#include "common/formatter/substitution_formatter.h"
-#include "common/http/headers.h"
-#include "common/network/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/stream_info/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/config/utility.h"
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/http/headers.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stream_info/utility.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"

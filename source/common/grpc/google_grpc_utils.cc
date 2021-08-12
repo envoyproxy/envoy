@@ -1,4 +1,4 @@
-#include "common/grpc/google_grpc_utils.h"
+#include "source/common/grpc/google_grpc_utils.h"
 
 #include <atomic>
 #include <cstdint>
@@ -8,13 +8,13 @@
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/registry/registry.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"

@@ -4,9 +4,8 @@
 #include "envoy/network/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
 namespace Extensions {
