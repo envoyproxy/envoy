@@ -74,7 +74,7 @@ public:
 private:
   struct PendingResolution;
 
-  // The newly created pending resolution and whether this action was succesful. Note
+  // The newly created pending resolution and whether this action was successful. Note
   // that {nullptr, true} is possible in the case where the resolution succeeds inline.
   using StartResolutionResult = std::pair<std::unique_ptr<PendingResolution>, bool>;
   StartResolutionResult startResolution(const std::string& dns_name,
