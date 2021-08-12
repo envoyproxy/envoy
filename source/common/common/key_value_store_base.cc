@@ -96,7 +96,7 @@ void FileBasedKeyValueStore::flush() {
     ENVOY_LOG(error, "Failed to flush cache to file {}", filename_);
     return;
   }
-  for (auto it : store_) {
+  for (const auto& it : store_) {
     file->write(absl::StrCat(it.first.length(), "\n"));
     file->write(it.first);
     file->write(absl::StrCat(it.second.length(), "\n"));

@@ -67,9 +67,9 @@ TEST_F(KeyValueStoreTest, HandleBadFile) {
 }
 
 TEST_F(KeyValueStoreTest, HandleInvalidFile) {
-  filename_ = "/foo";
+  filename_ = "c://foo";
   createStore();
-  EXPECT_LOG_CONTAINS("error", "Failed to flush cache to file /foo", store_->flush());
+  EXPECT_LOG_CONTAINS("error", "Failed to flush cache to file c://foo", store_->flush());
 }
 
 } // namespace
