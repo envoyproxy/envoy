@@ -84,8 +84,8 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoGoogleGrpc) {
   transport_api_version: {}
   )EOF";
 #ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
+  // TODO(chaoqin-li1123): clean this up when we move AUTO to V3 by default.
   expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::AUTO, google_grpc_service_yaml);
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V2, google_grpc_service_yaml);
 #endif
   expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V3, google_grpc_service_yaml);
 }
@@ -100,8 +100,8 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoEnvoyGrpc) {
   transport_api_version: {}
   )EOF";
 #ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
+  // TODO(chaoqin-li1123): clean this up when we move AUTO to V3 by default.
   expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::AUTO, envoy_grpc_service_yaml);
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V2, envoy_grpc_service_yaml);
 #endif
   expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V3, envoy_grpc_service_yaml);
 }
