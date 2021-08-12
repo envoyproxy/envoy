@@ -1339,8 +1339,12 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithRequestBody) {
 // Set up per-route configuration that sets a custom processing mode on the
 // route, and test that the processing mode takes effect.
 TEST_P(ExtProcIntegrationTest, PerRouteProcessingMode) {
+  Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::trace);
+  Logger::Registry::getLog(Logger::Id::misc).set_level(spdlog::level::debug);
   initializeConfig();
+  ENVOY_LOG_MISC(debug, "modify virtual host");
   modifyHttpVirtualHost([this](VirtualHost& vh) {
+    ENVOY_LOG_MISC(debug, "in modify virtual host");
     // Set up "/foo" so that it will send a buffered body
     auto* route = vh.mutable_routes()->Mutable(0);
     route->mutable_match()->set_path("/foo");
@@ -1350,6 +1354,7 @@ TEST_P(ExtProcIntegrationTest, PerRouteProcessingMode) {
     setPerRouteConfig(route, per_route);
   });
   HttpIntegrationTest::initialize();
+  ENVOY_LOG_MISC(debug, "initialized");
 
   auto response =
       sendDownstreamRequest([](Http::RequestHeaderMap& headers) { headers.setPath("/foo"); });
@@ -1359,12 +1364,15 @@ TEST_P(ExtProcIntegrationTest, PerRouteProcessingMode) {
   handleUpstreamRequestWithResponse(full_response, 100);
   processResponseHeadersMessage(false, absl::nullopt);
   // Because of the per-route config we should get a buffered response
+  ENVOY_LOG_MISC(debug, "processing response body");
   processResponseBodyMessage(false, [&full_response](const HttpBody& body, BodyResponse&) {
     EXPECT_TRUE(body.end_of_stream());
     EXPECT_EQ(body.body(), full_response.toString());
     return true;
   });
   verifyDownstreamResponse(*response, 200);
+  Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::info);
+  Logger::Registry::getLog(Logger::Id::misc).set_level(spdlog::level::info);
 }
 
 // Set up configuration on the virtual host and on the route and see that
