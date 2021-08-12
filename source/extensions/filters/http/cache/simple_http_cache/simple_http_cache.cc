@@ -33,9 +33,9 @@ public:
   }
 
   void getTrailers(LookupTrailersCallback&& cb) override {
-    ASSERT(trailers_ != nullptr,
-           "Called getTrailers for an entry that does not actually have trailers");
-    cb(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*trailers_));
+    if (trailers_ != nullptr) {
+      cb(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*trailers_));
+    } 
   }
 
   const LookupRequest& request() const { return request_; }

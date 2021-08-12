@@ -77,8 +77,9 @@ protected:
   Http::TestResponseTrailerMapImpl getTrailers(LookupContext& context) {
     Http::TestResponseTrailerMapImpl trailers;
     context.getTrailers([&trailers](Http::ResponseTrailerMapPtr&& data) {
-      EXPECT_NE(data, nullptr);
-      trailers = *data;
+      if (data) {
+        trailers = *data;
+      }
     });
     return trailers;
   }
@@ -106,7 +107,9 @@ protected:
     if (body != actual_body) {
       return AssertionFailure() << "Expected body == " << body << "\n  Actual:  " << actual_body;
     }
+    std::cout << "I am before getting trailers\n"; 
     const Http::TestResponseTrailerMapImpl actual_trailers = getTrailers(*lookup_context);
+    std::cout << "I am after getting trailers\n";
     if (trailers != actual_trailers) {
       return AssertionFailure() << "Expected trailers == " << trailers
                                 << "\n  Actual:  " << actual_trailers;
