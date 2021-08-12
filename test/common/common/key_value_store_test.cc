@@ -66,11 +66,13 @@ TEST_F(KeyValueStoreTest, HandleBadFile) {
   checkBadFile("3\nfoo3\nbar3\na", "Bad file: insufficient contents");
 }
 
+#ifndef WIN32
 TEST_F(KeyValueStoreTest, HandleInvalidFile) {
-  filename_ = "c://foo";
+  filename_ = "/foo";
   createStore();
-  EXPECT_LOG_CONTAINS("error", "Failed to flush cache to file c://foo", store_->flush());
+  EXPECT_LOG_CONTAINS("error", "Failed to flush cache to file /foo", store_->flush());
 }
+#endif
 
 } // namespace
 } // namespace Envoy
