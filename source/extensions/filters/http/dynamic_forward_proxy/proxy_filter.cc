@@ -1,12 +1,11 @@
 #include "source/extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
-#include "source/common/stream_info/address_set_accessor_impl.h"
-
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "source/common/http/utility.h"
+#include "source/common/stream_info/address_set_accessor_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
@@ -171,7 +170,8 @@ void ProxyFilter::addHostAddressToFilterState(
   }
 }
 
-void ProxyFilter::onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& hostInfo) {
+void ProxyFilter::onLoadDnsCacheComplete(
+    const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& hostInfo) {
   ENVOY_STREAM_LOG(debug, "load DNS cache complete, continuing after adding resolved host: {}",
                    *decoder_callbacks_, hostInfo->resolvedHost());
   ASSERT(circuit_breaker_ != nullptr);

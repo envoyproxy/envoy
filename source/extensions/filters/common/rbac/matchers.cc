@@ -1,7 +1,6 @@
 #include "source/extensions/filters/common/rbac/matchers.h"
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
-
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/stream_info/address_set_accessor_impl.h"
@@ -24,8 +23,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
     return std::make_shared<const IPMatcher>(permission.destination_ip(),
                                              IPMatcher::Type::DownstreamLocal);
   case envoy::config::rbac::v3::Permission::RuleCase::kUpstreamIp:
-    return std::make_shared<const IPMatcher>(permission.upstream_ip(),
-                                             IPMatcher::Type::Upstream);
+    return std::make_shared<const IPMatcher>(permission.upstream_ip(), IPMatcher::Type::Upstream);
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPort:
     return std::make_shared<const PortMatcher>(permission.destination_port());
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPortRange:

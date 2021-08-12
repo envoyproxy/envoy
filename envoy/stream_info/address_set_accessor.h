@@ -14,8 +14,9 @@ class AddressSetAccessor : public FilterState::Object {
 public:
   virtual void add(Network::Address::InstanceConstSharedPtr address) PURE;
 
-  virtual void iterate(
-      const std::function<void(const Network::Address::InstanceConstSharedPtr& address)>&) const PURE;
+  virtual void
+  iterate(const std::function<void(const Network::Address::InstanceConstSharedPtr& address)>&)
+      const PURE;
 };
 
 } // namespace StreamInfo

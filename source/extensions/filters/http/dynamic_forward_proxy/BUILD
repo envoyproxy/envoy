@@ -16,9 +16,9 @@ envoy_cc_library(
     deps = [
         "//envoy/http:filter_interface",
         "//source/common/http:header_utility_lib",
+        "//source/common/stream_info:address_set_accessor_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//source/common/stream_info:address_set_accessor_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/dynamic_forward_proxy/v3:pkg_cc_proto",
