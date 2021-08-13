@@ -79,6 +79,8 @@ private:
   OptRef<ResourceState> getRequestedResourceState(absl::string_view resource_name);
   OptRef<const ResourceState> getRequestedResourceState(absl::string_view resource_name) const;
 
+  bool isInitialRequestForLegacyWildcard();
+
   // Not all xDS resources support heartbeats due to there being specific information encoded in
   // an empty response, which is indistinguishable from a heartbeat in some cases. For now we just
   // disable heartbeats for these resources (currently only VHDS).

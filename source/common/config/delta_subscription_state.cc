@@ -275,36 +275,7 @@ DeltaSubscriptionState::getNextRequestAckless() {
   must_send_discovery_request_ = false;
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
-    bool is_legacy_wildcard = in_initial_legacy_wildcard_;
-    if (is_legacy_wildcard) {
-      requested_resource_state_.insert_or_assign(Wildcard, ResourceState::waitingForServer());
-      ASSERT(containerContains(requested_resource_state_, Wildcard));
-      ASSERT(!containerContains(wildcard_resource_state_, Wildcard));
-      ASSERT(!containerContains(ambiguous_resource_state_, Wildcard));
-    } else {
-      // If we are here, this means that we lost our initial wildcard mode, because we subscribed to
-      // something in the past. We could still be in the situation now that all we are subscribed to
-      // now is wildcard resource, so in such case try to send a legacy wildcard subscription
-      // request anyway. For this to happen, two conditions need to apply:
-      //
-      // 1. No change in interest.
-      // 2. The only requested resource is Wildcard resource.
-      //
-      // The invariant of the code here is that this code is executed only when
-      // subscriptionUpdatePending actually returns true, which in our case can only happen if the
-      // requested resources state_ isn't empty.
-      ASSERT(!requested_resource_state_.empty());
-
-      // If our subscription interest didn't change then the first condition for using legacy
-      // wildcard subscription is met.
-      is_legacy_wildcard = names_added_.empty() && names_removed_.empty();
-      if (is_legacy_wildcard) {
-        // If we requested only a wildcard resource then the second condition for using legacy
-        // wildcard condition is met.
-        is_legacy_wildcard = requested_resource_state_.size() == 1 &&
-                             requested_resource_state_.begin()->first == Wildcard;
-      }
-    }
+    const bool is_legacy_wildcard = isInitialRequestForLegacyWildcard();
     // initial_resource_versions "must be populated for first request in a stream".
     // Also, since this might be a new server, we must explicitly state *all* of our subscription
     // interest.
@@ -342,6 +313,39 @@ DeltaSubscriptionState::getNextRequestAckless() {
   request.set_type_url(type_url_);
   request.mutable_node()->MergeFrom(local_info_.node());
   return request;
+}
+
+bool DeltaSubscriptionState::isInitialRequestForLegacyWildcard() {
+  if (in_initial_legacy_wildcard_) {
+    requested_resource_state_.insert_or_assign(Wildcard, ResourceState::waitingForServer());
+    ASSERT(containerContains(requested_resource_state_, Wildcard));
+    ASSERT(!containerContains(wildcard_resource_state_, Wildcard));
+    ASSERT(!containerContains(ambiguous_resource_state_, Wildcard));
+    return true;
+  }
+
+  // If we are here, this means that we lost our initial wildcard mode, because we subscribed to
+  // something in the past. We could still be in the situation now that all we are subscribed to now
+  // is wildcard resource, so in such case try to send a legacy wildcard subscription request
+  // anyway. For this to happen, two conditions need to apply:
+  //
+  // 1. No change in interest.
+  // 2. The only requested resource is Wildcard resource.
+  //
+  // The invariant of the code here is that this code is executed only when
+  // subscriptionUpdatePending actually returns true, which in our case can only happen if the
+  // requested resources state_ isn't empty.
+  ASSERT(!requested_resource_state_.empty());
+
+  // If our subscription interest didn't change then the first condition for using legacy wildcard
+  // subscription is met.
+  if (!names_added_.empty() || !names_removed_.empty()) {
+    return false;
+  }
+  // If we requested only a wildcard resource then the second condition for using legacy wildcard
+  // condition is met.
+  return requested_resource_state_.size() == 1 &&
+    requested_resource_state_.begin()->first == Wildcard;
 }
 
 envoy::service::discovery::v3::DeltaDiscoveryRequest
