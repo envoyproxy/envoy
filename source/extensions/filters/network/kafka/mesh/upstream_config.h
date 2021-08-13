@@ -1,8 +1,11 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
 #include <utility>
+
+#include "envoy/common/pure.h"
 
 #include "absl/types/optional.h"
 
