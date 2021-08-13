@@ -427,7 +427,7 @@ void UpstreamRequest::onPoolReady(
         info.downstreamAddressProvider().connectionID().value());
   }
 
-  upstream_->setStreamInfo(parent_.callbacks()->streamInfo());
+  upstream_->setBytesMeterer(parent_.callbacks()->streamInfo().getUpstreamBytesMeterer());
 
   if (parent_.downstreamEndStream()) {
     setupPerTryTimeout();

@@ -1297,7 +1297,7 @@ public:
    */
   virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
 
-  virtual void setStreamInfo(StreamInfo::StreamInfo& stream_info) PURE;
+  virtual void setBytesMeterer(const std::shared_ptr<StreamInfo::BytesMeterer>&) PURE;
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;

@@ -87,7 +87,9 @@ public:
 
   void addDecodedBytes(size_t newly_received_bytes) override;
 
-  void setStreamInfo(StreamInfo::StreamInfo& info) override { info_ = &info; }
+  void setBytesMeterer(const std::shared_ptr<StreamInfo::BytesMeterer>& bytes_meterer) override {
+    bytes_meterer_ = bytes_meterer;
+  }
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection);
@@ -136,7 +138,7 @@ private:
   void flushOutput(bool end_encode = false);
 
   absl::string_view details_;
-  StreamInfo::StreamInfo* info_{};
+  std::shared_ptr<StreamInfo::BytesMeterer> bytes_meterer_;
 };
 
 /**

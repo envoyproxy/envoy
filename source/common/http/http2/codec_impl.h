@@ -292,8 +292,8 @@ protected:
                           bool skip_encoding_empty_trailers);
 
     void addEncodedBytes(size_t newly_encoded_bytes) override {
-      if (info_) {
-        info_->addWireBytesSent(newly_encoded_bytes);
+      if (bytes_meterer_) {
+        bytes_meterer_->addWireBytesSent(newly_encoded_bytes);
       }
       ENVOY_CONN_LOG(trace, "stream id {}:update encoded bytes {}\n", parent_.connection_,
                      stream_id_, newly_encoded_bytes);
@@ -302,17 +302,19 @@ protected:
     void addDecodedBytes(size_t newly_decoded_bytes) override {
       ENVOY_CONN_LOG(trace, "stream id {}:update decoded bytes {}\n", parent_.connection_,
                      stream_id_, newly_decoded_bytes);
-      if (info_) {
-        info_->addWireBytesReceived(newly_decoded_bytes);
+      if (bytes_meterer_) {
+        bytes_meterer_->addWireBytesReceived(newly_decoded_bytes);
       }
     }
 
-    void setStreamInfo(StreamInfo::StreamInfo& info) override { info_ = &info; }
+    void setBytesMeterer(const std::shared_ptr<StreamInfo::BytesMeterer>& bytes_meterer) override {
+      bytes_meterer_ = bytes_meterer;
+    }
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
-    StreamInfo::StreamInfo* info_{};
+    std::shared_ptr<StreamInfo::BytesMeterer> bytes_meterer_;
 
     Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
     // Note that in current implementation the watermark callbacks of the pending_recv_data_ are

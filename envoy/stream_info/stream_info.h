@@ -236,6 +236,21 @@ struct UpstreamTiming {
   absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
 };
 
+struct BytesMeterer {
+  uint64_t wireBytesSent() { return wire_bytes_sent_; }
+  uint64_t wireBytesReceived() { return wire_bytes_received_; }
+  uint64_t bodyBytesSent() { return body_bytes_sent_; }
+  uint64_t bodyBytesReceived() { return body_bytes_received_; }
+  void addBodyBytesSent(uint64_t added_bytes) { body_bytes_sent_ += added_bytes; }
+  void addBodyBytesReceived(uint64_t added_bytes) { body_bytes_received_ += added_bytes; }
+  void addWireBytesSent(uint64_t added_bytes) { wire_bytes_sent_ += added_bytes; }
+  void addWireBytesReceived(uint64_t added_bytes) { wire_bytes_received_ += added_bytes; }
+  uint64_t body_bytes_sent_{};
+  uint64_t body_bytes_received_{};
+  uint64_t wire_bytes_sent_{};
+  uint64_t wire_bytes_received_{};
+};
+
 /**
  * Additional information about a completed request for logging.
  */
@@ -295,9 +310,9 @@ public:
   virtual void addBytesReceived(uint64_t bytes_received) PURE;
 
   /**
-   * @param wire_bytes_received the total number of bytes decoded by the stream.
+   * @param UPSTREAM_WIRE_BYTES_RECEIVED the total number of bytes decoded by the stream.
    */
-  virtual void addWireBytesReceived(uint64_t wire_bytes_received) PURE;
+  virtual void addWireBytesReceived(uint64_t UPSTREAM_WIRE_BYTES_RECEIVED) PURE;
 
   /**
    * @return the number of body bytes received by the stream.
@@ -428,9 +443,9 @@ public:
   virtual void addBytesSent(uint64_t bytes_sent) PURE;
 
   /**
-   * @param wire_bytes_sent the total number of bytes encoded by the stream.
+   * @param UPSTREAM_WIRE_BYTES_SENT the total number of bytes encoded by the stream.
    */
-  virtual void addWireBytesSent(uint64_t wire_bytes_sent) PURE;
+  virtual void addWireBytesSent(uint64_t UPSTREAM_WIRE_BYTES_SENT) PURE;
 
   /**
    * @return the number of body bytes sent in the response.
@@ -623,6 +638,10 @@ public:
    * was never attempted upstream.
    */
   virtual absl::optional<uint32_t> attemptCount() const PURE;
+
+  virtual std::shared_ptr<BytesMeterer> getUpstreamBytesMeterer() const PURE;
+
+  virtual std::shared_ptr<BytesMeterer> getDownStreamBytesMeterer() const PURE;
 };
 
 } // namespace StreamInfo

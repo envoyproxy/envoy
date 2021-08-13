@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bits/stdint-uintn.h>
+
 #include <chrono>
 #include <cstdint>
 
@@ -292,6 +294,10 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
+  std::shared_ptr<BytesMeterer> getUpstreamBytesMeterer() const override {
+    return upstream_bytes_meterer_;
+  }
+
   TimeSource& time_source_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -349,6 +355,7 @@ private:
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
+  std::shared_ptr<BytesMeterer> upstream_bytes_meterer_{new BytesMeterer()};
 };
 
 } // namespace StreamInfo

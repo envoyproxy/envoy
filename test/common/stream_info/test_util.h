@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -223,6 +225,10 @@ public:
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
+  std::shared_ptr<Envoy::StreamInfo::BytesMeterer> getUpstreamBytesMeterer() const override {
+    return upstream_bytes_meterer_;
+  }
+
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -266,6 +272,8 @@ public:
   Tracing::Reason trace_reason_{Tracing::Reason::NotTraceable};
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
+  std::shared_ptr<Envoy::StreamInfo::BytesMeterer> upstream_bytes_meterer_{
+      new Envoy::StreamInfo::BytesMeterer()};
 };
 
 } // namespace Envoy

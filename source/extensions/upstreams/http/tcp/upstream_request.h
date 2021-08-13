@@ -84,7 +84,7 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
-  void setStreamInfo(StreamInfo::StreamInfo&) override {}
+  void setBytesMeterer(const std::shared_ptr<StreamInfo::BytesMeterer>&) override {}
 
 private:
   Router::UpstreamToDownstream* upstream_request_;

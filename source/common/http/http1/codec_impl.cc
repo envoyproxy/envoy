@@ -98,16 +98,16 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection)
 void StreamEncoderImpl::addEncodedBytes(size_t newly_encoded_bytes) {
   ENVOY_CONN_LOG(trace, "h1: update encoded bytes {}\n", connection_.connection(),
                  newly_encoded_bytes);
-  if (info_) {
-    info_->addWireBytesSent(newly_encoded_bytes);
+  if (bytes_meterer_) {
+    bytes_meterer_->addWireBytesSent(newly_encoded_bytes);
   }
 }
 
 void StreamEncoderImpl::addDecodedBytes(size_t newly_decoded_bytes) {
   ENVOY_CONN_LOG(trace, "h1: update decoded bytes {}\n", connection_.connection(),
                  newly_decoded_bytes);
-  if (info_) {
-    info_->addWireBytesReceived(newly_decoded_bytes);
+  if (bytes_meterer_) {
+    bytes_meterer_->addWireBytesReceived(newly_decoded_bytes);
   }
 }
 
