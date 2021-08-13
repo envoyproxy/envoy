@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile
 
+import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
 import java.nio.ByteBuffer
 
 /**
@@ -9,7 +10,7 @@ import java.nio.ByteBuffer
 class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) : Stream(underlyingStream) {
   private val mockStream: MockEnvoyHTTPStream = underlyingStream
 
-  private val mockStreamIntel = object : StreamIntel {
+  private val mockStreamIntel = object : EnvoyStreamIntel {
     override fun getStreamId(): Long { return 0 }
     override fun getConnectionId(): Long { return 0 }
     override fun getAttemptCount(): Long { return 0 }

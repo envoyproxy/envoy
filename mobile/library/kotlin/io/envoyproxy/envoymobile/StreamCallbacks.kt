@@ -5,8 +5,6 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
 
-typealias StreamIntel = EnvoyStreamIntel
-
 /**
  * A collection of platform-level callbacks that are specified by consumers
  * who wish to interact with streams.
@@ -38,29 +36,32 @@ internal class EnvoyHTTPCallbacksAdapter(
   override fun onHeaders(
     headers: Map<String, List<String>>,
     endStream: Boolean,
-    streamIntel: StreamIntel
+    streamIntel: EnvoyStreamIntel
   ) {
-    callbacks.onHeaders?.invoke(ResponseHeaders(headers), endStream, streamIntel)
+    callbacks.onHeaders?.invoke(ResponseHeaders(headers), endStream, StreamIntel(streamIntel))
   }
 
-  override fun onData(byteBuffer: ByteBuffer, endStream: Boolean, streamIntel: StreamIntel) {
-    callbacks.onData?.invoke(byteBuffer, endStream, streamIntel)
+  override fun onData(byteBuffer: ByteBuffer, endStream: Boolean, streamIntel: EnvoyStreamIntel) {
+    callbacks.onData?.invoke(byteBuffer, endStream, StreamIntel(streamIntel))
   }
 
-  override fun onTrailers(trailers: Map<String, List<String>>, streamIntel: StreamIntel) {
-    callbacks.onTrailers?.invoke(ResponseTrailers((trailers)), streamIntel)
+  override fun onTrailers(trailers: Map<String, List<String>>, streamIntel: EnvoyStreamIntel) {
+    callbacks.onTrailers?.invoke(ResponseTrailers((trailers)), StreamIntel(streamIntel))
   }
 
   override fun onError(
     errorCode: Int,
     message: String,
     attemptCount: Int,
-    streamIntel: StreamIntel
+    streamIntel: EnvoyStreamIntel
   ) {
-    callbacks.onError?.invoke(EnvoyError(errorCode, message, attemptCount), streamIntel)
+    callbacks.onError?.invoke(
+      EnvoyError(errorCode, message, attemptCount),
+      StreamIntel(streamIntel)
+    )
   }
 
-  override fun onCancel(streamIntel: StreamIntel) {
-    callbacks.onCancel?.invoke(streamIntel)
+  override fun onCancel(streamIntel: EnvoyStreamIntel) {
+    callbacks.onCancel?.invoke(StreamIntel(streamIntel))
   }
 }

@@ -60,6 +60,7 @@ envoy_mobile_kt_library(
         "StreamCallbacks.kt",
         "StreamClient.kt",
         "StreamClientImpl.kt",
+        "StreamIntel.kt",
         "StreamPrototype.kt",
         "StringAccessor.kt",
         "Trailers.kt",
