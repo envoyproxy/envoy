@@ -121,7 +121,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
     ] + select({
         "//bazel:apple": [
-            "//source/common/network:dns_lib",
+            "//source/extensions/network/dns_resolver/apple:apple_dns_lib",
         ],
         "//conditions:default": [],
     }),
@@ -130,10 +130,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "dns_impl_test",
     srcs = ["dns_impl_test.cc"],
-    args = [
-        # Used in createDnsResolver to force creation of DnsResolverImpl when running test on macOS.
-        "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
-    ],
+    #args = [
+    #    # Used in createDnsResolver to force creation of DnsResolverImpl when running test on macOS.
+    #    "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
+    #],
     # TODO(envoyproxy/windows-dev): Under winsock2 this is behaving unusually for windows, even as
     # 127.0.0.1 and ::1 are explicitly added to `c:\windows\system32\drivers\etc\hosts` ... see:
     # https://gist.github.com/wrowe/24fe5b93b58bb444bce7ecc134905395
@@ -146,7 +146,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
-        "//source/common/network:dns_lib",
+        "//source/extensions/network/dns_resolver/cares:dns_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/stats:stats_lib",
