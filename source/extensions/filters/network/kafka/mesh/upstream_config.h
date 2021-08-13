@@ -1,5 +1,11 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
