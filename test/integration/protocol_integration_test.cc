@@ -2859,7 +2859,6 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytes
   expectWireBytesSentAndReceived(upstream_access_log_name_, 0, 187, 0, 114, 0);
 }
 
-
 TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeResponseCompleteWireBytesCount) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
