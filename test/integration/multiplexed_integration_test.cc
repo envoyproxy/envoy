@@ -136,7 +136,8 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
         hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
       });
   initialize();
-  const size_t stream_flow_control_window = downstream_protocol_ == Http::CodecType::HTTP3 ? 32 * 1024 : 65535;
+  const size_t stream_flow_control_window =
+      downstream_protocol_ == Http::CodecType::HTTP3 ? 32 * 1024 : 65535;
   envoy::config::core::v3::Http2ProtocolOptions http2_options =
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions());
