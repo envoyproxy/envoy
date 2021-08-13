@@ -140,6 +140,10 @@ public:
   std::string filter_chain_name_;
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
+
+private:
+  MOCK_METHOD(void, setUpstreamBytesMeterer, (const std::shared_ptr<BytesMeterer>&));
+  MOCK_METHOD(void, setDownstreamBytesMeterer, (const std::shared_ptr<BytesMeterer>&));
 };
 
 } // namespace StreamInfo

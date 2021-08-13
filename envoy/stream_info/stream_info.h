@@ -245,6 +245,7 @@ struct BytesMeterer {
   void addBodyBytesReceived(uint64_t added_bytes) { body_bytes_received_ += added_bytes; }
   void addWireBytesSent(uint64_t added_bytes) { wire_bytes_sent_ += added_bytes; }
   void addWireBytesReceived(uint64_t added_bytes) { wire_bytes_received_ += added_bytes; }
+
 private:
   uint64_t body_bytes_sent_{};
   uint64_t body_bytes_received_{};
@@ -623,6 +624,17 @@ public:
   virtual std::shared_ptr<BytesMeterer> getUpstreamBytesMeterer() const PURE;
 
   virtual std::shared_ptr<BytesMeterer> getDownstreamBytesMeterer() const PURE;
+
+  static void syncUpstreamAndDownstreamBytesMeterer(StreamInfo& downstream_info,
+                                                    StreamInfo& upstream_info) {
+    downstream_info.setUpstreamBytesMeterer(upstream_info.getUpstreamBytesMeterer());
+    upstream_info.setDownstreamBytesMeterer(downstream_info.getDownstreamBytesMeterer());
+  }
+
+private:
+  virtual void setUpstreamBytesMeterer(const std::shared_ptr<BytesMeterer>&) PURE;
+
+  virtual void setDownstreamBytesMeterer(const std::shared_ptr<BytesMeterer>&) PURE;
 };
 
 } // namespace StreamInfo

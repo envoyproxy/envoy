@@ -332,6 +332,16 @@ private:
                                          : emptyDownstreamAddressProvider()),
         trace_reason_(Tracing::Reason::NotTraceable) {}
 
+  void
+  setUpstreamBytesMeterer(const std::shared_ptr<BytesMeterer>& upstream_bytes_meterer) override {
+    upstream_bytes_meterer_ = upstream_bytes_meterer;
+  }
+
+  void setDownstreamBytesMeterer(
+      const std::shared_ptr<BytesMeterer>& downstream_bytes_meterer) override {
+    downstream_bytes_meterer_ = downstream_bytes_meterer;
+  }
+
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;

@@ -136,6 +136,14 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, getDownstreamBytesMeterer()).WillByDefault(Invoke([this]() {
     return downstream_bytes_meterer_;
   }));
+  ON_CALL(*this, setUpstreamBytesMeterer(_))
+      .WillByDefault(Invoke([this](const std::shared_ptr<BytesMeterer>& upstream_bytes_meterer) {
+        upstream_bytes_meterer_ = upstream_bytes_meterer;
+      }));
+  ON_CALL(*this, setDownstreamBytesMeterer(_))
+      .WillByDefault(Invoke([this](const std::shared_ptr<BytesMeterer>& downstream_bytes_meterer) {
+        downstream_bytes_meterer_ = downstream_bytes_meterer;
+      }));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

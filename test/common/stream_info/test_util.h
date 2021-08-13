@@ -276,6 +276,17 @@ public:
       new Envoy::StreamInfo::BytesMeterer()};
   std::shared_ptr<Envoy::StreamInfo::BytesMeterer> downstream_bytes_meterer_{
       new Envoy::StreamInfo::BytesMeterer()};
+
+private:
+  void setUpstreamBytesMeterer(
+      const std::shared_ptr<Envoy::StreamInfo::BytesMeterer>& upstream_bytes_meterer) override {
+    upstream_bytes_meterer_ = upstream_bytes_meterer;
+  }
+
+  void setDownstreamBytesMeterer(
+      const std::shared_ptr<Envoy::StreamInfo::BytesMeterer>& downstream_bytes_meterer) override {
+    downstream_bytes_meterer_ = downstream_bytes_meterer;
+  }
 };
 
 } // namespace Envoy

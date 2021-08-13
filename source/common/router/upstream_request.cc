@@ -179,7 +179,7 @@ void UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
 
   maybeEndDecode(end_stream);
   stream_info_.addBytesReceived(data.length());
-  // parent_.callbacks()->streamInfo().getUpstreamBytesMeterer()->addBodyBytesReceived(buffered_request_body_->length());
+  streamInfo().getUpstreamBytesMeterer()->addBodyBytesReceived(data.length());
   parent_.onUpstreamData(data, *this, end_stream);
 }
 
@@ -427,7 +427,9 @@ void UpstreamRequest::onPoolReady(
         info.downstreamAddressProvider().connectionID().value());
   }
 
-  upstream_->setBytesMeterer(parent_.callbacks()->streamInfo().getUpstreamBytesMeterer());
+  upstream_->setBytesMeterer(streamInfo().getUpstreamBytesMeterer());
+  StreamInfo::StreamInfo::syncUpstreamAndDownstreamBytesMeterer(parent_.callbacks()->streamInfo(),
+                                                                stream_info_);
 
   if (parent_.downstreamEndStream()) {
     setupPerTryTimeout();
