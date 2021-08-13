@@ -129,8 +129,6 @@ public:
   FilterStateSharedPtr filter_state_;
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
-  uint64_t wire_bytes_received_{};
-  uint64_t wire_bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   std::shared_ptr<Network::SocketAddressSetterImpl> downstream_address_provider_;
   std::shared_ptr<BytesMeterer> upstream_bytes_meterer_{new BytesMeterer()};
