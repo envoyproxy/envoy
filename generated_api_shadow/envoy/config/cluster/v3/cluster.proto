@@ -1115,11 +1115,9 @@ message LoadBalancingPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.LoadBalancingPolicy.Policy";
 
-    // Required. The name of the LB policy.
-    string name = 1 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+    reserved 1, 3;
 
-    google.protobuf.Any typed_config = 3
-        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+    reserved "name", "typed_config";
 
     core.v3.TypedExtensionConfig typed_extension_config = 4;
 
