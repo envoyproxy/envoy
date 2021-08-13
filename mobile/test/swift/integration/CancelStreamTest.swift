@@ -75,24 +75,26 @@ static_resources:
     struct CancelValidationFilter: ResponseFilter {
       let expectation: XCTestExpectation
 
-      func onResponseHeaders(_ headers: ResponseHeaders, endStream: Bool)
+      func onResponseHeaders(_ headers: ResponseHeaders, endStream: Bool, streamIntel: StreamIntel)
         -> FilterHeadersStatus<ResponseHeaders>
       {
         return .continue(headers: headers)
       }
 
-      func onResponseData(_ body: Data, endStream: Bool) -> FilterDataStatus<ResponseHeaders> {
+      func onResponseData(_ body: Data, endStream: Bool, streamIntel: StreamIntel)
+        -> FilterDataStatus<ResponseHeaders>
+      {
         return .continue(data: body)
       }
 
-      func onResponseTrailers(_ trailers: ResponseTrailers)
+      func onResponseTrailers(_ trailers: ResponseTrailers, streamIntel: StreamIntel)
           -> FilterTrailersStatus<ResponseHeaders, ResponseTrailers> {
         return .continue(trailers: trailers)
       }
 
-      func onError(_ error: EnvoyError) {}
+      func onError(_ error: EnvoyError, streamIntel: StreamIntel) {}
 
-      func onCancel() {
+      func onCancel(streamIntel: StreamIntel) {
         self.expectation.fulfill()
       }
     }

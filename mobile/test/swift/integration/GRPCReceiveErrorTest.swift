@@ -48,27 +48,29 @@ static_resources:
       let receivedError: XCTestExpectation
       let notCancelled: XCTestExpectation
 
-      func onResponseHeaders(_ headers: ResponseHeaders, endStream: Bool)
+      func onResponseHeaders(_ headers: ResponseHeaders, endStream: Bool, streamIntel: StreamIntel)
         -> FilterHeadersStatus<ResponseHeaders>
       {
         return .continue(headers: headers)
       }
 
-      func onResponseData(_ body: Data, endStream: Bool) -> FilterDataStatus<ResponseHeaders> {
+      func onResponseData(_ body: Data, endStream: Bool, streamIntel: StreamIntel)
+        -> FilterDataStatus<ResponseHeaders>
+      {
         return .continue(data: body)
       }
 
-      func onResponseTrailers(_ trailers: ResponseTrailers)
+      func onResponseTrailers(_ trailers: ResponseTrailers, streamIntel: StreamIntel)
           -> FilterTrailersStatus<ResponseHeaders, ResponseTrailers> {
         return .continue(trailers: trailers)
       }
 
-      func onError(_ error: EnvoyError) {
+      func onError(_ error: EnvoyError, streamIntel: StreamIntel) {
         XCTAssertEqual(error.errorCode, 2) // 503/Connection Failure
         self.receivedError.fulfill()
       }
 
-      func onCancel() {
+      func onCancel(streamIntel: StreamIntel) {
         XCTFail("Unexpected call to onCancel filter callback")
         self.notCancelled.fulfill()
       }
