@@ -136,23 +136,24 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
         hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
       });
   initialize();
+  const size_t stream_flow_control_window = downstream_protocol_ == Http::CodecType::HTTP3 ? 32 * 1024 : 65535;
   envoy::config::core::v3::Http2ProtocolOptions http2_options =
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions());
-  http2_options.mutable_initial_stream_window_size()->set_value(32 * 1024);
+  http2_options.mutable_initial_stream_window_size()->set_value(stream_flow_control_window);
 #ifdef ENVOY_ENABLE_QUIC
   if (downstream_protocol_ == Http::CodecType::HTTP3) {
     dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
-        .quic_config_.SetInitialStreamFlowControlWindowToSend(32 * 1024);
+        .quic_config_.SetInitialStreamFlowControlWindowToSend(stream_flow_control_window);
     dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
-        .quic_config_.SetInitialSessionFlowControlWindowToSend(32 * 1024);
+        .quic_config_.SetInitialSessionFlowControlWindowToSend(stream_flow_control_window);
   }
 #endif
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeData(32 * 1024 + 2000, true);
+  upstream_request_->encodeData(stream_flow_control_window + 2000, true);
   std::string flush_timeout_counter(downstreamProtocol() == Http::CodecType::HTTP3
                                         ? "http3.tx_flush_timeout"
                                         : "http2.tx_flush_timeout");
