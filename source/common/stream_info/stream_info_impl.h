@@ -298,6 +298,10 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_bytes_meterer_;
   }
 
+  std::shared_ptr<BytesMeterer> getDownstreamBytesMeterer() const override {
+    return downstream_bytes_meterer_;
+  }
+
   TimeSource& time_source_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -356,6 +360,7 @@ private:
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
   std::shared_ptr<BytesMeterer> upstream_bytes_meterer_{new BytesMeterer()};
+  std::shared_ptr<BytesMeterer> downstream_bytes_meterer_{new BytesMeterer()};
 };
 
 } // namespace StreamInfo

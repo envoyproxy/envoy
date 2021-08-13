@@ -103,6 +103,7 @@ public:
   MOCK_METHOD(void, setAttemptCount, (uint32_t), ());
   MOCK_METHOD(absl::optional<uint32_t>, attemptCount, (), (const));
   MOCK_METHOD(std::shared_ptr<BytesMeterer>, getUpstreamBytesMeterer, (), (const));
+  MOCK_METHOD(std::shared_ptr<BytesMeterer>, getDownstreamBytesMeterer, (), (const));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
@@ -133,6 +134,7 @@ public:
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   std::shared_ptr<Network::SocketAddressSetterImpl> downstream_address_provider_;
   std::shared_ptr<BytesMeterer> upstream_bytes_meterer_{new BytesMeterer()};
+  std::shared_ptr<BytesMeterer> downstream_bytes_meterer_{new BytesMeterer()};
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   std::string route_name_;

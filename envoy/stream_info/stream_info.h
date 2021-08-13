@@ -641,7 +641,7 @@ public:
 
   virtual std::shared_ptr<BytesMeterer> getUpstreamBytesMeterer() const PURE;
 
-  virtual std::shared_ptr<BytesMeterer> getDownStreamBytesMeterer() const PURE;
+  virtual std::shared_ptr<BytesMeterer> getDownstreamBytesMeterer() const PURE;
 };
 
 } // namespace StreamInfo

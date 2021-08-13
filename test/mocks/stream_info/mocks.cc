@@ -142,6 +142,9 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, getUpstreamBytesMeterer()).WillByDefault(Invoke([this]() {
     return upstream_bytes_meterer_;
   }));
+  ON_CALL(*this, getDownstreamBytesMeterer()).WillByDefault(Invoke([this]() {
+    return downstream_bytes_meterer_;
+  }));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

@@ -229,6 +229,10 @@ public:
     return upstream_bytes_meterer_;
   }
 
+  std::shared_ptr<Envoy::StreamInfo::BytesMeterer> getDownstreamBytesMeterer() const override {
+    return downstream_bytes_meterer_;
+  }
+
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -273,6 +277,8 @@ public:
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
   std::shared_ptr<Envoy::StreamInfo::BytesMeterer> upstream_bytes_meterer_{
+      new Envoy::StreamInfo::BytesMeterer()};
+  std::shared_ptr<Envoy::StreamInfo::BytesMeterer> downstream_bytes_meterer_{
       new Envoy::StreamInfo::BytesMeterer()};
 };
 
