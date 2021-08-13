@@ -77,7 +77,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   UNREFERENCED_PARAMETER(config);
   // TODO(marcomagdy) - how do we factor this into the logic above
   UNREFERENCED_PARAMETER(tracing_decision);
-  const auto header = trace_context.getTraceContext(XRayTraceHeader);
+  const auto header = trace_context.getByKey(XRayTraceHeader);
   absl::optional<bool> should_trace;
   XRayHeader xray_header;
   if (header.has_value()) {
@@ -98,10 +98,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   }
 
   if (!should_trace.has_value()) {
-    const SamplingRequest request{
-        trace_context.getTraceContext(Http::Headers::get().HostLegacy).value_or(""),
-        trace_context.getTraceContext(Http::Headers::get().Method).value_or(""),
-        trace_context.getTraceContext(Http::Headers::get().Path).value_or("")};
+    const SamplingRequest request{trace_context.authority(), trace_context.method(),
+                                  trace_context.path()};
 
     should_trace = sampling_strategy_->shouldTrace(request);
   }

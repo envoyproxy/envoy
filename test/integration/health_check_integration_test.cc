@@ -539,6 +539,7 @@ public:
   void sendGrpcResponse(uint32_t cluster_idx,
                         const Http::TestResponseHeaderMapImpl& response_headers,
                         const grpc::health::v1::HealthCheckResponse& health_check_response) {
+    clusters_[cluster_idx].host_stream_->startGrpcStream(false);
     clusters_[cluster_idx].host_stream_->encodeHeaders(response_headers, false);
     clusters_[cluster_idx].host_stream_->sendGrpcMessage(health_check_response);
     clusters_[cluster_idx].host_stream_->finishGrpcStream(Grpc::Status::WellKnownGrpcStatus::Ok);

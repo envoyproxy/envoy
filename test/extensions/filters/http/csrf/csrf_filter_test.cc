@@ -59,12 +59,12 @@ public:
   }
 
   void setRoutePolicy(const CsrfPolicy* policy) {
-    ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(filter_name_))
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(filter_name_))
         .WillByDefault(Return(policy));
   }
 
   void setVirtualHostPolicy(const CsrfPolicy* policy) {
-    ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(filter_name_))
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(filter_name_))
         .WillByDefault(Return(policy));
   }
 

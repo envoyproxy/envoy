@@ -254,44 +254,46 @@ bool maybeAdjustForIpv6(absl::string_view absolute_url, uint64_t& offset, uint64
   return true;
 }
 
-std::string parseCookie(const HeaderMap& headers, const std::string& key,
-                        const std::string& cookie) {
-
-  std::string ret;
-
-  headers.iterateReverse([&key, &ret, &cookie](const HeaderEntry& header) -> HeaderMap::Iterate {
-    // Find the cookie headers in the request (typically, there's only one).
-    if (header.key() == cookie) {
-
-      // Split the cookie header into individual cookies.
-      for (const auto& s : StringUtil::splitToken(header.value().getStringView(), ";")) {
-        // Find the key part of the cookie (i.e. the name of the cookie).
-        size_t first_non_space = s.find_first_not_of(' ');
-        size_t equals_index = s.find('=');
-        if (equals_index == absl::string_view::npos) {
-          // The cookie is malformed if it does not have an `=`. Continue
-          // checking other cookies in this header.
-          continue;
-        }
-        const absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
-        // If the key matches, parse the value from the rest of the cookie string.
-        if (k == key) {
-          absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
-
-          // Cookie values may be wrapped in double quotes.
-          // https://tools.ietf.org/html/rfc6265#section-4.1.1
-          if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
-            v = v.substr(1, v.size() - 2);
-          }
-          ret = std::string{v};
-          return HeaderMap::Iterate::Break;
-        }
-      }
+absl::string_view parseCookie(absl::string_view cookie_value, absl::string_view key) {
+  // Split the cookie header into individual cookies.
+  for (const auto& s : StringUtil::splitToken(cookie_value, ";")) {
+    // Find the key part of the cookie (i.e. the name of the cookie).
+    size_t first_non_space = s.find_first_not_of(' ');
+    size_t equals_index = s.find('=');
+    if (equals_index == absl::string_view::npos) {
+      // The cookie is malformed if it does not have an `=`. Continue
+      // checking other cookies in this header.
+      continue;
     }
-    return HeaderMap::Iterate::Continue;
-  });
+    absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
+    // If the key matches, parse the value from the rest of the cookie string.
+    if (k == key) {
+      absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
 
-  return ret;
+      // Cookie values may be wrapped in double quotes.
+      // https://tools.ietf.org/html/rfc6265#section-4.1.1
+      if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
+        v = v.substr(1, v.size() - 2);
+      }
+      return v;
+    }
+  }
+  return EMPTY_STRING;
+}
+
+std::string parseCookie(const HeaderMap& headers, const std::string& key,
+                        const LowerCaseString& cookie) {
+  const Http::HeaderMap::GetResult cookie_headers = headers.get(cookie);
+
+  for (size_t index = 0; index < cookie_headers.size(); index++) {
+    auto cookie_header_value = cookie_headers[index]->value().getStringView();
+    absl::string_view result = parseCookie(cookie_header_value, key);
+    if (!result.empty()) {
+      return std::string{result};
+    }
+  }
+
+  return EMPTY_STRING;
 }
 
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
@@ -429,11 +431,12 @@ std::string Utility::stripQueryString(const HeaderString& path) {
 }
 
 std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
-  return parseCookie(headers, key, Http::Headers::get().Cookie.get());
+  // TODO(wbpcode): Modify the headers parameter type to 'RequestHeaderMap'.
+  return parseCookie(headers, key, Http::Headers::get().Cookie);
 }
 
 std::string Utility::parseSetCookieValue(const Http::HeaderMap& headers, const std::string& key) {
-  return parseCookie(headers, key, Http::Headers::get().SetCookie.get());
+  return parseCookie(headers, key, Http::Headers::get().SetCookie);
 }
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,

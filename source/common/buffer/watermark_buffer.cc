@@ -9,6 +9,11 @@
 
 namespace Envoy {
 namespace Buffer {
+namespace {
+// Effectively disables tracking as this should zero out all reasonable account
+// balances when shifted by this amount.
+constexpr uint32_t kEffectivelyDisableTrackingBitshift = 63;
+} // end namespace
 
 void WatermarkBuffer::add(const void* data, uint64_t size) {
   OwnedImpl::add(data, size);
@@ -174,6 +179,12 @@ void WatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPt
   }
 }
 
+WatermarkBufferFactory::WatermarkBufferFactory(
+    const envoy::config::overload::v3::BufferFactoryConfig& config)
+    : bitshift_(config.minimum_account_to_track_power_of_two()
+                    ? config.minimum_account_to_track_power_of_two() - 1
+                    : kEffectivelyDisableTrackingBitshift) {}
+
 WatermarkBufferFactory::~WatermarkBufferFactory() {
   for (auto& account_set : size_class_account_sets_) {
     ASSERT(account_set.empty(),
@@ -195,10 +206,10 @@ BufferMemoryAccountImpl::createAccount(WatermarkBufferFactory* factory,
 }
 
 int BufferMemoryAccountImpl::balanceToClassIndex() {
-  const uint64_t shifted_balance = buffer_memory_allocated_ >> 20; // shift by 1MB.
+  const uint64_t shifted_balance = buffer_memory_allocated_ >> factory_->bitshift();
 
   if (shifted_balance == 0) {
-    return -1; // Not worth tracking anything < 1MB.
+    return -1; // Not worth tracking anything < configured minimum threshold
   }
 
   const int class_idx = absl::bit_width(shifted_balance) - 1;

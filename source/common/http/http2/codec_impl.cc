@@ -202,8 +202,7 @@ void ConnectionImpl::ServerStreamImpl::encode100ContinueHeaders(const ResponseHe
   encodeHeaders(headers, false);
 }
 
-void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>& final_headers,
-                                                   bool end_stream) {
+void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, bool end_stream) {
   nghttp2_data_provider provider;
   if (!end_stream) {
     provider.source.ptr = this;
@@ -215,7 +214,7 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>
   }
 
   local_end_stream_ = end_stream;
-  submitHeaders(final_headers, end_stream ? nullptr : &provider);
+  submitHeaders(headers, end_stream ? nullptr : &provider);
   if (parent_.sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
     return;
@@ -229,13 +228,12 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
-  std::vector<nghttp2_nv> final_headers;
   Http::RequestHeaderMapPtr modified_headers;
   if (Http::Utility::isUpgrade(headers)) {
     modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
     upgrade_type_ = std::string(headers.getUpgradeValue());
     Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
-    buildHeaders(final_headers, *modified_headers);
+    encodeHeadersBase(*modified_headers, end_stream);
   } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
     // If this is not an upgrade style connect (above branch) it is a bytestream
     // connect and should have :path and :protocol set accordingly
@@ -248,11 +246,10 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
     if (!headers.Path()) {
       modified_headers->setPath("/");
     }
-    buildHeaders(final_headers, *modified_headers);
+    encodeHeadersBase(*modified_headers, end_stream);
   } else {
-    buildHeaders(final_headers, headers);
+    encodeHeadersBase(headers, end_stream);
   }
-  encodeHeadersBase(final_headers, end_stream);
   return okStatus();
 }
 
@@ -263,16 +260,14 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
 
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
-  std::vector<nghttp2_nv> final_headers;
   Http::ResponseHeaderMapPtr modified_headers;
   if (Http::Utility::isUpgrade(headers)) {
     modified_headers = createHeaderMap<ResponseHeaderMapImpl>(headers);
     Http::Utility::transformUpgradeResponseFromH1toH2(*modified_headers);
-    buildHeaders(final_headers, *modified_headers);
+    encodeHeadersBase(*modified_headers, end_stream);
   } else {
-    buildHeaders(final_headers, headers);
+    encodeHeadersBase(headers, end_stream);
   }
-  encodeHeadersBase(final_headers, end_stream);
 }
 
 void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
@@ -475,17 +470,21 @@ void ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t
   parent_.connection_.write(output, false);
 }
 
-void ConnectionImpl::ClientStreamImpl::submitHeaders(const std::vector<nghttp2_nv>& final_headers,
+void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers,
                                                      nghttp2_data_provider* provider) {
   ASSERT(stream_id_ == -1);
+  std::vector<nghttp2_nv> final_headers;
+  buildHeaders(final_headers, headers);
   stream_id_ = nghttp2_submit_request(parent_.session_, nullptr, final_headers.data(),
                                       final_headers.size(), provider, base());
   ASSERT(stream_id_ > 0);
 }
 
-void ConnectionImpl::ServerStreamImpl::submitHeaders(const std::vector<nghttp2_nv>& final_headers,
+void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers,
                                                      nghttp2_data_provider* provider) {
   ASSERT(stream_id_ != -1);
+  std::vector<nghttp2_nv> final_headers;
+  buildHeaders(final_headers, headers);
   int rc = nghttp2_submit_response(parent_.session_, stream_id_, final_headers.data(),
                                    final_headers.size(), provider);
   ASSERT(rc == 0);

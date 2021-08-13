@@ -61,6 +61,7 @@ public:
                            const std::string& hostname, uint16_t signature_algorithm,
                            absl::string_view in,
                            std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
+  absl::InlinedVector<uint16_t, 8> SupportedTlsSignatureAlgorithms() const override;
 
 protected:
   virtual void signPayload(const quic::QuicSocketAddress& server_address,

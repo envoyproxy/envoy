@@ -1,9 +1,9 @@
 #pragma once
 
-#include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
-#include "envoy/extensions/filters/http/squash/v3/squash.pb.validate.h"
-
 #include "source/extensions/filters/http/common/factory_base.h"
+
+#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.h"
+#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

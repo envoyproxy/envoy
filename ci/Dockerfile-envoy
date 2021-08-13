@@ -13,11 +13,12 @@ RUN apt-get update && apt-get upgrade -y \
 
 RUN mkdir -p /etc/envoy
 
+ARG ENVOY_BINARY=envoy
 ARG ENVOY_BINARY_SUFFIX=_stripped
-ADD ${TARGETPLATFORM}/build_release${ENVOY_BINARY_SUFFIX}/* /usr/local/bin/
+ADD ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release${ENVOY_BINARY_SUFFIX}/* /usr/local/bin/
 ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
 
-ADD ${TARGETPLATFORM}/build_release/su-exec /usr/local/bin/
+ADD ${TARGETPLATFORM}/build_${ENVOY_BINARY}_release/su-exec /usr/local/bin/
 RUN chown root:root /usr/local/bin/su-exec && adduser --group --system envoy
 
 EXPOSE 10000
