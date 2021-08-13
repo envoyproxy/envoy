@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
@@ -195,11 +196,11 @@ private:
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<Server::ValidationAdmin> admin_;
   Singleton::ManagerPtr singleton_manager_;
-  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   Random::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;

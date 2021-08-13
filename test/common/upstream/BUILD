@@ -84,9 +84,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "wrsq_scheduler_test",
+    srcs = ["wrsq_scheduler_test.cc"],
+    deps = [
+        "//source/common/upstream:scheduler_lib",
+        "//test/mocks:common_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "edf_scheduler_test",
     srcs = ["edf_scheduler_test.cc"],
-    deps = ["//source/common/upstream:edf_scheduler_lib"],
+    deps = ["//source/common/upstream:scheduler_lib"],
 )
 
 envoy_cc_test(
@@ -819,5 +828,17 @@ envoy_cc_fuzz_test(
         ":least_request_load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
         ":zone_aware_load_balancer_fuzz_lib",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "scheduler_benchmark",
+    srcs = ["scheduler_benchmark.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/common:random_generator_lib",
+        "//source/common/upstream:scheduler_lib",
     ],
 )

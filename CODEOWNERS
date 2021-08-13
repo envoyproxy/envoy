@@ -119,7 +119,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/router @alyssawilk @mattklein123 @snowp
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
 /*/extensions/filters/http/grpc_stats @kyessenov @lizan
-/*/extensions/filters/http/squash @yuval-k @alyssawilk
 /*/extensions/filters/common/original_src @klarose @snowp
 /*/extensions/filters/listener/tls_inspector @ggreenway @asraa
 /*/extensions/grpc_credentials/example @wozz @htuch
@@ -201,3 +200,7 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/matching/input_matchers/ip @aguinet @snowp
 # Kafka
 /*/extensions/filters/network/kafka @mattklein123 @adamkotwasinski
+
+# Contrib
+/contrib/exe/ @mattklein123 @lizan
+/contrib/squash/ @yuval-k @alyssawilk

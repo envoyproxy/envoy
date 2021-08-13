@@ -479,6 +479,7 @@ static_resources:
     type: eds
     eds_cluster_config:
       eds_config:
+        resource_api_version: V3
         api_config_source:
           api_type: GRPC
           transport_api_version: V3

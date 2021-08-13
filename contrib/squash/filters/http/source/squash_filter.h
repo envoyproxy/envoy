@@ -2,7 +2,6 @@
 
 #include <regex>
 
-#include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/filter.h"
 #include "envoy/json/json_object.h"
@@ -12,6 +11,7 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
+#include "contrib/envoy/extensions/filters/http/squash/v3/squash.pb.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -847,6 +847,7 @@ envoy_cc_test_library(
         "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/synchronization",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
@@ -1380,6 +1381,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/buffer:watermark_buffer_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
 

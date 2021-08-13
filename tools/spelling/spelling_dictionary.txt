@@ -41,6 +41,7 @@ RTP
 STATNAME
 SkyWalking
 TIDs
+WRSQ
 WASI
 ceil
 CCM
@@ -1261,6 +1262,7 @@ wildcards
 winsock
 workspace
 writev
+wrsq
 xDS
 xDSes
 xdstp

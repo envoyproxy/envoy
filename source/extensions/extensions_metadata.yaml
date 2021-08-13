@@ -263,11 +263,6 @@ envoy.filters.http.set_metadata:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
-envoy.filters.http.squash:
-  categories:
-  - envoy.filters.http
-  security_posture: requires_trusted_downstream_and_upstream
-  status: stable
 envoy.filters.http.tap:
   categories:
   - envoy.filters.http
