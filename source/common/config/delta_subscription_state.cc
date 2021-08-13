@@ -345,7 +345,7 @@ bool DeltaSubscriptionState::isInitialRequestForLegacyWildcard() {
   // If we requested only a wildcard resource then the second condition for using legacy wildcard
   // condition is met.
   return requested_resource_state_.size() == 1 &&
-    requested_resource_state_.begin()->first == Wildcard;
+         requested_resource_state_.begin()->first == Wildcard;
 }
 
 envoy::service::discovery::v3::DeltaDiscoveryRequest
