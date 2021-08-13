@@ -373,6 +373,62 @@ TEST_P(DeltaSubscriptionStateTestBlank, LegacyWildcardInitialRequests) {
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
 }
 
+TEST_P(DeltaSubscriptionStateTestBlank, AmbiguousResourceTTL) {
+  Event::SimulatedTimeSystem time_system;
+  time_system.setSystemTime(std::chrono::milliseconds(0));
+
+  auto create_resource_with_ttl = [](absl::string_view name, absl::string_view version,
+                                     absl::optional<std::chrono::seconds> ttl_s,
+                                     bool include_resource) {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+    auto* resource = added_resources.Add();
+    resource->set_name(std::string(name));
+    resource->set_version(std::string(version));
+
+    if (include_resource) {
+      resource->mutable_resource();
+    }
+
+    if (ttl_s) {
+      ProtobufWkt::Duration ttl;
+      ttl.set_seconds(ttl_s->count());
+      resource->mutable_ttl()->CopyFrom(ttl);
+    }
+
+    return added_resources;
+  };
+
+  updateSubscriptionInterest({WildcardStr, "foo"}, {});
+  auto req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre(WildcardStr, "foo"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  {
+    EXPECT_CALL(*ttl_timer_, enabled());
+    EXPECT_CALL(*ttl_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+    deliverDiscoveryResponse(create_resource_with_ttl("foo", "1", std::chrono::seconds(1), true),
+                             {}, "debug1", "nonce1");
+  }
+
+  // make foo ambiguous
+  updateSubscriptionInterest({}, {"foo"});
+  req = getNextRequestAckless();
+  EXPECT_TRUE(req->resource_names_subscribe().empty());
+  EXPECT_THAT(req->resource_names_unsubscribe(), UnorderedElementsAre("foo"));
+  {
+    // Refresh the TTL with a heartbeat. The resource should not be passed to the update callbacks.
+    EXPECT_CALL(*ttl_timer_, enabled());
+    deliverDiscoveryResponse(create_resource_with_ttl("foo", "1", std::chrono::seconds(1), false),
+                             {}, "debug1", "nonce1", true, 0);
+  }
+
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _));
+  EXPECT_CALL(*ttl_timer_, disableTimer());
+  time_system.setSystemTime(std::chrono::seconds(2));
+
+  // Invoke the TTL.
+  ttl_timer_->invokeCallback();
+}
+
 class DeltaSubscriptionStateTestWithResources : public DeltaSubscriptionStateTestBase {
 protected:
   DeltaSubscriptionStateTestWithResources(

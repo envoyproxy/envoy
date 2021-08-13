@@ -64,8 +64,8 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     // The resource we are interested in could also come from a wildcard subscription. Instead of
     // removing it outright, mark the resource as not interesting to us any more. The server could
     // later send us an update. If we don't have a wildcard subscription, just drop it.
-    if (auto it = requested_resource_state_.find(Wildcard); it != requested_resource_state_.end()) {
-      if (it = requested_resource_state_.find(r); it != requested_resource_state_.end()) {
+    if (containerContains(requested_resource_state_, Wildcard)) {
+      if (auto it = requested_resource_state_.find(r); it != requested_resource_state_.end()) {
         // Wildcard resources always have a version. If our requested resource has no version, it
         // won't be a wildcard resource then. If r is Wildcard itself, then it never has a version
         // attached to it.
