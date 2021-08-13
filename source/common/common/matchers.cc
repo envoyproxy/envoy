@@ -23,7 +23,8 @@ ValueMatcherConstSharedPtr ValueMatcher::create(const envoy::type::matcher::v3::
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kDoubleMatch:
     return std::make_shared<const DoubleMatcher>(v.double_match());
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kStringMatch:
-    return std::make_shared<const StringMatcherImpl>(v.string_match());
+    return std::make_shared<const StringMatcherImpl<std::decay_t<decltype(v.string_match())>>>(
+        v.string_match());
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kBoolMatch:
     return std::make_shared<const BoolMatcher>(v.bool_match());
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kPresentMatch:
@@ -61,65 +62,6 @@ bool DoubleMatcher::match(const ProtobufWkt::Value& value) const {
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   };
-}
-
-StringMatcherImpl::StringMatcherImpl(const envoy::type::matcher::v3::StringMatcher& matcher)
-    : matcher_(matcher) {
-  if (matcher.match_pattern_case() ==
-      envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex) {
-    if (matcher.ignore_case()) {
-      throw EnvoyException("ignore_case has no effect for safe_regex.");
-    }
-    regex_ = Regex::Utility::parseRegex(matcher_.safe_regex());
-  } else if (matcher.match_pattern_case() ==
-             envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains) {
-    if (matcher_.ignore_case()) {
-      // Cache the lowercase conversion of the Contains matcher for future use
-      lowercase_contains_match_ = absl::AsciiStrToLower(matcher_.contains());
-    }
-  }
-}
-
-bool StringMatcherImpl::match(const ProtobufWkt::Value& value) const {
-  if (value.kind_case() != ProtobufWkt::Value::kStringValue) {
-    return false;
-  }
-
-  return match(value.string_value());
-}
-
-bool StringMatcherImpl::match(const absl::string_view value) const {
-  switch (matcher_.match_pattern_case()) {
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
-    return matcher_.ignore_case() ? absl::EqualsIgnoreCase(value, matcher_.exact())
-                                  : value == matcher_.exact();
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix:
-    return matcher_.ignore_case() ? absl::StartsWithIgnoreCase(value, matcher_.prefix())
-                                  : absl::StartsWith(value, matcher_.prefix());
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
-    return matcher_.ignore_case() ? absl::EndsWithIgnoreCase(value, matcher_.suffix())
-                                  : absl::EndsWith(value, matcher_.suffix());
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains:
-    return matcher_.ignore_case()
-               ? absl::StrContains(absl::AsciiStrToLower(value), lowercase_contains_match_)
-               : absl::StrContains(value, matcher_.contains());
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
-    FALLTHRU;
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
-    return regex_->match(value);
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-}
-
-bool StringMatcherImpl::getCaseSensitivePrefixMatch(std::string& prefix) const {
-  if (matcher_.match_pattern_case() ==
-          envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix &&
-      !matcher_.ignore_case()) {
-    prefix = matcher_.prefix();
-    return true;
-  }
-  return false;
 }
 
 ListMatcher::ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher) : matcher_(matcher) {

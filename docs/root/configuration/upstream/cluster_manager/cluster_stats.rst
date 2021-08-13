@@ -114,7 +114,8 @@ HTTP/3 protocol stats are global with the following statistics:
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  <tx/rx>.quic_connection_close_error_code_<error_code>, Counter, A collection of counters that are lazily initialized to record each QUIC connection close's error code.
+  upstream.<tx/rx>.quic_connection_close_error_code_<error_code>, Counter, A collection of counters that are lazily initialized to record each QUIC connection close's error code.
+  upstream.<tx/rx>.quic_reset_stream_error_code_<error_code>, Counter, A collection of counters that are lazily initialized to record each QUIC stream reset error code.
 
 
 Health check statistics

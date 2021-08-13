@@ -23,6 +23,7 @@ EXCLUDED_PREFIXES = (
     "./bazel-",
     "./.cache",
     "./source/extensions/extensions_build_config.bzl",
+    "./contrib/contrib_build_config.bzl",
     "./bazel/toolchains/configs/",
     "./tools/testdata/check_format/",
     "./tools/pyformat/",
@@ -97,8 +98,8 @@ STD_REGEX_ALLOWLIST = (
     "./source/common/common/regex.cc", "./source/common/stats/tag_extractor_impl.h",
     "./source/common/stats/tag_extractor_impl.cc",
     "./source/common/formatter/substitution_formatter.cc",
-    "./source/extensions/filters/http/squash/squash_filter.h",
-    "./source/extensions/filters/http/squash/squash_filter.cc", "./source/server/admin/utils.h",
+    "./contrib/squash/filters/http/source/squash_filter.h",
+    "./contrib/squash/filters/http/source/squash_filter.cc", "./source/server/admin/utils.h",
     "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
     "./source/server/admin/stats_handler.cc", "./source/server/admin/prometheus_stats.h",
     "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
@@ -176,6 +177,7 @@ MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*
 HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
 TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
 EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
+CONTRIB_CODEOWNERS_REGEX = re.compile(r'(/contrib/\w+/\s+)(@.*)')
 COMMENT_REGEX = re.compile(r"//|\*")
 DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
@@ -1086,12 +1088,19 @@ class FormatChecker:
         # Sanity check CODEOWNERS.  This doesn't need to be done in a multi-threaded
         # manner as it is a small and limited list.
         source_prefix = './source/'
-        full_prefix = './source/extensions/'
+        core_extensions_full_prefix = './source/extensions/'
         # Check to see if this directory is a subdir under /source/extensions
         # Also ignore top level directories under /source/extensions since we don't
         # need owners for source/extensions/access_loggers etc, just the subdirectories.
-        if dir_name.startswith(full_prefix) and '/' in dir_name[len(full_prefix):]:
+        if dir_name.startswith(
+                core_extensions_full_prefix) and '/' in dir_name[len(core_extensions_full_prefix):]:
             self.check_owners(dir_name[len(source_prefix):], owned_directories, error_messages)
+
+        # For contrib extensions we track ownership at the top level only.
+        contrib_prefix = './contrib/'
+        if dir_name.startswith(contrib_prefix):
+            top_level = pathlib.PurePath('/', *pathlib.PurePath(dir_name).parts[:2], '/')
+            self.check_owners(str(top_level), owned_directories, error_messages)
 
         for file_name in names:
             if dir_name.startswith("./api") and self.is_starlark_file(file_name):
@@ -1212,6 +1221,15 @@ if __name__ == "__main__":
                         if not maintainer:
                             error_messages.append(
                                 "Extensions require at least one maintainer OWNER:\n"
+                                "    {}".format(line))
+
+                    m = CONTRIB_CODEOWNERS_REGEX.search(line)
+                    if m is not None and not line.startswith('#'):
+                        owned.append(m.group(1).strip())
+                        owners = re.findall('@\S+', m.group(2).strip())
+                        if len(owners) < 2:
+                            error_messages.append(
+                                "Contrib extensions require at least 2 owners in CODEOWNERS:\n"
                                 "    {}".format(line))
 
             return owned

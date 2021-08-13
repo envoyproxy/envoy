@@ -62,11 +62,6 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/extensions"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/tools/gpg"
   schedule:
     interval: "daily"

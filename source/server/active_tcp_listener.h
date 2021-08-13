@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/stats/timespan.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/linked_object.h"
@@ -11,12 +10,6 @@
 
 namespace Envoy {
 namespace Server {
-
-struct ActiveTcpConnection;
-using ActiveTcpConnectionPtr = std::unique_ptr<ActiveTcpConnection>;
-class ActiveConnections;
-using ActiveConnectionCollectionPtr = std::unique_ptr<ActiveConnections>;
-
 namespace {
 // Structure used to allow a unique_ptr to be captured in a posted lambda. See below.
 struct RebalancedSocket {
@@ -29,7 +22,7 @@ using RebalancedSocketSharedPtr = std::shared_ptr<RebalancedSocket>;
  * Wrapper for an active tcp listener owned by this handler.
  */
 class ActiveTcpListener final : public Network::TcpListenerCallbacks,
-                                public ActiveStreamListenerBase,
+                                public OwnedActiveStreamListenerBase,
                                 public Network::BalancedConnectionHandler {
 public:
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config,
@@ -78,26 +71,10 @@ public:
                            std::unique_ptr<StreamInfo::StreamInfo> stream_info) override;
 
   /**
-   * Return the active connections container attached with the given filter chain.
-   */
-  ActiveConnections& getOrCreateActiveConnections(const Network::FilterChain& filter_chain);
-
-  /**
    * Update the listener config. The follow up connections will see the new config. The existing
    * connections are not impacted.
    */
   void updateListenerConfig(Network::ListenerConfig& config);
-
-  void removeFilterChain(const Network::FilterChain* filter_chain) override;
-
-  /**
-   * Remove and destroy an active connection.
-   * @param connection supplies the connection to remove.
-   */
-  void removeConnection(ActiveTcpConnection& connection);
-
-  absl::flat_hash_map<const Network::FilterChain*, std::unique_ptr<ActiveConnections>>
-      connections_by_context_;
 
   Network::TcpConnectionHandler& tcp_conn_handler_;
   // The number of connections currently active on this listener. This is typically used for
@@ -106,44 +83,5 @@ public:
 };
 
 using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
-
-/**
- * Wrapper for a group of active connections which are attached to the same filter chain context.
- */
-class ActiveConnections : public Event::DeferredDeletable {
-public:
-  ActiveConnections(ActiveTcpListener& listener, const Network::FilterChain& filter_chain);
-  ~ActiveConnections() override;
-
-  // listener filter chain pair is the owner of the connections
-  ActiveTcpListener& listener_;
-  const Network::FilterChain& filter_chain_;
-  // Owned connections
-  std::list<ActiveTcpConnectionPtr> connections_;
-};
-
-/**
- * Wrapper for an active TCP connection owned by this handler.
- */
-struct ActiveTcpConnection : LinkedObject<ActiveTcpConnection>,
-                             public Event::DeferredDeletable,
-                             public Network::ConnectionCallbacks,
-                             Logger::Loggable<Logger::Id::conn_handler> {
-  ActiveTcpConnection(ActiveConnections& active_connections,
-                      Network::ConnectionPtr&& new_connection, TimeSource& time_system,
-                      std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
-  ~ActiveTcpConnection() override;
-
-  // Network::ConnectionCallbacks
-  void onEvent(Network::ConnectionEvent event) override;
-  void onAboveWriteBufferHighWatermark() override {}
-  void onBelowWriteBufferLowWatermark() override {}
-
-  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
-  ActiveConnections& active_connections_;
-  Network::ConnectionPtr connection_;
-  Stats::TimespanPtr conn_length_;
-};
-
 } // namespace Server
 } // namespace Envoy

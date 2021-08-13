@@ -108,7 +108,7 @@ protected:
 #ifndef WIN32
     int on = 1;
     auto status = setSocketOption(SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-    RELEASE_ASSERT(status.rc_ != -1, "failed to set SO_REUSEADDR socket option");
+    RELEASE_ASSERT(status.return_value_ != -1, "failed to set SO_REUSEADDR socket option");
 #endif
   }
 };

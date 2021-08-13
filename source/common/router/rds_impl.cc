@@ -6,7 +6,6 @@
 #include <string>
 
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/api/v2/route.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"

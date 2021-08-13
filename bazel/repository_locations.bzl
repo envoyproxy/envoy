@@ -440,14 +440,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "yaml-cpp",
         project_desc = "YAML parser and emitter in C++ matching the YAML 1.2 spec",
         project_url = "https://github.com/jbeder/yaml-cpp",
-        version = "98acc5a8874faab28b82c28936f4b400b389f5d6",
-        sha256 = "79ab7069ef1c7c3632e7ffe095f7185d4c77b64d8035db3c085c239d4fe96d5f",
+        version = "db6deedcd301754723065e0bbb1b75927c5b49c7",
+        sha256 = "387d7f25467312ca59068081f9a25bbab02bb6af32fd3e0aec1bd59163558171",
         strip_prefix = "yaml-cpp-{version}",
         urls = ["https://github.com/jbeder/yaml-cpp/archive/{version}.tar.gz"],
         # YAML is also used for runtime as well as controlplane. It shouldn't appear on the
         # dataplane but we can't verify this automatically due to code structure today.
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2020-07-27",
+        release_date = "2021-07-23",
         cpe = "cpe:2.3:a:yaml-cpp_project:yaml-cpp:*",
     ),
     com_github_msgpack_msgpack_c = dict(
@@ -808,12 +808,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://quiche.googlesource.com/quiche",
-        version = "5dd7a030209f9a6b5043bebd8ac3ee54f18d1d08",
-        sha256 = "306342cb35cb9d8baea079c7b924b0133c53cbf182b251655e589d3b4604dc41",
+        version = "29fb6fc501e4df5874129408b5474a91eaa9b7a0",
+        sha256 = "32e7b8ce4e91bb45b617bbf9721132f9218b86d9b3821ebfa32b1c7fc01aafae",
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/{version}.tar.gz
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["dataplane_core"],
-        release_date = "2021-07-16",
+        release_date = "2021-08-06",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
@@ -992,7 +992,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2021-07-17",
+        release_date = "2021-08-02",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(

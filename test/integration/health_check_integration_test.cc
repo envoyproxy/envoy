@@ -5,6 +5,7 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/http/http2/http2_frame.h"
 #include "test/common/upstream/utility.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
@@ -538,6 +539,7 @@ public:
   void sendGrpcResponse(uint32_t cluster_idx,
                         const Http::TestResponseHeaderMapImpl& response_headers,
                         const grpc::health::v1::HealthCheckResponse& health_check_response) {
+    clusters_[cluster_idx].host_stream_->startGrpcStream(false);
     clusters_[cluster_idx].host_stream_->encodeHeaders(response_headers, false);
     clusters_[cluster_idx].host_stream_->sendGrpcMessage(health_check_response);
     clusters_[cluster_idx].host_stream_->finishGrpcStream(Grpc::Status::WellKnownGrpcStatus::Ok);
