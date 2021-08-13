@@ -97,6 +97,7 @@ public:
         .Times(AnyNumber())
         .WillRepeatedly(Return(&request_));
     EXPECT_CALL(mock_router_filter_, cluster()).Times(AnyNumber());
+    EXPECT_CALL(mock_router_filter_, callbacks()).Times(AnyNumber());
     mock_router_filter_.requests_.push_back(std::make_unique<UpstreamRequest>(
         mock_router_filter_, std::make_unique<NiceMock<Router::MockGenericConnPool>>()));
     auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
