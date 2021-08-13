@@ -173,7 +173,8 @@ INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionStateTestBlank, DeltaSubscriptionState
 
 // Checks if subscriptionUpdatePending returns correct value depending on scenario.
 TEST_P(DeltaSubscriptionStateTestBlank, SubscriptionPendingTest) {
-  // We should send a request, because nothing has been sent out yet.
+  // We should send a request, because nothing has been sent out yet. Note that this means
+  // subscribing to the wildcard resource.
   EXPECT_TRUE(subscriptionUpdatePending());
   getNextRequestAckless();
 
@@ -208,6 +209,12 @@ TEST_P(DeltaSubscriptionStateTestBlank, SubscriptionPendingTest) {
   EXPECT_FALSE(subscriptionUpdatePending());
 }
 
+// Check if requested resources are dropped from the cache immediately after losing interest in them
+// in case we don't have a wildcard subscription. In such case there's no ambiguity whether a
+// dropped resource could come from the wildcard subscription.
+//
+// Dropping from the cache can be seen through the initial_resource_versions field in the initial
+// request.
 TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionNonWildcardFromRequestedToDropped) {
   updateSubscriptionInterest({"foo", "bar"}, {});
   auto req = getNextRequestAckless();
@@ -307,9 +314,8 @@ TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromReques
               UnorderedElementsAre(Pair("baz", "1"), Pair("wild1", "1")));
 }
 
-// Check that foo and bar do not appear in initial versions after we lost interest. Foo won't
-// appear, because we got a reply from server confirming dropping the resource. Bar won't appear
-// because we never got a reply from server with a version of it.
+// Check that we move the resource from wildcard subscription to requested without losing version
+// information about it.
 TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromWildcardToRequested) {
   updateSubscriptionInterest({}, {});
   auto req = getNextRequestAckless();
@@ -327,9 +333,8 @@ TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromWildca
               UnorderedElementsAre(Pair("foo", "1"), Pair("wild1", "1")));
 }
 
-// Check that foo and bar do not appear in initial versions after we lost interest. Foo won't
-// appear, because we got a reply from server confirming dropping the resource. Bar won't appear
-// because we never got a reply from server with a version of it.
+// Check that we move the ambiguous resource to requested without losing version information about
+// it.
 TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromAmbiguousToRequested) {
   updateSubscriptionInterest({WildcardStr, "foo"}, {});
   auto req = getNextRequestAckless();
@@ -349,6 +354,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, ResourceTransitionWithWildcardFromAmbigu
               UnorderedElementsAre(Pair("foo", "1"), Pair("wild1", "1")));
 }
 
+// Check if we correctly decide to send a legacy wildcard initial request.
 TEST_P(DeltaSubscriptionStateTestBlank, LegacyWildcardInitialRequests) {
   updateSubscriptionInterest({}, {});
   auto req = getNextRequestAckless();
@@ -373,6 +379,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, LegacyWildcardInitialRequests) {
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
 }
 
+// Check that ambiguous resources may also receive a heartbeat message.
 TEST_P(DeltaSubscriptionStateTestBlank, AmbiguousResourceTTL) {
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
