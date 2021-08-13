@@ -42,7 +42,7 @@ public:
 
     EXPECT_CALL(dispatcher_, isThreadSafe).WillRepeatedly(Return(true));
 
-    EXPECT_CALL(dispatcher_, createDnsResolver(_, _)).WillOnce(Return(resolver_));
+    EXPECT_CALL(dispatcher_, createDnsResolver(_)).WillOnce(Return(resolver_));
     dns_cache_ =
         std::make_unique<DnsCacheImpl>(dispatcher_, tls_, random_, loader_, store_, config_);
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
@@ -102,8 +102,8 @@ MATCHER_P3(DnsHostInfoEquals, address, resolved_host, is_ip_address, "") {
 
 MATCHER(DnsHostInfoAddressIsNull, "") { return arg->address() == nullptr; }
 
-MATCHER_P(CustomDnsResolversSizeEquals, expected_resolvers, "") {
-  return expected_resolvers.size() == arg.size();
+MATCHER_P(CustomTypedDnsResolverConfigEquals, expectedTypedDnsResolverConfig, "") {
+  return (TestUtility::protoEqual(expectedTypedDnsResolverConfig, arg));
 }
 
 TEST_F(DnsCacheImplTest, PreresolveSuccess) {
@@ -839,12 +839,14 @@ TEST_F(DnsCacheImplTest, DnsCacheCircuitBreakersOverflow) {
 TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionSetDeprecatedField) {
   initialize();
   config_.set_use_tcp_for_dns_lookups(true);
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  EXPECT_CALL(dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(resolver_)));
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dispatcher_, createDnsResolver(_))
+      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(resolver_)));
   DnsCacheImpl dns_cache_(dispatcher_, tls_, random_, loader_, store_, config_);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
   // `true` here means dns_resolver_options.use_tcp_for_dns_lookups is set to true.
-  EXPECT_EQ(true, dns_resolver_options.use_tcp_for_dns_lookups());
+  EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
 }
 
 TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionSet) {
@@ -852,12 +854,14 @@ TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionSet) {
   config_.mutable_dns_resolution_config()
       ->mutable_dns_resolver_options()
       ->set_use_tcp_for_dns_lookups(true);
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  EXPECT_CALL(dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(resolver_)));
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dispatcher_, createDnsResolver(_))
+      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(resolver_)));
   DnsCacheImpl dns_cache_(dispatcher_, tls_, random_, loader_, store_, config_);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
   // `true` here means dns_resolver_options.use_tcp_for_dns_lookups is set to true.
-  EXPECT_EQ(true, dns_resolver_options.use_tcp_for_dns_lookups());
+  EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
 }
 
 TEST_F(DnsCacheImplTest, NoDefaultSearchDomainOptionSet) {
@@ -865,32 +869,38 @@ TEST_F(DnsCacheImplTest, NoDefaultSearchDomainOptionSet) {
   config_.mutable_dns_resolution_config()
       ->mutable_dns_resolver_options()
       ->set_no_default_search_domain(true);
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  EXPECT_CALL(dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(resolver_)));
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dispatcher_, createDnsResolver(_))
+      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(resolver_)));
   DnsCacheImpl dns_cache_(dispatcher_, tls_, random_, loader_, store_, config_);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
   // `true` here means dns_resolver_options.no_default_search_domain is set to true.
-  EXPECT_EQ(true, dns_resolver_options.no_default_search_domain());
+  EXPECT_EQ(true, cares.dns_resolver_options().no_default_search_domain());
 }
 
 TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionUnSet) {
   initialize();
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  EXPECT_CALL(dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(resolver_)));
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dispatcher_, createDnsResolver(_))
+      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(resolver_)));
   DnsCacheImpl dns_cache_(dispatcher_, tls_, random_, loader_, store_, config_);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
   // `false` here means dns_resolver_options.use_tcp_for_dns_lookups is set to false.
-  EXPECT_EQ(false, dns_resolver_options.use_tcp_for_dns_lookups());
+  EXPECT_EQ(false, cares.dns_resolver_options().use_tcp_for_dns_lookups());
 }
 
 TEST_F(DnsCacheImplTest, NoDefaultSearchDomainOptionUnSet) {
   initialize();
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  EXPECT_CALL(dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&dns_resolver_options), Return(resolver_)));
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  EXPECT_CALL(dispatcher_, createDnsResolver(_))
+      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(resolver_)));
   DnsCacheImpl dns_cache_(dispatcher_, tls_, random_, loader_, store_, config_);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
   // `false` here means dns_resolver_options.no_default_search_domain is set to false.
-  EXPECT_EQ(false, dns_resolver_options.no_default_search_domain());
+  EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
 }
 
 // DNS cache manager config tests.
@@ -934,12 +944,16 @@ TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolutionConfig) {
   Stats::IsolatedStoreImpl store;
 
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
-  std::vector<Network::Address::InstanceConstSharedPtr> expected_empty_dns_resolvers;
-  EXPECT_CALL(dispatcher, createDnsResolver(expected_empty_dns_resolvers, _))
+  envoy::config::core::v3::TypedExtensionConfig empty_typed_dns_resolver_config;
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  empty_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  empty_typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+  EXPECT_CALL(dispatcher, createDnsResolver(CustomTypedDnsResolverConfigEquals(empty_typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
   DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
 }
 
+// Test dns_resolution_config is in place, use it.
 TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfig) {
   NiceMock<Event::MockDispatcher> dispatcher;
   std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
@@ -954,13 +968,100 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfig) {
   dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
   dns_resolvers->mutable_socket_address()->set_port_value(8080);
 
-  std::vector<Network::Address::InstanceConstSharedPtr> expected_dns_resolvers;
-  expected_dns_resolvers.push_back(Network::Address::resolveProtoAddress(*dns_resolvers));
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.add_resolvers()->MergeFrom(*dns_resolvers);
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
   EXPECT_CALL(dispatcher,
-              createDnsResolver(CustomDnsResolversSizeEquals(expected_dns_resolvers), _))
+              createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
   DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
 }
+
+// Test dns_resolution_config is in place, use it and overriding use_tcp_for_dns_lookups.
+TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfigOverridingUseTcp) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
+  Stats::IsolatedStoreImpl store;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+
+  // setup use_tcp
+  config.set_use_tcp_for_dns_lookups(false);
+
+  // setup dns_resolution_config
+  envoy::config::core::v3::Address* dns_resolvers =
+      config.mutable_dns_resolution_config()->add_resolvers();
+  dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
+  dns_resolvers->mutable_socket_address()->set_port_value(8080);
+  config.mutable_dns_resolution_config()->mutable_dns_resolver_options()
+      ->set_use_tcp_for_dns_lookups(true);
+  config.mutable_dns_resolution_config()->mutable_dns_resolver_options()
+      ->set_no_default_search_domain(true);
+
+  // setup expected typed config parameter
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.add_resolvers()->MergeFrom(*dns_resolvers);
+  cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(true);
+  cares.mutable_dns_resolver_options()->set_no_default_search_domain(true);
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+
+  EXPECT_CALL(dispatcher,
+              createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
+      .WillOnce(Return(resolver));
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
+}
+
+
+// Test the case that the typed_dns_resolver_config is specified, and it overrides all
+// other configuration, like config.dns_resolution_config, and config.use_tcp_for_dns_lookups.
+TEST(DnsCacheConfigOptionsTest, NonEmptyTypedDnsResolverConfig) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
+  Stats::IsolatedStoreImpl store;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+
+  // setup dns_resolution_config
+  envoy::config::core::v3::Address* dns_resolvers =
+      config.mutable_dns_resolution_config()->add_resolvers();
+  dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
+  dns_resolvers->mutable_socket_address()->set_port_value(8080);
+  config.mutable_dns_resolution_config()->mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(false);
+  config.mutable_dns_resolution_config()->mutable_dns_resolver_options()->set_no_default_search_domain(false);
+
+  // setup use_tcp_for_dns_lookups
+  config.set_use_tcp_for_dns_lookups(false);
+
+  // setup typed_dns_resolver_config
+  auto resolvers = envoy::config::core::v3::Address();
+  resolvers.mutable_socket_address()->set_address("5.6.7.8");
+  resolvers.mutable_socket_address()->set_port_value(9090);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.add_resolvers()->MergeFrom(resolvers);
+  cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(true);
+  cares.mutable_dns_resolver_options()->set_no_default_search_domain(true);
+  config.mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(cares);
+  config.mutable_typed_dns_resolver_config()->set_name(Envoy::Network::cares_dns_resolver);
+
+  // setup the expected function call parameter.
+  envoy::config::core::v3::TypedExtensionConfig expected_typed_dns_resolver_config;
+  expected_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  expected_typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+
+  EXPECT_CALL(dispatcher,
+              createDnsResolver(CustomTypedDnsResolverConfigEquals(expected_typed_dns_resolver_config)))
+      .WillOnce(Return(resolver));
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
+}
+
 
 // Note: this test is done here, rather than a TYPED_TEST_SUITE in
 // //test/common/config:utility_test, because we did not want to include an extension type in
