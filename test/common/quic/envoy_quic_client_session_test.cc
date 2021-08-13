@@ -191,8 +191,11 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest
                          testing::ValuesIn({true, false}));
 
 TEST_P(EnvoyQuicClientSessionTest, QuicUnimplemented) {
+  Buffer::OwnedImpl buffer;
   EXPECT_DEATH(http_connection_.goAway(), "");
   EXPECT_DEATH(http_connection_.shutdownNotice(), "");
+  bool var;
+  EXPECT_DEATH(var = http_connection_.dispatch(buffer).ok(), "");
 }
 
 TEST_P(EnvoyQuicClientSessionTest, NewStream) {
