@@ -37,13 +37,8 @@ FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
 }
 
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
-  if (src.disabled()) {
-    disabled_ = true;
-    processing_mode_.reset();
-  } else if (src.processingMode()) {
-    processing_mode_ = src.processingMode();
-    disabled_ = false;
-  }
+  disabled_ = src.disabled_;
+  processing_mode_ = src.processing_mode_;
 }
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
