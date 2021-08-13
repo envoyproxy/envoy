@@ -190,6 +190,11 @@ protected:
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest,
                          testing::ValuesIn({true, false}));
 
+TEST_P(EnvoyQuicClientSessionTest, QuicUnimplemented) {
+  EXPECT_DEATH(http_connection_.goAway(), "");
+  EXPECT_DEATH(http_connection_.shutdownNotice(), "");
+}
+
 TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
