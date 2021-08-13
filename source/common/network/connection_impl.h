@@ -244,11 +244,18 @@ public:
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
+  ClientConnectionImpl(Event::Dispatcher& dispatcher, std::unique_ptr<ConnectionSocket> socket,
+                       const Address::InstanceConstSharedPtr& source_address,
+                       Network::TransportSocketPtr&& transport_socket,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   // Network::ClientConnection
   void connect() override;
 
 private:
+  void setup(const Address::InstanceConstSharedPtr& remote_address,
+             const Network::Address::InstanceConstSharedPtr& source_address,
+             const Network::ConnectionSocket::OptionsSharedPtr& options);
   StreamInfo::StreamInfoImpl stream_info_;
 };
 

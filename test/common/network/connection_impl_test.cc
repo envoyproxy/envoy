@@ -2953,6 +2953,16 @@ TEST_F(PipeClientConnectionImplTest, SkipSourceAddress) {
   connection->close(ConnectionCloseType::NoFlush);
 }
 
+class InternalClientConnectionImplTest : public testing::Test {
+protected:
+  InternalClientConnectionImplTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  std::unqiue_ptr<ClientConnectionImpl> client_;
+};
+
 } // namespace
 } // namespace Network
 } // namespace Envoy
