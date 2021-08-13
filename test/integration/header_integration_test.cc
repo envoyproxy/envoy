@@ -1252,7 +1252,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesByDefaultUnchanghed) {
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
-        normalize_path_action: CONTINUE      
+        normalize_path_action: CONTINUE
               )EOF");
   initializeFilter(HeaderMode::Append, false);
   performRequest(
