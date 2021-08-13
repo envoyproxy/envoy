@@ -98,6 +98,7 @@ build:coverage --javabase=@bazel_tools//tools/jdk:remote_jdk11
 # however, the MacOS remote execution cluster doesn't use GCP auth
 # so we have to override it to 'false' here.
 build:remote-ci-macos --config=remote
+build:remote-ci-macos --xcode_version_config=//ci:xcode_config
 build:remote-ci-macos --auth_enabled=false
 build:remote-ci-macos --remote_executor=grpcs://envoy.cluster.engflow.com
 build:remote-ci-macos --bes_backend=grpcs://envoy.cluster.engflow.com/
