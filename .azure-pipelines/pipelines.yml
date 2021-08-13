@@ -313,14 +313,30 @@ stages:
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
+        artifactName: "bazel.release"
+        itemPattern: "bazel.release/envoy-contrib_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
         artifactName: "bazel.release.arm64"
         itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release.arm64"
+        itemPattern: "bazel.release.arm64/envoy-contrib_binary.tar.gz"
         downloadType: single
         targetPath: $(Build.StagingDirectory)
     - bash: |
         set -e
         mkdir -p linux/amd64 && tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz -C ./linux/amd64
+        tar zxf $(Build.StagingDirectory)/bazel.release/envoy-contrib_binary.tar.gz -C ./linux/amd64
         mkdir -p linux/arm64 && tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz -C ./linux/arm64
+        tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy-contrib_binary.tar.gz -C ./linux/arm64
         ci/docker_ci.sh
       workingDirectory: $(Build.SourcesDirectory)
       env:
