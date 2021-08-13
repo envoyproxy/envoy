@@ -73,7 +73,8 @@ public:
   }
 
 protected:
-  class ActiveHealthCheckSession : public Event::DeferredDeletable {
+  class ActiveHealthCheckSession : public Event::DeferredDeletable,
+                                   public std::enable_shared_from_this<ActiveHealthCheckSession> {
   public:
     ~ActiveHealthCheckSession() override;
     HealthTransition setUnhealthy(envoy::data::core::v3::HealthCheckFailureType type);

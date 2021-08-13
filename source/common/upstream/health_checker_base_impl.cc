@@ -412,12 +412,19 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::start() {
-  // Start health checks only after secrets are ready for the transport socket
-  // that health checks will be performed on. If health checks start
-  // immediately, they may fail with "network" errors due to TLS credentials
-  // not yet being loaded, which can result in long startup times.
-  host_->addHealthCheckingReadyCb([this] { onInitialInterval(); },
-                                  parent_.transportSocketMatchMetadata().get());
+  // Start health checks only after secrets are ready for the transport socket that health checks
+  // will be performed on. If health checks start immediately, they may fail with "network" errors
+  // due to TLS credentials not yet being loaded, which can result in long startup times. The
+  // callback needs to make sure this ActiveHealthCheckSession wasn't deleted before starting the
+  // health check loop in case it takes a while for the socket to become ready.
+  auto weak_self = weak_from_this();
+  host_->addHealthCheckingReadyCb(
+      [weak_self] {
+        if (auto self = weak_self.lock()) {
+          self->onInitialInterval();
+        }
+      },
+      parent_.transportSocketMatchMetadata().get());
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onInitialInterval() {
