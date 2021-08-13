@@ -11,6 +11,7 @@ import io.envoyproxy.envoymobile.GRPCRequestHeadersBuilder
 import io.envoyproxy.envoymobile.ResponseFilter
 import io.envoyproxy.envoymobile.ResponseHeaders
 import io.envoyproxy.envoymobile.ResponseTrailers
+import io.envoyproxy.envoymobile.StreamIntel
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
@@ -70,23 +71,34 @@ class GRPCReceiveErrorTest {
     private val receivedError: CountDownLatch,
     private val notCancelled: CountDownLatch
   ) : ResponseFilter {
-    override fun onResponseHeaders(headers: ResponseHeaders, endStream: Boolean): FilterHeadersStatus<ResponseHeaders> {
+    override fun onResponseHeaders(
+      headers: ResponseHeaders,
+      endStream: Boolean,
+      streamIntel: StreamIntel
+    ): FilterHeadersStatus<ResponseHeaders> {
       return FilterHeadersStatus.Continue(headers)
     }
 
-    override fun onResponseData(body: ByteBuffer, endStream: Boolean): FilterDataStatus<ResponseHeaders> {
+    override fun onResponseData(
+      body: ByteBuffer,
+      endStream: Boolean,
+      streamIntel: StreamIntel
+    ): FilterDataStatus<ResponseHeaders> {
       return FilterDataStatus.Continue(body)
     }
 
-    override fun onResponseTrailers(trailers: ResponseTrailers): FilterTrailersStatus<ResponseHeaders, ResponseTrailers> {
+    override fun onResponseTrailers(
+      trailers: ResponseTrailers,
+      streamIntel: StreamIntel
+    ): FilterTrailersStatus<ResponseHeaders, ResponseTrailers> {
       return FilterTrailersStatus.Continue(trailers)
     }
 
-    override fun onError(error: EnvoyError) {
+    override fun onError(error: EnvoyError, streamIntel: StreamIntel) {
       receivedError.countDown()
     }
 
-    override fun onCancel() {
+    override fun onCancel(streamIntel: StreamIntel) {
       notCancelled.countDown()
     }
   }

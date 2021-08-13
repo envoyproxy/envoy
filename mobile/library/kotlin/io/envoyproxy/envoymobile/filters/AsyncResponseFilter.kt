@@ -26,6 +26,7 @@ interface AsyncResponseFilter : ResponseFilter {
    * @param data: Any data that has been buffered where `StopIterationAndBuffer` was returned.
    * @param trailers: Trailers, if `StopIteration` was returned from `onReponseTrailers`.
    * @param endStream: True, if the stream ended with the previous (and thus, last) invocation.
+   * @param streamIntel: Internal HTTP stream metrics, context, and other details.
    *
    * @return: The resumption status including any HTTP entities that will be forwarded.
    */
@@ -33,6 +34,7 @@ interface AsyncResponseFilter : ResponseFilter {
     headers: ResponseHeaders?,
     data: ByteBuffer?,
     trailers: ResponseTrailers?,
-    endStream: Boolean
+    endStream: Boolean,
+    streamIntel: StreamIntel
   ): FilterResumeStatus<ResponseHeaders, ResponseTrailers>
 }
