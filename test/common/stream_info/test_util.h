@@ -35,8 +35,6 @@ public:
 
   void addBytesReceived(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   uint64_t bytesReceived() const override { return 1; }
-  void addWireBytesReceived(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  uint64_t wireBytesReceived() const override { return 233; }
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
   absl::optional<uint32_t> responseCode() const override { return response_code_; }
@@ -55,8 +53,6 @@ public:
   }
   void addBytesSent(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   uint64_t bytesSent() const override { return 2; }
-  void addWireBytesSent(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  uint64_t wireBytesSent() const override { return 233; }
   bool intersectResponseFlags(uint64_t response_flags) const override {
     return (response_flags_ & response_flags) != 0;
   }

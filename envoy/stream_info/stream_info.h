@@ -245,6 +245,7 @@ struct BytesMeterer {
   void addBodyBytesReceived(uint64_t added_bytes) { body_bytes_received_ += added_bytes; }
   void addWireBytesSent(uint64_t added_bytes) { wire_bytes_sent_ += added_bytes; }
   void addWireBytesReceived(uint64_t added_bytes) { wire_bytes_received_ += added_bytes; }
+private:
   uint64_t body_bytes_sent_{};
   uint64_t body_bytes_received_{};
   uint64_t wire_bytes_sent_{};
@@ -310,19 +311,9 @@ public:
   virtual void addBytesReceived(uint64_t bytes_received) PURE;
 
   /**
-   * @param UPSTREAM_WIRE_BYTES_RECEIVED the total number of bytes decoded by the stream.
-   */
-  virtual void addWireBytesReceived(uint64_t UPSTREAM_WIRE_BYTES_RECEIVED) PURE;
-
-  /**
    * @return the number of body bytes received by the stream.
    */
   virtual uint64_t bytesReceived() const PURE;
-
-  /**
-   * @return the total number of bytes decoded by the stream, including header, body, trailer, etc.
-   */
-  virtual uint64_t wireBytesReceived() const PURE;
 
   /**
    * @return the protocol of the request.
@@ -443,19 +434,9 @@ public:
   virtual void addBytesSent(uint64_t bytes_sent) PURE;
 
   /**
-   * @param UPSTREAM_WIRE_BYTES_SENT the total number of bytes encoded by the stream.
-   */
-  virtual void addWireBytesSent(uint64_t UPSTREAM_WIRE_BYTES_SENT) PURE;
-
-  /**
    * @return the number of body bytes sent in the response.
    */
   virtual uint64_t bytesSent() const PURE;
-
-  /**
-   * @return the total number of bytes encoded by the stream, including header, body, trailer, etc.
-   */
-  virtual uint64_t wireBytesSent() const PURE;
 
   /**
    * @return whether response flag is set or not.
