@@ -300,9 +300,9 @@ namespace {
 // https://tools.ietf.org/html/rfc2616#section-4.2.
 
 // Used to separate the values of different headers.
-constexpr absl::string_view header_separator = "\n";
+constexpr absl::string_view headerSeparator = "\n";
 // Used to separate multiple values of a same header.
-constexpr absl::string_view in_value_separator = "\r";
+constexpr absl::string_view inValueSeparator = "\r";
 }; // namespace
 
 absl::optional<std::string>
@@ -334,10 +334,10 @@ VaryHeader::createVaryIdentifier(const absl::btree_set<absl::string_view>& vary_
     // be used as an inspiration for some bucketing configuration. The config
     // should enable and control the bucketing wanted.
     const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(
-        request_headers, Http::LowerCaseString(std::string(header)), in_value_separator);
-    absl::StrAppend(&vary_identifier, header, in_value_separator,
+        request_headers, Http::LowerCaseString(std::string(header)), inValueSeparator);
+    absl::StrAppend(&vary_identifier, header, inValueSeparator,
                     all_values.result().has_value() ? all_values.result().value() : "",
-                    header_separator);
+                    headerSeparator);
   }
 
   return vary_identifier;
