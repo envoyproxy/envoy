@@ -8,14 +8,16 @@ final class BufferDemoFilter: ResponseFilter {
   private var headers: ResponseHeaders!
   private var body: Data?
 
-  func onResponseHeaders(_ headers: ResponseHeaders, endStream: Bool)
+  func onResponseHeaders(_ headers: ResponseHeaders, endStream: Bool, streamIntel: StreamIntel)
     -> FilterHeadersStatus<ResponseHeaders>
   {
     self.headers = headers
     return .stopIteration
   }
 
-  func onResponseData(_ data: Data, endStream: Bool) -> FilterDataStatus<ResponseHeaders> {
+  func onResponseData(_ data: Data, endStream: Bool, streamIntel: StreamIntel)
+    -> FilterDataStatus<ResponseHeaders>
+  {
     // Since we request buffering, each invocation will include all data buffered so far.
     self.body = data
 
@@ -29,7 +31,8 @@ final class BufferDemoFilter: ResponseFilter {
   }
 
   func onResponseTrailers(
-    _ trailers: ResponseTrailers
+    _ trailers: ResponseTrailers,
+    streamIntel: StreamIntel
   ) -> FilterTrailersStatus<ResponseHeaders, ResponseTrailers> {
     // Trailers imply end of stream; resume processing of the (now fully-buffered) response.
     let builder = self.headers.toResponseHeadersBuilder()
@@ -37,7 +40,7 @@ final class BufferDemoFilter: ResponseFilter {
     return .resumeIteration(headers: builder.build(), data: self.body, trailers: trailers)
   }
 
-  func onError(_ error: EnvoyError) {}
+  func onError(_ error: EnvoyError, streamIntel: StreamIntel) {}
 
-  func onCancel() {}
+  func onCancel(streamIntel: StreamIntel) {}
 }

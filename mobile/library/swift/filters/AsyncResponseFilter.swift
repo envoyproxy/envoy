@@ -19,12 +19,14 @@ public protocol AsyncResponseFilter: ResponseFilter {
   /// - param data: Any data that has been buffered where `stopIterationAndBuffer` was returned.
   /// - param trailers: Trailers, if `stopIteration` was returned from `onReponseTrailers`.
   /// - param endStream: True, if the stream ended with the previous (and thus, last) invocation.
+  /// - param streamIntel: Internal HTTP stream metrics, context, and other details.
   ///
   /// - return: The resumption status including any HTTP entities that will be forwarded.
   func onResumeResponse(
     headers: ResponseHeaders?,
     data: Data?,
     trailers: ResponseTrailers?,
-    endStream: Bool
+    endStream: Bool,
+    streamIntel: StreamIntel
   ) -> FilterResumeStatus<ResponseHeaders, ResponseTrailers>
 }
