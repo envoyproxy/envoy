@@ -11,7 +11,7 @@
 #include "envoy/network/dns.h"
 
 #include "source/common/network/address_impl.h"
-#include "source/common/network/apple_dns_impl.h"
+#include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
 
@@ -61,7 +61,7 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   void SetUp() override {
-    resolver_ = dispatcher_->createDnsResolver({}, envoy::config::core::v3::DnsResolverOptions());
+    resolver_ = dispatcher_->createDnsResolver(envoy::config::core::v3::TypedExtensionConfig());
   }
 
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,
@@ -119,17 +119,6 @@ protected:
   Event::DispatcherPtr dispatcher_;
   DnsResolverSharedPtr resolver_;
 };
-
-TEST_F(AppleDnsImplTest, InvalidConfigOptions) {
-  auto dns_resolver_options = envoy::config::core::v3::DnsResolverOptions();
-  EXPECT_DEATH(
-      dispatcher_->createDnsResolver({nullptr}, dns_resolver_options),
-      "defining custom resolvers is not possible when using Apple APIs for DNS resolution");
-  dns_resolver_options.set_use_tcp_for_dns_lookups(true);
-  EXPECT_DEATH(
-      dispatcher_->createDnsResolver({}, dns_resolver_options),
-      "using TCP for DNS lookups is not possible when using Apple APIs for DNS resolution");
-}
 
 // Validate that when AppleDnsResolverImpl is destructed with outstanding requests,
 // that we don't invoke any callbacks if the query was cancelled. This is a regression test from
