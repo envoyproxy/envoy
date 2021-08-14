@@ -157,7 +157,8 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
     const StreamInfo::AddressSetAccessor& address_set =
         info.filterState().getDataReadOnly<StreamInfo::AddressSetAccessor>(
             StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR);
-    address_set.iterate([&, this](Network::Address::InstanceConstSharedPtr address) {
+
+    address_set.iterate([&, this](const Network::Address::InstanceConstSharedPtr& address) {
       ipMatch = range_.isInRange(*address.get());
       if (ipMatch) {
         return false;
