@@ -32,12 +32,16 @@ using Http::FilterHeadersStatus;
 using Http::FilterTrailersStatus;
 using Http::LowerCaseString;
 
+using testing::AnyNumber;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 using testing::Unused;
 
 using namespace std::chrono_literals;
+
+// The value to return for the decoder buffer limit.
+static const uint32_t BufferSize = 100000;
 
 // These tests directly drive the filter. They concentrate on testing out all the different
 // ordering options for the protocol, which means that unlike other tests they do not verify
@@ -532,9 +536,14 @@ TEST_F(OrderingTest, AddRequestTrailers) {
 TEST_F(OrderingTest, ImmediateResponseOnRequest) {
   initialize(absl::nullopt);
 
+  // MockTimer constructor sets up expectations in the Dispatcher class to wire it up
+  MockTimer* request_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
+  EXPECT_CALL(*request_timer, enabled()).Times(AnyNumber());
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(*request_timer, disableTimer());
   sendImmediateResponse500();
   // The rest of the filter isn't necessarily called after this.
 }
@@ -543,14 +552,22 @@ TEST_F(OrderingTest, ImmediateResponseOnRequest) {
 TEST_F(OrderingTest, ImmediateResponseOnResponse) {
   initialize(absl::nullopt);
 
+  MockTimer* request_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*request_timer, enabled()).Times(AnyNumber());
+  EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(*request_timer, disableTimer());
   sendRequestHeadersReply();
 
+  MockTimer* response_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*response_timer, enableTimer(kMessageTimeout, nullptr));
+  EXPECT_CALL(*response_timer, enabled()).Times(AnyNumber());
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(*response_timer, disableTimer());
   sendImmediateResponse500();
   Buffer::OwnedImpl resp_body("Hello!");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
@@ -887,6 +904,20 @@ TEST_F(FastFailOrderingTest, GrpcErrorOnStartRequestBody) {
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_body, true));
 }
 
+// gRPC failure while opening stream with only request body enabled
+TEST_F(FastFailOrderingTest, GrpcErrorOnStartRequestBodyBufferedPartial) {
+  initialize([](ExternalProcessor& cfg) {
+    auto* pm = cfg.mutable_processing_mode();
+    pm->set_request_header_mode(ProcessingMode::SKIP);
+    pm->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+  });
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(BufferSize));
+  sendRequestHeadersPost(false);
+  Buffer::OwnedImpl req_body("Hello!");
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_body, true));
+}
+
 // gRPC failure while opening stream with only request body enabled in streaming mode
 TEST_F(FastFailOrderingTest, GrpcErrorOnStartRequestBodyStreaming) {
   initialize([](ExternalProcessor& cfg) {
@@ -919,6 +950,23 @@ TEST_F(FastFailOrderingTest, GrpcErrorIgnoredOnStartRequestBody) {
   Buffer::OwnedImpl resp_body("Hello!");
   Buffer::OwnedImpl resp_buf;
   expectBufferedRequest(resp_buf, false);
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
+}
+
+// gRPC failure while opening stream with only request body enabled and errors ignored
+TEST_F(FastFailOrderingTest, GrpcErrorIgnoredOnStartRequestBodyBufferedPartial) {
+  initialize([](ExternalProcessor& cfg) {
+    cfg.set_failure_mode_allow(true);
+    auto* pm = cfg.mutable_processing_mode();
+    pm->set_request_header_mode(ProcessingMode::SKIP);
+    pm->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+  });
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(BufferSize));
+  sendRequestHeadersPost(false);
+  Buffer::OwnedImpl req_body("Hello!");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_body, true));
+  sendResponseHeaders(false);
+  Buffer::OwnedImpl resp_body("Hello!");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
 }
 

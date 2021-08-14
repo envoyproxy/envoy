@@ -359,15 +359,18 @@ private:
 
       // This is a shared_ptr so we can keep it alive while cleaning up.
       std::shared_ptr<ConnPools> pools_;
-      bool ready_to_drain_{false};
-      uint64_t drains_remaining_{};
+      bool draining_{false};
+
+      // Protect from deletion while iterating through pools_. See comments and usage
+      // in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools()`.
+      bool do_not_delete_{false};
     };
 
     struct TcpConnPoolsContainer {
       using ConnPools = std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
 
       ConnPools pools_;
-      uint64_t drains_remaining_{};
+      bool draining_{false};
     };
 
     // Holds an unowned reference to a connection, and watches for Closed events. If the connection
@@ -397,17 +400,11 @@ private:
     using TcpConnectionsMap =
         absl::node_hash_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>;
 
-    struct ClusterEntry : public ThreadLocalCluster {
+    class ClusterEntry : public ThreadLocalCluster {
+    public:
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry() override;
-
-      Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
-                                               absl::optional<Http::Protocol> downstream_protocol,
-                                               LoadBalancerContext* context, bool peek);
-
-      Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
-                                                 LoadBalancerContext* context, bool peek);
 
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }
@@ -420,6 +417,25 @@ private:
                                               LoadBalancerContext* context) override;
       Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
       Http::AsyncClient& httpAsyncClient() override;
+
+      // Updates the hosts in the priority set.
+      void updateHosts(const std::string& name, uint32_t priority,
+                       PrioritySet::UpdateHostsParams&& update_hosts_params,
+                       LocalityWeightsConstSharedPtr locality_weights,
+                       const HostVector& hosts_added, const HostVector& hosts_removed,
+                       absl::optional<uint32_t> overprovisioning_factor);
+
+      // Drains any connection pools associated with the removed hosts.
+      void drainConnPools(const HostVector& hosts_removed);
+
+    private:
+      Http::ConnectionPool::Instance*
+      httpConnPoolImpl(ResourcePriority priority,
+                       absl::optional<Http::Protocol> downstream_protocol,
+                       LoadBalancerContext* context, bool peek);
+
+      Tcp::ConnectionPool::Instance* tcpConnPoolImpl(ResourcePriority priority,
+                                                     LoadBalancerContext* context, bool peek);
 
       ThreadLocalClusterManagerImpl& parent_;
       PrioritySetImpl priority_set_;
@@ -445,8 +461,10 @@ private:
     ~ThreadLocalClusterManagerImpl() override;
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
-    void clearContainer(HostSharedPtr old_host, ConnPoolsContainer& container);
-    void drainTcpConnPools(HostSharedPtr old_host, TcpConnPoolsContainer& container);
+    void drainTcpConnPools(TcpConnPoolsContainer& container);
+    void httpConnPoolIsIdle(HostConstSharedPtr host, ResourcePriority priority,
+                            const std::vector<uint8_t>& hash_key);
+    void tcpConnPoolIsIdle(HostConstSharedPtr host, const std::vector<uint8_t>& hash_key);
     void removeTcpConn(const HostConstSharedPtr& host, Network::ClientConnection& connection);
     void removeHosts(const std::string& name, const HostVector& hosts_removed);
     void updateClusterMembership(const std::string& name, uint32_t priority,

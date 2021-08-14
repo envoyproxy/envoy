@@ -22,7 +22,7 @@ Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstShar
   address_provider_->setLocalAddress(address);
 
   const Api::SysCallIntResult result = SocketImpl::bind(address_provider_->localAddress());
-  if (SOCKET_FAILURE(result.rc_)) {
+  if (SOCKET_FAILURE(result.return_value_)) {
     close();
     throw SocketBindException(fmt::format("cannot bind '{}': {}",
                                           address_provider_->localAddress()->asString(),

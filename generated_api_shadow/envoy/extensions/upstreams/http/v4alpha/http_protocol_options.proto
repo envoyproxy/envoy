@@ -84,6 +84,9 @@ message HttpProtocolOptions {
 
   // If this is used, the cluster can use either of the configured protocols, and
   // will use whichever protocol was used by the downstream connection.
+  //
+  // If HTTP/3 is configured for downstream and not configured for upstream,
+  // HTTP/3 requests will fail over to HTTP/2.
   message UseDownstreamHttpConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.extensions.upstreams.http.v3.HttpProtocolOptions.UseDownstreamHttpConfig";

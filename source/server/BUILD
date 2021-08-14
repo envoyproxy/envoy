@@ -157,6 +157,7 @@ envoy_cc_library(
     name = "active_tcp_listener_headers",
     hdrs = [
         "active_stream_listener_base.h",
+        "active_tcp_listener.h",
         "active_tcp_socket.h",
     ],
     deps = [
@@ -171,7 +172,10 @@ envoy_cc_library(
         "//envoy/network:listen_socket_interface",
         "//envoy/network:listener_interface",
         "//envoy/server:listener_manager_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
+        "//source/common/network:connection_lib",
+        "//source/common/stats:timespan_lib",
     ],
 )
 
@@ -385,7 +389,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/common/version:version_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ],
 )
 
@@ -574,12 +577,15 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:grpc_mux_lib",
+        "//source/common/config:new_grpc_mux_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_resource_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/grpc:context_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:context_lib",
+        "//source/common/http:headers_lib",
         "//source/common/init:manager_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/memory:heap_shrinker_lib",
@@ -598,7 +604,6 @@ envoy_cc_library(
         "//source/server:overload_manager_lib",
         "//source/server/admin:admin_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )

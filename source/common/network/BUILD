@@ -99,6 +99,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "happy_eyeballs_connection_impl_lib",
+    srcs = ["happy_eyeballs_connection_impl.cc"],
+    hdrs = ["happy_eyeballs_connection_impl.h"],
+    deps = [
+        ":connection_base_lib",
+        ":connection_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_lib",
     hdrs = ["filter_impl.h"],
     deps = [

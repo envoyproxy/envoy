@@ -18,6 +18,7 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:socket_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 

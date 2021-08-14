@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
@@ -112,7 +113,7 @@ public:
   bool enableReusePortDefault() override { return true; }
 
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
-  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
@@ -195,6 +196,7 @@ private:
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<Server::ValidationAdmin> admin_;
