@@ -18,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for cares DNS resolver
 // For Envoy to use cares DNS library as DNS resolver, the following need to be done:
 // 1) In file: source/extensions/extensions_build_config.bzl, enable cares DNS extension by adding below line
-//      "envoy.dns_resolver.cares":                "//source/extensions/network/dns_resolver/cares:dns_lib",
+//      "envoy.dns_resolver.cares":                "//source/extensions/network/dns_resolver/cares:config",
 // 2) In Envoy running configuration file, add cares DNS as a typed extension in *typed_dns_resolver_config* field.
 // For example, to add such configuration in bootstrap
 //    :ref:'typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>'

@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "dns_lib",
+    name = "config",
     srcs = ["dns_impl.cc"],
     hdrs = ["dns_impl.h"],
     external_deps = ["ares"],

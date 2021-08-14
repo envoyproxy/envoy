@@ -303,11 +303,11 @@ EXTENSIONS = {
     # cares DNS resolver extension is recommended to be enabled here to maintain the legacy DNS resolving behavior.
     # It should only be disabled if one knows how to add another DNS library as extension, and knows how to
     # configure Envoy to use that extension, and do not want to inluce cares in the build.
-    "envoy.dns_resolver.cares":                "//source/extensions/network/dns_resolver/cares:dns_lib",
+    "envoy.dns_resolver.cares":                "//source/extensions/network/dns_resolver/cares:config",
 
     # apple DNS resolver extension is only needed in MacOS build plus one want to use apple library for DNS resolving.
     # It can be disabled in all other cases.
-    "envoy.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:apple_dns_lib",
+    "envoy.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

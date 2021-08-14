@@ -18,7 +18,7 @@ namespace Network {
 
 const std::string cares_dns_resolver = "envoy.dns_resolver.cares";
 const std::string apple_dns_resolver = "envoy.dns_resolver.apple";
-const std::string dns_resolver = "envoy.network_dnsresolvers";
+const std::string dns_resolver_category = "envoy.network_dnsresolvers";
 
 class DnsResolverFactory : public Config::TypedFactory {
 public:
@@ -30,7 +30,7 @@ public:
       Event::Dispatcher& dispatcher, const Api::Api& api,
       const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) PURE;
 
-  std::string category() const override { return dns_resolver; }
+  std::string category() const override { return dns_resolver_category; }
 };
 
 // Retrieve the DNS related configurations in the passed in @param config, and store the data into
@@ -59,11 +59,11 @@ public:
 //
 // Note, to make cares DNS library to work, In file:
 //      source/extensions/extensions_build_config.bzl, cares DNS extension need to be enabled:
-//      "envoy.dns_resolver.cares": "//source/extensions/network/dns_resolver/cares:dns_lib",
+//      "envoy.dns_resolver.cares": "//source/extensions/network/dns_resolver/cares:config",
 
 // For Envoy running on Apple system, to use apple DNS library as DNS resolver, In file:
 //      source/extensions/extensions_build_config.bzl, Apple DNS extension need to be enabled:
-//      "envoy.dns_resolver.apple": "//source/extensions/network/dns_resolver/apple:apple_dns_lib",
+//      "envoy.dns_resolver.apple": "//source/extensions/network/dns_resolver/apple:config",
 //
 // To implement other new DNS library, one should implement the corresponding factory as another
 //     extension, enable the extension in the extensions_build_config.bzl file, and configure the
@@ -78,7 +78,8 @@ void makeDnsResolverConfig(
     Network::DnsResolverFactory* dns_resolver_factory;
     dns_resolver_factory = Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(
         config.typed_dns_resolver_config(), true);
-    if (dns_resolver_factory != nullptr && dns_resolver_factory->category() == dns_resolver) {
+    if ((dns_resolver_factory != nullptr) &&
+        (dns_resolver_factory->category() == dns_resolver_category)) {
       typed_dns_resolver_config.MergeFrom(config.typed_dns_resolver_config());
       return;
     }

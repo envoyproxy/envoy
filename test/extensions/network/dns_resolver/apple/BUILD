@@ -32,7 +32,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
     ] + select({
         "//bazel:apple": [
-            "//source/extensions/network/dns_resolver/apple:apple_dns_lib",
+            "//source/extensions/network/dns_resolver/apple:config",
         ],
         "//conditions:default": [],
     }),

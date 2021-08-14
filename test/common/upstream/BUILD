@@ -41,7 +41,7 @@ envoy_cc_test(
     deps = [
         ":test_cluster_manager",
         "//source/common/router:context_lib",
-        "//source/extensions/network/dns_resolver/cares:dns_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
         "//source/common/upstream:load_balancer_factory_base_lib",
         "//source/extensions/transport_sockets/tls:config",
         "//test/config:v2_link_hacks",

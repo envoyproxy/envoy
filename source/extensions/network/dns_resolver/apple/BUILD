@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "apple_dns_lib",
+    name = "config",
     srcs = select({
         "//bazel:apple": ["apple_dns_impl.cc"],
         "//conditions:default": [],
