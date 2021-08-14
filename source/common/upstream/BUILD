@@ -220,6 +220,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "load_balancer_factory_base_lib",
+    hdrs = ["load_balancer_factory_base.h"],
+    deps = [
+        ":load_balancer_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "load_stats_reporter_lib",
     srcs = ["load_stats_reporter.cc"],
     hdrs = ["load_stats_reporter.h"],
