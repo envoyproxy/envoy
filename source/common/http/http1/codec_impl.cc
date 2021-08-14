@@ -254,6 +254,9 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
 void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   // end_stream may be indicated with a zero length data buffer. If that is the case, so not
   // actually write the zero length buffer out.
+  if (bytes_meterer_) {
+    bytes_meterer_->addBodyBytesSent(data.length());
+  }
   if (data.length() > 0) {
     if (chunk_encoding_) {
       connection_.buffer().add(absl::StrCat(absl::Hex(data.length()), CRLF));

@@ -179,6 +179,7 @@ void UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
 
   maybeEndDecode(end_stream);
   stream_info_.addBytesReceived(data.length());
+  // parent_.callbacks()->streamInfo().getUpstreamBytesMeterer()->addBodyBytesReceived(buffered_request_body_->length());
   parent_.onUpstreamData(data, *this, end_stream);
 }
 
@@ -252,6 +253,7 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
 
     ENVOY_STREAM_LOG(trace, "proxying {} bytes", *parent_.callbacks(), data.length());
     stream_info_.addBytesSent(data.length());
+    stream_info_.getUpstreamBytesMeterer()->addBodyBytesSent(data.length());
     upstream_->encodeData(data, end_stream);
     if (end_stream) {
       upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
@@ -506,6 +508,7 @@ void UpstreamRequest::encodeBodyAndTrailers() {
     }
 
     if (buffered_request_body_) {
+      stream_info_.getUpstreamBytesMeterer()->addBodyBytesSent(buffered_request_body_->length());
       stream_info_.addBytesSent(buffered_request_body_->length());
       upstream_->encodeData(*buffered_request_body_, encode_complete_ && !encode_trailers_);
     }
