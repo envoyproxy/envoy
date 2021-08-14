@@ -6,7 +6,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
-#include "envoy/extensions/network/dns_resolver/apple/v3/appl_dns_resolver.pb.h"
+#include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
 #include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.pb.h"
 #include "envoy/network/dns.h"
 
