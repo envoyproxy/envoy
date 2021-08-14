@@ -220,8 +220,20 @@ class parallel:  # noqa: N801
     @async_property
     async def coros(self) -> AsyncIterator[Union[AsyncParallelIteratorError, Awaitable]]:
         """An async iterator of the provided coroutines"""
-        async for coro in self.iter_coros():
-            yield coro
+        coros = self.iter_coros()
+        try:
+            async for coro in coros:
+                yield coro
+        except GeneratorExit:
+            # If we exit before we finish generating we land here (ie error was raised)
+            # In this case we need to tell the (possibly) async generating provider to
+            # also close.
+            try:
+                await coros.aclose()  # type:ignore
+            finally:
+                # Suppress errors closing the provider generator
+                # This can raise a further `GeneratorExit` but it will stop providing.
+                return
 
     @property
     def default_limit(self) -> int:
@@ -317,6 +329,7 @@ class parallel:  # noqa: N801
 
     async def cancel_tasks(self) -> None:
         """Cancel any running tasks"""
+
         for running in self.running_tasks:
             running.cancel()
             try:
@@ -338,9 +351,9 @@ class parallel:  # noqa: N801
 
         async for coro in self.iter_coros():
             try:
-                # mypy reports that not all awaitables have a `close` method, but
-                # as we are asking for forgiveness anyway, no point in looking
-                # before we leap.
+                # this could be an `aio.AsyncParallelError` and not have a
+                # `close` method, but as we are asking for forgiveness anyway,
+                # no point in looking before we leap.
                 coro.close()  # type:ignore
             finally:
                 # ignore errors, we are dying anyway
@@ -455,20 +468,26 @@ class parallel:  # noqa: N801
                 # Iteration error, exit now
                 await self.out.put(coro)
                 break
-            # wait for the sem.lock
             if not await self.ready():
-                # queue is closing, get out of here
-                break
-            # check the supplied coro is awaitable
+                # Queue is closing, get out of here
+                try:
+                    # Ensure the last coro to be produced/generated is closed,
+                    # as it will not be scheduled as a task, and in the case
+                    # of generators it wont be closed any other way.
+                    coro.close()
+                finally:
+                    # ignore all coro closing errors, we are dying
+                    break
+            # Check the supplied coro is awaitable
             try:
                 self.validate_coro(coro)
             except AsyncParallelError as e:
                 await self.on_task_complete(e, decrement=False)
                 continue
-            # all good, create a task
+            # All good, create a task
             await self.create_task(coro)
         self.submission_lock.release()
-        # if cleanup of the submission queue has taken longer than processing
+        # If cleanup of the submission queue has taken longer than processing
         # we need to manually close
         await self.exit_on_completion()
 

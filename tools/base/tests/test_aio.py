@@ -186,23 +186,52 @@ def test_aio_parallel_closed(patches, locked):
 
 
 @pytest.mark.asyncio
-async def test_aio_parallel_coros(patches):
+@pytest.mark.parametrize("raises", [None, BaseException, GeneratorExit])
+@pytest.mark.parametrize("close_raises", [None, BaseException])
+async def test_aio_parallel_coros(patches, raises, close_raises):
     parallel = aio.parallel(["CORO"])
     patched = patches(
         ("parallel.iter_coros", dict(new_callable=PropertyMock)),
         prefix="tools.base.aio")
     results = []
     coros = [f"CORO{i}" for i in range(0, 3)]
+    _aclose = AsyncMock()
+    if close_raises:
+        _aclose.side_effect = close_raises()
 
-    async def _coros():
-        for coro in coros:
-            yield coro
+    class Coros:
+        aclose = _aclose
+
+        def __call__(self):
+            return self
+
+        async def __aiter__(self):
+            if raises:
+                raise raises("AN ERROR OCCURRED")
+            for coro in coros:
+                yield coro
 
     with patched as (m_coros, ):
+        _coros = Coros()
         m_coros.return_value = _coros
-        async for coro in parallel.coros:
-            results.append(coro)
+        if raises == BaseException:
+            with pytest.raises(BaseException):
+                async for coro in parallel.coros:
+                    pass
+        else:
+            async for coro in parallel.coros:
+                results.append(coro)
 
+    if raises == GeneratorExit:
+        assert (
+            list(_coros.aclose.call_args)
+            == [(), {}])
+        return
+
+    assert not _coros.aclose.called
+
+    if raises:
+        return
     assert results == coros
     assert "coros" not in parallel.__dict__
 
@@ -854,7 +883,7 @@ def test_aio_parallel_should_error(result, yield_exceptions):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("coros", range(0, 7))
-@pytest.mark.parametrize("unready", range(0, 10))
+@pytest.mark.parametrize("unready", range(0, 8))
 @pytest.mark.parametrize("valid_raises", [None, Exception, aio.AsyncParallelError])
 @pytest.mark.parametrize("iter_errors", [True, False])
 async def test_aio_parallel_submit(patches, coros, unready, valid_raises, iter_errors):
@@ -890,9 +919,10 @@ async def test_aio_parallel_submit(patches, coros, unready, valid_raises, iter_e
     def _release():
         m_order("RELEASE")
 
+    _corolist = [MagicMock() for coro in range(1, coros)]
+
     async def _coros():
-        for coro in range(1, coros):
-            coro = f"CORO{coro}"
+        for coro in _corolist:
             m_order(coro)
             yield coro
 
@@ -929,21 +959,31 @@ async def test_aio_parallel_submit(patches, coros, unready, valid_raises, iter_e
             == [(), {}])
 
     if coros < 2:
-        assert not m_ready.called
         assert not m_valid.called
         assert not m_inst.called
         assert not m_complete.called
         assert not m_create.called
+        assert not m_ready.called
         assert not m_out.return_value.put.called
         return
+
+    _should_close_coro = (
+        not iter_errors
+        and not valid_errors
+        and (len(_corolist) > unready))
+
+    if _should_close_coro:
+        assert _corolist[unready].close.called
+    else:
+        assert not any(_coro.close.called for _coro in _corolist)
 
     if iter_errors:
         assert (
             list(list(c) for c in m_out.return_value.put.call_args_list)
-            == [[("CORO1", ), {}]])
+            == [[(_corolist[0], ), {}]])
         assert (
             list(list(c) for c in m_inst.call_args_list)
-            == [[("CORO1", aio.AsyncParallelIteratorError), {}]])
+            == [[(_corolist[0], aio.AsyncParallelIteratorError), {}]])
         assert not m_ready.called
         assert not m_valid.called
         assert not m_complete.called
@@ -953,19 +993,19 @@ async def test_aio_parallel_submit(patches, coros, unready, valid_raises, iter_e
     if valid_errors:
         assert (
             list(list(c) for c in m_inst.call_args_list)
-            == [[("CORO1", aio.AsyncParallelIteratorError), {}]])
+            == [[(_corolist[0], aio.AsyncParallelIteratorError), {}]])
         assert (
             list(list(c) for c in m_ready.call_args_list)
             == [[(), {}]])
         assert (
             list(list(c) for c in m_valid.call_args_list)
-            == [[(f"CORO1", ), {}]])
+            == [[(_corolist[0], ), {}]])
         assert not m_complete.called
         assert not m_create.called
         assert (
             list(list(c) for c in m_order.call_args_list)
             == ([[('ACQUIRE',), {}],
-                 [('CORO1',), {}]]))
+                 [(_corolist[0],), {}]]))
         return
 
     assert not m_out.return_value.put.called
@@ -974,11 +1014,11 @@ async def test_aio_parallel_submit(patches, coros, unready, valid_raises, iter_e
         == [[(), {}]] * min(coros - 1, unready + 1 or 1))
     assert (
         list(list(c) for c in m_valid.call_args_list)
-        == [[(f"CORO{i}", ), {}] for i in range(1, min(coros, unready + 1))])
+        == [[(_corolist[i - 1], ), {}] for i in range(1, min(coros, unready + 1))])
     assert (
         list(list(c) for c in m_order.call_args_list)
         == ([[('ACQUIRE',), {}]]
-            + [[(f'CORO{i}',), {}] for i in range(1, min(coros, unready + 2))]
+            + [[(_corolist[i - 1],), {}] for i in range(1, min(coros, unready + 2))]
             + [[('RELEASE',), {}]]))
     if valid_raises:
         assert len(m_complete.call_args_list) == max(min(coros - 1, unready), 0)
@@ -993,7 +1033,7 @@ async def test_aio_parallel_submit(patches, coros, unready, valid_raises, iter_e
     assert not m_complete.called
     assert (
         list(list(c) for c in m_create.call_args_list)
-        == [[(f"CORO{i}",), {}] for i in range(1, min(coros, unready + 1))])
+        == [[(_corolist[i - 1],), {}] for i in range(1, min(coros, unready + 1))])
 
 
 class OtherException(BaseException):
@@ -1209,9 +1249,7 @@ async def test_aio_parallel_integration(limit, yield_exceptions, iter_type, coro
             # therefore the easiest thing is to just exclude them from this test
             assert _results == coros[:err_index - (err_index % limit)]
 
-        # as we havent closed the loop, and raising an error took priority over cleaning up the
-        #  tasks, gc hasnt happened yet. Any sleep here at all should allow `all_tasks` to return
-        # to its original state. `gc.collect` is also run to encourage asyncio to cleanup (?)
+        # this can probs be removed, i think it was caused by unhandled GeneratorExit
         await asyncio.sleep(.001)
         gc.collect()
         assert len(asyncio.all_tasks()) == tasks_at_the_beginning
