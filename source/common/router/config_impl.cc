@@ -549,7 +549,7 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
 
   for (const auto& m : dynamic_metadatas_) {
     if (!matches) {
-      // No need to match further as dynamic metadata matchers are ANDed.
+      // No need to check anymore as all dynamic metadata matchers must match for a match to occur.
       break;
     }
     matches &= m.match(stream_info.dynamicMetadata());
