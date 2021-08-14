@@ -8,7 +8,6 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/scope_tracker.h"
-#include "envoy/network/dns_factory.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
@@ -24,6 +23,7 @@
 #include "source/common/event/timer_impl.h"
 #include "source/common/filesystem/watcher_impl.h"
 #include "source/common/network/connection_impl.h"
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/runtime/runtime_features.h"

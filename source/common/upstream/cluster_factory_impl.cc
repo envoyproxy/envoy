@@ -1,11 +1,11 @@
 #include "source/common/upstream/cluster_factory_impl.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/network/dns_factory.h"
 #include "envoy/server/options.h"
 
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/upstream/health_checker_impl.h"

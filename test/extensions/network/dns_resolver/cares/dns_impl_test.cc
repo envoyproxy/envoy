@@ -13,11 +13,11 @@
 #include "source/common/common/utility.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/address_impl.h"
-#include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
@@ -507,8 +507,8 @@ public:
     listener_ = dispatcher_->createListener(socket_, *server_, true);
     updateDnsResolverOptions();
 
-    typed_dns_resolver_config_in_construct_ = getTypedDnsResolverConfig(
-        {socket_->addressProvider().localAddress()});
+    typed_dns_resolver_config_in_construct_ =
+        getTypedDnsResolverConfig({socket_->addressProvider().localAddress()});
     typed_dns_resolver_config_not_in_construct_ = getTypedDnsResolverConfig({});
 
     if (setResolverInConstructor()) {

@@ -15,7 +15,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/dns.h"
-#include "envoy/network/dns_factory.h"
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"

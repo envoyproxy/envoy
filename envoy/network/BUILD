@@ -64,23 +64,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "dns_factory_interface",
-    hdrs = ["dns_factory.h"],
-    deps = [
-        ":dns_interface",
-        "//envoy/api:api_interface",
-        "//envoy/event:dispatcher_interface",
-        "//source/common/config:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/udp/dns_filter/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/network/dns_resolver/apple/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/network/dns_resolver/cares/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "drain_decision_interface",
     hdrs = ["drain_decision.h"],
     external_deps = ["abseil_base"],

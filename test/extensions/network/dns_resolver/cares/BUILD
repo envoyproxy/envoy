@@ -1,10 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_benchmark_test",
-    "envoy_cc_benchmark_binary",
-    "envoy_cc_fuzz_test",
     "envoy_cc_test",
-    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -27,11 +23,11 @@ envoy_cc_test(
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
-        "//source/extensions/network/dns_resolver/cares:dns_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/network/dns_resolver/cares:dns_lib",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",

@@ -288,7 +288,7 @@ server_config:
     filename: {}
 )EOF";
 
-   const std::string typed_dns_resolver_config_exit = R"EOF(
+  const std::string typed_dns_resolver_config_exit = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
   resolver_timeout: 1s
@@ -326,7 +326,6 @@ server_config:
   external_dns_table:
     filename: {}
 )EOF";
-
 
   const std::string external_dns_table_json = R"EOF(
 {
@@ -2263,7 +2262,6 @@ TEST_F(DnsFilterTest, NoDnsConfigExit) {
   // No address
   EXPECT_EQ(0, cares_.resolvers().size());
 }
-
 
 TEST_F(DnsFilterTest, DEPRECATED_FEATURE_TEST(DeprecatedKnownSuffixes)) {
   InSequence s;

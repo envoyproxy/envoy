@@ -2413,9 +2413,9 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedField) {
   typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
   // As custom resolver is specified via deprecated field `dns_resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(
-      CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
-          .WillOnce(Return(dns_resolver));
+  EXPECT_CALL(factory_.dispatcher_,
+              createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
+      .WillOnce(Return(dns_resolver));
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
@@ -2457,9 +2457,9 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedFieldMulti
   typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
   // As custom resolver is specified via deprecated field `dns_resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(
-      CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
-          .WillOnce(Return(dns_resolver));
+  EXPECT_CALL(factory_.dispatcher_,
+              createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
+      .WillOnce(Return(dns_resolver));
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
@@ -2467,8 +2467,6 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedFieldMulti
   create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
 }
-
-
 
 // Test that custom DNS resolver is used, when custom resolver is configured per cluster.
 TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecified) {
@@ -2497,8 +2495,8 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecified) {
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(
-      CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
+  EXPECT_CALL(factory_.dispatcher_,
+              createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
@@ -2544,8 +2542,8 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedMultipleResolvers) {
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(
-      CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
+  EXPECT_CALL(factory_.dispatcher_,
+              createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
@@ -2556,8 +2554,8 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedMultipleResolvers) {
   factory_.tls_.shutdownThread();
 }
 
-
-// Test that custom DNS resolver is used and overriding the specified deprecated field `dns_resolvers`.
+// Test that custom DNS resolver is used and overriding the specified deprecated field
+// `dns_resolvers`.
 TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedOveridingDeprecatedResolver) {
   const std::string yaml = R"EOF(
   static_resources:
@@ -2588,8 +2586,8 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedOveridingDeprecatedReso
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(
-      CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
+  EXPECT_CALL(factory_.dispatcher_,
+              createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
@@ -2879,7 +2877,6 @@ TEST_F(ClusterManagerImplTest, NoDefaultSearchDomainWithCustomDnsResolver) {
   factory_.tls_.shutdownThread();
 }
 
-
 // Test that typed_dns_resolver_config is specified and is used.
 TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecified) {
   const std::string yaml = R"EOF(
@@ -3010,7 +3007,6 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigMultipleResolversSpecified)
   factory_.tls_.shutdownThread();
 }
 
-
 // Test that dns_resolver_options in typed_dns_resolver_config is specified and is used.
 TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigResolverOptionsSpecified) {
   const std::string yaml = R"EOF(
@@ -3047,8 +3043,9 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigResolverOptionsSpecified) {
   factory_.tls_.shutdownThread();
 }
 
-// Test that when typed_dns_resolver_config is specified, it is used. All other deprecated configurations
-// are ignored, which includes dns_resolvers, use_tcp_for_dns_lookups, and dns_resolution_config.
+// Test that when typed_dns_resolver_config is specified, it is used. All other deprecated
+// configurations are ignored, which includes dns_resolvers, use_tcp_for_dns_lookups, and
+// dns_resolution_config.
 TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedOveridingDeprecatedConfig) {
   const std::string yaml = R"EOF(
   static_resources:
@@ -3110,11 +3107,12 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedOveridingDeprecate
   factory_.tls_.shutdownThread();
 }
 
-
 // Test that when typed_dns_resolver_config is configured but with unregistered type,
-// e.g, "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig,
-// the default behavior is enforced: i.e, if dns_resolution_config is in place, use it.
-TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedUnregisteredDnsResolutionConfigInPlace) {
+// e.g, "@type":
+// type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig, the
+// default behavior is enforced: i.e, if dns_resolution_config is in place, use it.
+TEST_F(ClusterManagerImplTest,
+       TypedDnsResolverConfigSpecifiedUnregisteredDnsResolutionConfigInPlace) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -3170,12 +3168,13 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedUnregisteredDnsRes
   factory_.tls_.shutdownThread();
 }
 
-
 // Test that when typed_dns_resolver_config is configured but with unregistered type,
-// e.g, "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig,
-// the default behavior is enforced: i.e, if dns_resolution_config is not in place,
-// but dns_resolvers and use_tcp_for_dns_lookups are in place, use them.
-TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedUnregisteredDnsResolversConfigInPlace) {
+// e.g, "@type":
+// type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig, the
+// default behavior is enforced: i.e, if dns_resolution_config is not in place, but dns_resolvers
+// and use_tcp_for_dns_lookups are in place, use them.
+TEST_F(ClusterManagerImplTest,
+       TypedDnsResolverConfigSpecifiedUnregisteredDnsResolversConfigInPlace) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -3230,8 +3229,9 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedUnregisteredDnsRes
 }
 
 // Test that when typed_dns_resolver_config is configured but with unregistered type,
-// e.g, "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig,
-// the default behavior is enforced: i.e, if neither dns_resolution_config, nor dns_resolvers or
+// e.g, "@type":
+// type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig, the
+// default behavior is enforced: i.e, if neither dns_resolution_config, nor dns_resolvers or
 // use_tcp_for_dns_lookups is in place, then typed_dns_resolver_config is default value.
 TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedUnregisteredNoConfigInPlace) {
   const std::string yaml = R"EOF(
@@ -3273,7 +3273,8 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedUnregisteredNoConf
 // will throw out an exception since it doens't recognize this type, and abort the test.
 // This bogus @type case is not tested.
 
-TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedNonResolverDnsResolutionConfigInPlace) {
+TEST_F(ClusterManagerImplTest,
+       TypedDnsResolverConfigSpecifiedNonResolverDnsResolutionConfigInPlace) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -3328,7 +3329,6 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedNonResolverDnsReso
 
   factory_.tls_.shutdownThread();
 }
-
 
 // This is a regression test for a use-after-free in
 // ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(), where a removal at one

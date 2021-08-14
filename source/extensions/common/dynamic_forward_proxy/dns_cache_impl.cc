@@ -1,10 +1,10 @@
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
-#include "envoy/network/dns_factory.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
 

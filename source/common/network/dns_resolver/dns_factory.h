@@ -18,7 +18,7 @@ namespace Network {
 
 const std::string cares_dns_resolver = "envoy.dns_resolver.cares";
 const std::string apple_dns_resolver = "envoy.dns_resolver.apple";
-const std::string dns_resolver       = "envoy.network_dnsresolvers";
+const std::string dns_resolver = "envoy.network_dnsresolvers";
 
 class DnsResolverFactory : public Config::TypedFactory {
 public:
@@ -70,17 +70,15 @@ public:
 //     typed_dns_resolver_config with the corresponding DNS resolver type.
 
 template <class T>
-static inline void
-makeDnsResolverConfig(const T& config,
-                      envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+void makeDnsResolverConfig(
+    const T& config, envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   // If the config has typed_dns_resolver_config, and the corresponding DNS resolver factory
   // is registered, copy it into typed_dns_resolver_config and return.
   if (config.has_typed_dns_resolver_config()) {
     Network::DnsResolverFactory* dns_resolver_factory;
-    dns_resolver_factory = Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(config.typed_dns_resolver_config(),
-                                                                                            true);
-    if (dns_resolver_factory != nullptr &&
-        dns_resolver_factory->category() == dns_resolver) {
+    dns_resolver_factory = Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(
+        config.typed_dns_resolver_config(), true);
+    if (dns_resolver_factory != nullptr && dns_resolver_factory->category() == dns_resolver) {
       typed_dns_resolver_config.MergeFrom(config.typed_dns_resolver_config());
       return;
     }
@@ -115,7 +113,7 @@ makeDnsResolverConfig(const T& config,
   } else {
     // Skipping copying these fields for DnsFilterConfig.
     if constexpr (!(std::is_same_v<T, envoy::extensions::filters::udp::dns_filter::v3alpha::
-                    DnsFilterConfig::ClientContextConfig>)) {
+                                          DnsFilterConfig::ClientContextConfig>)) {
       cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(
           config.use_tcp_for_dns_lookups());
       if constexpr (std::is_same_v<T, envoy::config::cluster::v3::Cluster>) {

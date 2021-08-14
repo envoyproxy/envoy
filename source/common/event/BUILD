@@ -39,7 +39,6 @@ envoy_cc_library(
         "//envoy/common:scope_tracker_interface",
         "//envoy/common:time_interface",
         "//envoy/event:signal_interface",
-        "//envoy/network:dns_factory_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/network:listener_interface",
         "//source/common/common:assert_lib",
@@ -48,6 +47,7 @@ envoy_cc_library(
         "//source/common/filesystem:watcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:listener_lib",
+        "//source/common/network/dns_resolver:dns_factory_interface",
     ],
 )
 

@@ -11,9 +11,9 @@
 #include "envoy/network/dns.h"
 
 #include "source/common/network/address_impl.h"
-#include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"

@@ -61,11 +61,9 @@ TEST_P(ConfigValidation, CreateScaledTimer) {
 // DNS resolver returns the same shared_ptr.
 TEST_F(ConfigValidation, SharedDnsResolver) {
   auto typed_dns_resolver_config = envoy::config::core::v3::TypedExtensionConfig();
-  Network::DnsResolverSharedPtr dns1 =
-      dispatcher_->createDnsResolver(typed_dns_resolver_config);
+  Network::DnsResolverSharedPtr dns1 = dispatcher_->createDnsResolver(typed_dns_resolver_config);
   long use_count = dns1.use_count();
-  Network::DnsResolverSharedPtr dns2 =
-      dispatcher_->createDnsResolver(typed_dns_resolver_config);
+  Network::DnsResolverSharedPtr dns2 = dispatcher_->createDnsResolver(typed_dns_resolver_config);
 
   EXPECT_EQ(dns1.get(), dns2.get());          // Both point to the same instance.
   EXPECT_EQ(use_count + 1, dns2.use_count()); // Each call causes ++ in use_count.

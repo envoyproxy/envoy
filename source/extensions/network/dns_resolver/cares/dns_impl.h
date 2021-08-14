@@ -7,11 +7,11 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/network/dns.h"
-#include "envoy/network/dns_factory.h"
 
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/network/resolver_impl.h"
 
 #include "absl/container/node_hash_map.h"

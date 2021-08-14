@@ -948,7 +948,8 @@ TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolutionConfig) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   empty_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   empty_typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
-  EXPECT_CALL(dispatcher, createDnsResolver(CustomTypedDnsResolverConfigEquals(empty_typed_dns_resolver_config)))
+  EXPECT_CALL(dispatcher, createDnsResolver(
+                              CustomTypedDnsResolverConfigEquals(empty_typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
   DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
 }
@@ -997,9 +998,11 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfigOverridingUseTcp) {
       config.mutable_dns_resolution_config()->add_resolvers();
   dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
   dns_resolvers->mutable_socket_address()->set_port_value(8080);
-  config.mutable_dns_resolution_config()->mutable_dns_resolver_options()
+  config.mutable_dns_resolution_config()
+      ->mutable_dns_resolver_options()
       ->set_use_tcp_for_dns_lookups(true);
-  config.mutable_dns_resolution_config()->mutable_dns_resolver_options()
+  config.mutable_dns_resolution_config()
+      ->mutable_dns_resolver_options()
       ->set_no_default_search_domain(true);
 
   // setup expected typed config parameter
@@ -1017,7 +1020,6 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfigOverridingUseTcp) {
   DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
 }
 
-
 // Test the case that the typed_dns_resolver_config is specified, and it overrides all
 // other configuration, like config.dns_resolution_config, and config.use_tcp_for_dns_lookups.
 TEST(DnsCacheConfigOptionsTest, NonEmptyTypedDnsResolverConfig) {
@@ -1034,8 +1036,12 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyTypedDnsResolverConfig) {
       config.mutable_dns_resolution_config()->add_resolvers();
   dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
   dns_resolvers->mutable_socket_address()->set_port_value(8080);
-  config.mutable_dns_resolution_config()->mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(false);
-  config.mutable_dns_resolution_config()->mutable_dns_resolver_options()->set_no_default_search_domain(false);
+  config.mutable_dns_resolution_config()
+      ->mutable_dns_resolver_options()
+      ->set_use_tcp_for_dns_lookups(false);
+  config.mutable_dns_resolution_config()
+      ->mutable_dns_resolver_options()
+      ->set_no_default_search_domain(false);
 
   // setup use_tcp_for_dns_lookups
   config.set_use_tcp_for_dns_lookups(false);
@@ -1056,12 +1062,11 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyTypedDnsResolverConfig) {
   expected_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   expected_typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
 
-  EXPECT_CALL(dispatcher,
-              createDnsResolver(CustomTypedDnsResolverConfigEquals(expected_typed_dns_resolver_config)))
+  EXPECT_CALL(dispatcher, createDnsResolver(CustomTypedDnsResolverConfigEquals(
+                              expected_typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
   DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
 }
-
 
 // Note: this test is done here, rather than a TYPED_TEST_SUITE in
 // //test/common/config:utility_test, because we did not want to include an extension type in

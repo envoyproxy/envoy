@@ -51,7 +51,7 @@ public:
   }
 
   Network::DnsResolverSharedPtr createDnsResolver(
-        const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) override {
+      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) override {
     return impl_.createDnsResolver(typed_dns_resolver_config);
   }
 
