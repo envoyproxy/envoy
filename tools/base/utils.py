@@ -9,9 +9,15 @@ import tarfile
 import tempfile
 from configparser import ConfigParser
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
-from typing import Callable, Iterator, List, Optional, Union
+from typing import Callable, Iterator, List, Optional, Set, Union
 
 import yaml
+
+# See here for a list of known tar file extensions:
+#   https://en.wikipedia.org/wiki/Tar_(computing)#Suffixes_for_compressed_files
+# not all are listed here, and some extensions may require additional software
+# to handle. This list can be updated as required
+TAR_EXTS: Set[str] = {"tar", "tar.gz", "xz", "tar.xz", "tar.bz2"}
 
 
 class ExtractError(Exception):
@@ -128,3 +134,13 @@ def to_yaml(data: Union[dict, list, str, int], path: Union[pathlib.Path, str]) -
     path = pathlib.Path(path)
     path.write_text(yaml.dump(data))
     return path
+
+
+def is_tarlike(path: Union[pathlib.Path, str]) -> bool:
+    """Returns a bool based on whether a file looks like a tar file depending
+    on its file extension.
+
+    This allows for a provided path to save to, to dynamically be either
+    considered a directory (to create) or a tar file (to create).
+    """
+    return any(str(path).endswith(ext) for ext in TAR_EXTS)

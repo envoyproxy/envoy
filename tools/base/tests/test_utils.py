@@ -226,3 +226,13 @@ def test_util_to_yaml(patches):
     assert (
         list(m_plib.Path.call_args)
         == [("PATH", ), {}])
+
+
+@pytest.mark.parametrize("path", ["x.foo", "x.bar", "x.tar", "x.tar.xz", "x.xz"])
+def test_is_tarlike(patches, path):
+    matches = False
+    for ext in utils.TAR_EXTS:
+        if path.endswith(ext):
+            matches = True
+            break
+    assert utils.is_tarlike(path) == matches
