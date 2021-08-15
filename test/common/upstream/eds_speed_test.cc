@@ -50,7 +50,7 @@ public:
             local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-            envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, {}, true)) {
+            random_, stats_, {}, true)) {
     resetCluster(R"EOF(
       name: name
       connect_timeout: 0.25s

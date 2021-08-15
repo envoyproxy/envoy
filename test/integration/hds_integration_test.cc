@@ -27,8 +27,7 @@ namespace Envoy {
 namespace {
 
 // TODO(jmarantz): switch this to simulated-time after debugging flakes.
-class HdsIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
-                           public HttpIntegrationTest {
+class HdsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest, public HttpIntegrationTest {
 public:
   HdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
@@ -38,9 +37,6 @@ public:
     HttpIntegrationTest::createUpstreams();
   }
   void initialize() override {
-    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
-      config_helper_.enableDeprecatedV2Api();
-    }
     setUpstreamCount(upstream_endpoints_);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Setup hds and corresponding gRPC cluster.
@@ -48,7 +44,6 @@ public:
       hds_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
       hds_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       hds_config->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("hds_cluster");
-      hds_config->set_transport_api_version(apiVersion());
       auto* hds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       hds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       hds_cluster->mutable_circuit_breakers()->Clear();
@@ -278,9 +273,9 @@ transport_socket_matches:
                                         healthy, host_upstream_->localAddress())) {
       ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
       EXPECT_EQ("POST", hds_stream_->headers().getMethodValue());
-      EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.{1}.{0}.HealthDiscoveryService",
-                                                    "StreamHealthCheck", apiVersion(),
-                                                    serviceNamespace()),
+      EXPECT_EQ(TestUtility::getVersionedMethodPath(
+                    "envoy.service.{1}.{0}.HealthDiscoveryService", "StreamHealthCheck",
+                    envoy::config::core::v3::ApiVersion::V3, serviceNamespace()),
                 hds_stream_->headers().getPathValue());
       EXPECT_EQ("application/grpc", hds_stream_->headers().getContentTypeValue());
     }
@@ -333,9 +328,9 @@ transport_socket_matches:
       }
 
       EXPECT_EQ("POST", hds_stream_->headers().getMethodValue());
-      EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.{1}.{0}.HealthDiscoveryService",
-                                                    "StreamHealthCheck", apiVersion(),
-                                                    serviceNamespace()),
+      EXPECT_EQ(TestUtility::getVersionedMethodPath(
+                    "envoy.service.{1}.{0}.HealthDiscoveryService", "StreamHealthCheck",
+                    envoy::config::core::v3::ApiVersion::V3, serviceNamespace()),
                 hds_stream_->headers().getPathValue());
       EXPECT_EQ("application/grpc", hds_stream_->headers().getContentTypeValue());
     }
@@ -343,18 +338,7 @@ transport_socket_matches:
     return true;
   }
 
-  const std::string serviceNamespace() const {
-    switch (apiVersion()) {
-    case envoy::config::core::v3::ApiVersion::AUTO:
-      FALLTHRU;
-    case envoy::config::core::v3::ApiVersion::V2:
-      return "discovery";
-    case envoy::config::core::v3::ApiVersion::V3:
-      return "health";
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-  }
+  const std::string serviceNamespace() const { return "health"; }
 
   static constexpr uint32_t upstream_endpoints_ = 0;
 
@@ -379,9 +363,8 @@ transport_socket_matches:
   envoy::service::health::v3::HealthCheckSpecifier server_health_check_specifier_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, HdsIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, HdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Tests Envoy HTTP health checking a single healthy endpoint and reporting that it is
 // indeed healthy to the server.

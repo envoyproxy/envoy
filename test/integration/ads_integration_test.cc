@@ -7,7 +7,6 @@
 #include "envoy/grpc/status.h"
 
 #include "source/common/config/protobuf_link_hacks.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/version/version.h"
@@ -1248,7 +1247,7 @@ TEST_P(AdsIntegrationTest, NodeMessage) {
     node = &delta_request.node();
   }
   envoy::config::core::v3::BuildVersion build_version_msg;
-  Config::VersionConverter::upgrade(node->user_agent_build_version(), build_version_msg);
+  build_version_msg.MergeFrom(node->user_agent_build_version());
   EXPECT_THAT(build_version_msg, ProtoEq(VersionInfo::buildVersion()));
   EXPECT_GE(node->extensions().size(), 0);
   EXPECT_EQ(0, node->client_features().size());

@@ -17,7 +17,7 @@
 namespace Envoy {
 namespace {
 
-class LoadStatsIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
+class LoadStatsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
   LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
@@ -105,16 +105,13 @@ public:
   }
 
   void initialize() override {
-    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
-      config_helper_.enableDeprecatedV2Api();
-    }
     setUpstreamCount(upstream_endpoints_);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Setup load reporting and corresponding gRPC cluster.
       auto* loadstats_config = bootstrap.mutable_cluster_manager()->mutable_load_stats_config();
       loadstats_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
       loadstats_config->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("load_report");
-      loadstats_config->set_transport_api_version(apiVersion());
+      loadstats_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       auto* load_report_cluster = bootstrap.mutable_static_resources()->add_clusters();
       load_report_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       load_report_cluster->mutable_circuit_breakers()->Clear();
@@ -288,10 +285,10 @@ public:
       mergeLoadStats(loadstats_request, local_loadstats_request);
 
       EXPECT_EQ("POST", loadstats_stream_->headers().getMethodValue());
-      EXPECT_EQ(
-          TestUtility::getVersionedMethodPath("envoy.service.load_stats.{}.LoadReportingService",
-                                              "StreamLoadStats", apiVersion()),
-          loadstats_stream_->headers().getPathValue());
+      EXPECT_EQ(TestUtility::getVersionedMethodPath(
+                    "envoy.service.load_stats.{}.LoadReportingService", "StreamLoadStats",
+                    envoy::config::core::v3::ApiVersion::V3),
+                loadstats_stream_->headers().getPathValue());
       EXPECT_EQ("application/grpc", loadstats_stream_->headers().getContentTypeValue());
       if (!bound.withinBound()) {
         return TestUtility::assertRepeatedPtrFieldEqual(expected_cluster_stats,
@@ -390,8 +387,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, LoadStatsIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Validate the load reports for successful requests as cluster membership
 // changes.

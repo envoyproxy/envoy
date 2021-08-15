@@ -59,10 +59,9 @@ using ::testing::SaveArg;
 
 using namespace std::chrono_literals;
 
-envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml,
-                                                                 bool avoid_boosting = true) {
+envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(yaml, bootstrap, true, avoid_boosting);
+  TestUtility::loadFromYaml(yaml, bootstrap);
   return bootstrap;
 }
 

@@ -21,7 +21,6 @@
 #include "source/common/common/thread.h"
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/opaque_resource_decoder_impl.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -601,34 +600,20 @@ public:
   static std::string nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges);
 
   // Strict variants of Protobuf::MessageUtil
-  static void loadFromJson(const std::string& json, Protobuf::Message& message,
-                           bool preserve_original_type = false, bool avoid_boosting = false) {
-    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor(),
-                              !avoid_boosting);
-    if (!preserve_original_type) {
-      Config::VersionConverter::eraseOriginalTypeInformation(message);
-    }
+  static void loadFromJson(const std::string& json, Protobuf::Message& message) {
+    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
   }
 
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
     MessageUtil::loadFromJson(json, message);
   }
 
-  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                           bool preserve_original_type = false, bool avoid_boosting = false) {
-    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor(),
-                              !avoid_boosting);
-    if (!preserve_original_type) {
-      Config::VersionConverter::eraseOriginalTypeInformation(message);
-    }
+  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
+    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
   }
 
-  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api,
-                           bool preserve_original_type = false) {
+  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
     MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(), api);
-    if (!preserve_original_type) {
-      Config::VersionConverter::eraseOriginalTypeInformation(message);
-    }
   }
 
   template <class MessageType>
@@ -637,14 +622,9 @@ public:
   }
 
   template <class MessageType>
-  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
-                                      bool preserve_original_type = false,
-                                      bool avoid_boosting = false) {
-    MessageUtil::loadFromYamlAndValidate(
-        yaml, message, ProtobufMessage::getStrictValidationVisitor(), avoid_boosting);
-    if (!preserve_original_type) {
-      Config::VersionConverter::eraseOriginalTypeInformation(message);
-    }
+  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
+    MessageUtil::loadFromYamlAndValidate(yaml, message,
+                                         ProtobufMessage::getStrictValidationVisitor());
   }
 
   template <class MessageType> static void validate(const MessageType& message) {

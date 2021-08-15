@@ -9,7 +9,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/api_version.h"
-#include "source/common/config/version_converter.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -441,9 +440,6 @@ protected:
   // By default the test server will use custom stats to notify on increment.
   // This override exists for tests measuring stats memory.
   bool use_real_stats_{};
-
-  // Use a v2 bootstrap.
-  bool v2_bootstrap_{false};
 
 private:
   // Configuration for the fake upstream.

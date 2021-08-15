@@ -53,7 +53,7 @@ using ::Envoy::Http::TestRequestHeaderMapImpl;
 envoy::config::route::v3::ScopedRouteConfiguration
 parseScopedRouteConfigurationFromYaml(const std::string& yaml) {
   envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config;
-  TestUtility::loadFromYaml(yaml, scoped_route_config, true);
+  TestUtility::loadFromYaml(yaml, scoped_route_config);
   return scoped_route_config;
 }
 
@@ -61,7 +61,7 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
 parseHttpConnectionManagerFromYaml(const std::string& config_yaml) {
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       http_connection_manager;
-  TestUtility::loadFromYaml(config_yaml, http_connection_manager, true);
+  TestUtility::loadFromYaml(config_yaml, http_connection_manager);
   return http_connection_manager;
 }
 
