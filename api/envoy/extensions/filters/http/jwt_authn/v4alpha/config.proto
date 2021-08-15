@@ -52,7 +52,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.jwt_authn.v3.JwtProvider";
@@ -224,6 +224,19 @@ message JwtProvider {
   // Enables JWT cache, its size is specified by *jwt_cache_size*.
   // Only valid JWT tokens are cached.
   JwtCacheConfig jwt_cache_config = 12;
+
+  // JWT is sent in a cookie. `from_cookies` represents the cookie names to extract from.
+  //
+  // For example, if config is:
+  //
+  // .. code-block:: yaml
+  //
+  //   from_cookies:
+  //   - auth-token
+  //
+  // Then JWT will be extracted from `auth-token` cookie in the request.
+  //
+  repeated string from_cookies = 13;
 }
 
 // This message specifies JWT Cache configuration.
