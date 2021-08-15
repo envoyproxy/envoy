@@ -554,17 +554,10 @@ private:
 
 /**
  * Specialized PrioritySetImpl designed for the main thread. It will update and maintain the read
- * only all host map when the host set changes.
+ * only cross priority host map when the host set changes.
  */
 class MainPrioritySetImpl : public PrioritySetImpl, public Logger::Loggable<Logger::Id::upstream> {
 public:
-  MainPrioritySetImpl() {
-    host_map_update_handle_ = addPriorityUpdateCb(
-        [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) {
-          updateMutableAllHostMap(hosts_added, hosts_removed);
-        });
-  }
-
   // PrioritySet
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
@@ -574,10 +567,9 @@ public:
   HostMapConstSharedPtr crossPriorityHostMap() const override;
 
 protected:
-  void updateMutableAllHostMap(const HostVector& hosts_added, const HostVector& hosts_removed);
+  void updateCrossPriorityHostMap(const HostVector& hosts_added, const HostVector& hosts_removed);
 
   mutable HostMapSharedPtr mutable_cross_priority_host_map_;
-  Common::CallbackHandlePtr host_map_update_handle_;
 };
 
 /**

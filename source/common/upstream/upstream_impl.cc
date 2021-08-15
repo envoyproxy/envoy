@@ -609,6 +609,8 @@ void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& upd
                                       HostMapConstSharedPtr cross_priority_host_map) {
   ASSERT(cross_priority_host_map == nullptr,
          "External cross-priority host map is meaningless to MainPrioritySetImpl");
+  updateCrossPriorityHostMap(hosts_added, hosts_removed);
+
   PrioritySetImpl::updateHosts(priority, std::move(update_hosts_params), locality_weights,
                                hosts_added, hosts_removed, overprovisioning_factor);
 }
@@ -622,8 +624,8 @@ HostMapConstSharedPtr MainPrioritySetImpl::crossPriorityHostMap() const {
   return const_cross_priority_host_map_;
 }
 
-void MainPrioritySetImpl::updateMutableAllHostMap(const HostVector& hosts_added,
-                                                  const HostVector& hosts_removed) {
+void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_added,
+                                                     const HostVector& hosts_removed) {
   if (hosts_added.empty() && hosts_removed.empty()) {
     // No new hosts have been added and no old hosts have been removed.
     return;
