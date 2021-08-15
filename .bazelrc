@@ -205,8 +205,8 @@ build:rbe-toolchain-gcc --host_platform=@envoy_build_tools//toolchains:rbe_linux
 build:rbe-toolchain-gcc --crosstool_top=@envoy_build_tools//toolchains/configs/linux/gcc/bazel_3.7.2/cc:toolchain
 build:rbe-toolchain-gcc --extra_toolchains=@envoy_build_tools//toolchains/configs/linux/gcc/bazel_3.7.2/config:cc-toolchain
 
-build:rbe-toolchain-msvc-cl --host_platform=envoy_build_tools//toolchains:rbe_windows_msvc_cl_platform
-build:rbe-toolchain-msvc-cl --platforms=envoy_build_tools//toolchains:rbe_windows_msvc_cl_platform
+build:rbe-toolchain-msvc-cl --host_platform=@envoy_build_tools//toolchains:rbe_windows_msvc_cl_platform
+build:rbe-toolchain-msvc-cl --platforms=@envoy_build_tools//toolchains:rbe_windows_msvc_cl_platform
 build:rbe-toolchain-msvc-cl --crosstool_top=@envoy_build_tools//toolchains/configs/windows/msvc-cl/bazel_3.7.2/cc:toolchain
 build:rbe-toolchain-msvc-cl --extra_toolchains=@envoy_build_tools//toolchains/configs/windows/msvc-cl/bazel_3.7.2/config:cc-toolchain
 
