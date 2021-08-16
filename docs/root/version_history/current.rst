@@ -51,6 +51,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+* access log: added critical endpoint to AccessLogService to guarantee log arrival.
 * http: added :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>` in the header matcher.
 * http: added support for :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>` for both upstream and downstream connections.
 

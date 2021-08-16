@@ -21,13 +21,38 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 service AccessLogService {
   // Envoy will connect and send StreamAccessLogsMessage messages forever. It does not expect any
   // response to be sent as nothing would be done in the case of failure. The server should
-  // disconnect if it expects Envoy to reconnect. In the future we may decide to add a different
-  // API for "critical" access logs in which Envoy will buffer access logs for some period of time
-  // until it gets an ACK so it could then retry. This API is designed for high throughput with the
+  // disconnect if it expects Envoy to reconnect. This API is designed for high throughput with the
   // expectation that it might be lossy.
   rpc StreamAccessLogs(stream StreamAccessLogsMessage) returns (StreamAccessLogsResponse) {
   }
 
+  // This endpoint will be the one that guarantees the arrival of logs with the state set by the user.
+  // The state of the log can be set in
+  // :ref:`buffer_log_filter <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.buffer_log_filter>`.
+  // Log messages that match this filter will be guaranteed to be reachable. In order to guarantee
+  // the arrival, this endpoint performs the following process.
+  //
+  // 1. A response message is returned for each log. The response message includes ACK/NACK status,
+  //    and in case of NACK, the target log is not flushed but buffered by Envoy. In case of NACK,
+  //    it will be buffered by Envoy without flushing the target log.
+  // 2. Timeout for response message is set and if no message is returned within a certain time,
+  //    it will be considered as unreachable and buffered by Envoy without flushing the target log. This timeout is set by
+  //    :ref:`message_ack_timeout <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.message_ack_timeout>`.
+  //
+  // On the ALS receiver side, ACK is expected to be returned to indicate that the log was saved properly,
+  // and NACK is expected to be returned when the log could not be saved due to some error.
+  //
+  // .. attention::
+  //
+  // Buffers for guaranteed reachability can be extremely memory-intensive. Therefore, the following points
+  // should be considered when using this endpoint.
+  //
+  // 1. :ref:`buffer_log_filter <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.buffer_log_filter>`
+  //    should be set strictly. A loose filter may encourage rapid buffer overwhelm and leading to OOM.
+  // 2. :ref:`pending_critical_buffer_size_bytes <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.pending_critical_buffer_size_bytes>`
+  //    should be set appropriately to prevent OOM.
+  // 3. Make sure that ALS receiver is implemented properly. If it is not implemented, all messages will
+  //    be buffered, which may cause OOM soon.
   rpc BufferedCriticalAccessLogs(stream BufferedCriticalAccessLogsMessage)
       returns (stream BufferedCriticalAccessLogsResponse) {
   }

@@ -90,16 +90,7 @@ message CommonGrpcAccessLogConfig {
 
   // Define the log condition as a filter to ensure that the destination is reached.
   // Logs that match the filter are not forwarded to the normal endpoint,
-  // but are sent to a special endpoint. This endpoint will return ACK/NACK as a response,
-  // and Envoy will perform buffering upon receiving a NACK. The buffered message is
-  // resend until it is reached. Failure to send here means that
-  //
-  // 1. when a NACK message corresponding to the message sent is received
-  // 2. when the ACK message corresponding to the sent message buffer could not be
-  //    received until the message_ack_timeout is reached.
-  //
-  // It is recommended to set a strict filter because setting a loose filter here may cause
-  // extreme pressure on the Envoy buffer in cases where the log aggregation cluster is repeatedly restarted.
+  // but are sent to a special endpoint. For more detail,
   config.accesslog.v3.AccessLogFilter buffer_log_filter = 7;
 
   // The time to wait for an ACK message. If no ACK message is returned after this time,
