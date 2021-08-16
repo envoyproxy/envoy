@@ -79,7 +79,7 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
     : ActiveRawUdpListener(worker_index, concurrency, parent, *listen_socket_ptr, listen_socket_ptr,
                            dispatcher, config) {}
 
-ActiveRawUdpListener:: ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
+ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                                            Network::UdpConnectionHandler& parent,
                                            Network::Socket& listen_socket,
                                            Network::SocketSharedPtr listen_socket_ptr,

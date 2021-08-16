@@ -603,7 +603,9 @@ public:
   }
 
   // StreamInfo::StreamInfo
-  const Network::ConnectionInfoProvider& downstreamAddressProvider() const override { return *this; }
+  const Network::ConnectionInfoProvider& downstreamAddressProvider() const override {
+    return *this;
+  }
 
   // Network::ConnectionInfoProvider
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
