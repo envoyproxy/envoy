@@ -592,7 +592,7 @@ envoy.stat_sinks.wasm:
 envoy.tls.cert_validator.spiffe:
   categories:
   - envoy.tls.cert_validator
-  security_posture: robust_to_untrusted_downstream_and_upstream
+  security_posture: requires_trusted_downstream_and_upstream
   status: alpha
 envoy.tracers.datadog:
   categories:
