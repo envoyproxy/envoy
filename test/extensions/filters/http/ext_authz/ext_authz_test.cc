@@ -46,6 +46,13 @@ namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
 
+
+class ExtAuthzFilterTest {
+public:
+
+  Http::FilterFactoryCb filter_factory_;
+};
+
 template <class T> class HttpFilterTestBase : public T {
 public:
   HttpFilterTestBase() : http_context_(stats_store_.symbolTable()) {}

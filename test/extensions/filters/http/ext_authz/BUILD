@@ -46,7 +46,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
     deps = [
+        "//source/common/grpc:async_client_manager_lib",
+        "//source/common/network:address_lib",
+        "//test/proto:helloworld_proto_cc_proto",
         "//source/extensions/filters/http/ext_authz:config",
+        "//source/common/thread_local:thread_local_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
