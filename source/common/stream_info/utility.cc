@@ -268,7 +268,7 @@ ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
   } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamProtocolError)) {
     return ProxyStatusError::HttpProtocolError;
   } else if (stream_info.hasResponseFlag(ResponseFlag::NoClusterFound)) {
-    return ProxyStatusError::DestinationIpUnroutable;
+    return ProxyStatusError::DestinationUnavailable;
   } else {
     return absl::nullopt;
   }
