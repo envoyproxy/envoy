@@ -69,15 +69,19 @@ protected:
   void SetUp() override {
     proxy_status_config_.set_remove_details(false);
     proxy_status_config_.set_proxy_name(HttpConnectionManager::ProxyStatusConfig::ENVOY_LITERAL);
+
+    ON_CALL(stream_info_, hasAnyResponseFlag()).WillByDefault(Return(true));
+    ON_CALL(stream_info_, hasResponseFlag(ResponseFlag::DelayInjected)).WillByDefault(Return(true));
   }
 
   HttpConnectionManager::ProxyStatusConfig proxy_status_config_;
   NiceMock<MockStreamInfo> stream_info_;
 };
 
-TEST_F(ProxyStatusTest, ToStringNoDetailsAvailable) {
+TEST_F(ProxyStatusTest, ToStringAbsentDetails) {
   proxy_status_config_.set_remove_details(false);
   proxy_status_config_.set_remove_connection_termination_details(false);
+  proxy_status_config_.set_remove_response_flags(false);
   stream_info_.response_code_details_ = absl::nullopt;
   stream_info_.connection_termination_details_ = absl::nullopt;
   EXPECT_THAT(ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
@@ -85,9 +89,10 @@ TEST_F(ProxyStatusTest, ToStringNoDetailsAvailable) {
               Not(HasSubstr("details=")));
 }
 
-TEST_F(ProxyStatusTest, ToStringSetRemoveDetailsTrue) {
+TEST_F(ProxyStatusTest, ToStringNoDetails) {
   proxy_status_config_.set_remove_details(true);
   proxy_status_config_.set_remove_connection_termination_details(false);
+  proxy_status_config_.set_remove_response_flags(false);
   stream_info_.response_code_details_ = "some_response_code_details";
   stream_info_.connection_termination_details_ = "some_connection_termination_details";
   EXPECT_THAT(ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
@@ -96,36 +101,68 @@ TEST_F(ProxyStatusTest, ToStringSetRemoveDetailsTrue) {
                     Not(HasSubstr("some_connection_termination_details"))));
 }
 
-TEST_F(ProxyStatusTest, ToStringWithDetailsAndConnectionTerminationDetails) {
+TEST_F(ProxyStatusTest, ToStringWithAllFields) {
   proxy_status_config_.set_remove_details(false);
   proxy_status_config_.set_remove_connection_termination_details(false);
+  proxy_status_config_.set_remove_response_flags(false);
   stream_info_.response_code_details_ = "some_response_code_details";
   stream_info_.connection_termination_details_ = "some_connection_termination_details";
   EXPECT_THAT(
       ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
                                  /*server_name=*/"UNUSED", proxy_status_config_),
-      HasSubstr("details='some_response_code_details; some_connection_termination_details'"));
+      HasSubstr("details='some_response_code_details; some_connection_termination_details; DI'"));
 }
 
-TEST_F(ProxyStatusTest, ToStringWithDetailsButNotConnectionTerminationDetails) {
+TEST_F(ProxyStatusTest, ToStringNoConnectionTerminationDetails) {
   proxy_status_config_.set_remove_details(false);
   proxy_status_config_.set_remove_connection_termination_details(true);
+  proxy_status_config_.set_remove_response_flags(false);
   stream_info_.response_code_details_ = "some_response_code_details";
   stream_info_.connection_termination_details_ = "some_connection_termination_details";
   EXPECT_THAT(ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
                                          /*server_name=*/"UNUSED", proxy_status_config_),
-              AllOf(HasSubstr("details='some_response_code_details'"),
+              AllOf(HasSubstr("details='some_response_code_details; DI'"),
                     Not(HasSubstr("some_connection_termination_details"))));
 }
 
-TEST_F(ProxyStatusTest, ToStringWithDetailsButConnectionTerminationDetailsAbsent) {
+TEST_F(ProxyStatusTest, ToStringAbsentConnectionTerminationDetails) {
   proxy_status_config_.set_remove_details(false);
   proxy_status_config_.set_remove_connection_termination_details(false); // Don't remove them,
+  proxy_status_config_.set_remove_response_flags(false);
   stream_info_.response_code_details_ = "some_response_code_details";
   stream_info_.connection_termination_details_ = absl::nullopt; // But they're absent,
-  EXPECT_THAT(ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
-                                         /*server_name=*/"UNUSED", proxy_status_config_),
-              HasSubstr("details='some_response_code_details'")); // So they shouldn't be printed.
+  EXPECT_THAT(
+      ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
+                                 /*server_name=*/"UNUSED", proxy_status_config_),
+      HasSubstr("details='some_response_code_details; DI'")); // So they shouldn't be printed.
+}
+
+TEST_F(ProxyStatusTest, ToStringNoResponseFlags) {
+  proxy_status_config_.set_remove_details(false);
+  proxy_status_config_.set_remove_connection_termination_details(false);
+  proxy_status_config_.set_remove_response_flags(true);
+  stream_info_.response_code_details_ = "some_response_code_details";
+  stream_info_.connection_termination_details_ = "some_connection_termination_details";
+  EXPECT_THAT(
+      ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
+                                 /*server_name=*/"UNUSED", proxy_status_config_),
+      AllOf(HasSubstr("details='some_response_code_details; some_connection_termination_details'"),
+            Not(HasSubstr("DI"))));
+}
+
+TEST_F(ProxyStatusTest, ToStringAbsentResponseFlags) {
+  proxy_status_config_.set_remove_details(false);
+  proxy_status_config_.set_remove_connection_termination_details(false);
+  proxy_status_config_.set_remove_response_flags(false);
+  stream_info_.response_code_details_ = "some_response_code_details";
+  stream_info_.connection_termination_details_ = "some_connection_termination_details";
+  ON_CALL(stream_info_, hasAnyResponseFlag()).WillByDefault(Return(false));
+  ON_CALL(stream_info_, hasResponseFlag(_)).WillByDefault(Return(false));
+  EXPECT_THAT(
+      ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
+                                 /*server_name=*/"UNUSED", proxy_status_config_),
+      AllOf(HasSubstr("details='some_response_code_details; some_connection_termination_details'"),
+            Not(HasSubstr("DI"))));
 }
 
 TEST_F(ProxyStatusTest, ToStringNoServerName) {

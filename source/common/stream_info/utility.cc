@@ -154,6 +154,9 @@ ProxyStatusUtils::toString(const StreamInfo& stream_info, const ProxyStatusError
         stream_info.connectionTerminationDetails().has_value()) {
       details.push_back(stream_info.connectionTerminationDetails().value());
     }
+    if (!proxy_status_config.remove_response_flags() && stream_info.hasAnyResponseFlag()) {
+      details.push_back(ResponseFlagUtils::toShortString(stream_info));
+    }
     retval.push_back(absl::StrFormat("details='%s'", absl::StrJoin(details, "; ")));
   }
 

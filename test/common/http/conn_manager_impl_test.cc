@@ -3740,7 +3740,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCodeAndServerNa
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
   EXPECT_EQ(altered_headers->getProxyStatusValue(),
-            "custom_server_name; error=destination_unavailable; details='foo'");
+            "custom_server_name; error=destination_unavailable; details='foo; LH'");
   // Changed from request, since set_recommended_response_code is true. Here,
   // 503 is the recommended response code for FailedLocalHealthCheck.
   EXPECT_EQ(altered_headers->getStatusValue(), "503");
@@ -3763,7 +3763,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
   EXPECT_EQ(altered_headers->getProxyStatusValue(),
-            "envoy; error=connection_timeout; details='bar'");
+            "envoy; error=connection_timeout; details='bar; UT'");
   // Changed from request, since set_recommended_response_code is true. Here,
   // 504 is the recommended response code for UpstreamRequestTimeout.
   EXPECT_EQ(altered_headers->getStatusValue(), "504");
@@ -3774,6 +3774,8 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
 TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
   proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
   proxy_status_config_->set_remove_details(false);
+  proxy_status_config_->set_remove_connection_termination_details(false);
+  proxy_status_config_->set_remove_response_flags(false);
   proxy_status_config_->set_set_recommended_response_code(false);
   proxy_status_config_->set_proxy_name(
       HttpConnectionManagerProto::ProxyStatusConfig::ENVOY_LITERAL);
@@ -3786,7 +3788,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
   EXPECT_EQ(altered_headers->getProxyStatusValue(),
-            "envoy; error=connection_timeout; details='bar'");
+            "envoy; error=connection_timeout; details='bar; UT'");
   // Unchanged from request, since set_recommended_response_code is false. Here,
   // 504 would be the recommended response code for UpstreamRequestTimeout,
   EXPECT_NE(altered_headers->getStatusValue(), "504");
@@ -3834,7 +3836,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
   ASSERT_TRUE(altered_headers->ProxyStatus());
   // Expect to see the appended previous value: "SomeCDN; envoy; ...".
   EXPECT_EQ(altered_headers->getProxyStatusValue(),
-            "SomeCDN, envoy; error=connection_timeout; details='baz'");
+            "SomeCDN, envoy; error=connection_timeout; details='baz; UT'");
 
   teardown();
 }
