@@ -50,9 +50,9 @@ private:
  * TODO(soulxu): Since there are more than address information inside the provider, this will be
  * renamed as ConnectionInfoProvider. Ref https://github.com/envoyproxy/envoy/issues/17168
  */
-class SocketAddressProvider {
+class ConnectionInfoProvider {
 public:
-  virtual ~SocketAddressProvider() = default;
+  virtual ~ConnectionInfoProvider() = default;
 
   /**
    * @return the local address of the socket.
@@ -87,7 +87,7 @@ public:
   virtual absl::optional<uint64_t> connectionID() const PURE;
 
   /**
-   * Dumps the state of the SocketAddressProvider to the given ostream.
+   * Dumps the state of the ConnectionInfoProvider to the given ostream.
    *
    * @param os the std::ostream to dump to.
    * @param indent_level the level of indentation.
@@ -101,7 +101,7 @@ public:
   virtual Ssl::ConnectionInfoConstSharedPtr sslConnection() const PURE;
 };
 
-class SocketAddressSetter : public SocketAddressProvider {
+class SocketAddressSetter : public ConnectionInfoProvider {
 public:
   /**
    * Set the local address of the socket. On accepted sockets the local address defaults to the
@@ -146,7 +146,7 @@ public:
 };
 
 using SocketAddressSetterSharedPtr = std::shared_ptr<SocketAddressSetter>;
-using SocketAddressProviderSharedPtr = std::shared_ptr<const SocketAddressProvider>;
+using ConnectionInfoProviderSharedPtr = std::shared_ptr<const ConnectionInfoProvider>;
 
 /**
  * Base class for Sockets
@@ -164,8 +164,8 @@ public:
    * @return the address provider backing this socket.
    */
   virtual SocketAddressSetter& addressProvider() PURE;
-  virtual const SocketAddressProvider& addressProvider() const PURE;
-  virtual SocketAddressProviderSharedPtr addressProviderSharedPtr() const PURE;
+  virtual const ConnectionInfoProvider& addressProvider() const PURE;
+  virtual ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const PURE;
 
   /**
    * @return IoHandle for the underlying connection

@@ -975,7 +975,7 @@ TEST_F(HappyEyeballsConnectionImplTest, AddressProvider) {
 TEST_F(HappyEyeballsConnectionImplTest, AddressProviderSharedPtr) {
   connectFirstAttempt();
 
-  SocketAddressProviderSharedPtr provider = std::make_shared<SocketAddressSetterImpl>(
+  ConnectionInfoProviderSharedPtr provider = std::make_shared<SocketAddressSetterImpl>(
       std::make_shared<Address::Ipv4Instance>("127.0.0.2"),
       std::make_shared<Address::Ipv4Instance>("127.0.0.1"));
   EXPECT_CALL(*created_connections_[0], addressProviderSharedPtr()).WillOnce(Return(provider));

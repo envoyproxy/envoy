@@ -585,11 +585,11 @@ public:
 /**
  * This class allows the remote address to be overridden for HTTP stream info. This is used for
  * XFF handling. This is required to avoid providing stream info with a non-const address provider.
- * Private inheritance from SocketAddressProvider is used to make sure users get the address
+ * Private inheritance from ConnectionInfoProvider is used to make sure users get the address
  * provider via the normal getter.
  */
 class OverridableRemoteSocketAddressSetterStreamInfo : public StreamInfo::StreamInfoImpl,
-                                                       private Network::SocketAddressProvider {
+                                                       private Network::ConnectionInfoProvider {
 public:
   using StreamInfoImpl::StreamInfoImpl;
 
@@ -603,9 +603,9 @@ public:
   }
 
   // StreamInfo::StreamInfo
-  const Network::SocketAddressProvider& downstreamAddressProvider() const override { return *this; }
+  const Network::ConnectionInfoProvider& downstreamAddressProvider() const override { return *this; }
 
-  // Network::SocketAddressProvider
+  // Network::ConnectionInfoProvider
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return StreamInfoImpl::downstreamAddressProvider().localAddress();
   }
