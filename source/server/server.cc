@@ -74,10 +74,10 @@ InstanceImpl::InstanceImpl(
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       random_generator_(std::move(random_generator)),
-      api_(new Api::Impl(thread_factory, store, time_system, file_system, *random_generator_,
-                         process_context ? ProcessContextOptRef(std::ref(*process_context))
-                                         : absl::nullopt,
-                         watermark_factory)),
+      api_(new Api::Impl(
+          thread_factory, store, time_system, file_system, *random_generator_, bootstrap_,
+          process_context ? ProcessContextOptRef(std::ref(*process_context)) : absl::nullopt,
+          watermark_factory)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),

@@ -1,6 +1,5 @@
 #include <memory>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -15,7 +14,6 @@
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/config/v2_link_hacks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -61,7 +59,7 @@ public:
     grpc_mux_ = std::make_unique<GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
+            "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
         envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_, true);
   }
 
@@ -69,7 +67,7 @@ public:
     grpc_mux_ = std::make_unique<GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
+            "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
         envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, custom_rate_limit_settings,
         true);
   }
@@ -79,9 +77,9 @@ public:
                          bool first = false, const std::string& nonce = "",
                          const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
                          const std::string& error_message = "") {
-    API_NO_BOOST(envoy::api::v2::DiscoveryRequest) expected_request;
+    API_NO_BOOST(envoy::service::discovery::v3::DiscoveryRequest) expected_request;
     if (first) {
-      expected_request.mutable_node()->CopyFrom(API_DOWNGRADE(local_info_.node()));
+      expected_request.mutable_node()->CopyFrom(local_info_.node());
     }
     for (const auto& resource : resource_names) {
       expected_request.add_resource_names(resource);
@@ -884,7 +882,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
       GrpcMuxImpl(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
+              "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
           envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_, true),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
@@ -897,7 +895,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
       GrpcMuxImpl(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
+              "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
           envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_, true),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
