@@ -66,7 +66,7 @@ TEST(UtilityTest, formatDownstreamAddressNoPort) {
 
 class ProxyStatusTest : public ::testing::Test {
 protected:
-  void SetUp() {
+  void SetUp() override {
     proxy_status_config_.set_remove_details(false);
     proxy_status_config_.set_proxy_name(HttpConnectionManager::ProxyStatusConfig::ENVOY_LITERAL);
   }
