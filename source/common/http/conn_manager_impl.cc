@@ -1479,7 +1479,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
       headers.appendProxyStatus(StreamInfo::ProxyStatusUtils::toString(
                                     filter_manager_.streamInfo(), *proxy_status,
                                     connection_manager_.config_.serverName(), *proxy_status_config),
-                                "; ");
+                                ", ");
       // Apply the recommended response code, if configured and applicable.
       if (proxy_status_config->set_recommended_response_code()) {
         if (absl::optional<uint32_t> response_code =

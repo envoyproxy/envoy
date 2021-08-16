@@ -3834,7 +3834,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
   ASSERT_TRUE(altered_headers->ProxyStatus());
   // Expect to see the appended previous value: "SomeCDN; envoy; ...".
   EXPECT_EQ(altered_headers->getProxyStatusValue(),
-            "SomeCDN; envoy; error=connection_timeout; details='baz'");
+            "SomeCDN, envoy; error=connection_timeout; details='baz'");
 
   teardown();
 }
