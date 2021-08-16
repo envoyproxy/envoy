@@ -278,7 +278,7 @@ TEST_F(ExtractorTest, TestCustomParamToken) {
 TEST_F(ExtractorTest, TestCookieToken) {
   auto headers = TestRequestHeaderMapImpl{
       {"cookie", "token-cookie=token-cookie-value; token-cookie-2=token-cookie-value-2"},
-      {"cookie", "token-cookie-3=token-cookie-value-3"}};
+      {"cookie", "token-cookie-3=\"token-cookie-value-3\""}};
   auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 3);
 
