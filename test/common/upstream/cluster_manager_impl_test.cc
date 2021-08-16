@@ -3487,10 +3487,6 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedUnregisteredNoConf
 // Test that when typed_dns_resolver_config is configured but with none DNS resolver type,
 // "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 // the default behavior is enforced: i.e, if dns_resolution_config is in place, use it.
-//
-// Note, that if @type is bogus, like type.googleapis.com/Foo. The parseBootstrapFromV3Yaml(yaml)
-// will throw out an exception since it doens't recognize this type, and abort the test.
-// This bogus @type case is not tested.
 
 TEST_F(ClusterManagerImplTest,
        TypedDnsResolverConfigSpecifiedNonResolverDnsResolutionConfigInPlace) {

@@ -12,23 +12,18 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: apple DNS resolver configuration]
 
 // Configuration for apple DNS resolver
-// For Envoy running on Apple system, to use apple DNS library as DNS resolver, the following need to be done:
-// 1) In file: source/extensions/extensions_build_config.bzl, enable Apple DNS extension by adding below line
+// For Envoy built in MacOS to use apple DNS library as DNS resolver, the following need to be done:
+// 1) In file: :repo:`extensions_build_config.bzl <source/extensions/extensions_build_config.bzl>`,
+// enable apple DNS resolver extension by adding below line
 //      "envoy.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:config",
-// 2) In Envoy running configuration file, add apple DNS as a typed extension in *typed_dns_resolver_config* field.
-// For example, to add such configuration in bootstrap
+// 2) In corresponding Envoy configuration, for example:
+//    :repo:'bootstrap.proto <api/envoy/config/bootstrap/v3/bootstrap.proto>`,
+// add apple DNS resolver as a typed extension in field:
 //    :ref:'typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>'
-// Here is the configuration:
-//      typed_dns_resolver_config:
-//        name: envoy.dns_resolver.apple
-//        typed_config:
-//          "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig
 //
-// Such configuration can be added in other configurations, like dynamic_forward_proxy, cluster...
-// 3) If such Apple *typed_dns_resolver_config* does not exist, but the run time flag:
-// ``envoy.restart_features.use_apple_api_for_dns_lookups`` is enabled, Envoy will use Apple DNS library as DNS
-// resolver as well.
-// 4) If neither of the above is configured, Envoy may use cares DNS library as DNS resolver.
-
+// typed_dns_resolver_config:
+//   name: envoy.dns_resolver.apple
+//   typed_config:
+//     "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig
 message AppleDnsResolverConfig {
 }

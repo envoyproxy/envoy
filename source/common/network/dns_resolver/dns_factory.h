@@ -56,18 +56,6 @@ public:
 // 3.5) For ClusterConfig, one extra thing is to copy dns_resolvers into
 //      CaresDnsResolverConfig.resolvers,
 // 3.6) Then pack CaresDnsResolverConfig into typed_dns_resolver_config.
-//
-// Note, to make cares DNS library to work, In file:
-//      source/extensions/extensions_build_config.bzl, cares DNS extension need to be enabled:
-//      "envoy.dns_resolver.cares": "//source/extensions/network/dns_resolver/cares:config",
-
-// For Envoy running on Apple system, to use apple DNS library as DNS resolver, In file:
-//      source/extensions/extensions_build_config.bzl, Apple DNS extension need to be enabled:
-//      "envoy.dns_resolver.apple": "//source/extensions/network/dns_resolver/apple:config",
-//
-// To implement other new DNS library, one should implement the corresponding factory as another
-//     extension, enable the extension in the extensions_build_config.bzl file, and configure the
-//     typed_dns_resolver_config with the corresponding DNS resolver type.
 
 template <class T>
 void makeDnsResolverConfig(
@@ -84,12 +72,11 @@ void makeDnsResolverConfig(
       return;
     }
   }
-  // Otherwise, fall back to default behavior:
+
   // If Envoy is built in MacOS and "envoy.dns_resolver.apple" extension is enabled in build file,
-  // apple DNS resolver factory will be registered. If and only if in this case, also the run time
-  // flag envoy.restart_features.use_apple_api_for_dns_lookups is enabled, the default DNS behavior
-  // is to use Apple DNS library. To achieve this,
-  // Crafting a AppleDnsResolverConfig object and pack into typed_dns_resolver_config.
+  // and  the run time flag envoy.restart_features.use_apple_api_for_dns_lookups is enabled,
+  // in this case, use Apple DNS library. To achieve this, Crafting a AppleDnsResolverConfig
+  // object and pack into typed_dns_resolver_config.
   if (Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(apple_dns_resolver,
                                                                              true)) {
     static bool use_apple_api_for_dns_lookups =
@@ -102,7 +89,7 @@ void makeDnsResolverConfig(
       return;
     }
   }
-  // Default behavior for non-Apple case
+  // Otherwise, fall back to default behavior.
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   if (config.has_dns_resolution_config()) {
     // Copy resolvers if config has it.

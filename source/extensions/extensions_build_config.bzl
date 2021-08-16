@@ -299,7 +299,7 @@ EXTENSIONS = {
     #
     # DNS Resolver
     #
-    
+
     # cares DNS resolver extension is recommended to be enabled here to maintain the legacy DNS resolving behavior.
     # It should only be disabled if one knows how to add another DNS library as extension, and knows how to
     # configure Envoy to use that extension, and do not want to inluce cares in the build.
