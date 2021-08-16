@@ -153,9 +153,16 @@ public:
    * @return result timeout value from header. It will return nullopt if parse failed.
    */
   static absl::optional<std::chrono::milliseconds>
-  tryParseHeaderTimeout(const Http::HeaderEntry* header_timeout_entry);
+  tryParseHeaderTimeout(const Http::HeaderEntry& header_timeout_entry);
 
-  static bool trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_entry,
+  /**
+   * Try to set global timeout.
+   *
+   * @param header_timeout_entry header entry which may contain a timeout value.
+   * @param timeout timeout data to set from header timeout entry.
+   * @return whether set timeout from header was succeeded or not.
+   */
+  static bool trySetGlobalTimeout(const Http::HeaderEntry& header_timeout_entry,
                                   TimeoutData& timeout);
 
   /**

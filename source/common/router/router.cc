@@ -171,13 +171,13 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
     const Http::HeaderEntry* header_expected_timeout_entry =
         request_headers.EnvoyExpectedRequestTimeoutMs();
     if (header_expected_timeout_entry) {
-      trySetGlobalTimeout(header_expected_timeout_entry, timeout);
+      trySetGlobalTimeout(*header_expected_timeout_entry, timeout);
     } else {
       const Http::HeaderEntry* header_timeout_entry =
           request_headers.EnvoyUpstreamRequestTimeoutMs();
 
       if (header_timeout_entry) {
-        trySetGlobalTimeout(header_timeout_entry, timeout);
+        trySetGlobalTimeout(*header_timeout_entry, timeout);
         request_headers.removeEnvoyUpstreamRequestTimeoutMs();
       }
     }
@@ -185,7 +185,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
     const Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
 
     if (header_timeout_entry) {
-      trySetGlobalTimeout(header_timeout_entry, timeout);
+      trySetGlobalTimeout(*header_timeout_entry, timeout);
       request_headers.removeEnvoyUpstreamRequestTimeoutMs();
     }
   }
@@ -230,17 +230,15 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
 }
 
 absl::optional<std::chrono::milliseconds>
-FilterUtility::tryParseHeaderTimeout(const Http::HeaderEntry* header_timeout_entry) {
-  if (header_timeout_entry) {
-    uint64_t header_timeout;
-    if (absl::SimpleAtoi(header_timeout_entry->value().getStringView(), &header_timeout)) {
-      return std::chrono::milliseconds(header_timeout);
-    }
+FilterUtility::tryParseHeaderTimeout(const Http::HeaderEntry& header_timeout_entry) {
+  uint64_t header_timeout;
+  if (absl::SimpleAtoi(header_timeout_entry.value().getStringView(), &header_timeout)) {
+    return std::chrono::milliseconds(header_timeout);
   }
   return absl::nullopt;
 }
 
-bool FilterUtility::trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_entry,
+bool FilterUtility::trySetGlobalTimeout(const Http::HeaderEntry& header_timeout_entry,
                                         TimeoutData& timeout) {
   const auto timeout_ms = tryParseHeaderTimeout(header_timeout_entry);
   if (timeout_ms.has_value()) {
@@ -595,7 +593,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       headers.EnvoyUpstreamStreamDurationMs();
   if (header_max_stream_duration_entry) {
     dynamic_max_stream_duration_ =
-        FilterUtility::tryParseHeaderTimeout(header_max_stream_duration_entry);
+        FilterUtility::tryParseHeaderTimeout(*header_max_stream_duration_entry);
     headers.removeEnvoyUpstreamStreamDurationMs();
   }
 

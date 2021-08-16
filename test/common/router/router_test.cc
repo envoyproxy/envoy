@@ -3737,7 +3737,7 @@ TEST_F(RouterTest, MaxStreamDurationValidlyConfiguredWithoutRetryPolicy) {
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
-  expectMaxStreamDurationTimerCreate();
+  expectMaxStreamDurationTimerCreate(std::chrono::milliseconds(500));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -3786,7 +3786,7 @@ TEST_F(RouterTest, MaxStreamDurationCallbackNotCalled) {
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
-  expectMaxStreamDurationTimerCreate();
+  expectMaxStreamDurationTimerCreate(std::chrono::milliseconds(5000));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -3809,7 +3809,7 @@ TEST_F(RouterTest, MaxStreamDurationWhenDownstreamAlreadyStartedWithoutRetryPoli
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
-  expectMaxStreamDurationTimerCreate();
+  expectMaxStreamDurationTimerCreate(std::chrono::milliseconds(500));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -3837,7 +3837,7 @@ TEST_F(RouterTest, MaxStreamDurationWithRetryPolicy) {
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
-  expectMaxStreamDurationTimerCreate();
+  expectMaxStreamDurationTimerCreate(std::chrono::milliseconds(500));
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "reset"},
                                          {"x-envoy-internal", "true"}};
@@ -3859,7 +3859,7 @@ TEST_F(RouterTest, MaxStreamDurationWithRetryPolicy) {
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
-  expectMaxStreamDurationTimerCreate();
+  expectMaxStreamDurationTimerCreate(std::chrono::milliseconds(500));
   router_.retry_state_->callback_();
 
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
@@ -6071,7 +6071,7 @@ TEST_F(RouterTest, SetDynamicMaxStreamDuration) {
                               upstream_stream_info_, Http::Protocol::Http10);
         return nullptr;
       }));
-  expectMaxStreamDurationTimerCreate();
+  expectMaxStreamDurationTimerCreate(std::chrono::milliseconds(500));
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-stream-duration-ms", "500"}};
 
