@@ -155,7 +155,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
     _com_googlesource_chromium_v8()
-    _com_googlesource_quiche()
+    _com_github_google_quiche()
     _com_googlesource_googleurl()
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
@@ -738,31 +738,31 @@ def _com_googlesource_chromium_v8():
         actual = "@com_googlesource_chromium_v8//:wee8",
     )
 
-def _com_googlesource_quiche():
+def _com_github_google_quiche():
     external_genrule_repository(
-        name = "com_googlesource_quiche",
+        name = "com_github_google_quiche",
         genrule_cmd_file = "@envoy//bazel/external:quiche.genrule_cmd",
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
     native.bind(
         name = "quiche_common_platform",
-        actual = "@com_googlesource_quiche//:quiche_common_platform",
+        actual = "@com_github_google_quiche//:quiche_common_platform",
     )
     native.bind(
         name = "quiche_http2_platform",
-        actual = "@com_googlesource_quiche//:http2_platform",
+        actual = "@com_github_google_quiche//:http2_platform",
     )
     native.bind(
         name = "quiche_spdy_platform",
-        actual = "@com_googlesource_quiche//:spdy_platform",
+        actual = "@com_github_google_quiche//:spdy_platform",
     )
     native.bind(
         name = "quiche_quic_platform",
-        actual = "@com_googlesource_quiche//:quic_platform",
+        actual = "@com_github_google_quiche//:quic_platform",
     )
     native.bind(
         name = "quiche_quic_platform_base",
-        actual = "@com_googlesource_quiche//:quic_platform_base",
+        actual = "@com_github_google_quiche//:quic_platform_base",
     )
 
 def _com_googlesource_googleurl():

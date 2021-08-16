@@ -804,7 +804,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-06-25",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
-    com_googlesource_quiche = dict(
+    com_github_google_quiche = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://quiche.googlesource.com/quiche",
