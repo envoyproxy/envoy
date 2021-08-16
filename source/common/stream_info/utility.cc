@@ -129,29 +129,35 @@ ProxyStatusUtils::toString(const StreamInfo& stream_info, const ProxyStatusError
                            absl::string_view server_name,
                            const envoy::extensions::filters::network::http_connection_manager::v3::
                                HttpConnectionManager::ProxyStatusConfig& proxy_status_config) {
-  std::string retval = "";
+  std::vector<std::string> retval = {};
 
   switch (proxy_status_config.proxy_name()) {
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       ProxyStatusConfig::SERVER_NAME: {
-    retval.append(std::string(server_name));
+    retval.push_back(std::string(server_name));
     break;
   }
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       ProxyStatusConfig::ENVOY_LITERAL:
   default: {
-    retval.append(Envoy::Http::DefaultServerString::get());
+    retval.push_back(Envoy::Http::DefaultServerString::get());
     break;
   }
   }
 
-  retval.append(absl::StrFormat("; error=%s", proxyStatusErrorToString(error)));
+  retval.push_back(absl::StrFormat("error=%s", proxyStatusErrorToString(error)));
 
   if (!proxy_status_config.remove_details() && stream_info.responseCodeDetails().has_value()) {
-    retval.append(absl::StrFormat("; details='%s'", stream_info.responseCodeDetails().value()));
+    std::vector<std::string> details = {};
+    details.push_back(stream_info.responseCodeDetails().value());
+    if (!proxy_status_config.remove_connection_termination_details() &&
+        stream_info.connectionTerminationDetails().has_value()) {
+      details.push_back(stream_info.connectionTerminationDetails().value());
+    }
+    retval.push_back(absl::StrFormat("details='%s'", absl::StrJoin(details, "; ")));
   }
 
-  return retval;
+  return absl::StrJoin(retval, "; ");
 }
 
 const absl::string_view

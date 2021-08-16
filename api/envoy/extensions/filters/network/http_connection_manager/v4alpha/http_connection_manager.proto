@@ -332,16 +332,21 @@ message HttpConnectionManager {
     // This value defaults to `false`, i.e. the `details` field is populated by default.
     bool remove_details = 1;
 
+    // If true, the details field of the Proxy-Status header will not contain
+    // connection termination details. This value defaults to `false`, i.e. the
+    // `details` field will contain connection termination details by default.
+    bool remove_connection_termination_details = 2;
+
     // If true, overwrites the existing Status header with the response code
     // recommended by the Proxy-Status spec.
     // This value defaults to `false`, i.e. the HTTP response code is not
     // overwritten.
-    bool set_recommended_response_code = 2;
+    bool set_recommended_response_code = 3;
 
     // The name of the proxy as it appears at the start of the Proxy-Status
     // header.
     // This value defaults to ENVOY_LITERAL, i.e. `envoy`.
-    ProxyName proxy_name = 3;
+    ProxyName proxy_name = 4;
   }
 
   reserved 27, 11;
