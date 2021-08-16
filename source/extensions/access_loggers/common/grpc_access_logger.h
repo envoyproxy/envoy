@@ -143,6 +143,8 @@ public:
       return opt;
     }
 
+    // TODO(shikugawa): refactor conversion from route retry policy to core retry policy.
+    // This conversion is duplicated with jwks_fetcher.cc.
     envoy::config::route::v3::RetryPolicy retry_policy;
     retry_policy.mutable_num_retries()->set_value(
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(*grpc_stream_retry_policy_, num_retries, 1));
