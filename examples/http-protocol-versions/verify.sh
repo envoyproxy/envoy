@@ -36,6 +36,6 @@ for path in "${path_list[@]}"; do
     run_log "Check HTTP3 -> $path"
     # SNI parameter needs to be set explicitly because when hostname is localhost
     # crypto handshake fails because it could not figure out the value for SNI parameter
-    docker run -it --name h3client --rm --network=host h3client:test /root/h3client \
-        --sni "test.proxy" --address "https://localhost:10002/${path}" 2>&1
+    docker run --name h3client --rm --network=host h3client:test /root/h3client \
+        --sni "test.proxy" --address "https://localhost:10002/${path}" 2>&1 | grep "SUCCESS"
 done
