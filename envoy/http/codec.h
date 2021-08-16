@@ -11,6 +11,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
+#include "envoy/http/stream_reset_handler.h"
 #include "envoy/network/address.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -264,32 +265,6 @@ public:
 };
 
 /**
- * Stream reset reasons.
- */
-enum class StreamResetReason {
-  // If a local codec level reset was sent on the stream.
-  LocalReset,
-  // If a local codec level refused stream reset was sent on the stream (allowing for retry).
-  LocalRefusedStreamReset,
-  // If a remote codec level reset was received on the stream.
-  RemoteReset,
-  // If a remote codec level refused stream reset was received on the stream (allowing for retry).
-  RemoteRefusedStreamReset,
-  // If the stream was locally reset by a connection pool due to an initial connection failure.
-  ConnectionFailure,
-  // If the stream was locally reset due to connection termination.
-  ConnectionTermination,
-  // The stream was reset because of a resource overflow.
-  Overflow,
-  // Either there was an early TCP error for a CONNECT request or the peer reset with CONNECT_ERROR
-  ConnectError,
-  // Received payload did not conform to HTTP protocol.
-  ProtocolError,
-  // If the stream was locally reset by the Overload Manager.
-  OverloadManager
-};
-
-/**
  * Callbacks that fire against a stream.
  */
 class StreamCallbacks {
@@ -319,10 +294,8 @@ public:
 /**
  * An HTTP stream (request, response, and push).
  */
-class Stream {
+class Stream : public StreamResetHandler {
 public:
-  virtual ~Stream() = default;
-
   /**
    * Add stream callbacks.
    * @param callbacks supplies the callbacks to fire on stream events.
@@ -334,12 +307,6 @@ public:
    * @param callbacks supplies the callbacks to remove.
    */
   virtual void removeCallbacks(StreamCallbacks& callbacks) PURE;
-
-  /**
-   * Reset the stream. No events will fire beyond this point.
-   * @param reason supplies the reset reason.
-   */
-  virtual void resetStream(StreamResetReason reason) PURE;
 
   /**
    * Enable/disable further data from this stream.

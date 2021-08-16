@@ -485,6 +485,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
+    getStreamInfo().setAttemptCount(connect_attempts_);
     generic_conn_pool_->newStream(*this);
     // Because we never return open connections to the pool, this either has a handle waiting on
     // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.

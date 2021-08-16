@@ -220,7 +220,7 @@ TEST_F(HttpConnManFinalizerImplTest, NullRequestHeadersAndNullRouteEntry) {
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, upstreamHost()).WillRepeatedly(Return(nullptr));
-  EXPECT_CALL(stream_info, routeEntry()).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(Return(nullptr));
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
@@ -396,9 +396,9 @@ ree:
   emp: "")EOF";
   TestUtility::loadFromYaml(yaml, fake_struct);
   (*stream_info.metadata_.mutable_filter_metadata())["m.req"].MergeFrom(fake_struct);
-  NiceMock<Router::MockRouteEntry> route_entry;
-  EXPECT_CALL(stream_info, routeEntry()).WillRepeatedly(Return(&route_entry));
-  (*route_entry.metadata_.mutable_filter_metadata())["m.rot"].MergeFrom(fake_struct);
+  std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(Return(route));
+  (*route->metadata_.mutable_filter_metadata())["m.rot"].MergeFrom(fake_struct);
   std::shared_ptr<envoy::config::core::v3::Metadata> host_metadata =
       std::make_shared<envoy::config::core::v3::Metadata>();
   (*host_metadata->mutable_filter_metadata())["m.host"].MergeFrom(fake_struct);

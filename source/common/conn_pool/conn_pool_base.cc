@@ -171,32 +171,32 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
     onPoolFailure(client.real_host_description_, absl::string_view(),
                   ConnectionPool::PoolFailureReason::Overflow, context);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
-  } else {
-    ENVOY_CONN_LOG(debug, "creating stream", client);
-
-    client.remaining_streams_--;
-    if (client.remaining_streams_ == 0) {
-      ENVOY_CONN_LOG(debug, "maximum streams per connection, DRAINING", client);
-      host_->cluster().stats().upstream_cx_max_requests_.inc();
-      transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::DRAINING);
-    } else if (client.numActiveStreams() + 1 >= client.concurrent_stream_limit_) {
-      // As soon as the new stream is created, the client will be maxed out.
-      transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::BUSY);
-    }
-
-    // Decrement the capacity, as there's one less stream available for serving.
-    state_.decrConnectingAndConnectedStreamCapacity(1);
-    // Track the new active stream.
-    state_.incrActiveStreams(1);
-    num_active_streams_++;
-    host_->stats().rq_total_.inc();
-    host_->stats().rq_active_.inc();
-    host_->cluster().stats().upstream_rq_total_.inc();
-    host_->cluster().stats().upstream_rq_active_.inc();
-    host_->cluster().resourceManager(priority_).requests().inc();
-
-    onPoolReady(client, context);
+    return;
   }
+  ENVOY_CONN_LOG(debug, "creating stream", client);
+
+  client.remaining_streams_--;
+  if (client.remaining_streams_ == 0) {
+    ENVOY_CONN_LOG(debug, "maximum streams per connection, DRAINING", client);
+    host_->cluster().stats().upstream_cx_max_requests_.inc();
+    transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::DRAINING);
+  } else if (client.numActiveStreams() + 1 >= client.concurrent_stream_limit_) {
+    // As soon as the new stream is created, the client will be maxed out.
+    transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::BUSY);
+  }
+
+  // Decrement the capacity, as there's one less stream available for serving.
+  state_.decrConnectingAndConnectedStreamCapacity(1);
+  // Track the new active stream.
+  state_.incrActiveStreams(1);
+  num_active_streams_++;
+  host_->stats().rq_total_.inc();
+  host_->stats().rq_active_.inc();
+  host_->cluster().stats().upstream_rq_total_.inc();
+  host_->cluster().stats().upstream_rq_active_.inc();
+  host_->cluster().resourceManager(priority_).requests().inc();
+
+  onPoolReady(client, context);
 }
 
 void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& client,
@@ -242,39 +242,39 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
     return nullptr;
   }
 
-  if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
-    ConnectionPool::Cancellable* pending = newPendingStream(context);
-    ENVOY_LOG(debug, "trying to create new connection");
-    ENVOY_LOG(trace, fmt::format("{}", *this));
-
-    auto old_capacity = connecting_stream_capacity_;
-    // This must come after newPendingStream() because this function uses the
-    // length of pending_streams_ to determine if a new connection is needed.
-    const ConnectionResult result = tryCreateNewConnections();
-    // If there is not enough connecting capacity, the only reason to not
-    // increase capacity is if the connection limits are exceeded.
-    ENVOY_BUG(pending_streams_.size() <= connecting_stream_capacity_ ||
-                  connecting_stream_capacity_ > old_capacity ||
-                  (result == ConnectionResult::NoConnectionRateLimited ||
-                   result == ConnectionResult::FailedToCreateConnection),
-              fmt::format("Failed to create expected connection: {}", *this));
-    if (result == ConnectionResult::FailedToCreateConnection) {
-      // This currently only happens for HTTP/3 if secrets aren't yet loaded.
-      // Trigger connection failure.
-      pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
-      onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::Overflow,
-                    context);
-      return nullptr;
-    } else {
-      return pending;
-    }
-  } else {
+  if (!host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
     ENVOY_LOG(debug, "max pending streams overflow");
     onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::Overflow,
                   context);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
     return nullptr;
   }
+
+  ConnectionPool::Cancellable* pending = newPendingStream(context);
+  ENVOY_LOG(debug, "trying to create new connection");
+  ENVOY_LOG(trace, fmt::format("{}", *this));
+
+  auto old_capacity = connecting_stream_capacity_;
+  // This must come after newPendingStream() because this function uses the
+  // length of pending_streams_ to determine if a new connection is needed.
+  const ConnectionResult result = tryCreateNewConnections();
+  // If there is not enough connecting capacity, the only reason to not
+  // increase capacity is if the connection limits are exceeded.
+  ENVOY_BUG(pending_streams_.size() <= connecting_stream_capacity_ ||
+                connecting_stream_capacity_ > old_capacity ||
+                (result == ConnectionResult::NoConnectionRateLimited ||
+                 result == ConnectionResult::FailedToCreateConnection),
+            fmt::format("Failed to create expected connection: {}", *this));
+  if (result == ConnectionResult::FailedToCreateConnection) {
+    // This currently only happens for HTTP/3 if secrets aren't yet loaded.
+    // Trigger connection failure.
+    pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+    onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::Overflow,
+                  context);
+    return nullptr;
+  }
+
+  return pending;
 }
 
 bool ConnPoolImplBase::maybePreconnect(float global_preconnect_ratio) {

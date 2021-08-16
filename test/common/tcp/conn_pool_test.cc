@@ -57,7 +57,7 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
     conn_data_ = std::move(conn);
     conn_data_->addUpstreamCallbacks(callbacks_);
     host_ = host;
-    ssl_ = conn_data_->connection().streamInfo().downstreamSslConnection();
+    ssl_ = conn_data_->connection().streamInfo().downstreamAddressProvider().sslConnection();
     pool_ready_.ready();
   }
 
@@ -327,7 +327,7 @@ public:
     EXPECT_CALL(*connection_, connect());
     EXPECT_CALL(*connection_, setConnectionStats(_));
     EXPECT_CALL(*connection_, noDelay(true));
-    EXPECT_CALL(*connection_, streamInfo()).Times(3);
+    EXPECT_CALL(*connection_, streamInfo());
     EXPECT_CALL(*connection_, id()).Times(AnyNumber());
     EXPECT_CALL(*connection_, readDisable(_)).Times(AnyNumber());
 
@@ -341,10 +341,8 @@ public:
 
     EXPECT_CALL(*connect_timer_, disableTimer());
     EXPECT_CALL(callbacks_->pool_ready_, ready());
-    EXPECT_CALL(*connection_, ssl()).WillOnce(Return(ssl_));
     connection_->raiseEvent(Network::ConnectionEvent::Connected);
-    EXPECT_EQ(connection_->streamInfo().downstreamSslConnection(), ssl_);
-    EXPECT_EQ(callbacks_->ssl_, ssl_);
+    connection_->stream_info_.downstream_address_provider_->setSslConnection(ssl_);
   }
 
   bool test_new_connection_pool_;

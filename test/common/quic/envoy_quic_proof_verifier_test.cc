@@ -149,8 +149,6 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureLeafCertWithGarbage) {
 
 TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidHost) {
   configCertVerificationDetails(true);
-  std::unique_ptr<quic::CertificateView> cert_view =
-      quic::CertificateView::ParseSingleCertificate(leaf_cert_);
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
@@ -161,47 +159,8 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidHost) {
   EXPECT_EQ("Leaf certificate doesn't match hostname: unknown.org", error_details);
 }
 
-TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureEmptyCertChain) {
+TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureUnsupportedECKey) {
   configCertVerificationDetails(true);
-  std::unique_ptr<quic::CertificateView> cert_view =
-      quic::CertificateView::ParseSingleCertificate(leaf_cert_);
-  quic::QuicTransportVersion version{quic::QUIC_VERSION_UNSUPPORTED};
-  absl::string_view chlo_hash{"aaaaa"};
-  std::string server_config{"Server Config"};
-  const std::string ocsp_response;
-  const std::string cert_sct;
-  std::string error_details;
-  const std::vector<std::string> certs;
-  EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyProof(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
-                                   server_config, version, chlo_hash, certs, cert_sct, "signature",
-                                   nullptr, &error_details, nullptr, nullptr));
-  EXPECT_EQ("Received empty cert chain.", error_details);
-}
-
-TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureInvalidLeafCert) {
-  configCertVerificationDetails(true);
-  std::unique_ptr<quic::CertificateView> cert_view =
-      quic::CertificateView::ParseSingleCertificate(leaf_cert_);
-  quic::QuicTransportVersion version{quic::QUIC_VERSION_UNSUPPORTED};
-  absl::string_view chlo_hash{"aaaaa"};
-  std::string server_config{"Server Config"};
-  const std::string ocsp_response;
-  const std::string cert_sct;
-  std::string error_details;
-  const std::vector<std::string> certs{"invalid leaf cert"};
-  EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyProof(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
-                                   server_config, version, chlo_hash, certs, cert_sct, "signature",
-                                   nullptr, &error_details, nullptr, nullptr));
-  EXPECT_EQ("Invalid leaf cert.", error_details);
-}
-
-TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureUnsupportedECKey) {
-  configCertVerificationDetails(true);
-  quic::QuicTransportVersion version{quic::QUIC_VERSION_UNSUPPORTED};
-  absl::string_view chlo_hash{"aaaaa"};
-  std::string server_config{"Server Config"};
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
@@ -228,27 +187,9 @@ VdGXMAjeXhnOnPvmDi5hUz/uvI+Pg6cNmUoCRwSCnK/DazhA
       quic::CertificateView::ParseSingleCertificate(chain[0]);
   ASSERT(cert_view);
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyProof("www.google.com", 54321, server_config, version, chlo_hash,
-                                   chain, cert_sct, "signature", nullptr, &error_details, nullptr,
-                                   nullptr));
+            verifier_->VerifyCertChain("www.google.com", 54321, chain, ocsp_response, cert_sct,
+                                       nullptr, &error_details, nullptr, nullptr, nullptr));
   EXPECT_EQ("Invalid leaf cert, only P-256 ECDSA certificates are supported", error_details);
-}
-
-TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureInvalidSignature) {
-  configCertVerificationDetails(true);
-  std::unique_ptr<quic::CertificateView> cert_view =
-      quic::CertificateView::ParseSingleCertificate(leaf_cert_);
-  quic::QuicTransportVersion version{quic::QUIC_VERSION_UNSUPPORTED};
-  absl::string_view chlo_hash{"aaaaa"};
-  std::string server_config{"Server Config"};
-  const std::string ocsp_response;
-  const std::string cert_sct;
-  std::string error_details;
-  EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyProof(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
-                                   server_config, version, chlo_hash, {leaf_cert_}, cert_sct,
-                                   "signature", nullptr, &error_details, nullptr, nullptr));
-  EXPECT_EQ("Signature is not valid.", error_details);
 }
 
 } // namespace Quic

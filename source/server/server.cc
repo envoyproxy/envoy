@@ -10,8 +10,6 @@
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/time.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/event/dispatcher.h"
@@ -76,10 +74,10 @@ InstanceImpl::InstanceImpl(
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       random_generator_(std::move(random_generator)),
-      api_(new Api::Impl(thread_factory, store, time_system, file_system, *random_generator_,
-                         process_context ? ProcessContextOptRef(std::ref(*process_context))
-                                         : absl::nullopt,
-                         watermark_factory)),
+      api_(new Api::Impl(
+          thread_factory, store, time_system, file_system, *random_generator_, bootstrap_,
+          process_context ? ProcessContextOptRef(std::ref(*process_context)) : absl::nullopt,
+          watermark_factory)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
@@ -290,8 +288,6 @@ void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
     load_function(bootstrap, true);
   } else if (*bootstrap_version == 3) {
     load_function(bootstrap, false);
-  } else if (*bootstrap_version == 2) {
-    throw EnvoyException("v2 bootstrap is deprecated and no longer supported.");
   } else {
     throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
   }

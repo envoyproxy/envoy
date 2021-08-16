@@ -48,11 +48,11 @@ namespace {
 const size_t kNumSessionsToCreatePerLoopForTests = 16;
 }
 
-class EnvoyQuicDispatcherTest : public QuicMultiVersionTest,
+class EnvoyQuicDispatcherTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 protected Logger::Loggable<Logger::Id::main> {
 public:
   EnvoyQuicDispatcherTest()
-      : version_(GetParam().first), api_(Api::createApiForTest(time_system_)),
+      : version_(GetParam()), api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
         listen_socket_(std::make_unique<Network::NetworkListenSocket<
                            Network::NetworkSocketTrait<Network::Socket::Type::Datagram>>>(
@@ -61,15 +61,7 @@ public:
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::unique_ptr<TestProofSource>(proof_source_),
                        quic::KeyExchangeSource::Default()),
-        version_manager_([]() {
-          if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
-            return quic::CurrentSupportedVersionsWithQuicCrypto();
-          }
-          bool use_http3 = GetParam().second == QuicVersionType::Iquic;
-          SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
-          SetQuicReloadableFlag(quic_disable_version_rfcv1, !use_http3);
-          return quic::CurrentSupportedVersions();
-        }()),
+        version_manager_(quic::CurrentSupportedHttp3Versions()),
         quic_version_(version_manager_.GetSupportedVersions()[0]),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
@@ -114,10 +106,8 @@ public:
   void processValidChloPacket(const quic::QuicSocketAddress& peer_addr) {
     // Create a Quic Crypto or TLS1.3 CHLO packet.
     EnvoyQuicClock clock(*dispatcher_);
-    Buffer::OwnedImpl payload = generateChloPacketToSend(
-        quic_version_, quic_config_, crypto_config_, connection_id_, clock,
-        envoyIpAddressToQuicSocketAddress(listen_socket_->addressProvider().localAddress()->ip()),
-        peer_addr, "test.example.org");
+    Buffer::OwnedImpl payload =
+        generateChloPacketToSend(quic_version_, quic_config_, connection_id_);
     Buffer::RawSliceVector slice = payload.getRawSlices();
     ASSERT(slice.size() == 1);
     auto encrypted_packet = std::make_unique<quic::QuicEncryptedPacket>(
@@ -198,17 +188,7 @@ public:
     EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
     EXPECT_CALL(filter_chain_manager, findFilterChain(_))
         .WillOnce(Invoke([this](const Network::ConnectionSocket& socket) {
-          switch (GetParam().second) {
-          case QuicVersionType::GquicQuicCrypto:
-            EXPECT_EQ("", socket.requestedApplicationProtocols()[0]);
-            break;
-          case QuicVersionType::GquicTls:
-            EXPECT_EQ("h3-T051", socket.requestedApplicationProtocols()[0]);
-            break;
-          case QuicVersionType::Iquic:
-            EXPECT_EQ("h3", socket.requestedApplicationProtocols()[0]);
-            break;
-          }
+          EXPECT_EQ("h3", socket.requestedApplicationProtocols()[0]);
           EXPECT_EQ("test.example.org", socket.requestedServerName());
           return &proof_source_->filterChain();
         }));
@@ -230,18 +210,12 @@ public:
     EXPECT_CALL(*read_filter, onNewConnection())
         // Stop iteration to avoid calling getRead/WriteBuffer().
         .WillOnce(Return(Network::FilterStatus::StopIteration));
-    if (!quicVersionUsesTls()) {
-      // The test utility can't generate 0-RTT packet for Quic TLS handshake yet.
-      EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
-    }
 
     processValidChloPacketAndCheckStatus(should_buffer);
     EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
     // Shutdown() to close the connection.
     envoy_quic_dispatcher_.Shutdown();
   }
-
-  bool quicVersionUsesTls() { return quic_version_.UsesTls(); }
 
 protected:
   Network::Address::IpVersion version_;
@@ -266,7 +240,8 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicDispatcherTests, EnvoyQuicDispatcherTest,
-                         testing::ValuesIn(generateTestParam()), testParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
   processValidChloPacketAndInitializeFilters(false);
@@ -309,10 +284,6 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
   EXPECT_CALL(*read_filter, onNewConnection())
       // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Return(Network::FilterStatus::StopIteration));
-
-  if (!quicVersionUsesTls()) {
-    EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
-  }
 
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4

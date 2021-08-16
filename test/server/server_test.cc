@@ -18,6 +18,7 @@
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/stats/stat_test_utility.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
@@ -1181,15 +1182,6 @@ TEST_P(ServerInstanceImplTest, InvalidBootstrapVersion) {
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
       EnvoyException, "Unknown bootstrap version 1.");
-}
-
-// Validate that we always reject v2.
-TEST_P(ServerInstanceImplTest, InvalidV2Bootstrap) {
-  options_.bootstrap_version_ = 2;
-
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
-      EnvoyException, "v2 bootstrap is deprecated and no longer supported.");
 }
 
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {

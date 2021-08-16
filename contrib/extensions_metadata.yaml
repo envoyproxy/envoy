@@ -1,0 +1,5 @@
+envoy.filters.http.squash:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: stable

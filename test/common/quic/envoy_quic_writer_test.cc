@@ -5,16 +5,17 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
 
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/network/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Return;
 
 namespace Envoy {
@@ -23,7 +24,7 @@ namespace Quic {
 class EnvoyQuicWriterTest : public ::testing::Test {
 public:
   EnvoyQuicWriterTest()
-      : envoy_quic_writer_(std::make_unique<Network::UdpDefaultWriter>(socket_.ioHandle())) {
+      : envoy_quic_writer_(std::make_unique<Network::UdpDefaultWriter>(io_handle_)) {
     self_address_.FromString("::");
     quic::QuicIpAddress peer_ip;
     peer_ip.FromString("::1");
@@ -50,7 +51,7 @@ public:
 protected:
   testing::NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
-  testing::NiceMock<Network::MockListenSocket> socket_;
+  Network::IoSocketHandleImpl io_handle_;
   quic::QuicIpAddress self_address_;
   quic::QuicSocketAddress peer_address_;
   EnvoyQuicPacketWriter envoy_quic_writer_;

@@ -166,10 +166,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.healthCheck(true);
     EXPECT_TRUE(stream_info.healthCheck());
 
-    EXPECT_EQ(nullptr, stream_info.routeEntry());
-    NiceMock<Router::MockRouteEntry> route_entry;
-    stream_info.route_entry_ = &route_entry;
-    EXPECT_EQ(&route_entry, stream_info.routeEntry());
+    EXPECT_EQ(nullptr, stream_info.route());
+    std::shared_ptr<NiceMock<Router::MockRoute>> route =
+        std::make_shared<NiceMock<Router::MockRoute>>();
+    stream_info.route_ = route;
+    EXPECT_EQ(route, stream_info.route());
 
     stream_info.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
                                        FilterState::StateType::ReadOnly,
@@ -192,6 +193,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(testing::ReturnRef(session_id));
     stream_info.setUpstreamSslConnection(ssl_info);
     EXPECT_EQ(session_id, stream_info.upstreamSslConnection()->sessionId());
+
+    EXPECT_FALSE(stream_info.upstreamConnectionId().has_value());
+    stream_info.setUpstreamConnectionId(12345);
+    ASSERT_TRUE(stream_info.upstreamConnectionId().has_value());
+    EXPECT_EQ(12345, stream_info.upstreamConnectionId().value());
   }
 }
 
