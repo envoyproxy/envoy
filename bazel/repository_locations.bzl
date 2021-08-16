@@ -807,7 +807,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     com_github_google_quiche = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
-        project_url = "https://quiche.googlesource.com/quiche",
+        project_url = "https://github.com/google/quiche",
         version = "29fb6fc501e4df5874129408b5474a91eaa9b7a0",
         sha256 = "bcc17653958c622e475deacbf23e9a215cdb711688671110e20192500ba210dc",
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/{version}.tar.gz
