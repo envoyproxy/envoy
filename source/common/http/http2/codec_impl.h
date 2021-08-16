@@ -187,7 +187,10 @@ protected:
                       public ScopeTrackedObject {
 
     StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit);
+
+    // Http::MultiplexedStreamImplBase
     void destroy() override;
+    void onPendingFlushTimer() override;
 
     StreamImpl* base() { return this; }
     ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
@@ -205,7 +208,6 @@ protected:
     virtual HeaderMap& headers() PURE;
     virtual void allocTrailers() PURE;
     virtual HeaderMapPtr cloneTrailers(const HeaderMap& trailers) PURE;
-    void onPendingFlushTimer() override;
 
     // Http::StreamEncoder
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -303,6 +305,7 @@ protected:
     absl::string_view details_;
 
   protected:
+    // Http::MultiplexedStreamImplBase
     bool hasPendingData() override {
       return pending_send_data_->length() > 0 || pending_trailers_to_encode_ != nullptr;
     }

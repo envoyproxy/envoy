@@ -387,7 +387,11 @@ void EnvoyQuicServerStream::onPendingFlushTimer() {
   Reset(quic::QUIC_STREAM_CANCELLED);
 }
 
-bool EnvoyQuicServerStream::hasPendingData() { return BufferedDataBytes() > 0; }
+bool EnvoyQuicServerStream::hasPendingData() {
+  // Quic stream sends headers and trailers on the same stream, and buffers them in the same sending
+  // buffer if needed. So checking this buffer is sufficient.
+  return BufferedDataBytes() > 0;
+}
 
 } // namespace Quic
 } // namespace Envoy
