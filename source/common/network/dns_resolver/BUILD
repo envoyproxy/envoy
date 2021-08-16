@@ -13,11 +13,7 @@ envoy_cc_library(
     hdrs = ["dns_factory.h"],
     deps = [
         "//envoy/api:api_interface",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/network:dns_interface",
         "//source/common/config:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/udp/dns_filter/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/extensions/network/dns_resolver/apple/v3:pkg_cc_proto",

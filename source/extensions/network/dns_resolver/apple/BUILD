@@ -18,6 +18,7 @@ envoy_cc_extension(
         "//bazel:apple": ["apple_dns_impl.h"],
         "//conditions:default": [],
     }),
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/event:file_event_interface",
