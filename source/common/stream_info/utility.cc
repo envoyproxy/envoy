@@ -254,7 +254,7 @@ ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
   } else if (stream_info.hasResponseFlag(ResponseFlag::RateLimitServiceError)) {
     return ProxyStatusError::ConnectionLimitReached;
   } else if (stream_info.hasResponseFlag(ResponseFlag::UpstreamRetryLimitExceeded)) {
-    return ProxyStatusError::ConnectionTerminated;
+    return ProxyStatusError::DestinationUnavailable;
   } else if (stream_info.hasResponseFlag(ResponseFlag::StreamIdleTimeout)) {
     return ProxyStatusError::HttpResponseTimeout;
   } else if (stream_info.hasResponseFlag(ResponseFlag::InvalidEnvoyRequestHeaders)) {
