@@ -36,6 +36,7 @@
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/happy_eyeballs_connection_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
@@ -262,8 +263,8 @@ Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFact
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
-  return {createConnection(dispatcher, cluster(), address(), transportSocketFactory(), options,
-                           transport_socket_options),
+  return {createConnection(dispatcher, cluster(), address(), addressList(),
+                           transportSocketFactory(), options, transport_socket_options),
           shared_from_this()};
 }
 
@@ -293,17 +294,18 @@ Host::CreateConnectionData HostImpl::createHealthCheckConnection(
   Network::TransportSocketFactory& factory =
       (metadata != nullptr) ? resolveTransportSocketFactory(healthCheckAddress(), metadata)
                             : transportSocketFactory();
-  return {createConnection(dispatcher, cluster(), healthCheckAddress(), factory, nullptr,
+  return {createConnection(dispatcher, cluster(), healthCheckAddress(), {}, factory, nullptr,
                            transport_socket_options),
           shared_from_this()};
 }
 
-Network::ClientConnectionPtr
-HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
-                           const Network::Address::InstanceConstSharedPtr& address,
-                           Network::TransportSocketFactory& socket_factory,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           Network::TransportSocketOptionsConstSharedPtr transport_socket_options) {
+Network::ClientConnectionPtr HostImpl::createConnection(
+    Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
+    const Network::Address::InstanceConstSharedPtr& address,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+    Network::TransportSocketFactory& socket_factory,
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
   if (cluster.clusterSocketOptions() != nullptr) {
     if (options) {
@@ -318,10 +320,16 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
     connection_options = options;
   }
   ASSERT(!address->envoyInternalAddress());
-  Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(),
-      socket_factory.createTransportSocket(std::move(transport_socket_options)),
-      connection_options);
+  Network::ClientConnectionPtr connection =
+      address_list.size() > 1
+          ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
+                dispatcher, address_list, cluster.sourceAddress(), socket_factory,
+                transport_socket_options, connection_options)
+          : dispatcher.createClientConnection(
+                address, cluster.sourceAddress(),
+                socket_factory.createTransportSocket(std::move(transport_socket_options)),
+                connection_options);
+
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
   return connection;
@@ -799,6 +807,45 @@ ClusterInfoImpl::ClusterInfoImpl(
 
     lb_type_ = LoadBalancerType::ClusterProvided;
     break;
+  case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG: {
+    if (config.has_lb_subset_config()) {
+      throw EnvoyException(
+          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+    }
+
+    if (config.has_common_lb_config()) {
+      throw EnvoyException(
+          fmt::format("cluster: LB policy {} cannot be combined with common_lb_config",
+                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+    }
+
+    if (!config.has_load_balancing_policy()) {
+      throw EnvoyException(
+          fmt::format("cluster: LB policy {} requires load_balancing_policy to be set",
+                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+    }
+
+    for (const auto& policy : config.load_balancing_policy().policies()) {
+      TypedLoadBalancerFactory* factory =
+          Config::Utility::getAndCheckFactory<TypedLoadBalancerFactory>(
+              policy.typed_extension_config(), /*is_optional=*/true);
+      if (factory != nullptr) {
+        load_balancing_policy_ = policy;
+        load_balancer_factory_ = factory;
+        break;
+      }
+    }
+
+    if (load_balancer_factory_ == nullptr) {
+      throw EnvoyException(fmt::format(
+          "Didn't find a registered load balancer factory implementation for cluster: '{}'",
+          name_));
+    }
+
+    lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
+    break;
+  }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -886,6 +933,10 @@ std::vector<Http::Protocol>
 ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const {
   if (downstream_protocol.has_value() &&
       features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
+    if (downstream_protocol.value() == Http::Protocol::Http3 &&
+        !(features_ & Upstream::ClusterInfo::Features::HTTP3)) {
+      return {Http::Protocol::Http2};
+    }
     return {downstream_protocol.value()};
   }
 

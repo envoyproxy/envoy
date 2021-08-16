@@ -10,6 +10,9 @@ namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
 
+// MetricsService sink
+constexpr char MetricsServiceName[] = "envoy.stat_sinks.metrics_service";
+
 /**
  * Config registration for the MetricsService stats sink. @see StatsSinkFactory.
  */

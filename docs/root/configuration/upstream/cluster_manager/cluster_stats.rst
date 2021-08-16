@@ -105,6 +105,19 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   assignment_timeout_received, Counter, Total assignments received with endpoint lease information.
   assignment_stale, Counter, Number of times the received assignments went stale before new assignments arrived.
 
+HTTP/3 protocol statistics
+--------------------------
+
+HTTP/3 protocol stats are global with the following statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  upstream.<tx/rx>.quic_connection_close_error_code_<error_code>, Counter, A collection of counters that are lazily initialized to record each QUIC connection close's error code.
+  upstream.<tx/rx>.quic_reset_stream_error_code_<error_code>, Counter, A collection of counters that are lazily initialized to record each QUIC stream reset error code.
+
+
 Health check statistics
 -----------------------
 

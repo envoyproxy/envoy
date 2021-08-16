@@ -68,9 +68,7 @@ private:
     // Strong pointer to the listener, whether TCP, UDP, QUIC, etc.
     Network::ConnectionHandler::ActiveListenerPtr listener_;
 
-    absl::variant<absl::monostate,
-                  // TODO(lambdai): use interface instead of ActiveTcpListener.
-                  std::reference_wrapper<ActiveTcpListener>,
+    absl::variant<absl::monostate, std::reference_wrapper<ActiveTcpListener>,
                   std::reference_wrapper<Network::UdpListenerCallbacks>>
         typed_listener_;
 

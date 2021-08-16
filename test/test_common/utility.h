@@ -782,21 +782,18 @@ public:
    *
    * @param service_full_name_template the service fully-qualified name template.
    * @param api_version version of a service.
-   * @param use_alpha if the alpha version is preferred.
    * @param service_namespace to override the service namespace.
    * @return std::string full path of a service method.
    */
   static std::string
   getVersionedServiceFullName(const std::string& service_full_name_template,
                               envoy::config::core::v3::ApiVersion api_version,
-                              bool use_alpha = false,
                               const std::string& service_namespace = EMPTY_STRING) {
     switch (api_version) {
     case envoy::config::core::v3::ApiVersion::AUTO:
       FALLTHRU;
     case envoy::config::core::v3::ApiVersion::V2:
-      return fmt::format(service_full_name_template, use_alpha ? "v2alpha" : "v2",
-                         service_namespace);
+      return fmt::format(service_full_name_template, "v2", service_namespace);
 
     case envoy::config::core::v3::ApiVersion::V3:
       return fmt::format(service_full_name_template, "v3", service_namespace);
@@ -811,19 +808,17 @@ public:
    * @param service_full_name_template the service fully-qualified name template.
    * @param method_name the method name.
    * @param api_version version of a service method.
-   * @param use_alpha if the alpha version is preferred.
    * @param service_namespace to override the service namespace.
    * @return std::string full path of a service method.
    */
   static std::string getVersionedMethodPath(const std::string& service_full_name_template,
                                             absl::string_view method_name,
                                             envoy::config::core::v3::ApiVersion api_version,
-                                            bool use_alpha = false,
                                             const std::string& service_namespace = EMPTY_STRING) {
-    return absl::StrCat("/",
-                        getVersionedServiceFullName(service_full_name_template, api_version,
-                                                    use_alpha, service_namespace),
-                        "/", method_name);
+    return absl::StrCat(
+        "/",
+        getVersionedServiceFullName(service_full_name_template, api_version, service_namespace),
+        "/", method_name);
   }
 };
 
@@ -875,19 +870,36 @@ public:
       context_map_[value.first] = value.second;
     }
   }
-
-  absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override {
+  absl::string_view protocol() const override { return context_protocol_; }
+  absl::string_view authority() const override { return context_authority_; }
+  absl::string_view path() const override { return context_path_; }
+  absl::string_view method() const override { return context_method_; }
+  void forEach(IterateCallback callback) const override {
+    for (const auto& pair : context_map_) {
+      if (!callback(pair.first, pair.second)) {
+        break;
+      }
+    }
+  }
+  absl::optional<absl::string_view> getByKey(absl::string_view key) const override {
     auto iter = context_map_.find(key);
     if (iter == context_map_.end()) {
       return absl::nullopt;
     }
     return iter->second;
   }
-
-  void setTraceContext(absl::string_view key, absl::string_view val) override {
+  void setByKey(absl::string_view key, absl::string_view val) override {
     context_map_.insert({std::string(key), std::string(val)});
   }
+  void setByReferenceKey(absl::string_view key, absl::string_view val) override {
+    setByKey(key, val);
+  }
+  void setByReference(absl::string_view key, absl::string_view val) override { setByKey(key, val); }
 
+  std::string context_protocol_;
+  std::string context_authority_;
+  std::string context_path_;
+  std::string context_method_;
   absl::flat_hash_map<std::string, std::string> context_map_;
 };
 
@@ -1107,23 +1119,35 @@ public:
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 
-  absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override {
+  // Tracing::TraceContext
+  absl::string_view protocol() const override { return header_map_->getProtocolValue(); }
+  absl::string_view authority() const override { return header_map_->getHostValue(); }
+  absl::string_view path() const override { return header_map_->getPathValue(); }
+  absl::string_view method() const override { return header_map_->getMethodValue(); }
+  void forEach(IterateCallback callback) const override {
     ASSERT(header_map_);
-    return header_map_->getTraceContext(key);
+    header_map_->iterate([cb = std::move(callback)](const HeaderEntry& entry) {
+      if (cb(entry.key().getStringView(), entry.value().getStringView())) {
+        return HeaderMap::Iterate::Continue;
+      }
+      return HeaderMap::Iterate::Break;
+    });
   }
-  void setTraceContext(absl::string_view key, absl::string_view value) override {
+  absl::optional<absl::string_view> getByKey(absl::string_view key) const override {
     ASSERT(header_map_);
-    header_map_->setTraceContext(key, value);
+    return header_map_->getByKey(key);
   }
-
-  void setTraceContextReferenceKey(absl::string_view key, absl::string_view val) override {
+  void setByKey(absl::string_view key, absl::string_view value) override {
     ASSERT(header_map_);
-    header_map_->setTraceContextReferenceKey(key, val);
+    header_map_->setByKey(key, value);
   }
-
-  void setTraceContextReference(absl::string_view key, absl::string_view val) override {
+  void setByReference(absl::string_view key, absl::string_view val) override {
     ASSERT(header_map_);
-    header_map_->setTraceContextReference(key, val);
+    header_map_->setByReference(key, val);
+  }
+  void setByReferenceKey(absl::string_view key, absl::string_view val) override {
+    ASSERT(header_map_);
+    header_map_->setByReferenceKey(key, val);
   }
 };
 

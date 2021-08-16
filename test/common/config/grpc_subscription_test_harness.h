@@ -2,7 +2,6 @@
 
 #include <memory>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
@@ -40,7 +39,7 @@ public:
 
   GrpcSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
+            "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new NiceMock<Grpc::MockAsyncClient>()) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
@@ -73,9 +72,9 @@ public:
                          bool expect_node, const Protobuf::int32 error_code,
                          const std::string& error_message) {
     UNREFERENCED_PARAMETER(expect_node);
-    API_NO_BOOST(envoy::api::v2::DiscoveryRequest) expected_request;
+    API_NO_BOOST(envoy::service::discovery::v3::DiscoveryRequest) expected_request;
     if (expect_node) {
-      expected_request.mutable_node()->CopyFrom(API_DOWNGRADE(node_));
+      expected_request.mutable_node()->CopyFrom(node_);
     }
     for (const auto& cluster : cluster_names) {
       expected_request.add_resource_names(cluster);

@@ -45,6 +45,7 @@ envoy_cc_library(
         "//source/common/common:hex_lib",
         "//source/common/common:macros",
         "//source/common/common:random_generator_lib",
+        "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",

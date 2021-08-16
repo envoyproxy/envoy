@@ -147,9 +147,11 @@ public:
   waitForReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // gRPC convenience methods.
-  void startGrpcStream();
+  void startGrpcStream(bool send_headers = true);
   void finishGrpcStream(Grpc::Status::GrpcStatus status);
   template <class T> void sendGrpcMessage(const T& message) {
+    ASSERT(grpc_stream_started_,
+           "start gRPC stream by calling startGrpcStream before sending a message");
     auto serialized_response = Grpc::Common::serializeToGrpcFrame(message);
     encodeData(*serialized_response, false);
     ENVOY_LOG(debug, "Sent gRPC message: {}", message.DebugString());
@@ -249,6 +251,7 @@ private:
   absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   bool received_data_{false};
+  bool grpc_stream_started_{false};
 };
 
 using FakeStreamPtr = std::unique_ptr<FakeStream>;

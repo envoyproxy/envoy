@@ -21,7 +21,6 @@ envoy_cc_test(
     srcs = ["api_type_oracle_test.cc"],
     deps = [
         "//source/common/config:api_type_oracle_lib",
-        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3:pkg_cc_proto",
     ],
 )
@@ -63,7 +62,6 @@ envoy_cc_test(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:logging_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -166,7 +164,6 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -207,6 +204,8 @@ envoy_cc_test(
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -237,7 +236,6 @@ envoy_cc_test_library(
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -312,6 +310,7 @@ envoy_cc_test(
     deps = [
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:xds_resource_lib",
+        "//test/config:v2_link_hacks",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
@@ -356,6 +355,7 @@ envoy_cc_test(
     srcs = ["type_to_endpoint_test.cc"],
     deps = [
         "//source/common/config:type_to_endpoint_lib",
+        "//test/config:v2_link_hacks",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/route/v3:pkg_cc_proto",
     ],

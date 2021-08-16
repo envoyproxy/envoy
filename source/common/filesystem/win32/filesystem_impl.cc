@@ -22,7 +22,7 @@ namespace Filesystem {
 FileImplWin32::~FileImplWin32() {
   if (isOpen()) {
     const Api::IoCallBoolResult result = close();
-    ASSERT(result.rc_);
+    ASSERT(result.return_value_);
   }
 }
 

@@ -50,10 +50,10 @@ bool allowDeprecatedMetadataName() {
 }
 
 const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
-  if (callbacks->route() == nullptr || callbacks->route()->routeEntry() == nullptr) {
+  if (callbacks->route() == nullptr) {
     return ProtobufWkt::Struct::default_instance();
   }
-  const auto& metadata = callbacks->route()->routeEntry()->metadata();
+  const auto& metadata = callbacks->route()->metadata();
 
   {
     const auto& filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");

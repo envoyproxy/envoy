@@ -139,6 +139,10 @@ Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() {
   return parent_context_.listenerScope();
 }
 
+bool PerFilterChainFactoryContextImpl::isQuicListener() const {
+  return parent_context_.isQuicListener();
+}
+
 FilterChainManagerImpl::FilterChainManagerImpl(
     const Network::Address::InstanceConstSharedPtr& address,
     Configuration::FactoryContext& factory_context, Init::Manager& init_manager,
@@ -742,9 +746,10 @@ Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilter
 FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
                                        const envoy::config::listener::v3::Listener& config,
                                        Network::DrainDecision& drain_decision,
-                                       Stats::Scope& global_scope, Stats::Scope& listener_scope)
+                                       Stats::Scope& global_scope, Stats::Scope& listener_scope,
+                                       bool is_quic)
     : server_(server), config_(config), drain_decision_(drain_decision),
-      global_scope_(global_scope), listener_scope_(listener_scope) {}
+      global_scope_(global_scope), listener_scope_(listener_scope), is_quic_(is_quic) {}
 
 AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -791,5 +796,6 @@ envoy::config::core::v3::TrafficDirection FactoryContextImpl::direction() const 
 }
 Network::DrainDecision& FactoryContextImpl::drainDecision() { return drain_decision_; }
 Stats::Scope& FactoryContextImpl::listenerScope() { return listener_scope_; }
+bool FactoryContextImpl::isQuicListener() const { return is_quic_; }
 } // namespace Server
 } // namespace Envoy

@@ -25,7 +25,6 @@ BAZEL_BUILD_OPTIONS=(
     "--curses=no"
     --show_task_finish
     --verbose_failures
-    "--action_env=PATH=/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
     "--test_output=all"
     "--flaky_test_attempts=integration@2"
     "--override_repository=envoy_build_config=${BUILD_CONFIG}"

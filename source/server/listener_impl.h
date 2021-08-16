@@ -129,6 +129,7 @@ public:
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
+  bool isQuicListener() const override;
 
   // DrainDecision
   bool drainClose() const override {
@@ -148,6 +149,7 @@ private:
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const Server::DrainManagerPtr drain_manager_;
+  bool is_quic_;
 };
 
 class ListenerImpl;
@@ -201,6 +203,7 @@ public:
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
 
   Stats::Scope& listenerScope() override;
+  bool isQuicListener() const override;
 
   // ListenerFactoryContext
   const Network::ListenerConfig& listenerConfig() const override;
@@ -281,6 +284,9 @@ public:
   bool reusePort() const { return reuse_port_; }
   static bool getReusePortOrDefault(Server::Instance& server,
                                     const envoy::config::listener::v3::Listener& config);
+
+  // Check whether a new listener can share sockets with this listener.
+  bool hasCompatibleAddress(const ListenerImpl& other) const;
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }

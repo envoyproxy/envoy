@@ -13,7 +13,7 @@ Api::IoCallBoolResult MockFile::open(FlagSet flag) {
   Thread::LockGuard lock(open_mutex_);
 
   Api::IoCallBoolResult result = open_(flag);
-  is_open_ = result.rc_;
+  is_open_ = result.return_value_;
   num_opens_++;
   open_event_.notifyOne();
 
@@ -35,7 +35,7 @@ Api::IoCallSizeResult MockFile::write(absl::string_view buffer) {
 
 Api::IoCallBoolResult MockFile::close() {
   Api::IoCallBoolResult result = close_();
-  is_open_ = !result.rc_;
+  is_open_ = !result.return_value_;
 
   return result;
 }

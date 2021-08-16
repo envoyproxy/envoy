@@ -87,6 +87,7 @@ envoy_cc_library(
         "//source/common/tcp:conn_pool_lib",
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
         "//source/common/upstream:upstream_lib",
+        "//source/common/quic:quic_stat_names_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -147,9 +148,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "edf_scheduler_lib",
-    hdrs = ["edf_scheduler.h"],
-    deps = ["//source/common/common:assert_lib"],
+    name = "scheduler_lib",
+    hdrs = [
+        "edf_scheduler.h",
+        "wrsq_scheduler.h",
+    ],
+    deps = [
+        "//envoy/common:random_generator_interface",
+        "//envoy/upstream:scheduler_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -197,7 +206,7 @@ envoy_cc_library(
     srcs = ["load_balancer_impl.cc"],
     hdrs = ["load_balancer_impl.h"],
     deps = [
-        ":edf_scheduler_lib",
+        ":scheduler_lib",
         "//envoy/common:random_generator_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/stats:stats_interface",
@@ -207,6 +216,14 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_protos_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "load_balancer_factory_base_lib",
+    hdrs = ["load_balancer_factory_base.h"],
+    deps = [
+        ":load_balancer_lib",
     ],
 )
 
@@ -413,7 +430,6 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
@@ -471,6 +487,7 @@ envoy_cc_library(
         "//source/common/http/http2:codec_stats_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:happy_eyeballs_connection_impl_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:socket_option_lib",

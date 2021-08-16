@@ -56,18 +56,21 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   if (addr_port->ip()->version() == IpVersion::v6) {
     int socket_v6only = 0;
     socklen_t size_int = sizeof(socket_v6only);
-    ASSERT_GE(sock.getSocketOption(IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int).rc_, 0);
+    ASSERT_GE(
+        sock.getSocketOption(IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int).return_value_,
+        0);
     EXPECT_EQ(v6only, socket_v6only != 0);
   }
 
   // Bind the socket to the desired address and port.
   const Api::SysCallIntResult result = sock.bind(addr_port);
-  ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
-                           << "\nerrno: " << result.errno_;
+  ASSERT_EQ(result.return_value_, 0)
+      << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
+      << "\nerrno: " << result.errno_;
 
   // Do a bare listen syscall. Not bothering to accept connections as that would
   // require another thread.
-  ASSERT_EQ(sock.listen(128).rc_, 0);
+  ASSERT_EQ(sock.listen(128).return_value_, 0);
 
   auto client_connect = [](Address::InstanceConstSharedPtr addr_port) {
     // Create a client socket and connect to the server.
@@ -79,12 +82,13 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
     // operation of ::connect(), so connect returns with errno==EWOULDBLOCK before the tcp
     // handshake can complete. For testing convenience, re-enable blocking on the socket
     // so that connect will wait for the handshake to complete.
-    ASSERT_EQ(client_sock.setBlockingForTest(true).rc_, 0);
+    ASSERT_EQ(client_sock.setBlockingForTest(true).return_value_, 0);
 
     // Connect to the server.
     const Api::SysCallIntResult result = client_sock.connect(addr_port);
-    ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
-                             << "\nerrno: " << result.errno_;
+    ASSERT_EQ(result.return_value_, 0)
+        << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
+        << "\nerrno: " << result.errno_;
   };
 
   auto client_addr_port = Network::Utility::parseInternetAddressAndPort(
@@ -349,13 +353,14 @@ TEST(PipeInstanceTest, BasicPermission) {
   EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
 
   Api::SysCallIntResult result = sock.bind(address);
-  ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
-                           << "\terrno: " << result.errno_;
+  ASSERT_EQ(result.return_value_, 0)
+      << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
+      << "\terrno: " << result.errno_;
 
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   struct stat stat_buf;
   result = os_sys_calls.stat(path.c_str(), &stat_buf);
-  EXPECT_EQ(result.rc_, 0);
+  EXPECT_EQ(result.return_value_, 0);
   // Get file permissions bits
   ASSERT_EQ(stat_buf.st_mode & 07777, mode)
       << path << std::oct << "\t" << (stat_buf.st_mode & 07777) << std::dec << "\t"
@@ -449,8 +454,9 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
 
     const Api::SysCallIntResult result = sock.bind(address);
 
-    ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
-                             << "\nerrno: " << result.errno_;
+    ASSERT_EQ(result.return_value_, 0)
+        << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
+        << "\nerrno: " << result.errno_;
   };
 
   const std::string path = TestEnvironment::unixDomainSocketPath("UnlinksExistingFile.sock");
