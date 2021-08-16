@@ -13,6 +13,8 @@
 #include "source/common/grpc/async_client_manager_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/common/network/address_impl.h"
+#include "absl/synchronization/notification.h"
+#include "absl/time/time.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -48,15 +50,12 @@ public:
     TestUtility::loadFromYaml(grpc_service_yaml, *proto_config);
     filter_factory_ = factory.createFilterFactoryFromProto(*proto_config, "stats", context_);
 
-
     cm_.initializeThreadLocalClusters({"test_cluster"});
     ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(http_client_));
     ON_CALL(http_client_, start(_, _))
         .WillByDefault(
             Invoke([&](Http::AsyncClient::StreamCallbacks&,
-                                                   const Http::AsyncClient::StreamOptions&) {
-              return &http_stream_;
-            }));
+                       const Http::AsyncClient::StreamOptions&) { return &http_stream_; }));
   }
 
   void testFilter() {
@@ -91,6 +90,7 @@ public:
                                   Stats::Scope& scope, bool skip, Grpc::CacheOption cache_option) {
           auto raw_client =
               async_client_manager_->getOrCreateRawAsyncClient(config, scope, skip, cache_option);
+          // Ensure that the raw client is valid and an assertion has been triggerred.
           testGrpcClient(raw_client);
           return raw_client;
         }));
@@ -108,6 +108,7 @@ public:
         std::make_unique<Grpc::AsyncClientManagerImpl>(cm_, tls_, simTime(), *api_, stat_names_);
     for (Event::DispatcherPtr& dispatcher : dispatchers_) {
       dispatcher->post([&]() {
+        registerWorkerAndWaitForStartSignal();
         Http::MockFilterChainFactoryCallbacks filter_callbacks;
         EXPECT_CALL(filter_callbacks, addStreamFilter(_));
         filter_factory_(filter_callbacks);
@@ -121,9 +122,19 @@ public:
     }
   }
 
-  // void waitForSignal() {}
+  void registerWorkerAndWaitForStartSignal() {
+    if (shouldFire()) {
+      workers_should_fire_.Notify();
+    } else {
+      workers_should_fire_.WaitForNotification();
+    }
+  }
 
-  // void sendSignal() {}
+  bool shouldFire() {
+    Thread::LockGuard lock(mutex_);
+    active_threads_cnt_++;
+    return active_threads_cnt_ == num_threads_;
+  }
 
   ~ExtAuthzFilterTest() { tls_.shutdownGlobalThreading(); }
 
@@ -133,7 +144,6 @@ private:
   Api::ApiPtr api_;
   Stats::SymbolTableImpl symbol_table_;
   Grpc::StatNames stat_names_;
-
 
   std::unique_ptr<Grpc::AsyncClientManagerImpl> async_client_manager_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -145,6 +155,11 @@ private:
   const Protobuf::MethodDescriptor* method_descriptor_;
   NiceMock<Http::MockAsyncClient> http_client_;
   NiceMock<Http::MockAsyncClientStream> http_stream_;
+
+  absl::Notification workers_should_fire_;
+  Thread::MutexBasicLockable mutex_;
+  int active_threads_cnt_{};
+
   static constexpr int num_threads_ = 5;
 };
 
