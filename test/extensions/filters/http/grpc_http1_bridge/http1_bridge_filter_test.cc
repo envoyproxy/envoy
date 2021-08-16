@@ -252,6 +252,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {
 
 // Verifies that we convert grpc-status to the appropriates status code for a headers only response
 TEST_F(GrpcHttp1BridgeFilterTest, HandlingHeadersOnlyResponseBadGrpcStatus) {
+  TestScopedRuntime scoped_runtime;
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc"},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
