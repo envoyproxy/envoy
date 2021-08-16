@@ -417,8 +417,15 @@ void UpstreamRequest::onPoolReady(
   stream_info_.setUpstreamLocalAddress(upstream_local_address);
   parent_.callbacks()->streamInfo().setUpstreamLocalAddress(upstream_local_address);
 
-  stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
-  parent_.callbacks()->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
+  stream_info_.setUpstreamSslConnection(info.downstreamAddressProvider().sslConnection());
+  parent_.callbacks()->streamInfo().setUpstreamSslConnection(
+      info.downstreamAddressProvider().sslConnection());
+
+  if (info.downstreamAddressProvider().connectionID().has_value()) {
+    stream_info_.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
+    parent_.callbacks()->streamInfo().setUpstreamConnectionId(
+        info.downstreamAddressProvider().connectionID().value());
+  }
 
   if (parent_.downstreamEndStream()) {
     setupPerTryTimeout();

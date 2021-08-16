@@ -110,7 +110,7 @@ message Cluster {
     // this option or not.
     CLUSTER_PROVIDED = 6;
 
-    // [#not-implemented-hide:] Use the new :ref:`load_balancing_policy
+    // Use the new :ref:`load_balancing_policy
     // <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` field to determine the LB policy.
     // [#next-major-version: In the v3 API, we should consider deprecating the lb_policy field
     // and instead using the new load_balancing_policy field as the one and only mechanism for
@@ -720,8 +720,7 @@ message Cluster {
 
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
-  // [#comment:TODO: Remove enum constraint :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>` when implemented.]
-  LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true not_in: 7}];
+  LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true}];
 
   // Setting this is required for specifying members of
   // :ref:`STATIC<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STATIC>`,
@@ -1008,7 +1007,7 @@ message Cluster {
   // servers of this cluster.
   repeated Filter filters = 40;
 
-  // [#not-implemented-hide:] New mechanism for LB policy configuration. Used only if the
+  // New mechanism for LB policy configuration. Used only if the
   // :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>` field has the value
   // :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>`.
   LoadBalancingPolicy load_balancing_policy = 41;
@@ -1073,7 +1072,7 @@ message Cluster {
   bool connection_pool_per_downstream_connection = 51;
 }
 
-// [#not-implemented-hide:] Extensible load balancing policy configuration.
+// Extensible load balancing policy configuration.
 //
 // Every LB policy defined via this mechanism will be identified via a unique name using reverse
 // DNS notation. If the policy needs configuration parameters, it must define a message for its
@@ -1099,14 +1098,11 @@ message LoadBalancingPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.LoadBalancingPolicy.Policy";
 
-    reserved 2;
+    reserved 2, 1, 3;
 
-    reserved "config";
+    reserved "config", "name", "typed_config";
 
-    // Required. The name of the LB policy.
-    string name = 1;
-
-    google.protobuf.Any typed_config = 3;
+    core.v3.TypedExtensionConfig typed_extension_config = 4;
   }
 
   // Each client will iterate over the list in order and stop at the first policy that it

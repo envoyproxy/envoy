@@ -12,7 +12,7 @@ TEST_F(SocketOptionImplTest, BadFd) {
   absl::string_view zero("\0\0\0\0", 4);
   Api::SysCallIntResult result =
       SocketOptionImpl::setSocketOption(socket_, {}, zero.data(), zero.size());
-  EXPECT_EQ(-1, result.rc_);
+  EXPECT_EQ(-1, result.return_value_);
   EXPECT_EQ(SOCKET_ERROR_NOT_SUP, result.errno_);
 }
 

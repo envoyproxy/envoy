@@ -25,6 +25,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/connection.h"
+#include "test/mocks/network/io_handle.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
 
@@ -270,7 +271,7 @@ public:
               (unsigned long, void*, unsigned long, void*, unsigned long, unsigned long*));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
 
-  IoHandlePtr io_handle_;
+  std::unique_ptr<MockIoHandle> io_handle_;
   Network::SocketAddressSetterSharedPtr address_provider_;
   OptionsSharedPtr options_;
   bool socket_is_open_ = true;

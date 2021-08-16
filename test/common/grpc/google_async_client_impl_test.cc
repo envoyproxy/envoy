@@ -45,7 +45,7 @@ public:
     return shared_stub_;
   }
 
-  MockGenericStub* stub_ = new MockGenericStub();
+  NiceMock<MockGenericStub>* stub_ = new NiceMock<MockGenericStub>();
   GoogleStubSharedPtr shared_stub_{stub_};
 };
 
@@ -85,6 +85,20 @@ public:
   StatNames stat_names_;
   AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
 };
+
+// Verify that grpc client check for thread consistency.
+TEST_F(EnvoyGoogleAsyncClientImplTest, ThreadSafe) {
+  initialize();
+  ON_CALL(*stub_factory_.stub_, PrepareCall_(_, _, _)).WillByDefault(Return(nullptr));
+  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([&]() {
+    NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+    // Verify that using the grpc client in a different thread cause assertion failure.
+    EXPECT_DEBUG_DEATH(grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                                           Http::AsyncClient::StreamOptions()),
+                       "isThreadSafe");
+  });
+  thread->join();
+}
 
 // Validate that a failure in gRPC stub call creation returns immediately with
 // status UNAVAILABLE.

@@ -476,10 +476,72 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
     auto* add1 = response_mutation->add_set_headers();
     add1->mutable_header()->set_key("x-response-processed");
     add1->mutable_header()->set_value("1");
+    auto* add2 = response_mutation->add_set_headers();
+    add2->mutable_header()->set_key(":status");
+    add2->mutable_header()->set_value("201");
     return true;
   });
 
+  verifyDownstreamResponse(*response, 201);
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
+}
+
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the response_headers message
+// but tries to set the status code to an invalid value
+TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponseBadStatus) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(true, absl::nullopt);
+  handleUpstreamRequest();
+
+  processResponseHeadersMessage(false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+    auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+    auto* add1 = response_mutation->add_set_headers();
+    add1->mutable_header()->set_key("x-response-processed");
+    add1->mutable_header()->set_value("1");
+    auto* add2 = response_mutation->add_set_headers();
+    add2->mutable_header()->set_key(":status");
+    add2->mutable_header()->set_value("100");
+    return true;
+  });
+
+  // Invalid status code should be ignored, but the other header mutation
+  // should still have been processed.
   verifyDownstreamResponse(*response, 200);
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
+}
+
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the response_headers message
+// but tries to set the status code to two values. The second
+// attempt should be ignored.
+TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponseTwoStatuses) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(true, absl::nullopt);
+  handleUpstreamRequest();
+
+  processResponseHeadersMessage(false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+    auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+    auto* add1 = response_mutation->add_set_headers();
+    add1->mutable_header()->set_key("x-response-processed");
+    add1->mutable_header()->set_value("1");
+    auto* add2 = response_mutation->add_set_headers();
+    add2->mutable_header()->set_key(":status");
+    add2->mutable_header()->set_value("201");
+    auto* add3 = response_mutation->add_set_headers();
+    add3->mutable_header()->set_key(":status");
+    add3->mutable_header()->set_value("202");
+    add3->mutable_append()->set_value(true);
+    return true;
+  });
+
+  // Invalid status code should be ignored, but the other header mutation
+  // should still have been processed.
+  verifyDownstreamResponse(*response, 201);
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
 }
 
@@ -789,7 +851,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponse) {
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
 }
 
-// Test the filter with request body streaming enabled using
+// Test the filter with request body buffering enabled using
 // an ext_proc server that responds to the request_body message
 // by sending back an immediate_response message
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnRequestBody) {
@@ -808,7 +870,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnRequestBody) {
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
 }
 
-// Test the filter with body streaming enabled using
+// Test the filter with body buffering enabled using
 // an ext_proc server that responds to the response_body message
 // by sending back an immediate_response message. Since this
 // happens after the response headers have been sent, as a result
@@ -832,6 +894,23 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponseBody) {
   // we actually get an error message here.
   verifyDownstreamResponse(*response, 401);
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+}
+
+// Test the filter using an ext_proc server that responds to the request_body message
+// by sending back an immediate_response message with an invalid status code.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithBadStatus) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("Replace this!", absl::nullopt);
+  processAndRespondImmediately(true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Continue);
+    immediate.set_body("{\"reason\": \"Because\"}");
+    immediate.set_details("Failed because we said so");
+  });
+
+  // The attempt to set the status code to 100 should have been ignored.
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_EQ("{\"reason\": \"Because\"}", response->body());
 }
 
 // Test the ability of the filter to turn a GET into a POST by adding a body
@@ -999,6 +1078,215 @@ TEST_P(ExtProcIntegrationTest, ResponseMessageTimeoutIgnoreError) {
   });
 
   // We should still succeed despite the timeout
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test how the filter responds when asked to buffer a request body for a POST
+// request with an empty body. We should get an empty body message because
+// the Envoy filter stream received the body after all the headers.
+TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithEmptyBody) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("", absl::nullopt);
+
+  processRequestHeadersMessage(true, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_FALSE(headers.end_of_stream());
+    return true;
+  });
+  // We should get an empty body message this time
+  processRequestBodyMessage(false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    EXPECT_EQ(body.body().size(), 0);
+    return true;
+  });
+
+  handleUpstreamRequest();
+  processResponseHeadersMessage(false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test how the filter responds when asked to buffer a response body for a POST
+// request with an empty body. We should get an empty body message because
+// the Envoy filter stream received the body after all the headers.
+TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetWithEmptyResponseBody) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(true, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_TRUE(headers.end_of_stream());
+    return true;
+  });
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(0, true);
+  processResponseHeadersMessage(false, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_FALSE(headers.end_of_stream());
+    return true;
+  });
+  // We should get an empty body message this time
+  processResponseBodyMessage(false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    EXPECT_EQ(body.body().size(), 0);
+    return true;
+  });
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test how the filter responds when asked to buffer a response body for a POST
+// request with no body. We should not get an empty body message because
+// the Envoy filter stream received headers with no body.
+TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetWithNoResponseBody) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(true, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_TRUE(headers.end_of_stream());
+    return true;
+  });
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  processResponseHeadersMessage(false, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_TRUE(headers.end_of_stream());
+    return true;
+  });
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test how the filter responds when asked to stream a request body for a POST
+// request with an empty body. We should get an empty body message because
+// the Envoy filter stream received the body after all the headers.
+TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithEmptyBodyStreamed) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("", absl::nullopt);
+
+  processRequestHeadersMessage(true, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_FALSE(headers.end_of_stream());
+    return true;
+  });
+  // We should get an empty body message this time
+  processRequestBodyMessage(false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    EXPECT_EQ(body.body().size(), 0);
+    return true;
+  });
+
+  handleUpstreamRequest();
+  processResponseHeadersMessage(false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test how the filter responds when asked to stream a request body for a POST
+// request with an empty body in "buffered partial" mode. We should get an empty body message
+// because the Envoy filter stream received the body after all the headers.
+TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithEmptyBodyBufferedPartial) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("", absl::nullopt);
+
+  processRequestHeadersMessage(true, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_FALSE(headers.end_of_stream());
+    return true;
+  });
+  // We should get an empty body message this time
+  processRequestBodyMessage(false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    EXPECT_EQ(body.body().size(), 0);
+    return true;
+  });
+
+  handleUpstreamRequest();
+  processResponseHeadersMessage(false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test how the filter responds when asked to buffer a request body for a GET
+// request with no body. We should receive no body message because the Envoy
+// filter stream received the headers and end simultaneously.
+TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetRequestNoBody) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(true, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_TRUE(headers.end_of_stream());
+    return true;
+  });
+  // We should not see a request body message here
+  handleUpstreamRequest();
+  processResponseHeadersMessage(false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test how the filter responds when asked to stream a request body for a GET
+// request with no body. We should receive no body message because the Envoy
+// filter stream received the headers and end simultaneously.
+TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetRequestNoBodyStreaming) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(true, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_TRUE(headers.end_of_stream());
+    return true;
+  });
+  // We should not see a request body message here
+  handleUpstreamRequest();
+  processResponseHeadersMessage(false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test how the filter responds when asked to stream a request body for a GET
+// request with no body in "buffered partial" mode. We should receive no body message because the
+// Envoy filter stream received the headers and end simultaneously.
+TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetRequestNoBodyBufferedPartial) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(true, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_TRUE(headers.end_of_stream());
+    return true;
+  });
+  // We should not see a request body message here
+  handleUpstreamRequest();
+  processResponseHeadersMessage(false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test how the filter responds when asked to buffer a request body for a POST
+// request with a body.
+TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithRequestBody) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("Testing", absl::nullopt);
+
+  processRequestHeadersMessage(true, [](const HttpHeaders& headers, HeadersResponse&) {
+    EXPECT_FALSE(headers.end_of_stream());
+    return true;
+  });
+  processRequestBodyMessage(false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    EXPECT_EQ(body.body(), "Testing");
+    return true;
+  });
+  handleUpstreamRequest();
+  processResponseHeadersMessage(false, absl::nullopt);
   verifyDownstreamResponse(*response, 200);
 }
 

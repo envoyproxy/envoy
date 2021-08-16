@@ -73,6 +73,7 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::ConnectionTermination:
     return quic::QUIC_STREAM_CONNECTION_ERROR;
   case Http::StreamResetReason::LocalReset:
+  case Http::StreamResetReason::OverloadManager:
     return quic::QUIC_STREAM_CANCELLED;
   default:
     return quic::QUIC_BAD_APPLICATION_PAYLOAD;
@@ -122,15 +123,6 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
     return Http::StreamResetReason::ConnectionFailure;
   default:
     return Http::StreamResetReason::ConnectionTermination;
-  }
-}
-
-Http::GoAwayErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept {
-  switch (error) {
-  case quic::QUIC_NO_ERROR:
-    return Http::GoAwayErrorCode::NoError;
-  default:
-    return Http::GoAwayErrorCode::Other;
   }
 }
 
