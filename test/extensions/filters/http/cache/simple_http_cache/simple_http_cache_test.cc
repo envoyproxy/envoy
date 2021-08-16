@@ -107,9 +107,7 @@ protected:
     if (body != actual_body) {
       return AssertionFailure() << "Expected body == " << body << "\n  Actual:  " << actual_body;
     }
-    std::cout << "I am before getting trailers\n";
     const Http::TestResponseTrailerMapImpl actual_trailers = getTrailers(*lookup_context);
-    std::cout << "I am after getting trailers\n";
     if (trailers != actual_trailers) {
       return AssertionFailure() << "Expected trailers == " << trailers
                                 << "\n  Actual:  " << actual_trailers;
@@ -249,29 +247,29 @@ TEST(Registration, GetFactory) {
 
 TEST_F(SimpleHttpCacheTest, VaryResponses) {
   // Responses will vary on accept.
-  const std::string RequestPath("/some-resource");
+  const std::string request_path("/some-resource");
   Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                                    {"cache-control", "public,max-age=3600"},
                                                    {"vary", "accept"}};
 
   // First request.
   request_headers_.setCopy(Http::LowerCaseString("accept"), "image/*");
-  LookupContextPtr first_value_vary = lookup(RequestPath);
+  LookupContextPtr first_value_vary = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
   const std::string Body1("accept is image/*");
   insert(move(first_value_vary), response_headers, Body1);
-  first_value_vary = lookup(RequestPath);
+  first_value_vary = lookup(request_path);
   EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(first_value_vary.get(), Body1));
 
   // Second request with a different value for the varied header.
   request_headers_.setCopy(Http::LowerCaseString("accept"), "text/html");
-  LookupContextPtr second_value_vary = lookup(RequestPath);
+  LookupContextPtr second_value_vary = lookup(request_path);
   // Should miss because we don't have this version of the response saved yet.
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
   // Add second version and make sure we receive the correct one..
   const std::string Body2("accept is text/html");
   insert(move(second_value_vary), response_headers, Body2);
-  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(lookup(RequestPath).get(), Body2));
+  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(lookup(request_path).get(), Body2));
 
   // Looks up first version again to be sure it wasn't replaced with the second one.
   EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(first_value_vary.get(), Body1));

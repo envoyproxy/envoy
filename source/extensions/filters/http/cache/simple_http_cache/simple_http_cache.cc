@@ -33,9 +33,8 @@ public:
   }
 
   void getTrailers(LookupTrailersCallback&& cb) override {
-    if (trailers_ != nullptr) {
-      cb(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*trailers_));
-    }
+    cb(trailers_ ? Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*trailers_)
+                 : Http::ResponseTrailerMapPtr{});
   }
 
   const LookupRequest& request() const { return request_; }
