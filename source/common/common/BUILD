@@ -145,8 +145,6 @@ envoy_cc_library(
         "//envoy/common:key_value_store_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/filesystem:filesystem_interface",
-        "//envoy/registry",
-        "@envoy_api//envoy/extensions/cache/key_value_cache/v3:pkg_cc_proto",
     ],
 )
 

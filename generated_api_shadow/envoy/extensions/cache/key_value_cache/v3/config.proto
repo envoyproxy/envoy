@@ -15,8 +15,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Key Value Cache storage plugin]
 
-// [#not-implemented-hide:]
-// [#extension: envoy.cache.key_value_cache]
+// This shared configuration for Envoy key value stores.
 message KeyValueCacheConfig {
   // Extensible config for key values caches.
   // The expectation is that these are flushed to disk but for mobile, that may
@@ -30,7 +29,6 @@ message KeyValueCacheConfig {
   google.protobuf.Duration flush_interval = 3;
 }
 
-// [#not-implemented-hide:]
 // [#extension: envoy.cache.key_value_cache.file_based_cache]
 // This is configuration to flush a key value store out to disk.
 message FileBasedKeyValueCacheConfig {

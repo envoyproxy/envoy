@@ -719,3 +719,8 @@ envoy.watchdog.profile_action:
   - envoy.guarddog_actions
   security_posture: data_plane_agnostic
   status: alpha
+envoy.cache.key_value_cache.file_based_cache:
+  categories:
+  - envoy.key_value_cache
+  security_posture: data_plane_agnostic
+  status: alpha
