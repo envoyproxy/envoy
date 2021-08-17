@@ -22,12 +22,12 @@ const DefaultsProfile& DefaultsProfile::get() {
 
 // Retrieve number value in defaults profile @ config_name.field if it exists, otherwise return
 // `default_value`
-double DefaultsProfile::get_number(const std::string config_name, const std::string& field,
-                                   double default_value) const {
-  absl::optional<ProtobufWkt::Value> value = get_proto_value(config_name, field);
+double DefaultsProfile::getNumber(const ConfigContext& config, const std::string& field,
+                                  double default_value) const {
+  absl::optional<ProtobufWkt::Value> value = getProtoValue(std::string(config.getContext()), field);
 
   if (value && value->has_number_value()) {
-    printf("NUMBER VALUE: %f\n\n", value->number_value());
+    // printf("NUMBER VALUE: %f\n\n", value->number_value());
     return value->number_value();
   }
 
@@ -36,16 +36,16 @@ double DefaultsProfile::get_number(const std::string config_name, const std::str
 
 // Retrieve ms value in defaults profile @ config_name.field if it exists, otherwise return
 // `default_value`
-std::chrono::milliseconds DefaultsProfile::get_ms(const std::string config_name,
-                                                  const std::string& field,
-                                                  int default_value) const {
-  absl::optional<ProtobufWkt::Value> value = get_proto_value(config_name, field);
+std::chrono::milliseconds DefaultsProfile::getMs(const ConfigContext& config,
+                                                 const std::string& field,
+                                                 int default_value) const {
+  absl::optional<ProtobufWkt::Value> value = getProtoValue(std::string(config.getContext()), field);
 
   if (value && value->has_string_value()) {
     ProtobufWkt::Duration duration;
     auto result = ProtobufUtil::JsonStringToMessage("\"" + value->string_value() + "\"", &duration);
     // should I use TestUtility::loadFromJson("\"" + value->string_value() + "\"", &duration) ?
-    printf("DURATION VALUE: %lds\n\n", duration.seconds());
+    // printf("DURATION VALUE: %lds\n\n", duration.seconds());
     return std::chrono::milliseconds(result.ok() ? DurationUtil::durationToMilliseconds(duration)
                                                  : default_value);
   }
@@ -55,12 +55,12 @@ std::chrono::milliseconds DefaultsProfile::get_ms(const std::string config_name,
 
 // Retrieve bool value in defaults profile @ config_name.field if it exists, otherwise return
 // `default_value`
-bool DefaultsProfile::get_bool(const std::string config_name, const std::string& field,
-                               bool default_value) const {
-  absl::optional<ProtobufWkt::Value> value = get_proto_value(config_name, field);
+bool DefaultsProfile::getBool(const ConfigContext& config, const std::string& field,
+                              bool default_value) const {
+  absl::optional<ProtobufWkt::Value> value = getProtoValue(std::string(config.getContext()), field);
 
   if (value && value->has_bool_value()) {
-    printf("BOOL VALUE: %s\n\n", value->bool_value() ? "true" : "false");
+    // printf("BOOL VALUE: %s\n\n", value->bool_value() ? "true" : "false");
     return value->bool_value();
   }
 
@@ -68,9 +68,9 @@ bool DefaultsProfile::get_bool(const std::string config_name, const std::string&
 }
 
 // Search defaults profile for `field`, return value if found
-absl::optional<ProtobufWkt::Value>
-DefaultsProfile::get_proto_value(const std::string config_name, const std::string& field) const {
-  printf("\nFINDING %s.%s\n", config_name.c_str(), field.c_str());
+absl::optional<ProtobufWkt::Value> DefaultsProfile::getProtoValue(const std::string config_name,
+                                                                  const std::string& field) const {
+  // printf("\nFINDING %s.%s\n", config_name.c_str(), field.c_str());
   auto fields_map = defaults_manifest_.fields();
   auto config_it = fields_map.find(config_name);
 

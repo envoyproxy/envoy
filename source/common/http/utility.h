@@ -13,6 +13,7 @@
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
 
+#include "source/common/common/envoy_defaults.h"
 #include "source/common/http/exception.h"
 #include "source/common/http/status.h"
 
@@ -107,11 +108,22 @@ struct OptionsLimits {
  * Validates settings/options already set in |options| and initializes any remaining fields with
  * defaults.
  */
+
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options);
 
 envoy::config::core::v3::Http2ProtocolOptions
+initializeAndValidateOptions(const DefaultsProfile::ConfigContext& context,
+                             const envoy::config::core::v3::Http2ProtocolOptions& options);
+
+envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
+                             bool hcm_stream_error_set,
+                             const Protobuf::BoolValue& hcm_stream_error);
+
+envoy::config::core::v3::Http2ProtocolOptions
+initializeAndValidateOptions(const DefaultsProfile::ConfigContext& context,
+                             const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
                              const Protobuf::BoolValue& hcm_stream_error);
 } // namespace Utility

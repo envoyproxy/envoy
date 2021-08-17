@@ -282,8 +282,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       bind_to_port_(shouldBindToPort(config)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
-      per_connection_buffer_limit_bytes_(PROTOBUF_GET_NUMBER_OR_PROFILE_DEFAULT(
-          config, config, per_connection_buffer_limit_bytes, 1024 * 1024)),
+      per_connection_buffer_limit_bytes_(
+          PROTOBUF_GET_NUMBER_OR_PROFILE_DEFAULT(config, DefaultsProfile::ConfigContext(config),
+                                                 per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), added_via_api_(added_via_api),
       workers_started_(workers_started), hash_(hash),
       tcp_backlog_size_(

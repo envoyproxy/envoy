@@ -14,7 +14,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
-#include "source/common/common/envoy_defaults.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/grpc/status.h"
@@ -125,10 +124,24 @@ const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
 const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
 
 envoy::config::core::v3::Http2ProtocolOptions
+initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options) {
+  return initializeAndValidateOptions(DefaultsProfile::ConfigContext(), options);
+}
+
+envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
                              const Protobuf::BoolValue& hcm_stream_error) {
-  auto ret = initializeAndValidateOptions(options);
+  return initializeAndValidateOptions(DefaultsProfile::ConfigContext(), options,
+                                      hcm_stream_error_set, hcm_stream_error);
+}
+
+envoy::config::core::v3::Http2ProtocolOptions
+initializeAndValidateOptions(const DefaultsProfile::ConfigContext& context,
+                             const envoy::config::core::v3::Http2ProtocolOptions& options,
+                             bool hcm_stream_error_set,
+                             const Protobuf::BoolValue& hcm_stream_error) {
+  auto ret = initializeAndValidateOptions(context, options);
   if (!options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
     ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
         hcm_stream_error.value());
@@ -137,7 +150,8 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 }
 
 envoy::config::core::v3::Http2ProtocolOptions
-initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options) {
+initializeAndValidateOptions(const DefaultsProfile::ConfigContext& context,
+                             const envoy::config::core::v3::Http2ProtocolOptions& options) {
   envoy::config::core::v3::Http2ProtocolOptions options_clone(options);
   // This will throw an exception when a custom parameter and a named parameter collide.
   validateCustomSettingsParameters(options);
@@ -152,23 +166,30 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
   }
   ASSERT(options_clone.hpack_table_size().value() <= OptionsLimits::MAX_HPACK_TABLE_SIZE);
   if (!options_clone.has_max_concurrent_streams()) {
-    options_clone.mutable_max_concurrent_streams()->set_value(
-        OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+    // options_clone.mutable_max_concurrent_streams()->set_value(
+    //     OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+    options_clone.mutable_max_concurrent_streams()->set_value(DefaultsProfile::get().getNumber(
+        context, "max_concurrent_streams", OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS));
   }
   ASSERT(
       options_clone.max_concurrent_streams().value() >= OptionsLimits::MIN_MAX_CONCURRENT_STREAMS &&
       options_clone.max_concurrent_streams().value() <= OptionsLimits::MAX_MAX_CONCURRENT_STREAMS);
   if (!options_clone.has_initial_stream_window_size()) {
-    options_clone.mutable_initial_stream_window_size()->set_value(
-        OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+    // options_clone.mutable_initial_stream_window_size()->set_value(
+    //     OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+    options_clone.mutable_initial_stream_window_size()->set_value(DefaultsProfile::get().getNumber(
+        context, "initial_stream_window_size", OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE));
   }
   ASSERT(options_clone.initial_stream_window_size().value() >=
              OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE &&
          options_clone.initial_stream_window_size().value() <=
              OptionsLimits::MAX_INITIAL_STREAM_WINDOW_SIZE);
   if (!options_clone.has_initial_connection_window_size()) {
+    // options_clone.mutable_initial_connection_window_size()->set_value(
+    //     OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
     options_clone.mutable_initial_connection_window_size()->set_value(
-        OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+        DefaultsProfile::get().getNumber(context, "initial_connection_window_size",
+                                         OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE));
   }
   ASSERT(options_clone.initial_connection_window_size().value() >=
              OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE &&

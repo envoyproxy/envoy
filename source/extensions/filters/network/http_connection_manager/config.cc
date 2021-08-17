@@ -269,8 +269,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
-      use_remote_address_(
-          PROTOBUF_GET_BOOL_OR_PROFILE_DEFAULT(config, config, use_remote_address, false)),
+      use_remote_address_(PROTOBUF_GET_BOOL_OR_PROFILE_DEFAULT(
+          config, DefaultsProfile::ConfigContext(config), use_remote_address, false)),
       internal_address_config_(createInternalAddressConfig(config)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
@@ -281,6 +281,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.http3_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
       http2_options_(Http2::Utility::initializeAndValidateOptions(
+          DefaultsProfile::ConfigContext(config).appendField("http2_protocol_options"),
           config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
       http1_settings_(Http::Http1::parseHttp1Settings(
@@ -298,11 +299,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
       max_stream_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_stream_duration)),
-      stream_idle_timeout_(PROTOBUF_GET_MS_OR_PROFILE_DEFAULT(config, config, stream_idle_timeout,
-                                                              StreamIdleTimeoutMs)),
+      stream_idle_timeout_(
+          PROTOBUF_GET_MS_OR_PROFILE_DEFAULT(config, DefaultsProfile::ConfigContext(config),
+                                             stream_idle_timeout, StreamIdleTimeoutMs)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
-      request_headers_timeout_(PROTOBUF_GET_MS_OR_PROFILE_DEFAULT(
-          config, config, request_headers_timeout, RequestHeaderTimeoutMs)),
+      request_headers_timeout_(
+          PROTOBUF_GET_MS_OR_PROFILE_DEFAULT(config, DefaultsProfile::ConfigContext(config),
+                                             request_headers_timeout, RequestHeaderTimeoutMs)),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       preserve_external_request_id_(config.preserve_external_request_id()),
