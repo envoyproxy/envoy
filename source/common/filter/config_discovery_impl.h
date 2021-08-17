@@ -84,7 +84,7 @@ public:
   const std::string& name() override { return DynamicFilterConfigProviderImplBase::name(); }
   absl::optional<Envoy::Http::FilterFactoryCb> config() override { return tls_->config_; }
 
-  // Config::DynamicExtensionConfigProviderBase
+  // Config::DynamicExtensionConfigProvider
   void onConfigUpdate(Envoy::Http::FilterFactoryCb config, const std::string&,
                       Config::ConfigAppliedCb cb) override {
     tls_.runOnAllThreads(
