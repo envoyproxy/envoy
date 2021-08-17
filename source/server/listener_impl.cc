@@ -319,6 +319,13 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                               listener_init_target_.ready();
                             }
                           }),
+      transport_factory_context_(
+          std::make_shared<Server::Configuration::TransportSocketFactoryContextImpl>(
+              parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
+              parent_.server_.clusterManager(), parent_.server_.localInfo(),
+              parent_.server_.dispatcher(), parent_.server_.stats(),
+              parent_.server_.singletonManager(), parent_.server_.threadLocal(),
+              validation_visitor_, parent_.server_.api(), parent_.server_.options())),
       quic_stat_names_(parent_.quicStatNames()) {
 
   const absl::optional<std::string> runtime_val =
@@ -389,6 +396,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                             ASSERT(workers_started_);
                             parent_.inPlaceFilterChainUpdate(*this);
                           }),
+      transport_factory_context_(origin.transport_factory_context_),
       quic_stat_names_(parent_.quicStatNames()) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
@@ -537,13 +545,8 @@ void ListenerImpl::validateFilterChains(Network::Socket::Type socket_type) {
 }
 
 void ListenerImpl::buildFilterChains() {
-  Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
-      parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
-      parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
-      parent_.server_.stats(), parent_.server_.singletonManager(), parent_.server_.threadLocal(),
-      validation_visitor_, parent_.server_.api(), parent_.server_.options());
-  transport_factory_context.setInitManager(*dynamic_init_manager_);
-  ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
+  transport_factory_context_->setInitManager(*dynamic_init_manager_);
+  ListenerFilterChainFactoryBuilder builder(*this, *transport_factory_context_);
   filter_chain_manager_.addFilterChains(
       config_.filter_chains(),
       config_.has_default_filter_chain() ? &config_.default_filter_chain() : nullptr, builder,

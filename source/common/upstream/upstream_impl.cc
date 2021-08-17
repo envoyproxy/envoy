@@ -1164,6 +1164,11 @@ void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outli
       [this](const HostSharedPtr& host) -> void { reloadHealthyHosts(host); });
 }
 
+void ClusterImplBase::setTransportFactoryContext(
+    Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context) {
+  transport_factory_context_ = std::move(transport_factory_context);
+}
+
 void ClusterImplBase::reloadHealthyHosts(const HostSharedPtr& host) {
   // Every time a host changes Health Check state we cause a full healthy host recalculation which
   // for expensive LBs (ring, subset, etc.) can be quite time consuming. During startup, this
