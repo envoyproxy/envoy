@@ -156,9 +156,6 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
 
 // Create DNS resolver based on the @param typed_dns_resolver_config, which could be
 // cares DNS resolver, Apple DNS resolver, or any other DNS resolver type.
-// If no DNS resolver type are registered, or none of the registered DNS resolver
-// matching the typed_dns_resolver_config, getAndCheckFactory() will throw an exception
-// and the code will abort.
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
@@ -167,8 +164,7 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
 
   Network::DnsResolverFactory* dns_resolver_factory;
 
-  // If a typed dns resolver is configured, derive the DNS resolver factory from the config.
-  // The code will abort if no factory can be found.
+  // Derive the DNS resolver factory from the config.
   dns_resolver_factory =
       &Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(typed_dns_resolver_config);
 

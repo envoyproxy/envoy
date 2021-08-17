@@ -89,7 +89,8 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
   // where 'dns_resolvers' is specified, we have per-cluster DNS
   // resolvers that are created here but ownership resides with
   // StrictDnsClusterImpl/LogicalDnsCluster.
-  if (cluster.has_typed_dns_resolver_config() ||
+  if ((cluster.has_typed_dns_resolver_config() &&
+       !(cluster.typed_dns_resolver_config().typed_config().type_url().empty())) ||
       (cluster.has_dns_resolution_config() &&
        !cluster.dns_resolution_config().resolvers().empty()) ||
       !cluster.dns_resolvers().empty()) {
