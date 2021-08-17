@@ -184,6 +184,11 @@ public:
                                    absl::string_view method_name,
                                    RawAsyncStreamCallbacks& callbacks,
                                    const Http::AsyncClient::StreamOptions& options) PURE;
+
+protected:
+  // The lifetime of RawAsyncClient must be in the same thread.
+  bool isThreadSafe() { return thread_id_ == std::this_thread::get_id(); }
+  std::thread::id thread_id_{std::this_thread::get_id()};
 };
 
 using RawAsyncClientPtr = std::unique_ptr<RawAsyncClient>;
