@@ -132,7 +132,6 @@ protected:
     const SubscriptionOptions options_;
   };
 
-  void establishGrpcStream() { grpc_stream_.establishNewStream(); }
   void sendGrpcMessage(RQ& msg_proto, S& sub_state);
   void maybeUpdateQueueSizeStat(uint64_t size) { grpc_stream_.maybeUpdateQueueSizeStat(size); }
   bool grpcStreamAvailable() { return grpc_stream_.grpcStreamAvailable(); }
@@ -163,12 +162,12 @@ private:
   // whether we *want* to send a (Delta)DiscoveryRequest).
   bool canSendDiscoveryRequest(const std::string& type_url);
 
-  // Checks whether we have something to say in a (Delta)DiscoveryRequest, which can be an ACK
-  // and/or a subscription update. (Does not check whether we *can* send that
-  // (Delta)DiscoveryRequest). Returns the type_url we should send the DeltaDiscoveryRequest for (if
-  // any). First, prioritizes ACKs over non-ACK subscription interest updates. Then, prioritizes
-  // non-ACK updates in the order the various types of subscriptions were activated (as tracked by
-  // subscription_ordering_).
+  // Checks whether we have something to say in a (Delta)DiscoveryRequest, which can be an ACK and/or
+  // a subscription update. (Does not check whether we *can* send that (Delta)DiscoveryRequest).
+  // Returns the type_url we should send the DeltaDiscoveryRequest for (if any).
+  // First, prioritizes ACKs over non-ACK subscription interest updates.
+  // Then, prioritizes non-ACK updates in the order the various types
+  // of subscriptions were activated (as tracked by subscription_ordering_).
   absl::optional<std::string> whoWantsToSendDiscoveryRequest();
 
   // Invoked when dynamic context parameters change for a resource type.
