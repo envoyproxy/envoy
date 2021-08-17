@@ -423,7 +423,8 @@ private:
                        PrioritySet::UpdateHostsParams&& update_hosts_params,
                        LocalityWeightsConstSharedPtr locality_weights,
                        const HostVector& hosts_added, const HostVector& hosts_removed,
-                       absl::optional<uint32_t> overprovisioning_factor);
+                       absl::optional<uint32_t> overprovisioning_factor,
+                       HostMapConstSharedPtr cross_priority_host_map);
 
       // Drains any connection pools associated with the removed hosts.
       void drainConnPools(const HostVector& hosts_removed);
@@ -471,7 +472,8 @@ private:
                                  PrioritySet::UpdateHostsParams update_hosts_params,
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
-                                 uint64_t overprovisioning_factor);
+                                 uint64_t overprovisioning_factor,
+                                 HostMapConstSharedPtr cross_priority_host_map);
     void onHostHealthFailure(const HostSharedPtr& host);
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
