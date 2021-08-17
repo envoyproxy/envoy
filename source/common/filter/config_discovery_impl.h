@@ -39,7 +39,7 @@ public:
                                       bool last_filter_in_filter_chain,
                                       const std::string& filter_chain_type);
 
-  virtual ~DynamicFilterConfigProviderImplBase();
+  ~DynamicFilterConfigProviderImplBase() override;
   const Init::Target& initTarget() const { return init_target_; }
 
   void validateTypeUrl(const std::string& type_url) const;
@@ -128,7 +128,7 @@ private:
 
   // Currently applied configuration to ensure that the main thread deletes the last reference to
   // it.
-  absl::optional<Envoy::Http::FilterFactoryCb> current_config_;
+  absl::optional<Envoy::Http::FilterFactoryCb> current_config_{absl::nullopt};
   const absl::optional<Envoy::Http::FilterFactoryCb> default_configuration_;
   ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
 };
