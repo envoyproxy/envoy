@@ -39,3 +39,4 @@ Envoy will potentially sanitize the following headers:
 * :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`
 * :ref:`x-forwarded-proto <config_http_conn_man_headers_x-forwarded-proto>`
 * :ref:`x-request-id <config_http_conn_man_headers_x-request-id>`
+* :ref:`referer <config_http_conn_man_headers_referer>`
