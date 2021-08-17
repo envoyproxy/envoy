@@ -38,3 +38,15 @@ py_library(
     name = "exceptions",
     srcs = ["exceptions.py"],
 )
+
+envoy_py_library(
+    "tools.github.release.release",
+    deps = [
+        "//tools/base:aio",
+        "//tools/base:functional",
+        "//tools/base:utils",
+        ":abstract",
+        ":exceptions",
+        requirement("gidgethub"),
+    ],
+)
