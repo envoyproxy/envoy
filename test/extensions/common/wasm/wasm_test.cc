@@ -1683,7 +1683,7 @@ TEST_P(WasmCommonContextTest, EmptyContext) {
   root_context_->validateConfiguration("", plugin_);
 }
 
-TEST(VmCreationRatelimitter, Common) {
+TEST(VmCreationRateLimiter, Common) {
   Event::SimulatedTimeSystem time_system;
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store, time_system);
@@ -1696,32 +1696,32 @@ TEST(VmCreationRatelimitter, Common) {
     // Restart never allowed since restart_config is not given.
     auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
         plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-    proxy_wasm::VmCreationRatelimitter limitter =
-        getVmCreationRatelimitter(plugin->wasmConfig(), scope, *dispatcher);
+    proxy_wasm::VmCreationRateLimiter Limiter =
+        getVmCreationRateLimiter(plugin->wasmConfig(), scope, *dispatcher);
     time_system.setMonotonicTime(std::chrono::seconds(30)); // at 0m30s
-    EXPECT_FALSE(limitter());
+    EXPECT_FALSE(Limiter());
   }
   {
     // Set max restarts
     plugin_config.mutable_vm_config()->mutable_restart_config()->set_max_restart_per_minute(2);
     auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
         plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-    proxy_wasm::VmCreationRatelimitter limitter =
-        getVmCreationRatelimitter(plugin->wasmConfig(), scope, *dispatcher);
+    proxy_wasm::VmCreationRateLimiter Limiter =
+        getVmCreationRateLimiter(plugin->wasmConfig(), scope, *dispatcher);
     // Check on the first window.
     time_system.setMonotonicTime(std::chrono::seconds(30)); // at 0m30s
-    EXPECT_TRUE(limitter());
+    EXPECT_TRUE(Limiter());
     time_system.setMonotonicTime(std::chrono::seconds(40)); // at 0m40s
-    EXPECT_TRUE(limitter());
+    EXPECT_TRUE(Limiter());
     time_system.setMonotonicTime(std::chrono::seconds(50)); // at 0m50s
-    EXPECT_FALSE(limitter());
+    EXPECT_FALSE(Limiter());
     // Move to next window.
     time_system.setMonotonicTime(std::chrono::seconds(70)); // at 1m10s
-    EXPECT_TRUE(limitter());
+    EXPECT_TRUE(Limiter());
     time_system.setMonotonicTime(std::chrono::seconds(80)); // at 1m20s
-    EXPECT_TRUE(limitter());
+    EXPECT_TRUE(Limiter());
     time_system.setMonotonicTime(std::chrono::seconds(110)); // at 1m50s
-    EXPECT_FALSE(limitter());
+    EXPECT_FALSE(Limiter());
   }
 }
 

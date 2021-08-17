@@ -254,9 +254,9 @@ getWasmHandleFactory(WasmConfig& wasm_config, const Stats::ScopeSharedPtr& scope
     auto wasm = std::make_shared<Wasm>(wasm_config, toAbslStringView(vm_key), scope,
                                        cluster_manager, dispatcher);
     wasm->initializeLifecycle(lifecycle_notifier);
-    auto rate_limitter = getVmCreationRatelimitter(wasm_config, scope, dispatcher);
+    auto rate_limiter = getVmCreationRateLimiter(wasm_config, scope, dispatcher);
     return std::static_pointer_cast<WasmHandleBase>(
-        std::make_shared<WasmHandle>(std::move(wasm), std::move(rate_limitter)));
+        std::make_shared<WasmHandle>(std::move(wasm), std::move(rate_limiter)));
   };
 }
 
@@ -279,9 +279,9 @@ proxy_wasm::PluginHandleFactory getPluginHandleFactory() {
   };
 }
 
-proxy_wasm::VmCreationRatelimitter getVmCreationRatelimitter(WasmConfig& wasm_config,
-                                                             const Stats::ScopeSharedPtr& scope,
-                                                             Event::Dispatcher& dispatcher) {
+proxy_wasm::VmCreationRateLimiter getVmCreationRateLimiter(WasmConfig& wasm_config,
+                                                           const Stats::ScopeSharedPtr& scope,
+                                                           Event::Dispatcher& dispatcher) {
   auto stats_handler =
       std::make_shared<LifecycleStatsHandler>(scope, wasm_config.config().vm_config().runtime());
 
@@ -292,8 +292,8 @@ proxy_wasm::VmCreationRatelimitter getVmCreationRatelimitter(WasmConfig& wasm_co
       return false;
     };
   }
-  // Otherwise, create the VmCreationRatelimitterImpl instance with the configuration.
-  auto impl = std::make_shared<VmCreationRatelimitterImpl>(
+  // Otherwise, create the VmCreationRateLimiterImpl instance with the configuration.
+  auto impl = std::make_shared<VmCreationRateLimiterImpl>(
       wasm_config.config().vm_config().restart_config().max_restart_per_minute(), dispatcher);
   return [stats_handler, impl]() -> bool {
     const bool ok = impl->restartAllowed();
@@ -304,7 +304,7 @@ proxy_wasm::VmCreationRatelimitter getVmCreationRatelimitter(WasmConfig& wasm_co
   };
 }
 
-bool VmCreationRatelimitterImpl::restartAllowed() {
+bool VmCreationRateLimiterImpl::restartAllowed() {
   const auto now = dispatcher_.timeSource().monotonicTime();
   const auto current_window_key = std::chrono::floor<std::chrono::minutes>(now);
   const auto prev_window_key = current_window_key - std::chrono::minutes(1);
@@ -316,12 +316,12 @@ bool VmCreationRatelimitterImpl::restartAllowed() {
       prev_restart_window_ = current_restart_window_;
     }
     current_restart_window_ =
-        VmCreationRatelimitterImpl::RestartCountPerMinuteWindow{current_window_key, 0};
+        VmCreationRateLimiterImpl::RestartCountPerMinuteWindow{current_window_key, 0};
   }
 
   if (prev_restart_window_.window_key_ != prev_window_key) {
     prev_restart_window_ =
-        VmCreationRatelimitterImpl::RestartCountPerMinuteWindow{prev_window_key, 0};
+        VmCreationRateLimiterImpl::RestartCountPerMinuteWindow{prev_window_key, 0};
   }
 
   const double current_window_ratio =

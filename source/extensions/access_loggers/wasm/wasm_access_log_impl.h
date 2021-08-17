@@ -11,8 +11,8 @@ namespace AccessLoggers {
 namespace Wasm {
 
 using Common::Wasm::PluginHandleManager;
+using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtr;
 using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
-using Envoy::Extensions::Common::Wasm::Wasm;
 
 class WasmAccessLog : public AccessLog::Instance {
 public:
@@ -32,20 +32,16 @@ public:
       }
     }
 
-    Wasm* wasm = nullptr;
-    auto handle = tls_slot_->get()->handle();
-    if (handle->wasmHandle()) {
-      wasm = handle->wasmHandle()->wasm().get();
-      if (wasm->isFailed()) {
-        // Try to restart.
-        if (tls_slot_->get()->tryRestartPlugin()) {
-          handle = tls_slot_->get()->handle();
-          wasm = handle->wasmHandle()->wasm().get();
-        }
+    auto manager = tls_slot_->get();
+    PluginHandleSharedPtr plugin_handle = manager->handle();
+    if (!plugin_handle) {
+      if (manager->tryRestartPlugin()) {
+        plugin_handle = manager->handle();
       }
     }
-    if (wasm && !wasm->isFailed()) {
-      wasm->log(plugin_, request_headers, response_headers, response_trailers, stream_info);
+    if (plugin_handle && !plugin_handle->isFailed()) {
+      plugin_handle->wasmHandle()->wasm()->log(plugin_, request_headers, response_headers,
+                                               response_trailers, stream_info);
     }
   }
 

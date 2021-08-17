@@ -29,7 +29,7 @@ public:
     auto manager = tls_slot_->get();
     PluginHandleSharedPtr plugin_handle = manager->handle();
     if (!plugin_handle) {
-      if (tls_slot_->get()->tryRestartPlugin()) {
+      if (manager->tryRestartPlugin()) {
         plugin_handle = manager->handle();
       }
     }

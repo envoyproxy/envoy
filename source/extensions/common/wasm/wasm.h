@@ -124,10 +124,10 @@ using WasmSharedPtr = std::shared_ptr<Wasm>;
 
 class WasmHandle : public WasmHandleBase {
 public:
-  // rate_limitter is given only when this is for base wasm.
+  // rate_limiter is given only when this is for base wasm.
   explicit WasmHandle(const WasmSharedPtr& wasm,
-                      proxy_wasm::VmCreationRatelimitter rate_limitter = nullptr)
-      : WasmHandleBase(std::static_pointer_cast<WasmBase>(wasm), rate_limitter), wasm_(wasm) {}
+                      proxy_wasm::VmCreationRateLimiter rate_limiter = nullptr)
+      : WasmHandleBase(std::static_pointer_cast<WasmBase>(wasm), rate_limiter), wasm_(wasm) {}
 
   WasmSharedPtr& wasm() { return wasm_; }
 
@@ -176,13 +176,13 @@ public:
 
 using PluginHandleManagerSharedPtr = std::shared_ptr<PluginHandleManager>;
 
-proxy_wasm::VmCreationRatelimitter getVmCreationRatelimitter(WasmConfig& wasm_config,
-                                                             const Stats::ScopeSharedPtr& scope,
-                                                             Event::Dispatcher& dispatcher);
+proxy_wasm::VmCreationRateLimiter getVmCreationRateLimiter(WasmConfig& wasm_config,
+                                                           const Stats::ScopeSharedPtr& scope,
+                                                           Event::Dispatcher& dispatcher);
 
-class VmCreationRatelimitterImpl {
+class VmCreationRateLimiterImpl {
 public:
-  VmCreationRatelimitterImpl(uint32_t max_restart_per_minute, Event::Dispatcher& dispatcher)
+  VmCreationRateLimiterImpl(uint32_t max_restart_per_minute, Event::Dispatcher& dispatcher)
       : dispatcher_(dispatcher), max_restart_per_minute_(max_restart_per_minute) {}
 
   // Returns true if restart is allowed now for the given max_restart_per_minute in RestartConfig
