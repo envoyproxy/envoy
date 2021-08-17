@@ -510,15 +510,15 @@ public:
 
     // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
     envoy::config::core::v3::DnsResolverOptions dns_resolver_options = dns_resolver_options_;
-    typed_dns_resolver_config_in_construct_ = getTypedDnsResolverConfig(
+    auto typed_dns_resolver_config_in_construct = getTypedDnsResolverConfig(
         {socket_->addressProvider().localAddress()}, dns_resolver_options);
-    typed_dns_resolver_config_not_in_construct_ =
+    auto typed_dns_resolver_config_not_in_construct =
         getTypedDnsResolverConfig({}, dns_resolver_options);
 
     if (setResolverInConstructor()) {
-      resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config_in_construct_);
+      resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config_in_construct);
     } else {
-      resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config_not_in_construct_);
+      resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config_not_in_construct);
     }
 
     // Point c-ares at the listener with no search domains and TCP-only.
@@ -631,8 +631,6 @@ protected:
   Event::DispatcherPtr dispatcher_;
   DnsResolverSharedPtr resolver_;
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
-  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config_in_construct_;
-  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config_not_in_construct_;
 };
 
 // Parameterize the DNS test server socket address.
