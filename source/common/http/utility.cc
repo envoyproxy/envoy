@@ -297,7 +297,7 @@ std::string parseCookie(const HeaderMap& headers, const std::string& key,
 }
 
 std::map<std::string, std::string> Utility::parseCookies(const RequestHeaderMap& headers) {
-  // TODO(theshubhamp): Replace the deuplicated logic from parseCookie(...) with a cookie iterator.
+  // TODO(theshubhamp): Replace this duplicated logic from parseCookie(...) with a cookie iterator.
 
   std::map<std::string, std::string> cookies;
   const Http::HeaderMap::GetResult cookie_headers = headers.get(Http::Headers::get().Cookie);
