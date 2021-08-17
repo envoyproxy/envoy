@@ -130,7 +130,7 @@ template <typename T> static T* removeConst(const void* object) {
 }
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-    : parent_(parent),
+    : MultiplexedStreamImplBase(parent.connection_.dispatcher()), parent_(parent),
       pending_recv_data_(parent_.connection_.dispatcher().getWatermarkFactory().createBuffer(
           [this]() -> void { this->pendingRecvBufferLowWatermark(); },
           [this]() -> void { this->pendingRecvBufferHighWatermark(); },
@@ -149,10 +149,8 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
   }
 }
 
-ConnectionImpl::StreamImpl::~StreamImpl() { ASSERT(stream_idle_timer_ == nullptr); }
-
 void ConnectionImpl::StreamImpl::destroy() {
-  disarmStreamIdleTimer();
+  MultiplexedStreamImplBase::destroy();
   parent_.stats_.streams_active_.dec();
   parent_.stats_.pending_send_bytes_.sub(pending_send_data_->length());
 }
@@ -282,7 +280,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
         trailers.empty() && parent_.skip_encoding_empty_trailers_;
     if (!skip_encoding_empty_trailers) {
       pending_trailers_to_encode_ = cloneTrailers(trailers);
-      createPendingFlushTimer();
+      onLocalEndStream();
     }
   } else {
     submitTrailers(trailers);
@@ -490,18 +488,9 @@ void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers,
   ASSERT(rc == 0);
 }
 
-void ConnectionImpl::ServerStreamImpl::createPendingFlushTimer() {
-  ASSERT(stream_idle_timer_ == nullptr);
-  if (stream_idle_timeout_.count() > 0) {
-    stream_idle_timer_ =
-        parent_.connection_.dispatcher().createTimer([this] { onPendingFlushTimer(); });
-    stream_idle_timer_->enableTimer(stream_idle_timeout_);
-  }
-}
-
 void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
   ENVOY_CONN_LOG(debug, "pending stream flush timeout", parent_.connection_);
-  stream_idle_timer_.reset();
+  MultiplexedStreamImplBase::onPendingFlushTimer();
   parent_.stats_.tx_flush_timeout_.inc();
   ASSERT(local_end_stream_ && !local_end_stream_sent_);
   // This will emit a reset frame for this stream and close the stream locally. No reset callbacks
@@ -540,8 +529,8 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
     // Intended to check through coverage that this error case is tested
     return;
   }
-  if (local_end_stream_ && pending_send_data_->length() > 0) {
-    createPendingFlushTimer();
+  if (local_end_stream_) {
+    onLocalEndStream();
   }
 }
 
