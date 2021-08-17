@@ -141,7 +141,6 @@ public:
     return metadata_ == rhs.metadata_ && data_ == rhs.data_;
   };
 
-private:
   const Data data_;
 };
 
