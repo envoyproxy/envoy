@@ -120,8 +120,11 @@ EngineSharedPtr EngineBuilder::build() {
   null_logger.release = envoy_noop_const_release;
   null_logger.context = nullptr;
 
+  envoy_event_tracker null_tracker{};
+
   auto config_str = this->generateConfigStr();
-  auto envoy_engine = init_engine(this->callbacks_->asEnvoyEngineCallbacks(), null_logger);
+  auto envoy_engine =
+      init_engine(this->callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
   run_engine(envoy_engine, config_str.c_str(), logLevelToString(this->log_level_).c_str());
 
   // we can't construct via std::make_shared

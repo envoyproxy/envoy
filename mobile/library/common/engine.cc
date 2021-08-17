@@ -4,6 +4,7 @@
 
 #include "source/common/common/lock_guard.h"
 
+#include "library/common/bridge/utility.h"
 #include "library/common/config/internal.h"
 #include "library/common/data/utility.h"
 #include "library/common/stats/utility.h"
@@ -11,14 +12,19 @@
 namespace Envoy {
 
 Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
-               std::atomic<envoy_network_t>& preferred_network)
-    : callbacks_(callbacks), logger_(logger),
+               envoy_event_tracker event_tracker, std::atomic<envoy_network_t>& preferred_network)
+    : callbacks_(callbacks), logger_(logger), event_tracker_(event_tracker),
       dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()),
       preferred_network_(preferred_network) {
   // Ensure static factory registration occurs on time.
   // TODO: ensure this is only called one time once multiple Engine objects can be allocated.
   // https://github.com/lyft/envoy-mobile/issues/332
   ExtensionRegistry::registerFactories();
+
+  // TODO(Augustyniak): Capturing an address of event_tracker_ and registering it in the API
+  // registry may lead to crashes at Engine shutdown. To be figured out as part of
+  // https://github.com/lyft/envoy-mobile/issues/332
+  Envoy::Api::External::registerApi(std::string(envoy_event_tracker_api_name), &event_tracker_);
 }
 
 envoy_status_t Engine::run(const std::string config, const std::string log_level) {
@@ -50,6 +56,15 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
   {
     Thread::LockGuard lock(mutex_);
     try {
+      if (event_tracker_.track != nullptr) {
+        assert_handler_registration_ =
+            Assert::addDebugAssertionFailureRecordAction([this](const char* location) {
+              const auto event = Bridge::makeEnvoyMap(
+                  {{"name", "assertion"}, {"location", std::string(location)}});
+              event_tracker_.track(event, event_tracker_.context);
+            });
+      }
+
       main_common = std::make_unique<EngineCommon>(envoy_argv.size() - 1, envoy_argv.data());
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
@@ -104,6 +119,7 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
   stat_name_set_.reset();
   lambda_logger_.reset(nullptr);
   main_common.reset(nullptr);
+  assert_handler_registration_.reset(nullptr);
 
   callbacks_.on_exit(callbacks_.context);
 
