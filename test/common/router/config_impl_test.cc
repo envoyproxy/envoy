@@ -2139,7 +2139,7 @@ virtual_hosts:
     routes:
       - match:
           prefix: "/"
-          dynamic_metadatas:
+          dynamic_metadata:
           - filter: example
             path:
             - key: k1
@@ -2150,7 +2150,7 @@ virtual_hosts:
           cluster: foo
       - match:
           prefix: "/"
-          dynamic_metadatas:
+          dynamic_metadata:
           - filter: example
             path:
             - key: k2

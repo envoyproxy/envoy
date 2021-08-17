@@ -524,7 +524,7 @@ message RouteMatch {
   // The router will check the dynamic metadata against all the specified dynamic metadata matchers.
   // If the number of specified dynamic metadata matchers is nonzero, they all must match the
   // dynamic metadata for a match to occur.
-  repeated type.matcher.v3.MetadataMatcher dynamic_metadatas = 13;
+  repeated type.matcher.v3.MetadataMatcher dynamic_metadata = 13;
 }
 
 // [#next-free-field: 12]

@@ -360,8 +360,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           route, per_request_buffer_limit_bytes, vhost.retryShadowBufferLimit())),
       metadata_(route.metadata()), typed_metadata_(route.metadata()),
       match_grpc_(route.match().has_grpc()),
-      dynamic_metadatas_(route.match().dynamic_metadatas().begin(),
-                         route.match().dynamic_metadatas().end()),
+      dynamic_metadata_(route.match().dynamic_metadata().begin(),
+                        route.match().dynamic_metadata().end()),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       route_tracing_(parseRouteTracing(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
@@ -547,7 +547,7 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
 
   matches &= evaluateTlsContextMatch(stream_info);
 
-  for (const auto& m : dynamic_metadatas_) {
+  for (const auto& m : dynamic_metadata_) {
     if (!matches) {
       // No need to check anymore as all dynamic metadata matchers must match for a match to occur.
       break;
