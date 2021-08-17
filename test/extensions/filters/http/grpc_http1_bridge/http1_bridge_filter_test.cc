@@ -42,6 +42,7 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
+  TestScopedRuntime scoped_runtime_;
 };
 
 TEST_F(GrpcHttp1BridgeFilterTest, NoRoute) {
@@ -102,7 +103,6 @@ TEST_F(GrpcHttp1BridgeFilterTest, StatsHttp2HeaderOnlyResponse) {
       {"content-type", "application/grpc"},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
 
-  TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.grpc_bridge_stats_disabled", "false"}});
 
@@ -252,7 +252,6 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {
 
 // Verifies that we convert grpc-status to the appropriates status code for a headers only response
 TEST_F(GrpcHttp1BridgeFilterTest, HandlingHeadersOnlyResponseBadGrpcStatus) {
-  TestScopedRuntime scoped_runtime;
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc"},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
