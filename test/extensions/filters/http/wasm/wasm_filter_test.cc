@@ -42,8 +42,8 @@ using WasmFilterConfig = envoy::extensions::filters::http::wasm::v3::Wasm;
 
 class TestFilter : public Envoy::Extensions::Common::Wasm::Context {
 public:
-  TestFilter(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
-      : Envoy::Extensions::Common::Wasm::Context(wasm, root_context_id, plugin_handle) {}
+  TestFilter(PluginHandleSharedPtr plugin_handle, bool fail_open)
+      : Envoy::Extensions::Common::Wasm::Context(plugin_handle, fail_open) {}
   MOCK_CONTEXT_LOG_;
 };
 

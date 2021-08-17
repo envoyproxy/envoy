@@ -231,41 +231,6 @@ void Wasm::onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnap
   context->onStatsUpdate(snapshot);
 }
 
-bool WasmHandle::restartAllowed() {
-  ASSERT(is_base_wasm_); // restartAllowed must be called on base Wasm handle.
-  const auto now = wasm()->dispatcher().timeSource().monotonicTime();
-  const auto current_window_key = std::chrono::floor<std::chrono::minutes>(now);
-  const auto prev_window_key = current_window_key - std::chrono::minutes(1);
-
-  // Take write lock since this might be called from any thread.
-  absl::WriterMutexLock lock(&restart_counter_mutext_);
-  if (current_restart_window_.window_key_ != current_window_key) {
-    if (current_restart_window_.window_key_ == prev_window_key) {
-      prev_restart_window_ = current_restart_window_;
-    }
-    current_restart_window_ = WasmHandle::RestartCountPerMinuteWindow{current_window_key, 0};
-  }
-
-  if (prev_restart_window_.window_key_ != prev_window_key) {
-    prev_restart_window_ = WasmHandle::RestartCountPerMinuteWindow{prev_window_key, 0};
-  }
-
-  const double current_window_ratio =
-      static_cast<double>((now - current_window_key).count()) /
-      MonotonicTime(std::chrono::minutes(1)).time_since_epoch().count();
-  const double prev_window_ratio = 1.0 - current_window_ratio;
-  const double current_weight =
-      static_cast<double>(current_restart_window_.count_ + 1) * current_window_ratio;
-  const double prev_weight = static_cast<double>(prev_restart_window_.count_) * prev_window_ratio;
-  const auto allowed = current_weight + prev_weight <= static_cast<double>(max_restart_per_minute_);
-
-  if (allowed) {
-    // Assume that the new VM will be created right after this function at call sites.
-    current_restart_window_.count_++;
-  }
-  return allowed;
-}
-
 void clearCodeCacheForTesting() {
   std::lock_guard<std::mutex> guard(code_cache_mutex);
   if (code_cache) {
@@ -289,12 +254,13 @@ getWasmHandleFactory(WasmConfig& wasm_config, const Stats::ScopeSharedPtr& scope
     auto wasm = std::make_shared<Wasm>(wasm_config, toAbslStringView(vm_key), scope,
                                        cluster_manager, dispatcher);
     wasm->initializeLifecycle(lifecycle_notifier);
+    auto rate_limitter = getVmCreationRatelimitter(wasm_config, scope, dispatcher);
     return std::static_pointer_cast<WasmHandleBase>(
-        std::make_shared<WasmHandle>(wasm_config, std::move(wasm)));
+        std::make_shared<WasmHandle>(std::move(wasm), std::move(rate_limitter)));
   };
 }
 
-static proxy_wasm::WasmHandleCloneFactory
+proxy_wasm::WasmHandleCloneFactory
 getWasmHandleCloneFactory(Event::Dispatcher& dispatcher,
                           CreateContextFn create_root_context_for_testing) {
   return [&dispatcher, create_root_context_for_testing](
@@ -305,12 +271,73 @@ getWasmHandleCloneFactory(Event::Dispatcher& dispatcher,
   };
 }
 
-static proxy_wasm::PluginHandleFactory getPluginHandleFactory() {
+proxy_wasm::PluginHandleFactory getPluginHandleFactory() {
   return [](WasmHandleBaseSharedPtr wasm,
             PluginBaseSharedPtr plugin) -> std::shared_ptr<PluginHandleBase> {
     return std::static_pointer_cast<PluginHandleBase>(std::make_shared<PluginHandle>(
         std::static_pointer_cast<WasmHandle>(wasm), std::static_pointer_cast<Plugin>(plugin)));
   };
+}
+
+proxy_wasm::VmCreationRatelimitter getVmCreationRatelimitter(WasmConfig& wasm_config,
+                                                             const Stats::ScopeSharedPtr& scope,
+                                                             Event::Dispatcher& dispatcher) {
+  auto stats_handler =
+      std::make_shared<LifecycleStatsHandler>(scope, wasm_config.config().vm_config().runtime());
+
+  // If the configuration is not given, then we do not allow restarts.
+  if (!wasm_config.config().vm_config().has_restart_config()) {
+    return [stats_handler]() -> bool {
+      stats_handler->onEvent(WasmEvent::VmRestart);
+      return false;
+    };
+  }
+  // Otherwise, create the VmCreationRatelimitterImpl instance with the configuration.
+  auto impl = std::make_shared<VmCreationRatelimitterImpl>(
+      wasm_config.config().vm_config().restart_config().max_restart_per_minute(), dispatcher);
+  return [stats_handler, impl]() -> bool {
+    const bool ok = impl->restartAllowed();
+    if (ok) {
+      stats_handler->onEvent(WasmEvent::VmRestart);
+    }
+    return ok;
+  };
+}
+
+bool VmCreationRatelimitterImpl::restartAllowed() {
+  const auto now = dispatcher_.timeSource().monotonicTime();
+  const auto current_window_key = std::chrono::floor<std::chrono::minutes>(now);
+  const auto prev_window_key = current_window_key - std::chrono::minutes(1);
+
+  // Take write lock since this might be called from any thread.
+  absl::WriterMutexLock lock(&restart_counter_mutext_);
+  if (current_restart_window_.window_key_ != current_window_key) {
+    if (current_restart_window_.window_key_ == prev_window_key) {
+      prev_restart_window_ = current_restart_window_;
+    }
+    current_restart_window_ =
+        VmCreationRatelimitterImpl::RestartCountPerMinuteWindow{current_window_key, 0};
+  }
+
+  if (prev_restart_window_.window_key_ != prev_window_key) {
+    prev_restart_window_ =
+        VmCreationRatelimitterImpl::RestartCountPerMinuteWindow{prev_window_key, 0};
+  }
+
+  const double current_window_ratio =
+      static_cast<double>((now - current_window_key).count()) /
+      MonotonicTime(std::chrono::minutes(1)).time_since_epoch().count();
+  const double prev_window_ratio = 1.0 - current_window_ratio;
+  const double current_weight =
+      static_cast<double>(current_restart_window_.count_ + 1) * current_window_ratio;
+  const double prev_weight = static_cast<double>(prev_restart_window_.count_) * prev_window_ratio;
+  const auto allowed = current_weight + prev_weight <= static_cast<double>(max_restart_per_minute_);
+
+  if (allowed) {
+    // Assume that the new VM will be created right after this function at call sites.
+    current_restart_window_.count_++;
+  }
+  return allowed;
 }
 
 WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm) {
@@ -415,7 +442,7 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
     }
 
     auto config = plugin->wasmConfig();
-    auto wasm = proxy_wasm::createWasm(
+    auto wasm = proxy_wasm::createBaseWasm(
         vm_key, code, plugin,
         getWasmHandleFactory(config, scope, cluster_manager, dispatcher, lifecycle_notifier),
         getWasmHandleCloneFactory(dispatcher, create_root_context_for_testing),
@@ -485,53 +512,6 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
     return complete_cb(code);
   }
   return true;
-}
-
-bool PluginHandleManager::initializePluginHandle() {
-  if (!base_wasm_handle_) {
-    if (!plugin_->fail_open_) {
-      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), critical,
-                          "Plugin configured to fail closed failed to load");
-    }
-    // To handle the case when failed to create VMs and fail-open/close properly,
-    // we still create PluginHandle with null WasmHandle.
-    handle_ = std::make_shared<PluginHandle>(nullptr, plugin_);
-    return false;
-  } else {
-    handle_ = std::static_pointer_cast<PluginHandle>(proxy_wasm::getOrCreateThreadLocalPlugin(
-        std::static_pointer_cast<WasmHandle>(base_wasm_handle_), plugin_,
-        getWasmHandleCloneFactory(dispatcher_, create_root_context_for_testing_),
-        getPluginHandleFactory()));
-    return handle_->wasmHandle() != nullptr;
-  }
-}
-
-bool PluginHandleManager::tryRestartPlugin() {
-  // If the base_wasm is not created, then we have no way to restart thread-local one.
-  if (!base_wasm_handle_) {
-    return false;
-  }
-  const auto base_wasm = base_wasm_handle_->wasm();
-
-  // Check if the VM is already restarted for the vm_key.
-  const bool should_vm_restart = !proxy_wasm::getThreadLocalWasm(base_wasm->vm_key());
-  if (should_vm_restart) {
-    // This case we have to restart VM (i.e. recreate a new thread-local Wasm).
-    // So we check if the restart is not rate limited.
-    if (!base_wasm_handle_->restartAllowed()) {
-      ENVOY_LOG(error, "Could not restart Thread-local Wasm due to rate-limit");
-      // Rate-limited.
-      return false;
-    }
-  }
-
-  // Now restart the thread-local plugin.
-  const auto result = initializePluginHandle();
-  if (result && should_vm_restart) {
-    ENVOY_LOG(error, "Thread-local Wasm restarted");
-    base_wasm->lifecycleStatsHandler().onEvent(WasmEvent::VmRestart);
-  }
-  return result;
 }
 
 } // namespace Wasm

@@ -11,6 +11,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::network::wasm::v3::
           context.threadLocal())) {
   const auto plugin = std::make_shared<Common::Wasm::Plugin>(
       config.config(), context.direction(), context.localInfo(), &context.listenerMetadata());
+  fail_open_ = plugin->wasmConfig().config().fail_open();
 
   auto callback = [plugin, this](Common::Wasm::WasmHandleSharedPtr base_wasm) {
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.

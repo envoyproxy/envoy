@@ -28,8 +28,8 @@ using proxy_wasm::ContextBase;
 
 class TestFilter : public Context {
 public:
-  TestFilter(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
-      : Context(wasm, root_context_id, plugin_handle) {}
+  TestFilter(PluginHandleSharedPtr plugin_handle, bool fail_open)
+      : Context(plugin_handle, fail_open) {}
   MOCK_CONTEXT_LOG_;
 
   void testClose() { onCloseTCP(); }

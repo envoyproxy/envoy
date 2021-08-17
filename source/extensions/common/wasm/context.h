@@ -112,11 +112,10 @@ class Context : public proxy_wasm::ContextBase,
                 public google::api::expr::runtime::BaseActivation,
                 public std::enable_shared_from_this<Context> {
 public:
-  Context();                                          // Testing.
-  Context(Wasm* wasm);                                // Vm Context.
-  Context(Wasm* wasm, const PluginSharedPtr& plugin); // Root Context.
-  Context(Wasm* wasm, uint32_t root_context_id,
-          PluginHandleSharedPtr plugin_handle); // Stream context.
+  Context();                                                    // Testing.
+  Context(Wasm* wasm);                                          // Vm Context.
+  Context(Wasm* wasm, const PluginSharedPtr& plugin);           // Root Context.
+  Context(PluginHandleSharedPtr plugin_handle, bool fail_open); // Stream context.
   ~Context() override;
 
   Wasm* wasm() const;
@@ -399,7 +398,7 @@ protected:
   const Http::HeaderMap* getConstMap(WasmHeaderMapType type);
 
   const LocalInfo::LocalInfo* root_local_info_{nullptr}; // set only for root_context.
-  PluginHandleSharedPtr plugin_handle_{nullptr};
+  PluginSharedPtr plugin_{nullptr};
 
   uint32_t next_http_call_token_ = 1;
   uint32_t next_grpc_token_ = 1; // Odd tokens are for Calls even for Streams.

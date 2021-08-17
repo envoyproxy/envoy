@@ -93,7 +93,10 @@ public:
                                          remote_data_provider_, create_wasm_callback, create_root);
   }
 
-  WasmHandleSharedPtr& wasmHandle() { return plugin_handle_manager_->handle()->wasmHandle(); }
+  WasmHandleSharedPtr wasmHandle() {
+    const auto plugin_handle = plugin_handle_manager_->handle();
+    return plugin_handle ? plugin_handle->wasmHandle() : nullptr;
+  }
   Context* rootContext() { return root_context_; }
 
   DeferredRunner deferred_runner_;
@@ -138,11 +141,8 @@ private:
 template <typename Base = testing::Test> class WasmHttpFilterTestBase : public WasmTestBase<Base> {
 public:
   template <typename TestFilter> void setupFilterBase() {
-    auto wasm =
-        WasmTestBase<Base>::wasmHandle() ? WasmTestBase<Base>::wasmHandle()->wasm().get() : nullptr;
-    int root_context_id = wasm ? wasm->getRootContext(WasmTestBase<Base>::plugin_, false)->id() : 0;
-    context_ = std::make_unique<TestFilter>(wasm, root_context_id,
-                                            WasmTestBase<Base>::plugin_handle_manager_->handle());
+    context_ = std::make_unique<TestFilter>(WasmTestBase<Base>::plugin_handle_manager_->handle(),
+                                            WasmTestBase<Base>::plugin_->fail_open_);
     context_->setDecoderFilterCallbacks(decoder_callbacks_);
     context_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -157,11 +157,8 @@ template <typename Base = testing::Test>
 class WasmNetworkFilterTestBase : public WasmTestBase<Base> {
 public:
   template <typename TestFilter> void setupFilterBase() {
-    auto wasm =
-        WasmTestBase<Base>::wasmHandle() ? WasmTestBase<Base>::wasmHandle()->wasm().get() : nullptr;
-    int root_context_id = wasm ? wasm->getRootContext(WasmTestBase<Base>::plugin_, false)->id() : 0;
-    context_ = std::make_unique<TestFilter>(wasm, root_context_id,
-                                            WasmTestBase<Base>::plugin_handle_manager_->handle());
+    context_ = std::make_unique<TestFilter>(WasmTestBase<Base>::plugin_handle_manager_->handle(),
+                                            WasmTestBase<Base>::plugin_->fail_open_);
     context_->initializeReadFilterCallbacks(read_filter_callbacks_);
     context_->initializeWriteFilterCallbacks(write_filter_callbacks_);
   }

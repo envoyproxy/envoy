@@ -142,14 +142,16 @@ WasmResult Buffer::copyFrom(size_t start, size_t length, std::string_view data) 
 
 Context::Context() = default;
 Context::Context(Wasm* wasm) : ContextBase(wasm) {}
-Context::Context(Wasm* wasm, const PluginSharedPtr& plugin) : ContextBase(wasm, plugin) {
+Context::Context(Wasm* wasm, const PluginSharedPtr& plugin)
+    : ContextBase(wasm, plugin), plugin_(plugin) {
   root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->localInfo();
 }
-Context::Context(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
-    : ContextBase(wasm, root_context_id, plugin_handle), plugin_handle_(plugin_handle) {}
+Context::Context(PluginHandleSharedPtr plugin_handle, bool fail_open)
+    : ContextBase(plugin_handle, fail_open),
+      plugin_(plugin_handle ? plugin_handle->plugin() : nullptr) {}
 
 Wasm* Context::wasm() const { return static_cast<Wasm*>(wasm_); }
-Plugin* Context::plugin() const { return static_cast<Plugin*>(plugin_.get()); }
+Plugin* Context::plugin() const { return plugin_.get(); }
 Context* Context::rootContext() const { return static_cast<Context*>(root_context()); }
 Upstream::ClusterManager& Context::clusterManager() const { return wasm()->clusterManager(); }
 
@@ -496,7 +498,7 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     if (root_local_info_) {
       return CelProtoWrapper::CreateMessage(&root_local_info_->node(), arena);
     } else if (plugin_) {
-      return CelProtoWrapper::CreateMessage(&plugin()->localInfo().node(), arena);
+      return CelProtoWrapper::CreateMessage(&plugin_->localInfo().node(), arena);
     }
     break;
   case PropertyToken::SOURCE:
@@ -513,12 +515,12 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     break;
   case PropertyToken::LISTENER_DIRECTION:
     if (plugin_) {
-      return CelValue::CreateInt64(plugin()->direction());
+      return CelValue::CreateInt64(plugin_->direction());
     }
     break;
   case PropertyToken::LISTENER_METADATA:
     if (plugin_) {
-      return CelProtoWrapper::CreateMessage(plugin()->listenerMetadata(), arena);
+      return CelProtoWrapper::CreateMessage(plugin_->listenerMetadata(), arena);
     }
     break;
   case PropertyToken::CLUSTER_NAME:
@@ -557,7 +559,7 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     break;
   case PropertyToken::PLUGIN_NAME:
     if (plugin_) {
-      return CelValue::CreateStringView(plugin()->name_);
+      return CelValue::CreateStringView(plugin_->name_);
     }
     break;
   case PropertyToken::PLUGIN_ROOT_ID:

@@ -248,8 +248,9 @@ TEST_P(WasmCommonTest, PluginHandleManagerTryRestart) {
     // Restarts cannot be done with NullVm.
     return;
   }
-  std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_panic_cpp.wasm")));
+  std::string code =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+          "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_panic_on_tick_cpp.wasm")));
   EXPECT_FALSE(code.empty());
 
   Stats::IsolatedStoreImpl stats_store;
@@ -297,9 +298,7 @@ TEST_P(WasmCommonTest, PluginHandleManagerTryRestart) {
   EXPECT_NE(plugin_handle_manager.handle(), nullptr);
 
   // Cause panic.
-  auto context = std::make_unique<Context>(
-      plugin_handle_manager.handle()->wasmHandle()->wasm().get(),
-      plugin_handle_manager.handle()->rootContextId(), plugin_handle_manager.handle());
+  auto context = std::make_unique<Context>(plugin_handle_manager.handle(), false);
   context->onTick(0);
   EXPECT_TRUE(plugin_handle_manager.handle()->wasmHandle()->wasm()->isFailed());
   // Restart without being rate limited.
@@ -307,15 +306,12 @@ TEST_P(WasmCommonTest, PluginHandleManagerTryRestart) {
   EXPECT_TRUE(plugin_handle_manager.tryRestartPlugin());
   EXPECT_FALSE(plugin_handle_manager.handle()->wasmHandle()->wasm()->isFailed());
   // Cause panic again.
-  context = std::make_unique<Context>(plugin_handle_manager.handle()->wasmHandle()->wasm().get(),
-                                      plugin_handle_manager.handle()->rootContextId(),
-                                      plugin_handle_manager.handle());
+  context = std::make_unique<Context>(plugin_handle_manager.handle(), false);
   context->onTick(0);
   EXPECT_TRUE(plugin_handle_manager.handle()->wasmHandle()->wasm()->isFailed());
   // Cannot restart since we've reached the limit - rate limited.
   time_system.setMonotonicTime(std::chrono::seconds(40)); // at 0m40s
   EXPECT_FALSE(plugin_handle_manager.tryRestartPlugin());
-  EXPECT_TRUE(plugin_handle_manager.handle()->wasmHandle()->wasm()->isFailed());
   // In the near future time (approximately one minute later), rate-limit is removed.
   time_system.setMonotonicTime(std::chrono::seconds(80)); // at 1m20
   EXPECT_TRUE(plugin_handle_manager.tryRestartPlugin());
@@ -350,8 +346,9 @@ TEST_P(WasmCommonTest, PluginHandleManagerTryRestartForMultiplePlugin) {
   auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
   NiceMock<LocalInfo::MockLocalInfo> local_info;
 
-  std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_panic_cpp.wasm")));
+  std::string code =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+          "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_panic_on_tick_cpp.wasm")));
   EXPECT_FALSE(code.empty());
 
   // Create two plugin configs with different configuration - which means they share VM.
@@ -402,9 +399,7 @@ TEST_P(WasmCommonTest, PluginHandleManagerTryRestartForMultiplePlugin) {
       plugin_handle_manager1.handle()->wasmHandle()->wasm()->lifecycleStatsHandler();
 
   // Cause panic.
-  auto context = std::make_unique<Context>(
-      plugin_handle_manager1.handle()->wasmHandle()->wasm().get(),
-      plugin_handle_manager1.handle()->rootContextId(), plugin_handle_manager1.handle());
+  auto context = std::make_unique<Context>(plugin_handle_manager1.handle(), false);
   context->onTick(0);
   EXPECT_TRUE(plugin_handle_manager1.handle()->wasmHandle()->wasm()->isFailed());
   EXPECT_TRUE(plugin_handle_manager2.handle()->wasmHandle()->wasm()->isFailed());
@@ -415,9 +410,7 @@ TEST_P(WasmCommonTest, PluginHandleManagerTryRestartForMultiplePlugin) {
   EXPECT_EQ(lifecycle_stats.getRestartCountForTest(), 1);
 
   // Cause panic again.
-  context = std::make_unique<Context>(plugin_handle_manager1.handle()->wasmHandle()->wasm().get(),
-                                      plugin_handle_manager1.handle()->rootContextId(),
-                                      plugin_handle_manager1.handle());
+  context = std::make_unique<Context>(plugin_handle_manager1.handle(), false);
   context->onTick(0);
   EXPECT_TRUE(plugin_handle_manager1.handle()->wasmHandle()->wasm()->isFailed());
   EXPECT_TRUE(plugin_handle_manager2.handle()->wasmHandle()->wasm()->isFailed());
@@ -447,52 +440,6 @@ TEST(PluginHandleManager, tryRestartPluginInvalidBaseWasm) {
 
   auto manager = std::make_unique<PluginHandleManager>(nullptr, plugin, *dispatcher);
   EXPECT_FALSE(manager->tryRestartPlugin());
-}
-
-TEST(WasmHandle, RestartAllowed) {
-  Logger::Registry::getLog(Logger::Id::wasm).set_level(spdlog::level::debug);
-
-  Event::SimulatedTimeSystem time_system;
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store, time_system);
-  Upstream::MockClusterManager cluster_manager;
-  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
-  envoy::extensions::wasm::v3::PluginConfig plugin_config;
-  {
-    // Restart never allowed since restart_config is not given.
-    auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
-        plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-    auto wasm = std::make_shared<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), "", scope,
-                                                                 cluster_manager, *dispatcher);
-    auto handle = std::make_unique<WasmHandle>(plugin->wasmConfig(), wasm);
-    time_system.setMonotonicTime(std::chrono::seconds(30)); // at 0m30s
-    EXPECT_FALSE(handle->restartAllowed());
-  }
-  {
-    // Set max restarts
-    plugin_config.mutable_vm_config()->mutable_restart_config()->set_max_restart_per_minute(2);
-    auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
-        plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-    auto wasm = std::make_shared<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), "", scope,
-                                                                 cluster_manager, *dispatcher);
-    auto handle = std::make_unique<WasmHandle>(plugin->wasmConfig(), wasm);
-    // Check on the first window.
-    time_system.setMonotonicTime(std::chrono::seconds(30)); // at 0m30s
-    EXPECT_TRUE(handle->restartAllowed());
-    time_system.setMonotonicTime(std::chrono::seconds(40)); // at 0m40s
-    EXPECT_TRUE(handle->restartAllowed());
-    time_system.setMonotonicTime(std::chrono::seconds(50)); // at 0m50s
-    EXPECT_FALSE(handle->restartAllowed());
-    // Move to next window.
-    time_system.setMonotonicTime(std::chrono::seconds(70)); // at 1m10s
-    EXPECT_TRUE(handle->restartAllowed());
-    time_system.setMonotonicTime(std::chrono::seconds(80)); // at 1m20s
-    EXPECT_TRUE(handle->restartAllowed());
-    time_system.setMonotonicTime(std::chrono::seconds(110)); // at 1m50s
-    EXPECT_FALSE(handle->restartAllowed());
-  }
 }
 
 TEST_P(WasmCommonTest, BadSignature) {
@@ -1003,30 +950,22 @@ TEST_P(WasmCommonTest, VmCache) {
   EXPECT_NE(wasm_handle2, nullptr);
   EXPECT_EQ(wasm_handle, wasm_handle2);
 
-  auto plugin_handle_local = getOrCreateThreadLocalPlugin(
-      wasm_handle, plugin,
-      [&dispatcher](const WasmHandleBaseSharedPtr& base_wasm) -> WasmHandleBaseSharedPtr {
-        auto wasm =
-            std::make_shared<Wasm>(std::static_pointer_cast<WasmHandle>(base_wasm), *dispatcher);
-        wasm->setCreateContextForTesting(
-            nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
-              auto root_context = new TestContext(wasm, plugin);
-              EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_vm_start vm_cache")));
-              EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_done logging")));
-              EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_delete logging")));
-              return root_context;
-            });
-        return std::make_shared<WasmHandle>(wasm);
-      },
-      [](const WasmHandleBaseSharedPtr& wasm_handle,
-         const PluginBaseSharedPtr& plugin) -> PluginHandleBaseSharedPtr {
-        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(wasm_handle),
-                                              std::static_pointer_cast<Plugin>(plugin));
+  auto plugin_handle_manager = std::make_shared<PluginHandleManager>(
+      wasm_handle, plugin, *dispatcher,
+      [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+        auto root_context = new TestContext(wasm, plugin);
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_vm_start vm_cache")));
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_done logging")));
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_delete logging")));
+        return root_context;
       });
+
+  auto plugin_handle_local = plugin_handle_manager->handle();
+  plugin_handle_manager.reset();
   wasm_handle.reset();
   wasm_handle2.reset();
 
-  auto wasm = plugin_handle_local->wasm();
+  auto wasm = plugin_handle_local->wasmHandle()->wasm();
   plugin_handle_local.reset();
 
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
@@ -1126,29 +1065,21 @@ TEST_P(WasmCommonTest, RemoteCode) {
 
   EXPECT_NE(wasm_handle, nullptr);
 
-  auto plugin_handle_local = getOrCreateThreadLocalPlugin(
-      wasm_handle, plugin,
-      [&dispatcher](const WasmHandleBaseSharedPtr& base_wasm) -> WasmHandleBaseSharedPtr {
-        auto wasm =
-            std::make_shared<Wasm>(std::static_pointer_cast<WasmHandle>(base_wasm), *dispatcher);
-        wasm->setCreateContextForTesting(
-            nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
-              auto root_context = new TestContext(wasm, plugin);
-              EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_vm_start vm_cache")));
-              EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_done logging")));
-              EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_delete logging")));
-              return root_context;
-            });
-        return std::make_shared<WasmHandle>(wasm);
-      },
-      [](const WasmHandleBaseSharedPtr& wasm_handle,
-         const PluginBaseSharedPtr& plugin) -> PluginHandleBaseSharedPtr {
-        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(wasm_handle),
-                                              std::static_pointer_cast<Plugin>(plugin));
+  auto plugin_handle_manager = std::make_shared<PluginHandleManager>(
+      wasm_handle, plugin, *dispatcher,
+      [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+        auto root_context = new TestContext(wasm, plugin);
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_vm_start vm_cache")));
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_done logging")));
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_delete logging")));
+        return root_context;
       });
+
+  auto plugin_handle_local = plugin_handle_manager->handle();
+  plugin_handle_manager.reset();
   wasm_handle.reset();
 
-  auto wasm = plugin_handle_local->wasm();
+  auto wasm = plugin_handle_local->wasmHandle()->wasm();
   plugin_handle_local.reset();
 
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
@@ -1253,29 +1184,20 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_NE(wasm_handle, nullptr);
 
-  auto plugin_handle_local = getOrCreateThreadLocalPlugin(
-      wasm_handle, plugin,
-      [&dispatcher](const WasmHandleBaseSharedPtr& base_wasm) -> WasmHandleBaseSharedPtr {
-        auto wasm =
-            std::make_shared<Wasm>(std::static_pointer_cast<WasmHandle>(base_wasm), *dispatcher);
-        wasm->setCreateContextForTesting(
-            nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
-              auto root_context = new TestContext(wasm, plugin);
-              EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_vm_start vm_cache")));
-              EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_done logging")));
-              EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_delete logging")));
-              return root_context;
-            });
-        return std::make_shared<WasmHandle>(wasm);
-      },
-      [](const WasmHandleBaseSharedPtr& wasm_handle,
-         const PluginBaseSharedPtr& plugin) -> PluginHandleBaseSharedPtr {
-        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(wasm_handle),
-                                              std::static_pointer_cast<Plugin>(plugin));
+  auto plugin_handle_manager = std::make_shared<PluginHandleManager>(
+      wasm_handle, plugin, *dispatcher,
+      [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+        auto root_context = new TestContext(wasm, plugin);
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_vm_start vm_cache")));
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_done logging")));
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_delete logging")));
+        return root_context;
       });
+  auto plugin_handle_local = plugin_handle_manager->pluginHandle();
+  plugin_handle_manager.reset();
   wasm_handle.reset();
 
-  auto wasm = plugin_handle_local->wasm();
+  auto wasm = plugin_handle_local->wasmHandle()->wasm();
   plugin_handle_local.reset();
 
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
@@ -1672,8 +1594,7 @@ public:
   }
 
   void setupContext() {
-    context_ = std::make_unique<TestContext>(wasmHandle()->wasm().get(), root_context_->id(),
-                                             plugin_handle_manager_->handle());
+    context_ = std::make_unique<TestContext>(plugin_handle_manager_->handle(), false);
     context_->onCreate();
   }
 
@@ -1761,6 +1682,48 @@ TEST_P(WasmCommonContextTest, EmptyContext) {
   NiceMock<Envoy::Stats::MockMetricSnapshot> stats_snapshot;
   root_context_->onStatsUpdate(stats_snapshot);
   root_context_->validateConfiguration("", plugin_);
+}
+
+TEST(VmCreationRatelimitter, Common) {
+  Event::SimulatedTimeSystem time_system;
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store, time_system);
+  Upstream::MockClusterManager cluster_manager;
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
+  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  {
+    // Restart never allowed since restart_config is not given.
+    auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+        plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+    proxy_wasm::VmCreationRatelimitter limitter =
+        getVmCreationRatelimitter(plugin->wasmConfig(), scope, *dispatcher);
+    time_system.setMonotonicTime(std::chrono::seconds(30)); // at 0m30s
+    EXPECT_FALSE(limitter());
+  }
+  {
+    // Set max restarts
+    plugin_config.mutable_vm_config()->mutable_restart_config()->set_max_restart_per_minute(2);
+    auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+        plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+    proxy_wasm::VmCreationRatelimitter limitter =
+        getVmCreationRatelimitter(plugin->wasmConfig(), scope, *dispatcher);
+    // Check on the first window.
+    time_system.setMonotonicTime(std::chrono::seconds(30)); // at 0m30s
+    EXPECT_TRUE(limitter());
+    time_system.setMonotonicTime(std::chrono::seconds(40)); // at 0m40s
+    EXPECT_TRUE(limitter());
+    time_system.setMonotonicTime(std::chrono::seconds(50)); // at 0m50s
+    EXPECT_FALSE(limitter());
+    // Move to next window.
+    time_system.setMonotonicTime(std::chrono::seconds(70)); // at 1m10s
+    EXPECT_TRUE(limitter());
+    time_system.setMonotonicTime(std::chrono::seconds(80)); // at 1m20s
+    EXPECT_TRUE(limitter());
+    time_system.setMonotonicTime(std::chrono::seconds(110)); // at 1m50s
+    EXPECT_FALSE(limitter());
+  }
 }
 
 } // namespace Wasm

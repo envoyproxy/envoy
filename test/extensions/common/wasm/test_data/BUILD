@@ -89,6 +89,6 @@ envoy_wasm_cc_binary(
 )
 
 envoy_wasm_cc_binary(
-    name = "test_panic_cpp.wasm",
-    srcs = ["test_panic_cpp.cc"],
+    name = "test_panic_on_tick_cpp.wasm",
+    srcs = ["test_panic_on_tick_cpp.cc"],
 )

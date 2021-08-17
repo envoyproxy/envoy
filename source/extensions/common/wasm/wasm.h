@@ -47,6 +47,7 @@ public:
 
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   Event::Dispatcher& dispatcher() { return dispatcher_; }
+  Stats::ScopeSharedPtr scope() { return scope_; };
   Context* getRootContext(const std::shared_ptr<PluginBase>& plugin, bool allow_closed) {
     return static_cast<Context*>(WasmBase::getRootContext(plugin, allow_closed));
   }
@@ -123,38 +124,15 @@ using WasmSharedPtr = std::shared_ptr<Wasm>;
 
 class WasmHandle : public WasmHandleBase {
 public:
-  // Base Wasm.
-  explicit WasmHandle(WasmConfig& wasm_config, const WasmSharedPtr& wasm)
-      : WasmHandleBase(std::static_pointer_cast<WasmBase>(wasm)), wasm_(wasm), is_base_wasm_(true),
-        max_restart_per_minute_(
-            wasm_config.config().vm_config().has_restart_config()
-                ? wasm_config.config().vm_config().restart_config().max_restart_per_minute()
-                : 0) {}
-
-  // Thread-local Wasm.
-  explicit WasmHandle(const WasmSharedPtr& wasm)
-      : WasmHandleBase(std::static_pointer_cast<WasmBase>(wasm)), wasm_(wasm) {}
-
-  // Returns true if restart is allowed now for the given max_restart_per_minute in RestartConfig
-  // and the previous restart counts *from this base wasm*. We adopt the simple sliding window
-  // counters algorithm in the implementation.
-  bool restartAllowed();
+  // rate_limitter is given only when this is for base wasm.
+  explicit WasmHandle(const WasmSharedPtr& wasm,
+                      proxy_wasm::VmCreationRatelimitter rate_limitter = nullptr)
+      : WasmHandleBase(std::static_pointer_cast<WasmBase>(wasm), rate_limitter), wasm_(wasm) {}
 
   WasmSharedPtr& wasm() { return wasm_; }
 
 private:
   WasmSharedPtr wasm_;
-  bool is_base_wasm_{false};
-
-  // For restarts. Used only when is_base_wasm_ is true.
-  absl::Mutex restart_counter_mutext_;
-  uint32_t max_restart_per_minute_ = 0;
-  struct RestartCountPerMinuteWindow {
-    MonotonicTime window_key_;
-    uint32_t count_ = 0;
-  };
-  RestartCountPerMinuteWindow current_restart_window_;
-  RestartCountPerMinuteWindow prev_restart_window_;
 };
 
 using WasmHandleSharedPtr = std::shared_ptr<WasmHandle>;
@@ -166,8 +144,8 @@ public:
                          std::static_pointer_cast<PluginBase>(plugin)),
         plugin_(plugin), wasm_handle_(wasm_handle) {}
 
+  PluginSharedPtr& plugin() { return plugin_; }
   WasmHandleSharedPtr& wasmHandle() { return wasm_handle_; }
-  uint32_t rootContextId() { return wasm_handle_->wasm()->getRootContext(plugin_, false)->id(); }
 
 private:
   PluginSharedPtr plugin_;
@@ -176,40 +154,58 @@ private:
 
 using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
-// PluginHandleManager is responsible for recreating a plugin instance in case of VM failures for
-// the same plugin configuration and base_wasm. tryRestartPlugin can be  used to restart at
-// callsites where plugin's lifecycle varies.
-class PluginHandleManager : public ThreadLocal::ThreadLocalObject,
+proxy_wasm::WasmHandleCloneFactory
+getWasmHandleCloneFactory(Event::Dispatcher& dispatcher,
+                          CreateContextFn create_root_context_for_testing);
+proxy_wasm::PluginHandleFactory getPluginHandleFactory();
+
+class PluginHandleManager : public proxy_wasm::PluginHandleManagerBase,
+                            public ThreadLocal::ThreadLocalObject,
                             Logger::Loggable<Logger::Id::wasm> {
 public:
   PluginHandleManager(const WasmHandleSharedPtr base_wasm_handle, const PluginSharedPtr& plugin,
                       Event::Dispatcher& dispatcher,
                       CreateContextFn create_root_context_for_testing = nullptr)
-      : base_wasm_handle_(base_wasm_handle), plugin_(plugin), dispatcher_(dispatcher),
-        create_root_context_for_testing_(create_root_context_for_testing) {
-    initializePluginHandle();
-  };
+      : PluginHandleManagerBase(
+            base_wasm_handle, plugin,
+            getWasmHandleCloneFactory(dispatcher, create_root_context_for_testing),
+            getPluginHandleFactory()){};
 
-  // Try to restart plugin and re-create plugin_handle_.
-  // Returns true if the restart succeeded, false otherwise.
-  bool tryRestartPlugin();
-
-  PluginHandleSharedPtr& handle() { return handle_; }
-
-private:
-  bool initializePluginHandle();
-  PluginHandleSharedPtr handle_{nullptr};
-
-  // For creating plugin handle instances.
-  const WasmHandleSharedPtr base_wasm_handle_;
-  const PluginSharedPtr plugin_;
-  Event::Dispatcher& dispatcher_;
-  CreateContextFn create_root_context_for_testing_;
+  PluginHandleSharedPtr handle() { return std::static_pointer_cast<PluginHandle>(pluginHandle()); }
 };
 
 using PluginHandleManagerSharedPtr = std::shared_ptr<PluginHandleManager>;
 
-using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
+proxy_wasm::VmCreationRatelimitter getVmCreationRatelimitter(WasmConfig& wasm_config,
+                                                             const Stats::ScopeSharedPtr& scope,
+                                                             Event::Dispatcher& dispatcher);
+
+class VmCreationRatelimitterImpl {
+public:
+  VmCreationRatelimitterImpl(uint32_t max_restart_per_minute, Event::Dispatcher& dispatcher)
+      : dispatcher_(dispatcher), max_restart_per_minute_(max_restart_per_minute) {}
+
+  // Returns true if restart is allowed now for the given max_restart_per_minute in RestartConfig
+  // and the previous restart counts *from this base wasm*. We adopt the simple sliding window
+  // counters algorithm in the implementation.
+  bool restartAllowed();
+
+private:
+  Event::Dispatcher& dispatcher_;
+  absl::Mutex restart_counter_mutext_;
+  uint32_t max_restart_per_minute_ = 0;
+  struct RestartCountPerMinuteWindow {
+    MonotonicTime window_key_;
+    uint32_t count_ = 0;
+  };
+  RestartCountPerMinuteWindow current_restart_window_;
+  RestartCountPerMinuteWindow prev_restart_window_;
+};
+
+// The callback passed to createWasm below to initialize PluginHandleManager and thus PluginHandle.
+// base_wasm argument becomes null when createWasm fails to initialize and start base wasm VM
+// successfully.
+using CreateWasmCallback = std::function<void(WasmHandleSharedPtr base_wasm)>;
 
 // Returns false if createWasm failed synchronously. This is necessary because xDS *MUST* report
 // all failures synchronously as it has no facility to report configuration update failures

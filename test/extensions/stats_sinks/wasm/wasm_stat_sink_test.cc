@@ -44,8 +44,7 @@ public:
               });
   }
   void setupContext() {
-    context_ = std::make_unique<TestContext>(wasmHandle()->wasm().get(), root_context_->id(),
-                                             plugin_handle_manager_->handle());
+    context_ = std::make_unique<TestContext>(plugin_handle_manager_->handle(), false);
     context_->onCreate();
   }
 

@@ -19,7 +19,6 @@ using Envoy::Extensions::Common::Wasm::Context;
 using Envoy::Extensions::Common::Wasm::PluginHandleManager;
 using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtr;
 using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
-using Envoy::Extensions::Common::Wasm::Wasm;
 
 class FilterConfig : Logger::Loggable<Logger::Id::wasm> {
 public:
@@ -27,31 +26,28 @@ public:
                Server::Configuration::FactoryContext& context);
 
   std::shared_ptr<Context> createFilter() {
-    Wasm* wasm = nullptr;
-    PluginHandleSharedPtr handle = tls_slot_->get()->handle();
-    if (handle->wasmHandle()) {
-      wasm = handle->wasmHandle()->wasm().get();
-      if (wasm->isFailed()) {
-        // Try to restart.
-        if (tls_slot_->get()->tryRestartPlugin()) {
-          handle = tls_slot_->get()->handle();
-          wasm = handle->wasmHandle()->wasm().get();
-        }
+    auto manager = tls_slot_->get();
+    PluginHandleSharedPtr plugin_handle = manager->handle();
+    if (!plugin_handle) {
+      if (tls_slot_->get()->tryRestartPlugin()) {
+        plugin_handle = manager->handle();
       }
     }
-    if (!wasm || wasm->isFailed()) {
-      if (handle->plugin()->fail_open_) {
+
+    if (!plugin_handle || plugin_handle->isFailed()) {
+      if (fail_open_) {
         // Fail open skips adding this filter to callbacks.
         return nullptr;
       } else {
         // Fail closed is handled by an empty Context.
-        return std::make_shared<Context>(nullptr, 0, handle);
+        return std::make_shared<Context>(nullptr, fail_open_);
       }
     }
-    return std::make_shared<Context>(wasm, handle->rootContextId(), handle);
+    return std::make_shared<Context>(plugin_handle, fail_open_);
   }
 
 private:
+  bool fail_open_{false};
   ThreadLocal::TypedSlotPtr<PluginHandleManager> tls_slot_;
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 };
