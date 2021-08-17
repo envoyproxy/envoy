@@ -510,9 +510,10 @@ public:
 
     // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
     envoy::config::core::v3::DnsResolverOptions dns_resolver_options = dns_resolver_options_;
-    typed_dns_resolver_config_in_construct_ =
-        getTypedDnsResolverConfig({socket_->addressProvider().localAddress()}, dns_resolver_options);
-    typed_dns_resolver_config_not_in_construct_ = getTypedDnsResolverConfig({}, dns_resolver_options);
+    typed_dns_resolver_config_in_construct_ = getTypedDnsResolverConfig(
+        {socket_->addressProvider().localAddress()}, dns_resolver_options);
+    typed_dns_resolver_config_not_in_construct_ =
+        getTypedDnsResolverConfig({}, dns_resolver_options);
 
     if (setResolverInConstructor()) {
       resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config_in_construct_);
