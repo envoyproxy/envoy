@@ -101,7 +101,7 @@ public:
   virtual Ssl::ConnectionInfoConstSharedPtr sslConnection() const PURE;
 };
 
-class SocketAddressSetter : public ConnectionInfoProvider {
+class ConnectionInfoSetter : public ConnectionInfoProvider {
 public:
   /**
    * Set the local address of the socket. On accepted sockets the local address defaults to the
@@ -145,7 +145,7 @@ public:
   virtual void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
 };
 
-using SocketAddressSetterSharedPtr = std::shared_ptr<SocketAddressSetter>;
+using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;
 using ConnectionInfoProviderSharedPtr = std::shared_ptr<const ConnectionInfoProvider>;
 
 /**
@@ -163,7 +163,7 @@ public:
   /**
    * @return the address provider backing this socket.
    */
-  virtual SocketAddressSetter& addressProvider() PURE;
+  virtual ConnectionInfoSetter& addressProvider() PURE;
   virtual const ConnectionInfoProvider& addressProvider() const PURE;
   virtual ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const PURE;
 

@@ -308,7 +308,7 @@ private:
   static Network::ConnectionInfoProviderSharedPtr emptyDownstreamAddressProvider() {
     MUTABLE_CONSTRUCT_ON_FIRST_USE(
         Network::ConnectionInfoProviderSharedPtr,
-        std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr));
+        std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr));
   }
 
   StreamInfoImpl(absl::optional<Http::Protocol> protocol, TimeSource& time_source,
