@@ -15,7 +15,7 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
       hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
       iter_(accept_filters_.end()),
       stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
-          listener_.dispatcher().timeSource(), socket_->addressProviderSharedPtr(),
+          listener_.dispatcher().timeSource(), socket_->connectionInfoProviderSharedPtr(),
           StreamInfo::FilterState::LifeSpan::Connection)) {
   listener_.stats_.downstream_pre_cx_active_.inc();
 }

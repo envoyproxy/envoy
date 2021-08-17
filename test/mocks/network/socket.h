@@ -16,7 +16,7 @@ public:
 
   ConnectionInfoSetter& connectionInfoProvider() override { return *address_provider_; }
   const ConnectionInfoProvider& connectionInfoProvider() const override { return *address_provider_; }
-  ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
     return address_provider_;
   }
   IoHandle& ioHandle() override;

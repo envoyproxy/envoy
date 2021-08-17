@@ -75,8 +75,8 @@ public:
   const ConnectionInfoProvider& connectionInfoProvider() const override {
     return socket_->connectionInfoProvider();
   }
-  ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
-    return socket_->addressProviderSharedPtr();
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return socket_->connectionInfoProviderSharedPtr();
   }
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }

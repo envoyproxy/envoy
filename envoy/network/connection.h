@@ -195,7 +195,7 @@ public:
    * @return the address provider backing this connection.
    */
   virtual const ConnectionInfoProvider& connectionInfoProvider() const PURE;
-  virtual ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const PURE;
+  virtual ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const PURE;
 
   /**
    * Credentials of the peer of a socket as decided by SO_PEERCRED.

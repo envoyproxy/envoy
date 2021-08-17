@@ -71,8 +71,8 @@ public:
   const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
     return network_connection_->connectionSocket()->connectionInfoProvider();
   }
-  Network::ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
-    return network_connection_->connectionSocket()->addressProviderSharedPtr();
+  Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return network_connection_->connectionSocket()->connectionInfoProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {

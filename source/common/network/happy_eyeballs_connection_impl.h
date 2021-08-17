@@ -74,7 +74,7 @@ public:
   // Note, this might change before connect finishes.
   const ConnectionInfoProvider& connectionInfoProvider() const override;
   // Note, this might change before connect finishes.
-  ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override;
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override;
   // Note, this might change before connect finishes.
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   // Note, this might change before connect finishes.

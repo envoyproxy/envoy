@@ -245,7 +245,7 @@ public:
 
   ConnectionInfoSetter& connectionInfoProvider() override { return *address_provider_; }
   const ConnectionInfoProvider& connectionInfoProvider() const override { return *address_provider_; }
-  ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
     return address_provider_;
   }
   MOCK_METHOD(IoHandle&, ioHandle, ());
@@ -299,7 +299,7 @@ public:
 
   ConnectionInfoSetter& connectionInfoProvider() override { return *address_provider_; }
   const ConnectionInfoProvider& connectionInfoProvider() const override { return *address_provider_; }
-  ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
     return address_provider_;
   }
   MOCK_METHOD(void, setDetectedTransportProtocol, (absl::string_view));

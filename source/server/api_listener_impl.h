@@ -123,7 +123,7 @@ protected:
       const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
         return *address_provider_;
       }
-      Network::ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
+      Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
         return address_provider_;
       }
       absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>

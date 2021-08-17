@@ -159,8 +159,8 @@ const ConnectionInfoProvider& HappyEyeballsConnectionImpl::connectionInfoProvide
   return connections_[0]->connectionInfoProvider();
 }
 
-ConnectionInfoProviderSharedPtr HappyEyeballsConnectionImpl::addressProviderSharedPtr() const {
-  return connections_[0]->addressProviderSharedPtr();
+ConnectionInfoProviderSharedPtr HappyEyeballsConnectionImpl::connectionInfoProviderSharedPtr() const {
+  return connections_[0]->connectionInfoProviderSharedPtr();
 }
 
 absl::optional<Connection::UnixDomainSocketPeerCredentials>
