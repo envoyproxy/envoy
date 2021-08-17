@@ -10,7 +10,6 @@
 
 namespace Envoy {
 namespace Filter {
-namespace Http {
 
 using FilterConfigProvider =
     Envoy::Config::ExtensionConfigProvider<Server::Configuration::NamedHttpFilterConfigFactory,
@@ -55,6 +54,5 @@ public:
                                    const std::string& filter_config_name) PURE;
 };
 
-} // namespace Http
 } // namespace Filter
 } // namespace Envoy

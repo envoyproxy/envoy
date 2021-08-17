@@ -9,7 +9,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/utility.h"
-#include "source/common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/json/json_loader.h"
 
 #include "test/mocks/init/mocks.h"
@@ -34,7 +34,6 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Filter {
-namespace Http {
 namespace {
 
 class FilterConfigDiscoveryTestBase : public testing::Test {
@@ -73,7 +72,7 @@ public:
 class FilterConfigDiscoveryImplTest : public FilterConfigDiscoveryTestBase {
 public:
   FilterConfigDiscoveryImplTest() {
-    filter_config_provider_manager_ = std::make_unique<FilterConfigProviderManagerImpl>();
+    filter_config_provider_manager_ = std::make_unique<HttpFilterConfigProviderManagerImpl>();
   }
   ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
@@ -406,6 +405,5 @@ TEST_F(FilterConfigDiscoveryImplTest, TerminalFilterInvalid) {
 }
 
 } // namespace
-} // namespace Http
 } // namespace Filter
 } // namespace Envoy
