@@ -485,7 +485,7 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
         if (cluster.info()->lbConfig().close_connections_on_host_set_change()) {
           for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
             // This will drain all tcp and http connection pools.
-            postThreadLocalDrainConnections(cluster, host_set->hosts());
+            postThreadLocalRemoveHosts(cluster, host_set->hosts());
           }
         } else {
           // TODO(snowp): Should this be subject to merge windows?
@@ -495,7 +495,7 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
           // enabled, this case will be covered by first `if` statement, where all
           // connection pools are drained.
           if (!hosts_removed.empty()) {
-            postThreadLocalDrainConnections(cluster, hosts_removed);
+            postThreadLocalRemoveHosts(cluster, hosts_removed);
           }
         }
       });
@@ -956,8 +956,17 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   return data;
 }
 
-void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
-                                                         const HostVector& hosts_removed) {
+void ClusterManagerImpl::drainConnections(const std::string& cluster) {
+  tls_.runOnAllThreads([cluster](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    auto cluster_entry = cluster_manager->thread_local_clusters_.find(cluster);
+    if (cluster_entry != cluster_manager->thread_local_clusters_.end()) {
+      cluster_entry->second->drainConnPools();
+    }
+  });
+}
+
+void ClusterManagerImpl::postThreadLocalRemoveHosts(const Cluster& cluster,
+                                                    const HostVector& hosts_removed) {
   tls_.runOnAllThreads([name = cluster.info()->name(),
                         hosts_removed](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     cluster_manager->removeHosts(name, hosts_removed);
@@ -1387,6 +1396,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   }
 }
 
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnPools() {
+  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
+    parent_.drainConnPools(host_set->hosts());
+  }
+}
+
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry() {
   // We need to drain all connection pools for the cluster being removed. Then we can remove the
   // cluster.
@@ -1394,9 +1409,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
   // TODO(mattklein123): Optimally, we would just fire member changed callbacks and remove all of
   // the hosts inside of the HostImpl destructor. That is a change with wide implications, so we are
   // going with a more targeted approach for now.
-  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
-    parent_.drainConnPools(host_set->hosts());
-  }
+  drainConnPools();
 }
 
 Http::ConnectionPool::Instance*
