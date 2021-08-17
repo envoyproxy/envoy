@@ -85,6 +85,10 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level = 0) const override;
 
+  // Common stream instrumentation.
+  envoy_stream_intel streamIntel();
+
+  // Filter state.
   bool isAlive() { return alive_; }
 
 private:
@@ -114,13 +118,17 @@ private:
     // entities before resuming iteration.
     void onResume();
 
+    // Common stream instrumentation.
+    envoy_stream_intel streamIntel() { return parent_.streamIntel(); }
+
+    // Debugging instrumentation.
+    void dumpState(std::ostream& os, int indent_level = 0);
+
     // Directional (request/response) helper methods.
     virtual void addData(envoy_data data) PURE;
     virtual void addTrailers(envoy_headers trailers) PURE;
     virtual void resumeIteration() PURE;
     virtual Buffer::Instance* buffer() PURE;
-
-    void dumpState(std::ostream& os, int indent_level = 0);
 
     // Struct that collects Filter state for keeping track of state transitions and to report via
     // dumpState.

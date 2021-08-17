@@ -292,10 +292,11 @@ static void* jvm_on_response_headers(envoy_headers headers, bool end_stream,
 }
 
 static envoy_filter_headers_status
-jvm_http_filter_on_request_headers(envoy_headers headers, bool end_stream, const void* context) {
+jvm_http_filter_on_request_headers(envoy_headers headers, bool end_stream,
+                                   envoy_stream_intel stream_intel, const void* context) {
   JNIEnv* env = get_env();
   jobjectArray result = static_cast<jobjectArray>(jvm_on_headers(
-      "onRequestHeaders", headers, end_stream, envoy_stream_intel{}, const_cast<void*>(context)));
+      "onRequestHeaders", headers, end_stream, stream_intel, const_cast<void*>(context)));
 
   jobject status = env->GetObjectArrayElement(result, 0);
   jobjectArray j_headers = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
@@ -312,10 +313,11 @@ jvm_http_filter_on_request_headers(envoy_headers headers, bool end_stream, const
 }
 
 static envoy_filter_headers_status
-jvm_http_filter_on_response_headers(envoy_headers headers, bool end_stream, const void* context) {
+jvm_http_filter_on_response_headers(envoy_headers headers, bool end_stream,
+                                    envoy_stream_intel stream_intel, const void* context) {
   JNIEnv* env = get_env();
   jobjectArray result = static_cast<jobjectArray>(jvm_on_headers(
-      "onResponseHeaders", headers, end_stream, envoy_stream_intel{}, const_cast<void*>(context)));
+      "onResponseHeaders", headers, end_stream, stream_intel, const_cast<void*>(context)));
 
   jobject status = env->GetObjectArrayElement(result, 0);
   jobjectArray j_headers = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
@@ -360,10 +362,11 @@ static void* jvm_on_response_data(envoy_data data, bool end_stream, envoy_stream
 }
 
 static envoy_filter_data_status jvm_http_filter_on_request_data(envoy_data data, bool end_stream,
+                                                                envoy_stream_intel stream_intel,
                                                                 const void* context) {
   JNIEnv* env = get_env();
-  jobjectArray result = static_cast<jobjectArray>(jvm_on_data(
-      "onRequestData", data, end_stream, envoy_stream_intel{}, const_cast<void*>(context)));
+  jobjectArray result = static_cast<jobjectArray>(
+      jvm_on_data("onRequestData", data, end_stream, stream_intel, const_cast<void*>(context)));
 
   jobject status = env->GetObjectArrayElement(result, 0);
   jobject j_data = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
@@ -389,10 +392,11 @@ static envoy_filter_data_status jvm_http_filter_on_request_data(envoy_data data,
 }
 
 static envoy_filter_data_status jvm_http_filter_on_response_data(envoy_data data, bool end_stream,
+                                                                 envoy_stream_intel stream_intel,
                                                                  const void* context) {
   JNIEnv* env = get_env();
-  jobjectArray result = static_cast<jobjectArray>(jvm_on_data(
-      "onResponseData", data, end_stream, envoy_stream_intel{}, const_cast<void*>(context)));
+  jobjectArray result = static_cast<jobjectArray>(
+      jvm_on_data("onResponseData", data, end_stream, stream_intel, const_cast<void*>(context)));
 
   jobject status = env->GetObjectArrayElement(result, 0);
   jobject j_data = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
@@ -453,11 +457,12 @@ static void* jvm_on_response_trailers(envoy_headers trailers, envoy_stream_intel
   return jvm_on_trailers("onResponseTrailers", trailers, stream_intel, context);
 }
 
-static envoy_filter_trailers_status jvm_http_filter_on_request_trailers(envoy_headers trailers,
-                                                                        const void* context) {
+static envoy_filter_trailers_status
+jvm_http_filter_on_request_trailers(envoy_headers trailers, envoy_stream_intel stream_intel,
+                                    const void* context) {
   JNIEnv* env = get_env();
-  jobjectArray result = static_cast<jobjectArray>(jvm_on_trailers(
-      "onRequestTrailers", trailers, envoy_stream_intel{}, const_cast<void*>(context)));
+  jobjectArray result = static_cast<jobjectArray>(
+      jvm_on_trailers("onRequestTrailers", trailers, stream_intel, const_cast<void*>(context)));
 
   jobject status = env->GetObjectArrayElement(result, 0);
   jobjectArray j_trailers = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
@@ -488,11 +493,12 @@ static envoy_filter_trailers_status jvm_http_filter_on_request_trailers(envoy_he
                                         /*pending_data*/ pending_data};
 }
 
-static envoy_filter_trailers_status jvm_http_filter_on_response_trailers(envoy_headers trailers,
-                                                                         const void* context) {
+static envoy_filter_trailers_status
+jvm_http_filter_on_response_trailers(envoy_headers trailers, envoy_stream_intel stream_intel,
+                                     const void* context) {
   JNIEnv* env = get_env();
-  jobjectArray result = static_cast<jobjectArray>(jvm_on_trailers(
-      "onResponseTrailers", trailers, envoy_stream_intel{}, const_cast<void*>(context)));
+  jobjectArray result = static_cast<jobjectArray>(
+      jvm_on_trailers("onResponseTrailers", trailers, stream_intel, const_cast<void*>(context)));
 
   jobject status = env->GetObjectArrayElement(result, 0);
   jobjectArray j_trailers = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
@@ -567,7 +573,8 @@ static void jvm_http_filter_set_response_callbacks(envoy_http_filter_callbacks c
 
 static envoy_filter_resume_status
 jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data* data,
-                          envoy_headers* trailers, bool end_stream, const void* context) {
+                          envoy_headers* trailers, bool end_stream, envoy_stream_intel stream_intel,
+                          const void* context) {
   jni_log("[Envoy]", "jvm_on_resume");
 
   JNIEnv* env = get_env();
@@ -586,17 +593,19 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
     trailers_length = (jlong)trailers->length;
     pass_headers("passTrailer", *trailers, j_context);
   }
+  jlongArray j_stream_intel = native_stream_intel_to_array(env, stream_intel);
 
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
   jmethodID jmid_onResume =
-      env->GetMethodID(jcls_JvmCallbackContext, method, "(J[BJZ)Ljava/lang/Object;");
+      env->GetMethodID(jcls_JvmCallbackContext, method, "(J[BJZ[J)Ljava/lang/Object;");
   // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
   // TODO: make this cast safer.
   jobjectArray result = static_cast<jobjectArray>(
       env->CallObjectMethod(j_context, jmid_onResume, headers_length, j_in_data, trailers_length,
-                            end_stream ? JNI_TRUE : JNI_FALSE));
+                            end_stream ? JNI_TRUE : JNI_FALSE, j_stream_intel));
 
   env->DeleteLocalRef(jcls_JvmCallbackContext);
+  env->DeleteLocalRef(j_stream_intel);
   if (j_in_data != NULL) {
     env->DeleteLocalRef(j_in_data);
   }
@@ -625,15 +634,18 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
 
 static envoy_filter_resume_status
 jvm_http_filter_on_resume_request(envoy_headers* headers, envoy_data* data, envoy_headers* trailers,
-                                  bool end_stream, const void* context) {
-  return jvm_http_filter_on_resume("onResumeRequest", headers, data, trailers, end_stream, context);
+                                  bool end_stream, envoy_stream_intel stream_intel,
+                                  const void* context) {
+  return jvm_http_filter_on_resume("onResumeRequest", headers, data, trailers, end_stream,
+                                   stream_intel, context);
 }
 
 static envoy_filter_resume_status
 jvm_http_filter_on_resume_response(envoy_headers* headers, envoy_data* data,
-                                   envoy_headers* trailers, bool end_stream, const void* context) {
+                                   envoy_headers* trailers, bool end_stream,
+                                   envoy_stream_intel stream_intel, const void* context) {
   return jvm_http_filter_on_resume("onResumeResponse", headers, data, trailers, end_stream,
-                                   context);
+                                   stream_intel, context);
 }
 
 static void* jvm_on_complete(envoy_stream_intel, void* context) {
@@ -694,12 +706,13 @@ static void* jvm_on_cancel(envoy_stream_intel stream_intel, void* context) {
   return result;
 }
 
-static void jvm_http_filter_on_error(envoy_error error, const void* context) {
-  call_jvm_on_error(error, envoy_stream_intel{}, const_cast<void*>(context));
+static void jvm_http_filter_on_error(envoy_error error, envoy_stream_intel stream_intel,
+                                     const void* context) {
+  call_jvm_on_error(error, stream_intel, const_cast<void*>(context));
 }
 
-static void jvm_http_filter_on_cancel(const void* context) {
-  call_jvm_on_cancel(envoy_stream_intel{}, const_cast<void*>(context));
+static void jvm_http_filter_on_cancel(envoy_stream_intel stream_intel, const void* context) {
+  call_jvm_on_cancel(stream_intel, const_cast<void*>(context));
 }
 
 // JvmFilterFactoryContext

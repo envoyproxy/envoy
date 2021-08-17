@@ -117,43 +117,49 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 /// Returns tuple of:
 /// 0 - NSNumber *,filter status
 /// 1 - EnvoyHeaders *, forward headers
-@property (nonatomic, copy) NSArray * (^onRequestHeaders)(EnvoyHeaders *headers, BOOL endStream);
+@property (nonatomic, copy) NSArray * (^onRequestHeaders)
+    (EnvoyHeaders *headers, BOOL endStream, EnvoyStreamIntel streamIntel);
 
 /// Returns tuple of:
 /// 0 - NSNumber *,filter status
 /// 1 - NSData *, forward data
 /// 2 - EnvoyHeaders *, optional pending headers
-@property (nonatomic, copy) NSArray * (^onRequestData)(NSData *data, BOOL endStream);
+@property (nonatomic, copy) NSArray * (^onRequestData)
+    (NSData *data, BOOL endStream, EnvoyStreamIntel streamIntel);
 
 /// Returns tuple of:
 /// 0 - NSNumber *,filter status
 /// 1 - EnvoyHeaders *, forward trailers
 /// 2 - EnvoyHeaders *, optional pending headers
 /// 3 - NSData *, optional pending data
-@property (nonatomic, copy) NSArray * (^onRequestTrailers)(EnvoyHeaders *trailers);
+@property (nonatomic, copy) NSArray * (^onRequestTrailers)
+    (EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel);
 
 /// Returns tuple of:
 /// 0 - NSNumber *,filter status
 /// 1 - EnvoyHeaders *, forward headers
-@property (nonatomic, copy) NSArray * (^onResponseHeaders)(EnvoyHeaders *headers, BOOL endStream);
+@property (nonatomic, copy) NSArray * (^onResponseHeaders)
+    (EnvoyHeaders *headers, BOOL endStream, EnvoyStreamIntel streamIntel);
 
 /// Returns tuple of:
 /// 0 - NSNumber *,filter status
 /// 1 - NSData *, forward data
 /// 2 - EnvoyHeaders *, optional pending headers
-@property (nonatomic, copy) NSArray * (^onResponseData)(NSData *data, BOOL endStream);
+@property (nonatomic, copy) NSArray * (^onResponseData)
+    (NSData *data, BOOL endStream, EnvoyStreamIntel streamIntel);
 
 /// Returns tuple of:
 /// 0 - NSNumber *,filter status
 /// 1 - EnvoyHeaders *, forward trailers
 /// 2 - EnvoyHeaders *, optional pending headers
 /// 3 - NSData *, optional pending data
-@property (nonatomic, copy) NSArray * (^onResponseTrailers)(EnvoyHeaders *trailers);
+@property (nonatomic, copy) NSArray * (^onResponseTrailers)
+    (EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel);
 
-@property (nonatomic, copy) void (^onCancel)(void);
+@property (nonatomic, copy) void (^onCancel)(EnvoyStreamIntel streamIntel);
 
 @property (nonatomic, copy) void (^onError)
-    (uint64_t errorCode, NSString *message, int32_t attemptCount);
+    (uint64_t errorCode, NSString *message, int32_t attemptCount, EnvoyStreamIntel streamIntel);
 
 @property (nonatomic, copy) void (^setRequestFilterCallbacks)
     (id<EnvoyHTTPFilterCallbacks> callbacks);
@@ -166,7 +172,7 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 /// 3 - EnvoyHeaders *, optional pending trailers
 @property (nonatomic, copy) NSArray * (^onResumeRequest)
     (EnvoyHeaders *_Nullable headers, NSData *_Nullable data, EnvoyHeaders *_Nullable trailers,
-     BOOL endStream);
+     BOOL endStream, EnvoyStreamIntel streamIntel);
 
 @property (nonatomic, copy) void (^setResponseFilterCallbacks)
     (id<EnvoyHTTPFilterCallbacks> callbacks);
@@ -178,7 +184,7 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 /// 3 - EnvoyHeaders *, optional pending trailers
 @property (nonatomic, copy) NSArray * (^onResumeResponse)
     (EnvoyHeaders *_Nullable headers, NSData *_Nullable data, EnvoyHeaders *_Nullable trailers,
-     BOOL endStream);
+     BOOL endStream, EnvoyStreamIntel streamIntel);
 // clang-format on
 
 @end

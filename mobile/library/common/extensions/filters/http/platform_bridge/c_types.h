@@ -109,39 +109,41 @@ typedef const void* (*envoy_filter_init_f)(const void* context);
  */
 typedef envoy_filter_headers_status (*envoy_filter_on_headers_f)(envoy_headers headers,
                                                                  bool end_stream,
+                                                                 envoy_stream_intel stream_intel,
                                                                  const void* context);
 
 /**
  * Function signature for on-data filter invocations.
  */
 typedef envoy_filter_data_status (*envoy_filter_on_data_f)(envoy_data data, bool end_stream,
+                                                           envoy_stream_intel stream_intel,
                                                            const void* context);
 
 /**
  * Function signature for on-trailers filter invocations.
  */
 typedef envoy_filter_trailers_status (*envoy_filter_on_trailers_f)(envoy_headers trailers,
+                                                                   envoy_stream_intel stream_intel,
                                                                    const void* context);
 
 /**
  * Function signature for filter invocation after asynchronous resumption. Passes a
  * snapshot of all HTTP state that has not yet been forwarded along the filter chain.
  */
-typedef envoy_filter_resume_status (*envoy_filter_on_resume_f)(envoy_headers* headers,
-                                                               envoy_data* data,
-                                                               envoy_headers* trailers,
-                                                               bool end_stream,
-                                                               const void* context);
+typedef envoy_filter_resume_status (*envoy_filter_on_resume_f)(
+    envoy_headers* headers, envoy_data* data, envoy_headers* trailers, bool end_stream,
+    envoy_stream_intel stream_intel, const void* context);
 
 /**
  * Function signature for on-cancellation filter invocations.
  */
-typedef void (*envoy_filter_on_cancel_f)(const void* context);
+typedef void (*envoy_filter_on_cancel_f)(envoy_stream_intel stream_intel, const void* context);
 
 /**
  * Function signature for on-error filter invocations.
  */
-typedef void (*envoy_filter_on_error_f)(envoy_error error, const void* context);
+typedef void (*envoy_filter_on_error_f)(envoy_error error, envoy_stream_intel stream_intel,
+                                        const void* context);
 
 /**
  * Function signature to release a filter instance once the filter chain is finished with it.
