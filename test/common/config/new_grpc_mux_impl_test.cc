@@ -56,6 +56,15 @@ public:
         should_use_unified_(legacy_or_unified == LegacyOrUnified::Unified) {}
 
   void setup() {
+    if (isUnifiedMuxTest()) {
+      grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(
+          std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
+          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+              "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
+          envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_,
+          local_info_, false);
+      return;
+    }
     grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
@@ -93,6 +102,12 @@ public:
   }
 
   void remoteClose() {
+    if (isUnifiedMuxTest()) {
+      dynamic_cast<XdsMux::GrpcMuxDelta*>(grpc_mux_.get())
+          ->grpcStreamForTest()
+          .onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
+      return;
+    }
     dynamic_cast<NewGrpcMuxImpl*>(grpc_mux_.get())
         ->grpcStreamForTest()
         .onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
@@ -100,20 +115,39 @@ public:
 
   void onDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& response) {
+    if (isUnifiedMuxTest()) {
+      dynamic_cast<XdsMux::GrpcMuxDelta*>(grpc_mux_.get())
+          ->onDiscoveryResponse(std::move(response), control_plane_stats_);
+      return;
+    }
     dynamic_cast<NewGrpcMuxImpl*>(grpc_mux_.get())
         ->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
 
-  void shutdownMux() { dynamic_cast<NewGrpcMuxImpl*>(grpc_mux_.get())->shutdown(); }
+  void shutdownMux() {
+    if (isUnifiedMuxTest()) {
+      dynamic_cast<XdsMux::GrpcMuxDelta*>(grpc_mux_.get())->shutdown();
+      return;
+    }
+    dynamic_cast<NewGrpcMuxImpl*>(grpc_mux_.get())->shutdown();
+  }
 
   // the code is duplicated here, but all calls other than the check in return statement, return
   // different types.
   bool subscriptionExists(const std::string& type_url) const {
+    if (isUnifiedMuxTest()) {
+      auto* mux = dynamic_cast<XdsMux::GrpcMuxDelta*>(grpc_mux_.get());
+      auto& subscriptions = mux->subscriptions();
+      auto sub = subscriptions.find(type_url);
+      return sub != subscriptions.end();
+    }
     auto* mux = dynamic_cast<NewGrpcMuxImpl*>(grpc_mux_.get());
     auto& subscriptions = mux->subscriptions();
     auto sub = subscriptions.find(type_url);
     return sub != subscriptions.end();
   }
+
+  bool isUnifiedMuxTest() const { return should_use_unified_; }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Random::MockRandomGenerator> random_;
