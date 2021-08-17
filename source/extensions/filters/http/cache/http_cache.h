@@ -206,8 +206,8 @@ public:
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
                                 ResponseMetadata&& metadata, uint64_t content_length) const;
 
-  // Warning: this should not be accessed out-of-thread!
-  const Http::RequestHeaderMap& getVaryHeaders() const { return *vary_headers_; }
+  const Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
+  const VaryHeader& varyAllowList() const { return vary_allow_list_; }
 
 private:
   void initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers);
@@ -216,15 +216,10 @@ private:
 
   Key key_;
   std::vector<RawByteRange> request_range_spec_;
+  Http::RequestHeaderMapPtr request_headers_;
+  const VaryHeader& vary_allow_list_;
   // Time when this LookupRequest was created (in response to an HTTP request).
   SystemTime timestamp_;
-  // The subset of this request's headers that match one of the rules in
-  // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers. If a cache
-  // storage implementation forwards lookup requests to a remote cache server that supports *vary*
-  // headers, that server may need to see these headers. For local implementations, it may be
-  // simpler to instead call makeLookupResult with each potential response.
-  Http::RequestHeaderMapPtr vary_headers_;
-
   RequestCacheControl request_cache_control_;
 };
 
