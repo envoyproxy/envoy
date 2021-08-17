@@ -1837,9 +1837,6 @@ TEST_F(ListenerManagerImplTest, NotSupportedDatagramUds) {
                             "socket type SocketType::Datagram not supported for pipes");
 }
 
-// TODO(davinci26): See ListenSocketFactoryImpl::doFinalPreWorkerInit() for why this test is
-// not run on Windows.
-#ifndef WIN32
 TEST_F(ListenerManagerImplTest, CantListen) {
   InSequence s;
 
@@ -1870,7 +1867,6 @@ filter_chains:
       1UL,
       server_.stats_store_.counterFromString("listener_manager.listener_create_failure").value());
 }
-#endif
 
 TEST_F(ListenerManagerImplTest, CantBindSocket) {
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
@@ -3738,12 +3734,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateIncomplete) {
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), EnvoyException,
-      TestEnvironment::substitute(
-          "Failed to load incomplete certificate from {{ test_rundir }}"
-          "/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem, ",
-          Network::Address::IpVersion::v4));
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException, "Failed to load incomplete private key from path: ");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidCertificateChain) {

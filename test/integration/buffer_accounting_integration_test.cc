@@ -97,7 +97,8 @@ public:
 
 protected:
   std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_ =
-      std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
+      std::make_shared<Buffer::TrackedWatermarkBufferFactory>(
+          absl::bit_width(1024u * 1024u)); // Track >= 1MB
 
   bool streamBufferAccounting() { return std::get<1>(GetParam()); }
 
@@ -376,6 +377,10 @@ TEST_P(ProtocolsBufferWatermarksTest, ResettingStreamUnregistersAccount) {
       ASSERT_TRUE(response1->waitForReset());
       EXPECT_EQ(response1->resetReason(), Http::StreamResetReason::RemoteReset);
     }
+
+    // Wait for the upstream request to receive the reset to avoid a race when
+    // cleaning up the test.
+    ASSERT_TRUE(upstream_request1->waitForReset());
   } else {
     upstream_request1->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
     upstream_request1->encodeData(1000, true);

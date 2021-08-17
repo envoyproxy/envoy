@@ -33,3 +33,10 @@ package_group(
         "//test/extensions/...",
     ],
 )
+
+package_group(
+    name = "contrib_library",
+    packages = [
+        "//contrib/...",
+    ],
+)

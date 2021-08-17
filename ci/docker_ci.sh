@@ -23,6 +23,7 @@ config_env() {
 build_platforms() {
   TYPE=$1
   FILE_SUFFIX="${TYPE/-debug/}"
+  FILE_SUFFIX="${FILE_SUFFIX/-contrib/}"
 
   if is_windows; then
     echo "windows/amd64"
@@ -36,8 +37,13 @@ build_platforms() {
 build_args() {
   TYPE=$1
   FILE_SUFFIX="${TYPE/-debug/}"
+  FILE_SUFFIX="${FILE_SUFFIX/-contrib/}"
 
   printf ' -f ci/Dockerfile-envoy%s' "${FILE_SUFFIX}"
+  if [[ "${TYPE}" == *-contrib* ]]; then
+      printf ' --build-arg ENVOY_BINARY=envoy-contrib'
+  fi
+
   if [[ "${TYPE}" == *-debug ]]; then
       printf ' --build-arg ENVOY_BINARY_SUFFIX='
   elif [[ "${TYPE}" == "-google-vrp" ]]; then
@@ -124,7 +130,7 @@ if is_windows; then
   BUILD_COMMAND=("build")
 else
   # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
-  BUILD_TYPES=("" "-debug" "-alpine" "-distroless" "-google-vrp")
+  BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-alpine" "-distroless" "-google-vrp")
 
   # Configure docker-buildx tools
   BUILD_COMMAND=("buildx" "build")
@@ -141,7 +147,7 @@ for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
     build_images "${BUILD_TYPE}" "$image_tag"
 
     if ! is_windows; then
-        if [[ "$BUILD_TYPE" == "" || "$BUILD_TYPE" == "-alpine" ]]; then
+        if [[ "$BUILD_TYPE" == "" || "$BUILD_TYPE" == "-contrib" || "$BUILD_TYPE" == "-alpine" ]]; then
             # verify_examples expects the base and alpine images, and for them to be named `-dev`
             dev_image="envoyproxy/envoy${BUILD_TYPE}-dev:latest"
             docker tag "$image_tag" "$dev_image"

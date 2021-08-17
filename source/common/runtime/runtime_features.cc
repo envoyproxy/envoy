@@ -72,6 +72,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster",
     "envoy.reloadable_features.http2_consume_stream_refused_errors",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
+    "envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.improved_stream_limit_handling",
     "envoy.reloadable_features.internal_redirects_with_body",
@@ -79,10 +80,8 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.listener_wildcard_match_ip_family",
     "envoy.reloadable_features.new_tcp_connection_pool",
     "envoy.reloadable_features.no_chunked_encoding_header_for_304",
-    "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing",
     "envoy.reloadable_features.preserve_downstream_scheme",
     "envoy.reloadable_features.remove_forked_chromium_url",
-    "envoy.reloadable_features.require_ocsp_response_for_must_staple_certs",
     "envoy.reloadable_features.require_strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.return_502_for_upstream_protocol_errors",
     "envoy.reloadable_features.send_strict_1xx_and_204_response_headers",
@@ -98,6 +97,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.upstream_http2_flood_checks",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
     "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
+    "envoy.reloadable_features.sanitize_http_header_referer",
 };
 
 // This is a section for officially sanctioned runtime features which are too

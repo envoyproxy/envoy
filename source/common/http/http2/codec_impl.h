@@ -207,9 +207,8 @@ protected:
     void resetStreamWorker(StreamResetReason reason);
     static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
-    void encodeHeadersBase(const std::vector<nghttp2_nv>& final_headers, bool end_stream);
-    virtual void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
-                               nghttp2_data_provider* provider) PURE;
+    void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
+    virtual void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) PURE;
     void encodeTrailersBase(const HeaderMap& headers);
     void submitTrailers(const HeaderMap& trailers);
     void submitMetadata(uint8_t flags);
@@ -334,8 +333,7 @@ protected:
           headers_or_trailers_(ResponseHeaderMapImpl::create()) {}
 
     // StreamImpl
-    void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
-                       nghttp2_data_provider* provider) override;
+    void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) override;
     StreamDecoder& decoder() override { return response_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;
@@ -389,8 +387,7 @@ protected:
 
     // StreamImpl
     void destroy() override;
-    void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
-                       nghttp2_data_provider* provider) override;
+    void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) override;
     StreamDecoder& decoder() override { return *request_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;

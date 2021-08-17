@@ -9,6 +9,7 @@ proto_library(
     name = "active_protos",
     visibility = ["//visibility:public"],
     deps = [
+        "//contrib/envoy/extensions/filters/http/squash/v3:pkg",
         "//envoy/admin/v3:pkg",
         "//envoy/config/accesslog/v3:pkg",
         "//envoy/config/bootstrap/v3:pkg",
@@ -95,7 +96,6 @@ proto_library(
         "//envoy/extensions/filters/http/rbac/v3:pkg",
         "//envoy/extensions/filters/http/router/v3:pkg",
         "//envoy/extensions/filters/http/set_metadata/v3:pkg",
-        "//envoy/extensions/filters/http/squash/v3:pkg",
         "//envoy/extensions/filters/http/tap/v3:pkg",
         "//envoy/extensions/filters/http/wasm/v3:pkg",
         "//envoy/extensions/filters/listener/http_inspector/v3:pkg",
@@ -131,6 +131,7 @@ proto_library(
         "//envoy/extensions/filters/network/zookeeper_proxy/v3:pkg",
         "//envoy/extensions/filters/udp/dns_filter/v3alpha:pkg",
         "//envoy/extensions/filters/udp/udp_proxy/v3:pkg",
+        "//envoy/extensions/formatter/metadata/v3:pkg",
         "//envoy/extensions/formatter/req_without_query/v3:pkg",
         "//envoy/extensions/health_checkers/redis/v3:pkg",
         "//envoy/extensions/http/header_formatters/preserve_case/v3:pkg",

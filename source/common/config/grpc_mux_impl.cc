@@ -17,28 +17,18 @@ namespace Config {
 namespace {
 class AllMuxesState {
 public:
-  void insert(GrpcMuxImpl* mux) {
-    absl::WriterMutexLock locker(&lock_);
-    muxes_.insert(mux);
-  }
+  void insert(GrpcMuxImpl* mux) { muxes_.insert(mux); }
 
-  void erase(GrpcMuxImpl* mux) {
-    absl::WriterMutexLock locker(&lock_);
-    muxes_.erase(mux);
-  }
+  void erase(GrpcMuxImpl* mux) { muxes_.erase(mux); }
 
   void shutdownAll() {
-    absl::WriterMutexLock locker(&lock_);
     for (auto& mux : muxes_) {
       mux->shutdown();
     }
   }
 
 private:
-  absl::flat_hash_set<GrpcMuxImpl*> muxes_ ABSL_GUARDED_BY(lock_);
-
-  // TODO(ggreenway): can this lock be removed? Is this code only run on the main thread?
-  absl::Mutex lock_;
+  absl::flat_hash_set<GrpcMuxImpl*> muxes_;
 };
 using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
 } // namespace

@@ -5,6 +5,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/optref.h"
+#include "envoy/config/overload/v3/overload.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
 
@@ -182,6 +183,8 @@ private:
  */
 class WatermarkBufferFactory : public WatermarkFactory {
 public:
+  WatermarkBufferFactory(const envoy::config::overload::v3::BufferFactoryConfig& config);
+
   // Buffer::WatermarkFactory
   ~WatermarkBufferFactory() override;
   InstancePtr createBuffer(std::function<void()> below_low_watermark,
@@ -198,6 +201,8 @@ public:
   void updateAccountClass(const BufferMemoryAccountSharedPtr& account, int current_class,
                           int new_class);
 
+  uint32_t bitshift() const { return bitshift_; }
+
   // Unregister a buffer memory account.
   virtual void unregisterAccount(const BufferMemoryAccountSharedPtr& account, int current_class);
 
@@ -206,6 +211,9 @@ protected:
   using MemoryClassesToAccountsSet = std::array<absl::flat_hash_set<BufferMemoryAccountSharedPtr>,
                                                 BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_>;
   MemoryClassesToAccountsSet size_class_account_sets_;
+  // How much to bit shift right balances to test whether the account should be
+  // tracked in *size_class_account_sets_*.
+  const uint32_t bitshift_;
 };
 
 } // namespace Buffer

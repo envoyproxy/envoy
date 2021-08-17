@@ -62,47 +62,38 @@ function bazel_with_collection() {
   run_process_test_result
 }
 
-function cp_binary_for_outside_access() {
-  DELIVERY_LOCATION="$1"
-  cp -f \
-    bazel-bin/"${ENVOY_BIN}" \
-    "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}"
-}
-
-function cp_debug_info_for_outside_access() {
-  DELIVERY_LOCATION="$1"
-  cp -f \
-    bazel-bin/"${ENVOY_BIN}".dwp \
-    "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}".dwp
-}
-
-
 function cp_binary_for_image_build() {
+  local BINARY_TYPE="$1"
+  local COMPILE_TYPE="$2"
+  local EXE_NAME="$3"
+
   # TODO(mattklein123): Replace this with caching and a different job which creates images.
   local BASE_TARGET_DIR="${ENVOY_SRCDIR}${BUILD_ARCH_DIR}"
+  local TARGET_DIR=build_"${EXE_NAME}"_"${BINARY_TYPE}"
+  local FINAL_DELIVERY_DIR="${ENVOY_DELIVERY_DIR}"/"${EXE_NAME}"
+
   echo "Copying binary for image build..."
-  COMPILE_TYPE="$2"
-  mkdir -p "${BASE_TARGET_DIR}"/build_"$1"
-  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${BASE_TARGET_DIR}"/build_"$1"
+  mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
+  cp -f "${FINAL_DELIVERY_DIR}"/envoy "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   # Copy the su-exec utility binary into the image
-  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/build_"$1"
+  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
-    cp -f "${ENVOY_DELIVERY_DIR}"/envoy.dwp "${BASE_TARGET_DIR}"/build_"$1"
+    cp -f "${FINAL_DELIVERY_DIR}"/envoy.dwp "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   fi
-  mkdir -p "${BASE_TARGET_DIR}"/build_"$1"_stripped
-  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/build_"$1"_stripped/envoy
+  mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
+  strip "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
 
   # Copy for azp which doesn't preserve permissions, creating a tar archive
-  tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${BASE_TARGET_DIR}" build_"$1" build_"$1"_stripped
+  tar czf "${ENVOY_BUILD_DIR}"/"${EXE_NAME}"_binary.tar.gz -C "${BASE_TARGET_DIR}" "${TARGET_DIR}" "${TARGET_DIR}"_stripped
 
   # Remove binaries to save space, only if BUILD_REASON exists (running in AZP)
   [[ -z "${BUILD_REASON}" ]] || \
-    rm -rf "${BASE_TARGET_DIR}"/build_"$1" "${BASE_TARGET_DIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy{,.dwp} \
+    rm -rf "${BASE_TARGET_DIR:?}"/"${TARGET_DIR}" "${BASE_TARGET_DIR:?}"/"${TARGET_DIR}"_stripped "${FINAL_DELIVERY_DIR:?}"/envoy{,.dwp} \
       bazel-bin/"${ENVOY_BIN}"{,.dwp}
 }
 
 function bazel_binary_build() {
-  BINARY_TYPE="$1"
+  local BINARY_TYPE="$1"
   if [[ "${BINARY_TYPE}" == "release" ]]; then
     COMPILE_TYPE="opt"
   elif [[ "${BINARY_TYPE}" == "debug" ]]; then
@@ -116,31 +107,44 @@ function bazel_binary_build() {
     COMPILE_TYPE="fastbuild"
   fi
 
-  echo "Building..."
-  ENVOY_BIN=$(echo "${ENVOY_BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
+  local BUILD_TARGET="$2"
+  local BUILD_DEBUG_INFORMATION="$3"
+  local EXE_NAME="$4"
+  local FINAL_DELIVERY_DIR="${ENVOY_DELIVERY_DIR}"/"${EXE_NAME}"
+  mkdir -p "${FINAL_DELIVERY_DIR}"
+
+  echo "Building (type=${BINARY_TYPE} target=${BUILD_TARGET} debug=${BUILD_DEBUG_INFORMATION} name=${EXE_NAME})..."
+  ENVOY_BIN=$(echo "${BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
 
   # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
   [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
 
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${ENVOY_BUILD_TARGET}" ${CONFIG_ARGS}
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${BUILD_TARGET}" ${CONFIG_ARGS}
   collect_build_profile "${BINARY_TYPE}"_build
 
   # Copy the built envoy binary somewhere that we can access outside of the
   # container.
-  cp_binary_for_outside_access envoy
+  cp -f bazel-bin/"${ENVOY_BIN}" "${FINAL_DELIVERY_DIR}"/envoy
 
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
     # Generate dwp file for debugging since we used split DWARF to reduce binary
     # size
-    bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${ENVOY_BUILD_DEBUG_INFORMATION}" ${CONFIG_ARGS}
+    bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${BUILD_DEBUG_INFORMATION}" ${CONFIG_ARGS}
     # Copy the debug information
-    cp_debug_info_for_outside_access envoy
+    cp -f bazel-bin/"${ENVOY_BIN}".dwp "${FINAL_DELIVERY_DIR}"/envoy.dwp
   fi
 
   # Build su-exec utility
   bazel build external:su-exec
-  cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}"
+  cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
+}
 
+function bazel_envoy_binary_build() {
+  bazel_binary_build "$1" "${ENVOY_BUILD_TARGET}" "${ENVOY_BUILD_DEBUG_INFORMATION}" envoy
+}
+
+function bazel_contrib_binary_build() {
+  bazel_binary_build "$1" "${ENVOY_CONTRIB_BUILD_TARGET}" "${ENVOY_CONTRIB_BUILD_DEBUG_INFORMATION}" envoy-contrib
 }
 
 function run_process_test_result() {
@@ -184,6 +188,10 @@ if [[ $# -ge 1 ]]; then
 else
   # Coverage test will add QUICHE tests by itself.
   COVERAGE_TEST_TARGETS=("//test/...")
+  if [[ "$CI_TARGET" == "bazel.release" ]]; then
+    # We test contrib on release only.
+    COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "//contrib/...")
+  fi
   TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_googlesource_quiche//:ci_tests")
 fi
 
@@ -200,18 +208,22 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   echo "Testing ${TEST_TARGETS[*]} with options: ${BAZEL_BUILD_OPTIONS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c opt "${TEST_TARGETS[@]}"
 
-  echo "bazel release build with tests..."
-  bazel_binary_build release
+  echo "bazel release build..."
+  bazel_envoy_binary_build release
+
+  echo "bazel contrib release build..."
+  bazel_contrib_binary_build release
+
   exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel release build..."
-  bazel_binary_build release
+  bazel_envoy_binary_build release
   exit 0
 elif [[ "$CI_TARGET" == "bazel.sizeopt.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel size optimized build..."
-  bazel_binary_build sizeopt
+  bazel_envoy_binary_build sizeopt
   exit 0
 elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   setup_clang_toolchain
@@ -219,7 +231,7 @@ elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --config=sizeopt "${TEST_TARGETS[@]}"
 
   echo "bazel size optimized build with tests..."
-  bazel_binary_build sizeopt
+  bazel_envoy_binary_build sizeopt
   exit 0
 elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
   BAZEL_BUILD_OPTIONS+=("--test_env=HEAPCHECK=")
@@ -229,7 +241,7 @@ elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild -- "${TEST_TARGETS[@]}"
 
   echo "bazel release build with gcc..."
-  bazel_binary_build fastbuild
+  bazel_envoy_binary_build fastbuild
   exit 0
 elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   setup_clang_toolchain
@@ -237,12 +249,12 @@ elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}"
 
   echo "bazel debug build with tests..."
-  bazel_binary_build debug
+  bazel_envoy_binary_build debug
   exit 0
 elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel debug build..."
-  bazel_binary_build debug
+  bazel_envoy_binary_build debug
   exit 0
 elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
@@ -295,7 +307,7 @@ elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel fastbuild build with tests..."
   echo "Building..."
-  bazel_binary_build fastbuild
+  bazel_envoy_binary_build fastbuild
 
   echo "Testing ${TEST_TARGETS[*]}"
   bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
