@@ -202,4 +202,4 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
 /contrib/squash/ @yuval-k @alyssawilk
-/contrib/kafka @mattklein123 @adamkotwasinski
+/contrib/kafka/ @mattklein123 @adamkotwasinski
