@@ -161,6 +161,8 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
     address_set.iterate([&, this](const Network::Address::InstanceConstSharedPtr& address) {
       ipMatch = range_.isInRange(*address.get());
       if (ipMatch) {
+        ENVOY_LOG_MISC(debug, "upstream_ip {} matched range: {}", address->asString(),
+                       range_.asString());
         return false;
       }
 
