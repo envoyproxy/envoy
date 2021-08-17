@@ -75,8 +75,8 @@ public:
   const std::vector<std::string>& requestedApplicationProtocols() const override {
     return application_protocols_;
   }
-  Network::ConnectionInfoSetter& addressProvider() override { return *address_provider_; }
-  const Network::ConnectionInfoSetter& addressProvider() const override {
+  Network::ConnectionInfoSetter& connectionInfoProvider() override { return *address_provider_; }
+  const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
     return *address_provider_;
   }
   Network::ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {

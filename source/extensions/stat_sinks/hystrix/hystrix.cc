@@ -320,7 +320,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   auto on_destroy_callback = [this, &stream_decoder_filter_callbacks]() {
     ENVOY_LOG(debug, "stopped sending data to hystrix dashboard on port {}",
               stream_decoder_filter_callbacks.connection()
-                  ->addressProvider()
+                  ->connectionInfoProvider()
                   .remoteAddress()
                   ->asString());
 
@@ -333,7 +333,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
 
   ENVOY_LOG(
       debug, "started sending data to hystrix dashboard on port {}",
-      stream_decoder_filter_callbacks.connection()->addressProvider().remoteAddress()->asString());
+      stream_decoder_filter_callbacks.connection()->connectionInfoProvider().remoteAddress()->asString());
   return Http::Code::OK;
 }
 

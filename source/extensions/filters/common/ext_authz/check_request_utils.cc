@@ -38,10 +38,10 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeCo
   // Set the address
   auto addr = peer.mutable_address();
   if (local) {
-    Envoy::Network::Utility::addressToProtobufAddress(*connection.addressProvider().localAddress(),
+    Envoy::Network::Utility::addressToProtobufAddress(*connection.connectionInfoProvider().localAddress(),
                                                       *addr);
   } else {
-    Envoy::Network::Utility::addressToProtobufAddress(*connection.addressProvider().remoteAddress(),
+    Envoy::Network::Utility::addressToProtobufAddress(*connection.connectionInfoProvider().remoteAddress(),
                                                       *addr);
   }
 

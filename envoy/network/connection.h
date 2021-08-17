@@ -194,7 +194,7 @@ public:
   /**
    * @return the address provider backing this connection.
    */
-  virtual const ConnectionInfoProvider& addressProvider() const PURE;
+  virtual const ConnectionInfoProvider& connectionInfoProvider() const PURE;
   virtual ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const PURE;
 
   /**

@@ -65,7 +65,7 @@ public:
   MOCK_METHOD(void, readDisable, (bool disable));                                                  \
   MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));                                     \
   MOCK_METHOD(bool, readEnabled, (), (const));                                                     \
-  MOCK_METHOD(const ConnectionInfoProvider&, addressProvider, (), (const));                        \
+  MOCK_METHOD(const ConnectionInfoProvider&, connectionInfoProvider, (), (const));                        \
   MOCK_METHOD(ConnectionInfoProviderSharedPtr, addressProviderSharedPtr, (), (const));             \
   MOCK_METHOD(absl::optional<Connection::UnixDomainSocketPeerCredentials>,                         \
               unixSocketPeerCredentials, (), (const));                                             \

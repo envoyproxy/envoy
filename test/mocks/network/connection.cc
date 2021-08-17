@@ -54,7 +54,7 @@ void MockConnectionBase::runLowWatermarkCallbacks() {
 }
 
 template <class T> static void initializeMockConnection(T& connection) {
-  ON_CALL(connection, addressProvider())
+  ON_CALL(connection, connectionInfoProvider())
       .WillByDefault(ReturnPointee(connection.stream_info_.downstream_address_provider_));
   ON_CALL(connection, addressProviderSharedPtr())
       .WillByDefault(ReturnPointee(&connection.stream_info_.downstream_address_provider_));
