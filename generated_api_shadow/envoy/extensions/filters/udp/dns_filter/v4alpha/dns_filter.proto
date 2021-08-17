@@ -64,22 +64,23 @@ message DnsFilterConfig {
 
     // DNS resolution configuration which includes the underlying dns resolver addresses and options.
     // *dns_resolution_config* will be deprecated once
-    // :ref:'typed_dns_resolver_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.typed_dns_resolver_config>'
+    // :ref:`typed_dns_resolver_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.typed_dns_resolver_config>`
     // is fully supported.
     config.core.v4alpha.DnsResolutionConfig dns_resolution_config = 2;
 
     // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
     // or any other DNS resolver types and the related parameters.
     // For example, an object of
-    // :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>'
+    // :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
     // can be packed into this *typed_dns_resolver_config*. This configuration will replace the
-    // :ref:'dns_resolution_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolution_config>'
+    // :ref:`dns_resolution_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolution_config>`
     // configuration eventually.
     // TODO(yanjunxiang): Investigate the deprecation plan for *dns_resolution_config*.
     // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
     // this configuration is optional.
     // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
     // When *typed_dns_resolver_config* is missing, the default behavior is in place.
+    // [#extension-category: envoy.network_dnsresolvers]
     config.core.v4alpha.TypedExtensionConfig typed_dns_resolver_config = 4;
 
     // Controls how many outstanding external lookup contexts the filter tracks.

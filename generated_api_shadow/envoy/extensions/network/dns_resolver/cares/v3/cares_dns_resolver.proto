@@ -13,35 +13,23 @@ option java_outer_classname = "CaresDnsResolverProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: cares DNS resolver configuration]
+// [#protodoc-title: cares DNS resolver]
+// [#extension: envoy.dns_resolver.cares]
 
-// Configuration for cares DNS resolver
+// Configuration for cares DNS resolver.
 // For Envoy to use cares DNS library as DNS resolver, the following need to be done:
-// 1) In file: source/extensions/extensions_build_config.bzl, enable cares DNS extension by adding below line
-//      "envoy.dns_resolver.cares":                "//source/extensions/network/dns_resolver/cares:config",
-// 2) In Envoy running configuration file, add cares DNS as a typed extension in *typed_dns_resolver_config* field.
-// For example, to add such configuration in bootstrap
-//    :ref:'typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>'
-// Here is the configuration:
-// typed_dns_resolver_config:
-//  name: envoy.dns_resolver.cares
-//  typed_config:
-//    "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
-//    resolvers:
-//    - socket_address:
-//        address: "8.8.8.8"
-//        port_value: 53
-//    dns_resolver_options:
-//      use_tcp_for_dns_lookups: true
-//      no_default_search_domain: true
-// Such configuration can be added in other configurations, like dynamic_forward_proxy, cluster.
+// 1) In file: :repo:`extensions_build_config.bzl <source/extensions/extensions_build_config.bzl>`,
+// enable cares DNS resolver extension by adding below line
+// "envoy.dns_resolver.cares":                "//source/extensions/network/dns_resolver/cares:config",
+// 2) By default Envoy create cares DNS resolver for DNS resolving process.
+// Or in corresponding Envoy configuration, add a typed configuration. For example, in
+// :repo:'bootstrap.proto <api/envoy/config/bootstrap/v3/bootstrap.proto>`,
+// add this message as a typed extension in field:
+// :ref:'typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>'
 message CaresDnsResolverConfig {
   // A list of dns resolver addresses. If specified, the DNS client library will perform resolution
   // via the underlying DNS resolvers. Otherwise, the default system resolvers
   // (e.g., /etc/resolv.conf) will be used.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple's API only allows overriding DNS resolvers via system settings.
   repeated config.core.v3.Address resolvers = 1 [(validate.rules).repeated = {min_items: 1}];
 
   // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.

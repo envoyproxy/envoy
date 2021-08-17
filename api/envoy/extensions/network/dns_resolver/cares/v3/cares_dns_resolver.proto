@@ -13,29 +13,19 @@ option java_outer_classname = "CaresDnsResolverProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: cares DNS resolver configuration]
+// [#protodoc-title: cares DNS resolver]
+// [#extension: envoy.dns_resolver.cares]
 
 // Configuration for cares DNS resolver.
 // For Envoy to use cares DNS library as DNS resolver, the following need to be done:
 // 1) In file: :repo:`extensions_build_config.bzl <source/extensions/extensions_build_config.bzl>`,
 // enable cares DNS resolver extension by adding below line
-//      "envoy.dns_resolver.cares":                "//source/extensions/network/dns_resolver/cares:config",
-// 2) In corresponding Envoy configuration, for example:
-//    :repo:'bootstrap.proto <api/envoy/config/bootstrap/v3/bootstrap.proto>`,
-// add cares DNS resolver as a typed extension in field:
-//    :ref:'typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>'
-//
-// typed_dns_resolver_config:
-//   name: envoy.dns_resolver.cares
-//   typed_config:
-//     "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
-//     resolvers:
-//     - socket_address:
-//         address: "8.8.8.8"
-//         port_value: 53
-//     dns_resolver_options:
-//       use_tcp_for_dns_lookups: true
-//       no_default_search_domain: true
+// "envoy.dns_resolver.cares":                "//source/extensions/network/dns_resolver/cares:config",
+// 2) By default Envoy create cares DNS resolver for DNS resolving process.
+// Or in corresponding Envoy configuration, add a typed configuration. For example, in
+// :repo:'bootstrap.proto <api/envoy/config/bootstrap/v3/bootstrap.proto>`,
+// add this message as a typed extension in field:
+// :ref:'typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>'
 message CaresDnsResolverConfig {
   // A list of dns resolver addresses. If specified, the DNS client library will perform resolution
   // via the underlying DNS resolvers. Otherwise, the default system resolvers
