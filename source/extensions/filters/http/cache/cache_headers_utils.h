@@ -10,6 +10,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/protobuf.h"
 
+#include "absl/container/btree_set.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
@@ -117,7 +118,8 @@ public:
 
   // Parses the values of a comma-delimited list as defined per
   // https://tools.ietf.org/html/rfc7230#section-7.
-  static std::vector<std::string> parseCommaDelimitedList(const Http::HeaderMap::GetResult& entry);
+  static std::vector<absl::string_view>
+  parseCommaDelimitedHeader(const Http::HeaderMap::GetResult& entry);
 };
 
 class VaryHeader {
@@ -125,20 +127,27 @@ public:
   // Checks if the headers contain a non-empty value in the Vary header.
   static bool hasVary(const Http::ResponseHeaderMap& headers);
 
-  // Creates a single string combining the values of the varied headers from entry_headers.
-  static std::string createVaryKey(const Http::HeaderMap::GetResult& vary_header,
-                                   const Http::RequestHeaderMap& entry_headers);
+  // Retrieve all the individual header values from the provided response header
+  // map across all vary header entries.
+  static absl::btree_set<absl::string_view>
+  getVaryValues(const Envoy::Http::ResponseHeaderMap& headers);
+
+  // Checks if this header is allowed to vary cache entries.
+  bool allowsHeader(const absl::string_view header) const;
+
+  // Creates a single string combining the values of the varied headers from
+  // entry_headers. Returns an absl::nullopt if no valid vary key can be created
+  // and the response should not be cached (eg. when disallowed vary headers are
+  // present in the response).
+  absl::optional<std::string>
+  createVaryIdentifier(const absl::btree_set<absl::string_view>& vary_header_values,
+                       const Envoy::Http::RequestHeaderMap& request_headers) const;
 
   // Parses the allow list from the Cache Config into the object's private allow_list_.
   VaryHeader(const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list);
 
   // Checks if the headers contain an allowed value in the Vary header.
   bool isAllowed(const Http::ResponseHeaderMap& headers) const;
-
-  // Returns a header map containing the subset of the original headers that can be varied from the
-  // request.
-  Http::RequestHeaderMapPtr
-  possibleVariedHeaders(const Http::RequestHeaderMap& request_headers) const;
 
 private:
   // Stores the matching rules that define whether a header is allowed to be varied.

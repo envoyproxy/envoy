@@ -592,8 +592,8 @@ envoy.stat_sinks.wasm:
 envoy.tls.cert_validator.spiffe:
   categories:
   - envoy.tls.cert_validator
-  security_posture: unknown
-  status: wip
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.tracers.datadog:
   categories:
   - envoy.tracers

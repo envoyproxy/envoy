@@ -9,12 +9,12 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "filter_config_discovery_lib",
-    srcs = ["filter_config_discovery_impl.cc"],
-    hdrs = ["filter_config_discovery_impl.h"],
+    name = "config_discovery_lib",
+    srcs = ["config_discovery_impl.cc"],
+    hdrs = ["config_discovery_impl.h"],
     deps = [
         "//envoy/config:subscription_interface",
-        "//envoy/filter/http:filter_config_provider_interface",
+        "//envoy/filter:config_provider_manager_interface",
         "//envoy/singleton:instance_interface",
         "//envoy/stats:stats_macros",
         "//envoy/thread_local:thread_local_interface",

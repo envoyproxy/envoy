@@ -252,8 +252,35 @@ TEST_F(SimpleHttpCacheTest, VaryResponses) {
   insert(move(second_value_vary), response_headers, Body2);
   EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath).get(), Body2));
 
+  request_headers_.setCopy(Http::LowerCaseString("accept"), "image/*");
+  LookupContextPtr first_value_lookup2 = lookup(RequestPath);
   // Looks up first version again to be sure it wasn't replaced with the second one.
-  EXPECT_TRUE(expectLookupSuccessWithBody(first_value_vary.get(), Body1));
+  EXPECT_TRUE(expectLookupSuccessWithBody(first_value_lookup2.get(), Body1));
+
+  // Create a new allow list to make sure a now disallowed cached vary entry is not served.
+  Protobuf::RepeatedPtrField<::envoy::type::matcher::v3::StringMatcher> proto_allow_list;
+  ::envoy::type::matcher::v3::StringMatcher* matcher = proto_allow_list.Add();
+  matcher->set_exact("width");
+  vary_allow_list_ = VaryHeader(proto_allow_list);
+  lookup(RequestPath);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+}
+
+TEST_F(SimpleHttpCacheTest, VaryOnDisallowedKey) {
+  // Responses will vary on accept.
+  const std::string RequestPath("some-resource");
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"cache-control", "public,max-age=3600"},
+                                                   {"vary", "user-agent"}};
+
+  // First request.
+  request_headers_.setCopy(Http::LowerCaseString("user-agent"), "user_agent_one");
+  LookupContextPtr first_value_vary = lookup(RequestPath);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+  const std::string Body1("one");
+  insert(move(first_value_vary), response_headers, Body1);
+  first_value_vary = lookup(RequestPath);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 }
 
 } // namespace

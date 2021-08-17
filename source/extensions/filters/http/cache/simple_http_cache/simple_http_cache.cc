@@ -48,8 +48,10 @@ class SimpleInsertContext : public InsertContext {
 public:
   SimpleInsertContext(LookupContext& lookup_context, SimpleHttpCache& cache)
       : key_(dynamic_cast<SimpleLookupContext&>(lookup_context).request().key()),
-        entry_vary_headers_(
-            dynamic_cast<SimpleLookupContext&>(lookup_context).request().getVaryHeaders()),
+        request_headers_(
+            dynamic_cast<SimpleLookupContext&>(lookup_context).request().requestHeaders()),
+        vary_allow_list_(
+            dynamic_cast<SimpleLookupContext&>(lookup_context).request().varyAllowList()),
         cache_(cache) {}
 
   void insertHeaders(const Http::ResponseHeaderMap& response_headers,
@@ -86,16 +88,17 @@ private:
     committed_ = true;
     if (VaryHeader::hasVary(*response_headers_)) {
       cache_.varyInsert(key_, std::move(response_headers_), std::move(metadata_), body_.toString(),
-                        entry_vary_headers_);
+                        request_headers_, vary_allow_list_);
     } else {
       cache_.insert(key_, std::move(response_headers_), std::move(metadata_), body_.toString());
     }
   }
 
   Key key_;
+  const Http::RequestHeaderMap& request_headers_;
+  const VaryHeader& vary_allow_list_;
   Http::ResponseHeaderMapPtr response_headers_;
   ResponseMetadata metadata_;
-  const Http::RequestHeaderMap& entry_vary_headers_;
   SimpleHttpCache& cache_;
   Buffer::OwnedImpl body_;
   bool committed_ = false;
@@ -143,12 +146,19 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
   // This method should be called from lookup, which holds the mutex for reading.
   mutex_.AssertReaderHeld();
 
-  const auto vary_header = response_headers->get(Http::CustomHeaders::get().Vary);
-  ASSERT(!vary_header.empty());
+  absl::btree_set<absl::string_view> vary_header_values =
+      VaryHeader::getVaryValues(*response_headers);
+  ASSERT(!vary_header_values.empty());
 
   Key varied_request_key = request.key();
-  const std::string vary_key = VaryHeader::createVaryKey(vary_header, request.getVaryHeaders());
-  varied_request_key.add_custom_fields(vary_key);
+  const absl::optional<std::string> vary_identifier =
+      request.varyAllowList().createVaryIdentifier(vary_header_values, request.requestHeaders());
+  if (!vary_identifier.has_value()) {
+    // The vary allow list has changed and has made the vary header of this
+    // cached value not cacheable.
+    return SimpleHttpCache::Entry{};
+  }
+  varied_request_key.add_custom_fields(vary_identifier.value());
 
   auto iter = map_.find(varied_request_key);
   if (iter == map_.end()) {
@@ -164,31 +174,38 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
 void SimpleHttpCache::varyInsert(const Key& request_key,
                                  Http::ResponseHeaderMapPtr&& response_headers,
                                  ResponseMetadata&& metadata, std::string&& body,
-                                 const Http::RequestHeaderMap& request_vary_headers) {
+                                 const Http::RequestHeaderMap& request_headers,
+                                 const VaryHeader& vary_allow_list) {
   absl::WriterMutexLock lock(&mutex_);
 
-  const auto vary_header = response_headers->get(Http::CustomHeaders::get().Vary);
-  ASSERT(!vary_header.empty());
+  absl::btree_set<absl::string_view> vary_header_values =
+      VaryHeader::getVaryValues(*response_headers);
+  ASSERT(!vary_header_values.empty());
 
   // Insert the varied response.
   Key varied_request_key = request_key;
-  const std::string vary_key = VaryHeader::createVaryKey(vary_header, request_vary_headers);
-  varied_request_key.add_custom_fields(vary_key);
+  const absl::optional<std::string> vary_identifier =
+      vary_allow_list.createVaryIdentifier(vary_header_values, request_headers);
+  if (!vary_identifier.has_value()) {
+    // Skip the insert if we are unable to create a vary key.
+    return;
+  }
+
+  varied_request_key.add_custom_fields(vary_identifier.value());
   map_[varied_request_key] =
       SimpleHttpCache::Entry{std::move(response_headers), std::move(metadata), std::move(body)};
 
   // Add a special entry to flag that this request generates varied responses.
   auto iter = map_.find(request_key);
   if (iter == map_.end()) {
-    Http::ResponseHeaderMapPtr vary_only_map =
-        Http::createHeaderMap<Http::ResponseHeaderMapImpl>({});
-    // TODO(mattklein123): Support multiple vary headers and/or just make the vary header inline.
-    vary_only_map->setCopy(Http::CustomHeaders::get().Vary,
-                           vary_header[0]->value().getStringView());
+    Envoy::Http::ResponseHeaderMapPtr vary_only_map =
+        Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>({});
+    vary_only_map->setCopy(Envoy::Http::CustomHeaders::get().Vary,
+                           absl::StrJoin(vary_header_values, ","));
     // TODO(cbdm): In a cache that evicts entries, we could maintain a list of the "varykey"s that
     // we have inserted as the body for this first lookup. This way, we would know which keys we
-    // have inserted for that resource. For the first entry simply use vary_key as the entry_list,
-    // for future entries append vary_key to existing list.
+    // have inserted for that resource. For the first entry simply use vary_identifier as the
+    // entry_list; for future entries append vary_identifier to existing list.
     std::string entry_list;
     map_[request_key] = SimpleHttpCache::Entry{std::move(vary_only_map), {}, std::move(entry_list)};
   }

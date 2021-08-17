@@ -476,7 +476,8 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   envoy::config::core::v3::TypedExtensionConfig getTypedDnsResolverConfig(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolver_inst) {
+      const std::vector<Network::Address::InstanceConstSharedPtr>& resolver_inst,
+      const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) {
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
     auto dns_resolvers = envoy::config::core::v3::Address();
@@ -491,7 +492,7 @@ public:
       }
     }
     // copy over dns_resolver_options_
-    cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+    cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
     // setup the typed config
     typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
     typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
@@ -507,9 +508,11 @@ public:
     listener_ = dispatcher_->createListener(socket_, *server_, true);
     updateDnsResolverOptions();
 
+    // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
+    envoy::config::core::v3::DnsResolverOptions dns_resolver_options = dns_resolver_options_;
     typed_dns_resolver_config_in_construct_ =
-        getTypedDnsResolverConfig({socket_->addressProvider().localAddress()});
-    typed_dns_resolver_config_not_in_construct_ = getTypedDnsResolverConfig({});
+        getTypedDnsResolverConfig({socket_->addressProvider().localAddress()}, dns_resolver_options);
+    typed_dns_resolver_config_not_in_construct_ = getTypedDnsResolverConfig({}, dns_resolver_options);
 
     if (setResolverInConstructor()) {
       resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config_in_construct_);
