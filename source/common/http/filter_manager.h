@@ -589,7 +589,7 @@ public:
  * provider via the normal getter.
  */
 class OverridableRemoteConnectionInfoSetterStreamInfo : public StreamInfo::StreamInfoImpl,
-                                                       private Network::ConnectionInfoProvider {
+                                                        private Network::ConnectionInfoProvider {
 public:
   using StreamInfoImpl::StreamInfoImpl;
 

@@ -11,7 +11,7 @@ namespace Network {
 class ConnectionInfoSetterImpl : public ConnectionInfoSetter {
 public:
   ConnectionInfoSetterImpl(const Address::InstanceConstSharedPtr& local_address,
-                          const Address::InstanceConstSharedPtr& remote_address)
+                           const Address::InstanceConstSharedPtr& remote_address)
       : local_address_(local_address), remote_address_(remote_address),
         direct_remote_address_(remote_address) {}
 
