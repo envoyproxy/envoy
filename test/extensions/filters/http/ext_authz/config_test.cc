@@ -1,21 +1,18 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
-#include "test/proto/helloworld.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/grpc/async_client_manager_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/thread_local/thread_local_impl.h"
 #include "source/extensions/filters/http/ext_authz/config.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/grpc/mocks.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
-#include "source/common/grpc/async_client_manager_impl.h"
-#include "source/common/thread_local/thread_local_impl.h"
-#include "source/common/network/address_impl.h"
-#include "absl/synchronization/notification.h"
-#include "absl/time/time.h"
 
+#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -28,92 +25,34 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
-class ExtAuthzFilterTest : public Event::TestUsingSimulatedTime, public testing::Test {
+class MultiThreadTest {
 public:
-  ExtAuthzFilterTest()
-      : api_(Api::createApiForTest()), stat_names_(symbol_table_),
-        method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
-    initialize();
-  }
-  void initialize() {
-    std::string grpc_service_yaml = R"EOF(
-  transport_api_version: V3
-  grpc_service:
-    envoy_grpc:
-      cluster_name: test_cluster
-  failure_mode_allow: false
-  )EOF";
-    EXPECT_CALL(context_, getServerFactoryContext())
-        .WillRepeatedly(testing::ReturnRef(server_context_));
-    ExtAuthzFilterConfig factory;
-    ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-    TestUtility::loadFromYaml(grpc_service_yaml, *proto_config);
-    filter_factory_ = factory.createFilterFactoryFromProto(*proto_config, "stats", context_);
+  MultiThreadTest(size_t num_threads) : num_threads_(num_threads), api_(Api::createApiForTest()) {}
+  virtual ~MultiThreadTest() { tls_.shutdownGlobalThreading(); }
+  virtual void workerFunc() {}
+  void run() { spawnAllWorkers(); }
 
-    cm_.initializeThreadLocalClusters({"test_cluster"});
-    ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(http_client_));
-    ON_CALL(http_client_, start(_, _))
-        .WillByDefault(
-            Invoke([&](Http::AsyncClient::StreamCallbacks&,
-                       const Http::AsyncClient::StreamOptions&) { return &http_stream_; }));
-  }
-
-  void testFilter() {
-    async_client_manager_ =
-        std::make_unique<Grpc::AsyncClientManagerImpl>(cm_, tls_, simTime(), *api_, stat_names_);
-    Http::MockFilterChainFactoryCallbacks filter_callbacks;
-    EXPECT_CALL(context_.cluster_manager_.async_client_manager_,
-                getOrCreateRawAsyncClient(_, _, _, _))
-        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService& config,
-                             Stats::Scope& scope, bool skip, Grpc::CacheOption cache_option) {
-          return async_client_manager_->getOrCreateRawAsyncClient(config, scope, skip,
-                                                                  cache_option);
-        }));
-    Http::StreamFilterSharedPtr filter;
-    EXPECT_CALL(filter_callbacks, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
-    filter_factory_(filter_callbacks);
-    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-    filter->setDecoderFilterCallbacks(decoder_callbacks);
-  }
-
-  void testGrpcClient(Grpc::RawAsyncClientSharedPtr raw_client) {
-    Grpc::AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> client = raw_client;
-    NiceMock<Grpc::MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
-    auto grpc_stream =
-        client->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
-    EXPECT_NE(grpc_stream, nullptr);
-  }
-
-  void testGrpcClientMultiThread() {
-    ON_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
-        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService& config,
-                                  Stats::Scope& scope, bool skip, Grpc::CacheOption cache_option) {
-          auto raw_client =
-              async_client_manager_->getOrCreateRawAsyncClient(config, scope, skip, cache_option);
-          // Ensure that the raw client is valid and an assertion has been triggerred.
-          testGrpcClient(raw_client);
-          return raw_client;
-        }));
-
-    for (int i = 0; i < num_threads_; i++) {
+private:
+  void spawnAllWorkers() {
+    // Create dispatcher and register.
+    for (size_t i = 0; i < num_threads_; i++) {
       dispatchers_.emplace_back(api_->allocateDispatcher(std::to_string(i)));
       tls_.registerThread(*dispatchers_[i], false);
     }
-    for (int i = 0; i < num_threads_; i++) {
+    // Create running threads.
+    for (size_t i = 0; i < num_threads_; i++) {
       // i must be explictly captured by value.
       workers_.emplace_back(api_->threadFactory().createThread(
           [&, i]() { dispatchers_[i]->run(Event::Dispatcher::RunType::RunUntilExit); }));
     }
-    async_client_manager_ =
-        std::make_unique<Grpc::AsyncClientManagerImpl>(cm_, tls_, simTime(), *api_, stat_names_);
+    // Post callback to fire all threads at the same time.
     for (Event::DispatcherPtr& dispatcher : dispatchers_) {
       dispatcher->post([&]() {
-        registerWorkerAndWaitForStartSignal();
-        Http::MockFilterChainFactoryCallbacks filter_callbacks;
-        EXPECT_CALL(filter_callbacks, addStreamFilter(_));
-        filter_factory_(filter_callbacks);
+        waitForAllWorkersToFire();
+        workerFunc();
       });
     }
+    // Post exit signals and wait for thread to end.
     for (Event::DispatcherPtr& dispatcher : dispatchers_) {
       dispatcher->post([&dispatcher]() { dispatcher->exit(); });
     }
@@ -122,10 +61,12 @@ public:
     }
   }
 
-  void registerWorkerAndWaitForStartSignal() {
+  void waitForAllWorkersToFire() {
     if (shouldFire()) {
+      // The last thread spawned should notify all to start.
       workers_should_fire_.Notify();
     } else {
+      // Wait for notification if the current thread is not the last one spawned.
       workers_should_fire_.WaitForNotification();
     }
   }
@@ -136,12 +77,65 @@ public:
     return active_threads_cnt_ == num_threads_;
   }
 
-  ~ExtAuthzFilterTest() { tls_.shutdownGlobalThreading(); }
+  size_t num_threads_;
+  absl::Notification workers_should_fire_;
+  Thread::MutexBasicLockable mutex_;
+  size_t active_threads_cnt_{};
+  ThreadLocal::InstanceImpl tls_;
+  Api::ApiPtr api_;
+
+  std::vector<Event::DispatcherPtr> dispatchers_;
+  std::vector<Thread::ThreadPtr> workers_;
+};
+
+class ExtAuthzFilterTest : public MultiThreadTest, public testing::Test {
+public:
+  ExtAuthzFilterTest() : MultiThreadTest(10), stat_names_(symbol_table_) {}
+
+  void initialize(const std::string& ext_authz_config_yaml) {
+    initFilterFactory(ext_authz_config_yaml);
+    initAddress();
+  }
+
+  void initFilterFactory(const std::string& ext_authz_config_yaml) {
+    EXPECT_CALL(context_, getServerFactoryContext())
+        .WillRepeatedly(testing::ReturnRef(server_context_));
+    ON_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                  Grpc::CacheOption) {
+          return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+        }));
+    ExtAuthzFilterConfig factory;
+    ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+    TestUtility::loadFromYaml(ext_authz_config_yaml, *proto_config);
+    filter_factory_ = factory.createFilterFactoryFromProto(*proto_config, "stats", context_);
+  }
+
+  void initAddress() {
+    addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
+    connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+    connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+  }
+
+  void testFilter() {
+    Http::MockFilterChainFactoryCallbacks filter_callbacks;
+
+    Http::StreamFilterSharedPtr filter;
+    EXPECT_CALL(filter_callbacks, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
+    filter_factory_(filter_callbacks);
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    ON_CALL(decoder_callbacks, connection()).WillByDefault(Return(&connection_));
+    filter->setDecoderFilterCallbacks(decoder_callbacks);
+    EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+              filter->decodeHeaders(request_headers_, false));
+    std::shared_ptr<Http::StreamDecoderFilter> decoder_filter = filter;
+    decoder_filter->onDestroy();
+  }
+
+  void workerFunc() override { testFilter(); }
 
 private:
   NiceMock<Upstream::MockClusterManager> cm_;
-  ThreadLocal::InstanceImpl tls_;
-  Api::ApiPtr api_;
   Stats::SymbolTableImpl symbol_table_;
   Grpc::StatNames stat_names_;
 
@@ -149,23 +143,36 @@ private:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Http::FilterFactoryCb filter_factory_;
-  std::vector<Event::DispatcherPtr> dispatchers_;
-  std::vector<Thread::ThreadPtr> workers_;
 
-  const Protobuf::MethodDescriptor* method_descriptor_;
-  NiceMock<Http::MockAsyncClient> http_client_;
-  NiceMock<Http::MockAsyncClientStream> http_stream_;
-
-  absl::Notification workers_should_fire_;
-  Thread::MutexBasicLockable mutex_;
-  int active_threads_cnt_{};
-
-  static constexpr int num_threads_ = 5;
+  Network::Address::InstanceConstSharedPtr addr_;
+  NiceMock<Envoy::Network::MockConnection> connection_;
+  Http::TestRequestHeaderMapImpl request_headers_;
 };
 
-TEST_F(ExtAuthzFilterTest, FilterTest) { testFilter(); }
+TEST_F(ExtAuthzFilterTest, ExtAuthzFilterThreadingTestEnvoyGrpc) {
+  std::string ext_authz_config_yaml = R"EOF(
+   transport_api_version: V3
+   grpc_service:
+     envoy_grpc:
+       cluster_name: test_cluster
+   failure_mode_allow: false
+   )EOF";
+  initialize(ext_authz_config_yaml);
+  run();
+}
 
-TEST_F(ExtAuthzFilterTest, GrpcClientTest) { testGrpcClientMultiThread(); }
+TEST_F(ExtAuthzFilterTest, ExtAuthzFilterThreadingTestGoogleGrpc) {
+  std::string ext_authz_config_yaml = R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    google_grpc:
+      target_uri: ext_authz_server
+      stat_prefix: google
+  failure_mode_allow: false
+  )EOF";
+  initialize(ext_authz_config_yaml);
+  run();
+}
 
 namespace {
 
