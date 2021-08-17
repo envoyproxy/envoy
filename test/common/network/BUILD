@@ -322,7 +322,7 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
-        "@com_googlesource_quiche//:quic_test_tools_mock_syscall_wrapper_lib",
+        "@com_github_google_quiche//:quic_test_tools_mock_syscall_wrapper_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
