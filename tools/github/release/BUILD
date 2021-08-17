@@ -40,6 +40,20 @@ py_library(
 )
 
 envoy_py_library(
+    "tools.github.release.manager",
+    deps = [
+        ":abstract",
+        ":exceptions",
+        "//tools/base:abstract",
+        "//tools/base:functional",
+        "//tools/base:utils",
+        requirement("aiohttp"),
+        requirement("gidgethub"),
+        requirement("packaging"),
+    ],
+)
+
+envoy_py_library(
     "tools.github.release.release",
     deps = [
         "//tools/base:aio",
