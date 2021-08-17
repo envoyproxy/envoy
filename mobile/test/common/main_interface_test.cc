@@ -1,8 +1,12 @@
+#include "source/common/common/assert.h"
+
 #include "test/common/http/common.h"
 
 #include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "library/common/api/external.h"
+#include "library/common/bridge/utility.h"
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/main_interface.h"
@@ -17,6 +21,7 @@ typedef struct {
   absl::Notification on_exit;
   absl::Notification on_log;
   absl::Notification on_logger_release;
+  absl::Notification on_event;
 } engine_test_context;
 
 // This config is the minimal envoy mobile config that allows for running the engine.
@@ -89,6 +94,20 @@ layered_runtime:
 
 const std::string LEVEL_DEBUG = "debug";
 
+// Transform C map to C++ map.
+static inline std::map<std::string, std::string> toMap(envoy_map map) {
+  std::map<std::string, std::string> new_map;
+  for (envoy_map_size_t i = 0; i < map.length; i++) {
+    envoy_map_entry header = map.entries[i];
+    const auto key = Data::Utility::copyToString(header.key);
+    const auto value = Data::Utility::copyToString(header.value);
+    new_map.insert({std::move(key), std::move(value)});
+  }
+
+  release_envoy_map(map);
+  return new_map;
+}
+
 // Based on Http::Utility::toRequestHeaders() but only used for these tests.
 Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
   Http::ResponseHeaderMapPtr transformed_headers = Http::ResponseHeaderMapImpl::create();
@@ -115,7 +134,7 @@ TEST(MainInterfaceTest, BasicStream) {
                                       exit->on_exit.Notify();
                                     } /*on_exit*/,
                                     &engine_cbs_context /*context*/};
-  init_engine(engine_cbs, {});
+  init_engine(engine_cbs, {}, {});
   run_engine(0, BUFFERED_TEST_CONFIG.c_str(), level.c_str());
 
   ASSERT_TRUE(
@@ -180,7 +199,7 @@ TEST(MainInterfaceTest, SendMetadata) {
 
   // There is nothing functional about the config used to run the engine, as the created stream is
   // only used for send_metadata.
-  init_engine(engine_cbs, {});
+  init_engine(engine_cbs, {}, {});
   run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
 
   ASSERT_TRUE(
@@ -217,7 +236,7 @@ TEST(MainInterfaceTest, ResetStream) {
 
   // There is nothing functional about the config used to run the engine, as the created stream is
   // immediately reset.
-  init_engine(engine_cbs, {});
+  init_engine(engine_cbs, {}, {});
   run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
 
   ASSERT_TRUE(
@@ -288,7 +307,7 @@ TEST(MainInterfaceTest, RegisterPlatformApi) {
                                     &engine_cbs_context /*context*/};
 
   // Using the minimal envoy mobile config that allows for running the engine.
-  init_engine(engine_cbs, {});
+  init_engine(engine_cbs, {}, {});
   run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
 
   ASSERT_TRUE(
@@ -315,7 +334,7 @@ TEST(MainInterfaceTest, InitEngineReturns1) {
                                       exit->on_exit.Notify();
                                     } /*on_exit*/,
                                     &test_context /*context*/};
-  ASSERT_EQ(1, init_engine(engine_cbs, {}));
+  ASSERT_EQ(1, init_engine(engine_cbs, {}, {}));
   run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
   terminate_engine(0);
@@ -339,7 +358,7 @@ TEST(EngineTest, RecordCounter) {
                                     } /*on_exit*/,
                                     &test_context /*context*/};
   EXPECT_EQ(ENVOY_FAILURE, record_counter_inc(0, "counter", envoy_stats_notags, 1));
-  init_engine(engine_cbs, {});
+  init_engine(engine_cbs, {}, {});
   run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
   EXPECT_EQ(ENVOY_SUCCESS, record_counter_inc(0, "counter", envoy_stats_notags, 1));
@@ -361,7 +380,7 @@ TEST(EngineTest, SetGauge) {
                                     } /*on_exit*/,
                                     &test_context /*context*/};
   EXPECT_EQ(ENVOY_FAILURE, record_gauge_set(0, "gauge", envoy_stats_notags, 1));
-  init_engine(engine_cbs, {});
+  init_engine(engine_cbs, {}, {});
   run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -386,7 +405,7 @@ TEST(EngineTest, AddToGauge) {
                                     &test_context /*context*/};
   EXPECT_EQ(ENVOY_FAILURE, record_gauge_add(0, "gauge", envoy_stats_notags, 30));
 
-  init_engine(engine_cbs, {});
+  init_engine(engine_cbs, {}, {});
   run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
@@ -410,7 +429,7 @@ TEST(EngineTest, SubFromGauge) {
                                     &test_context /*context*/};
   EXPECT_EQ(ENVOY_FAILURE, record_gauge_sub(0, "gauge", envoy_stats_notags, 30));
 
-  init_engine(engine_cbs, {});
+  init_engine(engine_cbs, {}, {});
   run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
@@ -437,7 +456,7 @@ TEST(EngineTest, RecordHistogramValue) {
   EXPECT_EQ(ENVOY_FAILURE,
             record_histogram_value(0, "histogram", envoy_stats_notags, 99, MILLISECONDS));
 
-  init_engine(engine_cbs, {});
+  init_engine(engine_cbs, {}, {});
   run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
@@ -479,7 +498,7 @@ TEST(EngineTest, Logger) {
                       } /* release */,
                       &test_context};
 
-  init_engine(engine_cbs, logger);
+  init_engine(engine_cbs, logger, {});
   run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
@@ -487,6 +506,116 @@ TEST(EngineTest, Logger) {
 
   terminate_engine(0);
   ASSERT_TRUE(test_context.on_logger_release.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+}
+
+TEST(EngineTest, EventTrackerRegistersDefaultAPI) {
+  engine_test_context test_context{};
+  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+                                      auto* test_context =
+                                          static_cast<engine_test_context*>(context);
+                                      test_context->on_engine_running.Notify();
+                                    } /*on_engine_running*/,
+                                    [](void* context) -> void {
+                                      auto* test_context =
+                                          static_cast<engine_test_context*>(context);
+                                      test_context->on_exit.Notify();
+                                    } /*on_exit*/,
+                                    &test_context /*context*/};
+
+  init_engine(engine_cbs, {}, {});
+  run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
+
+  // A default event tracker is registered in external API registry.
+  const auto registered_event_tracker =
+      static_cast<envoy_event_tracker*>(Api::External::retrieveApi(envoy_event_tracker_api_name));
+  EXPECT_TRUE(registered_event_tracker != nullptr);
+  EXPECT_TRUE(registered_event_tracker->track == nullptr);
+  EXPECT_TRUE(registered_event_tracker->context == nullptr);
+
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  // Simulate a failed assertion by invoking a debug assertion failure
+  // record action.
+  // Verify that no crash if the assertion fails when no real event
+  // tracker is passed at engine's initialization time.
+  Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly("foo_location");
+
+  terminate_engine(0);
+  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+}
+
+TEST(EngineTest, EventTrackerRegistersAPI) {
+  engine_test_context test_context{};
+  envoy_engine_callbacks engine_cbs{NULL /*on_engine_running*/,
+                                    [](void* context) -> void {
+                                      auto* test_context =
+                                          static_cast<engine_test_context*>(context);
+                                      test_context->on_exit.Notify();
+                                    } /*on_exit*/,
+                                    &test_context /*context*/};
+
+  envoy_event_tracker event_tracker{[](envoy_map map, const void* context) -> void {
+                                      const auto new_map = toMap(map);
+                                      EXPECT_EQ("bar", new_map.at("foo"));
+                                      auto* test_context = static_cast<engine_test_context*>(
+                                          const_cast<void*>(context));
+                                      test_context->on_event.Notify();
+                                    } /*track*/,
+                                    &test_context /*context*/};
+
+  init_engine(engine_cbs, {}, event_tracker);
+  run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
+
+  const auto registered_event_tracker =
+      static_cast<envoy_event_tracker*>(Api::External::retrieveApi(envoy_event_tracker_api_name));
+  EXPECT_TRUE(registered_event_tracker != nullptr);
+  EXPECT_EQ(event_tracker.track, registered_event_tracker->track);
+  EXPECT_EQ(event_tracker.context, registered_event_tracker->context);
+
+  event_tracker.track(Envoy::Bridge::makeEnvoyMap({{"foo", "bar"}}),
+                      registered_event_tracker->context);
+
+  ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  terminate_engine(0);
+  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+}
+
+TEST(EngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
+  engine_test_context test_context{};
+  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+                                      auto* test_context =
+                                          static_cast<engine_test_context*>(context);
+                                      test_context->on_engine_running.Notify();
+                                    } /*on_engine_running*/,
+                                    [](void* context) -> void {
+                                      auto* test_context =
+                                          static_cast<engine_test_context*>(context);
+                                      test_context->on_exit.Notify();
+                                    } /*on_exit*/,
+                                    &test_context /*context*/};
+
+  envoy_event_tracker event_tracker{[](envoy_map map, const void* context) -> void {
+                                      const auto new_map = toMap(map);
+                                      EXPECT_EQ(new_map.at("name"), "assertion");
+                                      EXPECT_EQ(new_map.at("location"), "foo_location");
+                                      auto* test_context = static_cast<engine_test_context*>(
+                                          const_cast<void*>(context));
+                                      test_context->on_event.Notify();
+                                    } /*track*/,
+                                    &test_context /*context*/};
+
+  init_engine(engine_cbs, {}, event_tracker);
+  run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
+
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  // Simulate a failed assertion by invoking a debug assertion failure
+  // record action.
+  // Verify that an envoy event is emitted when an event tracker is passed
+  // at engine's initialization time.
+  Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly("foo_location");
+
+  ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  terminate_engine(0);
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 }
 

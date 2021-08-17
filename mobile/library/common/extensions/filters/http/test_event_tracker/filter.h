@@ -19,7 +19,11 @@ public:
           proto_config);
 
   std::vector<std::pair<std::string, std::string>> attributes() { return attributes_; };
-  void track(envoy_map event) { event_tracker_->track(event, event_tracker_->context); };
+  void track(envoy_map event) {
+    if (event_tracker_->track != nullptr) {
+      event_tracker_->track(event, event_tracker_->context);
+    }
+  };
 
 private:
   std::vector<std::pair<std::string, std::string>> attributes_;

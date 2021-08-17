@@ -2,7 +2,7 @@
 
 @implementation EnvoyEventTracker
 
-- (instancetype)initWithEventTrackingClosure:(nullable void (^)(EnvoyEvent *))track {
+- (instancetype)initWithEventTrackingClosure:(nonnull void (^)(EnvoyEvent *))track {
   self = [super init];
   if (!self) {
     return nil;

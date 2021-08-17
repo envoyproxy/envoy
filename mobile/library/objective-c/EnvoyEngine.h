@@ -346,9 +346,9 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 
 @interface EnvoyEventTracker : NSObject
 
-@property (nonatomic, copy, nullable) void (^track)(EnvoyEvent *);
+@property (nonatomic, copy, nonnull) void (^track)(EnvoyEvent *);
 
-- (instancetype)initWithEventTrackingClosure:(nullable void (^)(EnvoyEvent *))track;
+- (instancetype)initWithEventTrackingClosure:(nonnull void (^)(EnvoyEvent *))track;
 
 @end
 

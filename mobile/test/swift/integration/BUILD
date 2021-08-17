@@ -167,3 +167,13 @@ envoy_mobile_swift_test(
         "//library/objective-c:envoy_engine_objc_lib",
     ],
 )
+
+envoy_mobile_swift_test(
+    name = "set_event_tracker_test_no_tracker",
+    srcs = [
+        "SetEventTrackerTestNoTracker.swift",
+    ],
+    deps = [
+        "//library/objective-c:envoy_engine_objc_lib",
+    ],
+)

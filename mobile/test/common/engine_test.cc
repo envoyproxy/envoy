@@ -46,7 +46,7 @@ layered_runtime:
 // Envoy::Logger::current_log_context global.
 struct EngineHandle {
   EngineHandle(envoy_engine_callbacks callbacks, const std::string& level) {
-    init_engine(callbacks, {});
+    init_engine(callbacks, {}, {});
     run_engine(0, MINIMAL_TEST_CONFIG.c_str(), level.c_str());
   }
 

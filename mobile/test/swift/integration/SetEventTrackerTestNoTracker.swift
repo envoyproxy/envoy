@@ -3,17 +3,11 @@ import EnvoyEngine
 import Foundation
 import XCTest
 
-final class SetEventTrackerTest: XCTestCase {
-  func testEmitEventWithoutSettingEventTracker() throws {
-    let eventExpectation =
-      self.expectation(description: "Passed event tracker receives an event")
+final class SetEventTrackerTestNoTracker: XCTestCase {
+  func testSetEventTracker() throws {
+    let expectation = self.expectation(description: "Response headers received")
 
     let client = EngineBuilder()
-      .setEventTracker { event in
-        XCTAssertEqual("bar", event["foo"])
-        eventExpectation.fulfill()
-      }
-
       .addNativeFilter(
         name: "envoy.filters.http.test_event_tracker",
         // swiftlint:disable:next line_length
@@ -27,9 +21,12 @@ final class SetEventTrackerTest: XCTestCase {
 
     client
       .newStreamPrototype()
+      .setOnResponseHeaders { _, _, _ in
+        expectation.fulfill()
+      }
       .start()
       .sendHeaders(requestHeaders, endStream: true)
 
-    XCTAssertEqual(XCTWaiter.wait(for: [eventExpectation], timeout: 10), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 10), .completed)
   }
 }
