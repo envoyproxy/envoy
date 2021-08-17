@@ -475,6 +475,9 @@ stats_config:
             regex: '^cluster\.[\w]+?\.upstream_rq_[\w]+'
         - safe_regex:
             google_re2: {}
+            regex: '^cluster\.[\w]+?\.outlier_detection.*'
+        - safe_regex:
+            google_re2: {}
             regex: '^dns.apple.*'
         - safe_regex:
             google_re2: {}
