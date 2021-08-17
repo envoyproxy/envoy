@@ -35,7 +35,7 @@
 #include <arpa/nameser.h>
 #include <arpa/nameser_compat.h>
 #else
-#include "nameser.h"
+#include "ares_nameser.h"
 #endif
 
 using testing::_;
