@@ -78,6 +78,9 @@ public:
   bool implementsSecureTransport() const override { return false; }
   bool usesProxyProtocolOptions() const override { return false; }
 
+  // TODO(mpuncel) only invoke callback() once secrets are ready.
+  void addReadyCb(std::function<void()> callback) override { callback(); }
+
 private:
   Network::TransportSocketFactoryPtr raw_socket_factory_;
   Network::TransportSocketFactoryPtr tls_socket_factory_;

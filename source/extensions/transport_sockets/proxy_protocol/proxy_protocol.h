@@ -49,6 +49,7 @@ public:
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return true; }
+  void addReadyCb(std::function<void()> callback) override { callback(); };
 
 private:
   Network::TransportSocketFactoryPtr transport_socket_factory_;

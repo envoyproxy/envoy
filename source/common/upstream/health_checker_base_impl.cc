@@ -229,7 +229,8 @@ HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
     HealthCheckerImplBase& parent, HostSharedPtr host)
     : host_(host), parent_(parent),
       interval_timer_(parent.dispatcher_.createTimer([this]() -> void { onIntervalBase(); })),
-      timeout_timer_(parent.dispatcher_.createTimer([this]() -> void { onTimeoutBase(); })) {
+      timeout_timer_(parent.dispatcher_.createTimer([this]() -> void { onTimeoutBase(); })),
+      lifetime_guard_(std::make_shared<uint32_t>(1)) {
 
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent.incHealthy();
@@ -409,6 +410,22 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
 void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
   onTimeout();
   handleFailure(envoy::data::core::v3::NETWORK_TIMEOUT);
+}
+
+void HealthCheckerImplBase::ActiveHealthCheckSession::start() {
+  // Start health checks only after secrets are ready for the transport socket that health checks
+  // will be performed on. If health checks start immediately, they may fail with "network" errors
+  // due to TLS credentials not yet being loaded, which can result in long startup times. The
+  // callback needs to make sure this ActiveHealthCheckSession wasn't deleted before starting the
+  // health check loop in case it takes a while for the socket to become ready.
+  std::weak_ptr<uint32_t> lifetime_guard = lifetime_guard_;
+  host_->addHealthCheckingReadyCb(
+      [this, lifetime_guard] {
+        if (lifetime_guard.lock()) {
+          onInitialInterval();
+        }
+      },
+      parent_.transportSocketMatchMetadata().get());
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onInitialInterval() {

@@ -137,6 +137,8 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
 
+  void addReadyCb(std::function<void()> callback) override { callback(); };
+
 private:
   HandshakerFactory handshaker_factory_;
   HandshakeValidator handshake_validator_;

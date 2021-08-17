@@ -41,6 +41,7 @@ public:
   MOCK_METHOD(bool, supportsAlpn, (), (const));
   MOCK_METHOD(TransportSocketPtr, createTransportSocket, (TransportSocketOptionsConstSharedPtr),
               (const));
+  MOCK_METHOD(void, addReadyCb, (std::function<void()>));
 };
 
 } // namespace Network

@@ -335,6 +335,14 @@ Network::ClientConnectionPtr HostImpl::createConnection(
   return connection;
 }
 
+void HostImpl::addHealthCheckingReadyCb(std::function<void()> callback,
+                                        const envoy::config::core::v3::Metadata* metadata) const {
+  Network::TransportSocketFactory& factory =
+      (metadata != nullptr) ? resolveTransportSocketFactory(healthCheckAddress(), metadata)
+                            : transportSocketFactory();
+  factory.addReadyCb(callback);
+}
+
 void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, new_weight); }
 
 std::vector<HostsPerLocalityConstSharedPtr> HostsPerLocalityImpl::filter(

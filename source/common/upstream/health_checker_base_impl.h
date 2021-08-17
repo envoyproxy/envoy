@@ -78,7 +78,7 @@ protected:
     ~ActiveHealthCheckSession() override;
     HealthTransition setUnhealthy(envoy::data::core::v3::HealthCheckFailureType type);
     void onDeferredDeleteBase();
-    void start() { onInitialInterval(); }
+    void start();
 
   protected:
     ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
@@ -107,6 +107,10 @@ protected:
     uint32_t num_unhealthy_{};
     uint32_t num_healthy_{};
     bool first_check_{true};
+
+    // lifetime_guard_ is used to ensure health checks are not started via a callback after this
+    // ActiveHealthCheckSession has been deleted.
+    std::shared_ptr<uint32_t> lifetime_guard_{};
   };
 
   using ActiveHealthCheckSessionPtr = std::unique_ptr<ActiveHealthCheckSession>;

@@ -112,6 +112,8 @@ public:
   bool usesProxyProtocolOptions() const override { return false; }
   bool supportsAlpn() const override { return true; }
 
+  void addReadyCb(std::function<void()> callback) override;
+
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
 
@@ -126,6 +128,9 @@ private:
   Envoy::Ssl::ClientContextConfigPtr config_;
   mutable absl::Mutex ssl_ctx_mu_;
   Envoy::Ssl::ClientContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
+  mutable absl::Mutex secrets_ready_callbacks_mu_;
+  std::list<std::function<void()>>
+      secrets_ready_callbacks_ ABSL_GUARDED_BY(secrets_ready_callbacks_mu_);
 };
 
 class ServerSslSocketFactory : public Network::TransportSocketFactory,
@@ -141,6 +146,8 @@ public:
   bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return false; }
 
+  void addReadyCb(std::function<void()> callback) override;
+
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
 
@@ -152,6 +159,9 @@ private:
   const std::vector<std::string> server_names_;
   mutable absl::Mutex ssl_ctx_mu_;
   Envoy::Ssl::ServerContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
+  mutable absl::Mutex secrets_ready_callbacks_mu_;
+  std::list<std::function<void()>>
+      secrets_ready_callbacks_ ABSL_GUARDED_BY(secrets_ready_callbacks_mu_);
 };
 
 } // namespace Tls
