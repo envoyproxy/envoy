@@ -3,6 +3,9 @@
 #include "envoy/registry/registry.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Cache {
+namespace KeyValueCache {
 
 FileBasedKeyValueStore::FileBasedKeyValueStore(Event::Dispatcher& dispatcher,
                                                std::chrono::seconds flush_interval,
@@ -38,7 +41,6 @@ void FileBasedKeyValueStore::flush() {
   file->close();
 }
 
-
 KeyValueStorePtr FileBasedKeyValueStoreFactory::createStore(
     const Protobuf::Message& config, ProtobufMessage::ValidationVisitor& validation_visitor,
     Event::Dispatcher& dispatcher, Filesystem::Instance& file_system) {
@@ -55,4 +57,7 @@ KeyValueStorePtr FileBasedKeyValueStoreFactory::createStore(
 
 REGISTER_FACTORY(FileBasedKeyValueStoreFactory, KeyValueStoreFactory);
 
+} // namespace KeyValueCache
+} // namespace Cache
+} // namespace Extensions
 } // namespace Envoy

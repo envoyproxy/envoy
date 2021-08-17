@@ -20,6 +20,5 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/common/common:key_value_store_lib",
         "@envoy_api//envoy/extensions/cache/key_value_cache/v3:pkg_cc_proto",
-        ],
-    )
-
+    ],
+)

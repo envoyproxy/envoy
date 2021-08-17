@@ -53,9 +53,9 @@ envoy_extension_cc_test(
     #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
     tags = ["fails_on_clang_cl"],
     deps = [
+        "//source/extensions/cache/key_value_store/file_based:config_lib",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
-        "//source/extensions/cache/key_value_store/file_based:config_lib",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
