@@ -57,12 +57,18 @@ public:
         RetryInitialDelayMs, RetryMaxDelayMs, random_);
   }
 
+  ~GrpcStream() override {
+    std::cout << "in ~GrpcStream() !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+  }
+
   void establishNewStream() {
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
     if (stream_ != nullptr) {
       ENVOY_LOG(warn, "gRPC bidi stream for {} already exists!", service_method_.DebugString());
       return;
     }
+    std::cout << "GrpcStream::establishNewStream() " << &async_client_
+              << " !!!!!!!!!!!!!!!!!!!!!!!!!\n";
     stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
     if (stream_ == nullptr) {
       ENVOY_LOG(debug, "Unable to establish new stream to configuration server");

@@ -56,6 +56,7 @@ public:
         should_use_unified_(legacy_or_unified == LegacyOrUnified::Unified) {}
 
   void setup() {
+    std::cout << "NewGrpcMuxImplTestBase " << async_client_ << " !!!!!!!!!!!!!!!\n";
     if (isUnifiedMuxTest()) {
       grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
