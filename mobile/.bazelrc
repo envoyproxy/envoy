@@ -91,21 +91,51 @@ build:coverage --javabase=@bazel_tools//tools/jdk:remote_jdk11
 #############################################################################
 # Experimental EngFlow Remote Execution Configs
 #############################################################################
-# remote-ci-macos: Flags to run CI using Engflow's remote execution. This
-# config is used for MacOS-specific flags.
+# remote-ci-common: These options are valid for any platform, use the configs below
+# to add platform-specific options. Avoid using this config directly and
+# instead use a platform-specific config
 #############################################################################
 # --config=remote sets --auth_enabled=true to enable GCP authentication,
-# however, the MacOS remote execution cluster doesn't use GCP auth
-# so we have to override it to 'false' here.
-build:remote-ci-macos --config=remote
+# however, the remote execution cluster doesn't use GCP auth (it uses
+# GITHUB_TOKEN auth) so we have to override it to 'false' here.
+build:remote-ci-common --config=remote
+build:remote-ci-common --auth_enabled=false
+build:remote-ci-common --remote_executor=grpcs://envoy.cluster.engflow.com
+build:remote-ci-common --bes_backend=grpcs://envoy.cluster.engflow.com/
+build:remote-ci-common --bes_results_url=https://envoy.cluster.engflow.com/invocation/
+build:remote-ci-common --bes_lifecycle_events
+build:remote-ci-common --jobs=40
+build:remote-ci-common --verbose_failures
+#############################################################################
+# remote-ci-linux: These options are linux-only
+# TODO(lfpino): Add --remote_default_exec_properties=Pool=linux once the pool is defined
+#############################################################################
+# Common engflow flags
+build:remote-ci-linux --define=EXECUTOR=remote
+build:remote-ci-linux --disk_cache=
+build:remote-ci-linux --experimental_inmemory_dotd_files
+build:remote-ci-linux --experimental_inmemory_jdeps_files
+build:remote-ci-linux --incompatible_strict_action_env=true
+build:remote-ci-linux --remote_timeout=600
+build:remote-ci-linux --spawn_strategy=remote,local
+# Platform and toolchain flags
+build:remote-ci-linux --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:remote-ci-linux --crosstool_top=@engflow_remote_config//cc:toolchain
+build:remote-ci-linux --extra_execution_platforms=@engflow_remote_config//config:platform
+build:remote-ci-linux --extra_toolchains=@engflow_remote_config//config:cc-toolchain
+build:remote-ci-linux --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_java11
+build:remote-ci-linux --host_javabase=@engflow_remote_config//java:jdk
+build:remote-ci-linux --host_platform=@engflow_remote_config//config:platform
+build:remote-ci-linux --java_toolchain=@bazel_tools//tools/jdk:toolchain_java11
+build:remote-ci-linux --javabase=@engflow_remote_config//java:jdk
+build:remote-ci-linux --platforms=@engflow_remote_config//config:platform
+build:remote-ci-linux --config=remote-ci-common
+#############################################################################
+# remote-ci-macos: These options are macOS-only
+# TODO(lfpino): Add --remote_default_exec_properties=Pool=macos once the pool is defined
+#############################################################################
+build:remote-ci-macos --config=remote-ci-common
 build:remote-ci-macos --xcode_version_config=//ci:xcode_config
-build:remote-ci-macos --auth_enabled=false
-build:remote-ci-macos --remote_executor=grpcs://envoy.cluster.engflow.com
-build:remote-ci-macos --bes_backend=grpcs://envoy.cluster.engflow.com/
-build:remote-ci-macos --bes_results_url=https://envoy.cluster.engflow.com/invocation/
-build:remote-ci-macos --bes_lifecycle_events
-build:remote-ci-macos --jobs=40
-build:remote-ci-macos --verbose_failures
 #############################################################################
 # Experimental EngFlow Remote Execution Configs
 #############################################################################
