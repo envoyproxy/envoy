@@ -133,7 +133,7 @@ public:
 
     // Only cares DNS factory will call into this function.
     // Directly unpack the typed config to a cares object.
-    typed_dns_resolver_config.typed_config().UnpackTo(&cares);
+    Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), cares);
     dns_resolver_options.MergeFrom(cares.dns_resolver_options());
     if (!cares.resolvers().empty()) {
       const auto& resolver_addrs = cares.resolvers();

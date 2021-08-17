@@ -200,6 +200,9 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/matching/input_matchers/ip @aguinet @snowp
 # Kafka
 /*/extensions/filters/network/kafka @mattklein123 @adamkotwasinski
+# DNS Resolver
+/*/extensions/network/dns_resolver/cares @htuch @yanavlasov
+/*/extensions/network/dns_resolver/apple @htuch @yanavlasov
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
