@@ -25,7 +25,8 @@ namespace Cache {
 
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
                              const VaryHeader& vary_allow_list)
-    : timestamp_(timestamp) {
+    : request_headers_(Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers)),
+      vary_allow_list_(vary_allow_list), timestamp_(timestamp) {
   // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
   // CacheFilter doesn't create LookupRequests for such requests.
   ASSERT(request_headers.Path(), "Can't form cache lookup key for malformed Http::RequestHeaderMap "
@@ -50,8 +51,6 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   key_.set_host(std::string(request_headers.getHostValue()));
   key_.set_path(std::string(request_headers.getPathValue()));
   key_.set_clear_http(scheme == scheme_values.Http);
-
-  vary_headers_ = vary_allow_list.possibleVariedHeaders(request_headers);
 }
 
 // Unless this API is still alpha, calls to stableHashKey() must always return

@@ -2,7 +2,6 @@
 
 #include <queue>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
@@ -37,7 +36,7 @@ public:
   DeltaSubscriptionTestHarness() : DeltaSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
   DeltaSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
+            "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new Grpc::MockAsyncClient()) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
@@ -93,8 +92,8 @@ public:
                          const std::set<std::string>& unsubscribe, const Protobuf::int32 error_code,
                          const std::string& error_message,
                          std::map<std::string, std::string> initial_resource_versions) {
-    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) expected_request;
-    expected_request.mutable_node()->CopyFrom(API_DOWNGRADE(node_));
+    API_NO_BOOST(envoy::service::discovery::v3::DeltaDiscoveryRequest) expected_request;
+    expected_request.mutable_node()->CopyFrom(node_);
     std::copy(
         subscribe.begin(), subscribe.end(),
         Protobuf::RepeatedFieldBackInserter(expected_request.mutable_resource_names_subscribe()));
@@ -120,7 +119,7 @@ public:
                 sendMessageRaw_(
                     Grpc::ProtoBufferEqIgnoringField(expected_request, "response_nonce"), false))
         .WillOnce([this](Buffer::InstancePtr& buffer, bool) {
-          API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) message;
+          API_NO_BOOST(envoy::service::discovery::v3::DeltaDiscoveryRequest) message;
           EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
           const std::string nonce = message.response_nonce();
           if (!nonce.empty()) {

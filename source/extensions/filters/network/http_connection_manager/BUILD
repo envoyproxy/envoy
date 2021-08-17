@@ -37,7 +37,7 @@ envoy_cc_extension(
         "//source/common/common:envoy_defaults_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
-        "//source/common/filter/http:filter_config_discovery_lib",
+        "//source/common/filter:config_discovery_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:default_server_string_lib",
         "//source/common/http:request_id_extension_lib",

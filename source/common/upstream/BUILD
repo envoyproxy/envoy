@@ -148,9 +148,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "edf_scheduler_lib",
-    hdrs = ["edf_scheduler.h"],
-    deps = ["//source/common/common:assert_lib"],
+    name = "scheduler_lib",
+    hdrs = [
+        "edf_scheduler.h",
+        "wrsq_scheduler.h",
+    ],
+    deps = [
+        "//envoy/common:random_generator_interface",
+        "//envoy/upstream:scheduler_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -198,7 +206,7 @@ envoy_cc_library(
     srcs = ["load_balancer_impl.cc"],
     hdrs = ["load_balancer_impl.h"],
     deps = [
-        ":edf_scheduler_lib",
+        ":scheduler_lib",
         "//envoy/common:random_generator_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/stats:stats_interface",
@@ -208,6 +216,14 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_protos_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "load_balancer_factory_base_lib",
+    hdrs = ["load_balancer_factory_base.h"],
+    deps = [
+        ":load_balancer_lib",
     ],
 )
 

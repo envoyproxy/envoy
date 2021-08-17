@@ -70,8 +70,7 @@ TEST_F(OpaqueResourceDecoderImplTest, ValidateIgnored) {
 
 // Handling of smuggled deprecated fields during Any conversion.
 TEST_F(OpaqueResourceDecoderImplTest, HiddenEnvoyDeprecatedFields) {
-  // This test is only valid in API-v3, and should be updated for API-v4, as
-  // the deprecated fields of API-v2 will be removed.
+  // This test is only valid in API-v3, and should be updated for API-v4
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
       TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(R"EOF(
       cluster_name: fare

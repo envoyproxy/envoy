@@ -164,9 +164,10 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
   EXPECT_EQ(default_validator->verifyCertificate(/*cert=*/nullptr, /*verify_san_list=*/{},
                                                  /*subject_alt_name_matchers=*/{}),
             Envoy::Ssl::ClientValidationStatus::NotValidated);
-  X509 cert = {};
+  bssl::UniquePtr<X509> cert(X509_new());
   EXPECT_EQ(default_validator->doVerifyCertChain(/*store_ctx=*/nullptr,
-                                                 /*ssl_extended_info=*/nullptr, /*leaf_cert=*/cert,
+                                                 /*ssl_extended_info=*/nullptr,
+                                                 /*leaf_cert=*/*cert,
                                                  /*transport_socket_options=*/nullptr),
             0);
 }
