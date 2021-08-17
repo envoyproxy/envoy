@@ -44,6 +44,7 @@ envoy_py_library(
     deps = [
         ":abstract",
         ":exceptions",
+        ":release",
         "//tools/base:abstract",
         "//tools/base:functional",
         "//tools/base:utils",
@@ -60,7 +61,9 @@ envoy_py_library(
         "//tools/base:functional",
         "//tools/base:utils",
         ":abstract",
+        ":assets",
         ":exceptions",
+        requirement("aiohttp"),
         requirement("gidgethub"),
     ],
 )

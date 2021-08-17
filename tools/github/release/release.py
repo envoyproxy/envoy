@@ -16,7 +16,7 @@ from tools.base.functional import async_property
 
 from tools.github.release.abstract import (
     AGithubRelease, AGithubReleaseAssetsFetcher, AGithubReleaseAssetsPusher, AGithubReleaseManager)
-# from tools.github.release.assets import GithubReleaseAssetsFetcher, GithubReleaseAssetsPusher
+from tools.github.release.assets import GithubReleaseAssetsFetcher, GithubReleaseAssetsPusher
 from tools.github.release.exceptions import GithubReleaseError
 
 
@@ -57,8 +57,7 @@ class GithubRelease:
 
     @property
     def fetcher(self) -> Type[AGithubReleaseAssetsFetcher]:
-        # return GithubReleaseAssetsFetcher
-        raise NotImplementedError
+        return GithubReleaseAssetsFetcher
 
     @property
     def github(self) -> gidgethub.abc.GitHubAPI:
@@ -70,8 +69,7 @@ class GithubRelease:
 
     @property
     def pusher(self) -> Type[AGithubReleaseAssetsPusher]:
-        # return GithubReleaseAssetsPusher
-        raise NotImplementedError
+        return GithubReleaseAssetsPusher
 
     @async_property(cache=True)
     async def release(self) -> Dict:

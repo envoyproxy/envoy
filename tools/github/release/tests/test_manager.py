@@ -63,11 +63,18 @@ async def test_release_manager_async_contextmanager(patches):
             == [(), {}])
 
 
-def test_release_manager_dunder_getitem():
+def test_release_manager_dunder_getitem(patches):
     releaser = manager.GithubReleaseManager("PATH", "REPOSITORY")
+    patched = patches(
+        "GithubRelease",
+        prefix="tools.github.release.manager")
 
-    with pytest.raises(NotImplementedError):
-        releaser["X.Y.Z"]
+    with patched as (m_release, ):
+        assert releaser["X.Y.Z"] == m_release.return_value
+
+    assert (
+        list(m_release.call_args)
+        == [(releaser, "X.Y.Z"), {}])
 
 
 @pytest.mark.parametrize("oauth_token", [None, "OAUTH_TOKEN"])

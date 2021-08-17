@@ -17,7 +17,7 @@ from tools.base.functional import async_property
 
 from tools.github.release.abstract import AGithubRelease, AGithubReleaseManager
 from tools.github.release.exceptions import GithubReleaseError
-# from tools.github.release.release import GithubRelease
+from tools.github.release.release import GithubRelease
 
 VERSION_MIN = packaging.version.Version("0")
 
@@ -60,13 +60,11 @@ class GithubReleaseManager:
         await self.close()
 
     def __getitem__(self, version) -> AGithubRelease:
-        # return self.release_class(self, version)
-        raise NotImplementedError
+        return self.release_class(self, version)
 
     @property
     def release_class(self) -> Type[AGithubRelease]:
-        # return GithubRelease
-        raise NotImplementedError
+        return GithubRelease
 
     @cached_property
     def github(self) -> gidgethub.abc.GitHubAPI:
