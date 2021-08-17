@@ -90,6 +90,7 @@ public:
                const Http::AsyncClient::StreamOptions& options));
 
   std::unique_ptr<testing::NiceMock<Grpc::MockAsyncRequest>> async_request_;
+  int send_cnt_{};
 };
 
 class MockAsyncClientFactory : public AsyncClientFactory {

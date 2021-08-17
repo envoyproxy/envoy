@@ -41,7 +41,7 @@ private:
     }
     // Create running threads.
     for (size_t i = 0; i < num_threads_; i++) {
-      // i must be explictly captured by value.
+      // i must be explicitly captured by value.
       workers_.emplace_back(api_->threadFactory().createThread(
           [&, i]() { dispatchers_[i]->run(Event::Dispatcher::RunType::RunUntilExit); }));
     }
