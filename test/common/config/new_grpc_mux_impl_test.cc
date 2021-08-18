@@ -194,6 +194,9 @@ TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
   local_info_.context_provider_.update_cb_handler_.runCallbacks("bar");
 
   expectSendMessage("foo", {}, {"x", "y"});
+
+  testing::Mock::VerifyAndClearExpectations(*async_client_);
+  testing::Mock::VerifyAndClearExpectations(async_stream_);
 }
 
 // Validate cached nonces are cleared on reconnection.
