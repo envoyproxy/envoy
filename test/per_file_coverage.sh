@@ -30,7 +30,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/fault:94.6"
 "source/extensions/filters/common/rbac:88.6"
 "source/extensions/filters/http/cache:92.7"
-"source/extensions/filters/http/cache/simple_http_cache:95.7"
+"source/extensions/filters/http/cache/simple_http_cache:95.6"
 "source/extensions/filters/http/grpc_json_transcoder:95.6"
 "source/extensions/filters/http/ip_tagging:91.2"
 "source/extensions/filters/http/kill_request:85.0" # Death tests don't report LCOV
@@ -48,7 +48,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/stat_sinks/statsd:85.2"
 "source/extensions/tracers/opencensus:94.2"
 "source/extensions/tracers/xray:96.4"
-"source/extensions/transport_sockets:95.9"
+"source/extensions/transport_sockets:95.8"
 "source/extensions/transport_sockets/tls/cert_validator:96.5"
 "source/extensions/transport_sockets/tls/private_key:76.9"
 "source/extensions/transport_sockets/tls:95.2"
