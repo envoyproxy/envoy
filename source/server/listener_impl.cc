@@ -691,6 +691,9 @@ PerListenerFactoryContextImpl::getTransportSocketFactoryContext() const {
 Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
   return listener_factory_context_base_->listenerScope();
 }
+Stats::Scope& PerListenerFactoryContextImpl::leafScope() {
+  return listener_factory_context_base_->listenerScope();
+}
 bool PerListenerFactoryContextImpl::isQuicListener() const {
   return listener_factory_context_base_->isQuicListener();
 }

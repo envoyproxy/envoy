@@ -40,6 +40,7 @@ public:
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(Server::Admin&, admin, ());
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
+  Stats::Scope& leafScope() override { return listenerScope(); }
   MOCK_METHOD(bool, isQuicListener, (), (const));
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, listenerMetadata, (), (const));

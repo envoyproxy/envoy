@@ -129,6 +129,7 @@ public:
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
+  Stats::Scope& leafScope() override { return listenerScope(); }
   bool isQuicListener() const override;
 
   // DrainDecision
@@ -203,6 +204,8 @@ public:
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
 
   Stats::Scope& listenerScope() override;
+  Stats::Scope& leafScope() override;
+
   bool isQuicListener() const override;
 
   // ListenerFactoryContext

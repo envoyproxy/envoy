@@ -31,7 +31,10 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
-    : parent_context_(parent_context), init_manager_(init_manager) {}
+    : parent_context_(parent_context),
+      // TODO(lambdai): create dedicated name for per filter chain scope.
+      filter_chain_scope_(parent_context.leafScope().createScope("")), init_manager_(init_manager) {
+}
 
 bool PerFilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load() || parent_context_.drainDecision().drainClose();
@@ -796,6 +799,8 @@ envoy::config::core::v3::TrafficDirection FactoryContextImpl::direction() const 
 }
 Network::DrainDecision& FactoryContextImpl::drainDecision() { return drain_decision_; }
 Stats::Scope& FactoryContextImpl::listenerScope() { return listener_scope_; }
+// This specialize FactoryContextImpl is an per api listener context.
+Stats::Scope& FactoryContextImpl::leafScope() { return listener_scope_; }
 bool FactoryContextImpl::isQuicListener() const { return is_quic_; }
 } // namespace Server
 } // namespace Envoy

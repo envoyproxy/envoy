@@ -78,7 +78,7 @@ public:
   virtual Envoy::Runtime::Loader& runtime() PURE;
 
   /**
-   * @return Stats::Scope& the filter's stats scope.
+   * @return Stats::Scope& the global stats scope.
    */
   virtual Stats::Scope& scope() PURE;
 
@@ -210,6 +210,13 @@ public:
    * @return Stats::Scope& the listener's stats scope.
    */
   virtual Stats::Scope& listenerScope() PURE;
+
+  /**
+   * @return Stats::Scope& the leaf stats scope. Factory context outlives the filter, so leafScope
+   * is the smallest scope to accommodate the per filter stats. Use listenerScope() or scope() if
+   * longer life time is needed.
+   */
+  virtual Stats::Scope& leafScope() PURE;
 
   /**
    * @return bool if these filters are created under the scope of a Quic listener.

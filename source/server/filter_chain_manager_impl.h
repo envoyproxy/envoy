@@ -81,12 +81,14 @@ public:
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
+  Stats::Scope& leafScope() override { return *filter_chain_scope_; }
   bool isQuicListener() const override;
 
   void startDraining() override { is_draining_.store(true); }
 
 private:
   Configuration::FactoryContext& parent_context_;
+  Stats::ScopePtr filter_chain_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
 };
@@ -167,6 +169,7 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override;
   Network::DrainDecision& drainDecision() override;
   Stats::Scope& listenerScope() override;
+  Stats::Scope& leafScope() override;
   bool isQuicListener() const override;
 
 private:
