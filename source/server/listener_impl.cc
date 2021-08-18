@@ -74,12 +74,16 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
       ASSERT(bind_type_ == ListenerComponentFactory::BindType::ReusePort);
     }
   } else {
-    ASSERT(local_address_->type() == Network::Address::Type::Pipe);
-    // Listeners with Unix domain socket always use shared socket.
-    // TODO(mattklein123): This should be blocked at the config parsing layer instead of getting
-    // here and disabling reuse_port.
-    if (bind_type_ == ListenerComponentFactory::BindType::ReusePort) {
-      bind_type_ = ListenerComponentFactory::BindType::NoReusePort;
+    if (local_address_->type() == Network::Address::Type::Pipe) {
+      // Listeners with Unix domain socket always use shared socket.
+      // TODO(mattklein123): This should be blocked at the config parsing layer instead of getting
+      // here and disabling reuse_port.
+      if (bind_type_ == ListenerComponentFactory::BindType::ReusePort) {
+        bind_type_ = ListenerComponentFactory::BindType::NoReusePort;
+      }
+    } else {
+      ASSERT(local_address_->type() == Network::Address::Type::EnvoyInternal);
+      bind_type_ = ListenerComponentFactory::BindType::NoBind;
     }
   }
 
@@ -335,6 +339,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     buildSocketOptions();
     buildOriginalDstListenerFilter();
     buildProxyProtocolListenerFilter();
+    buildInternalListener();
   }
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
@@ -362,7 +367,8 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
-      // listener_init_target_ is not used during in place update because we expect server started.
+      // listener_init_target_ is not used during in place update because we expect server
+      // started.
       listener_init_target_("", nullptr),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),
@@ -395,6 +401,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   buildSocketOptions();
   buildOriginalDstListenerFilter();
   buildProxyProtocolListenerFilter();
+  buildInternalListener();
   open_connections_ = origin.open_connections_;
 }
 
@@ -403,6 +410,12 @@ void ListenerImpl::buildAccessLog() {
     AccessLog::InstanceSharedPtr current_access_log =
         AccessLog::AccessLogFactory::fromProto(access_log, *listener_factory_context_);
     access_logs_.push_back(current_access_log);
+  }
+}
+
+void ListenerImpl::buildInternalListener() {
+  if (config_.has_internal_listener()) {
+    internal_listener_config_ = std::make_unique<Network::InternalListenerConfig>();
   }
 }
 

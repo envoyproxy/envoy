@@ -21,6 +21,7 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Network {
@@ -280,7 +281,8 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 
   // Don't set NODELAY for unix domain sockets
-  if (socket_->addressType() == Address::Type::Pipe) {
+  if (socket_->addressType() == Address::Type::Pipe ||
+      socket_->addressType() == Address::Type::EnvoyInternal) {
     return;
   }
 
