@@ -23,12 +23,21 @@ public:
 
   void onStatsUpdate(uint32_t result_size) override;
   bool onDone() override;
+
+private:
+  int32_t on_flush_count_ = 0;
 };
 
 static RegisterContextFactory register_TestContext(CONTEXT_FACTORY(TestContext),
                                                    ROOT_FACTORY(TestRootContext));
 
 void TestRootContext::onStatsUpdate(uint32_t result_size) {
+  // If on_flush_count is called twice, cause panic.
+  if (++on_flush_count_ == 2) {
+    static int32_t* bad_ptr = nullptr;
+    *bad_ptr = 1;
+  }
+
   logWarn("TestRootContext::onStat");
   auto stats_buffer = getBufferBytes(WasmBufferType::CallData, 0, result_size);
   auto stats = parseStatResults(stats_buffer->view());

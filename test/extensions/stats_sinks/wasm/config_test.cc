@@ -38,6 +38,11 @@ protected:
           ->set_inline_bytes("CommonWasmTestContextCpp");
     }
     config_.mutable_config()->set_name("test");
+    // Allow restarts.
+    config_.mutable_config()
+        ->mutable_vm_config()
+        ->mutable_restart_config()
+        ->set_max_restart_per_minute(10);
   }
 
   void initializeWithConfig(const envoy::extensions::stat_sinks::wasm::v3::Wasm& config) {
@@ -94,6 +99,34 @@ TEST_P(WasmStatSinkConfigTest, CreateWasmFromWASM) {
   sink_->flush(snapshot);
   NiceMock<Stats::MockHistogram> histogram;
   sink_->onHistogramComplete(histogram, 0);
+}
+
+TEST_P(WasmStatSinkConfigTest, PanicAndRestart) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  return;
+#endif
+  if (GetParam() == "null") {
+    // NullVm cannot restart.
+    return;
+  }
+  initializeWithConfig(config_);
+  ASSERT_NE(sink_, nullptr);
+
+  auto wasm_sink = static_cast<WasmStatSink*>(sink_.get());
+  auto plugin_handle_manager = wasm_sink->singletonForTesting();
+  ASSERT_NE(plugin_handle_manager, nullptr);
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
+  sink_->flush(snapshot);
+  ASSERT_NE(plugin_handle_manager->getHealthyPluginHandle(), nullptr);
+  // Cause panic.
+  sink_->flush(snapshot);
+  // The current handle should be in the failed condition - getHealthyPluginHandle gives nullptr
+  ASSERT_EQ(plugin_handle_manager->getHealthyPluginHandle(), nullptr);
+  // Call flush again - internally tryRestartPlugin is called and the new VM is used.
+  sink_->flush(snapshot);
+  // The current handle actually should not be in the failed state.
+  ASSERT_NE(plugin_handle_manager->getHealthyPluginHandle(), nullptr);
 }
 
 } // namespace Wasm

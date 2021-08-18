@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <memory>
 
 #include "envoy/event/deferred_deletable.h"
 
@@ -282,23 +283,24 @@ proxy_wasm::PluginHandleFactory getPluginHandleFactory() {
 proxy_wasm::VmCreationRateLimiter getVmCreationRateLimiter(WasmConfig& wasm_config,
                                                            const Stats::ScopeSharedPtr& scope,
                                                            Event::Dispatcher& dispatcher) {
-  auto stats_handler =
-      std::make_shared<LifecycleStatsHandler>(scope, wasm_config.config().vm_config().runtime());
-
   // If the configuration is not given, then we do not allow restarts.
   if (!wasm_config.config().vm_config().has_restart_config()) {
-    return [stats_handler]() -> bool {
-      stats_handler->onEvent(WasmEvent::VmRestart);
-      return false;
-    };
+    return []() -> bool { return false; };
   }
+
   // Otherwise, create the VmCreationRateLimiterImpl instance with the configuration.
+  auto stats_handler =
+      std::make_shared<LifecycleStatsHandler>(scope, wasm_config.config().vm_config().runtime());
   auto impl = std::make_shared<VmCreationRateLimiterImpl>(
       wasm_config.config().vm_config().restart_config().max_restart_per_minute(), dispatcher);
   return [stats_handler, impl]() -> bool {
     const bool ok = impl->restartAllowed();
     if (ok) {
       stats_handler->onEvent(WasmEvent::VmRestart);
+    } else {
+      stats_handler->onEvent(WasmEvent::VmRestartRateLimited);
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), error,
+                          "Unable to create thread-Local Wasm due to rate-limit.");
     }
     return ok;
   };

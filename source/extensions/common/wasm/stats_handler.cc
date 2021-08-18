@@ -77,6 +77,10 @@ void LifecycleStatsHandler::onEvent(WasmEvent event) {
     break;
   case WasmEvent::VmRestart:
     lifecycle_stats_.restarted_.inc();
+    break;
+  case WasmEvent::VmRestartRateLimited:
+    lifecycle_stats_.restart_rate_limited_.inc();
+    break;
   default:
     break;
   }
@@ -85,6 +89,9 @@ void LifecycleStatsHandler::onEvent(WasmEvent event) {
 int64_t LifecycleStatsHandler::getActiveVmCount() { return active_wasms; };
 int64_t LifecycleStatsHandler::getRestartCountForTest() {
   return lifecycle_stats_.restarted_.value();
+};
+int64_t LifecycleStatsHandler::getRestartRatelimitedCountForTest() {
+  return lifecycle_stats_.restart_rate_limited_.value();
 };
 
 } // namespace Wasm

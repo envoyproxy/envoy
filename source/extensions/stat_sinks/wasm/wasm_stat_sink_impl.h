@@ -39,10 +39,9 @@ public:
     singleton_ = singleton;
   }
 
-  void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override {
-    (void)histogram;
-    (void)value;
-  }
+  void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
+
+  PluginHandleManagerSharedPtr singletonForTesting() { return singleton_; }
 
 private:
   PluginSharedPtr plugin_;

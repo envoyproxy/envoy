@@ -50,6 +50,8 @@ public:
     tls_slot_ = std::move(tls_slot);
   }
 
+  PluginHandleManager* pluginHandleManagerForTesting() { return tls_slot_->get().ptr(); }
+
 private:
   PluginSharedPtr plugin_;
   ThreadLocal::TypedSlotPtr<PluginHandleManager> tls_slot_;

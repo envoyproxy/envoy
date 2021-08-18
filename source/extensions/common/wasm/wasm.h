@@ -171,7 +171,9 @@ public:
             getWasmHandleCloneFactory(dispatcher, create_root_context_for_testing),
             getPluginHandleFactory()){};
 
-  PluginHandleSharedPtr handle() { return std::static_pointer_cast<PluginHandle>(pluginHandle()); }
+  PluginHandleSharedPtr handle() {
+    return std::static_pointer_cast<PluginHandle>(getHealthyPluginHandle());
+  }
 };
 
 using PluginHandleManagerSharedPtr = std::shared_ptr<PluginHandleManager>;

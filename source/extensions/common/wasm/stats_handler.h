@@ -30,7 +30,8 @@ struct CreateWasmStats {
 #define LIFECYCLE_STATS(COUNTER, GAUGE)                                                            \
   COUNTER(created)                                                                                 \
   GAUGE(active, NeverImport)                                                                       \
-  COUNTER(restarted)
+  COUNTER(restarted)                                                                               \
+  COUNTER(restart_rate_limited)
 
 struct LifecycleStats {
   LIFECYCLE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
@@ -55,6 +56,7 @@ enum class WasmEvent : int {
   VmCreated,
   VmShutDown,
   VmRestart,
+  VmRestartRateLimited,
 };
 
 class CreateStatsHandler : Logger::Loggable<Logger::Id::wasm> {
@@ -96,6 +98,7 @@ public:
   void onEvent(WasmEvent event);
   static int64_t getActiveVmCount();
   int64_t getRestartCountForTest();
+  int64_t getRestartRatelimitedCountForTest();
 
 protected:
   LifecycleStats lifecycle_stats_;

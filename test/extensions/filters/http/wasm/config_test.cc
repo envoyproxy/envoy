@@ -9,6 +9,7 @@
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/common/wasm/wasm.h"
 #include "source/extensions/filters/http/wasm/config.h"
+#include "source/extensions/filters/http/wasm/wasm_filter.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/http/mocks.h"
@@ -905,6 +906,45 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcodeFailOpen) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   // The filter is not registered.
   cb(filter_callback);
+}
+
+TEST_P(WasmFilterConfigTest, FilterPanicThenRestart) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    root_id: panic
+    vm_config:
+      restart_config:
+        max_restart_per_minute: 10
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    GetParam(), R"EOF("
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+  )EOF"));
+
+  envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  HttpFilters::Wasm::FilterConfig filter_config(proto_config, context_);
+
+  // Create a new context - should be with a healthy VM.
+  auto context = filter_config.createFilter();
+  EXPECT_NE(context, nullptr);
+  EXPECT_FALSE(context->isFailed());
+  // Create in-VM context and cause panic in onRequestHeaders.
+  context->onCreate();
+  context->onRequestHeaders(0, false);
+  // Now the VM used by the context is in the failed state.
+  EXPECT_TRUE(context->isFailed());
+  // Create another context - should be with a healthy VM thanks to retry.
+  context = filter_config.createFilter();
+  EXPECT_NE(context, nullptr);
+  EXPECT_FALSE(context->isFailed());
 }
 
 } // namespace Wasm

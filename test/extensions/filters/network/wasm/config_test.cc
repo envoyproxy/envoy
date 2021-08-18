@@ -339,6 +339,46 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigAllowOnVmStart) {
   cb(connection);
 }
 
+TEST_P(WasmNetworkFilterConfigTest, FilterPanicThenRestart) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  return;
+#endif
+  if (GetParam() == "null") {
+    // NullVm cannot restart.
+    return;
+  }
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    root_id: panic
+    vm_config:
+      restart_config:
+        max_restart_per_minute: 10
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    GetParam(), R"EOF("
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
+  )EOF"));
+
+  envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
+
+  // Create a new context - should be with a healthy VM.
+  auto context = filter_config.createFilter();
+  EXPECT_NE(context, nullptr);
+  EXPECT_FALSE(context->isFailed());
+  // Cause panic in onNewConnection.
+  context->onNewConnection();
+  // Now the VM used by the context is in the failed state.
+  EXPECT_TRUE(context->isFailed());
+  // Create another context - should be with a healthy VM thanks to retry.
+  context = filter_config.createFilter();
+  EXPECT_NE(context, nullptr);
+  EXPECT_FALSE(context->isFailed());
+}
+
 } // namespace Wasm
 } // namespace NetworkFilters
 } // namespace Extensions

@@ -79,6 +79,12 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
   }
   config.mutable_config()->mutable_vm_config()->mutable_code()->mutable_local()->set_inline_bytes(
       code);
+  // Allow restarts.
+  config.mutable_config()
+      ->mutable_vm_config()
+      ->mutable_restart_config()
+      ->set_max_restart_per_minute(10);
+
   // Test Any configuration.
   ProtobufWkt::Struct some_proto;
   config.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(some_proto);
@@ -102,6 +108,32 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
   AccessLog::InstanceSharedPtr filter_instance =
       factory->createAccessLogInstance(config, std::move(filter), context);
   filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info);
+
+  // Restart tests.
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  return;
+#endif
+  if (GetParam() == "null") {
+    // NullVm cannot restart.
+    return;
+  }
+  std::shared_ptr<WasmAccessLog> wasm_access_logger = std::static_pointer_cast<WasmAccessLog>(
+      factory->createAccessLogInstance(config, nullptr, context));
+  wasm_access_logger->log(&request_header, &response_header, &response_trailer, log_stream_info);
+
+  auto manager = wasm_access_logger->pluginHandleManagerForTesting();
+  // OK.
+  wasm_access_logger->log(&request_header, &response_header, &response_trailer, log_stream_info);
+  ASSERT_NE(manager, nullptr);
+  // Cause panic.
+  wasm_access_logger->log(&request_header, &response_header, &response_trailer, log_stream_info);
+  // The current handle should be in the failed condition - getHealthyPluginHandle gives nullptr
+  ASSERT_EQ(manager->getHealthyPluginHandle(), nullptr);
+  // Call log again - internally tryRestartPlugin is called and the new VM is used.
+  wasm_access_logger->log(&request_header, &response_header, &response_trailer, log_stream_info);
+  // The current handle actually should not be in the failed state.
+  ASSERT_NE(manager->getHealthyPluginHandle(), nullptr);
 }
 
 } // namespace Wasm

@@ -238,7 +238,7 @@ TEST_P(WasmCommonTest, Logging) {
   dispatcher->clearDeferredDeleteList();
 }
 
-TEST_P(WasmCommonTest, PluginHandleManagerTryRestart) {
+TEST_P(WasmCommonTest, PluginHandleManagerRestart) {
 #if defined(__aarch64__)
   // TODO(PiotrSikora): There are no Emscripten releases for arm64.
   return;
@@ -299,7 +299,8 @@ TEST_P(WasmCommonTest, PluginHandleManagerTryRestart) {
   // Cause panic.
   auto context = std::make_unique<Context>(plugin_handle_manager.handle(), false);
   context->onTick(0);
-  EXPECT_TRUE(plugin_handle_manager.handle()->wasmHandle()->wasm()->isFailed());
+  // handle() should return nullptr after VM failure.
+  EXPECT_EQ(plugin_handle_manager.handle(), nullptr);
   // Restart without being rate limited.
   time_system.setMonotonicTime(std::chrono::seconds(30)); // at 0m30s
   EXPECT_TRUE(plugin_handle_manager.tryRestartPlugin());
@@ -307,7 +308,8 @@ TEST_P(WasmCommonTest, PluginHandleManagerTryRestart) {
   // Cause panic again.
   context = std::make_unique<Context>(plugin_handle_manager.handle(), false);
   context->onTick(0);
-  EXPECT_TRUE(plugin_handle_manager.handle()->wasmHandle()->wasm()->isFailed());
+  // handle() should return nullptr after VM failure.
+  EXPECT_EQ(plugin_handle_manager.handle(), nullptr);
   // Cannot restart since we've reached the limit - rate limited.
   time_system.setMonotonicTime(std::chrono::seconds(40)); // at 0m40s
   EXPECT_FALSE(plugin_handle_manager.tryRestartPlugin());
@@ -400,32 +402,42 @@ TEST_P(WasmCommonTest, PluginHandleManagerTryRestartForMultiplePlugin) {
   // Cause panic.
   auto context = std::make_unique<Context>(plugin_handle_manager1.handle(), false);
   context->onTick(0);
-  EXPECT_TRUE(plugin_handle_manager1.handle()->wasmHandle()->wasm()->isFailed());
-  EXPECT_TRUE(plugin_handle_manager2.handle()->wasmHandle()->wasm()->isFailed());
+  // handle() should return nullptr after VM failure.
+  EXPECT_EQ(plugin_handle_manager1.handle(), nullptr);
+  EXPECT_EQ(plugin_handle_manager2.handle(), nullptr);
   // Restart.
   EXPECT_TRUE(plugin_handle_manager1.tryRestartPlugin());
   EXPECT_TRUE(plugin_handle_manager2.tryRestartPlugin());
-  // Check if the metric is only incremented once because the VM is shared.
+  // Check if the metric
   EXPECT_EQ(lifecycle_stats.getRestartCountForTest(), 1);
+  EXPECT_EQ(lifecycle_stats.getRestartRatelimitedCountForTest(), 0);
 
   // Cause panic again.
   context = std::make_unique<Context>(plugin_handle_manager1.handle(), false);
   context->onTick(0);
-  EXPECT_TRUE(plugin_handle_manager1.handle()->wasmHandle()->wasm()->isFailed());
-  EXPECT_TRUE(plugin_handle_manager2.handle()->wasmHandle()->wasm()->isFailed());
+  // handle() should return nullptr after VM failure.
+  EXPECT_EQ(plugin_handle_manager1.handle(), nullptr);
+  EXPECT_EQ(plugin_handle_manager2.handle(), nullptr);
 
   // Cannot restart since we've reached the limit - rate limited.
   time_system.setMonotonicTime(std::chrono::seconds(40)); // at 0m40s
   EXPECT_FALSE(plugin_handle_manager1.tryRestartPlugin());
   EXPECT_FALSE(plugin_handle_manager2.tryRestartPlugin());
+  EXPECT_EQ(lifecycle_stats.getRestartCountForTest(),
+            1); // Restart count should not be incremented.
+  EXPECT_EQ(lifecycle_stats.getRestartRatelimitedCountForTest(),
+            2); // Rate limited twice for two plugins.
 
   // In the near future time (approximately one minute later), rate-limit is removed.
   time_system.setMonotonicTime(std::chrono::seconds(80)); // at 1m20
   EXPECT_TRUE(plugin_handle_manager1.tryRestartPlugin());
   EXPECT_TRUE(plugin_handle_manager2.tryRestartPlugin());
 
-  // Check if the metric is only incremented once because the VM is shared.
-  EXPECT_EQ(lifecycle_stats.getRestartCountForTest(), 2);
+  // Check if the metrics
+  EXPECT_EQ(lifecycle_stats.getRestartCountForTest(),
+            2); // VM restart exactly once since the two plugins has the same vm_key.
+  EXPECT_EQ(lifecycle_stats.getRestartRatelimitedCountForTest(),
+            2); // rate limited count stays the same as before.
 }
 
 TEST(PluginHandleManager, tryRestartPluginInvalidBaseWasm) {
@@ -1192,7 +1204,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
         EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_delete logging")));
         return root_context;
       });
-  auto plugin_handle_local = plugin_handle_manager->pluginHandle();
+  auto plugin_handle_local = plugin_handle_manager->handle();
   plugin_handle_manager.reset();
   wasm_handle.reset();
 

@@ -190,7 +190,7 @@ TEST_P(WasmNetworkFilterTest, SegvFailOpen) {
 
   EXPECT_CALL(filter(), log_(spdlog::level::trace, Eq(absl::string_view("before segv"))));
   filter().onForeignFunction(0, 0);
-  EXPECT_TRUE(wasmHandle()->wasm()->isFailed());
+  EXPECT_FALSE(wasmHandle());
 
   Buffer::OwnedImpl fake_downstream_data("Fake");
   // No logging expected.

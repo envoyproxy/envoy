@@ -15,10 +15,19 @@ public:
   using RootContext::RootContext;
 
   void onLog() override;
+
+private:
+  int32_t on_log_count_ = 0;
 };
 static RegisterContextFactory register_ExampleContext(ROOT_FACTORY(TestRootContext));
 
 void TestRootContext::onLog() {
+  // If on_log is called twice, cause panic.
+  if (++on_log_count_ == 2) {
+    static int32_t* bad_ptr = nullptr;
+    *bad_ptr = 1;
+  }
+
   auto path = getRequestHeader(":path");
   logWarn("onLog " + std::to_string(id()) + " " + std::string(path->view()));
 }
