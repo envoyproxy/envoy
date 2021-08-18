@@ -18,4 +18,6 @@ jobs:
       - name: 'Install dependencies'
         run: ./ci/mac_ci_setup.sh
       - name: 'Run tests'
-        run: bazelisk test --test_output=all //test/common/...
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bazelisk test --test_output=all --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN"  //test/common/...
