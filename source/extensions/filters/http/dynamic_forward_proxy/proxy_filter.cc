@@ -124,9 +124,9 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     ASSERT(cache_load_handle_ == nullptr);
     ENVOY_STREAM_LOG(debug, "DNS cache entry already loaded, continuing", *decoder_callbacks_);
 
-    const auto& host_string_view = headers.Host()->value().getStringView();
-    if (config_->cache().getHost(host_string_view).has_value()) {
-      addHostAddressToFilterState(config_->cache().getHost(host_string_view).value()->address());
+    auto const& host = config_->cache().getHost(headers.Host()->value().getStringView());
+    if (host.has_value()) {
+      addHostAddressToFilterState(host.value()->address());
     }
 
     return Http::FilterHeadersStatus::Continue;
@@ -148,8 +148,14 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
 void ProxyFilter::addHostAddressToFilterState(
     const Network::Address::InstanceConstSharedPtr& address) {
+  if (!decoder_callbacks_ || !address) {
+    ENVOY_LOG_MISC(warn, "Missing decoder callbacks or resolved address");
+    return;
+  }
+
   ENVOY_STREAM_LOG(trace, "Adding resolved host {} to filter state", *decoder_callbacks_,
                    address->asString());
+
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
 
@@ -159,7 +165,7 @@ void ProxyFilter::addHostAddressToFilterState(
     address_set->add(address);
 
     filter_state->setData(StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR, std::move(address_set),
-                          StreamInfo::FilterState::StateType::ReadOnly,
+                          StreamInfo::FilterState::StateType::Mutable,
                           StreamInfo::FilterState::LifeSpan::Request);
 
   } else {
