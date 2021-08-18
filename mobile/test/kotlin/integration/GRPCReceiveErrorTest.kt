@@ -21,7 +21,7 @@ import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
 private const val hcmType =
-  "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+  "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
 private const val pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
 private const val localErrorFilterType =
   "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
@@ -36,26 +36,27 @@ static_resources:
     api_listener:
       api_listener:
         "@type": $hcmType
-        stat_prefix: hcm
-        route_config:
-          name: api_router
-          virtual_hosts:
-          - name: api
-            domains: ["*"]
-            routes:
-            - match: { prefix: "/" }
-              direct_response: { status: 503 }
-        http_filters:
-        - name: envoy.filters.http.platform_bridge
-          typed_config:
-            "@type": $pbfType
-            platform_filter_name: $filterName
-        - name: envoy.filters.http.local_error
-          typed_config:
-            "@type": $localErrorFilterType
-        - name: envoy.router
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+        config:
+          stat_prefix: hcm
+          route_config:
+            name: api_router
+            virtual_hosts:
+            - name: api
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/" }
+                direct_response: { status: 503 }
+          http_filters:
+          - name: envoy.filters.http.platform_bridge
+            typed_config:
+              "@type": $pbfType
+              platform_filter_name: $filterName
+          - name: envoy.filters.http.local_error
+            typed_config:
+              "@type": $localErrorFilterType
+          - name: envoy.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 """
 
 class GRPCReceiveErrorTest {

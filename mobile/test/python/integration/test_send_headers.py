@@ -2,7 +2,7 @@ from library.python.envoy_requests.common.engine import Engine
 from library.python.envoy_requests import get
 
 
-API_LISTENER_TYPE = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+API_LISTENER_TYPE = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
 ASSERTION_FILTER_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
 
 CONFIG_TEMPLATE = f"""\
@@ -17,30 +17,31 @@ static_resources:
     api_listener:
       api_listener:
         "@type": {API_LISTENER_TYPE}
-        stat_prefix: hcm
-        route_config:
-          name: api_router
-          virtual_hosts:
-            - name: api
-              domains:
-                - "*"
-              routes:
-                - match:
-                    prefix: "/"
-                  direct_response:
-                    status: 200
-        http_filters:
-          - name: envoy.filters.http.assertion
-            typed_config:
-              "@type": {ASSERTION_FILTER_TYPE}
-              match_config:
-                http_request_headers_match:
-                  headers:
-                    - name: ":authority"
-                      exact_match: example.com
-          - name: envoy.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+        config:
+          stat_prefix: hcm
+          route_config:
+            name: api_router
+            virtual_hosts:
+              - name: api
+                domains:
+                  - "*"
+                routes:
+                  - match:
+                      prefix: "/"
+                    direct_response:
+                      status: 200
+          http_filters:
+            - name: envoy.filters.http.assertion
+              typed_config:
+                "@type": {ASSERTION_FILTER_TYPE}
+                match_config:
+                  http_request_headers_match:
+                    headers:
+                      - name: ":authority"
+                        exact_match: example.com
+            - name: envoy.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 """
 
 

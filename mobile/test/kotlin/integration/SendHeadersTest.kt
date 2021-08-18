@@ -13,7 +13,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private val apiListenerType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+private val apiListenerType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
 private val assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
 private val config =
 """
@@ -28,30 +28,31 @@ static_resources:
     api_listener:
       api_listener:
         "@type": $apiListenerType
-        stat_prefix: hcm
-        route_config:
-          name: api_router
-          virtual_hosts:
-            - name: api
-              domains:
-                - "*"
-              routes:
-                - match:
-                    prefix: "/"
-                  direct_response:
-                    status: 200
-        http_filters:
-          - name: envoy.filters.http.assertion
-            typed_config:
-              "@type": $assertionFilterType
-              match_config:
-                http_request_headers_match:
-                  headers:
-                    - name: ":authority"
-                      exact_match: example.com
-          - name: envoy.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+        config:
+          stat_prefix: hcm
+          route_config:
+            name: api_router
+            virtual_hosts:
+              - name: api
+                domains:
+                  - "*"
+                routes:
+                  - match:
+                      prefix: "/"
+                    direct_response:
+                      status: 200
+          http_filters:
+            - name: envoy.filters.http.assertion
+              typed_config:
+                "@type": $assertionFilterType
+                match_config:
+                  http_request_headers_match:
+                    headers:
+                      - name: ":authority"
+                        exact_match: example.com
+            - name: envoy.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 """
 
 class SendHeadersTest {
