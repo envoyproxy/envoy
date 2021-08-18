@@ -485,9 +485,14 @@ public:
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                    const HostVector& hosts_removed,
-                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
+                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
+                   HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
 
   void batchHostUpdate(BatchUpdateCb& callback) override;
+
+  HostMapConstSharedPtr crossPriorityHostMap() const override {
+    return const_cross_priority_host_map_;
+  }
 
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
@@ -508,6 +513,9 @@ protected:
   // It will expand as host sets are added but currently does not shrink to
   // avoid any potential lifetime issues.
   std::vector<std::unique_ptr<HostSet>> host_sets_;
+
+  // Read only all host map for fast host searching. This will never be null.
+  mutable HostMapConstSharedPtr const_cross_priority_host_map_{std::make_shared<HostMap>()};
 
 private:
   // This is a matching vector to store the callback handles for host_sets_. It is kept separately
@@ -542,6 +550,26 @@ private:
     PrioritySetImpl& parent_;
     absl::node_hash_set<uint32_t> priorities_;
   };
+};
+
+/**
+ * Specialized PrioritySetImpl designed for the main thread. It will update and maintain the read
+ * only cross priority host map when the host set changes.
+ */
+class MainPrioritySetImpl : public PrioritySetImpl, public Logger::Loggable<Logger::Id::upstream> {
+public:
+  // PrioritySet
+  void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
+                   LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
+                   const HostVector& hosts_removed,
+                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
+                   HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
+  HostMapConstSharedPtr crossPriorityHostMap() const override;
+
+protected:
+  void updateCrossPriorityHostMap(const HostVector& hosts_added, const HostVector& hosts_removed);
+
+  mutable HostMapSharedPtr mutable_cross_priority_host_map_;
 };
 
 /**
@@ -894,7 +922,7 @@ protected:
 
 protected:
   TimeSource& time_source_;
-  PrioritySetImpl priority_set_;
+  MainPrioritySetImpl priority_set_;
 
   void validateEndpointsForZoneAwareRouting(
       const envoy::config::endpoint::v3::LocalityLbEndpoints& endpoints) const;
@@ -978,8 +1006,6 @@ protected:
    * @param hosts_added_to_current_priority will be populated with hosts added to the priority.
    * @param hosts_removed_from_current_priority will be populated with hosts removed from the
    * priority.
-   * @param updated_hosts is used to aggregate the new state of all hosts across priority, and will
-   * be updated with the hosts that remain in this priority after the update.
    * @param all_hosts all known hosts prior to this host update across all priorities.
    * @param all_new_hosts addresses of all hosts in the new configuration across all priorities.
    * @return whether the hosts for the priority changed.
@@ -987,7 +1013,7 @@ protected:
   bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_priority_hosts,
                              HostVector& hosts_added_to_current_priority,
                              HostVector& hosts_removed_from_current_priority,
-                             HostMap& updated_hosts, const HostMap& all_hosts,
+                             const HostMap& all_hosts,
                              const absl::flat_hash_set<std::string>& all_new_hosts);
 };
 

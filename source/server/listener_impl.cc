@@ -48,11 +48,18 @@ bool anyFilterChain(
 }
 
 bool usesProxyProto(const envoy::config::listener::v3::Listener& config) {
-  // TODO(#14085): `use_proxy_proto` should be deprecated.
   // Checking only the first or default filter chain is done for backwards compatibility.
-  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+  const bool use_proxy_proto = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       config.filter_chains().empty() ? config.default_filter_chain() : config.filter_chains()[0],
       use_proxy_proto, false);
+  if (use_proxy_proto) {
+    ENVOY_LOG_MISC(warn,
+                   "using deprecated field 'use_proxy_proto' is dangerous as it does not respect "
+                   "listener filter order. Do not use this field and instead configure the proxy "
+                   "proto listener filter directly.");
+  }
+
+  return use_proxy_proto;
 }
 
 bool shouldBindToPort(const envoy::config::listener::v3::Listener& config) {
