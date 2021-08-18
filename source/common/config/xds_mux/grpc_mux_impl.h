@@ -59,7 +59,7 @@ public:
   GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, bool skip_subsequent_node,
               const LocalInfo::LocalInfo& local_info,
               envoy::config::core::v3::ApiVersion transport_api_version,
-              Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
+              Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
               const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings);
 

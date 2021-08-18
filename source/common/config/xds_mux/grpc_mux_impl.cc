@@ -41,7 +41,7 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
                                        bool skip_subsequent_node,
                                        const LocalInfo::LocalInfo& local_info,
                                        envoy::config::core::v3::ApiVersion transport_api_version,
-                                       Grpc::RawAsyncClientPtr async_client,
+                                       Grpc::RawAsyncClientPtr&& async_client,
                                        Event::Dispatcher& dispatcher,
                                        const Protobuf::MethodDescriptor& service_method,
                                        Random::RandomGenerator& random, Stats::Scope& scope,
