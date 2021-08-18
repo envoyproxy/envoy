@@ -1,5 +1,4 @@
-#include "source/extensions/filters/network/kafka/mesh/config.h"
-
+#include "contrib/kafka/filters/network/source/mesh/config.h"
 #include <typeinfo>
 
 #include "envoy/registry/registry.h"
@@ -7,9 +6,9 @@
 #include "envoy/stats/scope.h"
 
 #ifndef WIN32
-#include "source/extensions/filters/network/kafka/mesh/upstream_config.h"
-#include "source/extensions/filters/network/kafka/mesh/upstream_kafka_facade.h"
-#include "source/extensions/filters/network/kafka/mesh/filter.h"
+#include "contrib/kafka/filters/network/source/mesh/upstream_config.h"
+#include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
+#include "contrib/kafka/filters/network/source/mesh/filter.h"
 #else
 #include "envoy/common/exception.h"
 #endif

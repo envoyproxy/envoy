@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
+    "envoy_cc_contrib_extension",
     "envoy_cc_library",
     "envoy_contrib_package",
 )
@@ -13,7 +13,7 @@ envoy_contrib_package()
 # Kafka-mesh network filter.
 # Mesh filter public docs: docs/root/configuration/listeners/network_filters/kafka_mesh_filter.rst
 
-envoy_cc_extension(
+envoy_cc_contrib_extension(
     name = "config_lib",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
@@ -68,11 +68,11 @@ envoy_cc_library(
         ":upstream_config_lib",
         ":upstream_kafka_facade_lib",
         "//source/common/common:minimal_logger_lib",
-        "//contrib/kafka/extensions/filters/network/kafka:kafka_request_codec_lib",
-        "//contrib/kafka/extensions/filters/network/kafka:kafka_request_parser_lib",
-        "//contrib/kafka/extensions/filters/network/kafka/mesh/command_handlers:api_versions_lib",
-        "//contrib/kafka/extensions/filters/network/kafka/mesh/command_handlers:metadata_lib",
-        "//contrib/kafka/extensions/filters/network/kafka/mesh/command_handlers:produce_lib",
+        "//contrib/kafka/filters/network/source:kafka_request_codec_lib",
+        "//contrib/kafka/filters/network/source:kafka_request_parser_lib",
+        "//contrib/kafka/filters/network/source/mesh/command_handlers:api_versions_lib",
+        "//contrib/kafka/filters/network/source/mesh/command_handlers:metadata_lib",
+        "//contrib/kafka/filters/network/source/mesh/command_handlers:produce_lib",
     ],
 )
 

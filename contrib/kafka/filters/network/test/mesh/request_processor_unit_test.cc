@@ -1,5 +1,5 @@
-#include "source/extensions/filters/network/kafka/mesh/command_handlers/produce.h"
-#include "source/extensions/filters/network/kafka/mesh/upstream_kafka_facade.h"
+#include "contrib/kafka/filters/network/source/mesh/command_handlers/produce.h"
+#include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
 
 #include "test/test_common/utility.h"
 

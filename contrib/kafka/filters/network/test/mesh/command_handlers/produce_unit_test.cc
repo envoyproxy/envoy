@@ -1,8 +1,8 @@
 #include <set>
 
-#include "source/extensions/filters/network/kafka/external/requests.h"
-#include "source/extensions/filters/network/kafka/external/responses.h"
-#include "source/extensions/filters/network/kafka/mesh/command_handlers/produce.h"
+#include "contrib/kafka/filters/network/source/external/requests.h"
+#include "contrib/kafka/filters/network/source/external/responses.h"
+#include "contrib/kafka/filters/network/source/mesh/command_handlers/produce.h"
 
 #include "test/test_common/utility.h"
 

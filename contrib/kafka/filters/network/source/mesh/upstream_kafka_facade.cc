@@ -1,4 +1,4 @@
-#include "source/extensions/filters/network/kafka/mesh/upstream_kafka_facade.h"
+#include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
 
 #include <thread>
 

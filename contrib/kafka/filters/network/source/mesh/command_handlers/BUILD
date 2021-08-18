@@ -11,6 +11,24 @@ envoy_contrib_package()
 # Handlers for particular Kafka requests that are used by Kafka-mesh filter.
 
 envoy_cc_library(
+    name = "produce_lib",
+    srcs = [
+        "produce.cc",
+    ],
+    hdrs = [
+        "produce.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/common:minimal_logger_lib",
+        "//contrib/kafka/filters/network/source:kafka_request_parser_lib",
+        "//contrib/kafka/filters/network/source:kafka_response_parser_lib",
+        "//contrib/kafka/filters/network/source/mesh:abstract_command_lib",
+        "//contrib/kafka/filters/network/source/mesh:upstream_kafka_facade_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "metadata_lib",
     srcs = [
         "metadata.cc",

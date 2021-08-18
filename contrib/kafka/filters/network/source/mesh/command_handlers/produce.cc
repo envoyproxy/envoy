@@ -1,6 +1,6 @@
-#include "source/extensions/filters/network/kafka/mesh/command_handlers/produce.h"
+#include "contrib/kafka/filters/network/source/mesh/command_handlers/produce.h"
 
-#include "source/extensions/filters/network/kafka/external/responses.h"
+#include "contrib/kafka/filters/network/source/external/responses.h"
 
 namespace Envoy {
 namespace Extensions {

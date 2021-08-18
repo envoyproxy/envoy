@@ -1,8 +1,8 @@
 #pragma once
 
-#include "source/extensions/filters/network/kafka/external/requests.h"
-#include "source/extensions/filters/network/kafka/mesh/abstract_command.h"
-#include "source/extensions/filters/network/kafka/mesh/upstream_kafka_facade.h"
+#include "contrib/kafka/filters/network/source/external/requests.h"
+#include "contrib/kafka/filters/network/source/mesh/abstract_command.h"
+#include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
 
 namespace Envoy {
 namespace Extensions {

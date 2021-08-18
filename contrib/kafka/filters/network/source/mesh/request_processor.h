@@ -1,19 +1,11 @@
 #pragma once
 
 #include "source/common/common/logger.h"
-<<<<<<< HEAD:source/extensions/filters/network/kafka/mesh/request_processor.h
-#include "source/extensions/filters/network/kafka/external/requests.h"
-#include "source/extensions/filters/network/kafka/mesh/abstract_command.h"
-#include "source/extensions/filters/network/kafka/mesh/upstream_config.h"
-#include "source/extensions/filters/network/kafka/mesh/upstream_kafka_facade.h"
-#include "source/extensions/filters/network/kafka/request_codec.h"
-=======
-
 #include "contrib/kafka/filters/network/source/external/requests.h"
 #include "contrib/kafka/filters/network/source/mesh/abstract_command.h"
 #include "contrib/kafka/filters/network/source/mesh/upstream_config.h"
+#include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
 #include "contrib/kafka/filters/network/source/request_codec.h"
->>>>>>> envoy/main:contrib/kafka/filters/network/source/mesh/request_processor.h
 
 namespace Envoy {
 namespace Extensions {

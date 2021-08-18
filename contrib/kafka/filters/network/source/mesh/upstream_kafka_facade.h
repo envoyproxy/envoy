@@ -4,8 +4,8 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/network/kafka/mesh/upstream_config.h"
-#include "source/extensions/filters/network/kafka/mesh/upstream_kafka_client.h"
+#include "contrib/kafka/filters/network/source/mesh/upstream_config.h"
+#include "contrib/kafka/filters/network/source/mesh/upstream_kafka_client.h"
 
 namespace Envoy {
 namespace Extensions {

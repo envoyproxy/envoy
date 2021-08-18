@@ -1,4 +1,4 @@
-#include "source/extensions/filters/network/kafka/mesh/upstream_config.h"
+#include "contrib/kafka/filters/network/source/mesh/upstream_config.h"
 
 #include "envoy/common/exception.h"
 

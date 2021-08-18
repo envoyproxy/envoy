@@ -1,4 +1,4 @@
-#include "source/extensions/filters/network/kafka/mesh/upstream_kafka_client.h"
+#include "contrib/kafka/filters/network/source/mesh/upstream_kafka_client.h"
 
 #include "test/extensions/filters/network/kafka/mesh/kafka_mocks.h"
 #include "test/mocks/event/mocks.h"

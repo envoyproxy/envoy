@@ -1,4 +1,4 @@
-#include "source/extensions/filters/network/kafka/mesh/config.h"
+#include "contrib/kafka/filters/network/source/mesh/config.h"
 
 #include "test/mocks/server/factory_context.h"
 
