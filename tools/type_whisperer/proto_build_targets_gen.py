@@ -120,6 +120,11 @@ if __name__ == '__main__':
     for desc in type_db.types.values():
         pkg = desc.qualified_package
         if is_v3_package(pkg):
+            # contrib API files have the standard namespace but are in a contrib folder for clarity.
+            # The following prepends contrib to the package path which indirectly will produce the
+            # proper bazel path.
+            if desc.proto_path.startswith('contrib/'):
+                pkg = "contrib." + pkg
             v3_packages.add(pkg)
             continue
         if is_v2_package(pkg):

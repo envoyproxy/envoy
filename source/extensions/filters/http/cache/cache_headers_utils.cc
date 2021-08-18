@@ -11,6 +11,7 @@
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 
 #include "absl/algorithm/container.h"
+#include "absl/container/btree_set.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
@@ -213,21 +214,18 @@ void CacheHeadersUtils::getAllMatchingHeaderNames(
   });
 }
 
-std::vector<std::string>
-CacheHeadersUtils::parseCommaDelimitedList(const Http::HeaderMap::GetResult& entry) {
-  if (entry.empty()) {
-    return {};
+std::vector<absl::string_view>
+CacheHeadersUtils::parseCommaDelimitedHeader(const Http::HeaderMap::GetResult& entry) {
+  std::vector<absl::string_view> values;
+  for (size_t i = 0; i < entry.size(); ++i) {
+    for (absl::string_view s : absl::StrSplit(entry[i]->value().getStringView(), ',')) {
+      if (s.empty()) {
+        continue;
+      }
+      values.emplace_back(absl::StripAsciiWhitespace(s));
+    }
   }
-
-  // TODO(mattklein123): Consider multiple header values?
-  std::vector<std::string> header_values = absl::StrSplit(entry[0]->value().getStringView(), ',');
-  for (std::string& value : header_values) {
-    // TODO(cbdm): Might be able to improve the performance here by using StringUtil::trim to
-    // remove whitespace.
-    absl::StripAsciiWhitespace(&value);
-  }
-
-  return header_values;
+  return values;
 }
 
 VaryHeader::VaryHeader(
@@ -240,15 +238,24 @@ VaryHeader::VaryHeader(
   }
 }
 
+bool VaryHeader::allowsHeader(const absl::string_view header) const {
+  for (const auto& rule : allow_list_) {
+    if (rule->match(header)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) const {
   if (!VaryHeader::hasVary(headers)) {
     return true;
   }
 
-  std::vector<std::string> varied_headers =
-      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::CustomHeaders::get().Vary));
+  std::vector<absl::string_view> varied_headers =
+      CacheHeadersUtils::parseCommaDelimitedHeader(headers.get(Http::CustomHeaders::get().Vary));
 
-  for (const std::string& header : varied_headers) {
+  for (absl::string_view& header : varied_headers) {
     bool valid = false;
 
     // "Vary: *" should never be cached per:
@@ -257,11 +264,8 @@ bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) const {
       return false;
     }
 
-    for (const auto& rule : allow_list_) {
-      if (rule->match(header)) {
-        valid = true;
-        break;
-      }
+    if (allowsHeader(header)) {
+      valid = true;
     }
 
     if (!valid) {
@@ -278,63 +282,65 @@ bool VaryHeader::hasVary(const Http::ResponseHeaderMap& headers) {
   return !vary_header.empty() && !vary_header[0]->value().empty();
 }
 
+absl::btree_set<absl::string_view>
+VaryHeader::getVaryValues(const Http::ResponseHeaderMap& headers) {
+  Http::HeaderMap::GetResult vary_headers = headers.get(Http::CustomHeaders::get().Vary);
+  if (vary_headers.empty()) {
+    return {};
+  }
+
+  std::vector<absl::string_view> values =
+      CacheHeadersUtils::parseCommaDelimitedHeader(vary_headers);
+  return absl::btree_set<absl::string_view>(values.begin(), values.end());
+}
+
 namespace {
 // The separator characters are used to create the vary-key, and must be characters that are
 // invalid to be inside values and header names. The chosen characters are invalid per:
 // https://tools.ietf.org/html/rfc2616#section-4.2.
 
 // Used to separate the values of different headers.
-constexpr absl::string_view header_separator = "\n";
+constexpr absl::string_view headerSeparator = "\n";
 // Used to separate multiple values of a same header.
-constexpr absl::string_view in_value_separator = "\r";
+constexpr absl::string_view inValueSeparator = "\r";
 }; // namespace
 
-std::string VaryHeader::createVaryKey(const Http::HeaderMap::GetResult& vary_header,
-                                      const Http::RequestHeaderMap& entry_headers) {
-  if (vary_header.empty()) {
-    return "";
+absl::optional<std::string>
+VaryHeader::createVaryIdentifier(const absl::btree_set<absl::string_view>& vary_header_values,
+                                 const Http::RequestHeaderMap& request_headers) const {
+  std::string vary_identifier = "vary-id\n";
+  if (vary_header_values.empty()) {
+    return vary_identifier;
   }
 
-  // TODO(mattklein123): Support multiple vary headers and/or just make the vary header inline.
-  ASSERT(vary_header[0]->key() == "vary");
-
-  std::string vary_key = "vary-key\n";
-
-  for (const std::string& header : CacheHeadersUtils::parseCommaDelimitedList(vary_header)) {
-    // TODO(cbdm): Can add some bucketing logic here based on header. For example, we could
-    // normalize the values for accept-language by making all of {en-CA, en-GB, en-US} into
-    // "en". This way we would not need to store multiple versions of the same payload, and any
-    // of those values would find the payload in the requested language. Another example would be to
-    // bucket UserAgent values into android/ios/desktop; UserAgent::initializeFromHeaders tries to
-    // do that normalization and could be used as an inspiration for some bucketing configuration.
-    // The config should enable and control the bucketing wanted.
-    const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(
-        entry_headers, Http::LowerCaseString(header), in_value_separator);
-    absl::StrAppend(&vary_key, header, in_value_separator,
-                    all_values.result().has_value() ? all_values.result().value() : "",
-                    header_separator);
-  }
-
-  return vary_key;
-}
-
-Http::RequestHeaderMapPtr
-VaryHeader::possibleVariedHeaders(const Http::RequestHeaderMap& request_headers) const {
-  Http::RequestHeaderMapPtr possible_headers =
-      Http::createHeaderMap<Http::RequestHeaderMapImpl>({});
-
-  absl::flat_hash_set<absl::string_view> header_names;
-  CacheHeadersUtils::getAllMatchingHeaderNames(request_headers, allow_list_, header_names);
-
-  for (const absl::string_view& header : header_names) {
-    const auto lower_case_header = Http::LowerCaseString(std::string{header});
-    const auto value = request_headers.get(lower_case_header);
-    for (size_t i = 0; i < value.size(); i++) {
-      possible_headers->addCopy(lower_case_header, value[i]->value().getStringView());
+  for (const absl::string_view& header : vary_header_values) {
+    if (header.empty()) {
+      continue;
     }
+    if (!allowsHeader(header)) {
+      // The backend tried to vary on a header that we don't allow, so return
+      // absl::nullopt to indicate we are unable to cache this request. This
+      // also may occur if the allow list has changed since an item was cached,
+      // rendering the cached vary value invalid.
+      return absl::nullopt;
+    }
+    // TODO(cbdm): Can add some bucketing logic here based on header. For
+    // example, we could normalize the values for accept-language by making all
+    // of {en-CA, en-GB, en-US} into "en". This way we would not need to store
+    // multiple versions of the same payload, and any of those values would find
+    // the payload in the requested language. Another example would be to bucket
+    // UserAgent values into android/ios/desktop;
+    // UserAgent::initializeFromHeaders tries to do that normalization and could
+    // be used as an inspiration for some bucketing configuration. The config
+    // should enable and control the bucketing wanted.
+    const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(
+        request_headers, Http::LowerCaseString(std::string(header)), inValueSeparator);
+    absl::StrAppend(&vary_identifier, header, inValueSeparator,
+                    all_values.result().has_value() ? all_values.result().value() : "",
+                    headerSeparator);
   }
 
-  return possible_headers;
+  return vary_identifier;
 }
 
 } // namespace Cache

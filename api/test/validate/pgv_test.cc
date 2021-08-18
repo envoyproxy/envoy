@@ -19,7 +19,6 @@
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.validate.h"
 #include "envoy/extensions/filters/http/lua/v3/lua.pb.validate.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.validate.h"
-#include "envoy/extensions/filters/http/squash/v3/squash.pb.validate.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"

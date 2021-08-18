@@ -130,7 +130,7 @@ template <typename T> static T* removeConst(const void* object) {
 }
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-    : parent_(parent),
+    : MultiplexedStreamImplBase(parent.connection_.dispatcher()), parent_(parent),
       pending_recv_data_(parent_.connection_.dispatcher().getWatermarkFactory().createBuffer(
           [this]() -> void { this->pendingRecvBufferLowWatermark(); },
           [this]() -> void { this->pendingRecvBufferHighWatermark(); },
@@ -149,10 +149,8 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
   }
 }
 
-ConnectionImpl::StreamImpl::~StreamImpl() { ASSERT(stream_idle_timer_ == nullptr); }
-
 void ConnectionImpl::StreamImpl::destroy() {
-  disarmStreamIdleTimer();
+  MultiplexedStreamImplBase::destroy();
   parent_.stats_.streams_active_.dec();
   parent_.stats_.pending_send_bytes_.sub(pending_send_data_->length());
 }
@@ -202,8 +200,7 @@ void ConnectionImpl::ServerStreamImpl::encode100ContinueHeaders(const ResponseHe
   encodeHeaders(headers, false);
 }
 
-void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>& final_headers,
-                                                   bool end_stream) {
+void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, bool end_stream) {
   nghttp2_data_provider provider;
   if (!end_stream) {
     provider.source.ptr = this;
@@ -215,7 +212,7 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>
   }
 
   local_end_stream_ = end_stream;
-  submitHeaders(final_headers, end_stream ? nullptr : &provider);
+  submitHeaders(headers, end_stream ? nullptr : &provider);
   if (parent_.sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
     return;
@@ -229,13 +226,12 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
-  std::vector<nghttp2_nv> final_headers;
   Http::RequestHeaderMapPtr modified_headers;
   if (Http::Utility::isUpgrade(headers)) {
     modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
     upgrade_type_ = std::string(headers.getUpgradeValue());
     Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
-    buildHeaders(final_headers, *modified_headers);
+    encodeHeadersBase(*modified_headers, end_stream);
   } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
     // If this is not an upgrade style connect (above branch) it is a bytestream
     // connect and should have :path and :protocol set accordingly
@@ -248,11 +244,10 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
     if (!headers.Path()) {
       modified_headers->setPath("/");
     }
-    buildHeaders(final_headers, *modified_headers);
+    encodeHeadersBase(*modified_headers, end_stream);
   } else {
-    buildHeaders(final_headers, headers);
+    encodeHeadersBase(headers, end_stream);
   }
-  encodeHeadersBase(final_headers, end_stream);
   return okStatus();
 }
 
@@ -263,16 +258,14 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
 
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
-  std::vector<nghttp2_nv> final_headers;
   Http::ResponseHeaderMapPtr modified_headers;
   if (Http::Utility::isUpgrade(headers)) {
     modified_headers = createHeaderMap<ResponseHeaderMapImpl>(headers);
     Http::Utility::transformUpgradeResponseFromH1toH2(*modified_headers);
-    buildHeaders(final_headers, *modified_headers);
+    encodeHeadersBase(*modified_headers, end_stream);
   } else {
-    buildHeaders(final_headers, headers);
+    encodeHeadersBase(headers, end_stream);
   }
-  encodeHeadersBase(final_headers, end_stream);
 }
 
 void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
@@ -287,7 +280,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
         trailers.empty() && parent_.skip_encoding_empty_trailers_;
     if (!skip_encoding_empty_trailers) {
       pending_trailers_to_encode_ = cloneTrailers(trailers);
-      createPendingFlushTimer();
+      onLocalEndStream();
     }
   } else {
     submitTrailers(trailers);
@@ -475,34 +468,29 @@ void ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t
   parent_.connection_.write(output, false);
 }
 
-void ConnectionImpl::ClientStreamImpl::submitHeaders(const std::vector<nghttp2_nv>& final_headers,
+void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers,
                                                      nghttp2_data_provider* provider) {
   ASSERT(stream_id_ == -1);
+  std::vector<nghttp2_nv> final_headers;
+  buildHeaders(final_headers, headers);
   stream_id_ = nghttp2_submit_request(parent_.session_, nullptr, final_headers.data(),
                                       final_headers.size(), provider, base());
   ASSERT(stream_id_ > 0);
 }
 
-void ConnectionImpl::ServerStreamImpl::submitHeaders(const std::vector<nghttp2_nv>& final_headers,
+void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers,
                                                      nghttp2_data_provider* provider) {
   ASSERT(stream_id_ != -1);
+  std::vector<nghttp2_nv> final_headers;
+  buildHeaders(final_headers, headers);
   int rc = nghttp2_submit_response(parent_.session_, stream_id_, final_headers.data(),
                                    final_headers.size(), provider);
   ASSERT(rc == 0);
 }
 
-void ConnectionImpl::ServerStreamImpl::createPendingFlushTimer() {
-  ASSERT(stream_idle_timer_ == nullptr);
-  if (stream_idle_timeout_.count() > 0) {
-    stream_idle_timer_ =
-        parent_.connection_.dispatcher().createTimer([this] { onPendingFlushTimer(); });
-    stream_idle_timer_->enableTimer(stream_idle_timeout_);
-  }
-}
-
 void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
   ENVOY_CONN_LOG(debug, "pending stream flush timeout", parent_.connection_);
-  stream_idle_timer_.reset();
+  MultiplexedStreamImplBase::onPendingFlushTimer();
   parent_.stats_.tx_flush_timeout_.inc();
   ASSERT(local_end_stream_ && !local_end_stream_sent_);
   // This will emit a reset frame for this stream and close the stream locally. No reset callbacks
@@ -541,8 +529,8 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
     // Intended to check through coverage that this error case is tested
     return;
   }
-  if (local_end_stream_ && pending_send_data_->length() > 0) {
-    createPendingFlushTimer();
+  if (local_end_stream_) {
+    onLocalEndStream();
   }
 }
 
