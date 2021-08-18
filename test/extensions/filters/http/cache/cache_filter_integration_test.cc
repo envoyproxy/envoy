@@ -183,7 +183,7 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
     // means it was served by an upstream cache.
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
   }
-  
+
   // Advance time to get a fresh cached response
   simTime().advanceTimeWait(Seconds(1));
 
@@ -193,8 +193,8 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
     IntegrationStreamDecoderPtr response_decoder =
         sendHeaderOnlyRequestAwaitResponse(request_headers, serveFromCache());
     EXPECT_THAT(response_decoder->headers(),
-        HeaderHasValueRef(Http::CustomHeaders::get().Age, "1"));
-    
+                HeaderHasValueRef(Http::CustomHeaders::get().Age, "1"));
+
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1),

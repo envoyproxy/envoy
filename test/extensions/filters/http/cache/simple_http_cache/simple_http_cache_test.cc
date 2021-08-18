@@ -83,7 +83,7 @@ protected:
     });
     return body;
   }
-  
+
   Http::ResponseHeaderMapPtr getHeaders(LookupContext& context) {
     Http::ResponseHeaderMapPtr response_headers_ptr;
     context.getHeaders([&response_headers_ptr](LookupResult&& lookup_result) {
@@ -132,7 +132,7 @@ protected:
     if (!lookup_context) {
       return AssertionFailure() << "Expected nonnull lookup_context";
     }
-    
+
     Http::ResponseHeaderMapPtr actual_headers_ptr = getHeaders(*lookup_context);
     if (!TestUtility::headerMapEqualIgnoreOrder(headers, *actual_headers_ptr)) {
       return AssertionFailure() << "Expected headers: " << headers
@@ -329,27 +329,27 @@ TEST_F(SimpleHttpCacheTest, VaryOnDisallowedKey) {
 }
 
 TEST_F(SimpleHttpCacheTest, UpdateHeadersAndMetadata) {
-    const std::string request_path_1("/name");
-    Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
-                                                     {"cache-control", "public,max-age=3600"}};
-    insert(request_path_1, response_headers, "body");
-    EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers));
+  const std::string request_path_1("/name");
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"cache-control", "public,max-age=3600"}};
+  insert(request_path_1, response_headers, "body");
+  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers));
 
-    // Update the date field in the headers
-    time_source_.advanceTimeWait(Seconds(3601));
-    
-    response_headers = Http::TestResponseHeaderMapImpl{{"date", formatter_.fromTime(current_time_)},
-                                                       {"cache-control", "public,max-age=3600"}};
-    updateHeaders(request_path_1, response_headers, {current_time_});
-    EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers));
+  // Update the date field in the headers
+  time_source_.advanceTimeWait(Seconds(3601));
+
+  response_headers = Http::TestResponseHeaderMapImpl{{"date", formatter_.fromTime(current_time_)},
+                                                     {"cache-control", "public,max-age=3600"}};
+  updateHeaders(request_path_1, response_headers, {current_time_});
+  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers));
 }
 
 TEST_F(SimpleHttpCacheTest, UpdateHeadersForMissingKey) {
-    const std::string request_path_1("/name");
-    Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
-                                                     {"cache-control", "public,max-age=3600"}};
-    updateHeaders(request_path_1, response_headers, {current_time_});
-    EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+  const std::string request_path_1("/name");
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"cache-control", "public,max-age=3600"}};
+  updateHeaders(request_path_1, response_headers, {current_time_});
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 }
 
 } // namespace

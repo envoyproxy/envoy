@@ -112,24 +112,23 @@ LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
 void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
                                     const Http::ResponseHeaderMap& response_headers,
                                     const ResponseMetadata& metadata) {
-    absl::WriterMutexLock lock(&mutex_);
-    const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
-    const Key& key = simple_lookup_context.request().key();
+  absl::WriterMutexLock lock(&mutex_);
+  const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
+  const Key& key = simple_lookup_context.request().key();
 
-    auto iter = map_.find(key);
-    if (iter == map_.end() || !iter->second.response_headers_) {
-      return;
-    }
-    auto& entry = iter->second;
+  auto iter = map_.find(key);
+  if (iter == map_.end() || !iter->second.response_headers_) {
+    return;
+  }
+  auto& entry = iter->second;
 
-    // TODO(tangsaidi) handle Vary header updates properly
-    if (VaryHeader::hasVary(*(entry.response_headers_))) {
-      return;
-    }
+  // TODO(tangsaidi) handle Vary header updates properly
+  if (VaryHeader::hasVary(*(entry.response_headers_))) {
+    return;
+  }
 
-    entry.response_headers_ =
-        Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
-    entry.metadata_ = metadata;
+  entry.response_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
+  entry.metadata_ = metadata;
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
