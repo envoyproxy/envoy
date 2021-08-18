@@ -248,7 +248,7 @@ bool VaryAllowList::allowsValue(const absl::string_view vary_value) const {
 }
 
 bool VaryAllowList::allowsHeaders(const Http::ResponseHeaderMap& headers) const {
-  if (!VaryUtils::hasVary(headers)) {
+  if (!VaryHeaderUtils::hasVary(headers)) {
     return true;
   }
 
@@ -276,14 +276,14 @@ bool VaryAllowList::allowsHeaders(const Http::ResponseHeaderMap& headers) const 
   return true;
 }
 
-bool VaryUtils::hasVary(const Http::ResponseHeaderMap& headers) {
+bool VaryHeaderUtils::hasVary(const Http::ResponseHeaderMap& headers) {
   // TODO(mattklein123): Support multiple vary headers and/or just make the vary header inline.
   const auto vary_header = headers.get(Http::CustomHeaders::get().Vary);
   return !vary_header.empty() && !vary_header[0]->value().empty();
 }
 
 absl::btree_set<absl::string_view>
-VaryUtils::getVaryValues(const Http::ResponseHeaderMap& headers) {
+VaryHeaderUtils::getVaryValues(const Http::ResponseHeaderMap& headers) {
   Http::HeaderMap::GetResult vary_headers = headers.get(Http::CustomHeaders::get().Vary);
   if (vary_headers.empty()) {
     return {};
@@ -306,7 +306,7 @@ constexpr absl::string_view inValueSeparator = "\r";
 }; // namespace
 
 absl::optional<std::string>
-VaryUtils::createVaryIdentifier(const VaryAllowList& allow_list,
+VaryHeaderUtils::createVaryIdentifier(const VaryAllowList& allow_list,
                                 const absl::btree_set<absl::string_view>& vary_header_values,
                                 const Http::RequestHeaderMap& request_headers) {
   std::string vary_identifier = "vary-id\n";

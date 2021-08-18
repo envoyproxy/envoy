@@ -86,7 +86,7 @@ public:
 private:
   void commit() {
     committed_ = true;
-    if (VaryUtils::hasVary(*response_headers_)) {
+    if (VaryHeaderUtils::hasVary(*response_headers_)) {
       cache_.varyInsert(key_, std::move(response_headers_), std::move(metadata_), body_.toString(),
                         request_headers_, vary_allow_list_);
     } else {
@@ -124,7 +124,7 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
   }
   ASSERT(iter->second.response_headers_);
 
-  if (VaryUtils::hasVary(*iter->second.response_headers_)) {
+  if (VaryHeaderUtils::hasVary(*iter->second.response_headers_)) {
     return varyLookup(request, iter->second.response_headers_);
   } else {
     return SimpleHttpCache::Entry{
@@ -147,11 +147,11 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
   mutex_.AssertReaderHeld();
 
   absl::btree_set<absl::string_view> vary_header_values =
-      VaryUtils::getVaryValues(*response_headers);
+      VaryHeaderUtils::getVaryValues(*response_headers);
   ASSERT(!vary_header_values.empty());
 
   Key varied_request_key = request.key();
-  const absl::optional<std::string> vary_identifier = VaryUtils::createVaryIdentifier(
+  const absl::optional<std::string> vary_identifier = VaryHeaderUtils::createVaryIdentifier(
       request.varyAllowList(), vary_header_values, request.requestHeaders());
   if (!vary_identifier.has_value()) {
     // The vary allow list has changed and has made the vary header of this
@@ -179,13 +179,13 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
   absl::WriterMutexLock lock(&mutex_);
 
   absl::btree_set<absl::string_view> vary_header_values =
-      VaryUtils::getVaryValues(*response_headers);
+      VaryHeaderUtils::getVaryValues(*response_headers);
   ASSERT(!vary_header_values.empty());
 
   // Insert the varied response.
   Key varied_request_key = request_key;
   const absl::optional<std::string> vary_identifier =
-      VaryUtils::createVaryIdentifier(vary_allow_list, vary_header_values, request_headers);
+      VaryHeaderUtils::createVaryIdentifier(vary_allow_list, vary_header_values, request_headers);
   if (!vary_identifier.has_value()) {
     // Skip the insert if we are unable to create a vary key.
     return;
