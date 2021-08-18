@@ -18,7 +18,6 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-using testing::AnyNumber;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Return;
