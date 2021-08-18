@@ -63,7 +63,7 @@ public:
               const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings);
 
-  virtual ~GrpcMuxImpl();
+  ~GrpcMuxImpl() override;
 
   // Causes all GrpcMuxImpl objects to stop sending any messages on `grpc_stream_` to fix a crash
   // on Envoy shutdown due to dangling pointers. This may not be the ideal fix; it is probably

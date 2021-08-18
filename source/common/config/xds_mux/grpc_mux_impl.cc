@@ -60,8 +60,7 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
 }
 
 template <class S, class F, class RQ, class RS> GrpcMuxImpl<S, F, RQ, RS>::~GrpcMuxImpl() {
-  std::cout << "in ~GrpcMuxImpl() !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-            << "\n";
+  ENVOY_LOG(info, "in ~GrpcMuxImpl() !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
   AllMuxes::get().erase(this);
 }
 
