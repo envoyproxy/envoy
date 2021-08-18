@@ -155,8 +155,6 @@ protected:
     return transport_api_version_;
   }
 
-  GrpcStream<RQ, RS> grpc_stream_;
-
 private:
   // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
   // whether we *want* to send a (Delta)DiscoveryRequest).
@@ -172,6 +170,8 @@ private:
 
   // Invoked when dynamic context parameters change for a resource type.
   void onDynamicContextUpdate(absl::string_view resource_type_url);
+
+  GrpcStream<RQ, RS> grpc_stream_;
 
   // Resource (N)ACKs we're waiting to send, stored in the order that they should be sent in. All
   // of our different resource types' ACKs are mixed together in this queue. See class for
