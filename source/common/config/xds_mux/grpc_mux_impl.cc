@@ -60,6 +60,8 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
 }
 
 template <class S, class F, class RQ, class RS> GrpcMuxImpl<S, F, RQ, RS>::~GrpcMuxImpl() {
+  std::cout << "in ~GrpcMuxImpl() !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+            << "\n";
   AllMuxes::get().erase(this);
 }
 
@@ -213,7 +215,6 @@ void GrpcMuxImpl<S, F, RQ, RS>::genericHandleResponse(const std::string& type_ur
 
 template <class S, class F, class RQ, class RS> void GrpcMuxImpl<S, F, RQ, RS>::start() {
   ENVOY_LOG(debug, "GrpcMuxImpl now trying to establish a stream");
-  std::cout << "in GrpcMuxImpl::start() !!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
   grpc_stream_.establishNewStream();
 }
 
