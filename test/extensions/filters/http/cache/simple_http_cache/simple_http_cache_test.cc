@@ -36,6 +36,19 @@ protected:
     request_headers_.setCopy(Http::CustomHeaders::get().CacheControl, "max-age=3600");
   }
 
+  // Updates the cache entry's header
+  void updateHeaders(LookupContextPtr lookup,
+                     const Http::TestResponseHeaderMapImpl& response_headers,
+                     const ResponseMetadata& metadata) {
+    cache_.updateHeaders(*lookup, response_headers, metadata);
+  }
+
+  void updateHeaders(absl::string_view request_path,
+                     const Http::TestResponseHeaderMapImpl& response_headers,
+                     const ResponseMetadata& metadata) {
+    updateHeaders(lookup(request_path), response_headers, metadata);
+  }
+
   // Performs a cache lookup.
   LookupContextPtr lookup(absl::string_view request_path) {
     LookupRequest request = makeLookupRequest(request_path);
@@ -70,6 +83,16 @@ protected:
     });
     return body;
   }
+  
+  Http::ResponseHeaderMapPtr getHeaders(LookupContext& context) {
+    Http::ResponseHeaderMapPtr response_headers_ptr;
+    context.getHeaders([&response_headers_ptr](LookupResult&& lookup_result) {
+      EXPECT_NE(lookup_result.cache_entry_status_, CacheEntryStatus::Unusable);
+      EXPECT_NE(lookup_result.headers_, nullptr);
+      response_headers_ptr = move(lookup_result.headers_);
+    });
+    return response_headers_ptr;
+  }
 
   LookupRequest makeLookupRequest(absl::string_view request_path) {
     request_headers_.setPath(request_path);
@@ -92,6 +115,28 @@ protected:
     const std::string actual_body = getBody(*lookup_context, 0, body.size());
     if (body != actual_body) {
       return AssertionFailure() << "Expected body == " << body << "\n  Actual:  " << actual_body;
+    }
+    return AssertionSuccess();
+  }
+
+  AssertionResult expectLookupSuccessWithHeaders(LookupContext* lookup_context,
+                                                 const Http::TestResponseHeaderMapImpl& headers) {
+    if (lookup_result_.cache_entry_status_ != CacheEntryStatus::Ok) {
+      return AssertionFailure() << "Expected: lookup_result_.cache_entry_status == "
+                                   "CacheEntryStatus::Ok\n  Actual: "
+                                << lookup_result_.cache_entry_status_;
+    }
+    if (!lookup_result_.headers_) {
+      return AssertionFailure() << "Expected nonnull lookup_result_.headers";
+    }
+    if (!lookup_context) {
+      return AssertionFailure() << "Expected nonnull lookup_context";
+    }
+    
+    Http::ResponseHeaderMapPtr actual_headers_ptr = getHeaders(*lookup_context);
+    if (!TestUtility::headerMapEqualIgnoreOrder(headers, *actual_headers_ptr)) {
+      return AssertionFailure() << "Expected headers: " << headers
+                                << "\nActual:  " << *actual_headers_ptr;
     }
     return AssertionSuccess();
   }
@@ -281,6 +326,22 @@ TEST_F(SimpleHttpCacheTest, VaryOnDisallowedKey) {
   insert(move(first_value_vary), response_headers, Body1);
   first_value_vary = lookup(RequestPath);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+}
+
+TEST_F(SimpleHttpCacheTest, UpdateHeadersAndMetadata) {
+    const std::string RequestPath1("Name");
+    Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                     {"cache-control", "public,max-age=3600"}};
+    insert(RequestPath1, response_headers, "");
+    EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(RequestPath1).get(), response_headers));
+
+    // Update the date field in the headers
+    time_source_.advanceTimeWait(Seconds(3601));
+    
+    response_headers = Http::TestResponseHeaderMapImpl{{"date", formatter_.fromTime(current_time_)},
+                                                       {"cache-control", "public,max-age=3600"}};
+    updateHeaders(RequestPath1, response_headers, {current_time_});
+    EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(RequestPath1).get(), response_headers));
 }
 
 } // namespace
