@@ -100,8 +100,8 @@ namespace CacheHeadersUtils {
 SystemTime httpTime(const Http::HeaderEntry* header_entry);
 
 // Calculates the age of a cached response
-Seconds calculateAge(const Http::ResponseHeaderMap& response_headers,
-                     SystemTime response_time, SystemTime now);
+Seconds calculateAge(const Http::ResponseHeaderMap& response_headers, SystemTime response_time,
+                     SystemTime now);
 
 /**
  * Read a leading positive decimal integer value and advance "*str" past the
@@ -117,12 +117,11 @@ void getAllMatchingHeaderNames(const Http::HeaderMap& headers,
 
 // Parses the values of a comma-delimited list as defined per
 // https://tools.ietf.org/html/rfc7230#section-7.
-std::vector<absl::string_view>
-    parseCommaDelimitedHeader(const Http::HeaderMap::GetResult& entry);
+std::vector<absl::string_view> parseCommaDelimitedHeader(const Http::HeaderMap::GetResult& entry);
 } // namespace CacheHeadersUtils
 
 class VaryAllowList {
- public:
+public:
   // Parses the allow list from the Cache Config into the object's private allow_list_.
   VaryAllowList(
       const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list);
@@ -133,7 +132,7 @@ class VaryAllowList {
   // Checks if this vary header value is allowed to vary cache entries.
   bool allowsValue(const absl::string_view header) const;
 
- private:
+private:
   // Stores the matching rules that define whether a header is allowed to be varied.
   std::vector<Matchers::StringMatcherPtr> allow_list_;
 };
