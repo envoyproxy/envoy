@@ -231,12 +231,35 @@ effectiveTransportApiVersion(envoy::config::core::v3::ApiVersion transport_api_v
   return transport_api_version;
 }
 
+TypeUrlToVersionedServiceMap::iterator findVersionedService(const std::string& type_url) {
+  const auto it = typeUrlToVersionedServiceMap().find(type_url);
+  if (it != typeUrlToVersionedServiceMap().cend()) {
+    return it;
+  }
+  std::string message_name = type_url;
+  const std::string& typeUrlPrefix = Grpc::Common::typeUrlPrefix();
+  if (message_name.compare(0, typeUrlPrefix.length(), typeUrlPrefix) == 0) {
+    if (message_name[typeUrlPrefix.length()] == '/') {
+      message_name.erase(0, typeUrlPrefix.length() + 1);
+    }
+  }
+  const auto* message_desc =
+      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(message_name);
+  if (message_desc != nullptr &&
+      message_desc->options().HasExtension(envoy::annotations::resource_alias)) {
+    const std::string& resource =
+        message_desc->options().GetExtension(envoy::annotations::resource_alias).type();
+    return typeUrlToVersionedServiceMap().find(Grpc::Common::typeUrl(resource));
+  }
+  return typeUrlToVersionedServiceMap().end();
+}
+
 } // namespace
 
 const Protobuf::MethodDescriptor&
 deltaGrpcMethod(absl::string_view type_url,
                 envoy::config::core::v3::ApiVersion transport_api_version) {
-  const auto it = typeUrlToVersionedServiceMap().find(static_cast<TypeUrl>(type_url));
+  const auto it = findVersionedService(static_cast<TypeUrl>(type_url));
   ASSERT(it != typeUrlToVersionedServiceMap().cend());
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
       it->second.delta_grpc_.methods_[effectiveTransportApiVersion(transport_api_version)]);
@@ -245,7 +268,7 @@ deltaGrpcMethod(absl::string_view type_url,
 const Protobuf::MethodDescriptor&
 sotwGrpcMethod(absl::string_view type_url,
                envoy::config::core::v3::ApiVersion transport_api_version) {
-  const auto it = typeUrlToVersionedServiceMap().find(static_cast<TypeUrl>(type_url));
+  const auto it = findVersionedService(static_cast<TypeUrl>(type_url));
   ASSERT(it != typeUrlToVersionedServiceMap().cend());
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
       it->second.sotw_grpc_.methods_[effectiveTransportApiVersion(transport_api_version)]);
@@ -253,7 +276,7 @@ sotwGrpcMethod(absl::string_view type_url,
 
 const Protobuf::MethodDescriptor&
 restMethod(absl::string_view type_url, envoy::config::core::v3::ApiVersion transport_api_version) {
-  const auto it = typeUrlToVersionedServiceMap().find(static_cast<TypeUrl>(type_url));
+  const auto it = findVersionedService(static_cast<TypeUrl>(type_url));
   ASSERT(it != typeUrlToVersionedServiceMap().cend());
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
       it->second.rest_.methods_[effectiveTransportApiVersion(transport_api_version)]);

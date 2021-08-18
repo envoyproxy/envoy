@@ -7,6 +7,7 @@ import "envoy/config/route/v4alpha/route_components.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/resource.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -22,6 +23,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.thrift_proxy.v3.RouteConfiguration";
+  option (envoy.annotations.resource_alias).type = "envoy.config.route.v3.RouteConfiguration";
 
   // The name of the route configuration. Reserved for future use in asynchronous route discovery.
   string name = 1;
