@@ -287,7 +287,7 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
 
 void DnsCacheImpl::finishResolve(const std::string& host,
                                  Network::DnsResolver::ResolutionStatus status,
-                                 std::list<Network::DnsResponse>&& response) {
+                                 std::list<Network::DnsResponse>&& response, bool from_cache) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
   ENVOY_LOG(debug, "main thread resolve complete for host '{}'. {} results", host, response.size());
 
@@ -328,7 +328,11 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   bool address_changed = false;
   auto current_address = primary_host_info->host_info_->address();
   if (new_address != nullptr && (current_address == nullptr || *current_address != *new_address)) {
-    addCacheEntry(host, new_address);
+    if (!from_cache) {
+      addCacheEntry(host, new_address);
+    }
+    // TODO(alyssawilk) don't immediately push cached entries to threads.
+    // Only serve stale entries if a configured resolve timeout has fired.
     ENVOY_LOG(debug, "host '{}' address has changed", host);
     primary_host_info->host_info_->setAddress(new_address);
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
@@ -424,6 +428,7 @@ void DnsCacheImpl::addCacheEntry(const std::string& host,
   if (!key_value_store_) {
     return;
   }
+  // TODO(alyssawilk) cache data should include TTL, or some other indicator.
   const std::string value = absl::StrCat(address->asString());
   key_value_store_->addOrUpdate(host, value);
 }
@@ -452,10 +457,8 @@ void DnsCacheImpl::loadCacheEntries(
     stats_.cache_load_.inc();
     std::list<Network::DnsResponse> response;
     response.emplace_back(Network::DnsResponse(address, std::chrono::seconds(0) /* ttl */));
-    // TODO(alyssawilk) communicate this came from cache, or otherwise make it
-    // possible to disambiguate very stale cache results from fresh.
     startCacheLoad(key, address->ip()->port());
-    finishResolve(key, Network::DnsResolver::ResolutionStatus::Success, std::move(response));
+    finishResolve(key, Network::DnsResolver::ResolutionStatus::Success, std::move(response), true);
     return KeyValueStore::Iterate::Continue;
   };
   key_value_store_->iterate(load);

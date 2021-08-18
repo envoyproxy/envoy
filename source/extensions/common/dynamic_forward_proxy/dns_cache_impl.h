@@ -177,7 +177,7 @@ private:
   void startResolve(const std::string& host, PrimaryHostInfo& host_info)
       ABSL_LOCKS_EXCLUDED(primary_hosts_lock_);
   void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
-                     std::list<Network::DnsResponse>&& response);
+                     std::list<Network::DnsResponse>&& response, bool from_cache = false);
   void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);
   void runRemoveCallbacks(const std::string& host);
   void notifyThreads(const std::string& host, const DnsHostInfoImplSharedPtr& resolved_info);
