@@ -111,7 +111,7 @@ TEST_P(WasmStatSinkConfigTest, PanicAndRestart) {
     return;
   } else if (GetParam() == "wamr") {
     // Somehow only WAMR fails in the restarts.
-    // TODO: investigate the cause and enabile.
+    // TODO: investigate the cause and enable.
     return;
   }
   initializeWithConfig(config_);

@@ -119,7 +119,7 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
     return;
   } else if (GetParam() == "wamr") {
     // Somehow only WAMR fails in the restarts.
-    // TODO: investigate the cause and enabile.
+    // TODO: investigate the cause and enable.
     return;
   }
   std::shared_ptr<WasmAccessLog> wasm_access_logger = std::static_pointer_cast<WasmAccessLog>(
