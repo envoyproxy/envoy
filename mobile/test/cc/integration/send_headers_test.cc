@@ -22,31 +22,32 @@ static_resources:\n\
         port_value: 10000\n\
     api_listener:\n\
       api_listener:\n\
-        \"@type\": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager\n\
-        stat_prefix: hcm\n\
-        route_config:\n\
-          name: api_router\n\
-          virtual_hosts:\n\
-            - name: api\n\
-              domains:\n\
-                - \"*\"\n\
-              routes:\n\
-                - match:\n\
-                    prefix: \"/\"\n\
-                  direct_response:\n\
-                    status: 200\n\
-        http_filters:\n\
-          - name: envoy.filters.http.assertion\n\
-            typed_config:\n\
-              \"@type\": type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion\n\
-              match_config:\n\
-                http_request_headers_match:\n\
-                  headers:\n\
-                    - name: \":authority\"\n\
-                      exact_match: example.com\n\
-          - name: envoy.router\n\
-            typed_config:\n\
-              \"@type\": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router\n\
+        \"@type\": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager\n\
+        config:\n\
+          stat_prefix: hcm\n\
+          route_config:\n\
+            name: api_router\n\
+            virtual_hosts:\n\
+              - name: api\n\
+                domains:\n\
+                  - \"*\"\n\
+                routes:\n\
+                  - match:\n\
+                      prefix: \"/\"\n\
+                    direct_response:\n\
+                      status: 200\n\
+          http_filters:\n\
+            - name: envoy.filters.http.assertion\n\
+              typed_config:\n\
+                \"@type\": type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion\n\
+                match_config:\n\
+                  http_request_headers_match:\n\
+                    headers:\n\
+                      - name: \":authority\"\n\
+                        exact_match: example.com\n\
+            - name: envoy.router\n\
+              typed_config:\n\
+                \"@type\": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router\n\
 ";
 
 struct Status {

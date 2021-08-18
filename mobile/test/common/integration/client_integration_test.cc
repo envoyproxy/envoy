@@ -114,25 +114,26 @@ address:
     port_value: 1
 api_listener:
   api_listener:
-    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-    stat_prefix: hcm
-    route_config:
-      virtual_hosts:
-        name: integration
-        routes:
-          route:
-            cluster: cluster_0
-          match:
-            prefix: "/"
-        domains: "*"
-      name: route_config_0
-    http_filters:
-      - name: envoy.filters.http.local_error
-        typed_config:
-          "@type": type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError
-      - name: envoy.router
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager
+    config:
+      stat_prefix: hcm
+      route_config:
+        virtual_hosts:
+          name: integration
+          routes:
+            route:
+              cluster: cluster_0
+            match:
+              prefix: "/"
+          domains: "*"
+        name: route_config_0
+      http_filters:
+        - name: envoy.filters.http.local_error
+          typed_config:
+            "@type": type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError
+        - name: envoy.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
       )EOF";
   }
 

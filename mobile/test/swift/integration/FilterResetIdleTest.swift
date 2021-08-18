@@ -6,6 +6,8 @@ import XCTest
 final class FilterResetIdleTests: XCTestCase {
   func skipped_testFilterResetIdle() {
     let idleTimeout = "0.5s"
+    // swiftlint:disable:next line_length
+    let emhcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
     let hcmType =
       // swiftlint:disable:next line_length
       "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
@@ -44,7 +46,7 @@ final class FilterResetIdleTests: XCTestCase {
             socket_address: { protocol: TCP, address: 0.0.0.0, port_value: 10000 }
           api_listener:
             api_listener:
-              "@type": \(hcmType)
+              "@type": \(emhcmType)
               stat_prefix: api_hcm
               stream_idle_timeout: \(idleTimeout)
               route_config:

@@ -6,7 +6,7 @@ import XCTest
 final class ReceiveDataTests: XCTestCase {
   func testReceiveData() {
     // swiftlint:disable:next line_length
-    let apiListenerType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+    let emhcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
     // swiftlint:disable:next line_length
     let assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
     let assertionResponseBody = "response_body"
@@ -22,33 +22,34 @@ static_resources:
         port_value: 10000
     api_listener:
       api_listener:
-        "@type": \(apiListenerType)
-        stat_prefix: hcm
-        route_config:
-          name: api_router
-          virtual_hosts:
-            - name: api
-              domains:
-                - "*"
-              routes:
-                - match:
-                    prefix: "/"
-                  direct_response:
-                    status: 200
-                    body:
-                      inline_string: \(assertionResponseBody)
-        http_filters:
-          - name: envoy.filters.http.assertion
-            typed_config:
-              "@type": \(assertionFilterType)
-              match_config:
-                http_request_headers_match:
-                  headers:
-                    - name: ":authority"
-                      exact_match: example.com
-          - name: envoy.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+        "@type": \(emhcmType)
+        config:
+          stat_prefix: hcm
+          route_config:
+            name: api_router
+            virtual_hosts:
+              - name: api
+                domains:
+                  - "*"
+                routes:
+                  - match:
+                      prefix: "/"
+                    direct_response:
+                      status: 200
+                      body:
+                        inline_string: \(assertionResponseBody)
+          http_filters:
+            - name: envoy.filters.http.assertion
+              typed_config:
+                "@type": \(assertionFilterType)
+                match_config:
+                  http_request_headers_match:
+                    headers:
+                      - name: ":authority"
+                        exact_match: example.com
+            - name: envoy.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 """
     let client = EngineBuilder(yaml: config)
       .addLogLevel(.debug)
