@@ -1,10 +1,9 @@
-#include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
-
 #include "envoy/extensions/cache/simple_http_cache/v3alpha/config.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -127,14 +126,14 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
     return;
   }
 
-  // https://www.rfc-editor.org/rfc/pdfrfc/rfc7234.txt.pdf 
+  // https://www.rfc-editor.org/rfc/pdfrfc/rfc7234.txt.pdf
   // 4.3.4 Freshening Stored Responses upon Validation
   // use other header fields provided in the 304 (Not Modified)
   // response to replace all instances of the corresponding header
   // fields in the stored response.
   //
   // Assumptions:
-  // 1. The internet is fast, i.e. we get the result as soon as the server sends it. 
+  // 1. The internet is fast, i.e. we get the result as soon as the server sends it.
   // Race conditions would not be possible because we are always processing up-to-date data.
   // 2. No key collision for etag. Therefore, if etag matches it's the same resource.
   // 3. Backend is correct. etag is being used as a unique identifier to the resource
