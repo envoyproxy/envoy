@@ -6,7 +6,7 @@ import "envoy/config/cluster/v4alpha/cluster.proto";
 import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/core/v4alpha/resolver.proto";
-import "envoy/extensions/cache/key_value_cache/v3/config.proto";
+import "envoy/extensions/common/key_value/v3/config.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -145,5 +145,5 @@ message DnsCacheConfig {
 
   // [#not-implemented-hide:]
   // Configuration to flush the DNS cache to long term storage.
-  cache.key_value_cache.v3.KeyValueCacheConfig persistent_cache_config = 13;
+  key_value.v3.KeyValueStoreConfig persistent_cache_config = 13;
 }

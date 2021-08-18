@@ -31,4 +31,3 @@ Extensions
   stat_sinks/stat_sinks
   quic/quic_extensions
   formatter/formatter
-  cache/key_value_cache

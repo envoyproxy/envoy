@@ -445,8 +445,8 @@ void DnsCacheImpl::loadCacheEntries(
   if (!config.has_persistent_cache_config()) {
     return;
   }
-  auto& factory =
-      Config::Utility::getAndCheckFactory<KeyValueStoreFactory>(config.persistent_cache_config());
+  auto& factory = Config::Utility::getAndCheckFactory<KeyValueStoreFactory>(
+      config.persistent_cache_config().config());
   key_value_store_ = factory.createStore(config.persistent_cache_config(), validation_visitor_,
                                          main_thread_dispatcher_, file_system_);
   KeyValueStore::ConstIterateCb load = [this](const std::string& key, const std::string& value) {

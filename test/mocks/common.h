@@ -136,7 +136,7 @@ public:
               (const Protobuf::Message&, ProtobufMessage::ValidationVisitor&, Event::Dispatcher&,
                Filesystem::Instance&));
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
-  std::string category() const override { return "envoy.cache.key_value_cache"; }
+  std::string category() const override { return "envoy.common.key_value"; }
   std::string name() const override { return "mock_key_value_store_factory"; }
 };
 

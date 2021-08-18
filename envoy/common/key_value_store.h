@@ -79,7 +79,7 @@ public:
                                        Filesystem::Instance& file_system) PURE;
 
   // @brief the category of the key value store for factory registration.
-  std::string category() const override { return "envoy.cache.key_value_cache"; }
+  std::string category() const override { return "envoy.common.key_value"; }
 };
 
 } // namespace Envoy

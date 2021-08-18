@@ -300,7 +300,7 @@ EXTENSIONS = {
     # Key value store
     #
 
-    "envoy.cache.key_value_cache.file_based_cache":     "//source/extensions/cache/key_value_store/file_based:config_lib",
+    "envoy.common.key_value.file_based":     "//source/extensions/common/key_value/file_based:config_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

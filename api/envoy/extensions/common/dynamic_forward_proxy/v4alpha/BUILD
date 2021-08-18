@@ -8,8 +8,8 @@ api_proto_package(
     deps = [
         "//envoy/config/cluster/v4alpha:pkg",
         "//envoy/config/core/v4alpha:pkg",
-        "//envoy/extensions/cache/key_value_cache/v3:pkg",
         "//envoy/extensions/common/dynamic_forward_proxy/v3:pkg",
+        "//envoy/extensions/common/key_value/v3:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

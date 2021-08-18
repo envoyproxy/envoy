@@ -1028,7 +1028,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   MockKeyValueStoreFactory factory;
   EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
     return std::make_unique<
-        envoy::extensions::cache::key_value_cache::v3::FileBasedKeyValueCacheConfig>();
+        envoy::extensions::common::key_value::v3::FileBasedKeyValueStoreConfig>();
   }));
   MockKeyValueStore* store{};
   EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce(Invoke([&store]() {
@@ -1040,7 +1040,8 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   }));
 
   Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
-  config_.mutable_persistent_cache_config()->set_name("mock_key_value_store_factory");
+  config_.mutable_persistent_cache_config()->mutable_config()->set_name(
+      "mock_key_value_store_factory");
 
   initialize();
   InSequence s;

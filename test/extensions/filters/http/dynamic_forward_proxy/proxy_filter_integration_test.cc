@@ -33,10 +33,11 @@ typed_config:
     dns_cache_circuit_breaker:
       max_pending_requests: {}
     persistent_cache_config:
-      name: envoy.cache.key_value_cache.file_based_cache
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.cache.key_value_cache.v3.FileBasedKeyValueCacheConfig
-        filename: {}
+      config:
+        name: envoy.common.key_value.file_based
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.common.key_value.v3.FileBasedKeyValueStoreConfig
+          filename: {}
 )EOF",
                                            Network::Test::ipVersionToDnsFamily(GetParam()),
                                            max_hosts, max_pending_requests, filename);
@@ -83,10 +84,11 @@ typed_config:
     dns_cache_circuit_breaker:
       max_pending_requests: {}
     persistent_cache_config:
-      name: envoy.cache.key_value_cache.file_based_cache
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.cache.key_value_cache.v3.FileBasedKeyValueCacheConfig
-        filename: {}
+      config:
+        name: envoy.common.key_value.file_based
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.common.key_value.v3.FileBasedKeyValueStoreConfig
+          filename: {}
 )EOF",
         Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, max_pending_requests, filename);
 

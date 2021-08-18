@@ -201,7 +201,7 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # Kafka
 /*/extensions/filters/network/kafka @mattklein123 @adamkotwasinski
 # Key Value store
-/*extensions/cache/key_value_store/ @alyssawilk @ryantheoptimist
+/*/extensions/common/key_value @alyssawilk @ryantheoptimist
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
 /contrib/squash/ @yuval-k @alyssawilk
