@@ -221,7 +221,6 @@ public:
                Random::RandomGenerator& random, Stats::Scope& scope,
                const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
                bool skip_subsequent_node);
-  ~GrpcMuxDelta() override = default;
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
@@ -238,7 +237,6 @@ public:
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
               bool skip_subsequent_node);
-  ~GrpcMuxSotw() override = default;
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
