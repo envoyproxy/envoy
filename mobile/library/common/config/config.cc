@@ -30,6 +30,7 @@ const char* route_cache_reset_filter_insert = R"(
               "@type": type.googleapis.com/envoymobile.extensions.filters.http.route_cache_reset.RouteCacheReset
 )";
 
+// clang-format off
 const std::string config_header = R"(
 !ignore default_defs:
 - &connect_timeout 30s
@@ -93,7 +94,7 @@ const std::string config_header = R"(
           inline_string: |
 )"
 #include "certificates.inc"
-    ;
+;
 
 const char* config_template = R"(
 !ignore custom_listener_defs:
@@ -201,9 +202,12 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
               dns_cache_config: &dns_cache_config
                 name: dynamic_forward_proxy_cache_config
-                # TODO: Support API for overriding prefetch_hostnames: https://github.com/envoyproxy/envoy-mobile/issues/1534
+)"              // TODO: Support API for overriding prefetch_hostnames:
+                // https://github.com/envoyproxy/envoy-mobile/issues/1534
+R"(
                 preresolve_hostnames: *dns_preresolve_hostnames
-                # TODO: Support IPV6 https://github.com/lyft/envoy-mobile/issues/1022
+)"              // TODO: Support IPV6 https://github.com/lyft/envoy-mobile/issues/1022
+R"(
                 dns_lookup_family: V4_ONLY
                 dns_refresh_rate: *dns_refresh_rate
                 dns_failure_refresh_rate:
@@ -218,10 +222,11 @@ static_resources:
                 name: gzip
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip
-                  # Maximum window bits to allow for any stream to be decompressed. Optimally this
-                  # would be set to 0. According to the zlib manual this would allow the decompressor
-                  # to use the window bits in the zlib header to perform the decompression.
-                  # Unfortunately, the proto field constraint makes this impossible currently.
+)"                // Maximum window bits to allow for any stream to be decompressed. Optimally this
+                  // would be set to 0. According to the zlib manual this would allow the decompressor
+                  // to use the window bits in the zlib header to perform the decompression.
+                  // Unfortunately, the proto field constraint makes this impossible currently.
+R"(
                   window_bits: 15
               request_direction_config:
                 common_config:
@@ -256,10 +261,11 @@ static_resources:
             budget_percent:
               value: 100
             min_retry_concurrency: 0xffffffff # uint32 max
-    # Used to reap dead connections. In mobile devices it is less important to keep a "host" ejected
-    # a long period and more important to be able to cycle connections assigned to given hosts.
-    # Therefore, the ejection time is short and the interval for unejection is tight, but not too
-    # tight to cause unnecessary churn.
+)"  // Used to reap dead connections. In mobile devices it is less important to keep a "host" ejected
+    // a long period and more important to be able to cycle connections assigned to given hosts.
+    // Therefore, the ejection time is short and the interval for unejection is tight, but not too
+    // tight to cause unnecessary churn.
+R"(
     outlier_detection: &base_outlier_detection
       consecutive_5xx: 3
       base_ejection_time: 0.001s
@@ -507,7 +513,10 @@ node:
   id: envoy-mobile
   cluster: envoy-mobile
   metadata: *metadata
-# Needed due to warning in https://github.com/envoyproxy/envoy/blob/6eb7e642d33f5a55b63c367188f09819925fca34/source/server/server.cc#L546
+)"
+// Needed due to warning in
+// https://github.com/envoyproxy/envoy/blob/6eb7e642d33f5a55b63c367188f09819925fca34/source/server/server.cc#L546
+R"(
 layered_runtime:
   layers:
     - name: static_layer_0
@@ -515,3 +524,4 @@ layered_runtime:
         overload:
           global_downstream_max_connections: 0xffffffff # uint32 max
 )";
+// clang-format on
