@@ -168,6 +168,7 @@ protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
+  std::string failure_reason_;
 
 private:
   friend class HappyEyeballsConnectionImpl;
