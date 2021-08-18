@@ -1,6 +1,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
+#include "source/common/stream_info/address_set_accessor_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "source/extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
@@ -327,6 +328,124 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
             filter_->decodeHeaders(headers, false));
 
   EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
+}
+
+// Tests if `StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR` is populated in the filter state when an
+// upstream host is resolved successfully.
+TEST_F(ProxyFilterTest, HttpAddResolvedHostFilterStateMetadata) {
+  Upstream::ResourceAutoIncDec* circuit_breakers_(
+      new Upstream::ResourceAutoIncDec(pending_requests_));
+
+  EXPECT_CALL(callbacks_, streamInfo());
+  auto& filter_state = callbacks_.streamInfo().filterState();
+
+  InSequence s;
+
+  // Setup test host
+  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
+  host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 80);
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(cm_, getThreadLocalCluster(_));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillOnce(Return(circuit_breakers_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _))
+      .WillOnce(Invoke([&](absl::string_view, uint16_t, ProxyFilter::LoadDnsCacheEntryCallbacks&) {
+        return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
+      }));
+
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, getHost(_))
+      .WillOnce(
+          Invoke([&](absl::string_view)
+                     -> absl::optional<const Common::DynamicForwardProxy::DnsHostInfoSharedPtr> {
+            return host_info;
+          }));
+
+  EXPECT_CALL(*host_info, address());
+
+  EXPECT_CALL(callbacks_, streamInfo());
+
+  // Host was resolved successfully, so continue filter iteration.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  // We expect FilterState to be populated
+  EXPECT_TRUE(filter_state->hasData<StreamInfo::AddressSetAccessor>(
+      StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR));
+
+  filter_->onDestroy();
+}
+
+// Tests if an already existing `StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR` data in filter state
+// is updated when upstream host is resolved successfully.
+TEST_F(ProxyFilterTest, HttpUpdateResolvedHostFilterStateMetadata) {
+  Upstream::ResourceAutoIncDec* circuit_breakers_(
+      new Upstream::ResourceAutoIncDec(pending_requests_));
+
+  EXPECT_CALL(callbacks_, streamInfo());
+
+  // Pre-populate the filter state with an address.
+  auto& filter_state = callbacks_.streamInfo().filterState();
+  const auto pre_address = Network::Utility::parseInternetAddress("1.2.3.3", 80);
+  auto address_set = std::make_unique<StreamInfo::AddressSetAccessorImpl>();
+  address_set->add(pre_address);
+  filter_state->setData(StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR, std::move(address_set),
+                        StreamInfo::FilterState::StateType::Mutable,
+                        StreamInfo::FilterState::LifeSpan::Request);
+
+  InSequence s;
+
+  // Setup test host
+  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
+  host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 80);
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(cm_, getThreadLocalCluster(_));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillOnce(Return(circuit_breakers_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _))
+      .WillOnce(Invoke([&](absl::string_view, uint16_t, ProxyFilter::LoadDnsCacheEntryCallbacks&) {
+        return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
+      }));
+
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, getHost(_))
+      .WillOnce(
+          Invoke([&](absl::string_view)
+                     -> absl::optional<const Common::DynamicForwardProxy::DnsHostInfoSharedPtr> {
+            return host_info;
+          }));
+
+  EXPECT_CALL(*host_info, address());
+
+  EXPECT_CALL(callbacks_, streamInfo());
+
+  // Host was resolved successfully, so continue filter iteration.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  // We expect FilterState to be populated
+  EXPECT_TRUE(filter_state->hasData<StreamInfo::AddressSetAccessor>(
+      StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR));
+
+  // Make sure filter state has pre and new addresses.
+  const StreamInfo::AddressSetAccessor& updated_address_set =
+      filter_state->getDataReadOnly<StreamInfo::AddressSetAccessor>(
+          StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR);
+
+  absl::flat_hash_set<absl::string_view> populated_addresses;
+  updated_address_set.iterate([&](const Network::Address::InstanceConstSharedPtr& address) {
+    populated_addresses.insert(address->asStringView());
+    return true;
+  });
+
+  // Verify the data
+  EXPECT_EQ(populated_addresses.size(), 2);
+  EXPECT_TRUE(populated_addresses.contains(pre_address->asStringView()));
+  EXPECT_TRUE(populated_addresses.contains(host_info->address_->asStringView()));
+
   filter_->onDestroy();
 }
 
