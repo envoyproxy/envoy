@@ -306,8 +306,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       preserve_external_request_id_(config.preserve_external_request_id()),
       always_set_request_id_in_response_(config.always_set_request_id_in_response()),
       date_provider_(date_provider),
-      listener_stats_(
-          Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_, context_.scope())),
+      listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
+                                                                         context_.listenerScope())),
       proxy_100_continue_(config.proxy_100_continue()),
       stream_error_on_invalid_http_messaging_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stream_error_on_invalid_http_message, false)),
