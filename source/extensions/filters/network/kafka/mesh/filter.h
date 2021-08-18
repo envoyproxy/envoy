@@ -9,6 +9,7 @@
 #include "source/extensions/filters/network/kafka/external/requests.h"
 #include "source/extensions/filters/network/kafka/mesh/abstract_command.h"
 #include "source/extensions/filters/network/kafka/mesh/request_processor.h"
+#include "source/extensions/filters/network/kafka/mesh/upstream_config.h"
 #include "source/extensions/filters/network/kafka/request_codec.h"
 
 namespace Envoy {
@@ -38,6 +39,9 @@ class KafkaMeshFilter : public Network::ReadFilter,
                         public AbstractRequestListener,
                         private Logger::Loggable<Logger::Id::kafka> {
 public:
+  // Proper constructor.
+  KafkaMeshFilter(const UpstreamKafkaConfiguration& configuration);
+
   // Visible for testing.
   KafkaMeshFilter(RequestDecoderSharedPtr request_decoder);
 

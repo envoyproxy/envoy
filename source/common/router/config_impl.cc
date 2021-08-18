@@ -365,9 +365,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       direct_response_body_(ConfigUtility::parseDirectResponseBody(
           route, factory_context.api(),
           vhost_.globalRouteConfig().maxDirectResponseBodySizeBytes())),
-      per_filter_configs_(route.typed_per_filter_config(),
-                          route.hidden_envoy_deprecated_per_filter_config(), optional_http_filters,
-                          factory_context, validator),
+      per_filter_configs_(route.typed_per_filter_config(), optional_http_filters, factory_context,
+                          validator),
       route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
@@ -1036,9 +1035,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
                                                       cluster.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
                                                        cluster.response_headers_to_remove())),
-      per_filter_configs_(cluster.typed_per_filter_config(),
-                          cluster.hidden_envoy_deprecated_per_filter_config(),
-                          optional_http_filters, factory_context, validator),
+      per_filter_configs_(cluster.typed_per_filter_config(), optional_http_filters, factory_context,
+                          validator),
       host_rewrite_(cluster.host_rewrite_literal()) {
   if (cluster.has_metadata_match()) {
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
@@ -1217,9 +1215,8 @@ VirtualHostImpl::VirtualHostImpl(
                                                       virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
-      per_filter_configs_(virtual_host.typed_per_filter_config(),
-                          virtual_host.hidden_envoy_deprecated_per_filter_config(),
-                          optional_http_filters, factory_context, validator),
+      per_filter_configs_(virtual_host.typed_per_filter_config(), optional_http_filters,
+                          factory_context, validator),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
@@ -1582,13 +1579,9 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
 
 PerFilterConfigs::PerFilterConfigs(
     const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
-    const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
-  if (!typed_configs.empty() && !configs.empty()) {
-    throw EnvoyException("Only one of typed_configs or configs can be specified");
-  }
 
   for (const auto& it : typed_configs) {
     // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
@@ -1597,19 +1590,6 @@ PerFilterConfigs::PerFilterConfigs(
 
     auto object =
         createRouteSpecificFilterConfig(name, it.second, ProtobufWkt::Struct::default_instance(),
-                                        optional_http_filters, factory_context, validator);
-    if (object != nullptr) {
-      configs_[name] = std::move(object);
-    }
-  }
-
-  for (const auto& it : configs) {
-    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
-    const auto& name =
-        Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
-
-    auto object =
-        createRouteSpecificFilterConfig(name, ProtobufWkt::Any::default_instance(), it.second,
                                         optional_http_filters, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
