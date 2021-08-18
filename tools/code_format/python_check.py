@@ -91,7 +91,7 @@ class PythonChecker(checker.AsyncChecker):
 
     async def check_yapf(self) -> None:
         """Run flake8 on files and/or repo"""
-        futures = aio.parallel(self.yapf_format(python_file) for python_file in self.yapf_files)
+        futures = aio.concurrent(self.yapf_format(python_file) for python_file in self.yapf_files)
 
         async for (python_file, (reformatted, encoding, changed)) in futures:
             self.yapf_result(python_file, reformatted, changed)

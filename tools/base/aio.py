@@ -1,9 +1,9 @@
 import asyncio
-import concurrent.futures
 import inspect
 import os
 import subprocess
 import types
+from concurrent.futures import Executor, ProcessPoolExecutor
 from functools import cached_property, partial
 from typing import (
     Any, AsyncGenerator, AsyncIterable, AsyncIterator, Awaitable, Iterable, Iterator, List,
@@ -12,17 +12,17 @@ from typing import (
 from tools.base.functional import async_property
 
 
-class AsyncParallelError(Exception):
+class ConcurrentError(Exception):
     """Raised when given inputs/awaitables are incorrect"""
     pass
 
 
-class AsyncParallelIteratorError(AsyncParallelError):
+class ConcurrentIteratorError(ConcurrentError):
     """Raised when iteration of provided awaitables fails"""
     pass
 
 
-class AsyncParallelExecutionError(AsyncParallelError):
+class ConcurrentExecutionError(ConcurrentError):
     """Raised when execution of a provided awaitable fails"""
     pass
 
@@ -61,7 +61,7 @@ class async_subprocess:  # noqa: N801
         # number of tasks, despite any additional overhead of creating the executor.
         # Without `max_workers` set `ProcessPoolExecutor` defaults to the number of cpus
         # on the machine.
-        with concurrent.futures.ProcessPoolExecutor() as pool:
+        with ProcessPoolExecutor() as pool:
             futures = asyncio.as_completed(
                 tuple(
                     asyncio.ensure_future(cls.run(command, executor=pool, **kwargs))
@@ -74,7 +74,7 @@ class async_subprocess:  # noqa: N801
             cls,
             *args,
             loop: Optional[asyncio.AbstractEventLoop] = None,
-            executor: Optional[concurrent.futures.Executor] = None,
+            executor: Optional[Executor] = None,
             **kwargs) -> subprocess.CompletedProcess:
         """This is an asyncio wrapper for `subprocess.run`
 
@@ -107,12 +107,12 @@ class async_subprocess:  # noqa: N801
         return await loop.run_in_executor(executor, partial(subprocess.run, *args, **kwargs))
 
 
-_marker = object()
+_sentinel = object()
 
 
-class parallel:  # noqa: N801
+class concurrent:  # noqa: N801
     """This utility provides very similar functionality to
-    `asyncio.as_completed` in that it runs coroutines in parallel, yielding the
+    `asyncio.as_completed` in that it runs coroutines in concurrent, yielding the
     results as they are available.
 
     There are a couple of differences:
@@ -120,7 +120,7 @@ class parallel:  # noqa: N801
     - `coros` can be any `iterables` including sync/async `generators`
     - `limit` can be supplied to specify the maximum number of concurrent tasks
 
-    Setting `limit` to `-1` will make all tasks run in parallel.
+    Setting `limit` to `-1` will make all tasks run in concurrent.
 
     The default is `number of cores + 4` to a maximum of `32`.
 
@@ -129,16 +129,16 @@ class parallel:  # noqa: N801
     rate-limiting or soak bandwidth.
 
     If an error is raised while trying to iterate the provided coroutines, the
-    error is wrapped in an `AsyncParallelIteratorError` and is raised immediately.
+    error is wrapped in an `ConcurrentIteratorError` and is raised immediately.
 
     In this case, no further handling occurs, and `yield_exceptions` has no
     effect.
 
     Any errors raised while trying to create or run tasks are wrapped in
-    `AsyncParallelError`.
+    `ConcurrentError`.
 
     Any errors raised during task execution are wrapped in
-    `AsyncParallelExecutionError`.
+    `ConcurrentExecutionError`.
 
     If you specify `yield_exceptions` as `True` then the wrapped errors will be
     yielded in the results.
@@ -151,7 +151,7 @@ class parallel:  # noqa: N801
     occurs, it is your responsibility to `close` remaining awaitables that you
     might have created but which have not already been fired.
 
-    This utility is mostly useful for parallelizing io-bound (as opposed to
+    This utility is mostly useful for concurrentizing io-bound (as opposed to
     cpu-bound) tasks.
 
     Example usage:
@@ -168,7 +168,7 @@ class parallel:  # noqa: N801
         return i, wait
 
     async def run(coros):
-        async for (i, wait) in aio.parallel(coros, limit=3):
+        async for (i, wait) in aio.concurrent(coros, limit=3):
             print(f"{i} waited {wait}")
 
     def provider():
@@ -218,7 +218,7 @@ class parallel:  # noqa: N801
         return asyncio.Lock()
 
     @async_property
-    async def coros(self) -> AsyncIterator[Union[AsyncParallelIteratorError, Awaitable]]:
+    async def coros(self) -> AsyncIterator[Union[ConcurrentIteratorError, Awaitable]]:
         """An async iterator of the provided coroutines"""
         coros = self.iter_coros()
         try:
@@ -351,7 +351,7 @@ class parallel:  # noqa: N801
 
         async for coro in self.iter_coros():
             try:
-                # this could be an `aio.AsyncParallelError` and not have a
+                # this could be an `aio.ConcurrentError` and not have a
                 # `close` method, but as we are asking for forgiveness anyway,
                 # no point in looking before we leap.
                 coro.close()  # type:ignore
@@ -368,7 +368,7 @@ class parallel:  # noqa: N801
     async def exit_on_completion(self) -> None:
         """Send the exit signal to the output queue"""
         if not self.active and not self.closed:
-            await self.out.put(_marker)
+            await self.out.put(_sentinel)
 
     def forget_task(self, task: asyncio.Task) -> None:
         """Task? what task?"""
@@ -378,7 +378,7 @@ class parallel:  # noqa: N801
             return
         self.running_tasks.remove(task)
 
-    async def iter_coros(self) -> AsyncIterator[Union[AsyncParallelIteratorError, Awaitable]]:
+    async def iter_coros(self) -> AsyncIterator[Union[ConcurrentIteratorError, Awaitable]]:
         """Iterate provided coros either synchronously or asynchronously,
         yielding the awaitables asynchoronously.
         """
@@ -393,7 +393,7 @@ class parallel:  # noqa: N801
             # Catch all errors iterating (other errors are caught elsewhere)
             # If iterating raises, wrap the error and send it to `submit` and
             # and `output` to close the queues.
-            yield AsyncParallelIteratorError(e)
+            yield ConcurrentIteratorError(e)
 
     async def on_task_complete(self, result: Any, decrement: Optional[bool] = True) -> None:
         """Output the result, release the sem lock, decrement the running
@@ -422,7 +422,7 @@ class parallel:  # noqa: N801
         while True:
             # Wait for some output
             result = await self.out.get()
-            if result is _marker:
+            if result is _sentinel:
                 # All done!
                 await self.close()
                 break
@@ -457,14 +457,14 @@ class parallel:  # noqa: N801
     def should_error(self, result: Any) -> bool:
         """Check a result type and whether it should raise an error"""
         return (
-            isinstance(result, AsyncParallelIteratorError)
-            or (isinstance(result, AsyncParallelError) and not self.yield_exceptions))
+            isinstance(result, ConcurrentIteratorError)
+            or (isinstance(result, ConcurrentError) and not self.yield_exceptions))
 
     async def submit(self) -> None:
         """Process the iterator of coroutines as a submission queue"""
         await self.submission_lock.acquire()
         async for coro in self.coros:
-            if isinstance(coro, AsyncParallelIteratorError):
+            if isinstance(coro, ConcurrentIteratorError):
                 # Iteration error, exit now
                 await self.out.put(coro)
                 break
@@ -481,7 +481,7 @@ class parallel:  # noqa: N801
             # Check the supplied coro is awaitable
             try:
                 self.validate_coro(coro)
-            except AsyncParallelError as e:
+            except ConcurrentError as e:
                 await self.on_task_complete(e, decrement=False)
                 continue
             # All good, create a task
@@ -496,14 +496,14 @@ class parallel:  # noqa: N801
         try:
             result = await coro
         except BaseException as e:
-            result = AsyncParallelExecutionError(e)
+            result = ConcurrentExecutionError(e)
         finally:
             await self.on_task_complete(result)
 
     def validate_coro(self, coro: Awaitable) -> None:
         """Validate that a provided coroutine is actually awaitable"""
         if not inspect.isawaitable(coro):
-            raise AsyncParallelError(f"Provided input was not a coroutine: {coro}")
+            raise ConcurrentError(f"Provided input was not a coroutine: {coro}")
 
         if inspect.getcoroutinestate(coro) != inspect.CORO_CREATED:
-            raise AsyncParallelError(f"Provided coroutine has already been fired: {coro}")
+            raise ConcurrentError(f"Provided coroutine has already been fired: {coro}")

@@ -199,14 +199,14 @@ async def test_python_check_yapf(patches):
         prefix="tools.code_format.python_check")
     _files = ["file1", "file2", "file3"]
 
-    async def _parallel(iters):
+    async def _concurrent(iters):
         assert isinstance(iters, types.GeneratorType)
         for i, format_result in enumerate(iters):
             yield (format_result, (f"REFORMAT{i}", f"ENCODING{i}", f"CHANGED{i}"))
 
     with patched as (m_aio, m_yapf_format, m_yapf_result, m_yapf_files):
         m_yapf_files.return_value = _files
-        m_aio.parallel.side_effect = _parallel
+        m_aio.concurrent.side_effect = _concurrent
         assert not await checker.check_yapf()
 
     assert (
