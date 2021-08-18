@@ -152,8 +152,8 @@ protected:
 
 // Simple flow of putting in an item, getting it, deleting it.
 TEST_F(SimpleHttpCacheTest, PutGet) {
-  const std::string RequestPath1("Name");
-  LookupContextPtr name_lookup_context = lookup(RequestPath1);
+  const std::string request_path_1("/name");
+  LookupContextPtr name_lookup_context = lookup(request_path_1);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
@@ -161,7 +161,7 @@ TEST_F(SimpleHttpCacheTest, PutGet) {
 
   const std::string Body1("Value");
   insert(move(name_lookup_context), response_headers, Body1);
-  name_lookup_context = lookup(RequestPath1);
+  name_lookup_context = lookup(request_path_1);
   EXPECT_TRUE(expectLookupSuccessWithBody(name_lookup_context.get(), Body1));
 
   const std::string& RequestPath2("Another Name");
@@ -170,14 +170,14 @@ TEST_F(SimpleHttpCacheTest, PutGet) {
 
   const std::string NewBody1("NewValue");
   insert(move(name_lookup_context), response_headers, NewBody1);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath1).get(), NewBody1));
+  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(request_path_1).get(), NewBody1));
 }
 
 TEST_F(SimpleHttpCacheTest, PrivateResponse) {
   Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                                    {"age", "2"},
                                                    {"cache-control", "private,max-age=3600"}};
-  const std::string request_path("Name");
+  const std::string request_path("/name");
 
   LookupContextPtr name_lookup_context = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
@@ -191,7 +191,7 @@ TEST_F(SimpleHttpCacheTest, PrivateResponse) {
 }
 
 TEST_F(SimpleHttpCacheTest, Miss) {
-  LookupContextPtr name_lookup_context = lookup("Name");
+  LookupContextPtr name_lookup_context = lookup("/name");
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 }
 
@@ -217,7 +217,7 @@ TEST_F(SimpleHttpCacheTest, Stale) {
 
 TEST_F(SimpleHttpCacheTest, RequestSmallMinFresh) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "min-fresh=1000");
-  const std::string request_path("Name");
+  const std::string request_path("/name");
   LookupContextPtr name_lookup_context = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
@@ -232,7 +232,7 @@ TEST_F(SimpleHttpCacheTest, RequestSmallMinFresh) {
 TEST_F(SimpleHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-stale=9000");
 
-  const std::string request_path("Name");
+  const std::string request_path("/name");
   LookupContextPtr name_lookup_context = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
@@ -329,26 +329,26 @@ TEST_F(SimpleHttpCacheTest, VaryOnDisallowedKey) {
 }
 
 TEST_F(SimpleHttpCacheTest, UpdateHeadersAndMetadata) {
-    const std::string RequestPath1("Name");
+    const std::string request_path_1("/name");
     Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                                      {"cache-control", "public,max-age=3600"}};
-    insert(RequestPath1, response_headers, "");
-    EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(RequestPath1).get(), response_headers));
+    insert(request_path_1, response_headers, "body");
+    EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers));
 
     // Update the date field in the headers
     time_source_.advanceTimeWait(Seconds(3601));
     
     response_headers = Http::TestResponseHeaderMapImpl{{"date", formatter_.fromTime(current_time_)},
                                                        {"cache-control", "public,max-age=3600"}};
-    updateHeaders(RequestPath1, response_headers, {current_time_});
-    EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(RequestPath1).get(), response_headers));
+    updateHeaders(request_path_1, response_headers, {current_time_});
+    EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers));
 }
 
 TEST_F(SimpleHttpCacheTest, UpdateHeadersForMissingKey) {
-    const std::string RequestPath1("Name");
+    const std::string request_path_1("/name");
     Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                                      {"cache-control", "public,max-age=3600"}};
-    updateHeaders(RequestPath1, response_headers, {current_time_});
+    updateHeaders(request_path_1, response_headers, {current_time_});
     EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 }
 
