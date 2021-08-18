@@ -7,6 +7,8 @@ Incompatible Behavior Changes
 
 * contrib: the :ref:`squash filter <config_http_filters_squash>` has been moved to
   :ref:`contrib images <install_contrib>`.
+* contrib: the :ref:`kafka broker filter <config_network_filters_kafka_broker>` has been moved to
+  :ref:`contrib images <install_contrib>`.
 * ext_authz: fixed skipping authentication when returning either a direct response or a redirect. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect`` runtime guard to false.
 
 Minor Behavior Changes

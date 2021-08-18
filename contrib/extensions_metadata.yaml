@@ -3,3 +3,8 @@ envoy.filters.http.squash:
   - envoy.filters.http
   security_posture: requires_trusted_downstream_and_upstream
   status: stable
+envoy.filters.network.kafka_broker:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
