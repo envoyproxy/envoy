@@ -315,9 +315,10 @@ public:
     return cluster_timeout_budget_stat_names_;
   }
 
+  void drainConnections(const std::string& cluster) override;
+
 protected:
-  virtual void postThreadLocalDrainConnections(const Cluster& cluster,
-                                               const HostVector& hosts_removed);
+  virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
   // Parameters for calling postThreadLocalClusterUpdate()
   struct ThreadLocalClusterUpdateParams {
@@ -428,6 +429,8 @@ private:
 
       // Drains any connection pools associated with the removed hosts.
       void drainConnPools(const HostVector& hosts_removed);
+      // Drains connection pools for all hosts.
+      void drainConnPools();
 
     private:
       Http::ConnectionPool::Instance*

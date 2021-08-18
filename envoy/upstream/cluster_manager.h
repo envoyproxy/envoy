@@ -310,6 +310,11 @@ public:
   virtual const ClusterRequestResponseSizeStatNames&
   clusterRequestResponseSizeStatNames() const PURE;
   virtual const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const PURE;
+
+  /**
+   * Drain all connection pool connections owned by this cluster.
+   */
+  virtual void drainConnections(const std::string& cluster) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
