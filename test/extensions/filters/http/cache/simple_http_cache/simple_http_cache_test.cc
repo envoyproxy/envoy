@@ -344,6 +344,14 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersAndMetadata) {
     EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(RequestPath1).get(), response_headers));
 }
 
+TEST_F(SimpleHttpCacheTest, UpdateHeadersForMissingKey) {
+    const std::string RequestPath1("Name");
+    Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                     {"cache-control", "public,max-age=3600"}};
+    updateHeaders(RequestPath1, response_headers, {current_time_});
+    EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+}
+
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters
