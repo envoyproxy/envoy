@@ -1005,8 +1005,8 @@ TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   EXPECT_TRUE(stream2->IsFlowControlBlocked());
 
   // Resetting stream3 should lower the buffered bytes, but callbacks will not
-  // be triggered because reset callback has been already triggered.
-  EXPECT_CALL(stream_callbacks3, onResetStream(Http::StreamResetReason::LocalReset, ""));
+  // be triggered because end stream is already encoded.
+  EXPECT_CALL(stream_callbacks3, onResetStream(Http::StreamResetReason::LocalReset, "")).Times(0);
   // Connection buffered data book keeping should also be updated.
   EXPECT_CALL(network_connection_callbacks_, onBelowWriteBufferLowWatermark());
   stream3->resetStream(Http::StreamResetReason::LocalReset);

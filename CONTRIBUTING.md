@@ -262,7 +262,17 @@ Other changes will likely include
   * Editing [source/extensions/extensions_metadata.yaml](source/extensions/extensions_metadata.yaml) to include metadata for the new extensions
   * Editing [docs/root/api-v3/config/config.rst](docs/root/api-v3/config/config.rst) to add area/area
   * Adding `docs/root/api-v3/config/area/area.rst` to add a table of contents for the API docs
-  * Adding `source/extensions/area/well_known_names.h` for registered plugins
+
+# Adding contrib extensions
+
+See [EXTENSION_POLICY.md](EXTENSION_POLICY.md) for more information on contrib. Adding a contrib
+extension mostly mirrors adding a normal extension above. Some differences are noted here:
+
+* API files should be added in `api/contrib/envoy/`, but the protos' namespaces should still be as
+  in normal extensions (which will make file movement easier later if the extension gets promoted
+  to core).
+* Build config and metadata should be included in [contrib/contrib_build_config.bzl](contrib/contrib_build_config.bzl)
+  and [contrib/extensions_metadata.yaml](contrib/extensions_metadata.yaml).
 
 # DCO: Sign your work
 

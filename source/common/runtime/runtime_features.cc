@@ -80,7 +80,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.listener_wildcard_match_ip_family",
     "envoy.reloadable_features.new_tcp_connection_pool",
     "envoy.reloadable_features.no_chunked_encoding_header_for_304",
-    "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing",
     "envoy.reloadable_features.preserve_downstream_scheme",
     "envoy.reloadable_features.remove_forked_chromium_url",
     "envoy.reloadable_features.require_strict_1xx_and_204_response_headers",
@@ -98,6 +97,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.upstream_http2_flood_checks",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
     "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
+    "envoy.reloadable_features.sanitize_http_header_referer",
 };
 
 // This is a section for officially sanctioned runtime features which are too

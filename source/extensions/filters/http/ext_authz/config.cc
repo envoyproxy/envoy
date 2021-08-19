@@ -25,6 +25,8 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
   const auto filter_config = std::make_shared<FilterConfig>(
       proto_config, context.scope(), context.runtime(), context.httpContext(), stats_prefix,
       context.getServerFactoryContext().bootstrap());
+  // The callback is created in main thread and executed in worker thread, variables except factory
+  // context must be captured by value into the callback.
   Http::FilterFactoryCb callback;
 
   if (proto_config.has_http_service()) {
@@ -42,7 +44,6 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     };
   } else if (proto_config.grpc_service().has_google_grpc()) {
     // Google gRPC client.
-
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
 
@@ -57,15 +58,14 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     };
   } else {
     // Envoy gRPC client.
-
-    Grpc::RawAsyncClientSharedPtr raw_client =
-        context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-            proto_config.grpc_service(), context.scope(), true, Grpc::CacheOption::AlwaysCache);
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
-    callback = [raw_client, filter_config, timeout_ms,
+    callback = [grpc_service = proto_config.grpc_service(), &context, filter_config, timeout_ms,
                 transport_api_version = Config::Utility::getAndCheckTransportVersion(proto_config)](
                    Http::FilterChainFactoryCallbacks& callbacks) {
+      Grpc::RawAsyncClientSharedPtr raw_client =
+          context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+              grpc_service, context.scope(), true, Grpc::CacheOption::AlwaysCache);
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           raw_client, std::chrono::milliseconds(timeout_ms), transport_api_version);
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));

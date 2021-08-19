@@ -1257,6 +1257,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/extensions/transport_sockets/tls:test_private_key_method_provider_test_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:resources_lib",
@@ -1819,7 +1820,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
-        "@com_googlesource_quiche//:quic_test_tools_session_peer_lib",
+        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ]),
 )
 
