@@ -1,28 +1,29 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_package",
+    "envoy_contrib_package",
+    "envoy_py_test",
 )
-load("@rules_python//python:defs.bzl", "py_test")
 load("@kafka_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_contrib_package()
 
-py_test(
+# This test sets up multiple services, and this can take variable amount of time (30-60 seconds).
+envoy_py_test(
     name = "kafka_mesh_integration_test",
     srcs = [
         "kafka_mesh_integration_test.py",
         "@kafka_python_client//:all",
     ],
     data = [
-        "//source/exe:envoy-static",
+        "//contrib/exe:envoy-static",
         "//bazel:remote_jdk11",
         "@kafka_server_binary//:all",
     ] + glob(["*.j2"]),
+    flaky = True,
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = ["manual"],
     deps = [
         requirement("Jinja2"),
         requirement("MarkupSafe"),

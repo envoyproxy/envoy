@@ -459,14 +459,14 @@ class ServicesHolder:
     def find_envoy():
         """
         This method locates envoy binary.
-        It's present at ./source/exe/envoy-static (at least for mac/bazel-asan/bazel-tsan),
-        or at ./external/envoy/source/exe/envoy-static (for bazel-compile_time_options).
+        It's present at ./contrib/exe/envoy-static (at least for mac/bazel-asan/bazel-tsan),
+        or at ./external/envoy/contrib/exe/envoy-static (for bazel-compile_time_options).
         """
 
-        candidate = os.path.join('.', 'source', 'exe', 'envoy-static')
+        candidate = os.path.join('.', 'contrib', 'exe', 'envoy-static')
         if os.path.isfile(candidate):
             return candidate
-        candidate = os.path.join('.', 'external', 'envoy', 'source', 'exe', 'envoy-static')
+        candidate = os.path.join('.', 'external', 'envoy', 'contrib', 'exe', 'envoy-static')
         if os.path.isfile(candidate):
             return candidate
         raise Exception("Could not find Envoy")
