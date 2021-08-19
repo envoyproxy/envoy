@@ -172,6 +172,8 @@ An example configuration can be found in the :ref:`edge best practices document 
 Reset Streams
 ^^^^^^^^^^^^^^^^^
 
+*Warning: Reset Stream only currently works with HTTP2.*
+
 The ``envoy.overload_actions.reset_streams`` overload action will reset
 expensive streams. This works in conjuction with the
 `minimum_threshold_for_tracking`, which can be configured via

@@ -430,7 +430,8 @@ INSTANTIATE_TEST_SUITE_P(
                      testing::Bool()),
     protocolTestParamsAndBoolToString);
 
-TEST_P(Http2OverloadManagerIntegrationTest, ResetsExpensiveStreamsWhenOverloaded) {
+TEST_P(Http2OverloadManagerIntegrationTest,
+       ResetsExpensiveStreamsWhenUpstreamBuffersTakeTooMuchSpaceAndOverloaded) {
   autonomous_upstream_ = true;
   autonomous_allow_incomplete_streams_ = true;
   initializeOverloadManagerInBootstrap(
@@ -504,6 +505,102 @@ TEST_P(Http2OverloadManagerIntegrationTest, ResetsExpensiveStreamsWhenOverloaded
   ASSERT_TRUE(smallest_request_response->waitForEndStream());
   ASSERT_TRUE(smallest_request_response->complete());
   EXPECT_EQ(smallest_request_response->headers().getStatusValue(), "200");
+}
+
+TEST_P(Http2OverloadManagerIntegrationTest,
+       ResetsExpensiveStreamsWhenDownstreamBuffersTakeTooMuchSpaceAndOverloaded) {
+  initializeOverloadManagerInBootstrap(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.reset_streams"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          scaled:
+            scaling_threshold: 0.90
+            saturation_threshold: 0.98
+    )EOF"));
+  initialize();
+
+  // Makes us have Envoy's writes to downstream return EAGAIN
+  writev_matcher_->setSourcePort(lookupPort("http"));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  writev_matcher_->setWritevReturnsEgain();
+
+  auto largest_response = std::move(sendRequests(1, 30, 4096 * 4)[0]);
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request_for_largest_response = std::move(upstream_request_);
+
+  auto medium_response = std::move(sendRequests(1, 20, 4096 * 2)[0]);
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request_for_medium_response = std::move(upstream_request_);
+
+  auto smallest_response = std::move(sendRequests(1, 10, 4096)[0]);
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request_for_smallest_response = std::move(upstream_request_);
+
+  // Send the responses back, without yet ending the stream.
+  upstream_request_for_largest_response->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_for_largest_response->encodeData(4096 * 4, false);
+
+  upstream_request_for_medium_response->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_for_medium_response->encodeData(4096 * 2, false);
+
+  upstream_request_for_smallest_response->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_for_smallest_response->encodeData(4096, false);
+
+  // Wait for the responses to come back
+  EXPECT_TRUE(buffer_factory_->waitUntilTotalBufferedExceeds(7 * 4096));
+
+  // Set the pressure so the overload action kills largest response
+  updateResource(0.95);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reset_streams.scale_percent", 62);
+  if (streamBufferAccounting()) {
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 1);
+    ASSERT_TRUE(upstream_request_for_largest_response->waitForReset());
+  }
+
+  // Set the pressure so the overload action kills medium response
+  updateResource(0.96);
+  if (streamBufferAccounting()) {
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 2);
+    ASSERT_TRUE(upstream_request_for_medium_response->waitForReset());
+  }
+
+  // Reduce resource pressure
+  updateResource(0.80);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reset_streams.scale_percent", 0);
+
+  // Resume writes to downstream, any responses that survive can go through.
+  writev_matcher_->setResumeWrites();
+
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(largest_response->waitForReset());
+    EXPECT_TRUE(largest_response->reset());
+
+    EXPECT_TRUE(medium_response->waitForReset());
+    EXPECT_TRUE(medium_response->reset());
+
+  } else {
+    // If we're not doing the accounting, we didn't end up resetting these
+    // streams. Finish sending data.
+    upstream_request_for_largest_response->encodeData(100, true);
+    upstream_request_for_medium_response->encodeData(100, true);
+    ASSERT_TRUE(largest_response->waitForEndStream());
+    ASSERT_TRUE(largest_response->complete());
+    EXPECT_EQ(largest_response->headers().getStatusValue(), "200");
+
+    ASSERT_TRUE(medium_response->waitForEndStream());
+    ASSERT_TRUE(medium_response->complete());
+    EXPECT_EQ(medium_response->headers().getStatusValue(), "200");
+  }
+
+  // Have the smallest response finish.
+  upstream_request_for_smallest_response->encodeData(100, true);
+  ASSERT_TRUE(smallest_response->waitForEndStream());
+  ASSERT_TRUE(smallest_response->complete());
+  EXPECT_EQ(smallest_response->headers().getStatusValue(), "200");
 }
 
 } // namespace Envoy

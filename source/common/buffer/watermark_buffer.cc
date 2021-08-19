@@ -196,6 +196,8 @@ void WatermarkBufferFactory::resetAccountsGivenPressure(float pressure) {
 
   ENVOY_LOG_MISC(warn, "resetting streams in buckets >= {}", bucket_idx);
 
+  // TODO(kbaichoo): Add a limit to the number of streams we reset
+  // per-invocation of this function.
   // Clear buckets
   while (bucket_idx < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_) {
     ENVOY_LOG_MISC(warn, "resetting {} streams in bucket {}.",
