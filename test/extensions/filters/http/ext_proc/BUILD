@@ -135,6 +135,7 @@ envoy_extension_cc_test_library(
     hdrs = ["test_processor.h"],
     extension_names = ["envoy.filters.http.ext_proc"],
     deps = [
+        "//envoy/network:address_interface",
         "@com_github_grpc_grpc//:grpc++",
         "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_grpc",
         "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",

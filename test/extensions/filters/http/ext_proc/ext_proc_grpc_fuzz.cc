@@ -252,6 +252,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   // external process to consume messages in a loop without blocking the fuzz
   // target from receiving the response.
   fuzzer.test_processor_.start(
+      fuzzer.ip_version_,
       [&fuzz_helper](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         while (true) {
           ProcessingRequest req;

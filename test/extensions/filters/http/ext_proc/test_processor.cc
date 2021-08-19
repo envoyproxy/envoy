@@ -9,6 +9,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+using Envoy::Network::Address::IpVersion;
+
 grpc::Status ProcessorWrapper::Process(
     grpc::ServerContext*,
     grpc::ServerReaderWriter<envoy::service::ext_proc::v3alpha::ProcessingResponse,
@@ -23,11 +25,12 @@ grpc::Status ProcessorWrapper::Process(
   return grpc::Status::OK;
 }
 
-void TestProcessor::start(ProcessingFunc cb) {
+void TestProcessor::start(IpVersion ip_version, ProcessingFunc cb) {
   wrapper_ = std::make_unique<ProcessorWrapper>(cb);
   grpc::ServerBuilder builder;
   builder.RegisterService(wrapper_.get());
-  builder.AddListeningPort("127.0.0.1:0", grpc::InsecureServerCredentials(), &listening_port_);
+  const char* address = ip_version == IpVersion::v4 ? "127.0.0.1:0" : "[::1]:0";
+  builder.AddListeningPort(address, grpc::InsecureServerCredentials(), &listening_port_);
   server_ = builder.BuildAndStart();
 }
 
