@@ -106,7 +106,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "c-ares-{version}",
         urls = ["https://github.com/c-ares/c-ares/releases/download/cares-{underscore_version}/c-ares-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2021-08-10",
+        release_date = "2021-07-24",
         cpe = "cpe:2.3:a:c-ares_project:c-ares:*",
     ),
     com_github_circonus_labs_libcircllhist = dict(
