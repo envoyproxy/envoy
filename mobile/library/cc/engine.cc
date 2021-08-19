@@ -13,17 +13,17 @@ Engine::Engine(envoy_engine_t engine) : engine_(engine), terminated_(false) {}
 // which can't be provided from inside of the constructor
 // because of how std::enable_shared_from_this works
 StreamClientSharedPtr Engine::streamClient() {
-  return std::make_shared<StreamClient>(this->shared_from_this());
+  return std::make_shared<StreamClient>(shared_from_this());
 }
 
 PulseClientSharedPtr Engine::pulseClient() { return std::make_shared<PulseClient>(); }
 
 void Engine::terminate() {
-  if (this->terminated_) {
+  if (terminated_) {
     throw std::runtime_error("attempting to double terminate Engine");
   }
-  terminate_engine(this->engine_);
-  this->terminated_ = true;
+  terminate_engine(engine_);
+  terminated_ = true;
 }
 
 } // namespace Platform
