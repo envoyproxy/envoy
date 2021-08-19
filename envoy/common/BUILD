@@ -76,6 +76,7 @@ envoy_cc_library(
     hdrs = ["key_value_store.h"],
     deps = [
         "//envoy/protobuf:message_validator_interface",
+        "//envoy/registry",
     ],
 )
 
