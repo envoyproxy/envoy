@@ -721,6 +721,6 @@ envoy.watchdog.profile_action:
   status: alpha
 envoy.common.key_value.file_based:
   categories:
-  - envoy.key_value
+  - envoy.common.key_value
   security_posture: data_plane_agnostic
   status: alpha
