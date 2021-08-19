@@ -299,6 +299,9 @@ EXTENSIONS = {
     # DNS Resolver
     #
 
+    # cares DNS resolver extension is recommended to be enabled to maintain the legacy DNS resolving behavior.
+    "envoy.dns_resolver.cares":                "//source/extensions/network/dns_resolver/cares:config",
+
     # apple DNS resolver extension is only needed in MacOS build plus one want to use apple library for DNS resolving.
     "envoy.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:config",
 }

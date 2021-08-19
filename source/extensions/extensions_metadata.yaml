@@ -714,6 +714,11 @@ envoy.watchdog.profile_action:
   - envoy.guarddog_actions
   security_posture: data_plane_agnostic
   status: alpha
+envoy.dns_resolver.cares:
+  categories:
+  - envoy.network_dnsresolvers
+  security_posture: unknown
+  status: alpha
 envoy.dns_resolver.apple:
   categories:
   - envoy.network_dnsresolvers
