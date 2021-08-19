@@ -21,6 +21,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
+#include "url/gurl.h"
 
 namespace Envoy {
 namespace Http {
@@ -104,10 +105,18 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_http_header_referer")) {
     auto result = request_headers.get(Http::CustomHeaders::get().Referer);
     if (!result.empty()) {
-      Utility::Url url;
-      if (result.size() > 1 || !url.initialize(result[0]->value().getStringView(), false)) {
-        // A request header shouldn't have multiple referer field.
+      if (result.size() > 1) {
+        // A request header shouldn't have multiple referer fields.
         request_headers.remove(Http::CustomHeaders::get().Referer);
+      } else {
+        // std::string url_copy = std::string(result[0]->value().getStringView());
+        auto url_string_view = result[0]->value().getStringView();
+        GURL referer_url(gurl_base::StringPiece(url_string_view.data(), url_string_view.length()));
+        request_headers.remove(Http::CustomHeaders::get().Referer);
+        if (referer_url.is_valid()) {
+          request_headers.addCopy(Http::CustomHeaders::get().Referer,
+                                  referer_url.GetAsReferrer().spec());
+        }
       }
     }
   }

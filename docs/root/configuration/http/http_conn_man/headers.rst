@@ -53,7 +53,7 @@ The *server* header will be set during encoding to the value in the :ref:`server
 referer
 -------
 
-The *referer* header will be sanitized during decoding. Multiple URLs or invalid URLs will be removed.
+The *referer* header will be sanitized during decoding. Multiple URLs or invalid URLs will be removed. Non-canonical URL will be canonicalized.
 
 .. _config_http_conn_man_headers_x-client-trace-id:
 
