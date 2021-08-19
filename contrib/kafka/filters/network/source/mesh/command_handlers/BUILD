@@ -20,11 +20,11 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
-        "//source/common/common:minimal_logger_lib",
         "//contrib/kafka/filters/network/source:kafka_request_parser_lib",
         "//contrib/kafka/filters/network/source:kafka_response_parser_lib",
         "//contrib/kafka/filters/network/source/mesh:abstract_command_lib",
         "//contrib/kafka/filters/network/source/mesh:upstream_kafka_facade_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 

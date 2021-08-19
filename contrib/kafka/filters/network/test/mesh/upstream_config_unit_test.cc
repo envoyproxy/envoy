@@ -1,8 +1,8 @@
 #include "source/common/protobuf/utility.h"
-#include "contrib/kafka/filters/network/source/mesh/upstream_config.h"
 
 #include "test/test_common/utility.h"
 
+#include "contrib/kafka/filters/network/source/mesh/upstream_config.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

@@ -1,9 +1,9 @@
 #pragma once
 
+#include "source/common/common/logger.h"
+
 #include "contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.pb.h"
 #include "contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.pb.validate.h"
-
-#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {

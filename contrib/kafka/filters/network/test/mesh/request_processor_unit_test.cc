@@ -1,12 +1,11 @@
-#include "contrib/kafka/filters/network/source/mesh/command_handlers/produce.h"
-#include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
-
 #include "test/test_common/utility.h"
 
 #include "contrib/kafka/filters/network/source/mesh/abstract_command.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/api_versions.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/metadata.h"
+#include "contrib/kafka/filters/network/source/mesh/command_handlers/produce.h"
 #include "contrib/kafka/filters/network/source/mesh/request_processor.h"
+#include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

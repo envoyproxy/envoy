@@ -3,8 +3,8 @@
 #include "envoy/common/exception.h"
 
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/api_versions.h"
-#include "contrib/kafka/filters/network/source/mesh/command_handlers/produce.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/metadata.h"
+#include "contrib/kafka/filters/network/source/mesh/command_handlers/produce.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,4 +1,5 @@
 #include "contrib/kafka/filters/network/source/mesh/config.h"
+
 #include <typeinfo>
 
 #include "envoy/registry/registry.h"

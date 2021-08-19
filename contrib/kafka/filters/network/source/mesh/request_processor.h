@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/common/common/logger.h"
+
 #include "contrib/kafka/filters/network/source/external/requests.h"
 #include "contrib/kafka/filters/network/source/mesh/abstract_command.h"
 #include "contrib/kafka/filters/network/source/mesh/upstream_config.h"

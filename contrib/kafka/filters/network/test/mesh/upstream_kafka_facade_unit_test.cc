@@ -1,11 +1,10 @@
 #include "envoy/thread/thread.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
-
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/thread_factory_for_test.h"
 
+#include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
