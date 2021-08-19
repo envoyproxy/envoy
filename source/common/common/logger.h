@@ -106,6 +106,7 @@ public:
   virtual ~SinkDelegate();
 
   virtual void log(absl::string_view msg) PURE;
+  virtual void logStable(absl::string_view, absl::string_view) {}
   virtual void flush() PURE;
 
 protected:
@@ -156,6 +157,10 @@ public:
   void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
   void clearLock() { stderr_sink_->clearLock(); }
 
+  template <class... Args> void logStable(absl::string_view stable_name, Args... msg) {
+    absl::ReaderMutexLock sink_lock(&sink_mutex_);
+    sink_->logStable(stable_name, fmt::format(msg...));
+  }
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
   void flush() override {
@@ -443,6 +448,9 @@ public:
  * Command line options for log macros: use Fancy Logger or not.
  */
 #define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
+
+#define ENVOY_LOG_STABLE(STABLE_NAME, ...)                                                         \
+  ::Envoy::Logger::Registry::getSink()->logStable(STABLE_NAME, ##__VA_ARGS__)
 
 #define ENVOY_LOG_FIRST_N_TO_LOGGER(LOGGER, LEVEL, N, ...)                                         \
   do {                                                                                             \
