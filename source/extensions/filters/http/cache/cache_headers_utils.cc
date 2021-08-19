@@ -307,8 +307,8 @@ constexpr absl::string_view inValueSeparator = "\r";
 
 absl::optional<std::string>
 VaryHeaderUtils::createVaryIdentifier(const VaryAllowList& allow_list,
-                                const absl::btree_set<absl::string_view>& vary_header_values,
-                                const Http::RequestHeaderMap& request_headers) {
+                                      const absl::btree_set<absl::string_view>& vary_header_values,
+                                      const Http::RequestHeaderMap& request_headers) {
   std::string vary_identifier = "vary-id\n";
   if (vary_header_values.empty()) {
     return vary_identifier;

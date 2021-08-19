@@ -693,7 +693,8 @@ TEST(CreateVaryIdentifier, EmptyVaryEntry) {
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}};
   VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
-  EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {}, request_headers), "vary-id\n");
+  EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {}, request_headers),
+            "vary-id\n");
 }
 
 TEST(CreateVaryIdentifier, SingleHeaderExists) {
@@ -718,8 +719,8 @@ TEST(CreateVaryIdentifier, MultipleHeadersAllExist) {
       {"accept", "image/*"}, {"accept-language", "en-us"}, {"width", "640"}};
   VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
-  EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"accept", "accept-language", "width"},
-                                            request_headers),
+  EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(
+                vary_allow_list, {"accept", "accept-language", "width"}, request_headers),
             "vary-id\naccept\r"
             "image/*\naccept-language\r"
             "en-us\nwidth\r640\n");
@@ -730,8 +731,8 @@ TEST(CreateVaryIdentifier, MultipleHeadersSomeExist) {
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}, {"width", "640"}};
   VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
-  EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"accept", "accept-language", "width"},
-                                            request_headers),
+  EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(
+                vary_allow_list, {"accept", "accept-language", "width"}, request_headers),
             "vary-id\naccept\r"
             "image/*\naccept-language\r\nwidth\r640\n");
 }
@@ -741,17 +742,18 @@ TEST(CreateVaryIdentifier, ExtraRequestHeaders) {
       {"accept", "image/*"}, {"heigth", "1280"}, {"width", "640"}};
   VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
-  EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"accept", "width"}, request_headers),
-            "vary-id\naccept\r"
-            "image/*\nwidth\r640\n");
+  EXPECT_EQ(
+      VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"accept", "width"}, request_headers),
+      "vary-id\naccept\r"
+      "image/*\nwidth\r640\n");
 }
 
 TEST(CreateVaryIdentifier, MultipleHeadersNoneExist) {
   Http::TestRequestHeaderMapImpl request_headers;
   VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
-  EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"accept", "accept-language", "width"},
-                                            request_headers),
+  EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(
+                vary_allow_list, {"accept", "accept-language", "width"}, request_headers),
             "vary-id\naccept\r\naccept-language\r\nwidth\r\n");
 }
 
@@ -795,8 +797,9 @@ TEST(CreateVaryIdentifier, DisallowedHeaderWithAllowedHeader) {
   Http::TestRequestHeaderMapImpl request_headers{{"width", "foo"}};
   VaryAllowList vary_allow_list(toStringMatchers({"accept", "accept-language", "width"}));
 
-  EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"disallowed,width"}, request_headers),
-            absl::nullopt);
+  EXPECT_EQ(
+      VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"disallowed,width"}, request_headers),
+      absl::nullopt);
 }
 
 envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {
