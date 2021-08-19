@@ -5,6 +5,7 @@
 #include <memory>
 #include <queue>
 #include <set>
+#include <type_traits>
 #include <vector>
 
 #include "envoy/common/callback.h"
@@ -12,11 +13,13 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
+#include "envoy/upstream/scheduler.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/common/upstream/edf_scheduler.h"
+#include "source/common/upstream/wrsq_scheduler.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -359,7 +362,24 @@ private:
 
 /**
  * Base implementation of LoadBalancer that performs weighted RR selection across the hosts in the
- * cluster. This scheduler respects host weighting and utilizes an EdfScheduler to achieve O(log
+ * cluster. Weighted RR scheduling is currently supported by the EDF or WRSQ schedulers.
+ *
+ * Weighted Random Selection Queue (WRSQ):
+ * ---------------------------------------
+ * This scheduler respects host weighting by keeping a queue for each unique weight among all
+ * objects inserted and adds the objects to their respective queues. When performing
+ * a host selection operation, a queue is selected and a host is pulled from the front. Each queue
+ * gets its own selection probability which is weighted as the sum of all weights of objects
+ * contained within. Once a queue is picked, you can simply pull from the top and honor the expected
+ * selection probability of each object.
+ *
+ * This scheduler provides a pick and insertion time complexity of O(log W), where W is the number
+ * of weight categories. For example, if all host weights are either 99 or 1, W=2. The WRSQ
+ * scheduler has O(num_hosts) memory use.
+ *
+ * Earliest Deadline First (EDF):
+ * ------------------------------
+ * This scheduler respects host weighting and utilizes EDF to achieve O(log
  * n) pick and insertion time complexity, O(n) memory use. The key insight is that if we schedule
  * with 1 / weight deadline, we will achieve the desired pick frequency for weighted RR in a given
  * interval. Naive implementations of weighted RR are either O(n) pick time or O(m * n) memory use,
@@ -374,12 +394,13 @@ private:
  * This base class also supports unweighted selection which derived classes can use to customize
  * behavior. Derived classes can also override how host weight is determined when in weighted mode.
  */
-class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase {
+class WRRLoadBalancerBase : public ZoneAwareLoadBalancerBase {
 public:
-  EdfLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+  WRRLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                       ClusterStats& stats, Runtime::Loader& runtime,
                       Random::RandomGenerator& random,
-                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
+                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+                      bool use_wrsq);
 
   // Upstream::LoadBalancerBase
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
@@ -387,10 +408,10 @@ public:
 
 protected:
   struct Scheduler {
-    // EdfScheduler for weighted LB. The edf_ is only created when the original
+    // Scheduler for weighted LB. The scheduler is only created when the original
     // host weights of 2 or more hosts differ. When not present, the
     // implementation of chooseHostOnce falls back to unweightedHostPick.
-    std::unique_ptr<EdfScheduler<const Host>> edf_;
+    std::unique_ptr<Upstream::Scheduler<const Host>> sched_;
   };
 
   void initialize();
@@ -414,21 +435,23 @@ private:
 
   // Scheduler for each valid HostsSource.
   absl::node_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
+
   Common::CallbackHandlePtr priority_update_cb_;
+  const bool use_wrsq_;
 };
 
 /**
- * A round robin load balancer. When in weighted mode, EDF scheduling is used. When in not
+ * A round robin load balancer. When in weighted mode, WRSQ scheduling is used. When in not
  * weighted mode, simple RR index selection is used.
  */
-class RoundRobinLoadBalancer : public EdfLoadBalancerBase {
+class RoundRobinLoadBalancer : public WRRLoadBalancerBase {
 public:
   RoundRobinLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                          ClusterStats& stats, Runtime::Loader& runtime,
                          Random::RandomGenerator& random,
                          const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                            common_config) {
+      : WRRLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random, common_config,
+                            true /* use_wrsq */) {
     initialize();
   }
 
@@ -485,7 +508,7 @@ private:
  *    The benefit of the Maglev table is at the expense of resolution, memory usage is capped.
  *    Additionally, the Maglev table can be shared amongst all threads.
  */
-class LeastRequestLoadBalancer : public EdfLoadBalancerBase,
+class LeastRequestLoadBalancer : public WRRLoadBalancerBase,
                                  Logger::Loggable<Logger::Id::upstream> {
 public:
   LeastRequestLoadBalancer(
@@ -494,8 +517,8 @@ public:
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
           least_request_config)
-      : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                            common_config),
+      : WRRLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random, common_config,
+                            false /* use_wrsq */),
         choice_count_(
             least_request_config.has_value()
                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.value(), choice_count, 2)
@@ -519,7 +542,7 @@ protected:
       active_request_bias_ = 1.0;
     }
 
-    EdfLoadBalancerBase::refresh(priority);
+    WRRLoadBalancerBase::refresh(priority);
   }
 
 private:

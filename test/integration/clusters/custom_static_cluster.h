@@ -16,6 +16,7 @@
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/mocks/common.h"
 #include "test/integration/clusters/cluster_factory_config.pb.h"
 #include "test/integration/clusters/cluster_factory_config.pb.validate.h"
 #include "test/test_common/registry.h"
@@ -78,6 +79,7 @@ private:
   const std::string address_;
   const uint32_t port_;
   const Upstream::HostSharedPtr host_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 
   friend class CustomStaticClusterFactoryBase;
 };

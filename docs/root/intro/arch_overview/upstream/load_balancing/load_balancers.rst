@@ -1,6 +1,6 @@
 .. _arch_overview_load_balancing_types:
 
-Supported load balancers
+Supported Load Balancers
 ------------------------
 
 When a filter needs to acquire a connection to a host in an upstream cluster, the cluster manager
@@ -13,20 +13,30 @@ healthy, unless otherwise specified through
 
 .. _arch_overview_load_balancing_types_round_robin:
 
-Weighted round robin
-^^^^^^^^^^^^^^^^^^^^
+Weighted Round Robin (WRR)
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 This is a simple policy in which each available upstream host is selected in round
-robin order. If :ref:`weights
-<envoy_v3_api_field_config.endpoint.v3.LbEndpoint.load_balancing_weight>` are assigned to
-endpoints in a locality, then a weighted round robin schedule is used, where
-higher weighted endpoints will appear more often in the rotation to achieve the
-effective weighting.
+robin order. Endpoint :ref:`weights
+<envoy_v3_api_field_config.endpoint.v3.LbEndpoint.load_balancing_weight>` are respected by keeping a
+round-robin rotation for each group of endpoints that share a weight and choosing an endpoint from
+one of those rotations.
+
+.. image:: images/wrsq.png
+
+In the diagram above, the rotations have a 40% and 60% selection probability respectively, honoring
+the configured endpoint weights. If all endpoint weights are the same, this results in standard
+round-robin scheduling.
+
+.. note::
+   The weighted round robin load balancer's scheduler uses the approach above as of release v1.20.
+   This behavior may be reverted to the EDF scheduler used before v1.20 using by setting the runtime
+   flag *envoy.reloadable_features.upstream.round_robin_scheduler_wrsq* to false.
 
 .. _arch_overview_load_balancing_types_least_request:
 
-Weighted least request
-^^^^^^^^^^^^^^^^^^^^^^
+Weighted Least Request (WLR)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The least request load balancer uses different algorithms depending on whether hosts have the
 same or different weights.
@@ -40,8 +50,8 @@ same or different weights.
   requests in the cluster will never receive new requests. It will be allowed to drain until it is
   less than or equal to all of the other hosts.
 * *all weights not equal*:  If two or more hosts in the cluster have different load balancing
-  weights, the load balancer shifts into a mode where it uses a weighted round robin schedule in
-  which weights are dynamically adjusted based on the host's request load at the time of selection.
+  weights, the load balancer shifts into a mode where the scheduler honors the configured weights by 
+  dynamically adjusting them based on the host's request load at the time of selection.
 
   In this case the weights are calculated at the time a host is picked using the following formula:
 
@@ -63,7 +73,7 @@ same or different weights.
 
 .. _arch_overview_load_balancing_types_ring_hash:
 
-Ring hash
+Ring Hash
 ^^^^^^^^^
 
 The ring/modulo hash load balancer implements consistent hashing to upstream hosts. Each host is

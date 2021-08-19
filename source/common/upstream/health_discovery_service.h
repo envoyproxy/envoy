@@ -108,6 +108,7 @@ private:
   HealthCheckerMap health_checkers_map_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   TimeSource& time_source_;
+  Random::RandomGenerator& random_;
 
   void updateHealthchecks(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks,

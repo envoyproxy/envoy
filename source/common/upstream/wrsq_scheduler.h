@@ -44,6 +44,14 @@ class WRSQScheduler : public Scheduler<C>, protected Logger::Loggable<Logger::Id
 public:
   WRSQScheduler(Random::RandomGenerator& random) : random_(random) {}
 
+  // The weighted random selections are performed via fitness proportionate selection (roulette
+  // wheel selection). This value dictates the number of "bins" in the roulette wheel, so unit tests
+  // may test all values in the range [0, accuracy) to exercise all possible random number
+  // selections in the scheduler. Exposing the value helps to yield more deterministic unit tests.
+  //
+  // See https://en.wikipedia.org/wiki/Fitness_proportionate_selection
+  static size_t accuracy() { return 10000; }
+
   std::shared_ptr<C> peekAgain(std::function<double(const C&)> calculate_weight) override {
     std::shared_ptr<C> picked{pickAndAddInternal(calculate_weight)};
     if (picked != nullptr) {
@@ -114,7 +122,11 @@ private:
     maybeRebuildCumulativeWeights();
 
     const double weight_sum = cumulative_weights_.back().cumulative_weight;
-    uint64_t rnum = random_.random() % static_cast<uint32_t>(weight_sum);
+
+    // It's possible that the weight sum can be fractional, so we need a random double.
+    const double r = static_cast<double>(random_.random()  % accuracy()) / accuracy();
+    const double rnum = r * weight_sum;
+
     auto it = std::upper_bound(cumulative_weights_.begin(), cumulative_weights_.end(), rnum,
                                [](auto a, auto b) { return a < b.cumulative_weight; });
     ASSERT(it != cumulative_weights_.end());

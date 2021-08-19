@@ -243,7 +243,7 @@ public:
             std::make_shared<HealthyHostVector>(*local_hosts_), local_hosts_per_locality_,
             std::make_shared<DegradedHostVector>(), HostsPerLocalityImpl::empty(),
             std::make_shared<ExcludedHostVector>(), HostsPerLocalityImpl::empty()),
-        {}, {}, {}, absl::nullopt);
+        {}, {}, {}, random_, absl::nullopt);
 
     lb_ = std::make_shared<SubsetLoadBalancer>(lb_type_, priority_set_, &local_priority_set_,
                                                stats_, *scope_, runtime_, random_, subset_info_,
@@ -383,7 +383,7 @@ public:
           updateHostsParams(local_hosts_, local_hosts_per_locality_,
                             std::make_shared<HealthyHostVector>(*local_hosts_),
                             local_hosts_per_locality_),
-          {}, {}, remove, absl::nullopt);
+          {}, {}, remove, random_, absl::nullopt);
     }
 
     for (const auto& host : add) {
@@ -400,7 +400,7 @@ public:
             updateHostsParams(local_hosts_, local_hosts_per_locality_,
                               std::make_shared<HealthyHostVector>(*local_hosts_),
                               local_hosts_per_locality_),
-            {}, add, {}, absl::nullopt);
+            {}, add, {}, random_, absl::nullopt);
       }
     } else if (!add.empty() || !remove.empty()) {
       local_priority_set_.updateHosts(
@@ -408,7 +408,7 @@ public:
           updateHostsParams(local_hosts_, local_hosts_per_locality_,
                             std::make_shared<const HealthyHostVector>(*local_hosts_),
                             local_hosts_per_locality_),
-          {}, add, remove, absl::nullopt);
+          {}, add, remove, random_, absl::nullopt);
     }
   }
 
@@ -1896,7 +1896,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
           {"tcp://127.0.0.1:84", {{"version", "1.0"}}},
           {"tcp://127.0.0.1:85", {{"version", "1.1"}}},
       },
-      host_set_, {1, 100});
+      host_set_, {1, 99});
 
   lb_ = std::make_shared<SubsetLoadBalancer>(
       lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
@@ -1904,13 +1904,25 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
-  // Since we respect locality weights, the second locality is selected.
-  EXPECT_CALL(random_, random()).WillOnce(Return(0));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(&context));
+  // Verify we respect locality weights.
+  const size_t iters = WRSQScheduler<int>::accuracy();
+  std::vector<size_t> counts({0, 0});
+  for (size_t i = 0; i < iters; ++i) {
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
+    auto h = lb_->chooseHost(&context);
+    auto& hosts0 = host_set_.healthy_hosts_per_locality_->get()[0];
+    auto& hosts1 = host_set_.healthy_hosts_per_locality_->get()[1];
+    if (std::count(hosts0.begin(), hosts0.end(), h) == 1) {
+      counts[0]++;
+    } else if (std::count(hosts1.begin(), hosts1.end(), h) == 1) {
+      counts[1]++;
+    }
+  }
+  EXPECT_EQ(0.01 * iters, counts[0]);
+  EXPECT_EQ(0.99 * iters, counts[1]);
 }
 
 TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
-
   std::vector<SubsetSelectorPtr> subset_selectors = {makeSelector(
       {"version"},
       envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED)};
@@ -1931,7 +1943,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
           {"tcp://127.0.0.1:84", {{"version", "1.0"}}},
           {"tcp://127.0.0.1:85", {{"version", "1.1"}}},
       },
-      host_set_, {50, 50});
+      host_set_, {20, 20});
 
   lb_ = std::make_shared<SubsetLoadBalancer>(
       lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
@@ -1942,15 +1954,19 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
   // locality to be selected less because we've excluded more hosts in that locality than in the
   // first.
   // The localities are split 50/50, but because of the scaling we expect to see 66/33 instead.
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  const size_t iters = WRSQScheduler<int>::accuracy();
+  std::vector<size_t> counts({0,0});
+  for (size_t i = 0; i < iters; ++i) {
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
+    auto h = lb_->chooseHost(&context);
+    if (h == host_set_.healthy_hosts_per_locality_->get()[0][1]) {
+      counts[0]++;
+    } else if (h == host_set_.healthy_hosts_per_locality_->get()[1][3]){
+      counts[1]++;
+    }
+  }
+  EXPECT_NEAR(2.0 * iters / 3, counts[0], 1);
+  EXPECT_NEAR(iters / 3.0, counts[1], 1);
 }
 
 TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
@@ -1984,13 +2000,23 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
   TestLoadBalancerContext context({{"version", "1.0"}});
 
   // We expect to see a 33/66 split because 2 * 1 / 2 = 1 and 2 * 3 / 4 = 1.5 -> 2
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][2], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+  std::vector<size_t> counts({0,0});
+  const size_t iters = WRSQScheduler<int>::accuracy();
+  for (size_t i = 0; i < iters; ++i) {
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
+    auto h = lb_->chooseHost(&context);
+    if (h == host_set_.healthy_hosts_per_locality_->get()[0][0]) {
+      counts[0]++;
+    } else if (h == host_set_.healthy_hosts_per_locality_->get()[1][0] ||
+               h == host_set_.healthy_hosts_per_locality_->get()[1][1] ||
+               h == host_set_.healthy_hosts_per_locality_->get()[1][2]){
+      counts[1]++;
+    } else {
+      FAIL() << "wrong host returned: " << h->address()->asString();
+    }
+  }
+  EXPECT_NEAR(iters / 3.0, counts[0], 1);
+  EXPECT_NEAR(2 * iters / 3.0, counts[1], 1);
 }
 
 // Regression for bug where missing locality weights crashed scaling and locality aware subset LBs.

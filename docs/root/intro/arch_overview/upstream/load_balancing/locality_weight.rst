@@ -69,3 +69,9 @@ identifying the location of the upstream hosts via :ref:`locality
 This feature is not compatible with :ref:`load balancer subsetting
 <arch_overview_load_balancer_subsets>`, since it is not straightforward to
 reconcile locality level weighting with sensible weights for individual subsets.
+
+.. note::
+   The weighted round robin scheduler implementation changed in release v1.20.
+   This behavior may be reverted to the EDF scheduling used before v1.20 using by setting the runtime
+   flag *envoy.reloadable_features.upstream.locality_scheduler_wrsq* to false.
+

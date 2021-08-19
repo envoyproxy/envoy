@@ -9,6 +9,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/common/upstream/wrsq_scheduler.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
@@ -558,7 +559,7 @@ public:
         0,
         updateHostsParams(hosts, hosts_per_locality,
                           std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-        {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
+        {}, empty_host_vector_, empty_host_vector_, random_, absl::nullopt);
   }
 
   void peekThenPick(std::vector<int> picks) {
@@ -898,40 +899,50 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
                               makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   init(false);
+
+  std::vector<size_t> counts;
+  auto run_selections = [&](size_t iterations) {
+    counts.clear();
+    counts.resize(3);
+    for (uint32_t i = 0; i < iterations; ++i) {
+      EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
+      auto host = lb_->chooseHost(nullptr);
+      if (host == hostSet().healthy_hosts_[0]) {
+        counts[0]++;
+      } else if (host == hostSet().healthy_hosts_[1]) {
+        counts[1]++;
+      } else {
+        counts[2]++;
+      }
+    }
+  };
+
+  const double runs = WRSQScheduler<int>::accuracy();
+  const double tolerance = 0.01;
+
   // Initial weights respected.
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, {});
+  run_selections(runs);
+  EXPECT_NEAR(counts[0] / runs, 1.0/3, tolerance);
+  EXPECT_NEAR(counts[1] / runs, 2.0/3, tolerance);
+
   // Modify weights, we converge on new weighting after one pick cycle.
   hostSet().healthy_hosts_[0]->weight(2);
   hostSet().healthy_hosts_[1]->weight(1);
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, {});
+  run_selections(runs);
+  EXPECT_NEAR(counts[0] / runs, 2.0/3, tolerance);
+  EXPECT_NEAR(counts[1] / runs, 1.0/3, tolerance);
+
   // Add a host, it should participate in next round of scheduling.
   hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), 3));
   hostSet().hosts_.push_back(hostSet().healthy_hosts_.back());
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, {});
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  run_selections(runs);
+  EXPECT_NEAR(counts[0] / runs, 2.0 / 6, tolerance);
+  EXPECT_NEAR(counts[1] / runs, 1.0/6, tolerance);
+  EXPECT_NEAR(counts[2] / runs, 3.0/6, tolerance);
+
   // Remove last two hosts, add a new one with different weights.
   HostVector removed_hosts = {hostSet().hosts_[1], hostSet().hosts_[2]};
   hostSet().healthy_hosts_.pop_back();
@@ -942,32 +953,9 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   hostSet().hosts_.push_back(hostSet().healthy_hosts_.back());
   hostSet().healthy_hosts_[0]->weight(1);
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, removed_hosts);
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-}
-
-// Validate that the RNG seed influences pick order when weighted RR.
-TEST_P(RoundRobinLoadBalancerTest, WeightedSeed) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
-  hostSet().hosts_ = hostSet().healthy_hosts_;
-  EXPECT_CALL(random_, random()).WillRepeatedly(Return(1));
-  init(false);
-  // Initial weights respected.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  run_selections(runs);
+  EXPECT_NEAR(counts[0] / runs, 1.0/5, tolerance);
+  EXPECT_NEAR(counts[1] / runs, 4.0/5, tolerance);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {

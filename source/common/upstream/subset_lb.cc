@@ -55,7 +55,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
                 describeMetadata(default_subset_metadata_));
       fallback_subset_ = std::make_shared<LbSubsetEntry>();
       fallback_subset_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
-          *this, predicate, locality_weight_aware_, scale_locality_weight_);
+          *this, predicate, locality_weight_aware_, scale_locality_weight_, random_);
     }
   }
 
@@ -200,7 +200,7 @@ void SubsetLoadBalancer::initSubsetAnyOnce() {
     HostPredicate predicate = [](const Host&) -> bool { return true; };
     subset_any_ = std::make_shared<LbSubsetEntry>();
     subset_any_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
-        *this, predicate, locality_weight_aware_, scale_locality_weight_);
+        *this, predicate, locality_weight_aware_, scale_locality_weight_, random_);
   }
 }
 
@@ -271,7 +271,7 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
                                         default_subset_metadata_, std::placeholders::_1);
     selector_fallback_subset_default_ = std::make_shared<LbSubsetEntry>();
     selector_fallback_subset_default_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
-        *this, predicate, locality_weight_aware_, scale_locality_weight_);
+        *this, predicate, locality_weight_aware_, scale_locality_weight_, random_);
   }
 }
 
@@ -537,7 +537,7 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
         // with only removed hosts is a degenerate case and we leave the entry
         // uninitialized.)
         entry->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
-            *this, predicate, locality_weight_aware_, scale_locality_weight_);
+            *this, predicate, locality_weight_aware_, scale_locality_weight_, random_);
         stats_.lb_subsets_active_.inc();
         stats_.lb_subsets_created_.inc();
       });
@@ -726,9 +726,11 @@ void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) {
 SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalancer& subset_lb,
                                                            HostPredicate predicate,
                                                            bool locality_weight_aware,
-                                                           bool scale_locality_weight)
+                                                           bool scale_locality_weight,
+                                                          Random::RandomGenerator& random)
     : original_priority_set_(subset_lb.original_priority_set_), predicate_(predicate),
-      locality_weight_aware_(locality_weight_aware), scale_locality_weight_(scale_locality_weight) {
+      locality_weight_aware_(locality_weight_aware), scale_locality_weight_(scale_locality_weight),
+      random_(random) {
 
   for (size_t i = 0; i < original_priority_set_.hostSetsPerPriority().size(); ++i) {
     empty_ &= getOrCreateHostSet(i).hosts().empty();
@@ -882,7 +884,7 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
                                degraded_hosts, degraded_hosts_per_locality, excluded_hosts,
                                excluded_hosts_per_locality),
                            determineLocalityWeights(*hosts_per_locality), filtered_added,
-                           filtered_removed, absl::nullopt);
+                           filtered_removed, random_, absl::nullopt);
 }
 
 LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocalityWeights(
@@ -929,7 +931,7 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
   ASSERT(!overprovisioning_factor.has_value() ||
          overprovisioning_factor.value() == host_set->overprovisioningFactor());
   return HostSetImplPtr{
-      new HostSubsetImpl(*host_set, locality_weight_aware_, scale_locality_weight_)};
+      new HostSubsetImpl(*host_set, locality_weight_aware_, scale_locality_weight_, random_)};
 }
 
 void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,

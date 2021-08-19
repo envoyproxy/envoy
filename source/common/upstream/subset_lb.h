@@ -56,10 +56,10 @@ private:
   class HostSubsetImpl : public HostSetImpl {
   public:
     HostSubsetImpl(const HostSet& original_host_set, bool locality_weight_aware,
-                   bool scale_locality_weight)
+                   bool scale_locality_weight, Random::RandomGenerator& random)
         : HostSetImpl(original_host_set.priority(), original_host_set.overprovisioningFactor()),
           original_host_set_(original_host_set), locality_weight_aware_(locality_weight_aware),
-          scale_locality_weight_(scale_locality_weight) {}
+          scale_locality_weight_(scale_locality_weight), random_(random) {}
 
     void update(const HostVector& hosts_added, const HostVector& hosts_removed,
                 HostPredicate predicate);
@@ -70,13 +70,14 @@ private:
     const HostSet& original_host_set_;
     const bool locality_weight_aware_;
     const bool scale_locality_weight_;
+    Random::RandomGenerator& random_;
   };
 
   // Represents a subset of an original PrioritySet.
   class PrioritySubsetImpl : public PrioritySetImpl {
   public:
     PrioritySubsetImpl(const SubsetLoadBalancer& subset_lb, HostPredicate predicate,
-                       bool locality_weight_aware, bool scale_locality_weight);
+                       bool locality_weight_aware, bool scale_locality_weight, Random::RandomGenerator& random);
 
     void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
 
@@ -110,6 +111,7 @@ private:
     const HostPredicate predicate_;
     const bool locality_weight_aware_;
     const bool scale_locality_weight_;
+    Random::RandomGenerator& random_;
     bool empty_ = true;
   };
 

@@ -110,6 +110,7 @@ private:
 
   absl::Mutex host_map_lock_;
   HostMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
+  Random::RandomGenerator& random_;
 
   friend class OriginalDstClusterFactory;
 };

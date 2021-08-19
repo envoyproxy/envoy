@@ -11,6 +11,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -21,6 +22,9 @@ namespace {
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
+
+constexpr absl::string_view WeightedRoundRobinSchedulerWRSQRuntime =
+    "envoy.reloadable_features.upstream.round_robin_scheduler_wrsq";
 
 bool tooManyPreconnects(size_t num_preconnect_picks, uint32_t healthy_hosts) {
   // Currently we only allow the number of preconnected connections to equal the
@@ -692,13 +696,13 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
   }
 }
 
-EdfLoadBalancerBase::EdfLoadBalancerBase(
+WRRLoadBalancerBase::WRRLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config, bool use_wrsq)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 common_config),
-      seed_(random_.random()) {
+      seed_(random_.random()), use_wrsq_(use_wrsq) {
   // We fully recompute the schedulers for a given host set here on membership change, which is
   // consistent with what other LB implementations do (e.g. thread aware).
   // The downside of a full recompute is that time complexity is O(n * log n),
@@ -708,39 +712,43 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
       [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
 }
 
-void EdfLoadBalancerBase::initialize() {
+void WRRLoadBalancerBase::initialize() {
   for (uint32_t priority = 0; priority < priority_set_.hostSetsPerPriority().size(); ++priority) {
     refresh(priority);
   }
 }
 
-void EdfLoadBalancerBase::refresh(uint32_t priority) {
+void WRRLoadBalancerBase::refresh(uint32_t priority) {
   const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
     // Nuke existing scheduler if it exists.
     auto& scheduler = scheduler_[source] = Scheduler{};
     refreshHostSource(source);
 
-    // Check if the original host weights are equal and skip EDF creation if they are. When all
-    // original weights are equal we can rely on unweighted host pick to do optimal round robin and
-    // least-loaded host selection with lower memory and CPU overhead.
+    // Check if the original host weights are equal and skip scheduler creation if they are. When
+    // all original weights are equal we can rely on unweighted host pick to do optimal round robin
+    // and least-loaded host selection with lower memory and CPU overhead.
     if (hostWeightsAreEqual(hosts)) {
-      // Skip edf creation.
+      // Skip scheduler creation.
       return;
     }
 
-    scheduler.edf_ = std::make_unique<EdfScheduler<const Host>>();
+    if (Runtime::runtimeFeatureEnabled(WeightedRoundRobinSchedulerWRSQRuntime) && use_wrsq_) {
+      scheduler.sched_ = std::make_unique<WRSQScheduler<const Host>>(random_);
+    } else {
+      scheduler.sched_ = std::make_unique<EdfScheduler<const Host>>();
+    }
 
     // Populate scheduler with host list.
-    // TODO(mattklein123): We must build the EDF schedule even if all of the hosts are currently
+    // TODO(mattklein123): We must build the schedule even if all of the hosts are currently
     // weighted 1. This is because currently we don't refresh host sets if only weights change.
     // We should probably change this to refresh at all times. See the comment in
     // BaseDynamicClusterImpl::updateDynamicHostList about this.
     for (const auto& host : hosts) {
       // We use a fixed weight here. While the weight may change without
       // notification, this will only be stale until this host is next picked,
-      // at which point it is reinserted into the EdfScheduler with its new
+      // at which point it is reinserted into the WRRScheduler with its new
       // weight in chooseHost().
-      scheduler.edf_->add(hostWeight(*host), host);
+      scheduler.sched_->add(hostWeight(*host), host);
     }
 
     // Cycle through hosts to achieve the intended offset behavior.
@@ -749,12 +757,12 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     if (!hosts.empty()) {
       for (uint32_t i = 0; i < seed_ % hosts.size(); ++i) {
         auto host =
-            scheduler.edf_->pickAndAdd([this](const Host& host) { return hostWeight(host); });
+            scheduler.sched_->pickAndAdd([this](const Host& host) { return hostWeight(host); });
       }
     }
   };
 
-  // Populate EdfSchedulers for each valid HostsSource value for the host set at this priority.
+  // Populate WRRSchedulers for each valid HostsSource value for the host set at this priority.
   const auto& host_set = priority_set_.hostSetsPerPriority()[priority];
   add_hosts_source(HostsSource(priority, HostsSource::SourceType::AllHosts), host_set->hosts());
   add_hosts_source(HostsSource(priority, HostsSource::SourceType::HealthyHosts),
@@ -775,7 +783,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
   }
 }
 
-HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* context) {
+HostConstSharedPtr WRRLoadBalancerBase::peekAnotherHost(LoadBalancerContext* context) {
   if (tooManyPreconnects(stashed_random_.size(), total_healthy_hosts_)) {
     return nullptr;
   }
@@ -791,12 +799,12 @@ HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* con
   ASSERT(scheduler_it != scheduler_.end());
   auto& scheduler = scheduler_it->second;
 
-  // As has been commented in both EdfLoadBalancerBase::refresh and
+  // As has been commented in both WRRLoadBalancerBase::refresh and
   // BaseDynamicClusterImpl::updateDynamicHostList, we must do a runtime pivot here to determine
-  // whether to use EDF or do unweighted (fast) selection. EDF is non-null iff the original weights
-  // of 2 or more hosts differ.
-  if (scheduler.edf_ != nullptr) {
-    return scheduler.edf_->peekAgain([this](const Host& host) { return hostWeight(host); });
+  // whether to use the WRR scheduler or do unweighted (fast) selection. The scheduler is non-null
+  // iff the original weights of 2 or more hosts differ.
+  if (scheduler.sched_ != nullptr) {
+    return scheduler.sched_->peekAgain([this](const Host& host) { return hostWeight(host); });
   } else {
     const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
     if (hosts_to_use.empty()) {
@@ -806,7 +814,7 @@ HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* con
   }
 }
 
-HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* context) {
+HostConstSharedPtr WRRLoadBalancerBase::chooseHostOnce(LoadBalancerContext* context) {
   const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(false));
   if (!hosts_source) {
     return nullptr;
@@ -817,12 +825,12 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
   ASSERT(scheduler_it != scheduler_.end());
   auto& scheduler = scheduler_it->second;
 
-  // As has been commented in both EdfLoadBalancerBase::refresh and
+  // As has been commented in both WRRLoadBalancerBase::refresh and
   // BaseDynamicClusterImpl::updateDynamicHostList, we must do a runtime pivot here to determine
-  // whether to use EDF or do unweighted (fast) selection. EDF is non-null iff the original weights
-  // of 2 or more hosts differ.
-  if (scheduler.edf_ != nullptr) {
-    auto host = scheduler.edf_->pickAndAdd([this](const Host& host) { return hostWeight(host); });
+  // whether to use a WRR scheduler or do unweighted (fast) selection. The scheduler is non-null iff
+  // the original weights of 2 or more hosts differ.
+  if (scheduler.sched_ != nullptr) {
+    auto host = scheduler.sched_->pickAndAdd([this](const Host& host) { return hostWeight(host); });
     return host;
   } else {
     const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);

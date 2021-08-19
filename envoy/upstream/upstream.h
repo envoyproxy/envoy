@@ -455,12 +455,14 @@ public:
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
    * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+   * @param random a random generator.
    * @param cross_priority_host_map read only cross-priority host map which is created in the main
    * thread and shared by all the worker threads.
    */
   virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
+                  Random::RandomGenerator& random,
                            absl::optional<uint32_t> overprovisioning_factor,
                            HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
@@ -478,11 +480,13 @@ public:
      * @param locality_weights supplies a map from locality to associated weight.
      * @param hosts_added supplies the hosts added since the last update.
      * @param hosts_removed supplies the hosts removed since the last update.
+     * @param random a random generator.
      * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
      */
     virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
+                     Random::RandomGenerator& random,
                              absl::optional<uint32_t> overprovisioning_factor) PURE;
   };
 

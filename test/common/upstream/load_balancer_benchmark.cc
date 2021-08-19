@@ -51,10 +51,10 @@ public:
     HostVectorConstSharedPtr updated_hosts = std::make_shared<HostVector>(hosts);
     HostsPerLocalityConstSharedPtr hosts_per_locality = makeHostsPerLocality({hosts});
     priority_set_.updateHosts(0, HostSetImpl::partitionHosts(updated_hosts, hosts_per_locality), {},
-                              hosts, {}, absl::nullopt);
+                              hosts, {}, random_, absl::nullopt);
     local_priority_set_.updateHosts(0,
                                     HostSetImpl::partitionHosts(updated_hosts, hosts_per_locality),
-                                    {}, hosts, {}, absl::nullopt);
+                                    {}, hosts, {}, random_, absl::nullopt);
   }
 
   Envoy::Thread::MutexBasicLockable lock_;
@@ -559,9 +559,9 @@ public:
   void update() {
     priority_set_.updateHosts(0,
                               HostSetImpl::partitionHosts(smaller_hosts_, smaller_locality_hosts_),
-                              nullptr, {}, host_moved_, absl::nullopt);
+                              nullptr, {}, host_moved_, random_, absl::nullopt);
     priority_set_.updateHosts(0, HostSetImpl::partitionHosts(orig_hosts_, orig_locality_hosts_),
-                              nullptr, host_moved_, {}, absl::nullopt);
+                              nullptr, host_moved_, {}, random_, absl::nullopt);
   }
 
   std::unique_ptr<LoadBalancerSubsetInfoImpl> subset_info_;

@@ -610,10 +610,10 @@ private:
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
   ThreadLocal::TypedSlot<ThreadLocalClusterManagerImpl> tls_;
-  Random::RandomGenerator& random_;
 
 protected:
   ClusterMap active_clusters_;
+  Random::RandomGenerator& random_;
 
 private:
   ClusterMap warming_clusters_;

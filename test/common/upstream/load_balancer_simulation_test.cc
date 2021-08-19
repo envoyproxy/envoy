@@ -51,6 +51,7 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   PrioritySetImpl priority_set;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   NiceMock<MockTimeSystem> time_source_;
+  Random::RandomGeneratorImpl random;
   HostVector hosts;
   for (uint64_t i = 0; i < num_hosts; i++) {
     const bool should_weight = i < num_hosts * (weighted_subset_percent / 100.0);
@@ -67,14 +68,13 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
       updateHostsParams(updated_hosts, updated_locality_hosts,
                         std::make_shared<const HealthyHostVector>(*updated_hosts),
                         updated_locality_hosts),
-      {}, hosts, {}, absl::nullopt);
+      {}, hosts, {}, random, absl::nullopt);
 
   Stats::IsolatedStoreImpl stats_store;
   ClusterStatNames stat_names(stats_store.symbolTable());
   ClusterStats stats{ClusterInfoImpl::generateStats(stats_store, stat_names)};
   stats.max_host_weight_.set(weight);
   NiceMock<Runtime::MockLoader> runtime;
-  Random::RandomGeneratorImpl random;
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
   LeastRequestLoadBalancer lb_{
@@ -176,7 +176,7 @@ public:
           updateHostsParams(originating_hosts, per_zone_local_shared,
                             std::make_shared<const HealthyHostVector>(*originating_hosts),
                             per_zone_local_shared),
-          {}, empty_vector_, empty_vector_, absl::nullopt);
+          {}, empty_vector_, empty_vector_, random_, absl::nullopt);
 
       HostConstSharedPtr selected = lb.chooseHost(nullptr);
       hits[selected->address()->asString()]++;

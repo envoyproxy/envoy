@@ -118,7 +118,8 @@ OriginalDstCluster::OriginalDstCluster(
       use_http_header_(info_->lbOriginalDstConfig()
                            ? info_->lbOriginalDstConfig().value().use_http_header()
                            : false),
-      host_map_(std::make_shared<HostMap>()) {
+      host_map_(std::make_shared<HostMap>()),
+      random_(factory_context.api().randomGenerator()) {
   if (config.has_load_assignment()) {
     throw EnvoyException("ORIGINAL_DST clusters must have no load assignment configured");
   }
@@ -139,7 +140,7 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
     all_hosts->emplace_back(host);
     priority_set_.updateHosts(0,
                               HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()),
-                              {}, {std::move(host)}, {}, absl::nullopt);
+                              {}, {std::move(host)}, {}, random_, absl::nullopt);
   }
 }
 
@@ -172,7 +173,7 @@ void OriginalDstCluster::cleanup() {
     setHostMap(new_host_map);
     priority_set_.updateHosts(
         0, HostSetImpl::partitionHosts(keeping_hosts, HostsPerLocalityImpl::empty()), {}, {},
-        to_be_removed, absl::nullopt);
+        to_be_removed, random_, absl::nullopt);
   }
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);

@@ -58,10 +58,11 @@ TEST(WRSQSchedulerTest, ProbabilityVerification) {
     pick_count[i] = 0;
   }
 
-  // If we try every random number between 0 and the weight sum, we should select each object the
-  // number of times equal to its weight.
-  for (uint32_t i = 0; i < weight_sum; ++i) {
-    EXPECT_CALL(random, random()).WillOnce(Return(i));
+  // When verifying the probabilities, we can try every random number the scheduler will generate.
+  // This ensures predictable test behavior.
+  const auto iters = WRSQScheduler<int>::accuracy();
+  for (uint32_t i = 0; i < iters; ++i) {
+    EXPECT_CALL(random, random()).WillRepeatedly(Return(i));
     auto peek = sched.peekAgain([](const double& x) { return x + 1; });
     auto p = sched.pickAndAdd([](const double& x) { return x + 1; });
     EXPECT_EQ(*p, *peek);
@@ -69,7 +70,8 @@ TEST(WRSQSchedulerTest, ProbabilityVerification) {
   }
 
   for (uint32_t i = 0; i < num_entries; ++i) {
-    EXPECT_EQ(i + 1, pick_count[i]);
+    EXPECT_NEAR((i + 1) / weight_sum, pick_count[i] / static_cast<double>(iters), 0.001) 
+      << fmt::format("weight_sum={}, pick_count={}, i={}\n", weight_sum, pick_count[i], i);
   }
 }
 
@@ -215,7 +217,8 @@ TEST(WRSQSchedulerTest, ExpireAll) {
       // We've got unexpired values, so we should be able to pick them. While we're at it, we can
       // check we're getting objects from both weight queues.
       uint32_t weight1pick{0}, weight5pick{0};
-      for (int i = 0; i < 1000; ++i) {
+      const int iters = WRSQScheduler<int>::accuracy();
+      for (int i = 0; i < iters; ++i) {
         EXPECT_CALL(random, random()).WillOnce(Return(rnum++));
         switch (*sched.pickAndAdd({})) {
         case 42:

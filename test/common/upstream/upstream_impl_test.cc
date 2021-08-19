@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <list>
@@ -260,11 +261,12 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
-  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+   auto factory_context = std::make_unique<Envoy::Server::Configuration::TransportSocketFactoryContextImpl>(
       admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
       singleton_manager_, tls_, validation_visitor_, *api_, options_);
-  StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, factory_context,
+  StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, *factory_context,
                                std::move(scope), false);
+  cluster.setTransportFactoryContext(std::move(factory_context));
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
@@ -598,11 +600,12 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
-  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+  auto factory_context = std::make_unique<Envoy::Server::Configuration::TransportSocketFactoryContextImpl>(
       admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
       singleton_manager_, tls_, validation_visitor_, *api_, options_);
-  StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, factory_context,
+  StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, *factory_context,
                                std::move(scope), false);
+  cluster.setTransportFactoryContext(std::move(factory_context));
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
@@ -1818,10 +1821,12 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
-  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+  auto factory_context = std::make_unique<Envoy::Server::Configuration::TransportSocketFactoryContextImpl>(
+
       admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
       singleton_manager_, tls_, validation_visitor_, *api_, options_);
-  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false);
+  StaticClusterImpl cluster(cluster_config, runtime_, *factory_context, std::move(scope), false);
+  cluster.setTransportFactoryContext(std::move(factory_context));
 
   Outlier::MockDetector* detector = new Outlier::MockDetector();
   EXPECT_CALL(*detector, addChangedStateCb(_));
@@ -1876,10 +1881,12 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
-  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+
+  auto factory_context = std::make_unique<Envoy::Server::Configuration::TransportSocketFactoryContextImpl>(
       admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
       singleton_manager_, tls_, validation_visitor_, *api_, options_);
-  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false);
+  StaticClusterImpl cluster(cluster_config, runtime_, *factory_context, std::move(scope), false);
+  cluster.setTransportFactoryContext(std::move(factory_context));
 
   Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
   cluster.setOutlierDetector(Outlier::DetectorSharedPtr{outlier_detector});
@@ -2229,7 +2236,7 @@ public:
           updateHostsParams(hosts_, hosts_per_locality_,
                             std::make_shared<const HealthyHostVector>(*hosts_),
                             hosts_per_locality_),
-          {}, hosts_added, hosts_removed, absl::nullopt);
+          {}, hosts_added, hosts_removed, random_, absl::nullopt);
     }
 
     // Remove the host from P1.
@@ -2242,12 +2249,13 @@ public:
           updateHostsParams(empty_hosts, HostsPerLocalityImpl::empty(),
                             std::make_shared<const HealthyHostVector>(*empty_hosts),
                             HostsPerLocalityImpl::empty()),
-          {}, hosts_added, hosts_removed, absl::nullopt);
+          {}, hosts_added, hosts_removed, random_, absl::nullopt);
     }
   }
 
   HostVectorSharedPtr hosts_;
   HostsPerLocalitySharedPtr hosts_per_locality_;
+  NiceMock<Random::MockRandomGenerator> random_;
 };
 
 // Test creating and extending a priority set.
@@ -2291,6 +2299,7 @@ TEST(PrioritySet, Extend) {
       new HostVector({makeTestHost(info, "tcp://127.0.0.1:80", *time_source)}));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
   HostMapConstSharedPtr fake_cross_priority_host_map = std::make_shared<HostMap>();
+  NiceMock<Random::MockRandomGenerator> random;
   {
     HostVector hosts_added{hosts->front()};
     HostVector hosts_removed{};
@@ -2299,7 +2308,7 @@ TEST(PrioritySet, Extend) {
         1,
         updateHostsParams(hosts, hosts_per_locality,
                           std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-        {}, hosts_added, hosts_removed, absl::nullopt, fake_cross_priority_host_map);
+        {}, hosts_added, hosts_removed, random, absl::nullopt, fake_cross_priority_host_map);
   }
   EXPECT_EQ(1, priority_changes);
   EXPECT_EQ(1, membership_changes);
@@ -2355,6 +2364,7 @@ TEST(PrioritySet, MainPrioritySetTest) {
   // The host map is initially empty or null.
   EXPECT_TRUE(priority_set.constHostMapForTest()->empty());
   EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
+  NiceMock<Random::MockRandomGenerator> random;
 
   {
     HostVector hosts_added{hosts->front()};
@@ -2364,7 +2374,7 @@ TEST(PrioritySet, MainPrioritySetTest) {
                              updateHostsParams(hosts, hosts_per_locality,
                                                std::make_shared<const HealthyHostVector>(*hosts),
                                                hosts_per_locality),
-                             {}, hosts_added, hosts_removed, absl::nullopt);
+                             {}, hosts_added, hosts_removed, random, absl::nullopt);
   }
 
   // Only mutable host map can be updated directly. Read only host map will not be updated before
@@ -2385,7 +2395,7 @@ TEST(PrioritySet, MainPrioritySetTest) {
                              updateHostsParams(hosts, hosts_per_locality,
                                                std::make_shared<const HealthyHostVector>(*hosts),
                                                hosts_per_locality),
-                             {}, hosts_added, hosts_removed, absl::nullopt);
+                             {}, hosts_added, hosts_removed, random, absl::nullopt);
   }
 
   // New mutable host map will be created and all update will be applied to new mutable host map.
@@ -3673,6 +3683,8 @@ public:
                     makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
                     makeTestHost(info_, "tcp://127.0.0.1:84", simTime()),
                     makeTestHost(info_, "tcp://127.0.0.1:85", simTime())};
+ protected:
+  NiceMock<Random::MockRandomGenerator> random_;
 };
 
 // When no locality weights belong to the host set, there's an empty pick.
@@ -3688,7 +3700,7 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
   auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
   host_set_.updateHosts(updateHostsParams(hosts, hosts_per_locality), locality_weights, {}, {},
-                        absl::nullopt);
+                        random_, absl::nullopt);
   EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
@@ -3714,7 +3726,7 @@ TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
           HostsPerLocalityImpl::empty(),
           makeHostsFromHostsPerLocality<ExcludedHostVector>(excluded_hosts_per_locality),
           excluded_hosts_per_locality),
-      locality_weights, {}, {}, absl::nullopt);
+      locality_weights, {}, {}, random_, absl::nullopt);
   // We should RR between localities with equal weight.
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
@@ -3731,7 +3743,7 @@ TEST_F(HostSetImplLocalityTest, EmptyLocality) {
   host_set_.updateHosts(updateHostsParams(hosts, hosts_per_locality,
                                           std::make_shared<const HealthyHostVector>(*hosts),
                                           hosts_per_locality),
-                        locality_weights, {}, {}, absl::nullopt);
+                        locality_weights, {}, {}, random_, absl::nullopt);
   // Verify that we are not RRing between localities.
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
@@ -3745,7 +3757,7 @@ TEST_F(HostSetImplLocalityTest, AllZeroWeights) {
   host_set_.updateHosts(updateHostsParams(hosts, hosts_per_locality,
                                           std::make_shared<const HealthyHostVector>(*hosts),
                                           hosts_per_locality),
-                        locality_weights, {}, {});
+                        locality_weights, {}, {}, random_);
   EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
@@ -3758,7 +3770,7 @@ TEST_F(HostSetImplLocalityTest, Unweighted) {
   host_set_.updateHosts(updateHostsParams(hosts, hosts_per_locality,
                                           std::make_shared<const HealthyHostVector>(*hosts),
                                           hosts_per_locality),
-                        locality_weights, {}, {}, absl::nullopt);
+                        locality_weights, {}, {}, random_, absl::nullopt);
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
@@ -3775,13 +3787,17 @@ TEST_F(HostSetImplLocalityTest, Weighted) {
   host_set_.updateHosts(updateHostsParams(hosts, hosts_per_locality,
                                           std::make_shared<const HealthyHostVector>(*hosts),
                                           hosts_per_locality),
-                        locality_weights, {}, {}, absl::nullopt);
-  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+                        locality_weights, {}, {}, random_, absl::nullopt);
+  size_t counts[2] = {0, 0};
+  const size_t iters = WRSQScheduler<int>::accuracy();
+  for (size_t i = 0; i < iters; ++i) {
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
+    auto val = host_set_.chooseHealthyLocality().value();
+    ASSERT_LT(val, 2);
+    counts[val]++;
+  }
+  EXPECT_NEAR(iters / 3.0, counts[0], 1);
+  EXPECT_NEAR(2 * iters / 3.0, counts[1], 1);
 }
 
 // Localities with no weight assignment are never picked.
@@ -3793,7 +3809,7 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
   host_set_.updateHosts(updateHostsParams(hosts, hosts_per_locality,
                                           std::make_shared<const HealthyHostVector>(*hosts),
                                           hosts_per_locality),
-                        locality_weights, {}, {}, absl::nullopt);
+                        locality_weights, {}, {}, random_, absl::nullopt);
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
@@ -3804,8 +3820,10 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
 
 // Gentle failover between localities as health diminishes.
 TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
+  constexpr uint32_t l1_weight = 1;
+  constexpr uint32_t l2_weight = 2;
   const auto setHealthyHostCount = [this](uint32_t host_count) {
-    LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
+    LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{l1_weight, l2_weight}};
     HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality(
         {{hosts_[0], hosts_[1], hosts_[2], hosts_[3], hosts_[4]}, {hosts_[5]}});
     HostVector healthy_hosts;
@@ -3820,37 +3838,56 @@ TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
                                             makeHostsFromHostsPerLocality<HealthyHostVector>(
                                                 healthy_hosts_per_locality),
                                             healthy_hosts_per_locality),
-                          locality_weights, {}, {}, absl::nullopt);
+                          locality_weights, {}, {}, random_, absl::nullopt);
   };
 
-  const auto expectPicks = [this](uint32_t locality_0_picks, uint32_t locality_1_picks) {
+  const uint32_t iters = WRSQScheduler<int>::accuracy();
+  const auto test_pick_count = [this, iters](uint32_t healthy_host_count) {
     uint32_t count[2] = {0, 0};
-    for (uint32_t i = 0; i < 100; ++i) {
+    for (uint32_t i = 0; i < iters; ++i) {
+      EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
       const uint32_t locality_index = host_set_.chooseHealthyLocality().value();
       ASSERT_LT(locality_index, 2);
       ++count[locality_index];
     }
     ENVOY_LOG_MISC(debug, "Locality picks {} {}", count[0], count[1]);
-    EXPECT_EQ(locality_0_picks, count[0]);
-    EXPECT_EQ(locality_1_picks, count[1]);
+
+    // Calculating the effective weight from the docs:
+    //   availability(L_X) = 140 * available_X_upstreams / total_X_upstreams
+    //   effective_weight(L_X) = locality_weight_X * min(100, availability(L_X))
+
+    const double l1_availability = 140.0 * healthy_host_count / 5.0;
+    const double l1_effective_weight = l1_weight * std::min(100.0, l1_availability);
+    const double l2_effective_weight = l2_weight * 100.0;
+    const double effective_weight_sum = l1_effective_weight + l2_effective_weight;
+
+    EXPECT_NEAR(iters * l1_effective_weight / effective_weight_sum, count[0], 1);
+    EXPECT_NEAR(iters * l2_effective_weight / effective_weight_sum, count[1], 1);
   };
 
   setHealthyHostCount(5);
-  expectPicks(33, 67);
+  test_pick_count(5);
+
   setHealthyHostCount(4);
-  expectPicks(33, 67);
+  test_pick_count(4);
+
   setHealthyHostCount(3);
-  expectPicks(29, 71);
+  test_pick_count(3);
+
   setHealthyHostCount(2);
-  expectPicks(22, 78);
+  test_pick_count(2);
+
   setHealthyHostCount(1);
-  expectPicks(12, 88);
+  test_pick_count(1);
+
   setHealthyHostCount(0);
-  expectPicks(0, 100);
+  test_pick_count(0);
 }
 
 TEST(OverProvisioningFactorTest, LocalityPickChanges) {
-  auto setUpHostSetWithOPFAndTestPicks = [](const uint32_t overprovisioning_factor,
+  NiceMock<Random::MockRandomGenerator> random;
+  const uint32_t iters = WRSQScheduler<int>::accuracy();
+  auto setUpHostSetWithOPFAndTestPicks = [&random, iters](const uint32_t overprovisioning_factor,
                                             const uint32_t pick_0, const uint32_t pick_1) {
     HostSetImpl host_set(0, overprovisioning_factor);
     std::shared_ptr<MockClusterInfo> cluster_info{new NiceMock<MockClusterInfo>()};
@@ -3869,9 +3906,10 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
     host_set.updateHosts(updateHostsParams(std::make_shared<const HostVector>(hosts),
                                            hosts_per_locality, healthy_hosts,
                                            healthy_hosts_per_locality),
-                         locality_weights, {}, {}, absl::nullopt);
+                         locality_weights, {}, {}, random, absl::nullopt);
     uint32_t cnts[] = {0, 0};
-    for (uint32_t i = 0; i < 100; ++i) {
+    for (uint32_t i = 0; i < iters; ++i) {
+      EXPECT_CALL(random, random()).WillRepeatedly(Return(i));
       absl::optional<uint32_t> locality_index = host_set.chooseHealthyLocality();
       if (!locality_index.has_value()) {
         // It's possible locality scheduler is nullptr (when factor is 0).
@@ -3880,17 +3918,17 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
       ASSERT_LT(locality_index.value(), 2);
       ++cnts[locality_index.value()];
     }
-    EXPECT_EQ(pick_0, cnts[0]);
-    EXPECT_EQ(pick_1, cnts[1]);
+    EXPECT_NEAR(pick_0, cnts[0], 1);
+    EXPECT_NEAR(pick_1, cnts[1], 1);
   };
 
   // NOTE: effective locality weight: weight * min(1, factor * healthy-ratio).
 
   // Picks in localities match to weight(1) * healthy-ratio when
   // overprovisioning factor is 1.
-  setUpHostSetWithOPFAndTestPicks(100, 33, 67);
+  setUpHostSetWithOPFAndTestPicks(100, iters / 3.0, 2 * iters / 3.0);
   // Picks in localities match to weights as factor * healthy-ratio > 1.
-  setUpHostSetWithOPFAndTestPicks(200, 50, 50);
+  setUpHostSetWithOPFAndTestPicks(200, iters / 2.0, iters / 2.0);
 };
 
 // Verifies that partitionHosts correctly splits hosts based on their health flags.

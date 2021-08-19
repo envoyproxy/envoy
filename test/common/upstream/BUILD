@@ -786,6 +786,7 @@ envoy_cc_test_library(
     hdrs = ["zone_aware_load_balancer_fuzz_base.h"],
     deps = [
         ":load_balancer_fuzz_lib",
+        "//source/common/common:random_generator_lib",
         ":zone_aware_load_balancer_fuzz_proto_cc_proto",
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:priority_set_mocks",

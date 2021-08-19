@@ -57,10 +57,11 @@ LogicalDnsCluster::LogicalDnsCluster(
       resolve_timer_(
           factory_context.dispatcher().createTimer([this]() -> void { startResolve(); })),
       local_info_(factory_context.localInfo()),
-      load_assignment_(convertPriority(cluster.load_assignment())) {
+      load_assignment_(convertPriority(cluster.load_assignment())),
+      random_(factory_context.api().randomGenerator()) {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
-          cluster, dns_refresh_rate_ms_.count(), factory_context.api().randomGenerator());
+          cluster, dns_refresh_rate_ms_.count(), random_);
 
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
@@ -133,7 +134,7 @@ void LogicalDnsCluster::startResolve() {
                                               lbEndpoint(), nullptr, time_source_);
 
             const auto& locality_lb_endpoint = localityLbEndpoint();
-            PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
+            PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
             priority_state_manager.initializePriorityFor(locality_lb_endpoint);
             priority_state_manager.registerHostForPriority(logical_host_, locality_lb_endpoint);
 

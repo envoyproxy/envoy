@@ -81,6 +81,7 @@ private:
   std::vector<LocalityWeightsMap> locality_weights_map_;
   Event::TimerPtr assignment_timeout_;
   InitializePhase initialize_phase_;
+  Random::RandomGenerator& random_;
 };
 
 using EdsClusterImplSharedPtr = std::shared_ptr<EdsClusterImpl>;

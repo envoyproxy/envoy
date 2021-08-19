@@ -39,6 +39,11 @@ Minor Behavior Changes
   to false. As part of this change, the use of reuse_port for TCP listeners on both macOS and
   Windows has been disabled due to suboptimal behavior. See the field documentation for more
   information.
+* upstream: weighted round-robin scheduling changed from an EDF scheduler implementation to WRSQ,
+  which exhibits less herding behavior in some cases for the weighted round robin and weighted
+  locality load balancers.  This behavior may be reverted in the weighted round robin load balancer
+  by setting ``envoy.reloadable_features.upstream.round_robin_scheduler_wrsq`` false and for
+  localities by setting ``envoy.reloadable_features.upstream.locality_scheduler_wrsq`` false.
 
 Bug Fixes
 ---------
