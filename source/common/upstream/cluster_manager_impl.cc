@@ -485,7 +485,7 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
         if (cluster.info()->lbConfig().close_connections_on_host_set_change()) {
           for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
             // This will drain all tcp and http connection pools.
-            postThreadLocalDrainConnections(cluster, host_set->hosts());
+            postThreadLocalRemoveHosts(cluster, host_set->hosts());
           }
         } else {
           // TODO(snowp): Should this be subject to merge windows?
@@ -495,7 +495,7 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
           // enabled, this case will be covered by first `if` statement, where all
           // connection pools are drained.
           if (!hosts_removed.empty()) {
-            postThreadLocalDrainConnections(cluster, hosts_removed);
+            postThreadLocalRemoveHosts(cluster, hosts_removed);
           }
         }
       });
@@ -956,8 +956,17 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   return data;
 }
 
-void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
-                                                         const HostVector& hosts_removed) {
+void ClusterManagerImpl::drainConnections(const std::string& cluster) {
+  tls_.runOnAllThreads([cluster](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    auto cluster_entry = cluster_manager->thread_local_clusters_.find(cluster);
+    if (cluster_entry != cluster_manager->thread_local_clusters_.end()) {
+      cluster_entry->second->drainConnPools();
+    }
+  });
+}
+
+void ClusterManagerImpl::postThreadLocalRemoveHosts(const Cluster& cluster,
+                                                    const HostVector& hosts_removed) {
   tls_.runOnAllThreads([name = cluster.info()->name(),
                         hosts_removed](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     cluster_manager->removeHosts(name, hosts_removed);
@@ -985,35 +994,37 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
     per_priority.overprovisioning_factor_ = host_set->overprovisioningFactor();
   }
 
-  tls_.runOnAllThreads(
-      [info = cm_cluster.cluster().info(), params = std::move(params), add_or_update_cluster,
-       load_balancer_factory](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-        ThreadLocalClusterManagerImpl::ClusterEntry* new_cluster = nullptr;
-        if (add_or_update_cluster) {
-          if (cluster_manager->thread_local_clusters_.count(info->name()) > 0) {
-            ENVOY_LOG(debug, "updating TLS cluster {}", info->name());
-          } else {
-            ENVOY_LOG(debug, "adding TLS cluster {}", info->name());
-          }
+  HostMapConstSharedPtr host_map = cm_cluster.cluster().prioritySet().crossPriorityHostMap();
 
-          new_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(*cluster_manager, info,
-                                                                        load_balancer_factory);
-          cluster_manager->thread_local_clusters_[info->name()].reset(new_cluster);
-        }
+  tls_.runOnAllThreads([info = cm_cluster.cluster().info(), params = std::move(params),
+                        add_or_update_cluster, load_balancer_factory, map = std::move(host_map)](
+                           OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    ThreadLocalClusterManagerImpl::ClusterEntry* new_cluster = nullptr;
+    if (add_or_update_cluster) {
+      if (cluster_manager->thread_local_clusters_.count(info->name()) > 0) {
+        ENVOY_LOG(debug, "updating TLS cluster {}", info->name());
+      } else {
+        ENVOY_LOG(debug, "adding TLS cluster {}", info->name());
+      }
 
-        for (const auto& per_priority : params.per_priority_update_params_) {
-          cluster_manager->updateClusterMembership(
-              info->name(), per_priority.priority_, per_priority.update_hosts_params_,
-              per_priority.locality_weights_, per_priority.hosts_added_,
-              per_priority.hosts_removed_, per_priority.overprovisioning_factor_);
-        }
+      new_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(*cluster_manager, info,
+                                                                    load_balancer_factory);
+      cluster_manager->thread_local_clusters_[info->name()].reset(new_cluster);
+    }
 
-        if (new_cluster != nullptr) {
-          for (auto& cb : cluster_manager->update_callbacks_) {
-            cb->onClusterAddOrUpdate(*new_cluster);
-          }
-        }
-      });
+    for (const auto& per_priority : params.per_priority_update_params_) {
+      cluster_manager->updateClusterMembership(
+          info->name(), per_priority.priority_, per_priority.update_hosts_params_,
+          per_priority.locality_weights_, per_priority.hosts_added_, per_priority.hosts_removed_,
+          per_priority.overprovisioning_factor_, map);
+    }
+
+    if (new_cluster != nullptr) {
+      for (auto& cb : cluster_manager->update_callbacks_) {
+        cb->onClusterAddOrUpdate(*new_cluster);
+      }
+    }
+  });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
@@ -1053,11 +1064,13 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
     const std::string& name, uint32_t priority,
     PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, absl::optional<uint32_t> overprovisioning_factor) {
+    const HostVector& hosts_removed, absl::optional<uint32_t> overprovisioning_factor,
+    HostMapConstSharedPtr cross_priority_host_map) {
   ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
             hosts_added.size(), hosts_removed.size());
   priority_set_.updateHosts(priority, std::move(update_hosts_params), std::move(locality_weights),
-                            hosts_added, hosts_removed, overprovisioning_factor);
+                            hosts_added, hosts_removed, overprovisioning_factor,
+                            std::move(cross_priority_host_map));
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (lb_factory_ != nullptr) {
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
@@ -1231,12 +1244,13 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority, PrioritySet::UpdateHostsParams update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, uint64_t overprovisioning_factor) {
+    const HostVector& hosts_removed, uint64_t overprovisioning_factor,
+    HostMapConstSharedPtr cross_priority_host_map) {
   ASSERT(thread_local_clusters_.find(name) != thread_local_clusters_.end());
   const auto& cluster_entry = thread_local_clusters_[name];
   cluster_entry->updateHosts(name, priority, std::move(update_hosts_params),
                              std::move(locality_weights), hosts_added, hosts_removed,
-                             overprovisioning_factor);
+                             overprovisioning_factor, std::move(cross_priority_host_map));
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
@@ -1382,6 +1396,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   }
 }
 
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnPools() {
+  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
+    parent_.drainConnPools(host_set->hosts());
+  }
+}
+
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry() {
   // We need to drain all connection pools for the cluster being removed. Then we can remove the
   // cluster.
@@ -1389,9 +1409,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
   // TODO(mattklein123): Optimally, we would just fire member changed callbacks and remove all of
   // the hosts inside of the HostImpl destructor. That is a change with wide implications, so we are
   // going with a more targeted approach for now.
-  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
-    parent_.drainConnPools(host_set->hosts());
-  }
+  drainConnPools();
 }
 
 Http::ConnectionPool::Instance*
