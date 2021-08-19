@@ -221,11 +221,11 @@ public:
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
-  std::shared_ptr<Envoy::StreamInfo::BytesMeterer> getUpstreamBytesMeterer() const override {
+  Envoy::StreamInfo::BytesMetererSharedPtr getUpstreamBytesMeterer() const override {
     return upstream_bytes_meterer_;
   }
 
-  std::shared_ptr<Envoy::StreamInfo::BytesMeterer> getDownstreamBytesMeterer() const override {
+  Envoy::StreamInfo::BytesMetererSharedPtr getDownstreamBytesMeterer() const override {
     return downstream_bytes_meterer_;
   }
 
@@ -272,19 +272,19 @@ public:
   Tracing::Reason trace_reason_{Tracing::Reason::NotTraceable};
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
-  std::shared_ptr<Envoy::StreamInfo::BytesMeterer> upstream_bytes_meterer_{
-      new Envoy::StreamInfo::BytesMeterer()};
-  std::shared_ptr<Envoy::StreamInfo::BytesMeterer> downstream_bytes_meterer_{
-      new Envoy::StreamInfo::BytesMeterer()};
+  Envoy::StreamInfo::BytesMetererSharedPtr upstream_bytes_meterer_ =
+      std::make_shared<Envoy::StreamInfo::BytesMeterer>();
+  Envoy::StreamInfo::BytesMetererSharedPtr downstream_bytes_meterer_ =
+      std::make_shared<Envoy::StreamInfo::BytesMeterer>();
 
 private:
   void setUpstreamBytesMeterer(
-      const std::shared_ptr<Envoy::StreamInfo::BytesMeterer>& upstream_bytes_meterer) override {
+      const Envoy::StreamInfo::BytesMetererSharedPtr& upstream_bytes_meterer) override {
     upstream_bytes_meterer_ = upstream_bytes_meterer;
   }
 
   void setDownstreamBytesMeterer(
-      const std::shared_ptr<Envoy::StreamInfo::BytesMeterer>& downstream_bytes_meterer) override {
+      const Envoy::StreamInfo::BytesMetererSharedPtr& downstream_bytes_meterer) override {
     downstream_bytes_meterer_ = downstream_bytes_meterer;
   }
 };

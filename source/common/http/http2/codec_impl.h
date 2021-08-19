@@ -307,14 +307,14 @@ protected:
       }
     }
 
-    void setBytesMeterer(const std::shared_ptr<StreamInfo::BytesMeterer>& bytes_meterer) override {
+    void setBytesMeterer(const StreamInfo::BytesMetererSharedPtr& bytes_meterer) override {
       bytes_meterer_ = bytes_meterer;
     }
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
-    std::shared_ptr<StreamInfo::BytesMeterer> bytes_meterer_;
+    StreamInfo::BytesMetererSharedPtr bytes_meterer_;
 
     Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
     // Note that in current implementation the watermark callbacks of the pending_recv_data_ are

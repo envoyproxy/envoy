@@ -280,11 +280,11 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
-  std::shared_ptr<BytesMeterer> getUpstreamBytesMeterer() const override {
+  BytesMetererSharedPtr getUpstreamBytesMeterer() const override {
     return upstream_bytes_meterer_;
   }
 
-  std::shared_ptr<BytesMeterer> getDownstreamBytesMeterer() const override {
+  BytesMetererSharedPtr getDownstreamBytesMeterer() const override {
     return downstream_bytes_meterer_;
   }
 
@@ -331,12 +331,12 @@ private:
         trace_reason_(Tracing::Reason::NotTraceable) {}
 
   void
-  setUpstreamBytesMeterer(const std::shared_ptr<BytesMeterer>& upstream_bytes_meterer) override {
+  setUpstreamBytesMeterer(const BytesMetererSharedPtr& upstream_bytes_meterer) override {
     upstream_bytes_meterer_ = upstream_bytes_meterer;
   }
 
   void setDownstreamBytesMeterer(
-      const std::shared_ptr<BytesMeterer>& downstream_bytes_meterer) override {
+      const BytesMetererSharedPtr& downstream_bytes_meterer) override {
     downstream_bytes_meterer_ = downstream_bytes_meterer;
   }
 
@@ -353,8 +353,8 @@ private:
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
-  std::shared_ptr<BytesMeterer> upstream_bytes_meterer_{new BytesMeterer()};
-  std::shared_ptr<BytesMeterer> downstream_bytes_meterer_{new BytesMeterer()};
+  BytesMetererSharedPtr upstream_bytes_meterer_ = std::make_shared<BytesMeterer>();
+  BytesMetererSharedPtr downstream_bytes_meterer_ = std::make_shared<BytesMeterer>();
 };
 
 } // namespace StreamInfo

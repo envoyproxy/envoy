@@ -237,10 +237,10 @@ struct UpstreamTiming {
 };
 
 struct BytesMeterer {
-  uint64_t wireBytesSent() { return wire_bytes_sent_; }
-  uint64_t wireBytesReceived() { return wire_bytes_received_; }
-  uint64_t bodyBytesSent() { return body_bytes_sent_; }
-  uint64_t bodyBytesReceived() { return body_bytes_received_; }
+  uint64_t wireBytesSent() const { return wire_bytes_sent_; }
+  uint64_t wireBytesReceived() const { return wire_bytes_received_; }
+  uint64_t bodyBytesSent() const { return body_bytes_sent_; }
+  uint64_t bodyBytesReceived() const { return body_bytes_received_; }
   void addBodyBytesSent(uint64_t added_bytes) { body_bytes_sent_ += added_bytes; }
   void addBodyBytesReceived(uint64_t added_bytes) { body_bytes_received_ += added_bytes; }
   void addWireBytesSent(uint64_t added_bytes) { wire_bytes_sent_ += added_bytes; }
@@ -252,6 +252,8 @@ private:
   uint64_t wire_bytes_sent_{};
   uint64_t wire_bytes_received_{};
 };
+
+using BytesMetererSharedPtr = std::shared_ptr<BytesMeterer>;
 
 /**
  * Additional information about a completed request for logging.
@@ -621,9 +623,9 @@ public:
    */
   virtual absl::optional<uint32_t> attemptCount() const PURE;
 
-  virtual std::shared_ptr<BytesMeterer> getUpstreamBytesMeterer() const PURE;
+  virtual BytesMetererSharedPtr getUpstreamBytesMeterer() const PURE;
 
-  virtual std::shared_ptr<BytesMeterer> getDownstreamBytesMeterer() const PURE;
+  virtual BytesMetererSharedPtr getDownstreamBytesMeterer() const PURE;
 
   static void syncUpstreamAndDownstreamBytesMeterer(StreamInfo& downstream_info,
                                                     StreamInfo& upstream_info) {
@@ -632,9 +634,9 @@ public:
   }
 
 private:
-  virtual void setUpstreamBytesMeterer(const std::shared_ptr<BytesMeterer>&) PURE;
+  virtual void setUpstreamBytesMeterer(const BytesMetererSharedPtr&) PURE;
 
-  virtual void setDownstreamBytesMeterer(const std::shared_ptr<BytesMeterer>&) PURE;
+  virtual void setDownstreamBytesMeterer(const BytesMetererSharedPtr&) PURE;
 };
 
 } // namespace StreamInfo

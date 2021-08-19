@@ -361,7 +361,7 @@ public:
 
   virtual void addDecodedBytes(size_t newly_received_bytes) PURE;
 
-  virtual void setBytesMeterer(const std::shared_ptr<StreamInfo::BytesMeterer>&) {}
+  virtual void setBytesMeterer(const StreamInfo::BytesMetererSharedPtr&) {}
 };
 
 /**
