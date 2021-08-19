@@ -377,7 +377,7 @@ TEST_F(ProxyFilterTest, AddResolvedHostFilterStateMetadata) {
 
   filter_->onDestroy();
 }
-/*
+
 // Tests if `StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR` is populated in the filter state when an
 // upstream host is resolved successfully but is null.
 TEST_F(ProxyFilterTest, IgnoreFilterStateMetadataNullAddress) {
@@ -421,7 +421,7 @@ TEST_F(ProxyFilterTest, IgnoreFilterStateMetadataNullAddress) {
 
   filter_->onDestroy();
 }
-*/
+
 // Tests if an already existing `StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR` data in filter state
 // is updated when upstream host is resolved successfully.
 TEST_F(ProxyFilterTest, UpdateResolvedHostFilterStateMetadata) {

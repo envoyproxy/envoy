@@ -148,12 +148,10 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
 void ProxyFilter::addHostAddressToFilterState(
     const Network::Address::InstanceConstSharedPtr& address) {
-  /*
-if (!decoder_callbacks_ || !address) {
-    ENVOY_LOG_MISC(warn, "Missing decoder callbacks or resolved address");
+  if (!decoder_callbacks_ || !address) {
+    ENVOY_LOG_MISC(warn, "Bad parameter - decoder callbacks or address");
     return;
-}
-*/
+  }
 
   ENVOY_STREAM_LOG(trace, "Adding resolved host {} to filter state", *decoder_callbacks_,
                    address->asString());
