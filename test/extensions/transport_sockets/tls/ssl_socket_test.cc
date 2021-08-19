@@ -5449,7 +5449,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptCompleteFailure) {
   testUtil(failing_test_options.setPrivateKeyMethodExpected(true)
                .setExpectedServerCloseEvent(Network::ConnectionEvent::LocalClose)
                .setExpectedServerStats("ssl.connection_error")
-               .setExpectedTransportFailureReasonContains("Connection reset by peer"));
+               .setExpectedTransportFailureReasonContains("system library"));
 }
 
 // Test having one cert with private key method and another with just
