@@ -49,8 +49,8 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",
-        "@com_googlesource_quiche//:quic_core_versions_lib",
-        "@com_googlesource_quiche//:quic_test_tools_test_certificates_lib",
+        "@com_github_google_quiche//:quic_core_versions_lib",
+        "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",
     ],
 )
 
@@ -85,7 +85,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_proof_verifier_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//test/mocks/ssl:ssl_mocks",
-        "@com_googlesource_quiche//:quic_test_tools_test_certificates_lib",
+        "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",
     ],
 )
 
@@ -106,9 +106,9 @@ envoy_cc_test(
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
         "//test/test_common:utility_lib",
-        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
-        "@com_googlesource_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
-        "@com_googlesource_quiche//:quic_test_tools_session_peer_lib",
+        "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
+        "@com_github_google_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
+        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ],
 )
 
@@ -128,8 +128,8 @@ envoy_cc_test(
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
         "//test/test_common:utility_lib",
-        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
-        "@com_googlesource_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
+        "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
+        "@com_github_google_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
     ],
 )
 
@@ -156,9 +156,9 @@ envoy_cc_test(
         "//test/test_common:global_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
-        "@com_googlesource_quiche//:quic_test_tools_config_peer_lib",
-        "@com_googlesource_quiche//:quic_test_tools_server_session_base_peer",
-        "@com_googlesource_quiche//:quic_test_tools_test_utils_lib",
+        "@com_github_google_quiche//:quic_test_tools_config_peer_lib",
+        "@com_github_google_quiche//:quic_test_tools_server_session_base_peer",
+        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
     ],
 )
 
@@ -182,7 +182,7 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
-        "@com_googlesource_quiche//:quic_test_tools_session_peer_lib",
+        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ],
 )
 
@@ -205,7 +205,7 @@ envoy_cc_test(
         "//test/mocks/server:instance_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
-        "@com_googlesource_quiche//:quic_test_tools_crypto_server_config_peer_lib",
+        "@com_github_google_quiche//:quic_test_tools_crypto_server_config_peer_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
@@ -242,7 +242,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/quic:envoy_quic_proof_source_base_lib",
         "//test/mocks/network:network_mocks",
-        "@com_googlesource_quiche//:quic_test_tools_test_certificates_lib",
+        "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",
     ],
 )
 
@@ -262,7 +262,7 @@ envoy_cc_test_library(
     deps = [
         ":test_proof_source_lib",
         ":test_proof_verifier_lib",
-        "@com_googlesource_quiche//:quic_test_tools_test_utils_lib",
+        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
     ],
 )
 
@@ -331,8 +331,8 @@ envoy_cc_test_library(
         "//source/common/quic:envoy_quic_server_connection_lib",
         "//source/common/quic:quic_filter_manager_connection_lib",
         "//test/test_common:environment_lib",
-        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
-        "@com_googlesource_quiche//:quic_test_tools_first_flight_lib",
-        "@com_googlesource_quiche//:quic_test_tools_qpack_qpack_encoder_test_utils_lib",
+        "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
+        "@com_github_google_quiche//:quic_test_tools_first_flight_lib",
+        "@com_github_google_quiche//:quic_test_tools_qpack_qpack_encoder_test_utils_lib",
     ],
 )

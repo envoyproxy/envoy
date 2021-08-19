@@ -87,5 +87,33 @@ TEST_P(HttpConnPoolIntegrationTest, PoolCleanupAfterRemoteClose) {
   test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.cx_pool_open", 0);
 }
 
+// Verify that the drainConnections() cluster manager API works correctly.
+TEST_P(HttpConnPoolIntegrationTest, PoolDrainAfterDrainApi) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  // Validate that the circuit breaker config is setup as we expect.
+  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.cx_pool_open", 1);
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+
+  // Drain connection pools via API. Need to post this to the server thread.
+  test_server_->server().dispatcher().post(
+      [this] { test_server_->server().clusterManager().drainConnections("cluster_0"); });
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  // Validate that the pool is deleted when it becomes idle.
+  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.cx_pool_open", 0);
+}
+
 } // namespace
 } // namespace Envoy

@@ -5,4 +5,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.filters.http.squash":                        "//contrib/squash/filters/http/source:config",
+
+    #
+    # Network filters
+    #
+
+    "envoy.filters.network.kafka_broker":                         "//contrib/kafka/filters/network/source:kafka_broker_config_lib",
 }

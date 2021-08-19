@@ -58,6 +58,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//contrib/envoy/extensions/filters/http/squash/v3:pkg",
+        "//contrib/envoy/extensions/filters/network/kafka_broker/v3:pkg",
         "//envoy/admin/v3:pkg",
         "//envoy/config/accesslog/v3:pkg",
         "//envoy/config/bootstrap/v3:pkg",
@@ -159,7 +160,6 @@ proto_library(
         "//envoy/extensions/filters/network/echo/v3:pkg",
         "//envoy/extensions/filters/network/ext_authz/v3:pkg",
         "//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
-        "//envoy/extensions/filters/network/kafka_broker/v3:pkg",
         "//envoy/extensions/filters/network/local_ratelimit/v3:pkg",
         "//envoy/extensions/filters/network/mongo_proxy/v3:pkg",
         "//envoy/extensions/filters/network/mysql_proxy/v3:pkg",
