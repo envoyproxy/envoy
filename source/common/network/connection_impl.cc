@@ -764,6 +764,8 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 absl::string_view ConnectionImpl::transportFailureReason() const {
   // TODO(mattklein123): Is it possible for there to be a local failure reason and a transport
   // failure reason? If so we may need to combine these somehow.
+  ENVOY_BUG(!failure_reason_.empty() && transport_socket_->failureReason().empty(),
+            "both connection and transport failure reason are not empty");
   if (!failure_reason_.empty()) {
     return failure_reason_;
   }

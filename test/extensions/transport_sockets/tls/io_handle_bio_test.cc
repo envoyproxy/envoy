@@ -31,7 +31,9 @@ TEST_F(IoHandleBioTest, WriteError) {
           Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(100),
                                                      Network::IoSocketError::deleteIoError)))));
   EXPECT_EQ(-1, bio_->method->bwrite(bio_, nullptr, 10));
-  EXPECT_EQ(ERR_GET_LIB(ERR_get_error()), ERR_LIB_SYS);
+  const int err = ERR_get_error();
+  EXPECT_EQ(ERR_GET_LIB(err), ERR_LIB_SYS);
+  EXPECT_EQ(ERR_GET_REASON(err), 100);
 }
 
 TEST_F(IoHandleBioTest, TestMiscApis) {
