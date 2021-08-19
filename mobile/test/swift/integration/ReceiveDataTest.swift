@@ -53,7 +53,6 @@ static_resources:
 """
     let client = EngineBuilder(yaml: config)
       .addLogLevel(.debug)
-      .addPlatformFilter(DemoFilter.init)
       .build()
       .streamClient()
 
