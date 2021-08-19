@@ -26,7 +26,7 @@ public:
             const absl::string_view value) override;
 
   // KafkaProducer
-  virtual void markFinished() override;
+  void markFinished() override;
 };
 
 } // namespace Mesh
