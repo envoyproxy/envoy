@@ -227,11 +227,18 @@ private:
   std::list<ConverterCallback> pending_callbacks_;
 };
 
+#define ALL_SHADOW_WRITER_STATS(COUNTER, GAUGE, HISTOGRAM) COUNTER(shadow_request_submit_failure)
+
+struct ShadowWriterStats {
+  ALL_SHADOW_WRITER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+};
+
 class ShadowWriterImpl : public ShadowWriter, Logger::Loggable<Logger::Id::thrift> {
 public:
   ShadowWriterImpl(Upstream::ClusterManager& cm, const std::string& stat_prefix,
                    Stats::Scope& scope, Event::Dispatcher& dispatcher)
-      : cm_(cm), stat_prefix_(stat_prefix), scope_(scope), dispatcher_(dispatcher) {}
+      : cm_(cm), stat_prefix_(stat_prefix), scope_(scope), dispatcher_(dispatcher),
+        stats_(generateStats(stat_prefix, scope)) {}
 
   ~ShadowWriterImpl() override {
     while (!active_routers_.empty()) {
@@ -253,11 +260,18 @@ public:
 private:
   friend class ShadowRouterImpl;
 
+  ShadowWriterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return ShadowWriterStats{ALL_SHADOW_WRITER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
+                                                     POOL_GAUGE_PREFIX(scope, prefix),
+                                                     POOL_HISTOGRAM_PREFIX(scope, prefix))};
+  }
+
   Upstream::ClusterManager& cm_;
   const std::string stat_prefix_;
   Stats::Scope& scope_;
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<ShadowRouterImpl>> active_routers_;
+  ShadowWriterStats stats_;
 };
 
 } // namespace Router

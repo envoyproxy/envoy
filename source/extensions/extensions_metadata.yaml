@@ -338,11 +338,6 @@ envoy.filters.network.envoy_mobile_http_connection_manager:
   - envoy.filters.network
   security_posture: robust_to_untrusted_downstream
   status: stable
-envoy.filters.network.kafka_broker:
-  categories:
-  - envoy.filters.network
-  security_posture: requires_trusted_downstream_and_upstream
-  status: wip
 envoy.filters.network.local_ratelimit:
   categories:
   - envoy.filters.network
