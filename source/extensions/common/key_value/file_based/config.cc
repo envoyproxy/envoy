@@ -48,10 +48,10 @@ KeyValueStorePtr FileBasedKeyValueStoreFactory::createStore(
       const envoy::extensions::common::key_value::v3::KeyValueStoreConfig&>(config,
                                                                             validation_visitor);
   const auto file_config = MessageUtil::anyConvertAndValidate<
-      envoy::extensions::common::key_value::v3::FileBasedKeyValueStoreConfig>(
+      envoy::extensions::common::key_value::file_based::v3::FileBasedKeyValueStoreConfig>(
       typed_config.config().typed_config(), validation_visitor);
   auto seconds =
-      std::chrono::seconds(DurationUtil::durationToSeconds(typed_config.flush_interval()));
+      std::chrono::seconds(DurationUtil::durationToSeconds(file_config.flush_interval()));
   return std::make_unique<FileBasedKeyValueStore>(dispatcher, seconds, file_system,
                                                   file_config.filename());
 }

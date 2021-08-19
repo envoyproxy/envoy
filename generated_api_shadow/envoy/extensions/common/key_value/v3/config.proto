@@ -22,10 +22,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message KeyValueStoreConfig {
   // [#extension-category: envoy.common.key_value]
   config.core.v3.TypedExtensionConfig config = 1 [(validate.rules).message = {required: true}];
-
-  // The interval at which the key value store should be flushed to long term
-  // storage.
-  google.protobuf.Duration flush_interval = 2;
 }
 
 // [#alpha:]
@@ -35,4 +31,7 @@ message FileBasedKeyValueStoreConfig {
   // The filename to read the keys and values from, and write the keys and
   // values to.
   string filename = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The interval at which the key value store should be flushed to the file.
+  google.protobuf.Duration flush_interval = 2;
 }

@@ -139,5 +139,5 @@ message DnsCacheConfig {
 
   // [#not-implemented-hide:]
   // Configuration to flush the DNS cache to long term storage.
-  key_value.v3.KeyValueStoreConfig persistent_cache_config = 13;
+  key_value.v3.KeyValueStoreConfig key_value_config = 13;
 }

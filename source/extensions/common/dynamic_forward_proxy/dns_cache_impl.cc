@@ -442,12 +442,12 @@ void DnsCacheImpl::removeCacheEntry(const std::string& host) {
 
 void DnsCacheImpl::loadCacheEntries(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) {
-  if (!config.has_persistent_cache_config()) {
+  if (!config.has_key_value_config()) {
     return;
   }
-  auto& factory = Config::Utility::getAndCheckFactory<KeyValueStoreFactory>(
-      config.persistent_cache_config().config());
-  key_value_store_ = factory.createStore(config.persistent_cache_config(), validation_visitor_,
+  auto& factory =
+      Config::Utility::getAndCheckFactory<KeyValueStoreFactory>(config.key_value_config().config());
+  key_value_store_ = factory.createStore(config.key_value_config(), validation_visitor_,
                                          main_thread_dispatcher_, file_system_);
   KeyValueStore::ConstIterateCb load = [this](const std::string& key, const std::string& value) {
     auto address = Network::Utility::parseInternetAddressAndPortNoThrow(value);
@@ -456,6 +456,8 @@ void DnsCacheImpl::loadCacheEntries(
     }
     stats_.cache_load_.inc();
     std::list<Network::DnsResponse> response;
+    // TODO(alyssawilk) change finishResolve to actually use the TTL rather than
+    // putting 0 here, return the remaining TTL or indicate the result is stale.
     response.emplace_back(Network::DnsResponse(address, std::chrono::seconds(0) /* ttl */));
     startCacheLoad(key, address->ip()->port());
     finishResolve(key, Network::DnsResolver::ResolutionStatus::Success, std::move(response), true);

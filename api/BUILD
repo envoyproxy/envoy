@@ -96,6 +96,7 @@ proto_library(
         "//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg",
         "//envoy/extensions/clusters/redis/v3:pkg",
         "//envoy/extensions/common/dynamic_forward_proxy/v3:pkg",
+        "//envoy/extensions/common/key_value/file_based/v3:pkg",
         "//envoy/extensions/common/key_value/v3:pkg",
         "//envoy/extensions/common/matching/v3:pkg",
         "//envoy/extensions/common/ratelimit/v3:pkg",

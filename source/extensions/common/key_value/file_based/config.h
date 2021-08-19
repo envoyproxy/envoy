@@ -1,4 +1,6 @@
 #include "envoy/common/key_value_store.h"
+#include "envoy/extensions/common/key_value/file_based/v3/config.pb.h"
+#include "envoy/extensions/common/key_value/file_based/v3/config.pb.validate.h"
 #include "envoy/extensions/common/key_value/v3/config.pb.h"
 #include "envoy/extensions/common/key_value/v3/config.pb.validate.h"
 
@@ -37,7 +39,7 @@ public:
   // TypedFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{
-        new envoy::extensions::common::key_value::v3::FileBasedKeyValueStoreConfig()};
+        new envoy::extensions::common::key_value::file_based::v3::FileBasedKeyValueStoreConfig()};
   }
 
   std::string name() const override { return "envoy.common.key_value.file_based"; }
