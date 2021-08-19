@@ -146,7 +146,7 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
     ip = info.downstreamAddressProvider().localAddress();
     break;
   case Upstream: {
-    if (!info.filterState().hasDataWithName(StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR)) {
+    if (!info.filterState().hasDataWithName(StreamInfo::AddressSetAccessorImpl::key())) {
       ENVOY_LOG_MISC(warn, "Did not find dynamic forward proxy metadata. Do you have dynamic "
                            "forward proxy in the filter chain before the RBAC filter ?");
       return false;
@@ -156,7 +156,7 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
 
     const StreamInfo::AddressSetAccessor& address_set =
         info.filterState().getDataReadOnly<StreamInfo::AddressSetAccessor>(
-            StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR);
+            StreamInfo::AddressSetAccessorImpl::key());
 
     address_set.iterate([&, this](const Network::Address::InstanceConstSharedPtr& address) {
       ipMatch = range_.isInRange(*address.get());

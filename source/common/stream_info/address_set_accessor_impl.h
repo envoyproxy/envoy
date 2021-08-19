@@ -16,6 +16,8 @@ public:
     addresses_.emplace(address);
   }
 
+  void clear() override { addresses_.clear(); }
+
   void iterate(const std::function<bool(const Network::Address::InstanceConstSharedPtr& address)>&
                    fn) const override {
     for (const auto& address : addresses_) {
@@ -23,6 +25,10 @@ public:
         break;
       }
     }
+  }
+
+  static const std::string& key() {
+    CONSTRUCT_ON_FIRST_USE(std::string, "filter_state_key.address_set_accessor");
   }
 
 private:

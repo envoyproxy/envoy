@@ -331,8 +331,8 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
   filter_->onDestroy();
 }
 
-// Tests if `StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR` is populated in the filter state when an
-// upstream host is resolved successfully.
+// Tests if address set is populated in the filter state when an upstream host is resolved
+// successfully.
 TEST_F(ProxyFilterTest, AddResolvedHostFilterStateMetadata) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
@@ -373,13 +373,13 @@ TEST_F(ProxyFilterTest, AddResolvedHostFilterStateMetadata) {
 
   // We expect FilterState to be populated
   EXPECT_TRUE(filter_state->hasData<StreamInfo::AddressSetAccessor>(
-      StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR));
+      StreamInfo::AddressSetAccessorImpl::key()));
 
   filter_->onDestroy();
 }
 
-// Tests if `StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR` is populated in the filter state when an
-// upstream host is resolved successfully but is null.
+// Tests if address set is populated in the filter state when an upstream host is resolved
+// successfully but is null.
 TEST_F(ProxyFilterTest, IgnoreFilterStateMetadataNullAddress) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
@@ -417,13 +417,13 @@ TEST_F(ProxyFilterTest, IgnoreFilterStateMetadataNullAddress) {
 
   // We do not expect FilterState to be populated
   EXPECT_FALSE(filter_state->hasData<StreamInfo::AddressSetAccessor>(
-      StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR));
+      StreamInfo::AddressSetAccessorImpl::key()));
 
   filter_->onDestroy();
 }
 
-// Tests if an already existing `StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR` data in filter state
-// is updated when upstream host is resolved successfully.
+// Tests if an already existing address set in filter state is updated when upstream host is
+// resolved successfully.
 TEST_F(ProxyFilterTest, UpdateResolvedHostFilterStateMetadata) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
@@ -435,7 +435,7 @@ TEST_F(ProxyFilterTest, UpdateResolvedHostFilterStateMetadata) {
   const auto pre_address = Network::Utility::parseInternetAddress("1.2.3.3", 80);
   auto address_set = std::make_unique<StreamInfo::AddressSetAccessorImpl>();
   address_set->add(pre_address);
-  filter_state->setData(StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR, std::move(address_set),
+  filter_state->setData(StreamInfo::AddressSetAccessorImpl::key(), std::move(address_set),
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Request);
 
@@ -472,12 +472,12 @@ TEST_F(ProxyFilterTest, UpdateResolvedHostFilterStateMetadata) {
 
   // We expect FilterState to be populated
   EXPECT_TRUE(filter_state->hasData<StreamInfo::AddressSetAccessor>(
-      StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR));
+      StreamInfo::AddressSetAccessorImpl::key()));
 
   // Make sure filter state has pre and new addresses.
   const StreamInfo::AddressSetAccessor& updated_address_set =
       filter_state->getDataReadOnly<StreamInfo::AddressSetAccessor>(
-          StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR);
+          StreamInfo::AddressSetAccessorImpl::key());
 
   absl::flat_hash_set<absl::string_view> populated_addresses;
   updated_address_set.iterate([&](const Network::Address::InstanceConstSharedPtr& address) {
@@ -486,8 +486,8 @@ TEST_F(ProxyFilterTest, UpdateResolvedHostFilterStateMetadata) {
   });
 
   // Verify the data
-  EXPECT_EQ(populated_addresses.size(), 2);
-  EXPECT_TRUE(populated_addresses.contains(pre_address->asStringView()));
+  EXPECT_EQ(populated_addresses.size(), 1);
+  EXPECT_FALSE(populated_addresses.contains(pre_address->asStringView()));
   EXPECT_TRUE(populated_addresses.contains(host_info->address_->asStringView()));
 
   filter_->onDestroy();

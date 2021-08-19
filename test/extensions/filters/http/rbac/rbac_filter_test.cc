@@ -322,7 +322,7 @@ void upstreamIpTestsFilterStateSetup(NiceMock<Http::MockStreamDecoderFilterCallb
 
   // Set the filter state data.
   callback.streamInfo().filterState()->setData(
-      StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR, std::move(address_set),
+      StreamInfo::AddressSetAccessorImpl::key(), std::move(address_set),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
 }
 

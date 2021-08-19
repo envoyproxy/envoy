@@ -160,18 +160,19 @@ void ProxyFilter::addHostAddressToFilterState(
       decoder_callbacks_->streamInfo().filterState();
 
   if (!filter_state->hasData<StreamInfo::AddressSetAccessor>(
-          StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR)) {
+          StreamInfo::AddressSetAccessorImpl::key())) {
     auto address_set = std::make_unique<StreamInfo::AddressSetAccessorImpl>();
     address_set->add(address);
 
-    filter_state->setData(StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR, std::move(address_set),
+    filter_state->setData(StreamInfo::AddressSetAccessorImpl::key(), std::move(address_set),
                           StreamInfo::FilterState::StateType::Mutable,
                           StreamInfo::FilterState::LifeSpan::Request);
 
   } else {
     StreamInfo::AddressSetAccessor& address_set =
         filter_state->getDataMutable<StreamInfo::AddressSetAccessor>(
-            StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR);
+            StreamInfo::AddressSetAccessorImpl::key());
+    address_set.clear();
     address_set.add(address);
   }
 }
