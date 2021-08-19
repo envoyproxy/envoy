@@ -109,7 +109,6 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
         // A request header shouldn't have multiple referer fields.
         request_headers.remove(Http::CustomHeaders::get().Referer);
       } else {
-        // std::string url_copy = std::string(result[0]->value().getStringView());
         auto url_string_view = result[0]->value().getStringView();
         GURL referer_url(gurl_base::StringPiece(url_string_view.data(), url_string_view.length()));
         request_headers.remove(Http::CustomHeaders::get().Referer);
