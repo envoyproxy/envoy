@@ -315,9 +315,10 @@ public:
     return cluster_timeout_budget_stat_names_;
   }
 
+  void drainConnections(const std::string& cluster) override;
+
 protected:
-  virtual void postThreadLocalDrainConnections(const Cluster& cluster,
-                                               const HostVector& hosts_removed);
+  virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
   // Parameters for calling postThreadLocalClusterUpdate()
   struct ThreadLocalClusterUpdateParams {
@@ -423,10 +424,13 @@ private:
                        PrioritySet::UpdateHostsParams&& update_hosts_params,
                        LocalityWeightsConstSharedPtr locality_weights,
                        const HostVector& hosts_added, const HostVector& hosts_removed,
-                       absl::optional<uint32_t> overprovisioning_factor);
+                       absl::optional<uint32_t> overprovisioning_factor,
+                       HostMapConstSharedPtr cross_priority_host_map);
 
       // Drains any connection pools associated with the removed hosts.
       void drainConnPools(const HostVector& hosts_removed);
+      // Drains connection pools for all hosts.
+      void drainConnPools();
 
     private:
       Http::ConnectionPool::Instance*
@@ -471,7 +475,8 @@ private:
                                  PrioritySet::UpdateHostsParams update_hosts_params,
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
-                                 uint64_t overprovisioning_factor);
+                                 uint64_t overprovisioning_factor,
+                                 HostMapConstSharedPtr cross_priority_host_map);
     void onHostHealthFailure(const HostSharedPtr& host);
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
