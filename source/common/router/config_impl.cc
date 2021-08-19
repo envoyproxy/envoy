@@ -59,6 +59,27 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
                                 src.headers_to_remove.end());
 }
 
+const envoy::config::route::v3::WeightedCluster::ClusterWeight&
+ValidateClusterSpecifier(const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster) {
+  if (!cluster.name().empty() && !cluster.cluster_header().empty()) {
+    throw EnvoyException("Only one of name or cluster_header can be specified");
+  } else if (cluster.name().empty() && cluster.cluster_header().empty()) {
+    throw EnvoyException("At least one of name or cluster_header need to be specified");
+  } else {
+    if (!cluster.cluster_header().empty()) {
+      envoy::type::matcher::v3::RegexMatcher matcher;
+      const std::string non_strict_pattern = "^[^\\x{0000}\\x{000A}\\x{000D}]*$";
+      matcher.mutable_google_re2();
+      matcher.set_regex(non_strict_pattern);
+      if (!Regex::Utility::parseRegex(matcher)->match(cluster.cluster_header())) {
+        throw EnvoyException("The cluster header name must conform to a well known regex for HTTP "
+                             "header names in no-strict mode");
+      }
+    }
+  }
+  return cluster;
+}
+
 } // namespace
 
 const std::string& OriginalConnectPort::key() {
@@ -1029,8 +1050,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     ProtobufMessage::ValidationVisitor& validator,
     const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster,
     const OptionalHttpFilters& optional_http_filters)
-    : DynamicRouteEntry(parent, cluster.name()), runtime_key_(runtime_key),
-      loader_(factory_context.runtime()),
+    : DynamicRouteEntry(parent, ValidateClusterSpecifier(cluster).name()),
+      runtime_key_(runtime_key), loader_(factory_context.runtime()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
       request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add(),
                                                       cluster.request_headers_to_remove())),
@@ -1041,23 +1062,6 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
                           optional_http_filters, factory_context, validator),
       host_rewrite_(cluster.host_rewrite_literal()),
       cluster_header_name_(cluster.cluster_header()) {
-
-  if (!cluster.name().empty() && !cluster.cluster_header().empty()) {
-    throw EnvoyException("Only one of name or cluster_header can be specified");
-  } else if (cluster.name().empty() && cluster.cluster_header().empty()) {
-    throw EnvoyException("At least one of name or cluster_header need to be specified");
-  } else {
-    if (!cluster.cluster_header().empty()) {
-      envoy::type::matcher::v3::RegexMatcher matcher;
-      const std::string non_strict_pattern = "^[^\\x{0000}\\x{000A}\\x{000D}]*$";
-      matcher.mutable_google_re2();
-      matcher.set_regex(non_strict_pattern);
-      if (!Regex::Utility::parseRegex(matcher)->match(cluster.cluster_header())) {
-        throw EnvoyException("The cluster header name must conform to a well known regex for HTTP "
-                             "header names in no-strict mode");
-      }
-    }
-  }
   if (cluster.has_metadata_match()) {
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
