@@ -5,6 +5,7 @@
 
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/filesystem/filesystem.h"
@@ -83,6 +84,11 @@ public:
    * @return an optional reference to the ProcessContext
    */
   virtual ProcessContextOptRef processContext() PURE;
+
+  /**
+   * @return the bootstrap Envoy started with.
+   */
+  virtual const envoy::config::bootstrap::v3::Bootstrap& bootstrap() const PURE;
 };
 
 using ApiPtr = std::unique_ptr<Api>;

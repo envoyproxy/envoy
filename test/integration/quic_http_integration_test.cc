@@ -27,6 +27,7 @@
 #pragma GCC diagnostic pop
 #endif
 
+#include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_client_connection.h"
@@ -281,10 +282,14 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsDefaultMode) {
 }
 
 TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsNoBPF) {
-  // Note: This runtime override is a no-op on platforms without BPF
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing", "false");
+  // Note: This setting is a no-op on platforms without BPF
+  class DisableBpf {
+  public:
+    DisableBpf() { ActiveQuicListenerFactory::setDisableKernelBpfPacketRoutingForTest(true); }
+    ~DisableBpf() { ActiveQuicListenerFactory::setDisableKernelBpfPacketRoutingForTest(false); }
+  };
 
+  DisableBpf disable;
   testMultipleQuicConnections();
 }
 
