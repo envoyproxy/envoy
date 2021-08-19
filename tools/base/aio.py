@@ -217,6 +217,16 @@ class concurrent:  # noqa: N801
         """Flag to indicate whether the generator has been closed"""
         return asyncio.Lock()
 
+    @cached_property
+    def consumes_async(self) -> bool:
+        """Provided coros iterable is some kind of async provider"""
+        return isinstance(self._coros, (types.AsyncGeneratorType, AsyncIterator, AsyncIterable))
+
+    @cached_property
+    def consumes_generator(self) -> bool:
+        """Provided coros iterable is some kind of generator"""
+        return isinstance(self._coros, (types.AsyncGeneratorType, types.GeneratorType))
+
     @async_property
     async def coros(self) -> AsyncIterator[Union[ConcurrentIteratorError, Awaitable]]:
         """An async iterator of the provided coroutines"""
@@ -241,16 +251,6 @@ class concurrent:  # noqa: N801
         # This reflects the default for asyncio's `ThreadPoolExecutor`, this is a fairly
         # arbitrary number to use, but it seems like a reasonable default.
         return min(32, (os.cpu_count() or 0) + 4)
-
-    @cached_property
-    def is_async(self) -> bool:
-        """Provided coros is some kind of async provider"""
-        return isinstance(self._coros, (types.AsyncGeneratorType, AsyncIterator, AsyncIterable))
-
-    @cached_property
-    def is_generator(self) -> bool:
-        """Provided coros is some kind of generator"""
-        return isinstance(self._coros, (types.AsyncGeneratorType, types.GeneratorType))
 
     @cached_property
     def limit(self) -> int:
@@ -345,7 +345,7 @@ class concurrent:  # noqa: N801
 
     async def close_coros(self) -> None:
         """Close provided coroutines (unless the provided coros is a generator)"""
-        if self.is_generator:
+        if self.consumes_generator:
             # If we have a generator, dont blow/create/wait upon any more items
             return
 
@@ -383,7 +383,7 @@ class concurrent:  # noqa: N801
         yielding the awaitables asynchoronously.
         """
         try:
-            if self.is_async:
+            if self.consumes_async:
                 async for coro in self._coros:  # type:ignore
                     yield coro
             else:

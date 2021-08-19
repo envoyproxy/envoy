@@ -197,24 +197,24 @@ async def test_python_check_yapf(patches):
         "PythonChecker.yapf_result",
         ("PythonChecker.yapf_files", dict(new_callable=PropertyMock)),
         prefix="tools.code_format.python_check")
-    _files = ["file1", "file2", "file3"]
+    files = ["file1", "file2", "file3"]
 
-    async def _concurrent(iters):
+    async def concurrent(iters):
         assert isinstance(iters, types.GeneratorType)
         for i, format_result in enumerate(iters):
             yield (format_result, (f"REFORMAT{i}", f"ENCODING{i}", f"CHANGED{i}"))
 
     with patched as (m_aio, m_yapf_format, m_yapf_result, m_yapf_files):
-        m_yapf_files.return_value = _files
-        m_aio.concurrent.side_effect = _concurrent
+        m_yapf_files.return_value = files
+        m_aio.concurrent.side_effect = concurrent
         assert not await checker.check_yapf()
 
     assert (
         list(list(c) for c in m_yapf_format.call_args_list)
-        == [[(_file,), {}] for _file in _files])
+        == [[(file,), {}] for file in files])
     assert (
         list(list(c) for c in m_yapf_result.call_args_list)
-        == [[(m_yapf_format.return_value, f"REFORMAT{i}", f"CHANGED{i}"), {}] for i, _ in enumerate(_files)])
+        == [[(m_yapf_format.return_value, f"REFORMAT{i}", f"CHANGED{i}"), {}] for i, _ in enumerate(files)])
 
 
 @pytest.mark.asyncio

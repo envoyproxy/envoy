@@ -42,9 +42,9 @@ async def test_functional_async_property(cache, raises, result):
             if raises:
                 await m_async()
                 raise SomeError("AN ITERATING ERROR OCCURRED")
-            _result = await m_async()
+            result = await m_async()
             for item in items:
-                yield item, _result
+                yield item, result
 
     klass = Klass()
 
@@ -65,7 +65,7 @@ async def test_functional_async_property(cache, raises, result):
             await klass.prop
 
         with pytest.raises(SomeError) as e2:
-            async for _result in klass.iter_prop:
+            async for result in klass.iter_prop:
                 pass
 
         assert (
@@ -84,17 +84,17 @@ async def test_functional_async_property(cache, raises, result):
     assert await klass.prop == result
 
     # results can also be repeatedly iterated
-    _results1 = []
-    async for _result in klass.iter_prop:
-        _results1.append(_result)
-    assert _results1 == [(item, result) for item in items]
+    results1 = []
+    async for returned_result in klass.iter_prop:
+        results1.append(returned_result)
+    assert results1 == [(item, result) for item in items]
 
-    _results2 = []
-    async for _result in klass.iter_prop:
-        _results2.append(_result)
+    results2 = []
+    async for returned_result in klass.iter_prop:
+        results2.append(returned_result)
 
     if not cache:
-        assert _results2 == _results1
+        assert results2 == results1
         assert (
             list(list(c) for c in m_async.call_args_list)
             == [[(), {}]] * 4)
@@ -116,4 +116,4 @@ async def test_functional_async_property(cache, raises, result):
         == dict(prop=m_async.return_value, iter_prop=iter_prop))
 
     # cached iterators dont give any more results once they are done
-    assert _results2 == []
+    assert results2 == []
