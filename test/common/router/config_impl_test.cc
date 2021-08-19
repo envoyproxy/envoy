@@ -5301,28 +5301,6 @@ TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithBothNameAndClusterHeade
       "Only one of name or cluster_header can be specified");
 }
 
-// TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithInvalidHeader) {
-
-//   const std::string yaml = R"EOF(
-//       virtual_hosts:
-//         - name: www1
-//           domains: ["www1.lyft.com"]
-//           routes:
-//             - match: { prefix: "/" }
-//               route:
-//                 weighted_clusters:
-//                   total_weight: 30
-//                   clusters:
-//                     - cluster_header: "haha\r"
-//                       weight: 30
-//       )EOF";
-
-//   EXPECT_THROW_WITH_MESSAGE(
-//         TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-//         EnvoyException, "The cluster header name must conform to a well known regex for HTTP
-//         header names");
-// }
-
 TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithNoClusterSpecifier) {
 
   const std::string yaml = R"EOF(
