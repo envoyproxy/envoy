@@ -5276,7 +5276,6 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithBothNameAndClusterHeader) {
-
   const std::string yaml = R"EOF(
       virtual_hosts:
         - name: www1
@@ -5302,7 +5301,6 @@ TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithBothNameAndClusterHeade
 }
 
 TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithNoClusterSpecifier) {
-
   const std::string yaml = R"EOF(
       virtual_hosts:
         - name: www1
@@ -5323,7 +5321,6 @@ TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithNoClusterSpecifier) {
 }
 
 TEST_F(RouteMatcherTest, WeightedClusterHeaderInvalidConfigWithInvalidHttpHeader) {
-
   const std::string yaml = R"EOF(
       virtual_hosts:
         - name: www1
@@ -5334,7 +5331,7 @@ TEST_F(RouteMatcherTest, WeightedClusterHeaderInvalidConfigWithInvalidHttpHeader
                 weighted_clusters:
                   total_weight: 30
                   clusters:
-                    - cluster_header: "haha\r"
+                    - cluster_header: "test\r"
                       weight: 30
       )EOF";
 
