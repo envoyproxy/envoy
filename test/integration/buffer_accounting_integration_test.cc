@@ -450,9 +450,9 @@ TEST_P(Http2OverloadManagerIntegrationTest,
   writev_matcher_->setWritevReturnsEgain();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto largest_request_response = std::move(sendRequests(1, 4096 * 4, 4096)[0]);
-  auto medium_request_response = std::move(sendRequests(1, 4096 * 2, 4096)[0]);
   auto smallest_request_response = std::move(sendRequests(1, 4096, 4096)[0]);
+  auto medium_request_response = std::move(sendRequests(1, 4096 * 2, 4096)[0]);
+  auto largest_request_response = std::move(sendRequests(1, 4096 * 4, 4096)[0]);
 
   // Wait for requests to come into Envoy.
   EXPECT_TRUE(buffer_factory_->waitUntilTotalBufferedExceeds(7 * 4096));
@@ -525,17 +525,17 @@ TEST_P(Http2OverloadManagerIntegrationTest,
   codec_client_ = makeHttpConnection(lookupPort("http"));
   writev_matcher_->setWritevReturnsEgain();
 
-  auto largest_response = std::move(sendRequests(1, 30, 4096 * 4)[0]);
+  auto smallest_response = std::move(sendRequests(1, 10, 4096)[0]);
   waitForNextUpstreamRequest();
-  FakeStreamPtr upstream_request_for_largest_response = std::move(upstream_request_);
+  FakeStreamPtr upstream_request_for_smallest_response = std::move(upstream_request_);
 
   auto medium_response = std::move(sendRequests(1, 20, 4096 * 2)[0]);
   waitForNextUpstreamRequest();
   FakeStreamPtr upstream_request_for_medium_response = std::move(upstream_request_);
 
-  auto smallest_response = std::move(sendRequests(1, 10, 4096)[0]);
+  auto largest_response = std::move(sendRequests(1, 30, 4096 * 4)[0]);
   waitForNextUpstreamRequest();
-  FakeStreamPtr upstream_request_for_smallest_response = std::move(upstream_request_);
+  FakeStreamPtr upstream_request_for_largest_response = std::move(upstream_request_);
 
   // Send the responses back, without yet ending the stream.
   upstream_request_for_largest_response->encodeHeaders(

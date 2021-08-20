@@ -92,11 +92,11 @@ public:
   static BufferMemoryAccountSharedPtr createAccount(WatermarkBufferFactory* factory,
                                                     Http::StreamResetHandler& reset_handler);
   ~BufferMemoryAccountImpl() override {
-    // The buffer_memory_allocated_ should always be zero on destruction, even if we
-    // triggered a reset of the downstream. This is because the dtor only will
-    // trigger when no entities have a pointer to the account, meaning any slices
-    // which charge and credit the account should have credited the account when
-    // they were deleted, maintaining this invariant.
+    // The buffer_memory_allocated_ should always be zero on destruction, even
+    // if we triggered a reset of the downstream. This is because the destructor
+    // will only trigger when no entities have a pointer to the account, meaning
+    // any slices which charge and credit the account should have credited the
+    // account when they were deleted, maintaining this invariant.
     ASSERT(buffer_memory_allocated_ == 0);
     ASSERT(!reset_handler_.has_value());
   }

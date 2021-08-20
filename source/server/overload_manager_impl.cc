@@ -299,6 +299,11 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     if (name == OverloadActionNames::get().ReduceTimeouts) {
       timer_minimums_ = std::make_shared<const Event::ScaledTimerTypeMap>(
           parseTimerMinimums(action.typed_config(), validation_visitor));
+    } else if (name == OverloadActionNames::get().ResetStreams) {
+      if (!config.has_buffer_factory_config()) {
+        throw EnvoyException(
+            fmt::format("Overload action \"{}\" requires buffer_factory_config.", name));
+      }
     } else if (action.has_typed_config()) {
       throw EnvoyException(fmt::format(
           "Overload action \"{}\" has an unexpected value for the typed_config field", name));

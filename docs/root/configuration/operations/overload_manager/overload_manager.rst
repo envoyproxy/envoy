@@ -172,15 +172,14 @@ An example configuration can be found in the :ref:`edge best practices document 
 Reset Streams
 ^^^^^^^^^^^^^^^^^
 
-*Warning: Reset Stream only currently works with HTTP2.*
+.. warning::
+
+   Reset Streams only currently works with HTTP2.
 
 The ``envoy.overload_actions.reset_streams`` overload action will reset
-expensive streams. This works in conjuction with the
-`minimum_threshold_for_tracking`, which can be configured via
-:ref:`buffer_factory_config
+expensive streams. This requires `minimum_threshold_for_tracking` to be
+configured via :ref:`buffer_factory_config
 <envoy_v3_api_field_config.overload.v3.OverloadManager.buffer_factory_config>`.
-If the `minimum_threshold_for_tracking` isn't configured, Envoy *won't* track
-per stream allocated bytes which is needed for this action to work.
 
 As an example, here is partial Overload Manager configuration with minimum
 threshold for tracking and a single overload action entry that enables reset
