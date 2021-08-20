@@ -61,15 +61,7 @@ Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderM
 }
 
 Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance&, bool end_stream) {
-  if (!do_bridging_) {
-    return Http::FilterDataStatus::Continue;
-  }
-
-  if (end_stream) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.grpc_bridge_convert_code_for_header_only_response")) {
-      setupHttp1Status(response_headers_->GrpcStatus(), response_headers_->GrpcMessage());
-    }
+  if (!do_bridging_ || end_stream) {
     return Http::FilterDataStatus::Continue;
   } else {
     // Buffer until the complete request has been processed.
