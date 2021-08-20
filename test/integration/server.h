@@ -281,6 +281,36 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.counterFromStatNameWithTags(name, tags);
   }
+  void forEachSinkedCounter(std::function<void(std::size_t)> f_size,
+                            std::function<void(Stats::Counter&)> f_stat) override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedCounter(f_size, f_stat);
+  }
+
+  void forEachSinkedGauge(std::function<void(std::size_t)> f_size,
+                          std::function<void(Stats::Gauge&)> f_stat) override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedGauge(f_size, f_stat);
+  }
+
+  void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
+                                std::function<void(Stats::TextReadout&)> f_stat) override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedTextReadout(f_size, f_stat);
+  }
+
+  void setCounterSinkFilter(std::function<bool(const Stats::Counter&)> filter) override {
+    store_.setCounterSinkFilter(filter);
+  }
+
+  void setGaugeSinkFilter(std::function<bool(const Stats::Gauge&)> filter) override {
+    store_.setGaugeSinkFilter(filter);
+  }
+
+  void setTextReadoutSinkFilter(std::function<bool(const Stats::TextReadout&)> filter) override {
+    store_.setTextReadoutSinkFilter(filter);
+  }
+
   Counter& counterFromString(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.counterFromString(name);

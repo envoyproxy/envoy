@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag_producer.h"
 
@@ -48,6 +49,27 @@ public:
    * @return a list of all known histograms.
    */
   virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
+
+  /**
+   * Iterate over all stats that need to be sinked. Note, that implementations can potentially  hold
+   * on to a mutex that will deadlock if the passed in functors try to create or delete a stat.
+   * @param f_size functor that is provided the number of all sinked stats.
+   * @param f_stat functor that is provided one sinked stat at a time.
+   */
+  virtual void forEachSinkedCounter(std::function<void(std::size_t)> f_size,
+                                    std::function<void(Stats::Counter&)> f_stat) PURE;
+
+  virtual void forEachSinkedGauge(std::function<void(std::size_t)> f_size,
+                                  std::function<void(Stats::Gauge&)> f_stat) PURE;
+
+  virtual void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
+                                        std::function<void(Stats::TextReadout&)> f_stat) PURE;
+  /**
+   * @param filter should return true if the passed in stat needs to be sinked.
+   */
+  virtual void setCounterSinkFilter(std::function<bool(const Stats::Counter&)> filter) PURE;
+  virtual void setGaugeSinkFilter(std::function<bool(const Stats::Gauge&)> filter) PURE;
+  virtual void setTextReadoutSinkFilter(std::function<bool(const Stats::TextReadout&)> filter) PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;
