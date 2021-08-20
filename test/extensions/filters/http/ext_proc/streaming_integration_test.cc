@@ -23,7 +23,6 @@ using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
 
 using Http::LowerCaseString;
-using Network::Address::IpVersion;
 
 // The buffer size for the listeners
 static const uint32_t BufferSize = 100000;
