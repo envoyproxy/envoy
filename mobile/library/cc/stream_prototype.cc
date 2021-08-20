@@ -45,5 +45,10 @@ StreamPrototype& StreamPrototype::setOnCancel(OnCancelCallback closure) {
   return *this;
 }
 
+StreamPrototype& StreamPrototype::setOnSendWindowAvailable(OnSendWindowAvailableCallback closure) {
+  this->callbacks_->on_send_window_available = closure;
+  return *this;
+}
+
 } // namespace Platform
 } // namespace Envoy

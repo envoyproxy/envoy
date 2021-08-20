@@ -87,6 +87,17 @@ void* c_on_cancel(envoy_stream_intel, void* context) {
   return nullptr;
 }
 
+void* c_on_send_window_available(envoy_stream_intel, void* context) {
+  auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
+  auto stream_callbacks = *stream_callbacks_ptr;
+  if (stream_callbacks->on_send_window_available.has_value()) {
+    auto on_send_window_available = stream_callbacks->on_send_window_available.value();
+    on_send_window_available();
+  }
+  delete stream_callbacks_ptr;
+  return nullptr;
+}
+
 } // namespace
 
 envoy_http_callbacks StreamCallbacks::asEnvoyHttpCallbacks() {
@@ -98,6 +109,7 @@ envoy_http_callbacks StreamCallbacks::asEnvoyHttpCallbacks() {
       .on_error = &c_on_error,
       .on_complete = &c_on_complete,
       .on_cancel = &c_on_cancel,
+      .on_send_window_available = &c_on_send_window_available,
       .context = new StreamCallbacksSharedPtr(this->shared_from_this()),
   };
 }

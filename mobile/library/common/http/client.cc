@@ -19,7 +19,7 @@ namespace Http {
 /**
  * IMPORTANT: stream closure semantics in envoy mobile depends on the fact that the HCM fires a
  * stream reset when the remote side of the stream is closed but the local side remains open.
- * In other words the HCM (like the rest of Envoy) dissallows locally half-open streams.
+ * In other words the HCM (like the rest of Envoy) disallows locally half-open streams.
  * If this changes in Envoy, this file will need to change as well.
  * For implementation details @see Client::DirectStreamCallbacks::closeRemote.
  */
@@ -273,6 +273,11 @@ void Client::DirectStreamCallbacks::onError() {
                              bridge_callbacks_.context);
 }
 
+void Client::DirectStreamCallbacks::onSendWindowAvailable() {
+  ENVOY_LOG(debug, "[S{}] remote send window available", direct_stream_.stream_handle_);
+  bridge_callbacks_.on_send_window_available(streamIntel(), bridge_callbacks_.context);
+}
+
 void Client::DirectStreamCallbacks::onCancel() {
   ScopeTrackerScopeState scope(&direct_stream_, http_client_.scopeTracker());
   ENVOY_LOG(debug, "[S{}] dispatching to platform cancel stream", direct_stream_.stream_handle_);
@@ -306,6 +311,19 @@ void Client::DirectStream::resetStream(StreamResetReason reason) {
     return;
   }
   callbacks_->onError();
+}
+
+void Client::DirectStream::readDisable(bool disable) {
+  if (disable) {
+    ++read_disable_count_;
+  } else {
+    ASSERT(read_disable_count_ > 0);
+    --read_disable_count_;
+    if (read_disable_count_ == 0 && wants_write_notification_) {
+      wants_write_notification_ = false;
+      callbacks_->onSendWindowAvailable();
+    }
+  }
 }
 
 void Client::DirectStream::dumpState(std::ostream&, int indent_level) const {
@@ -404,6 +422,19 @@ void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
     ENVOY_LOG(debug, "[S{}] request data for stream (length={} end_stream={})\n", stream,
               data.length, end_stream);
     direct_stream->request_decoder_->decodeData(*buf, end_stream);
+
+    if (direct_stream->explicit_flow_control_ && !end_stream) {
+      if (direct_stream->read_disable_count_ == 0) {
+        // If there is still buffer space after the write, notify the sender
+        // that send window is available.
+        direct_stream->wants_write_notification_ = false;
+        direct_stream->callbacks_->onSendWindowAvailable();
+      } else {
+        // Otherwise, make sure the stack will send a notification when the
+        // buffers are drained.
+        direct_stream->wants_write_notification_ = true;
+      }
+    }
   }
 }
 

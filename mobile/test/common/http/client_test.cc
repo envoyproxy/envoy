@@ -53,6 +53,7 @@ public:
     uint32_t on_complete_calls;
     uint32_t on_error_calls;
     uint32_t on_cancel_calls;
+    uint32_t on_send_window_available_calls;
     std::string expected_status_;
     bool end_stream_with_headers_;
     std::string body_data_;
@@ -92,6 +93,11 @@ public:
     bridge_callbacks_.on_cancel = [](envoy_stream_intel, void* context) -> void* {
       callbacks_called* cc = static_cast<callbacks_called*>(context);
       cc->on_cancel_calls++;
+      return nullptr;
+    };
+    bridge_callbacks_.on_send_window_available = [](envoy_stream_intel, void* context) -> void* {
+      callbacks_called* cc = static_cast<callbacks_called*>(context);
+      cc->on_send_window_available_calls++;
       return nullptr;
     };
     bridge_callbacks_.on_trailers = [](envoy_headers c_trailers, envoy_stream_intel,
@@ -139,7 +145,7 @@ public:
   ResponseEncoder* response_encoder_{};
   NiceMock<Event::MockProvisionalDispatcher> dispatcher_;
   envoy_http_callbacks bridge_callbacks_;
-  callbacks_called cc_ = {0, 0, 0, 0, 0, 0, "200", true, ""};
+  callbacks_called cc_ = {0, 0, 0, 0, 0, 0, 0, "200", true, ""};
   std::atomic<envoy_network_t> preferred_network_{ENVOY_NET_GENERIC};
   uint64_t alt_cluster_ = 0;
   NiceMock<Random::MockRandomGenerator> random_;
@@ -488,12 +494,16 @@ TEST_P(ClientTest, MultipleDataStream) {
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(request_decoder_, decodeData(BufferStringEqual("request body"), false));
   http_client_.sendData(stream_, c_data, false);
+  // The buffer is not full: expect an on_send_window_available call in explicit_flow_control mode.
+  EXPECT_EQ(cc_.on_send_window_available_calls, explicit_flow_control_ ? 1 : 0);
 
   // Send second request data.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(request_decoder_, decodeData(BufferStringEqual("request body2"), true));
   http_client_.sendData(stream_, c_data2, true);
+  // The stream is done: no further on_send_window_available calls should happen.
+  EXPECT_EQ(cc_.on_send_window_available_calls, explicit_flow_control_ ? 1 : 0);
 
   // Encode response headers and data.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_)).Times(3);
@@ -570,7 +580,7 @@ TEST_P(ClientTest, MultipleStreams) {
   ON_CALL(request_decoder2, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   ResponseEncoder* response_encoder2{};
   envoy_http_callbacks bridge_callbacks_2;
-  callbacks_called cc2 = {0, 0, 0, 0, 0, 0, "200", true, ""};
+  callbacks_called cc2 = {0, 0, 0, 0, 0, 0, 0, "200", true, ""};
   bridge_callbacks_2.context = &cc2;
   bridge_callbacks_2.on_headers = [](envoy_headers c_headers, bool end_stream, envoy_stream_intel,
                                      void* context) -> void* {
