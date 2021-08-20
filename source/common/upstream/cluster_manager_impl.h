@@ -317,6 +317,8 @@ public:
 
   void drainConnections(const std::string& cluster) override;
 
+  void drainConnections() override;
+
 protected:
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
