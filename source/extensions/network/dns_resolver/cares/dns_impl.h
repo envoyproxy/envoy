@@ -125,7 +125,7 @@ public:
   }
 
   DnsResolverSharedPtr createDnsResolverCb(
-      Event::Dispatcher& dispatcher, const Api::Api&,
+      Event::Dispatcher& dispatcher, Api::Api&,
       const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) override {
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
     envoy::config::core::v3::DnsResolverOptions dns_resolver_options;

@@ -27,7 +27,7 @@ public:
    */
 
   virtual DnsResolverSharedPtr createDnsResolverCb(
-      Event::Dispatcher& dispatcher, const Api::Api& api,
+      Event::Dispatcher& dispatcher, Api::Api& api,
       const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) PURE;
 
   std::string category() const override { return dns_resolver_category; }

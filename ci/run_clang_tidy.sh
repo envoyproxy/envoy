@@ -38,7 +38,7 @@ function exclude_win32_impl() {
 # Do not run clang-tidy against macOS impl
 # TODO: We should run clang-tidy against macOS impl for completeness
 function exclude_macos_impl() {
-  grep -v source/common/filesystem/kqueue/ | grep -v source/common/network/apple_dns_impl | grep -v test/common/network/apple_dns_impl_test
+  grep -v source/common/filesystem/kqueue/ | grep -v source/extensions/network/dns_resolver/apple/apple_dns_impl | grep -v test/extensions/network/dns_resolver/apple/apple_dns_impl_test
 }
 
 # Do not run incremental clang-tidy on check_format testdata files.
