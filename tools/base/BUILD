@@ -35,6 +35,14 @@ envoy_py_library(
 )
 
 envoy_py_library(
+    "tools.base.stream",
+    deps = [
+        requirement("aiofiles"),
+        requirement("aiohttp"),
+    ],
+)
+
+envoy_py_library(
     "tools.base.utils",
     deps = [
         requirement("pyyaml"),
