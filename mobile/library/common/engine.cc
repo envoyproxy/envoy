@@ -255,4 +255,10 @@ void Engine::flushStats() {
   server_->flushStats();
 }
 
+void Engine::drainConnections() {
+  ASSERT(dispatcher_->isThreadSafe(),
+         "drainConnections must be called from the dispatcher's context");
+  server_->clusterManager().drainConnections();
+}
+
 } // namespace Envoy

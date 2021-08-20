@@ -107,6 +107,11 @@ public:
    */
   void flushStats();
 
+  /**
+   * Drain all upstream connections associated with this Engine.
+   */
+  void drainConnections();
+
 private:
   envoy_status_t main(std::string config, std::string log_level);
 
