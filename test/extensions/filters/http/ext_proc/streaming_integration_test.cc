@@ -58,7 +58,7 @@ protected:
                           ->mutable_endpoint()
                           ->mutable_address()
                           ->mutable_socket_address();
-      address->set_address(ipVersion() == IpVersion::v4 ? "127.0.0.1" : "::1");
+      address->set_address(Network::Test::getLoopbackAddressString(ipVersion()));
       address->set_port_value(test_processor_.port());
 
       // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC.
@@ -67,15 +67,9 @@ protected:
       ConfigHelper::setHttp2(*processor_cluster);
 
       // Make sure both flavors of gRPC client use the right address.
-      if (ipVersion() == IpVersion::v4) {
-        setGrpcService(
-            *proto_config_.mutable_grpc_service(), "ext_proc_server",
-            std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", test_processor_.port()));
-      } else {
-        setGrpcService(
-            *proto_config_.mutable_grpc_service(), "ext_proc_server",
-            std::make_shared<Network::Address::Ipv6Instance>("::1", test_processor_.port()));
-      }
+      const auto addr = Network::Test::getCanonicalLoopbackAddress(ipVersion());
+      const auto addr_port = Network::Utility::getAddressWithPort(*addr, test_processor_.port());
+      setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server", addr_port);
 
       // Merge the filter.
       envoy::config::listener::v3::Filter ext_proc_filter;

@@ -93,15 +93,9 @@ public:
       ConfigHelper::setHttp2(*processor_cluster);
 
       // Make sure both flavors of gRPC client use the right address.
-      if (ipVersion() == Network::Address::IpVersion::v4) {
-        const auto addr = std::make_shared<Network::Address::Ipv4Instance>(
-            Network::Test::getLoopbackAddressString(ipVersion()), test_processor_.port());
-        setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server", addr);
-      } else {
-        const auto addr = std::make_shared<Network::Address::Ipv6Instance>(
-            Network::Test::getLoopbackAddressString(ipVersion()), test_processor_.port());
-        setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server", addr);
-      }
+      const auto addr = Network::Test::getCanonicalLoopbackAddress(ipVersion());
+      const auto addr_port = Network::Utility::getAddressWithPort(*addr, test_processor_.port());
+      setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server", addr_port);
 
       // Merge the filter.
       envoy::config::listener::v3::Filter ext_proc_filter;

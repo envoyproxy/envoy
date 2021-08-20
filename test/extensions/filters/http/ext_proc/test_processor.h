@@ -45,7 +45,7 @@ public:
   // Start the processor listening on an ephemeral port (port 0) on the local host.
   // All new streams will be delegated to the specified function. The function
   // will be invoked in a background thread controlled by the gRPC server.
-  void start(Network::Address::IpVersion ip_version, ProcessingFunc cb);
+  void start(const Network::Address::IpVersion ip_version, ProcessingFunc cb);
 
   // Stop the processor from listening once all streams are closed, and exit
   // the listening threads.

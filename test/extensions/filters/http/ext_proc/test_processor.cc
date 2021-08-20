@@ -2,14 +2,15 @@
 
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
 
+#include "test/test_common/network_utility.h"
+
+#include "absl/strings/str_format.h"
 #include "grpc++/server_builder.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
-
-using Envoy::Network::Address::IpVersion;
 
 grpc::Status ProcessorWrapper::Process(
     grpc::ServerContext*,
@@ -25,12 +26,13 @@ grpc::Status ProcessorWrapper::Process(
   return grpc::Status::OK;
 }
 
-void TestProcessor::start(IpVersion ip_version, ProcessingFunc cb) {
+void TestProcessor::start(const Network::Address::IpVersion ip_version, ProcessingFunc cb) {
   wrapper_ = std::make_unique<ProcessorWrapper>(cb);
   grpc::ServerBuilder builder;
   builder.RegisterService(wrapper_.get());
-  const char* address = ip_version == IpVersion::v4 ? "127.0.0.1:0" : "[::1]:0";
-  builder.AddListeningPort(address, grpc::InsecureServerCredentials(), &listening_port_);
+  builder.AddListeningPort(
+      absl::StrFormat("%s:0", Network::Test::getLoopbackAddressUrlString(ip_version)),
+      grpc::InsecureServerCredentials(), &listening_port_);
   server_ = builder.BuildAndStart();
 }
 
