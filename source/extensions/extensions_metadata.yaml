@@ -718,9 +718,9 @@ envoy.dns_resolver.cares:
   categories:
   - envoy.network_dnsresolvers
   security_posture: unknown
-  status: alpha
+  status: stable 
 envoy.dns_resolver.apple:
   categories:
   - envoy.network_dnsresolvers
   security_posture: unknown
-  status: alpha
+  status: stable

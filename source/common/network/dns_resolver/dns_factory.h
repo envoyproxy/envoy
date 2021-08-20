@@ -60,8 +60,7 @@ public:
 template <class T>
 void makeDnsResolverConfig(
     const T& config, envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
-  // If the config has typed_dns_resolver_config, and the corresponding DNS resolver factory
-  // is registered, copy it into typed_dns_resolver_config and return.
+  // typed_dns_resolver_config takes precedence
   if (config.has_typed_dns_resolver_config()) {
     Network::DnsResolverFactory* dns_resolver_factory;
     dns_resolver_factory = Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(
@@ -73,10 +72,7 @@ void makeDnsResolverConfig(
     }
   }
 
-  // If Envoy is built in MacOS and "envoy.dns_resolver.apple" extension is enabled in build file,
-  // and  the run time flag envoy.restart_features.use_apple_api_for_dns_lookups is enabled,
-  // in this case, use Apple DNS library. To achieve this, Crafting a AppleDnsResolverConfig
-  // object and pack into typed_dns_resolver_config.
+  // Checking MacOS
   if (Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(apple_dns_resolver,
                                                                              true)) {
     static bool use_apple_api_for_dns_lookups =
@@ -89,7 +85,7 @@ void makeDnsResolverConfig(
       return;
     }
   }
-  // Otherwise, fall back to default behavior.
+  // Fall back to default behavior.
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   if (config.has_dns_resolution_config()) {
     // Copy resolvers if config has it.
