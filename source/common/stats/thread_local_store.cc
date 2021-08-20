@@ -975,5 +975,35 @@ bool ParentHistogramImpl::usedLockHeld() const {
   return false;
 }
 
+void ThreadLocalStoreImpl::forEachSinkedCounter(std::function<void(std::size_t)> f_size,
+                                                std::function<void(Stats::Counter&)> f_stat) {
+  Thread::LockGuard lock(lock_);
+  alloc_.forEachSinkedCounter(f_size, f_stat);
+}
+
+void ThreadLocalStoreImpl::forEachSinkedGauge(std::function<void(std::size_t)> f_size,
+                                              std::function<void(Stats::Gauge&)> f_stat) {
+  Thread::LockGuard lock(lock_);
+  alloc_.forEachSinkedGauge(f_size, f_stat);
+}
+void ThreadLocalStoreImpl::forEachSinkedTextReadout(
+    std::function<void(std::size_t)> f_size, std::function<void(Stats::TextReadout&)> f_stat) {
+  Thread::LockGuard lock(lock_);
+  alloc_.forEachSinkedTextReadout(f_size, f_stat);
+}
+
+void ThreadLocalStoreImpl::setCounterSinkFilter(std::function<bool(const Stats::Counter&)> filter) {
+  alloc_.setCounterSinkFilter(filter);
+}
+
+void ThreadLocalStoreImpl::setGaugeSinkFilter(std::function<bool(const Stats::Gauge&)> filter) {
+  alloc_.setGaugeSinkFilter(filter);
+}
+
+void ThreadLocalStoreImpl::setTextReadoutSinkFilter(
+    std::function<bool(const Stats::TextReadout&)> filter) {
+  alloc_.setTextReadoutSinkFilter(filter);
+}
+
 } // namespace Stats
 } // namespace Envoy

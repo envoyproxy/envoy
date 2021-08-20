@@ -101,6 +101,57 @@ TEST(ServerInstanceUtil, flushHelper) {
   InstanceUtil::flushMetricsToSinks(sinks, mock_store, time_system);
 }
 
+TEST(ServerInstanceUtil, sinkFilter) {
+  InSequence s;
+
+  Stats::TestUtil::TestStore store;
+  Event::SimulatedTimeSystem time_system;
+  // Set the sink filters
+  store.setCounterSinkFilter(
+      [](const Stats::Counter& counter) { return counter.name().compare("hello") == 0; });
+  store.setGaugeSinkFilter(
+      [](const Stats::Gauge& gauge) { return gauge.name().compare("day") == 0; });
+  store.setTextReadoutSinkFilter([](const Stats::TextReadout& text_readout) {
+    return text_readout.name().compare("text") == 0;
+  });
+
+  Stats::Counter& c = store.counter("hello");
+  c.inc();
+  c.inc();
+  store.counter("world").inc();
+
+  store.gauge("sunny", Stats::Gauge::ImportMode::Accumulate).set(9);
+  store.gauge("day", Stats::Gauge::ImportMode::Accumulate).set(5);
+
+  store.textReadout("Text").set("don't sink");
+  store.textReadout("text").set("is important");
+
+  std::list<Stats::SinkPtr> sinks;
+  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
+  // Make sure that counters have been latched even if there are no sinks.
+  EXPECT_EQ(2UL, c.value());
+  EXPECT_EQ(0, c.latch());
+
+  Stats::MockSink* sink = new StrictMock<Stats::MockSink>();
+  sinks.emplace_back(sink);
+  EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
+    ASSERT_EQ(snapshot.counters().size(), 1);
+    EXPECT_EQ(snapshot.counters()[0].counter_.get().name(), "hello");
+    EXPECT_EQ(snapshot.counters()[0].delta_, 2);
+
+    ASSERT_EQ(snapshot.gauges().size(), 1);
+    EXPECT_EQ(snapshot.gauges()[0].get().name(), "day");
+    EXPECT_EQ(snapshot.gauges()[0].get().value(), 5);
+
+    ASSERT_EQ(snapshot.textReadouts().size(), 1);
+    EXPECT_EQ(snapshot.textReadouts()[0].get().name(), "text");
+    EXPECT_EQ(snapshot.textReadouts()[0].get().value(), "is important");
+  }));
+  c.inc();
+  c.inc();
+  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
+}
+
 class RunHelperTest : public testing::Test {
 public:
   RunHelperTest() {

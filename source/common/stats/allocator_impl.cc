@@ -124,6 +124,10 @@ public:
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.counters_.erase(statName());
     ASSERT(count == 1);
+    // Erase the counter from sinked_counters_ if a sink filter was provided.
+    if (alloc_.counter_sink_filter_ != nullptr) {
+      alloc_.sinked_counters_.erase(this);
+    }
   }
 
   // Stats::Counter
@@ -168,6 +172,10 @@ public:
   void removeFromSetLockHeld() override ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) {
     const size_t count = alloc_.gauges_.erase(statName());
     ASSERT(count == 1);
+    // Erase the gauge from sinked_gauges_ if a sink filter was provided.
+    if (alloc_.gauge_sink_filter_ != nullptr) {
+      alloc_.sinked_gauges_.erase(this);
+    }
   }
 
   // Stats::Gauge
@@ -240,6 +248,10 @@ public:
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.text_readouts_.erase(statName());
     ASSERT(count == 1);
+    // Erase from sinked_text_readouts_ if a sink filter was provided.
+    if (alloc_.text_readout_sink_filter_ != nullptr) {
+      alloc_.sinked_text_readouts_.erase(this);
+    }
   }
 
   // Stats::TextReadout
@@ -269,6 +281,9 @@ CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracte
   }
   auto counter = CounterSharedPtr(makeCounterInternal(name, tag_extracted_name, stat_name_tags));
   counters_.insert(counter.get());
+  if (counter_sink_filter_ && counter_sink_filter_(*counter)) {
+    sinked_counters_.insert(counter.get());
+  }
   return counter;
 }
 
@@ -285,6 +300,9 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_na
   auto gauge =
       GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, stat_name_tags, import_mode));
   gauges_.insert(gauge.get());
+  if (gauge_sink_filter_ && gauge_sink_filter_(*gauge)) {
+    sinked_gauges_.insert(gauge.get());
+  }
   return gauge;
 }
 
@@ -300,6 +318,9 @@ TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_
   auto text_readout =
       TextReadoutSharedPtr(new TextReadoutImpl(name, *this, tag_extracted_name, stat_name_tags));
   text_readouts_.insert(text_readout.get());
+  if (text_readout_sink_filter_ && text_readout_sink_filter_(*text_readout)) {
+    sinked_text_readouts_.insert(text_readout.get());
+  }
   return text_readout;
 }
 
@@ -314,6 +335,42 @@ bool AllocatorImpl::isMutexLockedForTest() {
 Counter* AllocatorImpl::makeCounterInternal(StatName name, StatName tag_extracted_name,
                                             const StatNameTagVector& stat_name_tags) {
   return new CounterImpl(name, *this, tag_extracted_name, stat_name_tags);
+}
+
+void AllocatorImpl::forEachSinkedCounter(std::function<void(std::size_t)> f_size,
+                                         std::function<void(Stats::Counter&)> f_stat) {
+  Thread::LockGuard lock(mutex_);
+  forEachSinkedStat(f_size, f_stat, counter_sink_filter_, counters_, sinked_counters_);
+}
+
+void AllocatorImpl::forEachSinkedGauge(std::function<void(std::size_t)> f_size,
+                                       std::function<void(Stats::Gauge&)> f_stat) {
+  Thread::LockGuard lock(mutex_);
+  forEachSinkedStat(f_size, f_stat, gauge_sink_filter_, gauges_, sinked_gauges_);
+}
+
+void AllocatorImpl::forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
+                                             std::function<void(Stats::TextReadout&)> f_stat) {
+  Thread::LockGuard lock(mutex_);
+  forEachSinkedStat(f_size, f_stat, text_readout_sink_filter_, text_readouts_,
+                    sinked_text_readouts_);
+}
+
+void AllocatorImpl::setCounterSinkFilter(
+    std::function<bool(const Stats::Counter&)> counter_sink_filter) {
+  ASSERT(counter_sink_filter_ == nullptr);
+  counter_sink_filter_ = counter_sink_filter;
+}
+
+void AllocatorImpl::setGaugeSinkFilter(std::function<bool(const Stats::Gauge&)> gauge_sink_filter) {
+  ASSERT(gauge_sink_filter_ == nullptr);
+  gauge_sink_filter_ = gauge_sink_filter;
+}
+
+void AllocatorImpl::setTextReadoutSinkFilter(
+    std::function<bool(const Stats::TextReadout&)> text_readout_sink_filter) {
+  ASSERT(text_readout_sink_filter_ == nullptr);
+  text_readout_sink_filter_ = text_readout_sink_filter;
 }
 
 } // namespace Stats
