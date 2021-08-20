@@ -43,8 +43,9 @@ def test_implementer_abstract_info(patches, isinst):
 
 @pytest.mark.parametrize("methods", [[], [f"METHOD{i}" for i in range(0, 2)], [f"METHOD{i}" for i in range(0, 5)]])
 @pytest.mark.parametrize("has_docs", [[], [f"METHOD{i}" for i in range(0, 2)], [f"METHOD{i}" for i in range(0, 5)]])
+@pytest.mark.parametrize("is_classmethod", [[], [f"METHOD{i}" for i in range(0, 2)], [f"METHOD{i}" for i in range(0, 5)]])
 @pytest.mark.parametrize("doc", [True, False])
-def test_implementer_add_docs(patches, methods, has_docs, doc):
+def test_implementer_add_docs(patches, methods, has_docs, doc, is_classmethod):
     abstract_docs = {f"DOC{i}": int(random() * 10) for i in range(0, 5)}
     abstract_methods = {f"METHOD{i}": MagicMock() for i in range(0, 5)}
 
@@ -58,8 +59,11 @@ def test_implementer_add_docs(patches, methods, has_docs, doc):
         getattr(abstract_klass, method).__doc__ = "KLASS DOCS"
         if method not in methods:
             delattr(klass, method)
-        elif method not in has_docs:
+            continue
+        if method not in has_docs:
             getattr(klass, method).__doc__ = ""
+        if method in is_classmethod:
+            getattr(klass, method).__self__ = "CLASSMETHOD_CLASS"
 
     patched = patches(
         "Implementer.implementation_info",
@@ -79,11 +83,14 @@ def test_implementer_add_docs(patches, methods, has_docs, doc):
     for abstract_method, abstract_klass in abstract_methods.items():
         if not abstract_method in methods:
             continue
+        expected = MagicMock.__doc__
+        if abstract_method in is_classmethod and abstract_method not in has_docs:
+            expected = ""
+        elif abstract_method not in has_docs:
+            expected = "KLASS DOCS"
         assert (
             getattr(klass, abstract_method).__doc__
-            == (MagicMock.__doc__
-                if abstract_method in has_docs
-                else "KLASS DOCS"))
+            == expected)
 
 
 @pytest.mark.parametrize("bases", [(), ("A", "B", "C"), ("A", "C")])
@@ -171,6 +178,11 @@ def test_implementer_dunder_new(patches, has_implements):
 
 class AFoo(metaclass=abstract.Abstraction):
 
+    @classmethod
+    @abstractmethod
+    def do_something_classy(cls):
+        pass
+
     @abstractmethod
     def do_something(self):
         """Do something"""
@@ -224,6 +236,10 @@ def _implementer(implements):
     @abstract.implementer(implements)
     class ImplementationOfAnImplementer:
         """A test implementation of an implementer"""
+
+        @classmethod
+        def do_something_classy(cls):
+            pass
 
         def do_something(self):
             pass

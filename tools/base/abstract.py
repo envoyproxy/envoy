@@ -87,12 +87,14 @@ class Implementer(type):
             if not method:
                 # this will not instantiate, so bail now
                 return
-            if not method.__doc__:
+            # Only set the doc for the method if its not already set.
+            # `@classmethod` `__doc__`s are immutable, so skip them.
+            if not method.__doc__ and not hasattr(method, "__self__"):
                 method.__doc__ = getattr(abstract_klass, abstract_method).__doc__
 
     @classmethod
     def get_bases(cls, bases: Tuple[Type, ...], clsdict: Dict) -> Tuple[Type, ...]:
-        """Returns a tuple of base classes, with `__implement__` classes included"""
+        """Returns a tuple of base classes, with `__implements__` classes included"""
         return bases + tuple(x for x in clsdict["__implements__"] if x not in bases)
 
     @classmethod
