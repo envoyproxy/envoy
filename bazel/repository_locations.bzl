@@ -821,13 +821,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Chrome URL parsing library",
         project_desc = "Chrome URL parsing library",
         project_url = "https://quiche.googlesource.com/googleurl",
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/ef0d23689e240e6c8de4c3a5296b209128c87373.tar.gz.
-        version = "ef0d23689e240e6c8de4c3a5296b209128c87373",
-        sha256 = "d769283fed1319bca68bae8bdd47fbc3a7933999329eee850eff1f1ea61ce176",
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/578e68d9ae4c25e37bc0d23460f3e2f183fe526a.tar.gz.
+        version = "578e68d9ae4c25e37bc0d23460f3e2f183fe526a",
+        sha256 = "dd13bd6732941a2a869e930503daff44c84eabe92788125bebcbe6b1260587c1",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
         extensions = [],
-        release_date = "2020-07-30",
+        release_date = "2021-06-07",
         cpe = "N/A",
     ),
     com_google_cel_cpp = dict(
