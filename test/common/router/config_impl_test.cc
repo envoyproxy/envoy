@@ -5320,7 +5320,7 @@ TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithNoClusterSpecifier) {
       "At least one of name or cluster_header need to be specified");
 }
 
-TEST_F(RouteMatcherTest, WeightedClusterHeaderInvalidConfigWithInvalidHttpHeader) {
+TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithInvalidHttpHeader) {
   const std::string yaml = R"EOF(
       virtual_hosts:
         - name: www1
@@ -5335,10 +5335,9 @@ TEST_F(RouteMatcherTest, WeightedClusterHeaderInvalidConfigWithInvalidHttpHeader
                       weight: 30
       )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "The cluster header name must conform to a well known regex for HTTP header names in "
-      "no-strict mode");
+      "Proto constraint validation failed.*");
 }
 
 TEST(NullConfigImplTest, All) {

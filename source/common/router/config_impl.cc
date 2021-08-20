@@ -65,17 +65,6 @@ const envoy::config::route::v3::WeightedCluster::ClusterWeight& validateWeighted
     throw EnvoyException("Only one of name or cluster_header can be specified");
   } else if (cluster.name().empty() && cluster.cluster_header().empty()) {
     throw EnvoyException("At least one of name or cluster_header need to be specified");
-  } else {
-    if (!cluster.cluster_header().empty()) {
-      envoy::type::matcher::v3::RegexMatcher matcher;
-      const std::string non_strict_pattern = "^[^\\x{0000}\\x{000A}\\x{000D}]*$";
-      matcher.mutable_google_re2();
-      matcher.set_regex(non_strict_pattern);
-      if (!Regex::Utility::parseRegex(matcher)->match(cluster.cluster_header())) {
-        throw EnvoyException("The cluster header name must conform to a well known regex for HTTP "
-                             "header names in no-strict mode");
-      }
-    }
   }
   return cluster;
 }
