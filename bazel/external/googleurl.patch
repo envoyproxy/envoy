@@ -87,3 +87,18 @@ index f2ec8da..4e2d55b 100644
 +       "//polyfills",
 +    ]
 +)
+
+diff --git a/build_config/build_config.bzl b/build_config/build_config.bzl
+index 117bc96..d231ebc 100644
+--- a/build_config/build_config.bzl
++++ b/build_config/build_config.bzl
+@@ -22,9 +22,6 @@ _url_linkopts = select({
+ 
+ _icuuc_deps = select({
+     "//build_config:with_system_icu": [],
+-
+-    # If we don't link against system ICU library, we must provide "@org_unicode_icuuc//:common".
+-    "//conditions:default": ["@org_unicode_icuuc//:common"],
+ })
+ 
+ build_config = struct(
