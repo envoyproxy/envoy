@@ -106,7 +106,8 @@ public:
   virtual ~SinkDelegate();
 
   virtual void log(absl::string_view msg) PURE;
-  virtual void logStable(absl::string_view, absl::string_view) {}
+  virtual void logWithStableName(absl::string_view stable_name, absl::string_view level,
+                                 absl::string_view component, absl::string_view msg);
   virtual void flush() PURE;
 
 protected:
@@ -157,9 +158,11 @@ public:
   void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
   void clearLock() { stderr_sink_->clearLock(); }
 
-  template <class... Args> void logStable(absl::string_view stable_name, Args... msg) {
+  template <class... Args>
+  void logWithStableName(absl::string_view stable_name, absl::string_view level,
+                         absl::string_view component, Args... msg) {
     absl::ReaderMutexLock sink_lock(&sink_mutex_);
-    sink_->logStable(stable_name, fmt::format(msg...));
+    sink_->logWithStableName(stable_name, level, component, fmt::format(msg...));
   }
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
@@ -449,8 +452,12 @@ public:
  */
 #define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
 
-#define ENVOY_LOG_STABLE(STABLE_NAME, ...)                                                         \
-  ::Envoy::Logger::Registry::getSink()->logStable(STABLE_NAME, ##__VA_ARGS__)
+#define ENVOY_LOG_EVENT(LEVEL, EVENT_NAME, ...)                                                    \
+  do {                                                                                             \
+    ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                               \
+    ::Envoy::Logger::Registry::getSink()->logWithStableName(EVENT_NAME, #LEVEL,                    \
+                                                            ENVOY_LOGGER().name(), ##__VA_ARGS__); \
+  } while (0)
 
 #define ENVOY_LOG_FIRST_N_TO_LOGGER(LOGGER, LEVEL, N, ...)                                         \
   do {                                                                                             \
