@@ -105,7 +105,8 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     // callback_ target _should_ still be around. In that case, raise the callback_ so the target
     // can be done with this query and initiate a new one.
     if (!cancelled_) {
-      ENVOY_LOG_EVENT(debug, "dns_resolution_destroyed", "dns resolution for {} destroyed", dns_name_);
+      ENVOY_LOG_EVENT(debug, "dns_resolution_destroyed", "dns resolution for {} destroyed",
+                      dns_name_);
 
       callback_(ResolutionStatus::Failure, {});
     }
@@ -182,8 +183,9 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
       // portFromTcpUrl().
       // TODO(chaoqin-li1123): remove try catch pattern here once we figure how to handle unexpected
       // exception in fuzz tests.
-      ENVOY_LOG_EVENT(debug, "dns_resolution_complete", "dns resolution for {} completed with status {}",
-                       dns_name_, resolution_status);
+      ENVOY_LOG_EVENT(debug, "dns_resolution_complete",
+                      "dns resolution for {} completed with status {}", dns_name_,
+                      resolution_status);
 
       TRY_NEEDS_AUDIT { callback_(resolution_status, std::move(address_list)); }
       catch (const EnvoyException& e) {
