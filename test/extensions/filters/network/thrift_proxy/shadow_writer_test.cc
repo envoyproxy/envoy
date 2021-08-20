@@ -254,6 +254,7 @@ TEST_F(ShadowWriterTest, SubmitClusterNotFound) {
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
   EXPECT_EQ(absl::nullopt, router_handle);
+  EXPECT_EQ(1U, context_.scope().counterFromString("test.shadow_request_submit_failure").value());
 }
 
 TEST_F(ShadowWriterTest, SubmitClusterInMaintenance) {
@@ -264,6 +265,7 @@ TEST_F(ShadowWriterTest, SubmitClusterInMaintenance) {
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
   EXPECT_EQ(absl::nullopt, router_handle);
+  EXPECT_EQ(1U, context_.scope().counterFromString("test.shadow_request_submit_failure").value());
 }
 
 TEST_F(ShadowWriterTest, SubmitNoHealthyUpstream) {
@@ -277,6 +279,7 @@ TEST_F(ShadowWriterTest, SubmitNoHealthyUpstream) {
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
   EXPECT_EQ(absl::nullopt, router_handle);
+  EXPECT_EQ(1U, context_.scope().counterFromString("test.shadow_request_submit_failure").value());
 
   // We still count the request, even if it didn't go through.
   EXPECT_EQ(

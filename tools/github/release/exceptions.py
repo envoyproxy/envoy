@@ -1,0 +1,2 @@
+class GithubReleaseError(Exception):
+    pass

@@ -3734,12 +3734,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateIncomplete) {
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), EnvoyException,
-      TestEnvironment::substitute(
-          "Failed to load incomplete certificate from {{ test_rundir }}"
-          "/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem, ",
-          Network::Address::IpVersion::v4));
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException, "Failed to load incomplete private key from path: ");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidCertificateChain) {

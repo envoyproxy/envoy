@@ -138,6 +138,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "key_value_store_lib",
+    srcs = ["key_value_store_base.cc"],
+    hdrs = ["key_value_store_base.h"],
+    deps = [
+        "//envoy/common:key_value_store_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/filesystem:filesystem_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "linked_object",
     hdrs = ["linked_object.h"],
     deps = [":assert_lib"],

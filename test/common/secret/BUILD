@@ -2,11 +2,17 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_proto_library(
+    name = "private_key_provider_proto",
+    srcs = ["private_key_provider.proto"],
+)
 
 envoy_cc_test(
     name = "secret_manager_impl_test",
@@ -15,6 +21,7 @@ envoy_cc_test(
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     deps = [
+        ":private_key_provider_proto_cc_proto",
         "//source/common/secret:sds_api_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
@@ -51,6 +58,7 @@ envoy_cc_test(
         "//test/mocks/init:init_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/secret:secret_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
