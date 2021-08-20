@@ -28,6 +28,7 @@ public:
   StreamPrototype& setOnError(OnErrorCallback closure);
   StreamPrototype& setOnComplete(OnCompleteCallback closure);
   StreamPrototype& setOnCancel(OnCancelCallback closure);
+  StreamPrototype& setOnSendWindowAvailable(OnSendWindowAvailableCallback closure);
 
 private:
   EngineSharedPtr engine_;

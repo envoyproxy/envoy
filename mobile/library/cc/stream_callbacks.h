@@ -23,7 +23,9 @@ using OnTrailersCallback = std::function<void(ResponseTrailersSharedPtr trailers
 using OnErrorCallback = std::function<void(EnvoyErrorSharedPtr error)>;
 using OnCompleteCallback = std::function<void()>;
 using OnCancelCallback = std::function<void()>;
+using OnSendWindowAvailableCallback = std::function<void()>;
 
+// See library/common/types/c_types.h for what these callbacks should do.
 struct StreamCallbacks : public std::enable_shared_from_this<StreamCallbacks> {
   absl::optional<OnHeadersCallback> on_headers;
   absl::optional<OnDataCallback> on_data;
@@ -31,6 +33,7 @@ struct StreamCallbacks : public std::enable_shared_from_this<StreamCallbacks> {
   absl::optional<OnErrorCallback> on_error;
   absl::optional<OnCompleteCallback> on_complete;
   absl::optional<OnCancelCallback> on_cancel;
+  absl::optional<OnSendWindowAvailableCallback> on_send_window_available;
 
   envoy_http_callbacks asEnvoyHttpCallbacks();
 };

@@ -142,9 +142,10 @@ static void *ios_on_error(envoy_error error, envoy_stream_intel stream_intel, vo
   atomic_store(context->closed, NO);
 
   // Create native callbacks
-  envoy_http_callbacks native_callbacks = {ios_on_headers,  ios_on_data,  ios_on_metadata,
-                                           ios_on_trailers, ios_on_error, ios_on_complete,
-                                           ios_on_cancel,   context};
+  // TODO(goaway) fix this up to call ios_on_send_window_available
+  envoy_http_callbacks native_callbacks = {ios_on_headers,  ios_on_data,   ios_on_metadata,
+                                           ios_on_trailers, ios_on_error,  ios_on_complete,
+                                           ios_on_cancel,   ios_on_cancel, context};
   _nativeCallbacks = native_callbacks;
 
   // We need create the native-held strong ref on this stream before we call start_stream because

@@ -360,6 +360,22 @@ typedef void (*envoy_logger_log_f)(envoy_data data, const void* context);
 typedef void (*envoy_logger_release_f)(const void* context);
 
 /**
+ * Callback signature which notify when there is buffer available for request
+ * body upload.
+ *
+ * This is only ever called when the library is in explicit flow control mode.
+ * In async mode, this will be called after the first call to decodeData, when
+ * more buffer is available locally for request body. It will be called once per
+ * decodeData call to inform the sender when it is safe to send more data.
+ *
+ * @param stream_intel, contains internal stream metrics, context, and other details.
+ * @param context, contains the necessary state to carry out platform-specific dispatch and
+ * execution.
+ * @return void*, return context (may be unused).
+ */
+typedef void* (*envoy_on_send_window_available_f)(envoy_stream_intel stream_intel, void* context);
+
+/**
  * Called when envoy's event tracker tracks an event.
  *
  * @param event, the dictionary with attributes that describe the event.
@@ -383,6 +399,7 @@ typedef struct {
   envoy_on_error_f on_error;
   envoy_on_complete_f on_complete;
   envoy_on_cancel_f on_cancel;
+  envoy_on_send_window_available_f on_send_window_available;
   // Context passed through to callbacks to provide dispatch and execution state.
   void* context;
 } envoy_http_callbacks;
