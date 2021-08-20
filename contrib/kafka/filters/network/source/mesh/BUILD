@@ -63,6 +63,52 @@ envoy_cc_library(
     deps = [
         "//contrib/kafka/filters/network/source:kafka_response_lib",
         "//contrib/kafka/filters/network/source:tagged_fields_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_kafka_facade_lib",
+    srcs = [
+        "upstream_kafka_facade.cc",
+    ],
+    hdrs = [
+        "upstream_kafka_facade.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":upstream_config_lib",
+        ":upstream_kafka_client_impl_lib",
+        ":upstream_kafka_client_lib",
+        "//envoy/thread:thread_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_kafka_client_lib",
+    srcs = [
+    ],
+    hdrs = [
+        "upstream_kafka_client.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_kafka_client_impl_lib",
+    srcs = [
+        "upstream_kafka_client_impl.cc",
+    ],
+    hdrs = [
+        "upstream_kafka_client_impl.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":upstream_kafka_client_lib",
+        "//envoy/event:dispatcher_interface",
         "//source/common/common:minimal_logger_lib",
     ],
 )
