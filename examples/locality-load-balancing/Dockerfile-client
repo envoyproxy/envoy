@@ -1,0 +1,12 @@
+FROM envoyproxy/envoy-dev:latest
+RUN apt-get update && apt-get install -y bash curl jq python3 vim iputils-ping
+
+COPY ./envoy-client.yaml /etc/envoy.yaml
+COPY ./client.py /client.py
+COPY ./configs /var/lib/envoy
+
+RUN chmod go+x /var/lib/envoy && chmod go+r /etc/envoy.yaml /var/lib/envoy/*
+
+EXPOSE 8001
+
+CMD ["/usr/local/bin/envoy", "-c", "/etc/envoy.yaml", "--service-node", "${HOSTNAME}", "--service-cluster", "client", "-l", "debug"]
