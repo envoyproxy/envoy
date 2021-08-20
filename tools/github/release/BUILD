@@ -1,7 +1,7 @@
 load("@github_pip3//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_py_library")
+load("//tools/base:envoy_python.bzl", "envoy_py_library", "envoy_py_binary")
 
 licenses(["notice"])  # Apache 2
 
@@ -65,5 +65,14 @@ envoy_py_library(
         ":exceptions",
         requirement("aiohttp"),
         requirement("gidgethub"),
+    ],
+)
+
+envoy_py_binary(
+    name = "tools.github.release.runner",
+    deps = [
+        "//tools/base:runner",
+        ":manager",
+        # requirement("memory_profiler"),
     ],
 )

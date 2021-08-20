@@ -95,8 +95,10 @@ class GithubReleaseManager:
 
     @async_property
     async def releases(self) -> List[Dict]:
-        # paging ?
-        return await self.github.getitem(str(self.releases_url))
+        results = []
+        async for result in self.github.getiter(str(self.releases_url)):
+            results.append(result)
+        return results
 
     @cached_property
     def releases_url(self) -> pathlib.PurePosixPath:

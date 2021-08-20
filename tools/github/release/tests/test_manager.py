@@ -189,13 +189,20 @@ async def test_release_manager_releases(patches):
         ("GithubReleaseManager.github", dict(new_callable=PropertyMock)),
         ("GithubReleaseManager.releases_url", dict(new_callable=PropertyMock)),
         prefix="tools.github.release.manager")
+    getiter_mock = MagicMock()
+
+    async def getiter(url):
+        getiter_mock(url)
+        for i in range(0, 5):
+            yield i
 
     with patched as (m_github, m_releases):
-        m_github.return_value.getitem = AsyncMock()
-        assert await releaser.releases == m_github.return_value.getitem.return_value
+        m_github.return_value.getiter = getiter
+        _releases = await releaser.releases
+        assert await releaser.releases == list(range(0, 5))
 
     assert (
-        list(m_github.return_value.getitem.call_args)
+        list(getiter_mock.call_args)
         == [(str(m_releases.return_value), ), {}])
     assert not hasattr(releaser, async_property.cache_name)
 
