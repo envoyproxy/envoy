@@ -4,8 +4,6 @@ import argparse
 import sys
 from pathlib import Path
 from detector import BufWrapper
-from detector_errors import ChangeDetectorError
-from buf_utils import make_lock, pull_buf_deps
 
 API_DIR = Path("api").resolve()
 GIT_PATH = Path(".", ".git").resolve()

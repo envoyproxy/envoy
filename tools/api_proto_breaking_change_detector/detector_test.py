@@ -11,15 +11,12 @@ from pathlib import Path
 import unittest
 
 from detector import ProtoBreakingChangeDetector, BufWrapper
-from detector_errors import ChangeDetectorInitializeError
 
 import tempfile
 from rules_python.python.runfiles import runfiles
-from tools.run_command import run_command
 from shutil import copyfile
 import os
 from buf_utils import make_lock, pull_buf_deps
-from typing import Tuple
 
 
 class BreakingChangeDetectorTests(object):

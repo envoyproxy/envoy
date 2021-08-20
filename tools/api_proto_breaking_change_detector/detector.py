@@ -13,11 +13,8 @@ if there was a breaking change.
 The tool is currently implemented with buf (https://buf.build/)
 """
 
-from tools.run_command import run_command
 from buf_utils import check_breaking, make_lock, pull_buf_deps
-from shutil import copyfile
 from pathlib import Path
-import os
 from typing import List
 from detector_errors import ChangeDetectorError
 
