@@ -33,7 +33,7 @@ public:
   std::string category() const override { return dns_resolver_category; }
 };
 
-// Create an emptry cares DNS resolver typed config.
+// Create an empty cares DNS resolver typed config.
 inline void makeEmptyCaresDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
@@ -41,7 +41,7 @@ inline void makeEmptyCaresDnsResolverConfig(
   typed_dns_resolver_config.set_name(cares_dns_resolver);
 }
 
-// Create an emptry apple DNS resolver typed config.
+// Create an empty apple DNS resolver typed config.
 inline void makeEmptyAppleDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig apple;
