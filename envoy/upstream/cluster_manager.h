@@ -313,8 +313,14 @@ public:
 
   /**
    * Drain all connection pool connections owned by this cluster.
+   * @param cluster, the cluster to drain.
    */
   virtual void drainConnections(const std::string& cluster) PURE;
+
+  /**
+   * Drain all connection pool connections owned by all clusters in the cluster manager.
+   */
+  virtual void drainConnections() PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;

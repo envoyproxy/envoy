@@ -1,5 +1,6 @@
 #pragma once
 
+<<<<<<< HEAD
 #include <atomic>
 #include <deque>
 #include <thread>
@@ -9,6 +10,14 @@
 #include "source/common/common/logger.h"
 
 #include "librdkafka/rdkafkacpp.h"
+=======
+#include <map>
+#include <memory>
+
+#include "envoy/common/pure.h"
+
+#include "absl/strings/string_view.h"
+>>>>>>> envoy/main
 
 namespace Envoy {
 namespace Extensions {
@@ -20,6 +29,7 @@ namespace Mesh {
 // in case of success this means offset (if acks > 0), or error code.
 struct DeliveryMemento {
 
+<<<<<<< HEAD
   // Pointer to byte array that was passed to Kafka producer.
   // This is used to find the original record sent upstream.
   // Important: we do not free this memory, it's still part of the 'Request' object two levels
@@ -28,6 +38,10 @@ struct DeliveryMemento {
 
   // Kafka producer error code.
   const RdKafka::ErrorCode error_code_;
+=======
+  // Kafka producer error code.
+  const int32_t error_code_;
+>>>>>>> envoy/main
 
   // Offset (only meaningful if error code is equal to 0).
   const int64_t offset_;
@@ -45,6 +59,7 @@ public:
 
 using ProduceFinishCbSharedPtr = std::shared_ptr<ProduceFinishCb>;
 
+<<<<<<< HEAD
 using RawKafkaProducerConfig = std::map<std::string, std::string>;
 
 /**
@@ -154,6 +169,34 @@ private:
 };
 
 using RichKafkaProducerPtr = std::unique_ptr<RichKafkaProducer>;
+=======
+/**
+ * Filter facing interface.
+ * A thing that takes records and sends them to upstream Kafka.
+ */
+class KafkaProducer {
+public:
+  virtual ~KafkaProducer() = default;
+
+  // Sends given record (key, value) to Kafka (topic, partition).
+  // When delivery is finished, it notifies the callback provided with corresponding delivery data
+  // (error code, offset).
+  virtual void send(const ProduceFinishCbSharedPtr origin, const std::string& topic,
+                    const int32_t partition, const absl::string_view key,
+                    const absl::string_view value) PURE;
+
+  // Impl leakage: real implementations of Kafka Producer need to stop a monitoring thread, then
+  // they can close the producer. Because the polling thread should not be interrupted, we just mark
+  // it as finished, and it's going to notice that change on the next iteration.
+  // Theoretically we do not need to do this and leave it all to destructor, but then closing N
+  // producers would require doing that in sequence, while we can optimize it somewhat (so we just
+  // wait for the slowest one).
+  // See https://github.com/edenhill/librdkafka/issues/2972
+  virtual void markFinished() PURE;
+};
+
+using KafkaProducerPtr = std::unique_ptr<KafkaProducer>;
+>>>>>>> envoy/main
 
 } // namespace Mesh
 } // namespace Kafka

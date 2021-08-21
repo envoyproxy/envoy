@@ -20,7 +20,16 @@ namespace Mesh {
 class UpstreamKafkaFacade {
 public:
   virtual ~UpstreamKafkaFacade() = default;
+<<<<<<< HEAD
   virtual RecordSink& getProducerForTopic(const std::string& topic) PURE;
+=======
+
+  /**
+   * Returns a Kafka producer that points an upstream Kafka cluster that is supposed to receive
+   * messages for the given topic.
+   */
+  virtual KafkaProducer& getProducerForTopic(const std::string& topic) PURE;
+>>>>>>> envoy/main
 };
 
 using UpstreamKafkaFacadeSharedPtr = std::shared_ptr<UpstreamKafkaFacade>;
@@ -28,6 +37,10 @@ using UpstreamKafkaFacadeSharedPtr = std::shared_ptr<UpstreamKafkaFacade>;
 /**
  * Provides access to upstream Kafka clients.
  * This is done by using thread-local maps of cluster to producer.
+<<<<<<< HEAD
+=======
+ * We are going to have one Kafka producer per upstream cluster, per Envoy worker thread.
+>>>>>>> envoy/main
  */
 class UpstreamKafkaFacadeImpl : public UpstreamKafkaFacade,
                                 private Logger::Loggable<Logger::Id::kafka> {
@@ -36,10 +49,17 @@ public:
                           ThreadLocal::SlotAllocator& slot_allocator,
                           Thread::ThreadFactory& thread_factory);
 
+<<<<<<< HEAD
   // Returns a Kafka producer that points to a cluster for a given topic.
   RecordSink& getProducerForTopic(const std::string& topic) override;
 
   size_t getProducerCountForTest();
+=======
+  // UpstreamKafkaFacade
+  KafkaProducer& getProducerForTopic(const std::string& topic) override;
+
+  size_t getProducerCountForTest() const;
+>>>>>>> envoy/main
 
 private:
   ThreadLocal::SlotPtr tls_;

@@ -965,6 +965,14 @@ void ClusterManagerImpl::drainConnections(const std::string& cluster) {
   });
 }
 
+void ClusterManagerImpl::drainConnections() {
+  tls_.runOnAllThreads([](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    for (const auto& cluster_entry : cluster_manager->thread_local_clusters_) {
+      cluster_entry.second->drainConnPools();
+    }
+  });
+}
+
 void ClusterManagerImpl::postThreadLocalRemoveHosts(const Cluster& cluster,
                                                     const HostVector& hosts_removed) {
   tls_.runOnAllThreads([name = cluster.info()->name(),
