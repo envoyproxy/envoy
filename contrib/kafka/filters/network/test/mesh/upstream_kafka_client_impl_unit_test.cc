@@ -2,7 +2,7 @@
 #include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/synchronization/blocking_counter.h"
-#include "contrib/kafka/filters/network/source/mesh/upstream_kafka_client.h"
+#include "contrib/kafka/filters/network/source/mesh/upstream_kafka_client_impl.h"
 #include "contrib/kafka/filters/network/test/mesh/kafka_mocks.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

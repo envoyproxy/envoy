@@ -33,14 +33,15 @@ public:
 
 class MockUpstreamKafkaFacade : public UpstreamKafkaFacade {
 public:
-  MOCK_METHOD(RecordSink&, getProducerForTopic, (const std::string&));
+  MOCK_METHOD(KafkaProducer&, getProducerForTopic, (const std::string&));
 };
 
-class MockRecordSink : public RecordSink {
+class MockKafkaProducer : public KafkaProducer {
 public:
   MOCK_METHOD(void, send,
               (const ProduceFinishCbSharedPtr, const std::string&, const int32_t,
                const absl::string_view, const absl::string_view));
+  MOCK_METHOD(void, markFinished, (), ());
 };
 
 class ProduceUnitTest : public testing::Test {
@@ -94,25 +95,25 @@ TEST_F(ProduceUnitTest, ShouldSendRecordsInNormalFlow) {
       std::make_shared<ProduceRequestHolder>(filter_, upstream_kafka_facade_, extractor_, message);
 
   // when, then - invoking should use producers to send records.
-  MockRecordSink record_sink1;
-  EXPECT_CALL(record_sink1, send(_, r1.topic_, r1.partition_, _, _));
-  MockRecordSink record_sink2;
-  EXPECT_CALL(record_sink2, send(_, r2.topic_, r2.partition_, _, _));
+  MockKafkaProducer producer1;
+  EXPECT_CALL(producer1, send(_, r1.topic_, r1.partition_, _, _));
+  MockKafkaProducer producer2;
+  EXPECT_CALL(producer2, send(_, r2.topic_, r2.partition_, _, _));
   EXPECT_CALL(upstream_kafka_facade_, getProducerForTopic(r1.topic_))
-      .WillOnce(ReturnRef(record_sink1));
+      .WillOnce(ReturnRef(producer1));
   EXPECT_CALL(upstream_kafka_facade_, getProducerForTopic(r2.topic_))
-      .WillOnce(ReturnRef(record_sink2));
+      .WillOnce(ReturnRef(producer2));
   testee->startProcessing();
 
   // when, then - request is not yet finished (2 records' delivery to be confirmed).
   EXPECT_FALSE(testee->finished());
 
   // when, then - first record should be delivered.
-  const DeliveryMemento dm1 = {r1.value_.data(), RdKafka::ERR_NO_ERROR, 123};
+  const DeliveryMemento dm1 = {r1.value_.data(), 0, 123};
   EXPECT_TRUE(testee->accept(dm1));
   EXPECT_FALSE(testee->finished());
 
-  const DeliveryMemento dm2 = {r2.value_.data(), RdKafka::ERR_NO_ERROR, 234};
+  const DeliveryMemento dm2 = {r2.value_.data(), 0, 234};
   // After all the deliveries have been confirmed, the filter is getting notified.
   EXPECT_CALL(filter_, onRequestReadyForAnswer());
   EXPECT_TRUE(testee->accept(dm2));
@@ -152,21 +153,21 @@ TEST_F(ProduceUnitTest, ShouldMergeOutboundRecordResponses) {
       std::make_shared<ProduceRequestHolder>(filter_, upstream_kafka_facade_, extractor_, message);
 
   // when, then - invoking should use producers to send records.
-  MockRecordSink record_sink;
-  EXPECT_CALL(record_sink, send(_, r1.topic_, r1.partition_, _, _)).Times(2);
+  MockKafkaProducer producer;
+  EXPECT_CALL(producer, send(_, r1.topic_, r1.partition_, _, _)).Times(2);
   EXPECT_CALL(upstream_kafka_facade_, getProducerForTopic(r1.topic_))
-      .WillRepeatedly(ReturnRef(record_sink));
+      .WillRepeatedly(ReturnRef(producer));
   testee->startProcessing();
 
   // when, then - request is not yet finished (2 records' delivery to be confirmed).
   EXPECT_FALSE(testee->finished());
 
   // when, then - first record should be delivered.
-  const DeliveryMemento dm1 = {r1.value_.data(), RdKafka::ERR_NO_ERROR, 4242};
+  const DeliveryMemento dm1 = {r1.value_.data(), 0, 4242};
   EXPECT_TRUE(testee->accept(dm1));
   EXPECT_FALSE(testee->finished());
 
-  const DeliveryMemento dm2 = {r2.value_.data(), RdKafka::ERR_NO_ERROR, 1313};
+  const DeliveryMemento dm2 = {r2.value_.data(), 0, 1313};
   // After all the deliveries have been confirmed, the filter is getting notified.
   EXPECT_CALL(filter_, onRequestReadyForAnswer());
   EXPECT_TRUE(testee->accept(dm2));
@@ -182,7 +183,7 @@ TEST_F(ProduceUnitTest, ShouldMergeOutboundRecordResponses) {
   const std::vector<TopicProduceResponse> responses = response->data_.responses_;
   EXPECT_EQ(responses.size(), 1);
   EXPECT_EQ(responses[0].partitions_.size(), 1);
-  EXPECT_EQ(responses[0].partitions_[0].error_code_, RdKafka::ERR_NO_ERROR);
+  EXPECT_EQ(responses[0].partitions_[0].error_code_, 0);
   EXPECT_EQ(responses[0].partitions_[0].base_offset_, 1313);
 }
 
@@ -206,22 +207,22 @@ TEST_F(ProduceUnitTest, ShouldHandleDeliveryErrors) {
       std::make_shared<ProduceRequestHolder>(filter_, upstream_kafka_facade_, extractor_, message);
 
   // when, then - invoking should use producers to send records.
-  MockRecordSink record_sink;
-  EXPECT_CALL(record_sink, send(_, r1.topic_, r1.partition_, _, _)).Times(2);
+  MockKafkaProducer producer;
+  EXPECT_CALL(producer, send(_, r1.topic_, r1.partition_, _, _)).Times(2);
   EXPECT_CALL(upstream_kafka_facade_, getProducerForTopic(r1.topic_))
-      .WillRepeatedly(ReturnRef(record_sink));
+      .WillRepeatedly(ReturnRef(producer));
   testee->startProcessing();
 
   // when, then - request is not yet finished (2 records' delivery to be confirmed).
   EXPECT_FALSE(testee->finished());
 
   // when, then - first record fails.
-  const DeliveryMemento dm1 = {r1.value_.data(), RdKafka::ERR_LEADER_NOT_AVAILABLE, 0};
+  const DeliveryMemento dm1 = {r1.value_.data(), 42, 0};
   EXPECT_TRUE(testee->accept(dm1));
   EXPECT_FALSE(testee->finished());
 
   // when, then - second record succeeds (we are going to ignore the result).
-  const DeliveryMemento dm2 = {r2.value_.data(), RdKafka::ERR_NO_ERROR, 234};
+  const DeliveryMemento dm2 = {r2.value_.data(), 0, 234};
   // After all the deliveries have been confirmed, the filter is getting notified.
   EXPECT_CALL(filter_, onRequestReadyForAnswer());
   EXPECT_TRUE(testee->accept(dm2));
@@ -256,7 +257,7 @@ TEST_F(ProduceUnitTest, ShouldIgnoreMementoFromAnotherRequest) {
       std::make_shared<ProduceRequestHolder>(filter_, upstream_kafka_facade_, extractor_, message);
 
   // when, then - this record will not match anything.
-  const DeliveryMemento dm = {nullptr, RdKafka::ERR_NO_ERROR, 42};
+  const DeliveryMemento dm = {nullptr, 0, 42};
   EXPECT_FALSE(testee->accept(dm));
   EXPECT_FALSE(testee->finished());
 }

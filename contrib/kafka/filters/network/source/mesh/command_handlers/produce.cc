@@ -26,7 +26,7 @@ void ProduceRequestHolder::startProcessing() {
   // Main part of the proxy: for each outbound record we get the appropriate sink (effectively a
   // facade for upstream Kafka cluster), and send the record to it.
   for (auto& outbound_record : outbound_records_) {
-    RecordSink& producer = kafka_facade_.getProducerForTopic(outbound_record.topic_);
+    KafkaProducer& producer = kafka_facade_.getProducerForTopic(outbound_record.topic_);
     // We need to provide our object as first argument, as we will want to be notified when the
     // delivery finishes.
     producer.send(shared_from_this(), outbound_record.topic_, outbound_record.partition_,
@@ -85,7 +85,8 @@ AbstractResponseSharedPtr ProduceRequestHolder::computeAnswer() const {
       // Proxy logic - aggregating multiple upstream answers into single downstream answer.
       // Let's fail if anything fails, otherwise use the lowest offset (like Kafka would have done).
       ErrorCodeAndOffset& curr = it->second;
-      if (RdKafka::ErrorCode::ERR_NO_ERROR == curr.first) {
+      // This 0 should be a constant.
+      if (0 == curr.first) {
         curr.first = outbound_record.error_code_;
         curr.second = std::min(curr.second, outbound_record.saved_offset_);
       }

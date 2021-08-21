@@ -1,10 +1,6 @@
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
 
-<<<<<<< HEAD
-#include <thread>
-=======
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_client_impl.h"
->>>>>>> envoy/main
 
 namespace Envoy {
 namespace Extensions {
@@ -22,31 +18,19 @@ public:
                          Event::Dispatcher& dispatcher, Thread::ThreadFactory& thread_factory);
   ~ThreadLocalKafkaFacade() override;
 
-<<<<<<< HEAD
-  RecordSink& getProducerForTopic(const std::string& topic);
-=======
   KafkaProducer& getProducerForTopic(const std::string& topic);
->>>>>>> envoy/main
 
   size_t getProducerCountForTest() const;
 
 private:
   // Mutates 'cluster_to_kafka_client_'.
-<<<<<<< HEAD
-  RichKafkaProducer& registerNewProducer(const ClusterConfig& cluster_config);
-=======
   KafkaProducer& registerNewProducer(const ClusterConfig& cluster_config);
->>>>>>> envoy/main
 
   const UpstreamKafkaConfiguration& configuration_;
   Event::Dispatcher& dispatcher_;
   Thread::ThreadFactory& thread_factory_;
 
-<<<<<<< HEAD
-  std::map<std::string, RichKafkaProducerPtr> cluster_to_kafka_client_;
-=======
   std::map<std::string, KafkaProducerPtr> cluster_to_kafka_client_;
->>>>>>> envoy/main
 };
 
 ThreadLocalKafkaFacade::ThreadLocalKafkaFacade(const UpstreamKafkaConfiguration& configuration,
@@ -55,21 +39,14 @@ ThreadLocalKafkaFacade::ThreadLocalKafkaFacade(const UpstreamKafkaConfiguration&
     : configuration_{configuration}, dispatcher_{dispatcher}, thread_factory_{thread_factory} {}
 
 ThreadLocalKafkaFacade::~ThreadLocalKafkaFacade() {
-<<<<<<< HEAD
-=======
   // Because the producers take a moment to shutdown, we mark their monitoring threads as shut down
   // before the destructors get called.
->>>>>>> envoy/main
   for (auto& entry : cluster_to_kafka_client_) {
     entry.second->markFinished();
   }
 }
 
-<<<<<<< HEAD
-RecordSink& ThreadLocalKafkaFacade::getProducerForTopic(const std::string& topic) {
-=======
 KafkaProducer& ThreadLocalKafkaFacade::getProducerForTopic(const std::string& topic) {
->>>>>>> envoy/main
   const absl::optional<ClusterConfig> cluster_config =
       configuration_.computeClusterConfigForTopic(topic);
   if (cluster_config) {
@@ -82,16 +59,9 @@ KafkaProducer& ThreadLocalKafkaFacade::getProducerForTopic(const std::string& to
   }
 }
 
-<<<<<<< HEAD
-RichKafkaProducer&
-ThreadLocalKafkaFacade::registerNewProducer(const ClusterConfig& cluster_config) {
-  ENVOY_LOG(debug, "Registering new Kafka producer for cluster [{}]", cluster_config.name_);
-  RichKafkaProducerPtr new_producer = std::make_unique<RichKafkaProducer>(
-=======
 KafkaProducer& ThreadLocalKafkaFacade::registerNewProducer(const ClusterConfig& cluster_config) {
   ENVOY_LOG(debug, "Registering new Kafka producer for cluster [{}]", cluster_config.name_);
-  KafkaProducerPtr new_producer = std::make_unique<PlaceholderKafkaProducer>(
->>>>>>> envoy/main
+  KafkaProducerPtr new_producer = std::make_unique<RichKafkaProducer>(
       dispatcher_, thread_factory_, cluster_config.upstream_producer_properties_);
   auto result = cluster_to_kafka_client_.emplace(cluster_config.name_, std::move(new_producer));
   return *(result.first->second);
@@ -114,20 +84,12 @@ UpstreamKafkaFacadeImpl::UpstreamKafkaFacadeImpl(const UpstreamKafkaConfiguratio
   tls_->set(cb);
 }
 
-// Return Producer instance that is local to given thread, via ThreadLocalKafkaFacade.
-<<<<<<< HEAD
-RecordSink& UpstreamKafkaFacadeImpl::getProducerForTopic(const std::string& topic) {
-  return tls_->getTyped<ThreadLocalKafkaFacade>().getProducerForTopic(topic);
-}
-
-size_t UpstreamKafkaFacadeImpl::getProducerCountForTest() {
-=======
+// Return KafkaProducer instance that is local to given thread, via ThreadLocalKafkaFacade.
 KafkaProducer& UpstreamKafkaFacadeImpl::getProducerForTopic(const std::string& topic) {
   return tls_->getTyped<ThreadLocalKafkaFacade>().getProducerForTopic(topic);
 }
 
 size_t UpstreamKafkaFacadeImpl::getProducerCountForTest() const {
->>>>>>> envoy/main
   return tls_->getTyped<ThreadLocalKafkaFacade>().getProducerCountForTest();
 }
 

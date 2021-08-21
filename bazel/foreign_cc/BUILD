@@ -11,14 +11,14 @@ configure_make(
     configure_in_place = True,
     configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd && cp Makefile.config src/.. && cp config.h src/.."],
     lib_source = "@edenhill_librdkafka//:all",
-    out_static_libs = [
+    static_libraries = [
         "librdkafka.a",
         "librdkafka++.a",
     ],
     tags = ["skip_on_windows"],
-    targets = [
-        "libs",
-        "install-subdirs",
+    make_commands = [
+        "make libs",
+        "make install-subdirs",
     ],
     alwayslink = True,
 )
