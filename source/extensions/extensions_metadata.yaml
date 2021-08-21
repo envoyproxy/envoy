@@ -373,11 +373,6 @@ envoy.filters.network.redis_proxy:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: stable
-envoy.filters.network.rocketmq_proxy:
-  categories:
-  - envoy.filters.network
-  security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
 envoy.filters.network.sni_cluster:
   categories:
   - envoy.filters.network
