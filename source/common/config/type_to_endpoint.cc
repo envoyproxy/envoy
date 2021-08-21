@@ -91,8 +91,8 @@ TypeUrlToV3ServiceMap& typeUrlToV3ServiceMap() {
 }
 
 TypeUrlToV3ServiceMap::iterator findV3Service(const std::string& type_url) {
-  const auto it = TypeUrlToV3ServiceMap().find(type_url);
-  if (it != TypeUrlToV3ServiceMap().cend()) {
+  const auto it = typeUrlToV3ServiceMap().find(type_url);
+  if (it != typeUrlToV3ServiceMap().cend()) {
     return it;
   }
   std::string message_name = type_url;
@@ -104,13 +104,15 @@ TypeUrlToV3ServiceMap::iterator findV3Service(const std::string& type_url) {
   }
   const auto* message_desc =
       Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(message_name);
+  printf("XXXX %p\n", message_desc);
   if (message_desc != nullptr &&
       message_desc->options().HasExtension(envoy::annotations::resource_alias)) {
     const std::string& resource =
         message_desc->options().GetExtension(envoy::annotations::resource_alias).type();
-    return TypeUrlToV3ServiceMap().find(Grpc::Common::typeUrl(resource));
+    printf("XXXX %s\n", resource.c_str());
+    return typeUrlToV3ServiceMap().find(Grpc::Common::typeUrl(resource));
   }
-  return TypeUrlToV3ServiceMap().end();
+  return typeUrlToV3ServiceMap().end();
 }
 
 } // namespace
