@@ -84,17 +84,30 @@ const std::string config_header = R"(
         address: 127.0.0.1
         port_value: 9901
 
-!ignore tls_socket_defs: &base_tls_socket
+!ignore tls_root_ca_defs: &tls_root_certs |
+)"
+#include "certificates.inc"
+R"(
+
+!ignore tls_socket_defs:
+- &base_tls_socket
   name: envoy.transport_sockets.tls
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
     common_tls_context:
       validation_context:
         trusted_ca:
-          inline_string: |
-)"
-#include "certificates.inc"
-;
+          inline_string: *tls_root_certs
+- &base_tls_h2_socket
+  name: envoy.transport_sockets.tls
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+    common_tls_context:
+      alpn_protocols: [h2]
+      validation_context:
+        trusted_ca:
+          inline_string: *tls_root_certs
+)";
 
 const char* config_template = R"(
 !ignore custom_listener_defs:
@@ -364,7 +377,7 @@ R"(
     connect_timeout: *connect_timeout
     lb_policy: CLUSTER_PROVIDED
     cluster_type: *base_cluster_type
-    transport_socket: *base_tls_socket
+    transport_socket: *base_tls_h2_socket
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     outlier_detection: *base_outlier_detection
@@ -373,7 +386,7 @@ R"(
     connect_timeout: *connect_timeout
     lb_policy: CLUSTER_PROVIDED
     cluster_type: *base_cluster_type
-    transport_socket: *base_tls_socket
+    transport_socket: *base_tls_h2_socket
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     outlier_detection: *base_outlier_detection
@@ -382,7 +395,7 @@ R"(
     connect_timeout: *connect_timeout
     lb_policy: CLUSTER_PROVIDED
     cluster_type: *base_cluster_type
-    transport_socket: *base_tls_socket
+    transport_socket: *base_tls_h2_socket
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     outlier_detection: *base_outlier_detection
@@ -391,7 +404,7 @@ R"(
     connect_timeout: *connect_timeout
     lb_policy: CLUSTER_PROVIDED
     cluster_type: *base_cluster_type
-    transport_socket: *base_tls_socket
+    transport_socket: *base_tls_h2_socket
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     outlier_detection: *base_outlier_detection
@@ -400,7 +413,7 @@ R"(
     connect_timeout: *connect_timeout
     lb_policy: CLUSTER_PROVIDED
     cluster_type: *base_cluster_type
-    transport_socket: *base_tls_socket
+    transport_socket: *base_tls_h2_socket
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     outlier_detection: *base_outlier_detection
@@ -409,7 +422,7 @@ R"(
     connect_timeout: *connect_timeout
     lb_policy: CLUSTER_PROVIDED
     cluster_type: *base_cluster_type
-    transport_socket: *base_tls_socket
+    transport_socket: *base_tls_h2_socket
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     outlier_detection: *base_outlier_detection
