@@ -33,6 +33,22 @@ public:
   std::string category() const override { return dns_resolver_category; }
 };
 
+// Create an emptry cares DNS resolver typed config.
+inline void makeEmptyCaresDnsResolverConfig(
+    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(cares_dns_resolver);
+}
+
+// Create an emptry apple DNS resolver typed config.
+inline void makeEmptyAppleDnsResolverConfig(
+    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+  envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig apple;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(apple);
+  typed_dns_resolver_config.set_name(apple_dns_resolver);
+}
+
 // Retrieve the DNS related configurations in the passed in @param config, and store the data into
 // @param typed_dns_resolver_config. The design behavior is:
 //
@@ -75,13 +91,8 @@ void makeDnsResolverConfig(
   // Checking MacOS
   if (Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(apple_dns_resolver,
                                                                              true)) {
-    static bool use_apple_api_for_dns_lookups =
-        Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups");
-    if (use_apple_api_for_dns_lookups) {
-      envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig apple;
-      // Pack AppleDnsResolverConfig object into typed_dns_resolver_config.
-      typed_dns_resolver_config.mutable_typed_config()->PackFrom(apple);
-      typed_dns_resolver_config.set_name(apple_dns_resolver);
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups")) {
+      makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);
       return;
     }
   }

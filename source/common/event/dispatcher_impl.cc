@@ -156,16 +156,17 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
 
 // Create DNS resolver based on the @param typed_dns_resolver_config, which could be
 // cares DNS resolver, Apple DNS resolver, or any other DNS resolver type.
-
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
 
   ASSERT(isThreadSafe());
 
-  Network::DnsResolverFactory* dns_resolver_factory;
+  // typed_dns_resolver_config need to be populated.
+  ASSERT(!typed_dns_resolver_config.name().empty() &&
+         !typed_dns_resolver_config.typed_config().type_url().empty());
 
-  // Derive the DNS resolver factory from the config.
-  dns_resolver_factory =
+  // Derive the DNS resolver factory from config.
+  Network::DnsResolverFactory* dns_resolver_factory =
       &Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(typed_dns_resolver_config);
 
   ENVOY_LOG(debug, "create DNS resolver type: {}", typed_dns_resolver_config.name());

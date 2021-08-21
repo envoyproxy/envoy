@@ -6,6 +6,7 @@
 #include "envoy/event/deferred_deletable.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/stats_handler.h"
 
@@ -171,8 +172,10 @@ Word resolve_dns(Word dns_address_ptr, Word dns_address_size, Word token_ptr) {
     root_context->onResolveDns(token, status, std::move(response));
   };
   if (!context->wasm()->dnsResolver()) {
-    context->wasm()->dnsResolver() = context->wasm()->dispatcher().createDnsResolver(
-        envoy::config::core::v3::TypedExtensionConfig());
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    Network::makeEmptyCaresDnsResolverConfig(typed_dns_resolver_config);
+    context->wasm()->dnsResolver() =
+        context->wasm()->dispatcher().createDnsResolver(typed_dns_resolver_config);
   }
   context->wasm()->dnsResolver()->resolve(std::string(address.value()),
                                           Network::DnsLookupFamily::Auto, callback);

@@ -61,7 +61,9 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   void SetUp() override {
-    resolver_ = dispatcher_->createDnsResolver(envoy::config::core::v3::TypedExtensionConfig());
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    Network::makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);
+    resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config);
   }
 
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,

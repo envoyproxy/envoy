@@ -6,6 +6,7 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/server/config_validation/api.h"
@@ -63,7 +64,8 @@ TEST_P(ConfigValidation, CreateScaledTimer) {
 // Make sure that creating DnsResolver does not cause crash and each call to create
 // DNS resolver returns the same shared_ptr.
 TEST_F(ConfigValidation, SharedDnsResolver) {
-  auto typed_dns_resolver_config = envoy::config::core::v3::TypedExtensionConfig();
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Network::makeEmptyCaresDnsResolverConfig(typed_dns_resolver_config);
   Network::DnsResolverSharedPtr dns1 = dispatcher_->createDnsResolver(typed_dns_resolver_config);
   long use_count = dns1.use_count();
   Network::DnsResolverSharedPtr dns2 = dispatcher_->createDnsResolver(typed_dns_resolver_config);
