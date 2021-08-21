@@ -85,7 +85,7 @@ class BufWrapper(ProtoBreakingChangeDetector):
             buf_path {str} -- path to the buf binary (default: "buf")
             additional_args {List[str]} -- additional arguments passed into the buf binary invocations
             config_file_loc {str} -- absolute path to buf.yaml configuration file (if not provided, uses default buf configuration)
-            
+
             If using lock file mode:
                 path_to_lock_file {str} -- absolute path to the lock file representing the initial state (must be provided if using lock file mode)
             If using git ref mode:
