@@ -13,31 +13,15 @@ if there was a breaking change.
 The tool is currently implemented with buf (https://buf.build/)
 """
 
-from buf_utils import check_breaking, make_lock, pull_buf_deps
 from pathlib import Path
 from typing import List
+
+from buf_utils import check_breaking, make_lock, pull_buf_deps
 from detector_errors import ChangeDetectorError
 
 
 class ProtoBreakingChangeDetector(object):
     """Abstract breaking change detector interface"""
-
-    def __init__(self, path_to_lock_file: str, path_to_changed_dir: str) -> None:
-        """Initialize the configuration of the breaking change detector
-
-        This function sets up any necessary config without actually
-        running the detector against any proto files.
-
-        Takes in a path to a lock file representing a proto "snapshot"
-        of the state before changes, and a path to a directory of proto
-        files that have been changed, and checks if the changes violate
-        any breaking change rules.
-
-        Args:
-            path_to_lock_file {str} -- absolute path to the lock file representing the before state
-            path_to_changed_dir {str} -- absolute path to a directory containing proto files in the after state
-        """
-        pass
 
     def run_detector(self) -> None:
         """Run the breaking change detector to detect rule violations
@@ -80,15 +64,43 @@ class BufWrapper(ProtoBreakingChangeDetector):
             path_to_lock_file: str = None,
             git_ref: str = None,
             git_path: str = None) -> None:
+        """Initialize the configuration of buf
+
+        This function sets up any necessary config without actually
+        running buf against any proto files.
+
+        BufWrapper takes a path to a directory containing proto files
+        as input, and it checks if these proto files break any changes
+        from a given initial state.
+
+        The initial state can be input in 2 different ways: as a lock
+        file, or as a git ref. In the lock file mode, __init__ expects
+        an absolute path to a lock file. In the git mode, __init__
+        expects a git ref string, as well as an absolute path to a .git
+        file for the repository. Note that exactly one mode must be used
+        for the initial state.
+
+        Args:
+            path_to_changed_dir {str} -- absolute path to a directory containing proto files in the after state
+            buf_path {str} -- path to the buf binary (default: "buf")
+            additional_args {List[str]} -- additional arguments passed into the buf binary invocations
+            config_file_loc {str} -- absolute path to buf.yaml configuration file (if not provided, uses default buf configuration)
+            
+            If using lock file mode:
+                path_to_lock_file {str} -- absolute path to the lock file representing the initial state (must be provided if using lock file mode)
+            If using git ref mode:
+                git_ref {str} -- git reference to use for the initial state of the protos (typically a commit hash) (must be provided if using git mode)
+                git_path {str} -- absolute path to .git file for the repository of interest (must be provided if using git mode)
+        """
         if path_to_lock_file and not Path(path_to_lock_file).is_file():
             raise ValueError(f"path_to_lock_file {path_to_lock_file} is not a file path")
 
         if not Path(path_to_changed_dir).is_dir():
             raise ValueError(f"path_to_changed_dir {path_to_changed_dir} is not a valid directory")
 
-        if Path(".").absolute() not in Path(path_to_changed_dir).parents:
+        if Path.cwd() not in Path(path_to_changed_dir).parents:
             raise ValueError(
-                f"path_to_changed_dir {path_to_changed_dir} must be a subdirectory of the cwd ({ Path('.').absolute() })"
+                f"path_to_changed_dir {path_to_changed_dir} must be a subdirectory of the cwd ({ Path.cwd() })"
             )
 
         if bool(path_to_lock_file) == bool(git_ref):
@@ -164,7 +176,7 @@ class BufWrapper(ProtoBreakingChangeDetector):
 
         if final_code != 0:
             return True
-        if final_out != "" or "Failure" in final_out:
+        if final_out != "":
             return True
         return False
 

@@ -7,16 +7,16 @@ already tests for these circumstances, these specify Envoy's requirements
 and ensure that tool behavior is consistent across dependency updates.
 """
 
-from pathlib import Path
-import unittest
-
-from detector import ProtoBreakingChangeDetector, BufWrapper
-
-import tempfile
-from rules_python.python.runfiles import runfiles
-from shutil import copyfile
 import os
+import tempfile
+import unittest
+from pathlib import Path
+from shutil import copyfile
+
+from rules_python.python.runfiles import runfiles
+
 from buf_utils import make_lock, pull_buf_deps
+from detector import ProtoBreakingChangeDetector, BufWrapper
 
 
 class BreakingChangeDetectorTests(object):
@@ -41,7 +41,7 @@ class BreakingChangeDetectorTests(object):
         changed = Path(tests_path, f"{testname}_next")
 
         # buf requires protobuf files to be in a subdirectory of the yaml file
-        with tempfile.TemporaryDirectory(prefix=str(Path(".").absolute()) + os.sep) as temp_dir:
+        with tempfile.TemporaryDirectory(prefix=str(Path.cwd()) + os.sep) as temp_dir:
             lock_location, changed_dir = self.initialize_test(
                 testname, temp_dir, current, changed, additional_args)
 

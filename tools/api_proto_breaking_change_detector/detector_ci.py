@@ -3,6 +3,7 @@
 import argparse
 import sys
 from pathlib import Path
+
 from detector import BufWrapper
 
 API_DIR = Path("api").resolve()
