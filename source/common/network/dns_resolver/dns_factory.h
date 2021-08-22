@@ -89,12 +89,11 @@ void makeDnsResolverConfig(
   }
 
   // Checking MacOS
-  if (Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(apple_dns_resolver,
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups") &&
+      Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(apple_dns_resolver,
                                                                              true)) {
-    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups")) {
-      makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);
-      return;
-    }
+    makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);
+    return;
   }
   // Fall back to default behavior.
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
