@@ -155,8 +155,6 @@ public:
     typed_dns_resolver_config.set_name(apple_dns_resolver);
     return typed_dns_resolver_config;
   }
-}
-
 };
 
 } // namespace Network
