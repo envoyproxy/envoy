@@ -61,12 +61,9 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   void SetUp() override {
-    if (DnsResolverFactory* dns_resolver_factory =
-            Config::Utility::getAndCheckFactoryByName<DnsResolverFactory>(cares_dns_resolver,
-                                                                          true)) {
-      auto typed_dns_resolver_config = dns_resolver_factory->makeEmptyDnsResolverConfig();
-      resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config);
-    }
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    Network::makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);
+    resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config);
   }
 
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,

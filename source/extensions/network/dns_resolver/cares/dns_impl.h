@@ -144,15 +144,6 @@ public:
     }
     return std::make_shared<Network::DnsResolverImpl>(dispatcher, resolvers, dns_resolver_options);
   }
-
-  // Create an empty cares DNS resolver typed config.
-  envoy::config::core::v3::TypedExtensionConfig makeEmptyDnsResolverConfig() override {
-    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-    typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-    typed_dns_resolver_config.set_name(cares_dns_resolver);
-    return typed_dns_resolver_config;
-  }
 };
 
 } // namespace Network
