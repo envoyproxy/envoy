@@ -396,7 +396,7 @@ admin:
   - name: envoy.access_loggers.file
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-      path: "{3}"
+      path: "{1}"
   address:
     socket_address:
       address: 127.0.0.1

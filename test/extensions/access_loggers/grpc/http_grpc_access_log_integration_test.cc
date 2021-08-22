@@ -71,8 +71,7 @@ public:
     envoy::service::accesslog::v3::StreamAccessLogsMessage request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
     EXPECT_EQ("POST", access_log_request_->headers().getMethodValue());
-    EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.accesslog.{}.AccessLogService",
-                                                  "StreamAccessLogs", apiVersion()),
+    EXPECT_EQ("/envoy.service.accesslog.v3.AccessLogService/StreamAccessLogs",
               access_log_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", access_log_request_->headers().getContentTypeValue());
 
@@ -117,7 +116,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, AccessLogIntegrationTest,
 
 // Test a basic full access logging flow.
 TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   testRouterNotFound();
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());

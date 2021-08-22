@@ -11,7 +11,7 @@ cluster: foo
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
   EXPECT_EQ(std::chrono::hours(1), config_obj.sharedConfig()->idleTimeout().value());
 }
 
@@ -23,7 +23,7 @@ idle_timeout: 0s
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
   EXPECT_FALSE(config_obj.sharedConfig()->idleTimeout().has_value());
 }
 
@@ -35,7 +35,7 @@ idle_timeout: 1s
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
   EXPECT_EQ(std::chrono::seconds(1), config_obj.sharedConfig()->idleTimeout().value());
 }
 
@@ -47,7 +47,7 @@ max_downstream_connection_duration: 10s
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
   EXPECT_EQ(std::chrono::seconds(10), config_obj.maxDownstreamConnectionDuration().value());
 }
 
@@ -72,7 +72,7 @@ TEST(ConfigTest, WeightedClusterWithZeroWeightConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(constructConfigFromV3Yaml(yaml, factory_context), EnvoyException);
+  EXPECT_THROW(constructConfigFromYaml(yaml, factory_context), EnvoyException);
 }
 
 // Tests that it is possible to define a list of weighted clusters.
@@ -88,7 +88,7 @@ TEST(ConfigTest, WeightedClustersConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
 
   NiceMock<Network::MockConnection> connection;
   EXPECT_CALL(factory_context.api_.random_, random()).WillOnce(Return(0));
@@ -122,7 +122,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
 
   {
     ProtobufWkt::Value v1, v2;
@@ -209,7 +209,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchAndTopLevelMetadataMatchConfig
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
 
   ProtobufWkt::Value v00, v01, v04;
   v00.set_string_value("v00");
@@ -300,7 +300,7 @@ TEST(ConfigTest, WeightedClustersWithTopLevelMetadataMatchConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
 
   ProtobufWkt::Value v1, v2;
   v1.set_string_value("v1");
@@ -339,7 +339,7 @@ TEST(ConfigTest, TopLevelMetadataMatchConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
 
   ProtobufWkt::Value v1, v2;
   v1.set_string_value("v1");
@@ -372,7 +372,7 @@ TEST(ConfigTest, ClusterWithTopLevelMetadataMatchConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
 
   ProtobufWkt::Value v1, v2;
   v1.set_string_value("v1");
@@ -411,7 +411,7 @@ TEST(ConfigTest, PerConnectionClusterWithTopLevelMetadataMatchConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
 
   ProtobufWkt::Value v1, v2;
   v1.set_string_value("v1");
@@ -450,7 +450,7 @@ TEST(ConfigTest, HashWithSourceIpConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
   EXPECT_NE(nullptr, config_obj.hashPolicy());
 }
 
@@ -461,7 +461,7 @@ TEST(ConfigTest, HashWithSourceIpDefaultConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
   EXPECT_EQ(nullptr, config_obj.hashPolicy());
 }
 

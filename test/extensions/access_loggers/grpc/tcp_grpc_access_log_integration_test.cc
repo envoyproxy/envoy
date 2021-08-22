@@ -76,9 +76,7 @@ public:
     envoy::service::accesslog::v3::StreamAccessLogsMessage request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
     EXPECT_EQ("POST", access_log_request_->headers().getMethodValue());
-    EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.accesslog.{}.AccessLogService",
-                                                  "StreamAccessLogs",
-                                                  envoy::config::core::v3::ApiVersion::V3),
+    EXPECT_EQ("/envoy.service.accesslog.v3.AccessLogService/StreamAccessLogs",
               access_log_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", access_log_request_->headers().getContentTypeValue());
 
@@ -127,7 +125,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, TcpGrpcAccessLogIntegrationTest,
 
 // Test a basic full access logging flow.
 TEST_P(TcpGrpcAccessLogIntegrationTest, BasicAccessLogFlow) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));

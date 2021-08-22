@@ -75,7 +75,7 @@ public:
                          bool first = false, const std::string& nonce = "",
                          const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
                          const std::string& error_message = "") {
-    API_NO_BOOST(envoy::service::discovery::v3::DiscoveryRequest) expected_request;
+    envoy::service::discovery::v3::DiscoveryRequest expected_request;
     if (first) {
       expected_request.mutable_node()->CopyFrom(local_info_.node());
     }

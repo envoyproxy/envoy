@@ -139,8 +139,7 @@ public:
     RELEASE_ASSERT(result, result.message());
 
     EXPECT_EQ("POST", ext_authz_request_->headers().getMethodValue());
-    EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.auth.{}.Authorization", "Check",
-                                                  envoy::config::core::v3::ApiVersion::V3),
+    EXPECT_EQ("/envoy.service.auth.v3.Authorization/Check",
               ext_authz_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", ext_authz_request_->headers().getContentTypeValue());
 
@@ -593,28 +592,24 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, ExtAuthzGrpcIntegrationTest,
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithBody) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecType::HTTP1, 4);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1 and the size of the request body is larger than max_request_bytes.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithLargeBody) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecType::HTTP1, 2048);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/2.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithBody) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecType::HTTP2, 4);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/2 and the size of the request body is larger than max_request_bytes.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecType::HTTP2, 2048);
 }
 
@@ -622,7 +617,6 @@ TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
 // server returns headers_to_add, response_headers_to_add, and headers_to_append in OkResponse
 // message.
 TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBodyWithHeaders(
       Http::CodecType::HTTP1, 4,
       /*headers_to_add=*/Headers{{"header1", "header1"}},
@@ -635,27 +629,22 @@ TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisable) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/false, /*disable_with_metadata=*/false, "200");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisableWithMetadata) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/false, /*disable_with_metadata=*/true, "200");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisable) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/true, /*disable_with_metadata=*/false, "403");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisableWithMetadata) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/true, /*disable_with_metadata=*/true, "403");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   // Set up ext_authz filter.
   initializeConfig();
 
@@ -850,7 +839,6 @@ body_format:
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initializeConfig();
   setDownstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
@@ -886,8 +874,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   RELEASE_ASSERT(result, result.message());
 
   EXPECT_EQ("POST", ext_authz_request_->headers().getMethodValue());
-  EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.auth.{}.Authorization", "Check",
-                                                apiVersion()),
+  EXPECT_EQ("/envoy.service.auth.v3.Authorization/Check",
             ext_authz_request_->headers().getPathValue());
   EXPECT_EQ("application/grpc", ext_authz_request_->headers().getContentTypeValue());
   result = ext_authz_request_->waitForEndStream(*dispatcher_);

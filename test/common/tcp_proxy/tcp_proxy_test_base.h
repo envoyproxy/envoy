@@ -57,13 +57,6 @@ inline Config constructConfigFromYaml(const std::string& yaml,
   return Config(tcp_proxy, context);
 }
 
-inline Config constructConfigFromV3Yaml(const std::string& yaml,
-                                        Server::Configuration::FactoryContext& context) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
-  return Config(tcp_proxy, context);
-}
-
 class TcpProxyTestBase : public testing::Test {
 public:
   TcpProxyTestBase() {
@@ -96,6 +89,7 @@ public:
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy defaultConfig() {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
     config.set_stat_prefix("name");
+    config.set_cluster("fake_cluster");
     return config;
   }
 

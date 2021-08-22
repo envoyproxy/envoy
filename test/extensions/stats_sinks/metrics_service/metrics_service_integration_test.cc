@@ -41,6 +41,7 @@ public:
       envoy::config::metrics::v3::MetricsServiceConfig config;
       setGrpcService(*config.mutable_grpc_service(), "metrics_service",
                      fake_upstreams_.back()->localAddress());
+      config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       metrics_sink->mutable_typed_config()->PackFrom(config);
       // Shrink reporting period down to 1s to make test not take forever.
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
@@ -78,9 +79,7 @@ public:
       envoy::service::metrics::v3::StreamMetricsMessage request_msg;
       VERIFY_ASSERTION(metrics_service_request_->waitForGrpcMessage(*dispatcher_, request_msg));
       EXPECT_EQ("POST", metrics_service_request_->headers().getMethodValue());
-      EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.metrics.{}.MetricsService",
-                                                    "StreamMetrics",
-                                                    envoy::config::core::v3::ApiVersion::V3),
+      EXPECT_EQ("/envoy.service.metrics.v3.MetricsService/StreamMetrics",
                 metrics_service_request_->headers().getPathValue());
       EXPECT_EQ("application/grpc", metrics_service_request_->headers().getContentTypeValue());
       EXPECT_TRUE(request_msg.envoy_metrics_size() > 0);
@@ -146,12 +145,11 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, MetricsServiceIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
                          Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Test a basic metric service flow.
 TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
   // Send an empty request so that histogram values merged for cluster_0.
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));

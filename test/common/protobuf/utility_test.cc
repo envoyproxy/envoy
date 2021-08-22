@@ -411,21 +411,6 @@ TEST_F(ProtobufUtilityTest, LoadJsonFromFileNoBoosting) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
-TEST_F(ProtobufV2ApiUtilityTest, DEPRECATED_FEATURE_TEST(LoadV2TextProtoFromFile)) {
-  API_NO_BOOST(envoy::config::bootstrap::v2::Bootstrap) bootstrap;
-  bootstrap.mutable_node()->set_build_version("foo");
-
-  std::string bootstrap_text;
-  ASSERT_TRUE(Protobuf::TextFormat::PrintToString(bootstrap, &bootstrap_text));
-  const std::string filename =
-      TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
-
-  API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_from_file;
-  TestUtility::loadFromFile(filename, proto_from_file, *api_);
-  EXPECT_GT(runtime_deprecated_feature_use_.value(), 0);
-  EXPECT_EQ("foo", proto_from_file.node().hidden_envoy_deprecated_build_version());
-}
-
 TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb_text", "invalid {");
@@ -1381,56 +1366,6 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
   }
 }
 
-// MessageUtility::unpackTo() with API message works across version.
-TEST_F(ProtobufV2ApiUtilityTest, UnpackToNextVersion) {
-  API_NO_BOOST(envoy::api::v2::Cluster) source;
-  source.set_drain_connections_on_host_removal(true);
-  ProtobufWkt::Any source_any;
-  source_any.PackFrom(source);
-  API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
-  MessageUtil::unpackTo(source_any, dst);
-  EXPECT_GT(runtime_deprecated_feature_use_.value(), 0);
-  EXPECT_TRUE(dst.ignore_health_on_host_removal());
-}
-
-// MessageUtility::unpackTo() with API message works across version and doesn't register
-// deprecations for allowlisted v2 protos.
-TEST_F(ProtobufV2ApiUtilityTest, UnpackToNextVersionV2Allowed) {
-  API_NO_BOOST(envoy::config::health_checker::redis::v2::Redis) source;
-  source.set_key("foo");
-  ProtobufWkt::Any source_any;
-  source_any.PackFrom(source);
-  API_NO_BOOST(envoy::extensions::health_checkers::redis::v3::Redis) dst;
-  MessageUtil::unpackTo(source_any, dst);
-  EXPECT_EQ(runtime_deprecated_feature_use_.value(), 0);
-  EXPECT_EQ(dst.key(), "foo");
-}
-
-// Validate warning messages on v2 upgrades.
-TEST_F(ProtobufV2ApiUtilityTest, V2UpgradeWarningLogs) {
-  API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
-  // First attempt works.
-  EXPECT_LOG_CONTAINS("warn", "Configuration does not parse cleanly as v3",
-                      MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
-                                                ProtobufMessage::getNullValidationVisitor()));
-  // Second attempt immediately after fails.
-  EXPECT_LOG_NOT_CONTAINS("warn", "Configuration does not parse cleanly as v3",
-                          MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}",
-                                                    dst,
-                                                    ProtobufMessage::getNullValidationVisitor()));
-  // Third attempt works, since this is a different log message.
-  EXPECT_LOG_CONTAINS("warn", "Configuration does not parse cleanly as v3",
-                      MessageUtil::loadFromJson("{drain_connections_on_host_removal: false}", dst,
-                                                ProtobufMessage::getNullValidationVisitor()));
-  // This is kind of terrible, but it's hard to do dependency injection at
-  // onVersionUpgradeDeprecation().
-  std::this_thread::sleep_for(5s); // NOLINT
-  // We can log the original warning again.
-  EXPECT_LOG_CONTAINS("warn", "Configuration does not parse cleanly as v3",
-                      MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
-                                                ProtobufMessage::getNullValidationVisitor()));
-}
-
 // MessageUtility::loadFromJson() throws on garbage JSON.
 TEST_F(ProtobufUtilityTest, LoadFromJsonGarbage) {
   envoy::config::cluster::v3::Cluster dst;
@@ -1478,38 +1413,6 @@ TEST_F(ProtobufUtilityTest, LoadFromJsonNoBoosting) {
       MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
                                 ProtobufMessage::getStrictValidationVisitor()),
       EnvoyException, "INVALID_ARGUMENT:drain_connections_on_host_removal: Cannot find field.");
-}
-
-// MessageUtility::loadFromJson() with API message works across version.
-TEST_F(ProtobufV2ApiUtilityTest, LoadFromJsonNextVersion) {
-  {
-    API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
-    MessageUtil::loadFromJson("{use_tcp_for_dns_lookups: true}", dst,
-                              ProtobufMessage::getNullValidationVisitor());
-    EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
-    EXPECT_TRUE(dst.use_tcp_for_dns_lookups());
-  }
-  {
-    API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
-    MessageUtil::loadFromJson("{use_tcp_for_dns_lookups: true}", dst,
-                              ProtobufMessage::getStrictValidationVisitor());
-    EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
-    EXPECT_TRUE(dst.use_tcp_for_dns_lookups());
-  }
-  {
-    API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
-    MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
-                              ProtobufMessage::getNullValidationVisitor());
-    EXPECT_GT(runtime_deprecated_feature_use_.value(), 0);
-    EXPECT_TRUE(dst.ignore_health_on_host_removal());
-  }
-  {
-    API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
-    MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
-                              ProtobufMessage::getStrictValidationVisitor());
-    EXPECT_GT(runtime_deprecated_feature_use_.value(), 0);
-    EXPECT_TRUE(dst.ignore_health_on_host_removal());
-  }
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertSuccess) {

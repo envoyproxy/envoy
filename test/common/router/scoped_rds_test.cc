@@ -2,7 +2,6 @@
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/admin/v3/config_dump.pb.validate.h"
-#include "envoy/api/v2/route.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
@@ -136,7 +135,7 @@ protected:
         subscriptionFromConfigSource(
             _,
             Eq(Grpc::Common::typeUrl(
-                API_NO_BOOST(envoy::api::v2::RouteConfiguration)().GetDescriptor()->full_name())),
+                envoy::config::route::v3::RouteConfiguration().GetDescriptor()->full_name())),
             _, _, _, _))
         .Times(AnyNumber())
         .WillRepeatedly(
@@ -820,12 +819,12 @@ inline_scoped_route_configs:
   - name: foo-scoped-routes
     scoped_route_configs:
      - name: foo
-       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
        route_configuration_name: foo-route-config
        key:
          fragments: { string_key: "172.10.10.10" }
      - name: foo2
-       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
        route_configuration_name: foo-route-config2
        key:
          fragments: { string_key: "172.10.10.20" }
@@ -855,12 +854,12 @@ inline_scoped_route_configs:
   - name: foo-scoped-routes
     scoped_route_configs:
      - name: foo
-       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
        route_configuration_name: foo-route-config
        key:
          fragments: { string_key: "172.10.10.10" }
      - name: foo2
-       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
        route_configuration_name: foo-route-config2
        key:
          fragments: { string_key: "172.10.10.20" }
@@ -871,7 +870,7 @@ dynamic_scoped_route_configs:
   - name: foo_scoped_routes
     scoped_route_configs:
       - name: dynamic-foo
-        "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
+        "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
         route_configuration_name: dynamic-foo-route-config
         key:
           fragments: { string_key: "172.30.30.10" }
@@ -898,7 +897,7 @@ inline_scoped_route_configs:
   - name: foo-scoped-routes
     scoped_route_configs:
      - name: foo
-       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
        route_configuration_name: foo-route-config
        key:
          fragments: { string_key: "172.10.10.10" }
@@ -934,7 +933,7 @@ dynamic_scoped_route_configs:
   - name: foo_scoped_routes
     scoped_route_configs:
       - name: dynamic-foo
-        "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
+        "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
         route_configuration_name: dynamic-foo-route-config
         key:
           fragments: { string_key: "172.30.30.10" }
@@ -958,12 +957,12 @@ inline_scoped_route_configs:
   - name: foo-scoped-routes
     scoped_route_configs:
      - name: foo
-       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
        route_configuration_name: foo-route-config
        key:
          fragments: { string_key: "172.10.10.10" }
      - name: foo2
-       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
        route_configuration_name: foo-route-config2
        key:
          fragments: { string_key: "172.10.10.20" }

@@ -725,6 +725,14 @@ void MessageUtil::redact(Protobuf::Message& message) {
   ::Envoy::redact(&message, /* ancestor_is_sensitive = */ false);
 }
 
+void MessageUtil::wireCast(const Protobuf::Message& src, Protobuf::Message& dst) {
+  // This should should generally succeed, but if there are malformed UTF-8 strings in a message,
+  // this can fail.
+  if (!dst.ParseFromString(src.SerializeAsString())) {
+    throw EnvoyException("Unable to deserialize during wireCast()");
+  }
+}
+
 ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {
   TRY_ASSERT_MAIN_THREAD { return parseYamlNode(YAML::Load(yaml)); }
   END_TRY
