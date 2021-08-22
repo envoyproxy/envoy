@@ -64,14 +64,16 @@ TEST_P(ConfigValidation, CreateScaledTimer) {
 // Make sure that creating DnsResolver does not cause crash and each call to create
 // DNS resolver returns the same shared_ptr.
 TEST_F(ConfigValidation, SharedDnsResolver) {
-  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  Network::makeEmptyCaresDnsResolverConfig(typed_dns_resolver_config);
-  Network::DnsResolverSharedPtr dns1 = dispatcher_->createDnsResolver(typed_dns_resolver_config);
-  long use_count = dns1.use_count();
-  Network::DnsResolverSharedPtr dns2 = dispatcher_->createDnsResolver(typed_dns_resolver_config);
-
-  EXPECT_EQ(dns1.get(), dns2.get());          // Both point to the same instance.
-  EXPECT_EQ(use_count + 1, dns2.use_count()); // Each call causes ++ in use_count.
+  if (Network::DnsResolverFactory* dns_resolver_factory =
+          Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(
+              Network::cares_dns_resolver, true)) {
+    auto typed_dns_resolver_config = dns_resolver_factory->makeEmptyDnsResolverConfig();
+    Network::DnsResolverSharedPtr dns1 = dispatcher_->createDnsResolver(typed_dns_resolver_config);
+    long use_count = dns1.use_count();
+    Network::DnsResolverSharedPtr dns2 = dispatcher_->createDnsResolver(typed_dns_resolver_config);
+    EXPECT_EQ(dns1.get(), dns2.get());          // Both point to the same instance.
+    EXPECT_EQ(use_count + 1, dns2.use_count()); // Each call causes ++ in use_count.
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConfigValidation,

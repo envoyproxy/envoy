@@ -146,6 +146,17 @@ public:
                       const envoy::config::core::v3::TypedExtensionConfig&) override {
     return std::make_shared<Network::AppleDnsResolverImpl>(dispatcher, api.rootScope());
   }
+
+  // Create an empty apple DNS resolver typed config.
+  envoy::config::core::v3::TypedExtensionConfig makeEmptyDnsResolverConfig() override {
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig apple;
+    typed_dns_resolver_config.mutable_typed_config()->PackFrom(apple);
+    typed_dns_resolver_config.set_name(apple_dns_resolver);
+    return typed_dns_resolver_config;
+  }
+}
+
 };
 
 } // namespace Network

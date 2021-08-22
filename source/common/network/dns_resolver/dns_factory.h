@@ -31,23 +31,8 @@ public:
       const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) PURE;
 
   std::string category() const override { return dns_resolver_category; }
+  virtual envoy::config::core::v3::TypedExtensionConfig makeEmptyDnsResolverConfig() PURE;
 };
-
-// Create an empty cares DNS resolver typed config.
-inline void makeEmptyCaresDnsResolverConfig(
-    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
-  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(cares_dns_resolver);
-}
-
-// Create an empty apple DNS resolver typed config.
-inline void makeEmptyAppleDnsResolverConfig(
-    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
-  envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig apple;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(apple);
-  typed_dns_resolver_config.set_name(apple_dns_resolver);
-}
 
 // Retrieve the DNS related configurations in the passed in @param config, and store the data into
 // @param typed_dns_resolver_config. The design behavior is:
@@ -76,9 +61,9 @@ inline void makeEmptyAppleDnsResolverConfig(
 template <class T>
 void makeDnsResolverConfig(
     const T& config, envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+  Network::DnsResolverFactory* dns_resolver_factory;
   // typed_dns_resolver_config takes precedence
   if (config.has_typed_dns_resolver_config()) {
-    Network::DnsResolverFactory* dns_resolver_factory;
     dns_resolver_factory = Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(
         config.typed_dns_resolver_config(), true);
     if ((dns_resolver_factory != nullptr) &&
@@ -89,12 +74,12 @@ void makeDnsResolverConfig(
   }
 
   // Checking MacOS
-  if (Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(apple_dns_resolver,
-                                                                             true)) {
-    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups")) {
-      makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);
-      return;
-    }
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups") &&
+      (dns_resolver_factory =
+           Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(
+               apple_dns_resolver, true))) {
+    typed_dns_resolver_config = dns_resolver_factory->makeEmptyDnsResolverConfig();
+    return;
   }
   // Fall back to default behavior.
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
