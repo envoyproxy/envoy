@@ -6,9 +6,6 @@ deps:
     - buf.build/beta/opentelemetry
     - buf.build/beta/gogo
     - buf.build/beta/xds
-build:
-  roots:
-    - .
 breaking:
   ignore_unstable_packages: true
   use:
