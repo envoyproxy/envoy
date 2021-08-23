@@ -945,3 +945,11 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerStringAccessor(JNIEnv* 
   env->DeleteLocalRef(jcls_JvmStringAccessorContext);
   return result;
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_drainConnections(JNIEnv* env,
+                                                                  jclass, // class
+                                                                  jlong engine) {
+  jni_log("[Envoy]", "drainConnections");
+  drain_connections(engine);
+}

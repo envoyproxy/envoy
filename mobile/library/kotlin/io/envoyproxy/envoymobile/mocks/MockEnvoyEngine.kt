@@ -42,4 +42,6 @@ internal class MockEnvoyEngine : EnvoyEngine {
   override fun registerStringAccessor(accessorName: String, accessor: EnvoyStringAccessor): Int = 0
 
   override fun flushStats() = Unit
+
+  override fun drainConnections() = Unit
 }

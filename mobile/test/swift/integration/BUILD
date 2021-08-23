@@ -13,6 +13,16 @@ envoy_mobile_swift_test(
 )
 
 envoy_mobile_swift_test(
+    name = "drain_connections_test",
+    srcs = [
+        "DrainConnectionsTest.swift",
+    ],
+    deps = [
+        "//library/objective-c:envoy_engine_objc_lib",
+    ],
+)
+
+envoy_mobile_swift_test(
     name = "direct_response_contains_headers_integration_test",
     srcs = [
         "DirectResponseContainsHeadersMatchIntegrationTest.swift",

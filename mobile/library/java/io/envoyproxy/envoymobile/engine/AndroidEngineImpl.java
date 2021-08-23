@@ -82,4 +82,9 @@ public class AndroidEngineImpl implements EnvoyEngine {
   public int registerStringAccessor(String accessorName, EnvoyStringAccessor accessor) {
     return envoyEngine.registerStringAccessor(accessorName, accessor);
   }
+
+  @Override
+  public void drainConnections() {
+    envoyEngine.drainConnections();
+  }
 }

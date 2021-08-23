@@ -111,4 +111,9 @@ public interface EnvoyEngine {
    * This is a noop if called before the underlying EnvoyEngine has started.
    */
   void flushStats();
+
+  /**
+   * Drain all connections owned by this Engine.
+   */
+  void drainConnections();
 }

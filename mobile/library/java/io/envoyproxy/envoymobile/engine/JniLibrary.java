@@ -285,4 +285,9 @@ public class JniLibrary {
    */
   protected static native int registerStringAccessor(String accessorName,
                                                      JvmStringAccessorContext context);
+
+  /**
+   * Drain all connections owned by this Engine.
+   */
+  protected static native int drainConnections(long engine);
 }

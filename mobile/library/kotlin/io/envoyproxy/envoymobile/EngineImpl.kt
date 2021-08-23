@@ -47,4 +47,8 @@ class EngineImpl constructor(
   override fun flushStats() {
     envoyEngine.flushStats()
   }
+
+  override fun drainConnections() {
+    envoyEngine.drainConnections()
+  }
 }
