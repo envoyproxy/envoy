@@ -256,6 +256,13 @@ std::string stripQueryString(const HeaderString& path);
 std::string parseCookieValue(const HeaderMap& headers, const std::string& key);
 
 /**
+ * Parse cookies from header into a map.
+ * @param headers supplies the headers to get cookies from.
+ * @return std::map cookie map.
+ **/
+std::map<std::string, std::string> parseCookies(const RequestHeaderMap& headers);
+
+/**
  * Parse a particular value out of a set-cookie
  * @param headers supplies the headers to get the set-cookie from.
  * @param key the key for the particular set-cookie value to return

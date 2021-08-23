@@ -138,9 +138,17 @@ FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope&
 
 void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
                                       const std::string& secret) {
-  expires_ = Http::Utility::parseCookieValue(headers, "OauthExpires");
-  token_ = Http::Utility::parseCookieValue(headers, "BearerToken");
-  hmac_ = Http::Utility::parseCookieValue(headers, "OauthHMAC");
+  const auto& cookies = Http::Utility::parseCookies(headers);
+
+  const auto expires_it = cookies.find("OauthExpires");
+  expires_ = expires_it != cookies.end() ? expires_it->second : EMPTY_STRING;
+
+  const auto token_it = cookies.find("BearerToken");
+  token_ = token_it != cookies.end() ? token_it->second : EMPTY_STRING;
+
+  const auto hmac_it = cookies.find("OauthHMAC");
+  hmac_ = hmac_it != cookies.end() ? hmac_it->second : EMPTY_STRING;
+
   host_ = headers.Host()->value().getStringView();
 
   secret_.assign(secret.begin(), secret.end());
