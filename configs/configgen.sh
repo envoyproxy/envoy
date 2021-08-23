@@ -10,7 +10,10 @@ shift
 mkdir -p "$OUT_DIR/certs"
 mkdir -p "$OUT_DIR/lib"
 mkdir -p "$OUT_DIR/protos"
-"$CONFIGGEN" "$OUT_DIR"
+
+if [[ "$CONFIGGEN" != "NO_CONFIGGEN" ]]; then
+  "$CONFIGGEN" "$OUT_DIR"
+fi
 
 for FILE in "$@"; do
   case "$FILE" in
@@ -33,4 +36,4 @@ for FILE in "$@"; do
 done
 
 # tar is having issues with -C for some reason so just cd into OUT_DIR.
-(cd "$OUT_DIR"; tar -hcvf example_configs.tar -- *.yaml certs/*.pem certs/*.der protos/*.pb lib/*.wasm lib/*.lua)
+(cd "$OUT_DIR"; tar --ignore-failed-read -hcvf example_configs.tar -- *.yaml certs/*.pem certs/*.der protos/*.pb lib/*.wasm lib/*.lua)
