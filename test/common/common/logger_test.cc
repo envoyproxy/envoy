@@ -158,7 +158,8 @@ struct NamedLogSink : SinkDelegate {
   ~NamedLogSink() override { restoreDelegate(); }
 
   MOCK_METHOD(void, log, (absl::string_view));
-  MOCK_METHOD(void, logWithStableName, (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
+  MOCK_METHOD(void, logWithStableName,
+              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
   void flush() override {}
 };
 
