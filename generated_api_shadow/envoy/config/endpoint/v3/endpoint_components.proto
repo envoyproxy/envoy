@@ -141,7 +141,7 @@ message LocalityLbEndpoints {
 
   // The group of endpoints belonging to the locality specified.
   // [#comment:TODO(adisuissa): Once LEDS is implemented this field needs to be
-  // deprecated and replaced by *lb_endpoints_list*.]
+  // deprecated and replaced by *load_balancer_endpoints*.]
   repeated LbEndpoint lb_endpoints = 2;
 
   // [#not-implemented-hide:]
@@ -149,7 +149,7 @@ message LocalityLbEndpoints {
     // The group of endpoints belonging to the locality.
     // [#comment:TODO(adisuissa): Once LEDS is implemented the *lb_endpoints* field
     // needs to be deprecated.]
-    LbEndpointList lb_endpoints_list = 7;
+    LbEndpointList load_balancer_endpoints = 7;
 
     // LEDS Configuration for the current locality.
     LedsClusterLocalityConfig leds_cluster_locality_config = 8;

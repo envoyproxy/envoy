@@ -54,6 +54,7 @@ namespace Logger {
   FUNCTION(io)                                                                                     \
   FUNCTION(jwt)                                                                                    \
   FUNCTION(kafka)                                                                                  \
+  FUNCTION(key_value_store)                                                                        \
   FUNCTION(lua)                                                                                    \
   FUNCTION(main)                                                                                   \
   FUNCTION(matcher)                                                                                \

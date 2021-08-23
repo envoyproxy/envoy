@@ -61,8 +61,10 @@ without further review.
 
 # Envoy security team
 
-* All maintainers
-* Tony Allen ([tonya11en](https://github.com/tonya11en)) (tallen@lyft.com)
+* All senior maintainers
+* Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
+* Dmitri Dolguikh ([dmitri-d](https://github.com/dmitri-d)) (ddolguik@redhat.com)
+* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
 
 # Emeritus maintainers
 
