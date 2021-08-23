@@ -92,8 +92,8 @@ public:
    * Flags:
    * Used: used by all stats types to figure out whether they have been used.
    * Logic...: used by gauges to cache how they should be combined with a parent's value.
-   * NeverImport...: TODO(???)
-   * CustomMetric...:
+   * NeverImport...: on hot-restart, each process starts with gauge at 0.
+   * CustomMetric...: used to indicate this is a custom metric, not a native Envoy metric.
    */
   struct Flags {
     static constexpr uint8_t Used = 0x01;
