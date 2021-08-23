@@ -181,6 +181,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     collector_endpoint: /api/v1/spans
+    collector_endpoint_version: HTTP_JSON
     )EOF";
     envoy::config::trace::v3::ZipkinConfig zipkin_config;
     TestUtility::loadFromYaml(yaml_string, zipkin_config);
@@ -194,6 +195,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     collector_endpoint: /api/v1/spans
+    collector_endpoint_version: HTTP_JSON
     )EOF";
     envoy::config::trace::v3::ZipkinConfig zipkin_config;
     TestUtility::loadFromYaml(yaml_string, zipkin_config);
@@ -209,6 +211,7 @@ TEST_F(ZipkinDriverTest, AllowCollectorClusterToBeAddedViaApi) {
   const std::string yaml_string = R"EOF(
   collector_cluster: fake_cluster
   collector_endpoint: /api/v1/spans
+  collector_endpoint_version: HTTP_JSON
   )EOF";
   envoy::config::trace::v3::ZipkinConfig zipkin_config;
   TestUtility::loadFromYaml(yaml_string, zipkin_config);
