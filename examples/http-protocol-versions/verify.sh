@@ -43,3 +43,9 @@ for path in "${path_list[@]}"; do
     docker-compose -f docker-compose-h3-client.yaml run \
         h3client /root/h3client --sni "test.proxy" --address "https://localhost:10002/${path}" 2>&1 | grep "SUCCESS"
 done
+
+docker-compose -f docker-compose-h3-client.yaml rm --force --stop
+
+run_log "Clean up generated certificates and keys"
+rm serverkey.pem || true
+rm servercert.pem || true
