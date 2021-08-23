@@ -95,6 +95,8 @@ R"(
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
     common_tls_context:
+      tls_params:
+        tls_maximum_protocol_version: TLSv1_3
       validation_context:
         trusted_ca:
           inline_string: *tls_root_certs
