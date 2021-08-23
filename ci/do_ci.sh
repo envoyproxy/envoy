@@ -379,6 +379,8 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   BUF_PATH=$(realpath "bazel-source/external/com_github_bufbuild_buf/bin/buf")
   echo "Checking API for breaking changes to protobuf backwards compatibility..."
   BASE_BRANCH_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
+  COMMIT_TITLE=$(git log -n 1 --pretty='format:%C(auto)%h (%s, %ad)' ${BASE_BRANCH_REF})
+  echo -e "\tUsing base commit ${COMMIT_TITLE}"
   # TODO: remove "|| true". currently added so that this step always exits with code 0
   # we want to roll this out as an "advisory" CI step, without interrupting the PR process
   "${ENVOY_SRCDIR}"/tools/api_proto_breaking_change_detector/detector_ci.sh "${BUF_PATH}" "${BASE_BRANCH_REF}" || true
