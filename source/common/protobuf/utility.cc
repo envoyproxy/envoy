@@ -221,41 +221,6 @@ void ProtoExceptionUtil::throwProtoValidationException(const std::string& valida
   throw ProtoValidationException(validation_error, message);
 }
 
-void MessageUtil::onVersionUpgradeDeprecation(absl::string_view desc, bool /*reject*/) {
-  const std::string& warning_str =
-      fmt::format("Configuration does not parse cleanly as v3. v2 configuration is "
-                  "deprecated and will be removed from Envoy at the start of Q1 2021: {}",
-                  desc);
-  // Always log at trace level. This is useful for tests that don't want to rely on possible
-  // elision.
-  ENVOY_LOG_MISC(trace, warning_str);
-  // Log each distinct message at warn level once every 5s. We use a static map here, which is fine
-  // as we are always on the main thread.
-  static auto* last_warned = new absl::flat_hash_map<std::string, int64_t>();
-  const auto now = t_logclock::now().time_since_epoch().count();
-  const auto it = last_warned->find(warning_str);
-  if (it == last_warned->end() ||
-      (now - it->second) > std::chrono::duration_cast<std::chrono::nanoseconds>(5s).count()) {
-    ENVOY_LOG_MISC(warn, warning_str);
-    (*last_warned)[warning_str] = now;
-  }
-  Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting();
-  // We only log, and don't bump stats, if we're sufficiently early in server initialization (i.e.
-  // bootstrap).
-  if (loader != nullptr) {
-    loader->countDeprecatedFeatureUse();
-  }
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.test_only.broken_in_production.enable_deprecated_v2_api")) {
-    throw DeprecatedMajorVersionException(fmt::format(
-        "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
-        "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
-        "following "
-        "the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition. ({})",
-        desc));
-  }
-}
-
 size_t MessageUtil::hash(const Protobuf::Message& message) {
   std::string text_format;
 

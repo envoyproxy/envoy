@@ -35,7 +35,6 @@ public:
   virtual void onMessage(const Protobuf::Message&, const void*){};
 };
 
-void traverseMutableMessage(ProtoVisitor& visitor, Protobuf::Message& message, const void* ctxt);
 void traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& message,
                      const void* ctxt);
 

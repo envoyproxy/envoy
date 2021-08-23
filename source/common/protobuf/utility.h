@@ -390,14 +390,6 @@ public:
   };
 
   /**
-   * Invoke when a version upgrade (e.g. v2 -> v3) is detected. This may warn or throw
-   * depending on where we are in the major version deprecation cycle.
-   * @param desc description of upgrade to include in warning or exception.
-   * @param reject should a DeprecatedMajorVersionException be thrown on failure?
-   */
-  static void onVersionUpgradeDeprecation(absl::string_view desc, bool reject = true);
-
-  /**
    * Obtain a string field from a protobuf message dynamically.
    *
    * @param message message to extract from.
