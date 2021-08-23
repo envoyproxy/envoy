@@ -144,7 +144,7 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
 
 // Make sure all workers pick up connections
 #ifdef WIN32
-// We can only gurantee this on Windows without the reuse_port changes.
+// We can only guarantee this on Windows without the reuse_port changes.
 TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   concurrency_ = 2;
   initialize();
