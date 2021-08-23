@@ -42,7 +42,7 @@ protected:
   Http::TestResponseHeaderMapImpl response_headers_ = {{":status", "200"},
                                                        {"date", "Sun, 06 Nov 1994 08:49:37 GMT"},
                                                        {"cache-control", cache_control_}};
-  VaryHeader vary_allow_list_;
+  VaryAllowList vary_allow_list_;
 };
 
 TEST_F(CanServeRequestFromCacheTest, CacheableRequest) {
