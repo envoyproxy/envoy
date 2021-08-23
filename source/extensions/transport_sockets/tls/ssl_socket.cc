@@ -389,13 +389,11 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
   }
 
   if (should_run_callbacks) {
-    {
-      absl::WriterMutexLock m(&secrets_ready_callbacks_mu_);
-      for (const auto& cb : secrets_ready_callbacks_) {
-        cb();
-      }
-      secrets_ready_callbacks_.clear();
+    absl::WriterMutexLock m(&secrets_ready_callbacks_mu_);
+    for (const auto& cb : secrets_ready_callbacks_) {
+      cb();
     }
+    secrets_ready_callbacks_.clear();
   }
   stats_.ssl_context_update_by_sds_.inc();
 }
@@ -407,10 +405,8 @@ void ClientSslSocketFactory::addReadyCb(std::function<void()> callback) {
     if (ssl_ctx_) {
       immediately_run_callback = true;
     } else {
-      {
-        absl::WriterMutexLock m(&secrets_ready_callbacks_mu_);
-        secrets_ready_callbacks_.push_back(callback);
-      }
+      absl::WriterMutexLock m(&secrets_ready_callbacks_mu_);
+      secrets_ready_callbacks_.push_back(callback);
     }
   }
   if (immediately_run_callback) {
@@ -468,13 +464,11 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
   }
 
   if (should_run_callbacks) {
-    {
-      absl::WriterMutexLock l(&secrets_ready_callbacks_mu_);
-      for (const auto& cb : secrets_ready_callbacks_) {
-        cb();
-      }
-      secrets_ready_callbacks_.clear();
+    absl::WriterMutexLock l(&secrets_ready_callbacks_mu_);
+    for (const auto& cb : secrets_ready_callbacks_) {
+      cb();
     }
+    secrets_ready_callbacks_.clear();
   }
   stats_.ssl_context_update_by_sds_.inc();
 }
@@ -486,10 +480,8 @@ void ServerSslSocketFactory::addReadyCb(std::function<void()> callback) {
     if (ssl_ctx_) {
       immediately_run_callback = true;
     } else {
-      {
-        absl::WriterMutexLock m(&secrets_ready_callbacks_mu_);
-        secrets_ready_callbacks_.push_back(callback);
-      }
+      absl::WriterMutexLock m(&secrets_ready_callbacks_mu_);
+      secrets_ready_callbacks_.push_back(callback);
     }
   }
   if (immediately_run_callback) {
