@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.rocketmq_proxy.v4alpha;
 
-import "envoy/extensions/filters/network/rocketmq_proxy/v4alpha/route.proto";
+import "contrib/envoy/extensions/filters/network/rocketmq_proxy/v4alpha/route.proto";
 
 import "google/protobuf/duration.proto";
 
