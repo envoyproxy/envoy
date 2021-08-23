@@ -518,7 +518,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithFaultInjectionIntegrationTest
 
 void RedisProxyIntegrationTest::initialize() {
   setUpstreamCount(num_upstreams_);
-  setDeterministic();
+  setDeterministicValue(0);
   config_helper_.renameListener("redis_proxy");
   BaseIntegrationTest::initialize();
 }

@@ -401,9 +401,9 @@ public:
   static IntegrationTestServerPtr
   create(const std::string& config_path, const Network::Address::IpVersion version,
          std::function<void(IntegrationTestServer&)> on_server_ready_function,
-         std::function<void()> on_server_init_function, bool deterministic,
-         Event::TestTimeSystem& time_system, Api::Api& api,
-         bool defer_listener_finalization = false,
+         std::function<void()> on_server_init_function,
+         absl::optional<uint64_t> deterministic_value, Event::TestTimeSystem& time_system,
+         Api::Api& api, bool defer_listener_finalization = false,
          ProcessObjectOptRef process_object = absl::nullopt,
          Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
          uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
@@ -433,10 +433,11 @@ public:
   void onWorkersStarted() override {}
 
   void start(const Network::Address::IpVersion version,
-             std::function<void()> on_server_init_function, bool deterministic,
-             bool defer_listener_finalization, ProcessObjectOptRef process_object,
-             Server::FieldValidationConfig validation_config, uint32_t concurrency,
-             std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
+             std::function<void()> on_server_init_function,
+             absl::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
+             ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
+             uint32_t concurrency, std::chrono::seconds drain_time,
+             Server::DrainStrategy drain_strategy,
              Buffer::WatermarkFactorySharedPtr watermark_factory, bool v2_bootstrap);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
@@ -541,7 +542,8 @@ private:
   /**
    * Runs the real server on a thread.
    */
-  void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
+  void threadRoutine(const Network::Address::IpVersion version,
+                     absl::optional<uint64_t> deterministic_value,
                      ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,

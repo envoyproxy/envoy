@@ -77,7 +77,6 @@ using OptionalHttpFilters = absl::flat_hash_set<std::string>;
 class PerFilterConfigs : public Logger::Loggable<Logger::Id::http> {
 public:
   PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
-                   const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
                    const OptionalHttpFilters& optional_http_filters,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    ProtobufMessage::ValidationVisitor& validator);
@@ -814,6 +813,8 @@ private:
         const std::string& filter_name,
         std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
+    const Http::LowerCaseString& clusterHeaderName() { return cluster_header_name_; }
+
   private:
     const std::string runtime_key_;
     Runtime::Loader& loader_;
@@ -823,6 +824,7 @@ private:
     HeaderParserPtr response_headers_parser_;
     PerFilterConfigs per_filter_configs_;
     const std::string host_rewrite_;
+    const Http::LowerCaseString cluster_header_name_;
   };
 
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
@@ -853,6 +855,12 @@ private:
   buildInternalRedirectPolicy(const envoy::config::route::v3::RouteAction& route_config,
                               ProtobufMessage::ValidationVisitor& validator,
                               absl::string_view current_route_name) const;
+
+  RouteConstSharedPtr pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
+                                                  const Http::HeaderMap& headers) const;
+
+  RouteConstSharedPtr pickWeightedCluster(const Http::HeaderMap& headers, uint64_t random_value,
+                                          bool ignore_overflow) const;
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;

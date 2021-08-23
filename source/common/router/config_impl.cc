@@ -365,9 +365,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       direct_response_body_(ConfigUtility::parseDirectResponseBody(
           route, factory_context.api(),
           vhost_.globalRouteConfig().maxDirectResponseBodySizeBytes())),
-      per_filter_configs_(route.typed_per_filter_config(),
-                          route.hidden_envoy_deprecated_per_filter_config(), optional_http_filters,
-                          factory_context, validator),
+      per_filter_configs_(route.typed_per_filter_config(), optional_http_filters, factory_context,
+                          validator),
       route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
@@ -955,6 +954,23 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
   }
 }
 
+RouteConstSharedPtr
+RouteEntryImplBase::pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
+                                                const Http::HeaderMap& headers) const {
+  const auto entry = headers.get(cluster_header_name);
+  std::string final_cluster_name;
+  if (!entry.empty()) {
+    // This is an implicitly untrusted header, so per the API documentation only
+    // the first value is used.
+    final_cluster_name = std::string(entry[0]->value().getStringView());
+  }
+
+  // NOTE: Though we return a shared_ptr here, the current ownership model
+  // assumes that the route table sticks around. See snapped_route_config_ in
+  // ConnectionManagerImpl::ActiveStream.
+  return std::make_shared<DynamicRouteEntry>(this, final_cluster_name);
+}
+
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& headers,
                                                      uint64_t random_value) const {
   // Gets the route object chosen from the list of weighted clusters
@@ -964,23 +980,42 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
       return shared_from_this();
     } else {
       ASSERT(!cluster_header_name_.get().empty());
-      const auto entry = headers.get(cluster_header_name_);
-      std::string final_cluster_name;
-      if (!entry.empty()) {
-        // This is an implicitly untrusted header, so per the API documentation only the first
-        // value is used.
-        final_cluster_name = std::string(entry[0]->value().getStringView());
-      }
-
-      // NOTE: Though we return a shared_ptr here, the current ownership model assumes that
-      //       the route table sticks around. See snapped_route_config_ in
-      //       ConnectionManagerImpl::ActiveStream.
-      return std::make_shared<DynamicRouteEntry>(this, final_cluster_name);
+      return pickClusterViaClusterHeader(cluster_header_name_, headers);
     }
   }
+  return pickWeightedCluster(headers, random_value, true);
+}
 
-  return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_, random_value,
-                                          true);
+RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMap& headers,
+                                                            const uint64_t random_value,
+                                                            const bool ignore_overflow) const {
+  uint64_t selected_value = random_value % total_cluster_weight_;
+  uint64_t begin = 0;
+  uint64_t end = 0;
+
+  // Find the right cluster to route to based on the interval in which
+  // the selected value falls. The intervals are determined as
+  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
+  for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
+    end = begin + cluster->clusterWeight();
+    if (!ignore_overflow) {
+      // end > total_cluster_weight: This case can only occur with Runtimes,
+      // when the user specifies invalid weights such that
+      // sum(weights) > total_cluster_weight.
+      ASSERT(end <= total_cluster_weight_);
+    }
+
+    if (selected_value >= begin && selected_value < end) {
+      if (!cluster->clusterHeaderName().get().empty() &&
+          !headers.get(cluster->clusterHeaderName()).empty()) {
+        return pickClusterViaClusterHeader(cluster->clusterHeaderName(), headers);
+      }
+      return cluster;
+    }
+    begin = end;
+  }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void RouteEntryImplBase::validateClusters(
@@ -989,21 +1024,31 @@ void RouteEntryImplBase::validateClusters(
     return;
   }
 
-  // Currently, we verify that the cluster exists in the CM if we have an explicit cluster or
-  // weighted cluster rule. We obviously do not verify a cluster_header rule. This means that
-  // trying to use all CDS clusters with a static route table will not work. In the upcoming RDS
-  // change we will make it so that dynamically loaded route tables do *not* perform CM checks.
-  // In the future we might decide to also have a config option that turns off checks for static
-  // route tables. This would enable the all CDS with static route table case.
+  // Currently, we verify that the cluster exists in the CM if we have an
+  // explicit cluster or weighted cluster rule. We obviously do not verify a
+  // cluster_header rule. This means that trying to use all CDS clusters with a
+  // static route table will not work. In the upcoming RDS change we will make
+  // it so that dynamically loaded route tables do *not* perform CM checks. In
+  // the future we might decide to also have a config option that turns off
+  // checks for static route tables. This would enable the all CDS with static
+  // route table case.
+  // For weighted clusters, we only verifies that the `cluster_header_name` is
+  // not empty because the cluster name is not set yet at config time (hence the
+  // validation here).
   if (!cluster_name_.empty()) {
     if (!cluster_info_maps.hasCluster(cluster_name_)) {
       throw EnvoyException(fmt::format("route: unknown cluster '{}'", cluster_name_));
     }
   } else if (!weighted_clusters_.empty()) {
     for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
-      if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
-        throw EnvoyException(
-            fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
+      if (!cluster_info_maps.hasCluster(cluster->clusterName()) &&
+          cluster->clusterHeaderName().get().empty()) {
+        if (!cluster->clusterName().empty()) {
+          throw EnvoyException(
+              fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
+        } else {
+          throw EnvoyException("route: unknown weighted cluster with no cluster_header field");
+        }
       }
     }
   }
@@ -1036,10 +1081,10 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
                                                       cluster.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
                                                        cluster.response_headers_to_remove())),
-      per_filter_configs_(cluster.typed_per_filter_config(),
-                          cluster.hidden_envoy_deprecated_per_filter_config(),
-                          optional_http_filters, factory_context, validator),
-      host_rewrite_(cluster.host_rewrite_literal()) {
+      per_filter_configs_(cluster.typed_per_filter_config(), optional_http_filters, factory_context,
+                          validator),
+      host_rewrite_(cluster.host_rewrite_literal()),
+      cluster_header_name_(cluster.cluster_header()) {
   if (cluster.has_metadata_match()) {
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -1217,9 +1262,8 @@ VirtualHostImpl::VirtualHostImpl(
                                                       virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
-      per_filter_configs_(virtual_host.typed_per_filter_config(),
-                          virtual_host.hidden_envoy_deprecated_per_filter_config(),
-                          optional_http_filters, factory_context, validator),
+      per_filter_configs_(virtual_host.typed_per_filter_config(), optional_http_filters,
+                          factory_context, validator),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
@@ -1353,9 +1397,9 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
     validation_clusters = factory_context.clusterManager().clusters();
   }
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
-    VirtualHostSharedPtr virtual_host(
-        new VirtualHostImpl(virtual_host_config, optional_http_filters, global_route_config,
-                            factory_context, *vhost_scope_, validator, validation_clusters));
+    VirtualHostSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
+        virtual_host_config, optional_http_filters, global_route_config, factory_context,
+        *vhost_scope_, validator, validation_clusters);
     for (const std::string& domain_name : virtual_host_config.domains()) {
       const std::string domain = Http::LowerCaseString(domain_name).get();
       bool duplicate_found = false;
@@ -1582,13 +1626,9 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
 
 PerFilterConfigs::PerFilterConfigs(
     const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
-    const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
-  if (!typed_configs.empty() && !configs.empty()) {
-    throw EnvoyException("Only one of typed_configs or configs can be specified");
-  }
 
   for (const auto& it : typed_configs) {
     // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
@@ -1597,19 +1637,6 @@ PerFilterConfigs::PerFilterConfigs(
 
     auto object =
         createRouteSpecificFilterConfig(name, it.second, ProtobufWkt::Struct::default_instance(),
-                                        optional_http_filters, factory_context, validator);
-    if (object != nullptr) {
-      configs_[name] = std::move(object);
-    }
-  }
-
-  for (const auto& it : configs) {
-    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
-    const auto& name =
-        Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
-
-    auto object =
-        createRouteSpecificFilterConfig(name, ProtobufWkt::Any::default_instance(), it.second,
                                         optional_http_filters, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);

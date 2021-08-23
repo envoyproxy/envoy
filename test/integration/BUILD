@@ -1256,6 +1256,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/extensions/transport_sockets/tls:test_private_key_method_provider_test_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:resources_lib",
@@ -1818,7 +1819,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
-        "@com_googlesource_quiche//:quic_test_tools_session_peer_lib",
+        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ]),
 )
 
@@ -1832,5 +1833,18 @@ envoy_cc_test(
         "//source/extensions/http/original_ip_detection/custom_header:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/original_ip_detection/custom_header/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "weighted_cluster_integration_test",
+    srcs = ["weighted_cluster_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        ":integration_lib",
+        "//test/integration/filters:repick_cluster_filter_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

@@ -2820,6 +2820,40 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, WeightedClusterHeader) {
+
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  total_weight: 100
+                  clusters:
+                    - cluster_header: some_header
+                      weight: 30
+                    - name: cluster1
+                      weight: 30
+                    - name: cluster2
+                      weight: 40
+      )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some_header", "cluster1", "cluster2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+  // Cluster name is empty here because it will pick the cluster with cluster_header
+  // (i.e. no cluster_name) first.
+  EXPECT_EQ("", config.route(headers, 115)->routeEntry()->clusterName());
+  // Modify the header mapping.
+  headers.addCopy("some_header", "some_cluster");
+  EXPECT_EQ("some_cluster", config.route(headers, 115)->routeEntry()->clusterName());
+  EXPECT_EQ("cluster1", config.route(headers, 445)->routeEntry()->clusterName());
+  EXPECT_EQ("cluster2", config.route(headers, 560)->routeEntry()->clusterName());
+}
+
 TEST_F(RouteMatcherTest, ContentType) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -7580,64 +7614,6 @@ public:
       registered_default_factory_;
 };
 
-TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(TypedConfigFilterError)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  {
-    const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-    per_filter_config: { unknown.filter: {} }
-    typed_per_filter_config:
-      unknown.filter:
-        "@type": type.googleapis.com/google.protobuf.Timestamp
-)EOF";
-
-    EXPECT_THROW_WITH_MESSAGE(
-        TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-        EnvoyException, "Only one of typed_configs or configs can be specified");
-  }
-
-  {
-    const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-        per_filter_config: { unknown.filter: {} }
-        typed_per_filter_config:
-          unknown.filter:
-            "@type": type.googleapis.com/google.protobuf.Timestamp
-)EOF";
-
-    EXPECT_THROW_WITH_MESSAGE(
-        TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-        EnvoyException, "Only one of typed_configs or configs can be specified");
-  }
-}
-
-TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(UnknownFilterStruct)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-    per_filter_config: { unknown.filter: {} }
-)EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Didn't find a registered implementation for name: 'unknown.filter'");
-}
-
 TEST_F(PerFilterConfigsTest, UnknownFilterAny) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -7654,47 +7630,6 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "Didn't find a registered implementation for name: 'unknown.filter'");
-}
-
-// Test that a trivially specified NamedHttpFilterConfigFactory ignores per_filter_config without
-// error.
-TEST_F(PerFilterConfigsTest,
-       DEPRECATED_FEATURE_TEST(DefaultFilterImplementationStructPerVirtualHost)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-    per_filter_config: { test.default.filter: { seconds: 123} }
-)EOF";
-
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.check_unsupported_typed_per_filter_config", "false"}});
-
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkNoPerFilterConfig(yaml);
-}
-
-TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(DefaultFilterImplementationStructPerRoute)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-        per_filter_config: { test.default.filter: { seconds: 123} }
-)EOF";
-
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.check_unsupported_typed_per_filter_config", "false"}});
-
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkNoPerFilterConfig(yaml);
 }
 
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyPerVirtualHost) {
@@ -7739,46 +7674,6 @@ virtual_hosts:
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   checkNoPerFilterConfig(yaml);
-}
-
-// Test that a trivially specified NamedHttpFilterConfigFactory reject unsupported
-// per_filter_config.
-TEST_F(PerFilterConfigsTest,
-       DEPRECATED_FEATURE_TEST(DefaultFilterImplementationStructWithCheckPerVirtualHost)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-    per_filter_config: { test.default.filter: { seconds: 123} }
-)EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
-      "The filter test.default.filter doesn't support virtual host-specific configurations");
-}
-
-TEST_F(PerFilterConfigsTest,
-       DEPRECATED_FEATURE_TEST(DefaultFilterImplementationStructWithCheckPerRoute)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-        per_filter_config: { test.default.filter: { seconds: 123} }
-)EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
-      "The filter test.default.filter doesn't support virtual host-specific configurations");
 }
 
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyWithCheckPerVirtualHost) {
@@ -7945,24 +7840,6 @@ virtual_hosts:
   checkNoPerFilterConfig(yaml, optional_http_filters);
 }
 
-TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(RouteLocalConfig)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-        per_filter_config: { test.filter: { seconds: 123 } }
-    per_filter_config: { test.filter: { seconds: 456 } }
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  absl::InlinedVector<uint32_t, 3> expected_traveled_config({456, 123});
-  checkEach(yaml, 123, expected_traveled_config);
-}
-
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfig) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -8014,28 +7891,6 @@ virtual_hosts:
   checkEach(yaml, 123, expected_traveled_config);
 }
 
-TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterConfig)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route:
-          weighted_clusters:
-            clusters:
-              - name: baz
-                weight: 100
-                per_filter_config: { test.filter: { seconds: 789 } }
-    per_filter_config: { test.filter: { seconds: 1011 } }
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  absl::InlinedVector<uint32_t, 3> expected_traveled_config({1011, 789});
-  checkEach(yaml, 789, expected_traveled_config);
-}
-
 TEST_F(PerFilterConfigsTest, WeightedClusterTypedConfig) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -8063,28 +7918,6 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   absl::InlinedVector<uint32_t, 3> expected_traveled_config({1011, 789});
   checkEach(yaml, 789, expected_traveled_config);
-}
-
-TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterFallthroughConfig)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route:
-          weighted_clusters:
-            clusters:
-              - name: baz
-                weight: 100
-        per_filter_config: { test.filter: { seconds: 1213 } }
-    per_filter_config: { test.filter: { seconds: 1415 } }
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  absl::InlinedVector<uint32_t, 3> expected_traveled_config({1415, 1213});
-  checkEach(yaml, 1213, expected_traveled_config);
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughTypedConfig) {

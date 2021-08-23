@@ -176,10 +176,10 @@ public:
   }
   ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
     TcpAttachContext context(&callbacks);
-    return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
+    return newStreamImpl(context);
   }
   bool maybePreconnect(float preconnect_ratio) override {
-    return Envoy::ConnectionPool::ConnPoolImplBase::maybePreconnect(preconnect_ratio);
+    return maybePreconnectImpl(preconnect_ratio);
   }
 
   ConnectionPool::Cancellable*

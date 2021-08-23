@@ -23,7 +23,7 @@ from flake8.main.application import Application as Flake8Application  # type:ign
 
 import yapf  # type:ignore
 
-from tools.base import checker, utils
+from tools.base import aio, checker, utils
 
 FLAKE8_CONFIG = '.flake8'
 YAPF_CONFIG = '.style.yapf'
@@ -32,7 +32,7 @@ YAPF_CONFIG = '.style.yapf'
 #      - isort
 
 
-class PythonChecker(checker.ForkingChecker):
+class PythonChecker(checker.AsyncChecker):
     checks = ("flake8", "yapf")
 
     @property
@@ -80,7 +80,7 @@ class PythonChecker(checker.ForkingChecker):
         parser.add_argument(
             "--diff-file", default=None, help="Specify the path to a diff file with fixes")
 
-    def check_flake8(self) -> None:
+    async def check_flake8(self) -> None:
         """Run flake8 on files and/or repo"""
         errors: List[str] = []
         with utils.buffered(stdout=errors, mangle=self._strip_lines):
@@ -89,36 +89,39 @@ class PythonChecker(checker.ForkingChecker):
         if errors:
             self.error("flake8", errors)
 
-    def check_yapf(self) -> None:
+    async def check_yapf(self) -> None:
         """Run flake8 on files and/or repo"""
-        for python_file in self.yapf_files:
-            self.yapf_run(python_file)
+        futures = aio.concurrent(self.yapf_format(python_file) for python_file in self.yapf_files)
 
-    def on_check_run(self, check: str) -> None:
+        async for (python_file, (reformatted, encoding, changed)) in futures:
+            self.yapf_result(python_file, reformatted, changed)
+
+    async def on_check_run(self, check: str) -> None:
         if check not in self.failed and check not in self.warned:
             self.succeed(check, [check])
 
-    def on_checks_complete(self) -> int:
+    async def on_checks_complete(self) -> int:
         if self.diff_file_path and self.has_failed:
-            result = self.subproc_run(["git", "diff", "HEAD"])
+            result = await aio.async_subprocess.run(["git", "diff", "HEAD"],
+                                                    cwd=self.path,
+                                                    capture_output=True)
             self.diff_file_path.write_bytes(result.stdout)
-        return super().on_checks_complete()
+        return await super().on_checks_complete()
 
-    def yapf_format(self, python_file: str) -> tuple:
-        return yapf.yapf_api.FormatFile(
+    async def yapf_format(self, python_file: str) -> tuple:
+        return python_file, yapf.yapf_api.FormatFile(
             python_file,
             style_config=str(self.yapf_config_path),
             in_place=self.fix,
             print_diff=not self.fix)
 
-    def yapf_run(self, python_file: str) -> None:
-        reformatted_source, encoding, changed = self.yapf_format(python_file)
+    def yapf_result(self, python_file: str, reformatted: str, changed: bool) -> None:
         if not changed:
             return self.succeed("yapf", [python_file])
         if self.fix:
             return self.warn("yapf", [f"{python_file}: reformatted"])
-        if reformatted_source:
-            return self.warn("yapf", [f"{python_file}: diff\n{reformatted_source}"])
+        if reformatted:
+            return self.warn("yapf", [f"{python_file}: diff\n{reformatted}"])
         self.error("yapf", [python_file])
 
     def _strip_line(self, line: str) -> str:
@@ -128,7 +131,7 @@ class PythonChecker(checker.ForkingChecker):
         return [self._strip_line(line) for line in lines if line]
 
 
-def main(*args: str) -> int:
+def main(*args: str) -> Optional[int]:
     return PythonChecker(*args).run()
 
 
