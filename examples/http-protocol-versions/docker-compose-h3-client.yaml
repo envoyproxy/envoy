@@ -1,0 +1,7 @@
+version: "3.7"
+services:
+  h3client:
+    build:
+      context: .
+      dockerfile: Dockerfile-http3-client
+    network_mode: "host"
