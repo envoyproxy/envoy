@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Cache {
+namespace Cache { 
 namespace {
 
 class SimpleLookupContext : public LookupContext {
@@ -112,9 +112,9 @@ LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
 void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
                                     const Http::ResponseHeaderMap& response_headers,
                                     const ResponseMetadata& metadata) {
-  absl::WriterMutexLock lock(&mutex_);
   const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
   const Key& key = simple_lookup_context.request().key();
+  absl::WriterMutexLock lock(&mutex_);
 
   auto iter = map_.find(key);
   if (iter == map_.end() || !iter->second.response_headers_) {
