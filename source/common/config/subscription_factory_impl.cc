@@ -43,11 +43,6 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                                                             api_config_source);
     const auto transport_api_version = Utility::getAndCheckTransportVersion(api_config_source);
     switch (api_config_source.api_type()) {
-    case envoy::config::core::v3::ApiConfigSource::hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY:
-      throw EnvoyException(
-          "REST_LEGACY no longer a supported ApiConfigSource. "
-          "Please specify an explicit supported api_type in the following config:\n" +
-          config.DebugString());
     case envoy::config::core::v3::ApiConfigSource::REST:
       return std::make_unique<HttpSubscriptionImpl>(
           local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_,
