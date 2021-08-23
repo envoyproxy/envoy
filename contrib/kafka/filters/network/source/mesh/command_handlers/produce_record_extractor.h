@@ -21,12 +21,28 @@ public:
 };
 
 /**
- * Just a placeholder for now.
+ * Proper implementation of record extractor, capable of parsing V2 record set.
+ * Reference: https://kafka.apache.org/24/documentation/#messageformat
  */
-class PlaceholderRecordExtractor : public RecordExtractor {
+class RecordExtractorImpl : public RecordExtractor {
 public:
   std::vector<OutboundRecord>
   extractRecords(const std::vector<TopicProduceData>& data) const override;
+
+  static absl::string_view extractElement(absl::string_view& input);
+
+private:
+  std::vector<OutboundRecord> extractPartitionRecords(const std::string& topic,
+                                                      const int32_t partition,
+                                                      const Bytes& records) const;
+
+  // Impl note: I'm sorry for the long name.
+  std::vector<OutboundRecord> extractRecordsOutOfBatchWithMagicEqualTo2(const std::string& topic,
+                                                                        const int32_t partition,
+                                                                        absl::string_view sv) const;
+
+  OutboundRecord extractRecord(const std::string& topic, const int32_t partition,
+                               absl::string_view& data) const;
 };
 
 } // namespace Mesh
