@@ -20,6 +20,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "produce_record_extractor_unit_test",
+    srcs = ["produce_record_extractor_unit_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//contrib/kafka/filters/network/source/mesh/command_handlers:produce_record_extractor_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "metadata_unit_test",
     srcs = ["metadata_unit_test.cc"],
     tags = ["skip_on_windows"],
