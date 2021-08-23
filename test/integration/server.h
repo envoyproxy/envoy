@@ -87,20 +87,20 @@ public:
     wrapped_scope_->deliverHistogramToSinks(histogram, value);
   }
 
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override {
+  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                       bool) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->counterFromStatNameWithTags(name, tags);
   }
 
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override {
+                                   Gauge::ImportMode import_mode, bool) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
   }
 
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override {
+                                           Histogram::Unit unit, bool) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogramFromStatNameWithTags(name, tags, unit);
   }
@@ -195,6 +195,7 @@ public:
   uint32_t use_count() const override { return counter_->use_count(); }
   StatName tagExtractedStatName() const override { return counter_->tagExtractedStatName(); }
   bool used() const override { return counter_->used(); }
+  bool isCustomMetric() const override { return false; }
   SymbolTable& symbolTable() override { return counter_->symbolTable(); }
   const SymbolTable& constSymbolTable() const override { return counter_->constSymbolTable(); }
 
@@ -238,10 +239,12 @@ public:
 
 protected:
   Stats::Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
-                                      const StatNameTagVector& stat_name_tags) override {
-    Stats::Counter* counter = new NotifyingCounter(
-        Stats::AllocatorImpl::makeCounterInternal(name, tag_extracted_name, stat_name_tags), mutex_,
-        condvar_);
+                                      const StatNameTagVector& stat_name_tags,
+                                      bool is_custom_metric) override {
+    Stats::Counter* counter =
+        new NotifyingCounter(Stats::AllocatorImpl::makeCounterInternal(
+                                 name, tag_extracted_name, stat_name_tags, is_custom_metric),
+                             mutex_, condvar_);
     {
       absl::MutexLock l(&mutex_);
       // Allow getting the counter directly from the allocator, since it's harder to
@@ -276,8 +279,8 @@ private:
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
   // Stats::Scope
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override {
+  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                       bool) override {
     Thread::LockGuard lock(lock_);
     return store_.counterFromStatNameWithTags(name, tags);
   }
@@ -295,7 +298,7 @@ public:
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override {
+                                   Gauge::ImportMode import_mode, bool) override {
     Thread::LockGuard lock(lock_);
     return store_.gaugeFromStatNameWithTags(name, tags, import_mode);
   }
@@ -304,7 +307,7 @@ public:
     return store_.gaugeFromString(name, import_mode);
   }
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override {
+                                           Histogram::Unit unit, bool) override {
     Thread::LockGuard lock(lock_);
     return store_.histogramFromStatNameWithTags(name, tags, unit);
   }

@@ -84,14 +84,22 @@ public:
   virtual bool used() const PURE;
 
   /**
+   * Indicates whether this metric is a custom metric or not.
+   */
+  virtual bool isCustomMetric() const PURE;
+
+  /**
    * Flags:
    * Used: used by all stats types to figure out whether they have been used.
    * Logic...: used by gauges to cache how they should be combined with a parent's value.
+   * NeverImport...: TODO(???)
+   * CustomMetric...:
    */
   struct Flags {
     static constexpr uint8_t Used = 0x01;
     static constexpr uint8_t LogicAccumulate = 0x02;
     static constexpr uint8_t NeverImport = 0x04;
+    static constexpr uint8_t CustomMetric = 0x08;
   };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;

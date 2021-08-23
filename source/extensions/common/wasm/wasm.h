@@ -89,6 +89,10 @@ public:
   }
   void setFailStateForTesting(proxy_wasm::FailState fail_state) { failed_ = fail_state; }
 
+  absl::flat_hash_map<uint32_t, Stats::Counter*>& countersForTesting() { return counters_; }
+  absl::flat_hash_map<uint32_t, Stats::Gauge*>& gaugesForTesting() { return gauges_; }
+  absl::flat_hash_map<uint32_t, Stats::Histogram*>& histogramForTesting() { return histograms_; }
+
 protected:
   friend class Context;
 

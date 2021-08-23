@@ -41,19 +41,22 @@ protected:
 
   ~PrometheusStatsFormatterTest() override { clearStorage(); }
 
-  void addCounter(const std::string& name, Stats::StatNameTagVector cluster_tags) {
+  void addCounter(const std::string& name, Stats::StatNameTagVector cluster_tags,
+                  bool is_custom_metric = false) {
     Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
     Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
     counters_.push_back(alloc_.makeCounter(name_storage.statName(),
-                                           tag_extracted_name_storage.statName(), cluster_tags));
+                                           tag_extracted_name_storage.statName(), cluster_tags,
+                                           is_custom_metric));
   }
 
-  void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags) {
+  void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags,
+                bool is_custom_metric = false) {
     Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
     Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
     gauges_.push_back(alloc_.makeGauge(name_storage.statName(),
                                        tag_extracted_name_storage.statName(), cluster_tags,
-                                       Stats::Gauge::ImportMode::Accumulate));
+                                       Stats::Gauge::ImportMode::Accumulate, is_custom_metric));
   }
 
   using MockHistogramSharedPtr = Stats::RefcountPtr<NiceMock<Stats::MockParentHistogram>>;
@@ -102,38 +105,38 @@ protected:
 TEST_F(PrometheusStatsFormatterTest, MetricName) {
   std::string raw = "vulture.eats-liver";
   std::string expected = "envoy_vulture_eats_liver";
-  auto actual = PrometheusStatsFormatter::metricName(raw);
+  auto actual = PrometheusStatsFormatter::metricName(raw, false);
+  EXPECT_EQ(expected, actual);
+}
+
+TEST_F(PrometheusStatsFormatterTest, CustomMetricName) {
+  std::string raw = "vulture.eats-liver";
+  // Custom metrics should not be prefixed by "envoy_".
+  std::string expected = "vulture_eats_liver";
+  auto actual = PrometheusStatsFormatter::metricName(raw, true);
   EXPECT_EQ(expected, actual);
 }
 
 TEST_F(PrometheusStatsFormatterTest, SanitizeMetricName) {
   std::string raw = "An.artist.plays-violin@019street";
   std::string expected = "envoy_An_artist_plays_violin_019street";
-  auto actual = PrometheusStatsFormatter::metricName(raw);
+  auto actual = PrometheusStatsFormatter::metricName(raw, false);
   EXPECT_EQ(expected, actual);
 }
 
 TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
   std::string raw = "3.artists.play-violin@019street";
   std::string expected = "envoy_3_artists_play_violin_019street";
-  auto actual = PrometheusStatsFormatter::metricName(raw);
+  auto actual = PrometheusStatsFormatter::metricName(raw, false);
   EXPECT_EQ(expected, actual);
 }
 
-TEST_F(PrometheusStatsFormatterTest, NamespaceRegistry) {
-  std::string raw = "vulture.eats-liver";
-  std::string expected = "vulture_eats_liver";
-
-  EXPECT_FALSE(PrometheusStatsFormatter::registerPrometheusNamespace("3vulture"));
-  EXPECT_FALSE(PrometheusStatsFormatter::registerPrometheusNamespace(".vulture"));
-
-  EXPECT_FALSE(PrometheusStatsFormatter::unregisterPrometheusNamespace("vulture"));
-  EXPECT_TRUE(PrometheusStatsFormatter::registerPrometheusNamespace("vulture"));
-  EXPECT_FALSE(PrometheusStatsFormatter::registerPrometheusNamespace("vulture"));
-  EXPECT_EQ(expected, PrometheusStatsFormatter::metricName(raw));
-  EXPECT_TRUE(PrometheusStatsFormatter::unregisterPrometheusNamespace("vulture"));
-
-  EXPECT_EQ("envoy_" + expected, PrometheusStatsFormatter::metricName(raw));
+TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirstForCustomMetric) {
+  std::string raw = "3.artists.play-violin@019street";
+  // Custom metrics should not be prefixed by "envoy_".
+  std::string expected = "3_artists_play_violin_019street";
+  auto actual = PrometheusStatsFormatter::metricName(raw, true);
+  EXPECT_EQ(expected, actual);
 }
 
 TEST_F(PrometheusStatsFormatterTest, FormattedTags) {
@@ -317,10 +320,14 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
              {{makeStat("a.tag-name"), makeStat("a.tag-value")}});
   addCounter("cluster.test_2.upstream_cx_total",
              {{makeStat("another_tag_name"), makeStat("another_tag-value")}});
+  addCounter("my_custom_metric.test.foo",
+             {{makeStat("another_tag_name"), makeStat("another_tag-value")}}, true);
   addGauge("cluster.test_3.upstream_cx_total",
            {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}});
   addGauge("cluster.test_4.upstream_cx_total",
            {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
+  addGauge("my_custom_metric.test.bar",
+           {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}}, true);
 
   const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
   HistogramWrapper h1_cumulative;
@@ -337,7 +344,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   Buffer::OwnedImpl response;
   auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
                                                           false, absl::nullopt);
-  EXPECT_EQ(5UL, size);
+  EXPECT_EQ(7UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
 envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
@@ -345,11 +352,17 @@ envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
 # TYPE envoy_cluster_test_2_upstream_cx_total counter
 envoy_cluster_test_2_upstream_cx_total{another_tag_name="another_tag-value"} 0
 
+# TYPE my_custom_metric_test_foo counter
+my_custom_metric_test_foo{another_tag_name="another_tag-value"} 0
+
 # TYPE envoy_cluster_test_3_upstream_cx_total gauge
 envoy_cluster_test_3_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
 
 # TYPE envoy_cluster_test_4_upstream_cx_total gauge
 envoy_cluster_test_4_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
+
+# TYPE my_custom_metric_test_bar gauge
+my_custom_metric_test_bar{another_tag_name_4="another_tag_4-value"} 0
 
 # TYPE envoy_cluster_test_1_upstream_rq_time histogram
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="0.5"} 0

@@ -12,9 +12,6 @@ namespace Server {
 namespace {
 
 const std::regex& promRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "[^a-zA-Z0-9_]"); }
-const std::regex& namespaceRegex() {
-  CONSTRUCT_ON_FIRST_USE(std::regex, "^[a-zA-Z_][a-zA-Z0-9]*$");
-}
 
 /**
  * Take a string and sanitize it according to Prometheus conventions.
@@ -113,8 +110,11 @@ uint64_t outputStatType(
   }
 
   for (auto& group : groups) {
-    const std::string prefixed_tag_extracted_name =
-        PrometheusStatsFormatter::metricName(global_symbol_table.toString(group.first));
+    // We assume that custom metric flag is the same across all metrics with the same
+    // tagExtractedStatName. Callsites of defining these metrics must meet this criteria.
+    const bool is_custom_metric = group.second.front()->isCustomMetric();
+    const std::string prefixed_tag_extracted_name = PrometheusStatsFormatter::metricName(
+        global_symbol_table.toString(group.first), is_custom_metric);
     response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, type));
 
     // Sort before producing the final output to satisfy the "preferred" ordering from the
@@ -176,10 +176,6 @@ std::string generateHistogramOutput(const Stats::ParentHistogram& histogram,
   return output;
 };
 
-absl::flat_hash_set<std::string>& prometheusNamespaces() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>);
-}
-
 } // namespace
 
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
@@ -191,17 +187,15 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
   return absl::StrJoin(buf, ",");
 }
 
-std::string PrometheusStatsFormatter::metricName(const std::string& extracted_name) {
+std::string PrometheusStatsFormatter::metricName(const std::string& extracted_name,
+                                                 bool is_custom_metric) {
   std::string sanitized_name = sanitizeName(extracted_name);
 
-  absl::string_view prom_namespace{sanitized_name};
-  prom_namespace = prom_namespace.substr(0, prom_namespace.find_first_of('_'));
-
-  if (prometheusNamespaces().contains(prom_namespace)) {
+  // If the metric is not a native Envoy metric, we do not prefix with "envoy_".
+  if (is_custom_metric) {
     return sanitized_name;
   }
-
-  // Add namespacing prefix to avoid conflicts, as per best practice:
+  // Otherwise, add namespacing prefix to avoid conflicts, as per best practice:
   // https://prometheus.io/docs/practices/naming/#metric-names
   // Also, naming conventions on https://prometheus.io/docs/concepts/data_model/
   return absl::StrCat("envoy_", sanitized_name);
@@ -225,24 +219,6 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
       response, used_only, regex, histograms, generateHistogramOutput, "histogram");
 
   return metric_name_count;
-}
-
-bool PrometheusStatsFormatter::registerPrometheusNamespace(absl::string_view prometheus_namespace) {
-  if (std::regex_match(prometheus_namespace.begin(), prometheus_namespace.end(),
-                       namespaceRegex())) {
-    return prometheusNamespaces().insert(std::string(prometheus_namespace)).second;
-  }
-  return false;
-}
-
-bool PrometheusStatsFormatter::unregisterPrometheusNamespace(
-    absl::string_view prometheus_namespace) {
-  auto it = prometheusNamespaces().find(prometheus_namespace);
-  if (it == prometheusNamespaces().end()) {
-    return false;
-  }
-  prometheusNamespaces().erase(it);
-  return true;
 }
 
 } // namespace Server

@@ -93,9 +93,9 @@ private:
 class HistogramImpl : public HistogramImplHelper {
 public:
   HistogramImpl(StatName name, Unit unit, Store& parent, StatName tag_extracted_name,
-                const StatNameTagVector& stat_name_tags)
+                const StatNameTagVector& stat_name_tags, bool is_custom_metric = false)
       : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, parent.symbolTable()),
-        unit_(unit), parent_(parent) {}
+        unit_(unit), is_custom_metric_(is_custom_metric), parent_(parent) {}
   ~HistogramImpl() override {
     // We must explicitly free the StatName here in order to supply the
     // SymbolTable reference. An RAII alternative would be to store a
@@ -108,11 +108,14 @@ public:
   Unit unit() const override { return unit_; };
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
+  // Stats::Metric
   bool used() const override { return true; }
+  bool isCustomMetric() const override { return is_custom_metric_; }
   SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
 private:
   Unit unit_;
+  bool is_custom_metric_;
 
   // This is used for delivering the histogram data to sinks.
   Store& parent_;
@@ -129,6 +132,7 @@ public:
   ~NullHistogramImpl() override { MetricImpl::clear(symbol_table_); }
 
   bool used() const override { return false; }
+  bool isCustomMetric() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
   Unit unit() const override { return Unit::Null; };
