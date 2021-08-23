@@ -452,11 +452,24 @@ public:
  */
 #define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
 
+/**
+ * Log with a stable event name. This allows emitting a log line with a stable name in addition to
+ * the standard log line. The stable log line is passsed to custom sinks that may want to intercept
+ * these log messages.
+ *
+ * By default these named logs are not handled, but a custom log sink may intercept them by
+ * implementing the logWithStableName function.
+ */
 #define ENVOY_LOG_EVENT(LEVEL, EVENT_NAME, ...)                                                    \
+  ENVOY_LOG_EVENT_TO_LOGGER(ENVOY_LOGGER(), LEVEL, EVENT_NAME, ##__VA_ARGS__)
+
+#define ENVOY_LOG_EVENT_TO_LOGGER(LOGGER, LEVEL, EVENT_NAME, ...)                                  \
   do {                                                                                             \
     ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                               \
-    ::Envoy::Logger::Registry::getSink()->logWithStableName(EVENT_NAME, #LEVEL,                    \
-                                                            ENVOY_LOGGER().name(), ##__VA_ARGS__); \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      ::Envoy::Logger::Registry::getSink()->logWithStableName(EVENT_NAME, #LEVEL, (LOGGER).name(), \
+                                                              ##__VA_ARGS__);                      \
+    }                                                                                              \
   } while (0)
 
 #define ENVOY_LOG_FIRST_N_TO_LOGGER(LOGGER, LEVEL, N, ...)                                         \
