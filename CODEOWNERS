@@ -23,8 +23,6 @@
 extensions/filters/common/original_src @snowp @klarose
 # dubbo_proxy extension
 /*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan
-# rocketmq_proxy extension
-/*/extensions/filters/network/rocketmq_proxy @aaron-ai @lizhanhui @lizan
 # thrift_proxy extension
 /*/extensions/filters/network/thrift_proxy @zuercher @rgs1
 # cdn_loop extension
@@ -203,3 +201,4 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /contrib/exe/ @mattklein123 @lizan
 /contrib/squash/ @yuval-k @alyssawilk
 /contrib/kafka/ @mattklein123 @adamkotwasinski
+/contrib/rocketmq_proxy/ @aaron-ai @lizhanhui @lizan

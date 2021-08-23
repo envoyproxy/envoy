@@ -228,7 +228,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   }
 }
 
-ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context) {
+ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& context) {
   ASSERT(!deferred_deleting_);
 
   ASSERT(static_cast<ssize_t>(connecting_stream_capacity_) ==
@@ -277,7 +277,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
   return pending;
 }
 
-bool ConnPoolImplBase::maybePreconnect(float global_preconnect_ratio) {
+bool ConnPoolImplBase::maybePreconnectImpl(float global_preconnect_ratio) {
   ASSERT(!deferred_deleting_);
   return tryCreateNewConnection(global_preconnect_ratio) == ConnectionResult::CreatedNewConnection;
 }
