@@ -285,12 +285,6 @@ void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& messa
   throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
 }
 
-void MessageUtil::loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message) {
-  // No need to validate if converting to a Struct, since there are no unknown
-  // fields possible.
-  return loadFromYaml(yaml, message, ProtobufMessage::getNullValidationVisitor());
-}
-
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor,
                                Api::Api& api) {
