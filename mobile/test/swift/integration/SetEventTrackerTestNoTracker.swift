@@ -4,10 +4,12 @@ import Foundation
 import XCTest
 
 final class SetEventTrackerTestNoTracker: XCTestCase {
-  func testSetEventTracker() throws {
+  // Skipping because this test currently attempts to connect to an invalid remote (example.com)
+  func skipped_testSetEventTracker() throws {
     let expectation = self.expectation(description: "Response headers received")
 
     let client = EngineBuilder()
+      .addLogLevel(.trace)
       .addNativeFilter(
         name: "envoy.filters.http.test_event_tracker",
         // swiftlint:disable:next line_length
