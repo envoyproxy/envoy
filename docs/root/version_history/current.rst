@@ -5,6 +5,8 @@ Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
+* config: the ``--bootstrap-version`` CLI flag has been removed, Envoy has only been able to accept v3
+  bootstrap configurations since 1.18.0.
 * contrib: the :ref:`squash filter <config_http_filters_squash>` has been moved to
   :ref:`contrib images <install_contrib>`.
 * contrib: the :ref:`kafka broker filter <config_network_filters_kafka_broker>` has been moved to
@@ -12,8 +14,6 @@ Incompatible Behavior Changes
 * contrib: the :ref:`RocketMQ proxy filter <config_network_filters_rocketmq_proxy>` has been moved to
   :ref:`contrib images <install_contrib>`.
 * ext_authz: fixed skipping authentication when returning either a direct response or a redirect. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect`` runtime guard to false.
-* config: the ``--bootstrap-version`` CLI flag has been removed, Envoy has only been able to accept v3
-  bootstrap configurations since 1.18.0.
 
 Minor Behavior Changes
 ----------------------
