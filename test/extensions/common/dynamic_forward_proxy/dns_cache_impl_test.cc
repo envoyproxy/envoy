@@ -1047,7 +1047,6 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   InSequence s;
   ASSERT(store != nullptr);
 
-  // Make sure the store gets the first insert.
   MockLoadDnsCacheEntryCallbacks callbacks;
   Network::DnsResolver::ResolveCb resolve_cb;
   Event::MockTimer* resolve_timer = new Event::MockTimer(&dispatcher_);
@@ -1064,6 +1063,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
   EXPECT_CALL(*timeout_timer, disableTimer());
+  // Make sure the store gets the first insert.
   EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.1:80"));
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
@@ -1103,8 +1103,8 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   checkStats(3 /* attempt */, 2 /* success */, 0 /* failure */, 1 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
-  // Address does change.
   EXPECT_CALL(*timeout_timer, disableTimer());
+  // Make sure the store gets the updated address.
   EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.2:80"));
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.2:80", "foo.com", false)));

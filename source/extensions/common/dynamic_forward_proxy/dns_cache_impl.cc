@@ -452,6 +452,7 @@ void DnsCacheImpl::loadCacheEntries(
   KeyValueStore::ConstIterateCb load = [this](const std::string& key, const std::string& value) {
     auto address = Network::Utility::parseInternetAddressAndPortNoThrow(value);
     if (address == nullptr) {
+      ENVOY_LOG(warn, "Unable to parse cache line '{}'", value);
       return KeyValueStore::Iterate::Break;
     }
     stats_.cache_load_.inc();
