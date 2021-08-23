@@ -39,9 +39,7 @@ public:
     }
   }
 
-  void addEncodedBytes(size_t) override {}
-
-  void addDecodedBytes(size_t) override {}
+  StreamInfo::BytesMeterer* bytesMeterer() override { return nullptr; }
 };
 
 } // namespace Http

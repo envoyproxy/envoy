@@ -83,9 +83,7 @@ public:
 
   void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
 
-  void addEncodedBytes(size_t newly_sent_bytes) override;
-
-  void addDecodedBytes(size_t newly_received_bytes) override;
+  StreamInfo::BytesMeterer* bytesMeterer() override { return bytes_meterer_.get(); }
 
   void setBytesMeterer(const StreamInfo::BytesMetererSharedPtr& bytes_meterer) override {
     bytes_meterer_ = bytes_meterer;

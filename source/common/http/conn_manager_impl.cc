@@ -1138,7 +1138,6 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
                                connection_manager_.read_callbacks_->connection().dispatcher());
   filter_manager_.maybeEndDecode(end_stream);
   filter_manager_.streamInfo().addBytesReceived(data.length());
-  filter_manager_.streamInfo().getDownstreamBytesMeterer()->addBodyBytesReceived(data.length());
 
   filter_manager_.decodeData(data, end_stream);
 }
@@ -1483,7 +1482,6 @@ void ConnectionManagerImpl::ActiveStream::encodeData(Buffer::Instance& data, boo
                    end_stream);
 
   filter_manager_.streamInfo().addBytesSent(data.length());
-  filter_manager_.streamInfo().getDownstreamBytesMeterer()->addBodyBytesSent(data.length());
   response_encoder_->encodeData(data, end_stream);
 }
 

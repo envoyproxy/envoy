@@ -95,22 +95,6 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection)
   }
 }
 
-void StreamEncoderImpl::addEncodedBytes(size_t newly_encoded_bytes) {
-  ENVOY_CONN_LOG(trace, "h1: update encoded bytes {}\n", connection_.connection(),
-                 newly_encoded_bytes);
-  if (bytes_meterer_) {
-    bytes_meterer_->addWireBytesSent(newly_encoded_bytes);
-  }
-}
-
-void StreamEncoderImpl::addDecodedBytes(size_t newly_decoded_bytes) {
-  ENVOY_CONN_LOG(trace, "h1: update decoded bytes {}\n", connection_.connection(),
-                 newly_decoded_bytes);
-  if (bytes_meterer_) {
-    bytes_meterer_->addWireBytesReceived(newly_decoded_bytes);
-  }
-}
-
 void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const char* value,
                                      uint32_t value_size) {
 
@@ -254,14 +238,13 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
 void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   // end_stream may be indicated with a zero length data buffer. If that is the case, so not
   // actually write the zero length buffer out.
-  if (bytes_meterer_) {
-    bytes_meterer_->addBodyBytesSent(data.length());
-  }
   if (data.length() > 0) {
     if (chunk_encoding_) {
       connection_.buffer().add(absl::StrCat(absl::Hex(data.length()), CRLF));
     }
-
+    if (bytes_meterer_) {
+      bytes_meterer_->addBodyBytesSent(data.length());
+    }
     connection_.buffer().move(data);
 
     if (chunk_encoding_) {
@@ -277,7 +260,10 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void StreamEncoderImpl::flushOutput(bool end_encode) {
-  addEncodedBytes(connection_.flushOutput(end_encode));
+  auto encoded_bytes = connection_.flushOutput(end_encode);
+  if (bytes_meterer_) {
+    bytes_meterer_->addWireBytesSent(encoded_bytes);
+  }
 }
 
 void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
@@ -590,7 +576,11 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
 
 Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
   if (pending_response_.has_value()) {
-    pending_response_.value().encoder_.getStream().addDecodedBytes(data.length());
+    StreamInfo::BytesMeterer* bytes_meterer =
+        pending_response_.value().encoder_.getStream().bytesMeterer();
+    if (bytes_meterer) {
+      bytes_meterer->addWireBytesReceived(data.length());
+    }
   }
   Http::Status status = ConnectionImpl::dispatch(data);
   if (status.ok() && data.length() > 0) {

@@ -116,9 +116,7 @@ public:
 
   absl::string_view responseDetails() override { return details_; }
 
-  void addEncodedBytes(size_t) override {}
-
-  void addDecodedBytes(size_t) override {}
+  StreamInfo::BytesMeterer* bytesMeterer() override { return nullptr; }
 
 protected:
   virtual void switchStreamBlockState() PURE;

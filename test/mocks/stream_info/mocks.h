@@ -131,8 +131,10 @@ public:
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   std::shared_ptr<Network::SocketAddressSetterImpl> downstream_address_provider_;
-  BytesMetererSharedPtr upstream_bytes_meterer_ = std::make_shared<BytesMeterer>();;
-  BytesMetererSharedPtr downstream_bytes_meterer_ = std::make_shared<BytesMeterer>();;
+  BytesMetererSharedPtr upstream_bytes_meterer_ = std::make_shared<BytesMeterer>();
+  ;
+  BytesMetererSharedPtr downstream_bytes_meterer_ = std::make_shared<BytesMeterer>();
+  ;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   std::string route_name_;

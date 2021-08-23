@@ -291,25 +291,11 @@ protected:
     void encodeDataHelper(Buffer::Instance& data, bool end_stream,
                           bool skip_encoding_empty_trailers);
 
-    void addEncodedBytes(size_t newly_encoded_bytes) override {
-      if (bytes_meterer_) {
-        bytes_meterer_->addWireBytesSent(newly_encoded_bytes);
-      }
-      ENVOY_CONN_LOG(trace, "stream id {}:update encoded bytes {}\n", parent_.connection_,
-                     stream_id_, newly_encoded_bytes);
-    }
-
-    void addDecodedBytes(size_t newly_decoded_bytes) override {
-      ENVOY_CONN_LOG(trace, "stream id {}:update decoded bytes {}\n", parent_.connection_,
-                     stream_id_, newly_decoded_bytes);
-      if (bytes_meterer_) {
-        bytes_meterer_->addWireBytesReceived(newly_decoded_bytes);
-      }
-    }
-
     void setBytesMeterer(const StreamInfo::BytesMetererSharedPtr& bytes_meterer) override {
       bytes_meterer_ = bytes_meterer;
     }
+
+    virtual StreamInfo::BytesMeterer* bytesMeterer() override { return bytes_meterer_.get(); }
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};

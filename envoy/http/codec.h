@@ -357,9 +357,7 @@ public:
    */
   virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
 
-  virtual void addEncodedBytes(size_t newly_sent_bytes) PURE;
-
-  virtual void addDecodedBytes(size_t newly_received_bytes) PURE;
+  virtual StreamInfo::BytesMeterer* bytesMeterer() PURE;
 
   virtual void setBytesMeterer(const StreamInfo::BytesMetererSharedPtr&) {}
 };

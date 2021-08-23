@@ -807,8 +807,13 @@ Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
                  hd->stream_id, hd->length);
   current_stream_id_ = hd->stream_id;
   StreamImpl* stream = getStream(hd->stream_id);
-  if (stream != nullptr && hd->type != METADATA_FRAME_TYPE) {
-    stream->addDecodedBytes(hd->length + H2_FRAME_HEADER_SIZE);
+  if (stream != nullptr && stream->bytes_meterer_ != nullptr) {
+    if (hd->type != METADATA_FRAME_TYPE) {
+      stream->bytes_meterer_->addWireBytesReceived(hd->length + H2_FRAME_HEADER_SIZE);
+    }
+    if (hd->type == NGHTTP2_DATA) {
+      stream->bytes_meterer_->addBodyBytesReceived(hd->length + H2_FRAME_HEADER_SIZE);
+    }
   }
   // Track all the frames without padding here, since this is the only callback we receive
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
@@ -942,8 +947,13 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "sent frame type={}, stream_id={}, length={}", connection_,
                  static_cast<uint64_t>(frame->hd.type), frame->hd.stream_id, frame->hd.length);
   StreamImpl* stream = getStream(frame->hd.stream_id);
-  if (stream != nullptr && frame->hd.type != METADATA_FRAME_TYPE) {
-    stream->addEncodedBytes(frame->hd.length + H2_FRAME_HEADER_SIZE);
+  if (stream != nullptr && stream->bytes_meterer_ != nullptr) {
+    if (frame->hd.type != METADATA_FRAME_TYPE) {
+      stream->bytes_meterer_->addWireBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
+    }
+    if (frame->hd.type == NGHTTP2_DATA) {
+      stream->bytes_meterer_->addBodyBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
+    }
   }
   switch (frame->hd.type) {
   case NGHTTP2_GOAWAY: {
