@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Cache { 
+namespace Cache {
 namespace {
 
 class SimpleLookupContext : public LookupContext {
