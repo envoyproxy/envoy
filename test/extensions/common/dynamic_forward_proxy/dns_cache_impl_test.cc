@@ -103,7 +103,7 @@ MATCHER_P3(DnsHostInfoEquals, address, resolved_host, is_ip_address, "") {
 MATCHER(DnsHostInfoAddressIsNull, "") { return arg->address() == nullptr; }
 
 MATCHER_P(CustomTypedDnsResolverConfigEquals, expectedTypedDnsResolverConfig, "") {
-  return (TestUtility::protoEqual(expectedTypedDnsResolverConfig, arg));
+  return TestUtility::protoEqual(expectedTypedDnsResolverConfig, arg);
 }
 
 TEST_F(DnsCacheImplTest, PreresolveSuccess) {
@@ -947,7 +947,7 @@ TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolutionConfig) {
   envoy::config::core::v3::TypedExtensionConfig empty_typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   empty_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  empty_typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+  empty_typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
   EXPECT_CALL(dispatcher, createDnsResolver(
                               CustomTypedDnsResolverConfigEquals(empty_typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
@@ -973,7 +973,7 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfig) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.add_resolvers()->MergeFrom(*dns_resolvers);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+  typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
   EXPECT_CALL(dispatcher,
               createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
@@ -1012,7 +1012,7 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfigOverridingUseTcp) {
   cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(true);
   cares.mutable_dns_resolver_options()->set_no_default_search_domain(true);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+  typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
 
   EXPECT_CALL(dispatcher,
               createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
@@ -1055,12 +1055,12 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyTypedDnsResolverConfig) {
   cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(true);
   cares.mutable_dns_resolver_options()->set_no_default_search_domain(true);
   config.mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(cares);
-  config.mutable_typed_dns_resolver_config()->set_name(Envoy::Network::cares_dns_resolver);
+  config.mutable_typed_dns_resolver_config()->set_name(Envoy::Network::CaresDnsResolver);
 
   // setup the expected function call parameter.
   envoy::config::core::v3::TypedExtensionConfig expected_typed_dns_resolver_config;
   expected_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  expected_typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+  expected_typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
 
   EXPECT_CALL(dispatcher, createDnsResolver(CustomTypedDnsResolverConfigEquals(
                               expected_typed_dns_resolver_config)))

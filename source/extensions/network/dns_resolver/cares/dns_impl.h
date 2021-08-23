@@ -11,7 +11,6 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
-#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/network/resolver_impl.h"
 
 #include "absl/container/node_hash_map.h"
@@ -113,37 +112,6 @@ private:
 
   absl::node_hash_map<int, Event::FileEventPtr> events_;
   const absl::optional<std::string> resolvers_csv_;
-};
-
-class CaresDnsResolverFactoryImpl : public DnsResolverFactory {
-public:
-  std::string name() const override { return cares_dns_resolver; }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{
-        new envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig()};
-  }
-
-  DnsResolverSharedPtr createDnsResolverCb(
-      Event::Dispatcher& dispatcher, Api::Api&,
-      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) override {
-    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-    envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-    std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-
-    // Only cares DNS factory will call into this function.
-    // Directly unpack the typed config to a cares object.
-    Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), cares);
-    dns_resolver_options.MergeFrom(cares.dns_resolver_options());
-    if (!cares.resolvers().empty()) {
-      const auto& resolver_addrs = cares.resolvers();
-      resolvers.reserve(resolver_addrs.size());
-      for (const auto& resolver_addr : resolver_addrs) {
-        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
-      }
-    }
-    return std::make_shared<Network::DnsResolverImpl>(dispatcher, resolvers, dns_resolver_options);
-  }
 };
 
 } // namespace Network

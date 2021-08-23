@@ -167,8 +167,8 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         client_config, resolver_timeout, DEFAULT_RESOLVER_TIMEOUT.count()));
     max_pending_lookups_ = client_config.max_pending_lookups();
   } else {
-    // In case client_config doesn't exist, craft an empty cares DNS resolver config
-    // and stored in typed_dns_resolver_config_ to use cares DNS library by default.
+    // In case client_config doesn't exist, craft an empty c-ares DNS resolver config
+    // and stored in typed_dns_resolver_config_ to use c-ares DNS library by default.
     const auto& client_config = envoy::extensions::filters::udp::dns_filter::v3alpha::
         DnsFilterConfig::ClientContextConfig();
     Envoy::Network::makeDnsResolverConfig(client_config, typed_dns_resolver_config_);

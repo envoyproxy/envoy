@@ -301,7 +301,7 @@ client_config:
         address: "1.1.1.1"
         port_value: 53
   typed_dns_resolver_config:
-    name: envoy.dns_resolver.cares
+    name: envoy.network.dns_resolver.cares
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
       resolvers:

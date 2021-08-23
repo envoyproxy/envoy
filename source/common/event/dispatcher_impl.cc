@@ -155,7 +155,7 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
 }
 
 // Create DNS resolver based on the @param typed_dns_resolver_config, which could be
-// cares DNS resolver, Apple DNS resolver, or any other DNS resolver type.
+// c-ares DNS resolver, Apple DNS resolver, or any other DNS resolver type.
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
 
@@ -170,7 +170,7 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
       &Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(typed_dns_resolver_config);
 
   ENVOY_LOG(debug, "create DNS resolver type: {}", typed_dns_resolver_config.name());
-  return dns_resolver_factory->createDnsResolverCb(*this, api_, typed_dns_resolver_config);
+  return dns_resolver_factory->createDnsResolverImpl(*this, api_, typed_dns_resolver_config);
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,

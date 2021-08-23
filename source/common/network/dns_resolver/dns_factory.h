@@ -16,29 +16,31 @@
 namespace Envoy {
 namespace Network {
 
-const std::string cares_dns_resolver = "envoy.dns_resolver.cares";
-const std::string apple_dns_resolver = "envoy.dns_resolver.apple";
-const std::string dns_resolver_category = "envoy.network_dnsresolvers";
+const std::string CaresDnsResolver = "envoy.network.dns_resolver.cares";
+const std::string AppleDnsResolver = "envoy.network.dns_resolver.apple";
+const std::string DnsResolverCategory = "envoy.network.dns_resolver";
 
 class DnsResolverFactory : public Config::TypedFactory {
 public:
   /**
-   * @returns a callback to create a DnsResolver.
+   * @returns a DnsResolver object.
+   * @param dispatcher: the local dispatcher thread
+   * @param api: API interface to interact with system resources
+   * @param typed_dns_resolver_config: the typed DNS resolver config
    */
-
-  virtual DnsResolverSharedPtr createDnsResolverCb(
+  virtual DnsResolverSharedPtr createDnsResolverImpl(
       Event::Dispatcher& dispatcher, Api::Api& api,
-      const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) PURE;
+      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) PURE;
 
-  std::string category() const override { return dns_resolver_category; }
+  std::string category() const override { return DnsResolverCategory; }
 };
 
-// Create an empty cares DNS resolver typed config.
+// Create an empty c-ares DNS resolver typed config.
 inline void makeEmptyCaresDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(cares_dns_resolver);
+  typed_dns_resolver_config.set_name(CaresDnsResolver);
 }
 
 // Create an empty apple DNS resolver typed config.
@@ -46,7 +48,7 @@ inline void makeEmptyAppleDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig apple;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(apple);
-  typed_dns_resolver_config.set_name(apple_dns_resolver);
+  typed_dns_resolver_config.set_name(AppleDnsResolver);
 }
 
 // Retrieve the DNS related configurations in the passed in @param config, and store the data into
@@ -61,7 +63,7 @@ inline void makeEmptyAppleDnsResolverConfig(
 
 // 3) If it is not MacOS, synthetic a CaresDnsResolverConfig object and pack it into
 // typed_dns_resolver_config.
-//    This can enable Envoy to use cares DNS library during DNS resolving process. The details are:
+//    This can enable Envoy to use c-ares DNS library during DNS resolving process. The details are:
 // 3.1) if dns_resolution_config exists, copy it into CaresDnsResolverConfig,
 //      and pack CaresDnsResolverConfig into typed_dns_resolver_config.
 // 3.2) if dns_resolution_config doesn't exists, follow below behavior for backward compatibility:
@@ -78,11 +80,11 @@ void makeDnsResolverConfig(
     const T& config, envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   // typed_dns_resolver_config takes precedence
   if (config.has_typed_dns_resolver_config()) {
-    Network::DnsResolverFactory* dns_resolver_factory;
-    dns_resolver_factory = Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(
-        config.typed_dns_resolver_config(), true);
+    Network::DnsResolverFactory* dns_resolver_factory =
+        Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(
+            config.typed_dns_resolver_config(), true);
     if ((dns_resolver_factory != nullptr) &&
-        (dns_resolver_factory->category() == dns_resolver_category)) {
+        (dns_resolver_factory->category() == DnsResolverCategory)) {
       typed_dns_resolver_config.MergeFrom(config.typed_dns_resolver_config());
       return;
     }
@@ -90,7 +92,7 @@ void makeDnsResolverConfig(
 
   // Checking MacOS
   if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups") &&
-      Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(apple_dns_resolver,
+      Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(AppleDnsResolver,
                                                                              true)) {
     makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);
     return;
@@ -121,7 +123,7 @@ void makeDnsResolverConfig(
   }
   // Pack CaresDnsResolverConfig object into typed_dns_resolver_config.
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(cares_dns_resolver);
+  typed_dns_resolver_config.set_name(CaresDnsResolver);
 }
 
 } // namespace Network

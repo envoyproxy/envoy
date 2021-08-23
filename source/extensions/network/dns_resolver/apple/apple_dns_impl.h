@@ -15,7 +15,6 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
-#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/singleton/threadsafe_singleton.h"
 
 #include "absl/container/node_hash_map.h"
@@ -132,20 +131,6 @@ private:
   BackOffStrategyPtr backoff_strategy_;
   Stats::ScopePtr scope_;
   AppleDnsResolverStats stats_;
-};
-
-class AppleDnsResolverFactoryImpl : public DnsResolverFactory {
-public:
-  std::string name() const override { return apple_dns_resolver; }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{
-        new envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig()};
-  }
-  DnsResolverSharedPtr
-  createDnsResolverCb(Event::Dispatcher& dispatcher, Api::Api& api,
-                      const envoy::config::core::v3::TypedExtensionConfig&) override {
-    return std::make_shared<Network::AppleDnsResolverImpl>(dispatcher, api.rootScope());
-  }
 };
 
 } // namespace Network

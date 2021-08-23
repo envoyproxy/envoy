@@ -13,12 +13,12 @@ option java_outer_classname = "CaresDnsResolverProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: cares DNS resolver]
-// [#extension: envoy.dns_resolver.cares]
+// [#protodoc-title: c-ares DNS resolver]
+// [#extension: envoy.network.dns_resolver.cares]
 
-// Configuration for cares DNS resolver.
-// Envoy by default uses cares DNS library as DNS resolver, and is always built with this extension enabled.
-// A typed configuration can be added to configure cares DNS resolver options. For example, in
+// Configuration for c-ares DNS resolver.
+// Envoy by default uses c-ares DNS library as DNS resolver, and is always built with this extension enabled.
+// A typed configuration can be added to configure c-ares DNS resolver options. For example, in
 // :repo:'bootstrap.proto <api/envoy/config/bootstrap/v3/bootstrap.proto>`,
 // add this message as a typed extension in field:
 // :ref:'typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>'

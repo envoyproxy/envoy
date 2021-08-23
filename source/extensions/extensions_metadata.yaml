@@ -714,13 +714,13 @@ envoy.watchdog.profile_action:
   - envoy.guarddog_actions
   security_posture: data_plane_agnostic
   status: alpha
-envoy.dns_resolver.cares:
+envoy.network.dns_resolver.cares:
   categories:
-  - envoy.network_dnsresolvers
+  - envoy.network.dns_resolver
   security_posture: unknown
   status: stable
-envoy.dns_resolver.apple:
+envoy.network.dns_resolver.apple:
   categories:
-  - envoy.network_dnsresolvers
+  - envoy.network.dns_resolver
   security_posture: unknown
   status: stable

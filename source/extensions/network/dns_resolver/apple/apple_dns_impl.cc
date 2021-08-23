@@ -15,6 +15,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/network/utility.h"
 
 #include "absl/strings/str_join.h"
@@ -321,6 +322,21 @@ AppleDnsResolverImpl::PendingResolution::buildDnsResponse(const struct sockaddr*
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
+
+// apple DNS resolver factory
+class AppleDnsResolverFactoryImpl : public DnsResolverFactory {
+public:
+  std::string name() const override { return AppleDnsResolver; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{
+        new envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig()};
+  }
+  DnsResolverSharedPtr
+  createDnsResolverImpl(Event::Dispatcher& dispatcher, Api::Api& api,
+                        const envoy::config::core::v3::TypedExtensionConfig&) override {
+    return std::make_shared<Network::AppleDnsResolverImpl>(dispatcher, api.rootScope());
+  }
+};
 
 // Register the AppleDnsResolverFactory
 REGISTER_FACTORY(AppleDnsResolverFactoryImpl, DnsResolverFactory);

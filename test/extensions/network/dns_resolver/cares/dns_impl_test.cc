@@ -375,7 +375,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
 
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+  typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
 
   auto resolver = dispatcher_->createDnsResolver(typed_dns_resolver_config);
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
@@ -440,7 +440,7 @@ TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
 
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+  typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
 
   auto resolver = dispatcher_->createDnsResolver(typed_dns_resolver_config);
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
@@ -464,7 +464,7 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
 
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+  typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
 
   EXPECT_THROW_WITH_MESSAGE(dispatcher_->createDnsResolver(typed_dns_resolver_config),
                             EnvoyException, "DNS resolver 'foo' is not an IP address");
@@ -495,7 +495,7 @@ public:
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
     // setup the typed config
     typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-    typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+    typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
 
     return typed_dns_resolver_config;
   }

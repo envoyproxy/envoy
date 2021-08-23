@@ -75,12 +75,13 @@ message DnsFilterConfig {
     // can be packed into this *typed_dns_resolver_config*. This configuration will replace the
     // :ref:`dns_resolution_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolution_config>`
     // configuration eventually.
-    // TODO(yanjunxiang): Investigate the deprecation plan for *dns_resolution_config*.
+    //
+    // [#comment:TODO(yanjunxiang): Determine the deprecation plan for *dns_resolution_config*.]
     // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
     // this configuration is optional.
     // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
     // When *typed_dns_resolver_config* is missing, the default behavior is in place.
-    // [#extension-category: envoy.network_dnsresolvers]
+    // [#extension-category: envoy.network.dns_resolver]
     config.core.v4alpha.TypedExtensionConfig typed_dns_resolver_config = 4;
 
     // Controls how many outstanding external lookup contexts the filter tracks.

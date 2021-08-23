@@ -182,7 +182,7 @@ public:
 
 // Compare the expected protobuf message matches with typed_dns_resolver_config parameter.
 MATCHER_P(CustomTypedDnsResolverConfigEquals, expectedTypedDnsResolverConfig, "") {
-  return (TestUtility::protoEqual(expectedTypedDnsResolverConfig, arg));
+  return TestUtility::protoEqual(expectedTypedDnsResolverConfig, arg);
 }
 
 envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
@@ -2629,7 +2629,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedField) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.add_resolvers()->MergeFrom(resolvers);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+  typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
   // As custom resolver is specified via deprecated field `dns_resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
   EXPECT_CALL(factory_.dispatcher_,
@@ -2673,7 +2673,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedFieldMulti
   resolvers.mutable_socket_address()->set_port_value(81);
   cares.add_resolvers()->MergeFrom(resolvers);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+  typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
   // As custom resolver is specified via deprecated field `dns_resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
   EXPECT_CALL(factory_.dispatcher_,
@@ -2710,7 +2710,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecified) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.add_resolvers()->MergeFrom(resolvers);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+  typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
@@ -2757,7 +2757,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedMultipleResolvers) {
   resolvers.mutable_socket_address()->set_port_value(81);
   cares.add_resolvers()->MergeFrom(resolvers);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+  typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
@@ -2801,7 +2801,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedOveridingDeprecatedReso
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.add_resolvers()->MergeFrom(resolvers);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(Envoy::Network::cares_dns_resolver);
+  typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
@@ -3105,7 +3105,7 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecified) {
       connect_timeout: 0.250s
       type: STRICT_DNS
       typed_dns_resolver_config:
-        name: envoy.dns_resolver.cares
+        name: envoy.network.dns_resolver.cares
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
           resolvers:
@@ -3148,7 +3148,7 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigResolversSpecified) {
       connect_timeout: 0.250s
       type: STRICT_DNS
       typed_dns_resolver_config:
-        name: envoy.dns_resolver.cares
+        name: envoy.network.dns_resolver.cares
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
           resolvers:
@@ -3188,7 +3188,7 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigMultipleResolversSpecified)
       connect_timeout: 0.250s
       type: STRICT_DNS
       typed_dns_resolver_config:
-        name: envoy.dns_resolver.cares
+        name: envoy.network.dns_resolver.cares
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
           resolvers:
@@ -3235,7 +3235,7 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigResolverOptionsSpecified) {
       connect_timeout: 0.250s
       type: STRICT_DNS
       typed_dns_resolver_config:
-        name: envoy.dns_resolver.cares
+        name: envoy.network.dns_resolver.cares
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
           dns_resolver_options:
@@ -3286,7 +3286,7 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedOveridingDeprecate
           use_tcp_for_dns_lookups: false
           no_default_search_domain: false
       typed_dns_resolver_config:
-        name: envoy.dns_resolver.cares
+        name: envoy.network.dns_resolver.cares
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
           resolvers:
@@ -3355,7 +3355,7 @@ TEST_F(ClusterManagerImplTest,
               address: 1.2.3.5
               port_value: 81
       typed_dns_resolver_config:
-        name: envoy.dns_resolver.apple
+        name: envoy.network.dns_resolver.apple
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig
   )EOF";
@@ -3412,7 +3412,7 @@ TEST_F(ClusterManagerImplTest,
           address: 3.4.5.6
           port_value: 102
       typed_dns_resolver_config:
-        name: envoy.dns_resolver.apple
+        name: envoy.network.dns_resolver.apple
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig
   )EOF";
@@ -3460,7 +3460,7 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedUnregisteredNoConf
       connect_timeout: 0.250s
       type: STRICT_DNS
       typed_dns_resolver_config:
-        name: envoy.dns_resolver.apple
+        name: envoy.network.dns_resolver.apple
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig
   )EOF";
