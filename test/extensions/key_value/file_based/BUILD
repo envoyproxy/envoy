@@ -13,7 +13,7 @@ envoy_cc_test(
     srcs = ["key_value_store_test.cc"],
     deps = [
         "//source/common/common:key_value_store_lib",
-        "//source/extensions/common/key_value/file_based:config_lib",
+        "//source/extensions/key_value/file_based:config_lib",
         "//test/mocks/event:event_mocks",
         "//test/test_common:file_system_for_test_lib",
     ],

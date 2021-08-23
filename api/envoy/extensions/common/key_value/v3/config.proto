@@ -23,15 +23,3 @@ message KeyValueStoreConfig {
   // [#extension-category: envoy.common.key_value]
   config.core.v3.TypedExtensionConfig config = 1 [(validate.rules).message = {required: true}];
 }
-
-// [#alpha:]
-// [#extension: envoy.common.key_value.file_based]
-// This is configuration to flush a key value store out to disk.
-message FileBasedKeyValueStoreConfig {
-  // The filename to read the keys and values from, and write the keys and
-  // values to.
-  string filename = 1 [(validate.rules).string = {min_len: 1}];
-
-  // The interval at which the key value store should be flushed to the file.
-  google.protobuf.Duration flush_interval = 2;
-}

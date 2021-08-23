@@ -2,7 +2,7 @@
 #include <string>
 
 #include "source/common/common/key_value_store_base.h"
-#include "source/extensions/common/key_value/file_based/config.h"
+#include "source/extensions/key_value/file_based/config.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
@@ -15,7 +15,6 @@ using testing::NiceMock;
 
 namespace Envoy {
 namespace Extensions {
-namespace Common {
 namespace KeyValue {
 namespace {
 
@@ -110,6 +109,5 @@ TEST_F(KeyValueStoreTest, HandleInvalidFile) {
 
 } // namespace
 } // namespace KeyValue
-} // namespace Common
 } // namespace Extensions
 } // namespace Envoy

@@ -1,10 +1,9 @@
-#include "source/extensions/common/key_value/file_based/config.h"
+#include "source/extensions/key_value/file_based/config.h"
 
 #include "envoy/registry/registry.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace Common {
 namespace KeyValue {
 
 FileBasedKeyValueStore::FileBasedKeyValueStore(Event::Dispatcher& dispatcher,
@@ -48,7 +47,7 @@ KeyValueStorePtr FileBasedKeyValueStoreFactory::createStore(
       const envoy::extensions::common::key_value::v3::KeyValueStoreConfig&>(config,
                                                                             validation_visitor);
   const auto file_config = MessageUtil::anyConvertAndValidate<
-      envoy::extensions::common::key_value::file_based::v3::FileBasedKeyValueStoreConfig>(
+      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig>(
       typed_config.config().typed_config(), validation_visitor);
   auto seconds =
       std::chrono::seconds(DurationUtil::durationToSeconds(file_config.flush_interval()));
@@ -59,6 +58,5 @@ KeyValueStorePtr FileBasedKeyValueStoreFactory::createStore(
 REGISTER_FACTORY(FileBasedKeyValueStoreFactory, KeyValueStoreFactory);
 
 } // namespace KeyValue
-} // namespace Common
 } // namespace Extensions
 } // namespace Envoy

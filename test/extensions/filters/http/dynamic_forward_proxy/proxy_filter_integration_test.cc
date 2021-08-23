@@ -34,9 +34,9 @@ typed_config:
       max_pending_requests: {}
     key_value_config:
       config:
-        name: envoy.common.key_value.file_based
+        name: envoy.key_value.file_based
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.common.key_value.file_based.v3.FileBasedKeyValueStoreConfig
+          "@type": type.googleapis.com/envoy.extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig
           filename: {}
 )EOF",
                                            Network::Test::ipVersionToDnsFamily(GetParam()),
@@ -85,9 +85,9 @@ typed_config:
       max_pending_requests: {}
     key_value_config:
       config:
-        name: envoy.common.key_value.file_based
+        name: envoy.key_value.file_based
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.common.key_value.file_based.v3.FileBasedKeyValueStoreConfig
+          "@type": type.googleapis.com/envoy.extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig
           filename: {}
 )EOF",
         Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, max_pending_requests, filename);

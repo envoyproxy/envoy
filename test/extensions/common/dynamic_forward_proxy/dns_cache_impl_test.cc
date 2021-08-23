@@ -1,7 +1,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/resolver.pb.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
-#include "envoy/extensions/common/key_value/file_based/v3/config.pb.validate.h"
+#include "envoy/extensions/key_value/file_based/v3/config.pb.validate.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/network/resolver_impl.h"
@@ -1029,7 +1029,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   MockKeyValueStoreFactory factory;
   EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
     return std::make_unique<
-        envoy::extensions::common::key_value::file_based::v3::FileBasedKeyValueStoreConfig>();
+        envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig>();
   }));
   MockKeyValueStore* store{};
   EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce(Invoke([&store]() {

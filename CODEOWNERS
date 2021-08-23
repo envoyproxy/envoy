@@ -199,7 +199,7 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # IP address input matcher
 /*/extensions/matching/input_matchers/ip @aguinet @snowp
 # Key Value store
-/*/extensions/common/key_value @alyssawilk @ryantheoptimist
+/*/extensions/key_value @alyssawilk @ryantheoptimist
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
