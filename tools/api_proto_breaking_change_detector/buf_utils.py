@@ -68,12 +68,7 @@ def pull_buf_deps(
         raise ChangeDetectorInitializeError(
             "buf mod update did not generate a buf.lock file (silent error... incorrect config?)")
 
-    build_code, build_out, build_err = run_command(' '.join([f'{buf_path} build', *buf_args]))
-    build_out, build_err = ''.join(build_out), ''.join(build_err)
-    if build_code != 0:
-        raise ChangeDetectorInitializeError(
-            f'Error running `buf build` after updating deps: exit status code {build_code} | stdout: {build_out} | stderr: {build_err}'
-        )
+    run_command(' '.join([f'{buf_path} build', *buf_args]))
 
 
 @_cd_into_config_parent
