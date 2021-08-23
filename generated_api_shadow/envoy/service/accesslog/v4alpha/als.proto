@@ -26,10 +26,10 @@ service AccessLogService {
   rpc StreamAccessLogs(stream StreamAccessLogsMessage) returns (StreamAccessLogsResponse) {
   }
 
-  // This endpoint will be the one that guarantees the arrival of logs with the state set by the user.
-  // The state of the log can be set in
+  // This endpoint provides acknowledgment of logs marked as requiring this.
+  // The requirement for an acknowledgment can be set in
   // :ref:`buffer_log_filter <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.buffer_log_filter>`.
-  // Log messages that match this filter will be guaranteed to be reachable. In order to guarantee
+  // Log messages that match this filter will be guaranteed delivery. In order to guarantee
   // the arrival, this endpoint performs the following process.
   //
   // 1. A response message is returned for each log. The response message includes ACK/NACK status,
@@ -81,7 +81,7 @@ message BufferedCriticalAccessLogsResponse {
   Status status = 1;
 
   // Message ID that identifies a message.
-  uint32 id = 2;
+  uint64 id = 2;
 }
 
 // Stream message for the StreamAccessLogs API. Envoy will open a stream to the server and stream

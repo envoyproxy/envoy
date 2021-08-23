@@ -90,15 +90,16 @@ message CommonGrpcAccessLogConfig {
 
   // Define the log condition as a filter to ensure that the destination is reached.
   // Logs that match the filter are not forwarded to the normal endpoint,
-  // but are sent to a special endpoint. For more detail,
+  // but are sent to a special endpoint.
   config.accesslog.v3.AccessLogFilter buffer_log_filter = 7;
 
   // The time to wait for an ACK message. If no ACK message is returned after this time,
   // the message is considered undeliverable and the failed transmission is buffered again.
+  // The re-buffered message will be sent again at the next time the critical log is sent.
   google.protobuf.Duration message_ack_timeout = 8
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 
-  // Soft size limit (in bytes) of the buffer used to store messages during processing in a
+  // Size limit (in bytes) of the buffer used to store messages during processing in a
   // critical logger. A critical logger buffers messages until it receives an ACK from upstream.
   // The default is 16384.
   google.protobuf.UInt32Value pending_critical_buffer_size_bytes = 9;
