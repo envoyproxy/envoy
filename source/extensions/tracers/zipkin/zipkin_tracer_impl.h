@@ -158,8 +158,8 @@ private:
  * Information about the Zipkin collector.
  */
 struct CollectorInfo {
-  // The Zipkin collector endpoint/path to receive the collected trace data. e.g. /api/v1/spans if
-  // HTTP_JSON_V1 or /api/v2/spans otherwise.
+  // The Zipkin collector endpoint/path to receive the collected trace data. e.g. default is
+  // /api/v2/spans.
   std::string endpoint_{DEFAULT_COLLECTOR_ENDPOINT};
 
   // The version of the collector. This is related to endpoint's supported payload specification and
