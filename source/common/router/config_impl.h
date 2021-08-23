@@ -1057,12 +1057,12 @@ struct RouteActionContext {
 // Action used with the matching tree to specify route to use for an incoming stream.
 class RouteMatchAction : public Matcher::ActionBase<envoy::config::route::v3::Route> {
 public:
-  explicit RouteMatchAction(RouteConstSharedPtr route) : route_(std::move(route)) {}
+  explicit RouteMatchAction(RouteEntryImplBaseConstSharedPtr route) : route_(std::move(route)) {}
 
-  RouteConstSharedPtr route() const { return route_; }
+  RouteEntryImplBaseConstSharedPtr route() const { return route_; }
 
 private:
-  const RouteConstSharedPtr route_;
+  const RouteEntryImplBaseConstSharedPtr route_;
 };
 
 // Registered factory for RouteMatchAction.

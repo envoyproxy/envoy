@@ -203,7 +203,8 @@ do this for :authority in some cases).
 
 To use the generic matching tree, specify a ref:`matcher <fds>` on a virtual host with a RouteAction action:
 
-```
+.. code-block:: yaml
+
   matcher:
     "@type": type.googleapis.com/envoy.config.common.matcher.v3.Matcher
     matcher_tree:
@@ -236,7 +237,6 @@ To use the generic matching tree, specify a ref:`matcher <fds>` on a virtual hos
                 - header:
                     key: x-route-header
                     value: new-value
-```
 
 This allows resolving the same Route proto message used for the `routes`-based routing using the additional
 matching flexibility provided by the generic matching framework.
@@ -245,6 +245,7 @@ The only inputs supported are request headers (via `envoy.type.matcher.v3.HttpRe
 the docs for the :ref:`matching API <arch_overview_matching_api>` for more information about the API as a whole.
 
 Known limiations:
-- The matching tree doesn't work with path rewrites. This is because this relies on rewriting the matched path
+
+* The matching tree doesn't work with path rewrites. This is because this relies on rewriting the matched path
   against the rewrite rule, but the matching engine allows matching on :path in many different ways, making it
   ambiguous which path match should be used when rewriting.

@@ -1487,7 +1487,14 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
 
     if (match.result_) {
       ASSERT(dynamic_cast<RouteMatchAction*>(match.result_.get()));
-      return static_cast<const RouteMatchAction&>(*match.result_).route();
+
+      const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*match.result_);
+
+      if (route_action.route()->matches(headers, stream_info, random_value)) {
+        return route_action.route();
+      }
+
+      return nullptr;
     }
 
     // TODO(snowp): Add logger
