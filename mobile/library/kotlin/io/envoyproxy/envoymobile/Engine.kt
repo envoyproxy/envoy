@@ -27,4 +27,9 @@ interface Engine {
    * This is a noop if called before the underlying EnvoyEngine has started.
    */
   fun flushStats()
+
+  /**
+   * Drain all connections owned by this Engine.
+   */
+  fun drainConnections()
 }

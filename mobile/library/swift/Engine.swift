@@ -17,4 +17,7 @@ public protocol Engine: AnyObject {
 
   /// Terminates the running engine.
   func terminate()
+
+  /// Drain all connections owned by this Engine.
+  func drainConnections()
 }

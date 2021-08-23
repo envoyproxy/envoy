@@ -65,4 +65,8 @@ extension EngineImpl: Engine {
   func terminate() {
     self.engine.terminate()
   }
+
+  func drainConnections() {
+    self.engine.drainConnections()
+  }
 }

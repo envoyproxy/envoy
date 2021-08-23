@@ -466,6 +466,8 @@ extern const int kEnvoyFailure;
 
 - (void)terminate;
 
+- (void)drainConnections;
+
 @end
 
 #pragma mark - EnvoyLogger

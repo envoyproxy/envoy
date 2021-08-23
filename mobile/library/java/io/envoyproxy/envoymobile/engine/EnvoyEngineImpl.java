@@ -189,4 +189,9 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   public int registerStringAccessor(String accessor_name, EnvoyStringAccessor accessor) {
     return JniLibrary.registerStringAccessor(accessor_name, new JvmStringAccessorContext(accessor));
   }
+
+  @Override
+  public void drainConnections() {
+    JniLibrary.drainConnections(engineHandle);
+  }
 }

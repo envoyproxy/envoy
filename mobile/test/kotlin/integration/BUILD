@@ -72,6 +72,20 @@ envoy_mobile_jni_kt_test(
 )
 
 envoy_mobile_jni_kt_test(
+    name = "drain_connections_test",
+    srcs = [
+        "DrainConnectionsTest.kt",
+    ],
+    native_deps = [
+        "//library/common/jni:libjava_jni_lib.so",
+        "//library/common/jni:java_jni_lib.jnilib",
+    ],
+    deps = [
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)
+
+envoy_mobile_jni_kt_test(
     name = "grpc_receive_error_test",
     srcs = [
         "GRPCReceiveErrorTest.kt",
