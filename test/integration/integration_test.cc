@@ -144,6 +144,8 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
 }
 
 // Make sure all workers pick up connections
+#ifdef WIN32
+// We can only guarantee this on Windows without the reuse_port changes.
 TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   concurrency_ = 2;
   initialize();
@@ -189,6 +191,7 @@ TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   EXPECT_TRUE(w0_ctr > 1);
   EXPECT_TRUE(w1_ctr > 1);
 }
+#endif
 
 TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
   const std::string body = "Response body";
