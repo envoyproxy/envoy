@@ -454,7 +454,7 @@ public:
 
 /**
  * Log with a stable event name. This allows emitting a log line with a stable name in addition to
- * the standard log line. The stable log line is passsed to custom sinks that may want to intercept
+ * the standard log line. The stable log line is passed to custom sinks that may want to intercept
  * these log messages.
  *
  * By default these named logs are not handled, but a custom log sink may intercept them by
