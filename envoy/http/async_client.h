@@ -226,7 +226,7 @@ public:
     }
 
     StreamOptions& setRetryPolicy(const envoy::config::core::v3::RetryPolicy& p,
-                                  std::string&& retry_on) {
+                                  const std::string& retry_on) {
       envoy::config::route::v3::RetryPolicy route_retry_policy;
 
       uint64_t base_interval_ms = RetryInitialDelayMilliseconds;
@@ -330,8 +330,8 @@ public:
       return *this;
     }
     RequestOptions& setRetryPolicy(const envoy::config::core::v3::RetryPolicy& p,
-                                   std::string&& retry_on) {
-      StreamOptions::setRetryPolicy(p, std::move(retry_on));
+                                   const std::string& retry_on) {
+      StreamOptions::setRetryPolicy(p, retry_on);
       return *this;
     }
     RequestOptions& setParentSpan(Tracing::Span& parent_span) {
