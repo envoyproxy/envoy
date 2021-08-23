@@ -35,9 +35,10 @@ public:
   virtual absl::optional<FactoryCallback> config() PURE;
 };
 
-template <class Factory, class FactoryCallback>
-class DynamicExtensionConfigProvider : public ExtensionConfigProvider<Factory, FactoryCallback> {
+template <class FactoryCallback> class DynamicExtensionConfigProviderBase {
 public:
+  virtual ~DynamicExtensionConfigProviderBase() = default;
+
   /**
    * Update the provider with a new configuration.
    * @param config is an extension factory callback to replace the existing configuration.
@@ -58,6 +59,10 @@ public:
    */
   virtual void applyDefaultConfiguration() PURE;
 };
+
+template <class Factory, class FactoryCallback>
+class DynamicExtensionConfigProvider : public DynamicExtensionConfigProviderBase<FactoryCallback>,
+                                       public ExtensionConfigProvider<Factory, FactoryCallback> {};
 
 } // namespace Config
 } // namespace Envoy

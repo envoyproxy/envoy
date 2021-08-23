@@ -66,6 +66,9 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
     }
   }
   WriteHeaders(std::move(spdy_headers), end_stream, nullptr);
+  if (local_end_stream_) {
+    onLocalEndStream();
+  }
   return Http::okStatus();
 }
 
@@ -85,6 +88,9 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
+  if (local_end_stream_) {
+    onLocalEndStream();
+  }
 }
 
 void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& trailers) {
@@ -93,6 +99,7 @@ void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& traile
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
   ScopedWatermarkBufferUpdater updater(this, this);
   WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+  onLocalEndStream();
 }
 
 void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
@@ -271,6 +278,7 @@ void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
 }
 
 void EnvoyQuicClientStream::OnClose() {
+  destroy();
   quic::QuicSpdyClientStream::OnClose();
   if (isDoingWatermarkAccounting()) {
     // This is called in the scope of a watermark buffer updater. Clear the
@@ -320,6 +328,8 @@ void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_conn
     Reset(rst_code);
   }
 }
+
+bool EnvoyQuicClientStream::hasPendingData() { return BufferedDataBytes() > 0; }
 
 } // namespace Quic
 } // namespace Envoy

@@ -28,82 +28,40 @@ void validateTypeUrlHelper(const std::string& type_url,
 
 } // namespace
 
-DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
+DynamicFilterConfigProviderImplBase::DynamicFilterConfigProviderImplBase(
     FilterConfigSubscriptionSharedPtr& subscription,
-    const absl::flat_hash_set<std::string>& require_type_urls,
-
-    Server::Configuration::FactoryContext& factory_context,
-    Envoy::Http::FilterFactoryCb default_config, bool last_filter_in_filter_chain,
+    const absl::flat_hash_set<std::string>& require_type_urls, bool last_filter_in_filter_chain,
     const std::string& filter_chain_type)
     : subscription_(subscription), require_type_urls_(require_type_urls),
-      default_configuration_(default_config ? absl::make_optional(default_config) : absl::nullopt),
-      tls_(factory_context.threadLocal()), init_target_("DynamicFilterConfigProviderImpl",
-                                                        [this]() {
-                                                          subscription_->start();
-                                                          // This init target is used to activate
-                                                          // the subscription but not wait for a
-                                                          // response. It is used whenever a default
-                                                          // config is provided to be used while
-                                                          // waiting for a response.
-                                                          init_target_.ready();
-                                                        }),
+      init_target_("DynamicFilterConfigProviderImpl",
+                   [this]() {
+                     subscription_->start();
+                     // This init target is used to activate the subscription but not wait for a
+                     // response. It is used whenever a default config is provided to be used while
+                     // waiting for a response.
+                     init_target_.ready();
+                   }),
       last_filter_in_filter_chain_(last_filter_in_filter_chain),
       filter_chain_type_(filter_chain_type) {
 
   subscription_->filter_config_providers_.insert(this);
-  tls_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
 }
 
-DynamicFilterConfigProviderImpl::~DynamicFilterConfigProviderImpl() {
+DynamicFilterConfigProviderImplBase::~DynamicFilterConfigProviderImplBase() {
   subscription_->filter_config_providers_.erase(this);
 }
 
-void DynamicFilterConfigProviderImpl::validateTypeUrl(const std::string& type_url) const {
+void DynamicFilterConfigProviderImplBase::validateTypeUrl(const std::string& type_url) const {
   validateTypeUrlHelper(type_url, require_type_urls_);
 }
 
-const std::string& DynamicFilterConfigProviderImpl::name() { return subscription_->name(); }
+const std::string& DynamicFilterConfigProviderImplBase::name() { return subscription_->name(); }
 
-absl::optional<Envoy::Http::FilterFactoryCb> DynamicFilterConfigProviderImpl::config() {
-  return tls_->config_;
-}
-
-void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryCb config,
-                                                     const std::string&,
-                                                     Config::ConfigAppliedCb cb) {
-  tls_.runOnAllThreads(
-      [config, cb](OptRef<ThreadLocalConfig> tls) {
-        tls->config_ = config;
-        if (cb) {
-          cb();
-        }
-      },
-      [this, config]() {
-        // This happens after all workers have discarded the previous config so it can be safely
-        // deleted on the main thread by an update with the new config.
-        this->current_config_ = config;
-      });
-}
-
-void DynamicFilterConfigProviderImpl::validateTerminalFilter(const std::string& name,
-                                                             const std::string& filter_type,
-                                                             bool is_terminal_filter) {
+void DynamicFilterConfigProviderImplBase::validateTerminalFilter(const std::string& name,
+                                                                 const std::string& filter_type,
+                                                                 bool is_terminal_filter) {
   Config::Utility::validateTerminalFilters(name, filter_type, filter_chain_type_,
                                            is_terminal_filter, last_filter_in_filter_chain_);
-}
-
-void DynamicFilterConfigProviderImpl::onConfigRemoved(
-    Config::ConfigAppliedCb applied_on_all_threads) {
-  tls_.runOnAllThreads(
-      [config = default_configuration_](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
-      [this, applied_on_all_threads]() {
-        // This happens after all workers have discarded the previous config so it can be safely
-        // deleted on the main thread by an update with the new config.
-        this->current_config_ = default_configuration_;
-        if (applied_on_all_threads) {
-          applied_on_all_threads();
-        }
-      });
 }
 
 FilterConfigSubscription::FilterConfigSubscription(
@@ -178,9 +136,9 @@ void FilterConfigSubscription::onConfigUpdate(
       factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
 
-  Common::applyToAllWithCleanup<DynamicFilterConfigProviderImpl*>(
+  Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
       filter_config_providers_,
-      [&factory_callback, &version_info](DynamicFilterConfigProviderImpl* provider,
+      [&factory_callback, &version_info](DynamicFilterConfigProviderImplBase* provider,
                                          std::shared_ptr<Cleanup> cleanup) {
         provider->onConfigUpdate(factory_callback, version_info, [cleanup] {});
       },
@@ -199,9 +157,9 @@ void FilterConfigSubscription::onConfigUpdate(
   if (!removed_resources.empty()) {
     ASSERT(removed_resources.size() == 1);
     ENVOY_LOG(debug, "Removing filter config {}", filter_config_name_);
-    Common::applyToAllWithCleanup<DynamicFilterConfigProviderImpl*>(
+    Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
         filter_config_providers_,
-        [](DynamicFilterConfigProviderImpl* provider, std::shared_ptr<Cleanup> cleanup) {
+        [](DynamicFilterConfigProviderImplBase* provider, std::shared_ptr<Cleanup> cleanup) {
           provider->onConfigRemoved([cleanup] {});
         },
         [this]() { stats_.config_reload_.inc(); });
@@ -304,7 +262,7 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
 
   // Ensure the subscription starts if it has not already.
   if (config_source.apply_default_config_without_warming()) {
-    factory_context.initManager().add(provider->init_target_);
+    factory_context.initManager().add(provider->initTarget());
   }
 
   // If the subscription already received a config, attempt to apply it.
