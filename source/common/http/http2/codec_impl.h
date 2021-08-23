@@ -295,7 +295,7 @@ protected:
       bytes_meterer_ = bytes_meterer;
     }
 
-    virtual StreamInfo::BytesMeterer* bytesMeterer() override { return bytes_meterer_.get(); }
+    StreamInfo::BytesMeterer* bytesMeterer() override { return bytes_meterer_.get(); }
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};

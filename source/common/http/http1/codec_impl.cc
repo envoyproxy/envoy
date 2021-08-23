@@ -1375,6 +1375,11 @@ void ClientConnectionImpl::onBody(Buffer::Instance& data) {
   ASSERT(!deferred_end_stream_headers_);
   if (pending_response_.has_value()) {
     ASSERT(!pending_response_done_);
+    StreamInfo::BytesMeterer* bytes_meterer =
+        pending_response_.value().encoder_.getStream().bytesMeterer();
+    if (bytes_meterer) {
+      bytes_meterer->addBodyBytesReceived(data.length());
+    }
     pending_response_.value().decoder_->decodeData(data, false);
   }
 }
