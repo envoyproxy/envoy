@@ -26,11 +26,10 @@ internal class FilterFactory(
 internal class EnvoyHTTPFilterAdapter(
   private val filter: Filter
 ) : EnvoyHTTPFilter {
-  private val nullIntel = StreamIntel(0L, 0L, 0L)
 
   override fun onRequestHeaders(headers: Map<String, List<String>>, endStream: Boolean, streamIntel: EnvoyStreamIntel): Array<Any?> {
     (filter as? RequestFilter)?.let { requestFilter ->
-      val result = requestFilter.onRequestHeaders(RequestHeaders(headers), endStream, nullIntel)
+      val result = requestFilter.onRequestHeaders(RequestHeaders(headers), endStream, StreamIntel(streamIntel))
       return when (result) {
         is FilterHeadersStatus.Continue -> arrayOf(result.status, result.headers.headers)
         is FilterHeadersStatus.StopIteration -> arrayOf(result.status, emptyMap<String, List<String>>())
@@ -41,7 +40,7 @@ internal class EnvoyHTTPFilterAdapter(
 
   override fun onResponseHeaders(headers: Map<String, List<String>>, endStream: Boolean, streamIntel: EnvoyStreamIntel): Array<Any?> {
     (filter as? ResponseFilter)?.let { responseFilter ->
-      val result = responseFilter.onResponseHeaders(ResponseHeaders(headers), endStream, nullIntel)
+      val result = responseFilter.onResponseHeaders(ResponseHeaders(headers), endStream, StreamIntel(streamIntel))
       return when (result) {
         is FilterHeadersStatus.Continue -> arrayOf(result.status, result.headers.headers)
         is FilterHeadersStatus.StopIteration -> arrayOf(result.status, emptyMap<String, List<String>>())
@@ -52,7 +51,7 @@ internal class EnvoyHTTPFilterAdapter(
 
   override fun onRequestData(data: ByteBuffer, endStream: Boolean, streamIntel: EnvoyStreamIntel): Array<Any?> {
     (filter as? RequestFilter)?.let { requestFilter ->
-      val result = requestFilter.onRequestData(data, endStream, nullIntel)
+      val result = requestFilter.onRequestData(data, endStream, StreamIntel(streamIntel))
       return when (result) {
         is FilterDataStatus.Continue<*> -> arrayOf(result.status, result.data)
         is FilterDataStatus.StopIterationAndBuffer<*> -> arrayOf(result.status, ByteBuffer.allocate(0))
@@ -65,7 +64,7 @@ internal class EnvoyHTTPFilterAdapter(
 
   override fun onResponseData(data: ByteBuffer, endStream: Boolean, streamIntel: EnvoyStreamIntel): Array<Any?> {
     (filter as? ResponseFilter)?.let { responseFilter ->
-      val result = responseFilter.onResponseData(data, endStream, nullIntel)
+      val result = responseFilter.onResponseData(data, endStream, StreamIntel(streamIntel))
       return when (result) {
         is FilterDataStatus.Continue<*> -> arrayOf(result.status, result.data)
         is FilterDataStatus.StopIterationAndBuffer<*> -> arrayOf(result.status, ByteBuffer.allocate(0))
@@ -78,7 +77,7 @@ internal class EnvoyHTTPFilterAdapter(
 
   override fun onRequestTrailers(trailers: Map<String, List<String>>, streamIntel: EnvoyStreamIntel): Array<Any?> {
     (filter as? RequestFilter)?.let { requestFilter ->
-      val result = requestFilter.onRequestTrailers(RequestTrailers(trailers), nullIntel)
+      val result = requestFilter.onRequestTrailers(RequestTrailers(trailers), StreamIntel(streamIntel))
       return when (result) {
         is FilterTrailersStatus.Continue<*, *> -> arrayOf(result.status, result.trailers.headers)
         is FilterTrailersStatus.StopIteration<*, *> -> arrayOf(result.status, emptyMap<String, List<String>>())
@@ -90,7 +89,7 @@ internal class EnvoyHTTPFilterAdapter(
 
   override fun onResponseTrailers(trailers: Map<String, List<String>>, streamIntel: EnvoyStreamIntel): Array<Any?> {
     (filter as? ResponseFilter)?.let { responseFilter ->
-      val result = responseFilter.onResponseTrailers(ResponseTrailers(trailers), nullIntel)
+      val result = responseFilter.onResponseTrailers(ResponseTrailers(trailers), StreamIntel(streamIntel))
       return when (result) {
         is FilterTrailersStatus.Continue<*, *> -> arrayOf(result.status, result.trailers.headers)
         is FilterTrailersStatus.StopIteration<*, *> -> arrayOf(result.status, emptyMap<String, List<String>>())
@@ -102,13 +101,13 @@ internal class EnvoyHTTPFilterAdapter(
 
   override fun onError(errorCode: Int, message: String, attemptCount: Int, streamIntel: EnvoyStreamIntel) {
     (filter as? ResponseFilter)?.let { responseFilter ->
-      responseFilter.onError(EnvoyError(errorCode, message, attemptCount), nullIntel)
+      responseFilter.onError(EnvoyError(errorCode, message, attemptCount), StreamIntel(streamIntel))
     }
   }
 
   override fun onCancel(streamIntel: EnvoyStreamIntel) {
     (filter as? ResponseFilter)?.let { responseFilter ->
-      responseFilter.onCancel(nullIntel)
+      responseFilter.onCancel(StreamIntel(streamIntel))
     }
   }
 
@@ -125,7 +124,7 @@ internal class EnvoyHTTPFilterAdapter(
         data,
         trailers?.let(::RequestTrailers),
         endStream,
-        nullIntel
+        StreamIntel(streamIntel)
       )
       return when (result) {
         is FilterResumeStatus.ResumeIteration<*, *> -> arrayOf(result.status, result.headers?.headers, result.data, result.trailers?.headers)
@@ -147,7 +146,7 @@ internal class EnvoyHTTPFilterAdapter(
         data,
         trailers?.let(::ResponseTrailers),
         endStream,
-        nullIntel
+        StreamIntel(streamIntel)
       )
       return when (result) {
         is FilterResumeStatus.ResumeIteration<*, *> -> arrayOf(result.status, result.headers?.headers, result.data, result.trailers?.headers)
