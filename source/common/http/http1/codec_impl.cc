@@ -583,6 +583,7 @@ Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
   if (pending_response_.has_value()) {
     StreamInfo::BytesMeterer* bytes_meterer =
         pending_response_.value().encoder_.getStream().bytesMeterer();
+        ASSERT(bytes_meterer);
     if (bytes_meterer) {
       bytes_meterer->addWireBytesReceived(data.length());
     }

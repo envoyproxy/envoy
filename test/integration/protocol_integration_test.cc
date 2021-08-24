@@ -2808,7 +2808,7 @@ TEST_P(ProtocolIntegrationTest, HeaderOnlyBytesCountDownstream) {
   expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 124, 0, 0, 0, 68, 0, 0, 0);
 }
 
-TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCount) {
+TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountUpstream) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
@@ -2820,7 +2820,19 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCount) {
                                          100);
 }
 
-TEST_P(ProtocolIntegrationTest, TrailersWireBytesCount) {
+TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountDownstream) {
+  // we only care about upstream protocol.
+  if (upstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+               "%DOWNSTREAM_BODY_BYTES_SENT% %DOWNSTREAM_BODY_BYTES_RECEIVED%\n");
+  testRouterRequestAndResponseWithBody(100, 100, false);
+  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 244, 0, 106, 10, 177, 109, 100,
+                                         100);
+}
+
+TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUsptream) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
@@ -2835,7 +2847,7 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCount) {
   expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 248, 120, 15, 29, 172, 81, 19, 29);
 }
 
-TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireBytesCount) {
+TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireBytesCountUpstream) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
@@ -2848,7 +2860,7 @@ TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireByt
   expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 187, 0, 0, 0, 114, 0, 0, 0);
 }
 
-TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytesCount) {
+TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytesCountUpstream) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
@@ -2861,7 +2873,7 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytes
   expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 187, 0, 0, 0, 114, 0, 0, 0);
 }
 
-TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireBytesCount) {
+TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireBytesCountUpstream) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
@@ -2874,7 +2886,7 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireByte
   expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 159, 47, 0, 0, 113, 13, 0, 0);
 }
 
-TEST_P(ProtocolIntegrationTest, DownstreamResetWireBytesCount) {
+TEST_P(ProtocolIntegrationTest, DownstreamResetWireBytesCountUpstream) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
