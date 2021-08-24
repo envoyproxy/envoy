@@ -6,6 +6,7 @@
 
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
+#include "source/extensions/filters/network/common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -195,6 +196,18 @@ ClusterFactory::createClusterWithConfig(
   auto new_cluster = std::make_shared<Cluster>(
       cluster_config, proto_config, context.runtime(), cache_manager_factory, context.localInfo(),
       socket_factory_context, std::move(stats_scope), context.addedViaApi());
+
+  auto& options = new_cluster->info()->upstreamHttpProtocolOptions();
+
+  if (!proto_config.allow_insecure_cluster_options()) {
+    if (!options.has_value() ||
+        (!options.value().auto_sni() || !options.value().auto_san_validation())) {
+      throw EnvoyException(
+          "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true unless "
+          "allow_insecure_cluster_options is set.");
+    }
+  }
+
   auto lb = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }
