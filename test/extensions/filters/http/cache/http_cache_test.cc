@@ -46,7 +46,7 @@ public:
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {":scheme", "https"}, {":authority", "example.com"}};
 
-  VaryHeader vary_allow_list_;
+  VaryAllowList vary_allow_list_;
 
   static const SystemTime& currentTime() {
     CONSTRUCT_ON_FIRST_USE(SystemTime, Event::SimulatedTimeSystem().systemTime());

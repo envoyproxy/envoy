@@ -585,11 +585,11 @@ public:
 /**
  * This class allows the remote address to be overridden for HTTP stream info. This is used for
  * XFF handling. This is required to avoid providing stream info with a non-const address provider.
- * Private inheritance from SocketAddressProvider is used to make sure users get the address
+ * Private inheritance from ConnectionInfoProvider is used to make sure users get the address
  * provider via the normal getter.
  */
-class OverridableRemoteSocketAddressSetterStreamInfo : public StreamInfo::StreamInfoImpl,
-                                                       private Network::SocketAddressProvider {
+class OverridableRemoteConnectionInfoSetterStreamInfo : public StreamInfo::StreamInfoImpl,
+                                                        private Network::ConnectionInfoProvider {
 public:
   using StreamInfoImpl::StreamInfoImpl;
 
@@ -603,9 +603,11 @@ public:
   }
 
   // StreamInfo::StreamInfo
-  const Network::SocketAddressProvider& downstreamAddressProvider() const override { return *this; }
+  const Network::ConnectionInfoProvider& downstreamAddressProvider() const override {
+    return *this;
+  }
 
-  // Network::SocketAddressProvider
+  // Network::ConnectionInfoProvider
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return StreamInfoImpl::downstreamAddressProvider().localAddress();
   }
@@ -636,7 +638,7 @@ public:
     StreamInfoImpl::dumpState(os, indent_level);
 
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "OverridableRemoteSocketAddressSetterStreamInfo " << this
+    os << spaces << "OverridableRemoteConnectionInfoSetterStreamInfo " << this
        << DUMP_MEMBER_AS(remoteAddress(), remoteAddress()->asStringView())
        << DUMP_MEMBER_AS(directRemoteAddress(), directRemoteAddress()->asStringView())
        << DUMP_MEMBER_AS(localAddress(), localAddress()->asStringView()) << "\n";
@@ -1025,7 +1027,7 @@ private:
 
   FilterChainFactory& filter_chain_factory_;
   const LocalReply::LocalReply& local_reply_;
-  OverridableRemoteSocketAddressSetterStreamInfo stream_info_;
+  OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.
   friend ActiveStreamFilterBase;

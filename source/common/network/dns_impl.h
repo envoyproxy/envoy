@@ -107,7 +107,7 @@ private:
   Event::TimerPtr timer_;
   ares_channel channel_;
   bool dirty_channel_{};
-  const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options_;
+  envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 
   absl::node_hash_map<int, Event::FileEventPtr> events_;
   const absl::optional<std::string> resolvers_csv_;

@@ -2,6 +2,7 @@
 # Functional utilities
 #
 
+import inspect
 from typing import Any, Callable, Optional
 
 
@@ -32,6 +33,8 @@ class async_property:  # noqa: N801
         if instance is None:
             return self
         self._instance = instance
+        if inspect.isasyncgenfunction(self._fun):
+            return self.async_iter_result()
         return self.async_result()
 
     def fun(self, *args, **kwargs):
@@ -41,6 +44,22 @@ class async_property:  # noqa: N801
     @property
     def prop_cache(self) -> dict:
         return getattr(self._instance, self.cache_name, {})
+
+    # An async wrapper function to return the result
+    # This is returned when the prop is called if the wrapped
+    # method is an async generator
+    async def async_iter_result(self):
+        # retrieve the value from cache if available
+        try:
+            result = self.get_cached_prop()
+        except (NoCache, KeyError):
+            result = None
+
+        if result is None:
+            result = self.set_prop_cache(self.fun(self._instance))
+
+        async for item in result:
+            yield item
 
     # An async wrapper function to return the result
     # This is returned when the prop is called

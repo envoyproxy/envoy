@@ -256,6 +256,16 @@ public:
 
   bool ocspStaplingEnabled() const { return ocsp_stapling_enabled_; }
 
+  TestUtilOptions& setExpectedTransportFailureReasonContains(
+      const std::string& expected_transport_failure_reason_contains) {
+    expected_transport_failure_reason_contains_ = expected_transport_failure_reason_contains;
+    return *this;
+  }
+
+  const std::string& expectedTransportFailureReasonContains() const {
+    return expected_transport_failure_reason_contains_;
+  }
+
 private:
   const std::string client_ctx_yaml_;
   const std::string server_ctx_yaml_;
@@ -277,6 +287,7 @@ private:
   std::string expected_expiration_peer_cert_;
   std::string expected_ocsp_response_;
   bool ocsp_stapling_enabled_{false};
+  std::string expected_transport_failure_reason_contains_;
 };
 
 void testUtil(const TestUtilOptions& options) {
@@ -481,6 +492,15 @@ void testUtil(const TestUtilOptions& options) {
 
   if (!options.expectedServerStats().empty()) {
     EXPECT_EQ(1UL, server_stats_store.counter(options.expectedServerStats()).value());
+  }
+
+  if (options.expectSuccess()) {
+    EXPECT_EQ("", client_connection->transportFailureReason());
+    EXPECT_EQ("", server_connection->transportFailureReason());
+  } else {
+    EXPECT_THAT(std::string(client_connection->transportFailureReason()),
+                ContainsRegex(options.expectedTransportFailureReasonContains()));
+    EXPECT_NE("", server_connection->transportFailureReason());
   }
 }
 
@@ -5428,7 +5448,8 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptCompleteFailure) {
   TestUtilOptions failing_test_options(failing_client_ctx_yaml, server_ctx_yaml, false, GetParam());
   testUtil(failing_test_options.setPrivateKeyMethodExpected(true)
                .setExpectedServerCloseEvent(Network::ConnectionEvent::LocalClose)
-               .setExpectedServerStats("ssl.connection_error"));
+               .setExpectedServerStats("ssl.connection_error")
+               .setExpectedTransportFailureReasonContains("system library"));
 }
 
 // Test having one cert with private key method and another with just

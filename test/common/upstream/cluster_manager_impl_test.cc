@@ -59,10 +59,9 @@ using ::testing::SaveArg;
 
 using namespace std::chrono_literals;
 
-envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml,
-                                                                 bool avoid_boosting = true) {
+envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(yaml, bootstrap, true, avoid_boosting);
+  TestUtility::loadFromYaml(yaml, bootstrap);
   return bootstrap;
 }
 
@@ -3637,6 +3636,80 @@ TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
   ConnectionPool::Instance::IdleCb drained_cb = []() {};
   EXPECT_CALL(*pool_mock, addIdleCallback(_));
   opt_cp.value().addIdleCallback(drained_cb);
+}
+
+// Test that the read only cross-priority host map in the main thread is correctly synchronized to
+// the worker thread when the cluster's host set is updated.
+TEST_F(ClusterManagerImplTest, CrossPriorityHostMapSyncTest) {
+  std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
+      common_lb_config:
+        update_merge_window: 0s
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
+  EXPECT_EQ(2, cluster.prioritySet().crossPriorityHostMap()->size());
+  EXPECT_EQ(
+      cluster_manager_->getThreadLocalCluster("cluster_1")->prioritySet().crossPriorityHostMap(),
+      cluster.prioritySet().crossPriorityHostMap());
+
+  HostVectorSharedPtr hosts(
+      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_added;
+  HostVector hosts_removed;
+
+  hosts_removed.push_back((*hosts)[0]);
+  cluster.prioritySet().updateHosts(
+      0,
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
+      {}, hosts_added, hosts_removed, absl::nullopt);
+
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+
+  EXPECT_EQ(1, cluster.prioritySet().crossPriorityHostMap()->size());
+  EXPECT_EQ(
+      cluster_manager_->getThreadLocalCluster("cluster_1")->prioritySet().crossPriorityHostMap(),
+      cluster.prioritySet().crossPriorityHostMap());
+
+  hosts_added.push_back((*hosts)[0]);
+  hosts_removed.clear();
+  cluster.prioritySet().updateHosts(
+      0,
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
+      {}, hosts_added, hosts_removed, absl::nullopt);
+  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+
+  EXPECT_EQ(2, cluster.prioritySet().crossPriorityHostMap()->size());
+  EXPECT_EQ(
+      cluster_manager_->getThreadLocalCluster("cluster_1")->prioritySet().crossPriorityHostMap(),
+      cluster.prioritySet().crossPriorityHostMap());
 }
 
 class TestUpstreamNetworkFilter : public Network::WriteFilter {
