@@ -9,7 +9,8 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "dns_factory_interface",
+    name = "dns_factory_lib",
+    srcs = ["dns_factory.cc"],
     hdrs = ["dns_factory.h"],
     deps = [
         "//envoy/api:api_interface",
