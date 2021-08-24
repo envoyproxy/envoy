@@ -71,9 +71,7 @@ public:
       : cleanup_timer_(new Event::MockTimer(&dispatcher_)),
         api_(Api::createApiForTest(stats_store_)) {}
 
-  void setupFromYaml(const std::string& yaml, bool avoid_boosting = true) {
-    setup(parseClusterFromV3Yaml(yaml, avoid_boosting));
-  }
+  void setupFromYaml(const std::string& yaml) { setup(parseClusterFromV3Yaml(yaml)); }
 
   void setup(const envoy::config::cluster::v3::Cluster& cluster_config) {
     NiceMock<MockClusterManager> cm;

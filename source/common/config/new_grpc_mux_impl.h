@@ -31,10 +31,8 @@ class NewGrpcMuxImpl
       Logger::Loggable<Logger::Id::config> {
 public:
   NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-                 const Protobuf::MethodDescriptor& service_method,
-                 envoy::config::core::v3::ApiVersion transport_api_version,
-                 Random::RandomGenerator& random, Stats::Scope& scope,
-                 const RateLimitSettings& rate_limit_settings,
+                 const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
+                 Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 
   ~NewGrpcMuxImpl() override;
@@ -178,7 +176,6 @@ private:
 
   const LocalInfo::LocalInfo& local_info_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
-  const envoy::config::core::v3::ApiVersion transport_api_version_;
   Event::Dispatcher& dispatcher_;
 
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is

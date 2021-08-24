@@ -9,7 +9,6 @@
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/protobuf/protobuf.h"
 
@@ -70,8 +69,7 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-        envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_,
-        local_info_);
+        random_, stats_, rate_limit_settings_, local_info_);
   }
 
   void expectSendMessage(const std::string& type_url,

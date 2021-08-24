@@ -71,11 +71,6 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<std::string> config_yaml(
       "", "config-yaml", "Inline YAML configuration, merges with the contents of --config-path",
       false, "", "string", cmd);
-  TCLAP::ValueArg<uint32_t> bootstrap_version(
-      "", "bootstrap-version",
-      "API version to parse the bootstrap config as (e.g. 3). If "
-      "unset, all known versions will be attempted",
-      false, 0, "string", cmd);
 
   TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
                                         "allow unknown fields in static configuration (DEPRECATED)",
@@ -241,9 +236,6 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
-  if (bootstrap_version.getValue() != 0) {
-    bootstrap_version_ = bootstrap_version.getValue();
-  }
   if (allow_unknown_fields.getValue()) {
     ENVOY_LOG(warn,
               "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.");

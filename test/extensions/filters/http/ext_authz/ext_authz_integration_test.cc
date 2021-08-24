@@ -23,7 +23,7 @@ namespace Envoy {
 
 using Headers = std::vector<std::pair<const std::string, const std::string>>;
 
-class ExtAuthzGrpcIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
+class ExtAuthzGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                     public HttpIntegrationTest {
 public:
   ExtAuthzGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
@@ -34,9 +34,6 @@ public:
   }
 
   void initializeConfig(bool disable_with_metadata = false) {
-    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
-      config_helper_.enableDeprecatedV2Api();
-    }
     config_helper_.addConfigModifier([this, disable_with_metadata](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -60,7 +57,7 @@ public:
       }
       proto_config_.mutable_deny_at_disable()->set_runtime_key("envoy.ext_authz.deny_at_disable");
       proto_config_.mutable_deny_at_disable()->mutable_default_value()->set_value(false);
-      proto_config_.set_transport_api_version(apiVersion());
+      proto_config_.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
 
       // Add labels and verify they are passed.
       std::map<std::string, std::string> labels;
@@ -142,8 +139,7 @@ public:
     RELEASE_ASSERT(result, result.message());
 
     EXPECT_EQ("POST", ext_authz_request_->headers().getMethodValue());
-    EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.auth.{}.Authorization", "Check",
-                                                  apiVersion()),
+    EXPECT_EQ("/envoy.service.auth.v3.Authorization/Check",
               ext_authz_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", ext_authz_request_->headers().getContentTypeValue());
 
@@ -590,34 +586,30 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, ExtAuthzGrpcIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithBody) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecType::HTTP1, 4);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1 and the size of the request body is larger than max_request_bytes.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithLargeBody) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecType::HTTP1, 2048);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/2.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithBody) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecType::HTTP2, 4);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/2 and the size of the request body is larger than max_request_bytes.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecType::HTTP2, 2048);
 }
 
@@ -625,7 +617,6 @@ TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
 // server returns headers_to_add, response_headers_to_add, and headers_to_append in OkResponse
 // message.
 TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBodyWithHeaders(
       Http::CodecType::HTTP1, 4,
       /*headers_to_add=*/Headers{{"header1", "header1"}},
@@ -638,27 +629,22 @@ TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisable) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/false, /*disable_with_metadata=*/false, "200");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisableWithMetadata) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/false, /*disable_with_metadata=*/true, "200");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisable) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/true, /*disable_with_metadata=*/false, "403");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisableWithMetadata) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/true, /*disable_with_metadata=*/true, "403");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   // Set up ext_authz filter.
   initializeConfig();
 
@@ -853,7 +839,6 @@ body_format:
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initializeConfig();
   setDownstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
@@ -889,8 +874,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   RELEASE_ASSERT(result, result.message());
 
   EXPECT_EQ("POST", ext_authz_request_->headers().getMethodValue());
-  EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.auth.{}.Authorization", "Check",
-                                                apiVersion()),
+  EXPECT_EQ("/envoy.service.auth.v3.Authorization/Check",
             ext_authz_request_->headers().getPathValue());
   EXPECT_EQ("application/grpc", ext_authz_request_->headers().getContentTypeValue());
   result = ext_authz_request_->waitForEndStream(*dispatcher_);

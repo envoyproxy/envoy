@@ -138,13 +138,6 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
     return drain_manager;
   });
 
-  if (config.has_hidden_envoy_deprecated_deprecated_v1()) {
-    for (const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute&
-             route_desc : config.hidden_envoy_deprecated_deprecated_v1().routes()) {
-      routes_.emplace_back(std::make_shared<const RouteImpl>(*this, route_desc));
-    }
-  }
-
   if (!config.cluster().empty()) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute
         default_route;
