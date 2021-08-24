@@ -239,7 +239,7 @@ public:
     while (!active_routers_.empty()) {
       auto& router = active_routers_.front();
       router->resetStream();
-      router->onRouterDestroy();
+      remove(*router);
     }
   }
 
