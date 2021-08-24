@@ -1,6 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_py_binary")
+load("@base_pip3//:requirements.bzl", base_requirement = "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -45,6 +46,6 @@ envoy_py_binary(
     name = "tools.dependency.pip_check",
     deps = [
         "//tools/base:checker",
-        "//tools/base:utils",
+        base_requirement("envoy.base.utils"),
     ],
 )

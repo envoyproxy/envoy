@@ -15,7 +15,9 @@ import sys
 from functools import cached_property
 from typing import Iterable, Set
 
-from tools.base import checker, utils
+from envoy.base import utils
+
+from tools.base import checker
 
 DEPENDABOT_CONFIG = ".github/dependabot.yml"
 REQUIREMENTS_FILENAME = "requirements.txt"

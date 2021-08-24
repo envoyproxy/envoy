@@ -12,7 +12,9 @@ from colorama import Fore, Style  # type:ignore
 
 from sphinx.cmd.build import main as sphinx_build  # type:ignore
 
-from tools.base import runner, utils
+from envoy.base import utils
+
+from tools.base import runner
 
 
 class SphinxBuildError(Exception):

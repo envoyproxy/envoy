@@ -66,6 +66,9 @@ coverage==5.5 \
     # via
     #   -r tools/testing/requirements.txt
     #   pytest-cov
+envoy.base.utils==0.0.1 \
+    --hash=sha256:1d0c10dd9707a9bfe7ed763f1ea214f86adf46b67fe4627efdc5135cbeb8c3ec
+    # via -r tools/testing/requirements.txt
 iniconfig==1.1.1 \
     --hash=sha256:011e24c64b7f47f6ebd835bb12a743f2fbe9a26d4cecaa7f53bc4f35ee9da8b3 \
     --hash=sha256:bc3af051d7d14b2ee5ef9969666def0cd1a000e121eaea580d4a313df4b37f32

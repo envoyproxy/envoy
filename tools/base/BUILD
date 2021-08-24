@@ -24,11 +24,3 @@ envoy_py_library(
         requirement("verboselogs"),
     ],
 )
-
-envoy_py_library(
-    "tools.base.utils",
-    deps = [
-        requirement("pyyaml"),
-        requirement("setuptools"),
-    ],
-)

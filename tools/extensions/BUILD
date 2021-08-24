@@ -1,6 +1,7 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//tools/base:envoy_python.bzl", "envoy_py_binary")
+load("@base_pip3//:requirements.bzl", base_requirement = "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -17,6 +18,6 @@ envoy_py_binary(
     ] + envoy_all_extensions(),
     deps = [
         "//tools/base:checker",
-        "//tools/base:utils",
+        base_requirement("envoy.base.utils"),
     ],
 )

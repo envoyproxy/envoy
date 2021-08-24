@@ -142,3 +142,4 @@ wrapt==1.12.1 \
     # via
     #   -r tools/dependency/requirements.txt
     #   deprecated
+envoy.base.utils

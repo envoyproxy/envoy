@@ -21,10 +21,11 @@ from jinja2 import Template
 # just remove it from the sys.path.
 sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 
+from envoy.base import utils
+
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
-from tools.base import utils
 from tools.config_validation import validate_fragment
 
 from tools.protodoc import manifest_pb2

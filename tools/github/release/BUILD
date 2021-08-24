@@ -11,7 +11,6 @@ py_library(
     name = "abstract",
     srcs = ["abstract.py"],
     deps = [
-        "//tools/base:utils",
         requirement("aio.functional"),
         requirement("aiohttp"),
         requirement("gidgethub"),

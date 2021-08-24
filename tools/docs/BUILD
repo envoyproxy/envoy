@@ -2,6 +2,7 @@ load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("@docs_pip3//:requirements.bzl", "requirement")
 load("//tools/base:envoy_python.bzl", "envoy_py_binary")
+load("@base_pip3//:requirements.bzl", base_requirement = "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -11,7 +12,7 @@ py_binary(
     name = "generate_extensions_security_rst",
     srcs = ["generate_extensions_security_rst.py"],
     deps = [
-        "//tools/base:utils",
+        base_requirement("envoy.base.utils"),
     ],
 )
 
@@ -37,7 +38,7 @@ envoy_py_binary(
     name = "tools.docs.sphinx_runner",
     deps = [
         "//tools/base:runner",
-        "//tools/base:utils",
+        base_requirement("envoy.base.utils"),
         requirement("alabaster"),
         requirement("Babel"),
         requirement("certifi"),
