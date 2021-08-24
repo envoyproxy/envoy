@@ -270,6 +270,28 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingHeadersOnlyResponseBadGrpcStatus) {
   EXPECT_EQ("foo", bad_response_headers.get_("grpc-message"));
 }
 
+TEST_F(GrpcHttp1BridgeFilterTest, HandlingHeadersOnlyResponseBadGrpcStatusForOldBehavior) {
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.grpc_bridge_convert_code_for_header_only_response", "false"}});
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
+  Http::TestRequestTrailerMapImpl request_trailers{{"hello", "world"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+
+  Http::TestResponseHeaderMapImpl bad_response_headers{{"grpc-status", "1"},
+                                                       {"grpc-message", "foo"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(bad_response_headers, true));
+  EXPECT_EQ("", bad_response_headers.get_(":status"));
+  EXPECT_EQ("", bad_response_headers.get_("content-length"));
+  EXPECT_EQ("1", bad_response_headers.get_("grpc-status"));
+  EXPECT_EQ("foo", bad_response_headers.get_("grpc-message"));
+}
+
 } // namespace
 } // namespace GrpcHttp1Bridge
 } // namespace HttpFilters
