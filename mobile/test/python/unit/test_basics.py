@@ -77,8 +77,6 @@ def test_envoy_error():
     response = envoy_requests.get("http://127.0.0.1:0/fake-url")
     assert response.envoy_error is not None
     assert response.envoy_error.error_code == envoy_requests.ErrorCode.ConnectionFailure
-    #TODO(goaway): use updated error message
-    #assert re.match((
-    #    "^upstream connect error or disconnect/reset before headers. "
-    #    "reset reason: connection failure, transport failure reason:"
-    #), response.envoy_error.message)
+    assert re.match((
+       "^upstream_reset_before_response_started{connection_failure"
+    ), response.envoy_error.message)
