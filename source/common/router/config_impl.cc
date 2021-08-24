@@ -218,10 +218,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
                                Runtime::Loader& loader)
     : config_(config), loader_(loader), allow_methods_(config.allow_methods()),
       allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
-      max_age_(config.max_age()),
-      legacy_enabled_(config.has_hidden_envoy_deprecated_enabled()
-                          ? config.hidden_envoy_deprecated_enabled().value()
-                          : true) {
+      max_age_(config.max_age()) {
   for (const auto& string_match : config.allow_origin_string_match()) {
     allow_origins_.push_back(
         std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
@@ -239,9 +236,6 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) {
   if (config.has_runtime_fraction()) {
     runtime_key_ = config.runtime_fraction().runtime_key();
     default_value_ = config.runtime_fraction().default_value();
-  } else {
-    runtime_key_ = config.hidden_envoy_deprecated_runtime_key();
-    default_value_.set_numerator(0);
   }
   trace_sampled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, trace_sampled, true);
 }
@@ -377,23 +371,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   if (!route.route().request_mirror_policies().empty()) {
-    if (route.route().has_hidden_envoy_deprecated_request_mirror_policy()) {
-      // protobuf does not allow `oneof` to contain a field labeled `repeated`, so we do our own
-      // xor-like check.
-      // https://github.com/protocolbuffers/protobuf/issues/2592
-      // The alternative solution suggested (wrapping the oneof in a repeated message) would still
-      // break wire compatibility.
-      // (see https://github.com/envoyproxy/envoy/issues/439#issuecomment-383622723)
-      throw EnvoyException("Cannot specify both request_mirror_policy and request_mirror_policies");
-    }
     for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
       shadow_policies_.push_back(std::make_unique<ShadowPolicyImpl>(mirror_policy_config));
     }
-  } else if (route.route().has_hidden_envoy_deprecated_request_mirror_policy()) {
-    shadow_policies_.push_back(std::make_unique<ShadowPolicyImpl>(
-        route.route().hidden_envoy_deprecated_request_mirror_policy()));
   }
-
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
   // single cluster, pointing back to the parent. Metadata criteria

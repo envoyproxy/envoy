@@ -147,9 +147,9 @@ public:
       absl::node_hash_map<std::string,
                           const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
 
-  void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true) {
+  void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
@@ -2948,9 +2948,9 @@ public:
 
 class ProdHttpHealthCheckerTest : public testing::Test, public HealthCheckerTestBase {
 public:
-  void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true) {
+  void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestProdHttpHealthChecker>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
@@ -3025,7 +3025,7 @@ TEST_F(HttpHealthCheckerImplTest, Http1CodecClient) {
       codec_client_type: Http1
     )EOF";
 
-  allocHealthChecker(yaml, false);
+  allocHealthChecker(yaml);
   addCompletionCallback();
   EXPECT_EQ(Http::CodecType::HTTP1, health_checker_->codecClientType());
 }
@@ -3045,7 +3045,7 @@ TEST_F(HttpHealthCheckerImplTest, Http2CodecClient) {
       codec_client_type: Http2
     )EOF";
 
-  allocHealthChecker(yaml, false);
+  allocHealthChecker(yaml);
   addCompletionCallback();
   EXPECT_EQ(Http::CodecType::HTTP2, health_checker_->codecClientType());
 }
@@ -3370,9 +3370,9 @@ class TcpHealthCheckerImplTest : public testing::Test,
                                  public HealthCheckerTestBase,
                                  public Event::TestUsingSimulatedTime {
 public:
-  void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true) {
+  void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
