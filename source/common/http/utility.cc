@@ -294,21 +294,21 @@ std::string parseCookie(const HeaderMap& headers, const std::string& key,
   std::string value;
 
   // Iterate over each cookie & return if its value is not empty.
-  forEachCookie(headers, cookie,
-                [&key, &value](absl::string_view k, absl::string_view v) -> bool {
-                  if (key == k && !v.empty()) {
-                    value = std::string{v};
-                    return false;
-                  }
+  forEachCookie(headers, cookie, [&key, &value](absl::string_view k, absl::string_view v) -> bool {
+    if (key == k && !v.empty()) {
+      value = std::string{v};
+      return false;
+    }
 
-                  // continue iterating until a cookie that matches `key` is found.
-                  return true;
-                });
+    // continue iterating until a cookie that matches `key` is found.
+    return true;
+  });
 
   return value;
 }
 
-absl::flat_hash_map<std::string, std::string> Utility::parseCookies(const RequestHeaderMap& headers) {
+absl::flat_hash_map<std::string, std::string>
+Utility::parseCookies(const RequestHeaderMap& headers) {
   absl::flat_hash_map<std::string, std::string> cookies;
 
   forEachCookie(headers, Http::Headers::get().Cookie,
