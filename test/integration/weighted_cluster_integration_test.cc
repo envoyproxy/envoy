@@ -107,7 +107,7 @@ public:
   int getUpstreamCount() { return upstream_count_; }
   const std::vector<uint64_t>& getDefaultWeights() { return default_weights_; }
 
-  void SendRequestAndValidateResponse(const std::vector<uint64_t>& upstream_indices) {
+  void sendRequestAndValidateResponse(const std::vector<uint64_t>& upstream_indices) {
     // Create a client aimed at Envoy’s default HTTP port.
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
@@ -147,7 +147,7 @@ TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithName) {
 
   // The expected destination cluster upstream is index 0 since the selected
   // value is set to 0 indirectly via `setDeterministicValue(0)`.
-  SendRequestAndValidateResponse({0});
+  sendRequestAndValidateResponse({0});
 }
 
 TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithHeader) {
@@ -163,7 +163,7 @@ TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithHeader) {
 
   // The expected destination cluster upstream is index
   // `total_cluster_with_name_count`.
-  SendRequestAndValidateResponse({static_cast<uint64_t>(total_cluster_with_name_count)});
+  sendRequestAndValidateResponse({static_cast<uint64_t>(total_cluster_with_name_count)});
 }
 
 TEST_F(WeightedClusterIntegrationTest, SplitTrafficRandomly) {
@@ -175,7 +175,7 @@ TEST_F(WeightedClusterIntegrationTest, SplitTrafficRandomly) {
   for (int i = 0; i < 100; ++i) {
     // The expected destination cluster upstream is randomly selected based on
     // weight, so all the upstreams needs to be available for selection.
-    SendRequestAndValidateResponse(upstream_indices);
+    sendRequestAndValidateResponse(upstream_indices);
   }
 
   // Check that all the upstream cluster have been routed to at least once.
