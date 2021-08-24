@@ -13,8 +13,9 @@ import aiohttp
 
 import gidgethub.abc
 
+from aio.functional import async_property
+
 from tools.base import abstract
-from tools.base.functional import async_property
 
 
 class AGithubReleaseAssets(metaclass=abstract.Abstraction):

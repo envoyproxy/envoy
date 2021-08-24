@@ -12,8 +12,9 @@ import aiohttp
 import gidgethub.abc
 import gidgethub.aiohttp
 
+from aio.functional import async_property
+
 from tools.base import abstract
-from tools.base.functional import async_property
 
 from tools.github.release.abstract import AGithubRelease, AGithubReleaseManager
 from tools.github.release.exceptions import GithubReleaseError

@@ -11,7 +11,7 @@ envoy_py_library("tools.base.abstract")
 envoy_py_library(
     "tools.base.aio",
     deps = [
-        ":functional",
+        requirement("aio.functional"),
     ],
 )
 
@@ -21,8 +21,6 @@ envoy_py_library(
         ":runner",
     ],
 )
-
-envoy_py_library("tools.base.functional")
 
 envoy_py_library(
     "tools.base.runner",

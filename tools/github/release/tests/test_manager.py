@@ -5,7 +5,8 @@ import pytest
 
 import packaging.version
 
-from tools.base.functional import async_property
+from aio.functional import async_property
+
 from tools.github.release import manager, exceptions as github_errors
 
 
