@@ -1,4 +1,4 @@
-1.16.5 (Pending)
+1.16.5 (Aug 24, 2021)
 =======================
 
 Incompatible Behavior Changes
