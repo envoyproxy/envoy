@@ -85,7 +85,7 @@ public:
   // Notifies this instance that it is going to be destroyed soon.
   // Impl note: it allows us to prepare all rich producers for shutdown instead of waiting for each
   // one by one.
-  void markFinished();
+  void markFinished() override;
 
   std::list<ProduceFinishCbSharedPtr>& getUnfinishedRequestsForTest();
 
