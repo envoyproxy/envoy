@@ -1148,13 +1148,17 @@ void ClusterImplBase::onPreInitComplete() {
   }
   initialization_started_ = true;
 
-  ENVOY_LOG(debug, "initializing {} cluster {} completed",
+  ENVOY_LOG(debug, "pre-initializing {} cluster {} completed",
             initializePhase() == InitializePhase::Primary ? "Primary" : "Secondary",
             info()->name());
   init_manager_.initialize(init_watcher_);
 }
 
 void ClusterImplBase::onInitDone() {
+  ENVOY_LOG(debug, "initializing {} cluster {} completed",
+            initializePhase() == InitializePhase::Primary ? "Primary" : "Secondary",
+            info()->name());
+
   if (health_checker_ && pending_initialize_health_checks_ == 0) {
     for (auto& host_set : prioritySet().hostSetsPerPriority()) {
       pending_initialize_health_checks_ += host_set->hosts().size();
@@ -1183,6 +1187,9 @@ void ClusterImplBase::finishInitialization() {
   initialization_complete_callback_ = nullptr;
 
   if (health_checker_ != nullptr) {
+    ENVOY_LOG(debug, "health checks initialized for {} cluster {}",
+              initializePhase() == InitializePhase::Primary ? "Primary" : "Secondary",
+              info()->name());
     reloadHealthyHosts(nullptr);
   }
 
