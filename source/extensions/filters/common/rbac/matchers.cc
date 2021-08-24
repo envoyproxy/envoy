@@ -3,7 +3,8 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "source/common/stream_info/address_set_accessor_impl.h"
+#include "source/common/config/utility.h"
+#include "source/extensions/filters/common/rbac/matcher_extension.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,19 +12,19 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission& permission) {
+MatcherConstSharedPtr
+Matcher::create(const envoy::config::rbac::v3::Permission& permission,
+                const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor) {
   switch (permission.rule_case()) {
   case envoy::config::rbac::v3::Permission::RuleCase::kAndRules:
-    return std::make_shared<const AndMatcher>(permission.and_rules());
+    return std::make_shared<const AndMatcher>(permission.and_rules(), validation_visitor);
   case envoy::config::rbac::v3::Permission::RuleCase::kOrRules:
-    return std::make_shared<const OrMatcher>(permission.or_rules());
+    return std::make_shared<const OrMatcher>(permission.or_rules(), validation_visitor);
   case envoy::config::rbac::v3::Permission::RuleCase::kHeader:
     return std::make_shared<const HeaderMatcher>(permission.header());
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationIp:
     return std::make_shared<const IPMatcher>(permission.destination_ip(),
                                              IPMatcher::Type::DownstreamLocal);
-  case envoy::config::rbac::v3::Permission::RuleCase::kUpstreamIp:
-    return std::make_shared<const IPMatcher>(permission.upstream_ip(), IPMatcher::Type::Upstream);
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPort:
     return std::make_shared<const PortMatcher>(permission.destination_port());
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPortRange:
@@ -33,11 +34,17 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
   case envoy::config::rbac::v3::Permission::RuleCase::kMetadata:
     return std::make_shared<const MetadataMatcher>(permission.metadata());
   case envoy::config::rbac::v3::Permission::RuleCase::kNotRule:
-    return std::make_shared<const NotMatcher>(permission.not_rule());
+    return std::make_shared<const NotMatcher>(permission.not_rule(), validation_visitor);
   case envoy::config::rbac::v3::Permission::RuleCase::kRequestedServerName:
     return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name());
   case envoy::config::rbac::v3::Permission::RuleCase::kUrlPath:
     return std::make_shared<const PathMatcher>(permission.url_path());
+  case envoy::config::rbac::v3::Permission::RuleCase::kMatcher: {
+    ASSERT(validation_visitor.has_value());
+    auto& factory =
+        Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(permission.matcher());
+    return factory.create(permission.matcher(), *validation_visitor.value());
+  }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -75,9 +82,11 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
   }
 }
 
-AndMatcher::AndMatcher(const envoy::config::rbac::v3::Permission::Set& set) {
+AndMatcher::AndMatcher(
+    const envoy::config::rbac::v3::Permission::Set& set,
+    const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor) {
   for (const auto& rule : set.rules()) {
-    matchers_.push_back(Matcher::create(rule));
+    matchers_.push_back(Matcher::create(rule, validation_visitor));
   }
 }
 
@@ -99,9 +108,11 @@ bool AndMatcher::matches(const Network::Connection& connection,
   return true;
 }
 
-OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules) {
+OrMatcher::OrMatcher(
+    const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules,
+    const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor) {
   for (const auto& rule : rules) {
-    matchers_.push_back(Matcher::create(rule));
+    matchers_.push_back(Matcher::create(rule, validation_visitor));
   }
 }
 
@@ -145,34 +156,6 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
   case DownstreamLocal:
     ip = info.downstreamAddressProvider().localAddress();
     break;
-  case Upstream: {
-    if (!info.filterState().hasDataWithName(StreamInfo::AddressSetAccessorImpl::key())) {
-      ENVOY_LOG_MISC(warn, "Did not find dynamic forward proxy metadata. Do you have dynamic "
-                           "forward proxy in the filter chain before the RBAC filter ?");
-      return false;
-    }
-
-    bool ipMatch = false;
-
-    const StreamInfo::AddressSetAccessor& address_set =
-        info.filterState().getDataReadOnly<StreamInfo::AddressSetAccessor>(
-            StreamInfo::AddressSetAccessorImpl::key());
-
-    address_set.iterate([&, this](const Network::Address::InstanceConstSharedPtr& address) {
-      ipMatch = range_.isInRange(*address.get());
-      if (ipMatch) {
-        ENVOY_LOG_MISC(debug, "upstream_ip {} matched range: {}", address->asString(),
-                       range_.asString());
-        return false;
-      }
-
-      return true;
-    });
-
-    ENVOY_LOG_MISC(debug, "UpstreamIp matcher evaluated to: {}", ipMatch);
-
-    return ipMatch;
-  }
   case DownstreamDirectRemote:
     ip = info.downstreamAddressProvider().directRemoteAddress();
     break;

@@ -1,5 +1,6 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/http/rbac/v3/upstream_ip_matcher.pb.h"
 
 #include "source/common/config/metadata.h"
 #include "source/common/network/utility.h"
@@ -50,7 +51,8 @@ public:
     (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
     config.set_shadow_rules_stat_prefix("prefix_");
 
-    return std::make_shared<RoleBasedAccessControlFilterConfig>(config, "test", store_);
+    return std::make_shared<RoleBasedAccessControlFilterConfig>(
+        config, "test", store_, ProtobufMessage::getStrictValidationVisitor());
   }
 
   RoleBasedAccessControlFilterTest()
@@ -290,10 +292,17 @@ void upstreamIpTestsBasicPolicySetup(RoleBasedAccessControlFilterTest& test,
       TestUtility::createRegexMatcher(".*cncf.io"));
 
   // Setup upstream ip to match.
+
   for (const auto& ip : upstream_ips) {
-    auto* upstream_ip = policy_rules->add_rules()->mutable_upstream_ip();
-    upstream_ip->set_address_prefix(ip);
-    upstream_ip->mutable_prefix_len()->set_value(32);
+    envoy::extensions::filters::http::rbac::v3::UpstreamIpMatcher matcher;
+    matcher.mutable_upstream_ip()->set_address_prefix(ip);
+    matcher.mutable_upstream_ip()->mutable_prefix_len()->set_value(32);
+
+    auto* matcher_ext_config = policy_rules->add_rules()->mutable_matcher();
+
+    *matcher_ext_config->mutable_name() = "envoy.filters.http.rbac.matchers.upstream_ip";
+
+    matcher_ext_config->mutable_typed_config()->PackFrom(matcher);
   }
 
   policy.add_principals()->set_any(true);
@@ -302,8 +311,8 @@ void upstreamIpTestsBasicPolicySetup(RoleBasedAccessControlFilterTest& test,
   config.mutable_rules()->set_action(action);
   (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
-  auto config_ptr =
-      std::make_shared<RoleBasedAccessControlFilterConfig>(config, "test", test.store_);
+  auto config_ptr = std::make_shared<RoleBasedAccessControlFilterConfig>(
+      config, "test", test.store_, ProtobufMessage::getStrictValidationVisitor());
 
   // Setup test with the policy config.
   test.SetUp(config_ptr);

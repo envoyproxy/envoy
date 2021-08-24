@@ -331,9 +331,18 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
   filter_->onDestroy();
 }
 
+class UpstreamResolvedHostFilterStateHelper : public TestScopedRuntime, public ProxyFilterTest {
+public:
+  UpstreamResolvedHostFilterStateHelper() {
+    Runtime::LoaderSingleton::getExisting()->mergeValues({
+        {"envoy.reloadable_features.enable_rbac_upstream_address", "true"},
+    });
+  }
+};
+
 // Tests if address set is populated in the filter state when an upstream host is resolved
 // successfully.
-TEST_F(ProxyFilterTest, AddResolvedHostFilterStateMetadata) {
+TEST_F(UpstreamResolvedHostFilterStateHelper, AddResolvedHostFilterStateMetadata) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
@@ -380,7 +389,7 @@ TEST_F(ProxyFilterTest, AddResolvedHostFilterStateMetadata) {
 
 // Tests if address set is populated in the filter state when an upstream host is resolved
 // successfully but is null.
-TEST_F(ProxyFilterTest, IgnoreFilterStateMetadataNullAddress) {
+TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddress) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
@@ -424,7 +433,7 @@ TEST_F(ProxyFilterTest, IgnoreFilterStateMetadataNullAddress) {
 
 // Tests if an already existing address set in filter state is updated when upstream host is
 // resolved successfully.
-TEST_F(ProxyFilterTest, UpdateResolvedHostFilterStateMetadata) {
+TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetadata) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 

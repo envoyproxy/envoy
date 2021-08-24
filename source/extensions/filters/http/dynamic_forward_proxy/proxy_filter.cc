@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/address_set_accessor_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
@@ -124,9 +125,11 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     ASSERT(cache_load_handle_ == nullptr);
     ENVOY_STREAM_LOG(debug, "DNS cache entry already loaded, continuing", *decoder_callbacks_);
 
-    auto const& host = config_->cache().getHost(headers.Host()->value().getStringView());
-    if (host.has_value()) {
-      addHostAddressToFilterState(host.value()->address());
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.rbac_policy_upstream_address")) {
+      auto const& host = config_->cache().getHost(headers.Host()->value().getStringView());
+      if (host.has_value()) {
+        addHostAddressToFilterState(host.value()->address());
+      }
     }
 
     return Http::FilterHeadersStatus::Continue;
@@ -184,7 +187,9 @@ void ProxyFilter::onLoadDnsCacheComplete(
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();
 
-  addHostAddressToFilterState(host_info->address());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.rbac_policy_upstream_address")) {
+    addHostAddressToFilterState(host_info->address());
+  }
 
   decoder_callbacks_->continueDecoding();
 }

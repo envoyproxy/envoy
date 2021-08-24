@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.rbac.v3;
+
+import "envoy/type/range.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.rbac.v3";
+option java_outer_classname = "UpstreamPortMatcherProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: RBAC Upstream port range matcher plugin]
+
+// [#alpha:]
+// [#extension: envoy.filters.http.rbac.matcher.upstream_port]
+// This is configuration for matching upstream port.
+message UpstreamPortMatcher {
+  // A Port range that will be used to match the upstream port. This field is only applicable if the
+  // request is routed by dynamic forward proxy. If this field is present and the request did not
+  // have dynamic forward proxy in its filter chain before it was processed by the RBAC filter,
+  // the matcher will evaluate the permission as `false`. Dynamic forward proxy caches the
+  // upstream ip address in filter state and the state is invalidated after each request.
+  type.Int64Range port_range = 1;
+}

@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.rbac.v3;
 
 import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/path.proto";
@@ -219,13 +220,10 @@ message Permission {
     // setup SNI.
     type.matcher.v3.StringMatcher requested_server_name = 9;
 
-    // A CIDR block that will be used to match the upstream IP. This field is only applicable if the
-    // request is routed by dynamic forward proxy. If this field is present and the request did not
-    // have dynamic forward proxy in its filter chain before it was processed by the RBAC filter,
-    // the matcher will evaluate the permission as `false`. Dynamic forward proxy caches the
-    // upstream ip address in filter state and the state is invalidated after each request. Both
-    // Ipv4 and Ipv6 ranges can be matched.
-    core.v3.CidrRange upstream_ip = 12;
+    // Optional extension for configuring custom matchers for RBAC. An example could be - matcher
+    // for CIDR AND Port range for upstream connection.
+    // [#extension-category: filters.common.rbac]
+    core.v3.TypedExtensionConfig matcher = 12;
   }
 }
 
