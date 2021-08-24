@@ -303,7 +303,7 @@ envoy_proto_library(
 envoy_cc_fuzz_test(
     name = "random_load_balancer_fuzz_test",
     srcs = ["random_load_balancer_fuzz_test.cc"],
-    corpus = "//test/common/upstream:random_load_balancer_corpus",
+    corpus = "random_load_balancer_corpus",
     deps = [
         ":load_balancer_fuzz_lib",
         ":load_balancer_fuzz_proto_cc_proto",
@@ -803,7 +803,7 @@ envoy_proto_library(
 envoy_cc_fuzz_test(
     name = "round_robin_load_balancer_fuzz_test",
     srcs = ["round_robin_load_balancer_fuzz_test.cc"],
-    corpus = "//test/common/upstream:round_robin_load_balancer_corpus",
+    corpus = "round_robin_load_balancer_corpus",
     deps = [
         ":round_robin_load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
@@ -824,7 +824,7 @@ envoy_proto_library(
 envoy_cc_fuzz_test(
     name = "least_request_load_balancer_fuzz_test",
     srcs = ["least_request_load_balancer_fuzz_test.cc"],
-    corpus = "//test/common/upstream:least_request_load_balancer_corpus",
+    corpus = "least_request_load_balancer_corpus",
     deps = [
         ":least_request_load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",

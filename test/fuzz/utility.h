@@ -166,7 +166,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
           : Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
   test_stream_info->upstream_local_address_ = upstream_local_address;
   test_stream_info->downstream_address_provider_ =
-      std::make_shared<Network::SocketAddressSetterImpl>(address, address);
+      std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
   test_stream_info->downstream_address_provider_->setRequestedServerName(
       stream_info.requested_server_name());
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
