@@ -98,6 +98,8 @@ class GithubReleaseManager:
     @async_property
     async def releases(self) -> List[Dict]:
         results = []
+        # By iterating the results from the releases url here,
+        # gidgethub will paginate the release information.
         async for result in self.github.getiter(str(self.releases_url)):
             results.append(result)
         return results
@@ -134,10 +136,10 @@ class GithubReleaseManager:
         return self._version_format.format(version=version)
 
     def parse_version(self, version: str) -> Optional[packaging.version.Version]:
-        _version = self.version_re.sub(r"\1", version)
-        if _version:
+        parsed_version = self.version_re.sub(r"\1", version)
+        if parsed_version:
             try:
-                return packaging.version.Version(_version)
+                return packaging.version.Version(parsed_version)
             except packaging.version.InvalidVersion:
                 pass
         self.log.warning(f"Unable to parse version: {version}")

@@ -156,11 +156,11 @@ async def test_release_manager_latest(patches):
         ("GithubReleaseManager.releases", dict(new_callable=PropertyMock)),
         prefix="tools.github.release.manager")
 
-    _versions = [dict(tag_name=v) for v in ("1.19.2", "X", "1.19.1", "Y_Z", "1.20.3", "", "0.0.1")]
+    versions = [dict(tag_name=v) for v in ("1.19.2", "X", "1.19.1", "Y_Z", "1.20.3", "", "0.0.1")]
 
     with patched as (m_version, m_releases):
         m_version.side_effect = lambda version: (packaging.version.Version(version) if "." in version else None)
-        m_releases.side_effect = AsyncMock(return_value=_versions)
+        m_releases.side_effect = AsyncMock(return_value=versions)
         result = await releaser.latest
 
     assert (
@@ -191,7 +191,6 @@ async def test_release_manager_releases(patches):
 
     with patched as (m_github, m_releases):
         m_github.return_value.getiter = getiter
-        _releases = await releaser.releases
         assert await releaser.releases == list(range(0, 5))
 
     assert (
