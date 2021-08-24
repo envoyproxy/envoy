@@ -10,7 +10,6 @@
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/protobuf/protobuf.h"
 
@@ -80,9 +79,9 @@ public:
                          bool first = false, const std::string& nonce = "",
                          const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
                          const std::string& error_message = "") {
-    API_NO_BOOST(envoy::api::v2::DiscoveryRequest) expected_request;
+    envoy::service::discovery::v3::DiscoveryRequest expected_request;
     if (first) {
-      expected_request.mutable_node()->CopyFrom(API_DOWNGRADE(local_info_.node()));
+      expected_request.mutable_node()->CopyFrom(local_info_.node());
     }
     for (const auto& resource : resource_names) {
       expected_request.add_resource_names(resource);
@@ -864,9 +863,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
 TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsResources) {
   setup();
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  const std::string& type_url =
-      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          envoy::config::core::v3::ApiVersion::V3);
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   grpc_mux_->start();
 
   // subscribe and unsubscribe so that the type is known to envoy

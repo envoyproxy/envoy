@@ -142,7 +142,7 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
       .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
 
   // Prepare the parent context of this call.
-  auto address_provider = std::make_shared<Network::SocketAddressSetterImpl>(
+  auto address_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
   StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), address_provider};
   Http::AsyncClient::ParentContext parent_context{&stream_info};

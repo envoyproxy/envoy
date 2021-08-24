@@ -6,7 +6,6 @@
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/config/xds_context_params.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/memory/utils.h"
@@ -177,7 +176,6 @@ void GrpcMuxImpl<S, F, RQ, RS>::sendGrpcMessage(RQ& msg_proto, S& sub_state) {
       !skipSubsequentNode()) {
     msg_proto.mutable_node()->CopyFrom(localInfo().node());
   }
-  VersionConverter::prepareMessageForGrpcWire(msg_proto, transportApiVersion());
   sendMessage(msg_proto);
   setAnyRequestSentYetInCurrentStream(true);
   sub_state.clearDynamicContextChanged();

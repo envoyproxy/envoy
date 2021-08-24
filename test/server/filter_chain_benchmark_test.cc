@@ -39,7 +39,7 @@ class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 class MockConnectionSocket : public Network::ConnectionSocket {
 public:
   MockConnectionSocket()
-      : address_provider_(std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr)) {}
+      : address_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)) {}
 
   static std::unique_ptr<MockConnectionSocket>
   createMockConnectionSocket(uint16_t destination_port, const std::string& destination_address,
@@ -75,11 +75,11 @@ public:
   const std::vector<std::string>& requestedApplicationProtocols() const override {
     return application_protocols_;
   }
-  Network::SocketAddressSetter& addressProvider() override { return *address_provider_; }
-  const Network::SocketAddressSetter& addressProvider() const override {
+  Network::ConnectionInfoSetter& addressProvider() override { return *address_provider_; }
+  const Network::ConnectionInfoSetter& addressProvider() const override {
     return *address_provider_;
   }
-  Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+  Network::ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
     return address_provider_;
   }
 
@@ -126,7 +126,7 @@ public:
 private:
   Network::IoHandlePtr io_handle_;
   OptionsSharedPtr options_;
-  std::shared_ptr<Network::SocketAddressSetterImpl> address_provider_;
+  std::shared_ptr<Network::ConnectionInfoSetterImpl> address_provider_;
   std::string server_name_;
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
