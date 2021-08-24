@@ -18,6 +18,8 @@ envoy_py_binary(
         "//tools/base:aio",
         "//tools/base:checker",
         "//tools/base:utils",
+        requirement("aio.subprocess"),
+        requirement("aio.task"),
         requirement("flake8"),
         requirement("pep8-naming"),
         requirement("yapf"),

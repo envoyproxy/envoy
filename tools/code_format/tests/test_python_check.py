@@ -249,7 +249,7 @@ async def test_python_on_check_run(patches, errors, warnings):
 async def test_python_on_checks_complete(patches, diff_path, failed):
     checker = python_check.PythonChecker("path1", "path2", "path3")
     patched = patches(
-        "aio",
+        "async_subprocess",
         ("checker.AsyncChecker.on_checks_complete", dict(new_callable=AsyncMock)),
         ("PythonChecker.diff_file_path", dict(new_callable=PropertyMock)),
         ("PythonChecker.has_failed", dict(new_callable=PropertyMock)),
@@ -257,7 +257,7 @@ async def test_python_on_checks_complete(patches, diff_path, failed):
         prefix="tools.code_format.python_check")
 
     with patched as (m_aio, m_super, m_diff, m_failed, m_path):
-        m_aio.async_subprocess.run = AsyncMock()
+        m_aio.run = AsyncMock()
         if not diff_path:
             m_diff.return_value = None
         m_failed.return_value = failed
@@ -265,14 +265,14 @@ async def test_python_on_checks_complete(patches, diff_path, failed):
 
     if diff_path and failed:
         assert (
-            list(m_aio.async_subprocess.run.call_args)
+            list(m_aio.run.call_args)
             == [(['git', 'diff', 'HEAD'],),
                 dict(capture_output=True, cwd=m_path.return_value)])
         assert (
             list(m_diff.return_value.write_bytes.call_args)
-            == [(m_aio.async_subprocess.run.return_value.stdout,), {}])
+            == [(m_aio.run.return_value.stdout,), {}])
     else:
-        assert not m_aio.async_subprocess.run.called
+        assert not m_aio.run.called
 
     assert (
         list(m_super.call_args)

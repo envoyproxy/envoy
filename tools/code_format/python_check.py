@@ -23,6 +23,8 @@ from flake8.main.application import Application as Flake8Application  # type:ign
 
 import yapf  # type:ignore
 
+from aio.subprocess import async_subprocess
+
 from tools.base import aio, checker, utils
 
 FLAKE8_CONFIG = '.flake8'
@@ -102,9 +104,9 @@ class PythonChecker(checker.AsyncChecker):
 
     async def on_checks_complete(self) -> int:
         if self.diff_file_path and self.has_failed:
-            result = await aio.async_subprocess.run(["git", "diff", "HEAD"],
-                                                    cwd=self.path,
-                                                    capture_output=True)
+            result = await async_subprocess.run(["git", "diff", "HEAD"],
+                                                cwd=self.path,
+                                                capture_output=True)
             self.diff_file_path.write_bytes(result.stdout)
         return await super().on_checks_complete()
 
