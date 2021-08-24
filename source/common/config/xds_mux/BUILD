@@ -63,7 +63,6 @@ envoy_cc_library(
         "//envoy/grpc:async_client_interface",
         "//source/common/config:grpc_stream_lib",
         "//source/common/config:pausable_ack_queue_lib",
-        "//source/common/config:version_converter_lib",
         "//source/common/config:watch_map_lib",
         "//source/common/config:xds_context_params_lib",
         "//source/common/config:xds_resource_lib",

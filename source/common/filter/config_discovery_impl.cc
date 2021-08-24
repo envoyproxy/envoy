@@ -70,7 +70,6 @@ FilterConfigSubscription::FilterConfigSubscription(
     const std::string& stat_prefix, FilterConfigProviderManagerImpl& filter_config_provider_manager,
     const std::string& subscription_id)
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>(
-          envoy::config::core::v3::ApiVersion::V3,
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       filter_config_name_(filter_config_name), factory_context_(factory_context),
       validator_(factory_context.messageValidationContext().dynamicValidationVisitor()),
