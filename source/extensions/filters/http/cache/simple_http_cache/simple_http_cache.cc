@@ -123,7 +123,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
   auto& entry = iter->second;
 
   // TODO(tangsaidi) handle Vary header updates properly
-  if (VaryHeader::hasVary(*(entry.response_headers_))) {
+  if (VaryHeaderUtils::hasVary(*(entry.response_headers_))) {
     return;
   }
 
