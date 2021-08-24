@@ -239,16 +239,21 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   // end_stream may be indicated with a zero length data buffer. If that is the case, so not
   // actually write the zero length buffer out.
   if (data.length() > 0) {
+    size_t body_frame_size = data.length();
     if (chunk_encoding_) {
-      connection_.buffer().add(absl::StrCat(absl::Hex(data.length()), CRLF));
+      std::string chunk_beginning = absl::StrCat(absl::Hex(data.length()), CRLF);
+      body_frame_size += chunk_beginning.size();
+      connection_.buffer().add(std::move(chunk_beginning));
     }
-    if (bytes_meterer_) {
-      bytes_meterer_->addBodyBytesSent(data.length());
-    }
+
     connection_.buffer().move(data);
 
     if (chunk_encoding_) {
       connection_.buffer().add(CRLF);
+      body_frame_size += 2;
+    }
+    if (bytes_meterer_) {
+      bytes_meterer_->addBodyBytesSent(body_frame_size);
     }
   }
 
@@ -843,6 +848,11 @@ void ConnectionImpl::dispatchBufferedBody() {
 }
 
 void ConnectionImpl::onChunkHeader(bool is_final_chunk) {
+  StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
+  // Count overhead of chunk encoding per chunk.
+  if (bytes_meterer) {
+    bytes_meterer->addBodyBytesReceived(is_final_chunk ? 3 : 4);
+  }
   if (is_final_chunk) {
     // Dispatch body before parsing trailers, so body ends up dispatched even if an error is found
     // while processing trailers.

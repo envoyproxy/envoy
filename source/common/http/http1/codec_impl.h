@@ -219,6 +219,8 @@ public:
    */
   virtual void onEncodeComplete() PURE;
 
+  virtual StreamInfo::BytesMeterer* getBytesMeterer() PURE;
+
   /**
    * Called when resetStream() has been called on an active stream. In HTTP/1.1 the only
    * valid operation after this point is for the connection to get blown away, but we will not
@@ -497,6 +499,12 @@ private:
   Status onUrl(const char* data, size_t length) override;
   // ConnectionImpl
   void onEncodeComplete() override;
+  virtual StreamInfo::BytesMeterer* getBytesMeterer() override {
+    if (active_request_.has_value()) {
+      return active_request_->response_encoder_.getStream().bytesMeterer();
+    }
+    return nullptr;
+  }
   Status onMessageBeginBase() override;
   Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
   // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
@@ -582,6 +590,12 @@ private:
   // ConnectionImpl
   Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}
+  virtual StreamInfo::BytesMeterer* getBytesMeterer() override {
+    if (pending_response_.has_value()) {
+      return pending_response_->encoder_.getStream().bytesMeterer();
+    }
+    return nullptr;
+  }
   Status onMessageBeginBase() override { return okStatus(); }
   Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
   bool upgradeAllowed() const override;
