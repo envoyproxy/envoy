@@ -37,6 +37,7 @@ namespace Logger {
   FUNCTION(connection)                                                                             \
   FUNCTION(conn_handler)                                                                           \
   FUNCTION(decompression)                                                                          \
+  FUNCTION(dns)                                                                                    \
   FUNCTION(dubbo)                                                                                  \
   FUNCTION(envoy_bug)                                                                              \
   FUNCTION(ext_authz)                                                                              \
