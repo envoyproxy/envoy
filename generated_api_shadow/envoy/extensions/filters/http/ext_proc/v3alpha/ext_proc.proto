@@ -151,8 +151,7 @@ message ExternalProcessor {
 }
 
 // Extra settings that may be added to per-route configuration for a
-// virtual host or cluster. The name "envoy.filters.http.ext_proc" should
-// be used to identify the configuration in the per-route configuration map.
+// virtual host or cluster.
 message ExtProcPerRoute {
   oneof override {
     option (validate.required) = true;
