@@ -455,8 +455,8 @@ public:
     if (tcpOnly()) {
       peer_->resetChannelTcpOnly(zeroTimeout());
     }
-    ares_set_servers_ports_csv(peer_->channel(),
-                               socket_->connectionInfoProvider().localAddress()->asString().c_str());
+    ares_set_servers_ports_csv(
+        peer_->channel(), socket_->connectionInfoProvider().localAddress()->asString().c_str());
   }
 
   void TearDown() override {

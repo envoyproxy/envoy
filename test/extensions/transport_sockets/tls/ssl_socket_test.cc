@@ -2892,7 +2892,8 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         Network::TransportSocketFactory& tsf =
-            socket->connectionInfoProvider().localAddress() == socket1->connectionInfoProvider().localAddress()
+            socket->connectionInfoProvider().localAddress() ==
+                    socket1->connectionInfoProvider().localAddress()
                 ? server_ssl_socket_factory1
                 : server_ssl_socket_factory2;
         server_connection = dispatcher->createServerConnection(
@@ -2936,7 +2937,8 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         Network::TransportSocketFactory& tsf =
-            socket->connectionInfoProvider().localAddress() == socket1->connectionInfoProvider().localAddress()
+            socket->connectionInfoProvider().localAddress() ==
+                    socket1->connectionInfoProvider().localAddress()
                 ? server_ssl_socket_factory1
                 : server_ssl_socket_factory2;
         server_connection = dispatcher->createServerConnection(
@@ -3015,8 +3017,9 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
       std::make_unique<ClientContextConfigImpl>(client_tls_context, client_factory_context);
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
-      tcp_socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(nullptr), nullptr);
+      tcp_socket->connectionInfoProvider().localAddress(),
+      Network::Address::InstanceConstSharedPtr(), ssl_socket_factory.createTransportSocket(nullptr),
+      nullptr);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);
@@ -3471,10 +3474,11 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
-        Network::TransportSocketFactory& tsf = accepted_socket->connectionInfoProvider().localAddress() ==
-                                                       socket->connectionInfoProvider().localAddress()
-                                                   ? server_ssl_socket_factory
-                                                   : server2_ssl_socket_factory;
+        Network::TransportSocketFactory& tsf =
+            accepted_socket->connectionInfoProvider().localAddress() ==
+                    socket->connectionInfoProvider().localAddress()
+                ? server_ssl_socket_factory
+                : server2_ssl_socket_factory;
         server_connection = dispatcher_->createServerConnection(
             std::move(accepted_socket), tsf.createTransportSocket(nullptr), stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
@@ -3512,10 +3516,11 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
 
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
-        Network::TransportSocketFactory& tsf = accepted_socket->connectionInfoProvider().localAddress() ==
-                                                       socket->connectionInfoProvider().localAddress()
-                                                   ? server_ssl_socket_factory
-                                                   : server2_ssl_socket_factory;
+        Network::TransportSocketFactory& tsf =
+            accepted_socket->connectionInfoProvider().localAddress() ==
+                    socket->connectionInfoProvider().localAddress()
+                ? server_ssl_socket_factory
+                : server2_ssl_socket_factory;
         server_connection = dispatcher_->createServerConnection(
             std::move(accepted_socket), tsf.createTransportSocket(nullptr), stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);

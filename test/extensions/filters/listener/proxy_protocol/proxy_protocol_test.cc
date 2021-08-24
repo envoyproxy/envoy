@@ -1421,7 +1421,8 @@ TEST_P(WildcardProxyProtocolTest, Basic) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->asString(), "1.2.3.4:65535");
+  EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->asString(),
+            "1.2.3.4:65535");
   EXPECT_EQ(server_connection_->connectionInfoProvider().localAddress()->asString(),
             "254.254.254.254:1234");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
@@ -1435,8 +1436,10 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->asString(), "[1:2:3::4]:65535");
-  EXPECT_EQ(server_connection_->connectionInfoProvider().localAddress()->asString(), "[5:6::7:8]:1234");
+  EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->asString(),
+            "[1:2:3::4]:65535");
+  EXPECT_EQ(server_connection_->connectionInfoProvider().localAddress()->asString(),
+            "[5:6::7:8]:1234");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();

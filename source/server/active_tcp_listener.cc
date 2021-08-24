@@ -135,8 +135,9 @@ void ActiveTcpListener::newActiveConnection(const Network::FilterChain& filter_c
                                             dispatcher().timeSource(), std::move(stream_info));
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
-    ENVOY_CONN_LOG(debug, "new connection from {}", *active_connection->connection_,
-                   active_connection->connection_->connectionInfoProvider().remoteAddress()->asString());
+    ENVOY_CONN_LOG(
+        debug, "new connection from {}", *active_connection->connection_,
+        active_connection->connection_->connectionInfoProvider().remoteAddress()->asString());
     active_connection->connection_->addConnectionCallbacks(*active_connection);
     LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
   }

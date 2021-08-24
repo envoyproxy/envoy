@@ -331,9 +331,11 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   // Add the callback to the admin_filter list of callbacks
   admin_stream.addOnDestroyCallback(std::move(on_destroy_callback));
 
-  ENVOY_LOG(
-      debug, "started sending data to hystrix dashboard on port {}",
-      stream_decoder_filter_callbacks.connection()->connectionInfoProvider().remoteAddress()->asString());
+  ENVOY_LOG(debug, "started sending data to hystrix dashboard on port {}",
+            stream_decoder_filter_callbacks.connection()
+                ->connectionInfoProvider()
+                .remoteAddress()
+                ->asString());
   return Http::Code::OK;
 }
 

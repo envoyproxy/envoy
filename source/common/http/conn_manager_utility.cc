@@ -135,7 +135,8 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
       final_remote_address = connection.connectionInfoProvider().remoteAddress();
     }
     if (!config.skipXffAppend()) {
-      if (Network::Utility::isLoopbackAddress(*connection.connectionInfoProvider().remoteAddress())) {
+      if (Network::Utility::isLoopbackAddress(
+              *connection.connectionInfoProvider().remoteAddress())) {
         Utility::appendXff(request_headers, config.localAddress());
       } else {
         Utility::appendXff(request_headers, *connection.connectionInfoProvider().remoteAddress());

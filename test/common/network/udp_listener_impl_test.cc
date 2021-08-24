@@ -473,8 +473,8 @@ TEST_P(UdpListenerImplTest, SendDataError) {
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
   // send data to itself
-  UdpSendData send_data{send_to_addr_->ip(), *server_socket_->connectionInfoProvider().localAddress(),
-                        *buffer};
+  UdpSendData send_data{send_to_addr_->ip(),
+                        *server_socket_->connectionInfoProvider().localAddress(), *buffer};
 
   // Inject mocked OsSysCalls implementation to mock a write failure.
   Api::MockOsSysCalls os_sys_calls;

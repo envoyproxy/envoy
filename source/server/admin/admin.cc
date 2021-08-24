@@ -131,7 +131,8 @@ void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&
                  "listen() failed on admin listener");
   socket_factory_ = std::make_unique<AdminListenSocketFactory>(socket_);
   listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
-  ENVOY_LOG(info, "admin address: {}", socket().connectionInfoProvider().localAddress()->asString());
+  ENVOY_LOG(info, "admin address: {}",
+            socket().connectionInfoProvider().localAddress()->asString());
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
     if (!address_out_file) {

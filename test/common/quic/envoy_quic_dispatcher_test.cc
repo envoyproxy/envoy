@@ -117,7 +117,8 @@ public:
             quic::test::ConstructReceivedPacket(*encrypted_packet, clock.Now()));
 
     envoy_quic_dispatcher_.ProcessPacket(
-        envoyIpAddressToQuicSocketAddress(listen_socket_->connectionInfoProvider().localAddress()->ip()),
+        envoyIpAddressToQuicSocketAddress(
+            listen_socket_->connectionInfoProvider().localAddress()->ip()),
         peer_addr, *received_packet);
   }
 

@@ -159,7 +159,8 @@ const ConnectionInfoProvider& HappyEyeballsConnectionImpl::connectionInfoProvide
   return connections_[0]->connectionInfoProvider();
 }
 
-ConnectionInfoProviderSharedPtr HappyEyeballsConnectionImpl::connectionInfoProviderSharedPtr() const {
+ConnectionInfoProviderSharedPtr
+HappyEyeballsConnectionImpl::connectionInfoProviderSharedPtr() const {
   return connections_[0]->connectionInfoProviderSharedPtr();
 }
 

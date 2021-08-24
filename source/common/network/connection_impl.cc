@@ -878,7 +878,8 @@ ClientConnectionImpl::ClientConnectionImpl(
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this,
                  socket_->connectionInfoProvider().remoteAddress()->asString());
-  const Api::SysCallIntResult result = socket_->connect(socket_->connectionInfoProvider().remoteAddress());
+  const Api::SysCallIntResult result =
+      socket_->connect(socket_->connectionInfoProvider().remoteAddress());
   if (result.return_value_ == 0) {
     // write will become ready.
     ASSERT(connecting_);

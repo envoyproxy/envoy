@@ -2824,9 +2824,10 @@ public:
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
-    client_connection_ = dispatcher_->createClientConnection(
-        socket_->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
-        Network::Test::createRawBufferSocket(), nullptr);
+    client_connection_ =
+        dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
+                                            Network::Address::InstanceConstSharedPtr(),
+                                            Network::Test::createRawBufferSocket(), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
 

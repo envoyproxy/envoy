@@ -95,10 +95,10 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
     Network::ConnectionSocketPtr&& connection_socket) {
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
       std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle()));
-  quic::QuicSocketAddress self_address =
-      envoyIpAddressToQuicSocketAddress(connection_socket->connectionInfoProvider().localAddress()->ip());
-  quic::QuicSocketAddress peer_address =
-      envoyIpAddressToQuicSocketAddress(connection_socket->connectionInfoProvider().remoteAddress()->ip());
+  quic::QuicSocketAddress self_address = envoyIpAddressToQuicSocketAddress(
+      connection_socket->connectionInfoProvider().localAddress()->ip());
+  quic::QuicSocketAddress peer_address = envoyIpAddressToQuicSocketAddress(
+      connection_socket->connectionInfoProvider().remoteAddress()->ip());
 
   // The old socket is closed in this call.
   setConnectionSocket(std::move(connection_socket));
@@ -124,8 +124,9 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
   // right default for QUIC. Determine whether this should be configurable or not.
   if (connected() && (events & Event::FileReadyType::Read)) {
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
-        connectionSocket()->ioHandle(), *connectionSocket()->connectionInfoProvider().localAddress(),
-        *this, dispatcher_.timeSource(), true, packets_dropped_);
+        connectionSocket()->ioHandle(),
+        *connectionSocket()->connectionInfoProvider().localAddress(), *this,
+        dispatcher_.timeSource(), true, packets_dropped_);
     if (err == nullptr) {
       connectionSocket()->ioHandle().activateFileEvents(Event::FileReadyType::Read);
       return;

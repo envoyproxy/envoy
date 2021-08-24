@@ -136,9 +136,10 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
 
   auto initiate_connections = [&](const int count) {
     for (int i = 0; i < count; ++i) {
-      client_connections.emplace_back(dispatcher_->createClientConnection(
-          socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
-          Network::Test::createRawBufferSocket(), nullptr));
+      client_connections.emplace_back(
+          dispatcher_->createClientConnection(socket->connectionInfoProvider().localAddress(),
+                                              Network::Address::InstanceConstSharedPtr(),
+                                              Network::Test::createRawBufferSocket(), nullptr));
       client_connections.back()->connect();
     }
   };
@@ -189,9 +190,9 @@ TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket,
                                         listener_callbacks, true);
 
-  auto local_dst_address =
-      Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(version_),
-                                           socket->connectionInfoProvider().localAddress()->ip()->port());
+  auto local_dst_address = Network::Utility::getAddressWithPort(
+      *Network::Test::getCanonicalLoopbackAddress(version_),
+      socket->connectionInfoProvider().localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       local_dst_address, Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr);
@@ -233,12 +234,12 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket,
                                         listener_callbacks, true);
 
-  auto listener_address =
-      Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(version_),
-                                           socket->connectionInfoProvider().localAddress()->ip()->port());
-  auto local_dst_address =
-      Network::Utility::getAddressWithPort(*Network::Utility::getCanonicalIpv4LoopbackAddress(),
-                                           socket->connectionInfoProvider().localAddress()->ip()->port());
+  auto listener_address = Network::Utility::getAddressWithPort(
+      *Network::Test::getCanonicalLoopbackAddress(version_),
+      socket->connectionInfoProvider().localAddress()->ip()->port());
+  auto local_dst_address = Network::Utility::getAddressWithPort(
+      *Network::Utility::getCanonicalIpv4LoopbackAddress(),
+      socket->connectionInfoProvider().localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       local_dst_address, Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr);
