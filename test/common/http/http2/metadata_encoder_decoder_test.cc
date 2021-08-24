@@ -182,30 +182,17 @@ TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
   cleanUp();
 }
 
-TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimitIncremental) {
-  MetadataMap metadata_map = {
-      {"header_key1", std::string(1024 * 1024 + 1, 'a')},
-  };
-  MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
-  MetadataMapVector metadata_map_vector;
-  metadata_map_vector.push_back(std::move(metadata_map_ptr));
-
-  // Verifies the encoding/decoding result in decoder's callback functions.
-  initialize([this, &metadata_map_vector](MetadataMapPtr&& metadata_map_ptr) -> void {
-    this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
-  });
-
-  // metadata_map exceeds size limit.
-  EXPECT_LOG_CONTAINS("error", "exceeds the max bound.",
-                      EXPECT_FALSE(encoder_.createPayload(metadata_map_vector)));
+TEST_F(MetadataEncoderDecoderTest, TestTotalPayloadSize) {
+  initialize([](MetadataMapPtr&&) {});
 
   std::string payload = std::string(1024, 'a');
-  for (int i = 0; i < 1024; ++i) {
-    EXPECT_TRUE(
-        decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()), payload.size()));
-  }
-  EXPECT_FALSE(
-      decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()), 1));
+  EXPECT_EQ(0, decoder_->totalPayloadSize());
+  EXPECT_TRUE(decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()),
+                                        payload.size()));
+  EXPECT_EQ(payload.size(), decoder_->totalPayloadSize());
+  EXPECT_TRUE(decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()),
+                                        payload.size()));
+  EXPECT_EQ(2 * payload.size(), decoder_->totalPayloadSize());
   cleanUp();
 }
 
