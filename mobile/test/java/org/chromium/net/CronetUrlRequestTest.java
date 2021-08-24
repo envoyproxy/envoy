@@ -54,7 +54,6 @@ import org.robolectric.RobolectricTestRunner;
 /**
  * Test functionality of CronetUrlRequest.
  */
-@Ignore("ignoring due to https://github.com/envoyproxy/envoy-mobile/pull/1710")
 @RunWith(RobolectricTestRunner.class)
 public class CronetUrlRequestTest {
 
@@ -639,6 +638,7 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1558")
   public void testResponseHeadersList() throws Exception {
     TestUrlRequestCallback callback = startAndWaitForComplete(NativeTestServer.getSuccessURL());
     assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
