@@ -254,8 +254,9 @@ bool maybeAdjustForIpv6(absl::string_view absolute_url, uint64_t& offset, uint64
   return true;
 }
 
-void forEachCookie(const HeaderMap& headers, const LowerCaseString& cookie_header,
-                   const std::function<bool (const absl::string_view&, const absl::string_view&)> cookie_consumer) {
+void forEachCookie(
+    const HeaderMap& headers, const LowerCaseString& cookie_header,
+    const std::function<bool(const absl::string_view&, const absl::string_view&)> cookie_consumer) {
   const Http::HeaderMap::GetResult cookie_headers = headers.get(cookie_header);
 
   for (size_t index = 0; index < cookie_headers.size(); index++) {
@@ -293,15 +294,16 @@ std::string parseCookie(const HeaderMap& headers, const std::string& key,
   std::string value;
 
   // Iterate over each cookie & return if its value is not empty.
-  forEachCookie(headers, cookie, [&key, &value] (const absl::string_view& k, const absl::string_view& v) -> bool {
-    if (key == k && !v.empty()) {
-      value = std::string{v};
-      return false;
-    }
+  forEachCookie(headers, cookie,
+                [&key, &value](const absl::string_view& k, const absl::string_view& v) -> bool {
+                  if (key == k && !v.empty()) {
+                    value = std::string{v};
+                    return false;
+                  }
 
-    // continue iterating until a cookie that matches `key` is found.
-    return true;
-  });
+                  // continue iterating until a cookie that matches `key` is found.
+                  return true;
+                });
 
   return value;
 }
@@ -309,12 +311,13 @@ std::string parseCookie(const HeaderMap& headers, const std::string& key,
 std::map<std::string, std::string> Utility::parseCookies(const RequestHeaderMap& headers) {
   std::map<std::string, std::string> cookies;
 
-  forEachCookie(headers, Http::Headers::get().Cookie, [&cookies] (const absl::string_view& k, const absl::string_view& v) -> bool {
-    cookies.emplace(std::string{k}, std::string{v});
+  forEachCookie(headers, Http::Headers::get().Cookie,
+                [&cookies](const absl::string_view& k, const absl::string_view& v) -> bool {
+                  cookies.emplace(std::string{k}, std::string{v});
 
-    // continue iterating until all cookies are processed.
-    return true;
-  });
+                  // continue iterating until all cookies are processed.
+                  return true;
+                });
 
   return cookies;
 }
