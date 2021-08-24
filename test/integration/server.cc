@@ -106,8 +106,8 @@ void IntegrationTestServer::start(
   thread_ = api_.threadFactory().createThread([version, deterministic_value, process_object,
                                                validator_config, concurrency, drain_time,
                                                drain_strategy, watermark_factory, this]() -> void {
-    threadRoutine(version, deterministic_value, process_object, validator_config, concurrency, drain_time,
-                  drain_strategy, watermark_factory);
+    threadRoutine(version, deterministic_value, process_object, validator_config, concurrency,
+                  drain_time, drain_strategy, watermark_factory);
   });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
