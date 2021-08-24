@@ -202,4 +202,4 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /contrib/squash/ @yuval-k @alyssawilk
 /contrib/kafka/ @mattklein123 @adamkotwasinski
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui @lizan
-/contrib/cryptomb/ @rojkov
+/contrib/cryptomb/ @rojkov @ipuustin
