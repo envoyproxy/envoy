@@ -6916,7 +6916,11 @@ virtual_hosts:
           headers:
           - name: :path
             string_match:
-              exact: "/foo"
+              prefix: "/foo"
+          query_parameters:
+            - name: param
+              string_match:
+                exact: test
           grpc: {}
         route:
           cluster: bar_cluster
@@ -6944,7 +6948,7 @@ virtual_hosts:
                 featureEnabled("bogus_key",
                                testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 41))
         .WillRepeatedly(Return(true));
-    auto headers = genHeaders("www.lyft.com", "/foo", "GET");
+    auto headers = genHeaders("www.lyft.com", "/foo?param=test", "GET");
     headers.addCopy("content-type", "application/grpc");
     EXPECT_EQ("bar_cluster", config.route(headers, stream_info, 41)->routeEntry()->clusterName());
   }
@@ -6958,7 +6962,7 @@ virtual_hosts:
                 featureEnabled("bogus_key",
                                testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 41))
         .WillRepeatedly(Return(true));
-    auto headers = genHeaders("www.lyft.com", "/foo", "GET");
+    auto headers = genHeaders("www.lyft.com", "/foo?param=test", "GET");
     EXPECT_EQ("foo_cluster", config.route(headers, stream_info, 41)->routeEntry()->clusterName());
   }
   // runtime_fraction isn't matched.
@@ -6971,7 +6975,7 @@ virtual_hosts:
                 featureEnabled("bogus_key",
                                testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 43))
         .WillRepeatedly(Return(false));
-    auto headers = genHeaders("www.lyft.com", "/foo", "GET");
+    auto headers = genHeaders("www.lyft.com", "/foo?param=test", "GET");
     headers.addCopy("content-type", "application/grpc");
     EXPECT_EQ("foo_cluster", config.route(headers, stream_info, 43)->routeEntry()->clusterName());
   }
@@ -6985,7 +6989,7 @@ virtual_hosts:
                 featureEnabled("bogus_key",
                                testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 41))
         .WillRepeatedly(Return(true));
-    auto headers = genHeaders("www.lyft.com", "/", "GET");
+    auto headers = genHeaders("www.lyft.com", "/?param=test", "GET");
     headers.addCopy("content-type", "application/grpc");
     EXPECT_EQ("foo_cluster", config.route(headers, stream_info, 41)->routeEntry()->clusterName());
   }
@@ -6999,9 +7003,23 @@ virtual_hosts:
                 featureEnabled("bogus_key",
                                testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 41))
         .WillRepeatedly(Return(true));
-    auto headers = genHeaders("www.lyft.com", "/foo", "GET");
+    auto headers = genHeaders("www.lyft.com", "/foo?param=test", "GET");
     headers.addCopy("content-type", "application/grpc");
     EXPECT_EQ("foo_cluster", config.route(headers, 41)->routeEntry()->clusterName());
+  }
+  // missing query parameter.
+  {
+    Runtime::MockSnapshot snapshot;
+    ON_CALL(factory_context_.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
+
+    EXPECT_CALL(snapshot,
+                featureEnabled("bogus_key",
+                               testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 41))
+        .WillRepeatedly(Return(true));
+    auto headers = genHeaders("www.lyft.com", "/foo", "GET");
+    headers.addCopy("content-type", "application/grpc");
+    EXPECT_EQ("foo_cluster", config.route(headers, stream_info, 41)->routeEntry()->clusterName());
   }
 }
 
