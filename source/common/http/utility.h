@@ -258,9 +258,9 @@ std::string parseCookieValue(const HeaderMap& headers, const std::string& key);
 /**
  * Parse cookies from header into a map.
  * @param headers supplies the headers to get cookies from.
- * @return std::map cookie map.
+ * @return absl::flat_hash_map cookie map.
  **/
-std::map<std::string, std::string> parseCookies(const RequestHeaderMap& headers);
+absl::flat_hash_map<std::string, std::string> parseCookies(const RequestHeaderMap& headers);
 
 /**
  * Parse a particular value out of a set-cookie

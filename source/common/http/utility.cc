@@ -308,8 +308,8 @@ std::string parseCookie(const HeaderMap& headers, const std::string& key,
   return value;
 }
 
-std::map<std::string, std::string> Utility::parseCookies(const RequestHeaderMap& headers) {
-  std::map<std::string, std::string> cookies;
+absl::flat_hash_map<std::string, std::string> Utility::parseCookies(const RequestHeaderMap& headers) {
+  absl::flat_hash_map<std::string, std::string> cookies;
 
   forEachCookie(headers, Http::Headers::get().Cookie,
                 [&cookies](absl::string_view k, absl::string_view v) -> bool {
