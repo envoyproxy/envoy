@@ -11,16 +11,6 @@ envoy_py_library("tools.base.abstract")
 envoy_py_library(
     "tools.base.checker",
     deps = [
-        ":runner",
-    ],
-)
-
-envoy_py_library(
-    "tools.base.runner",
-    deps = [
-        requirement("colorama"),
-        requirement("coloredlogs"),
-        requirement("frozendict"),
-        requirement("verboselogs"),
+        requirement("envoy.base.runner"),
     ],
 )

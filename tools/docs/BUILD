@@ -37,7 +37,7 @@ py_binary(
 envoy_py_binary(
     name = "tools.docs.sphinx_runner",
     deps = [
-        "//tools/base:runner",
+        base_requirement("envoy.base.runner"),
         base_requirement("envoy.base.utils"),
         requirement("alabaster"),
         requirement("Babel"),

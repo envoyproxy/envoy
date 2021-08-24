@@ -3,9 +3,9 @@ from unittest.mock import MagicMock, PropertyMock
 
 import pytest
 
+from envoy.base import runner
 from envoy.gpg import identity
 
-from tools.base import runner
 from tools.distribution import sign
 
 

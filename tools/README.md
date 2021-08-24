@@ -308,7 +308,7 @@ breakpoint()
 
 This will drop you into the Python debugger (`pdb`) at the breakpoint.
 
-### Using the `tools.base.runner.Runner` class
+### Using the `envoy.base.runner.Runner` class
 
 A base class for writing tools that need to parse command line arguments has been provided.
 
@@ -320,7 +320,7 @@ Edit `tools/sometools/BUILD` and change the `tools.sometools.mytool` target to t
 envoy_py_binary(
     name = "tools.sometools.mytool",
     deps = [
-        "//tools/base:runner",
+        requirement("envoy.base.runner"),
         requirement("requests"),
         requirement("pyyaml"),
     ],
@@ -337,7 +337,7 @@ import sys
 import requests
 import yaml
 
-from tools.base.runner import Runner
+from envoy.base.runner import Runner
 
 
 class Mytool(Runner):

@@ -31,10 +31,8 @@ from typing import Iterator, Optional, Tuple, Type, Union
 
 import verboselogs  # type:ignore
 
-from envoy.base import utils
+from envoy.base import runner, utils
 from envoy.gpg import identity
-
-from tools.base import runner
 
 
 # Replacable `__` maintainer/gpg config - python interpolation doesnt work easily

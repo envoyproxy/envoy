@@ -26,8 +26,8 @@ envoy_py_binary(
         requirement("pytest-asyncio"),
         requirement("pytest-cov"),
         requirement("pytest-patches"),
+        base_requirement("envoy.base.runner"),
         base_requirement("envoy.base.utils"),
-        "//tools/base:runner",
     ],
 )
 
@@ -36,10 +36,10 @@ envoy_py_binary(
     data = [
         ":plugin",
         "//:.coveragerc",
-        "//tools/base:runner",
     ],
     deps = [
         requirement("coverage"),
+        base_requirement("envoy.base.runner"),
         base_requirement("envoy.base.utils"),
     ],
 )

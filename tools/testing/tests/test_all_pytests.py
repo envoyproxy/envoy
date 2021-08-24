@@ -3,7 +3,8 @@ from unittest.mock import patch, MagicMock, PropertyMock
 
 import pytest
 
-from tools.base.runner import BazelRunError
+from envoy.base.runner import BazelRunError
+
 from tools.testing import all_pytests
 
 

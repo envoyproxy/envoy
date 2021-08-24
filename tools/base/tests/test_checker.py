@@ -3,9 +3,10 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
+from envoy.base.runner import BazelRunner
+
 from tools.base.checker import (
     AsyncChecker, BaseChecker, BazelChecker, Checker, CheckerSummary)
-from tools.base.runner import BazelRunner
 
 
 class DummyChecker(Checker):
