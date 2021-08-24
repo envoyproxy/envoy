@@ -107,6 +107,12 @@ std::string encodeResourceList(const Protobuf::RepeatedPtrField<std::string>& re
 void setBearerToken(Http::RequestHeaderMap& headers, const std::string& token) {
   headers.setInline(authorization_handle.handle(), absl::StrCat("Bearer ", token));
 }
+
+std::string findValue(const absl::flat_hash_map<std::string, std::string>& map,
+                      const std::string& key) {
+  const auto value_it = map.find(key);
+  return value_it != map.end() ? value_it->second : EMPTY_STRING;
+}
 } // namespace
 
 FilterConfig::FilterConfig(
@@ -140,15 +146,9 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
                                       const std::string& secret) {
   const auto& cookies = Http::Utility::parseCookies(headers);
 
-  const auto expires_it = cookies.find("OauthExpires");
-  expires_ = expires_it != cookies.end() ? expires_it->second : EMPTY_STRING;
-
-  const auto token_it = cookies.find("BearerToken");
-  token_ = token_it != cookies.end() ? token_it->second : EMPTY_STRING;
-
-  const auto hmac_it = cookies.find("OauthHMAC");
-  hmac_ = hmac_it != cookies.end() ? hmac_it->second : EMPTY_STRING;
-
+  expires_ = findValue(cookies, "OauthExpires");
+  token_ = findValue(cookies, "BearerToken");
+  hmac_ = findValue(cookies, "OauthHMAC");
   host_ = headers.Host()->value().getStringView();
 
   secret_.assign(secret.begin(), secret.end());
