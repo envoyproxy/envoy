@@ -9,13 +9,6 @@ envoy_package()
 envoy_py_library("tools.base.abstract")
 
 envoy_py_library(
-    "tools.base.aio",
-    deps = [
-        requirement("aio.functional"),
-    ],
-)
-
-envoy_py_library(
     "tools.base.checker",
     deps = [
         ":runner",

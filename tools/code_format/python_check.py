@@ -24,8 +24,9 @@ from flake8.main.application import Application as Flake8Application  # type:ign
 import yapf  # type:ignore
 
 from aio.subprocess import async_subprocess
+from aio.tasks import concurrent
 
-from tools.base import aio, checker, utils
+from tools.base import checker, utils
 
 FLAKE8_CONFIG = '.flake8'
 YAPF_CONFIG = '.style.yapf'
@@ -93,7 +94,7 @@ class PythonChecker(checker.AsyncChecker):
 
     async def check_yapf(self) -> None:
         """Run flake8 on files and/or repo"""
-        futures = aio.concurrent(self.yapf_format(python_file) for python_file in self.yapf_files)
+        futures = concurrent(self.yapf_format(python_file) for python_file in self.yapf_files)
 
         async for (python_file, (reformatted, encoding, changed)) in futures:
             self.yapf_result(python_file, reformatted, changed)

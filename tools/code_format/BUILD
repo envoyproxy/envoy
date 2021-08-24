@@ -15,11 +15,10 @@ exports_files([
 envoy_py_binary(
     name = "tools.code_format.python_check",
     deps = [
-        "//tools/base:aio",
         "//tools/base:checker",
         "//tools/base:utils",
         requirement("aio.subprocess"),
-        requirement("aio.task"),
+        requirement("aio.tasks"),
         requirement("flake8"),
         requirement("pep8-naming"),
         requirement("yapf"),

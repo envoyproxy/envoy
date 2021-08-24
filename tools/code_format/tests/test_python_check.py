@@ -192,7 +192,7 @@ def test_python_check_recurse():
 async def test_python_check_yapf(patches):
     checker = python_check.PythonChecker("path1", "path2", "path3")
     patched = patches(
-        "aio",
+        "concurrent",
         ("PythonChecker.yapf_format", dict(new_callable=MagicMock)),
         "PythonChecker.yapf_result",
         ("PythonChecker.yapf_files", dict(new_callable=PropertyMock)),
@@ -204,9 +204,9 @@ async def test_python_check_yapf(patches):
         for i, format_result in enumerate(iters):
             yield (format_result, (f"REFORMAT{i}", f"ENCODING{i}", f"CHANGED{i}"))
 
-    with patched as (m_aio, m_yapf_format, m_yapf_result, m_yapf_files):
+    with patched as (m_concurrent, m_yapf_format, m_yapf_result, m_yapf_files):
         m_yapf_files.return_value = files
-        m_aio.concurrent.side_effect = concurrent
+        m_concurrent.side_effect = concurrent
         assert not await checker.check_yapf()
 
     assert (
