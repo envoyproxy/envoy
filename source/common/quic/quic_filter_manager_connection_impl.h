@@ -68,10 +68,10 @@ public:
   void readDisable(bool /*disable*/) override { ASSERT(false); }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
   bool readEnabled() const override { return true; }
-  const Network::SocketAddressSetter& addressProvider() const override {
+  const Network::ConnectionInfoSetter& addressProvider() const override {
     return network_connection_->connectionSocket()->addressProvider();
   }
-  Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+  Network::ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
     return network_connection_->connectionSocket()->addressProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
