@@ -17,7 +17,7 @@ import yaml
 #   https://en.wikipedia.org/wiki/Tar_(computing)#Suffixes_for_compressed_files
 # not all are listed here, and some extensions may require additional software
 # to handle. This list can be updated as required
-TAR_EXTS: Set[str] = {"tar", "tar.gz", "xz", "tar.xz", "tar.bz2"}
+TAR_EXTS: Set[str] = {"tar", "tar.gz", "tar.xz", "tar.bz2"}
 
 
 class ExtractError(Exception):
