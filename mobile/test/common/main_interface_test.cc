@@ -579,7 +579,7 @@ TEST(EngineTest, EventTrackerRegistersAPI) {
   EXPECT_EQ(event_tracker.track, registered_event_tracker->track);
   EXPECT_EQ(event_tracker.context, registered_event_tracker->context);
 
-  event_tracker.track(Envoy::Bridge::makeEnvoyMap({{"foo", "bar"}}),
+  event_tracker.track(Bridge::Utility::makeEnvoyMap({{"foo", "bar"}}),
                       registered_event_tracker->context);
 
   ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));

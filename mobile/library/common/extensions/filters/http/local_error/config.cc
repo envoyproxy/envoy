@@ -12,7 +12,7 @@ Http::FilterFactoryCb LocalErrorFilterFactory::createFilterFactoryFromProtoTyped
     Server::Configuration::FactoryContext&) {
 
   return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamEncoderFilter(std::make_shared<LocalErrorFilter>());
+    callbacks.addStreamFilter(std::make_shared<LocalErrorFilter>());
   };
 }
 

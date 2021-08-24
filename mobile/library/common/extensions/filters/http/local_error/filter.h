@@ -15,19 +15,11 @@ namespace LocalError {
 /**
  * Filter to assert expectations on HTTP requests.
  */
-class LocalErrorFilter final : public Http::PassThroughEncoderFilter,
+class LocalErrorFilter final : public Http::PassThroughFilter,
                                public Logger::Loggable<Logger::Id::filter> {
 public:
-  LocalErrorFilter();
-
-  // StreamEncoderFilter
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
-                                          bool end_stream) override;
-  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
-
-private:
-  bool httpError_{};
-  Http::ResponseHeaderMap* headers_{};
+  // StreamFilterBase
+  Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override;
 };
 
 } // namespace LocalError

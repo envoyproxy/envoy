@@ -67,6 +67,7 @@ public:
 
   // StreamFilterBase
   void onDestroy() override;
+  Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override;
 
   // StreamDecoderFilter
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
