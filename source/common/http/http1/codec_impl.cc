@@ -847,11 +847,18 @@ void ConnectionImpl::dispatchBufferedBody() {
   }
 }
 
-void ConnectionImpl::onChunkHeader(bool is_final_chunk) {
+void ConnectionImpl::onChunkHeader(int content_length) {
+  bool is_final_chunk = (content_length == 0);
+  int content_length_digits = 0;
+  do {
+    content_length_digits++;
+    content_length /= 10;
+  } while (content_length > 0);
+
   StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
   // Count overhead of chunk encoding per chunk.
   if (bytes_meterer) {
-    bytes_meterer->addBodyBytesReceived(is_final_chunk ? 3 : 4);
+    bytes_meterer->addBodyBytesReceived(is_final_chunk ? 3 : 4 + content_length_digits);
   }
   if (is_final_chunk) {
     // Dispatch body before parsing trailers, so body ends up dispatched even if an error is found

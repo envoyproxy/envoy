@@ -2816,7 +2816,7 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCount) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_BODY_BYTES_SENT% %UPSTREAM_BODY_BYTES_RECEIVED%\n");
   testRouterRequestAndResponseWithBody(100, 100, false);
-  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 371, 158, 106, 107, 277, 122, 100,
+  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 371, 158, 106, 110, 277, 122, 100,
                                          100);
 }
 
@@ -2832,7 +2832,7 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCount) {
 
   testTrailers(10, 20, true, true);
 
-  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 248, 120, 15, 27, 172, 81, 19, 29);
+  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 248, 120, 15, 29, 172, 81, 19, 29);
 }
 
 TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireBytesCount) {
@@ -2884,7 +2884,7 @@ TEST_P(ProtocolIntegrationTest, DownstreamResetWireBytesCount) {
 
   testDownstreamResetBeforeResponseComplete();
 
-  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 210, 566, 0, 516, 132, 534, 9, 521);
+  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 210, 566, 0, 519, 132, 534, 9, 521);
 }
 
 } // namespace Envoy
