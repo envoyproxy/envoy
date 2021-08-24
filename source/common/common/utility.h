@@ -11,9 +11,9 @@
 #include "envoy/common/interval_set.h"
 #include "envoy/common/time.h"
 
-#include "common/common/assert.h"
-#include "common/common/hash.h"
-#include "common/common/non_copyable.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/non_copyable.h"
 
 #include "absl/strings/string_view.h"
 
@@ -177,6 +177,12 @@ public:
    * @return uint64_t the number of milliseconds since the epoch.
    */
   static uint64_t nowToMilliseconds(TimeSource& time_source);
+
+  /**
+   * @param time_source time keeping source.
+   * @return uint64_t the number os seconds since the epoch.
+   */
+  static uint64_t nowToSeconds(TimeSource& time_source);
 };
 
 /**

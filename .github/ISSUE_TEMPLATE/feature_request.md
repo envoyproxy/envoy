@@ -10,7 +10,7 @@ assignees: ''
 *Title*: *One line description*
 
 *Description*:
->Describe the the desired behavior, what scenario it enables and how it
+>Describe the desired behavior, what scenario it enables and how it
 would be used.
 
 [optional *Relevant Links*:]

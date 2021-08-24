@@ -419,7 +419,7 @@ private:
   }
 
   void insertReplacement(const clang::tooling::Replacement& replacement) {
-    llvm::Error error = replacements_[replacement.getFilePath()].add(replacement);
+    llvm::Error error = replacements_[std::string(replacement.getFilePath())].add(replacement);
     if (error) {
       std::cerr << "  Replacement insertion error: " << llvm::toString(std::move(error))
                 << std::endl;
@@ -447,15 +447,15 @@ private:
 
   std::string getSourceText(clang::SourceLocation begin_loc, int size,
                             const clang::SourceManager& source_manager) {
-    return clang::Lexer::getSourceText(
+    return std::string(clang::Lexer::getSourceText(
         {clang::SourceRange(begin_loc, begin_loc.getLocWithOffset(size)), false}, source_manager,
-        lexer_lopt_, 0);
+        lexer_lopt_, 0));
   }
 
   std::string getSourceText(clang::SourceRange source_range,
                             const clang::SourceManager& source_manager) {
-    return clang::Lexer::getSourceText(clang::CharSourceRange::getTokenRange(source_range),
-                                       source_manager, lexer_lopt_, 0);
+    return std::string(clang::Lexer::getSourceText(
+        clang::CharSourceRange::getTokenRange(source_range), source_manager, lexer_lopt_, 0));
   }
 
   void addNamedspaceQualifiedTypeReplacement() {}

@@ -94,8 +94,8 @@ following are the command line options that Envoy supports.
 .. option:: --component-log-level <string>
 
   *(optional)* The comma separated list of logging level per component. Non developers should generally
-  never set this option. For example, if you want `upstream` component to run at `debug` level and
-  `connection` component to run at `trace` level, you should pass ``upstream:debug,connection:trace`` to
+  never set this option. For example, if you want ``upstream`` component to run at ``debug`` level and
+  ``connection`` component to run at ``trace`` level, you should pass ``upstream:debug,connection:trace`` to
   this flag. See ``ALL_LOGGER_IDS`` in :repo:`/source/common/common/logger.h` for a list of components.
 
 .. option:: --cpuset-threads
@@ -124,6 +124,7 @@ following are the command line options that Envoy supports.
 
    :%v:	The actual message to log ("some user text")
    :%_:	The actual message to log, but with escaped newlines (from (if using ``%v``) "some user text\nbelow", to "some user text\\nbelow")
+   :%j:	The actual message to log as JSON escaped string (https://tools.ietf.org/html/rfc7159#page-8).
    :%t:	Thread id ("1232")
    :%P:	Process id ("3456")
    :%n:	Logger's name ("filter")
@@ -177,10 +178,10 @@ following are the command line options that Envoy supports.
 .. option:: --enable-fine-grain-logging
 
   *(optional)* Enables fine-grain logger with file level log control and runtime update at administration
-  interface. If enabled, main log macros including `ENVOY_LOG`, `ENVOY_CONN_LOG`, `ENVOY_STREAM_LOG` and
-  `ENVOY_FLUSH_LOG` will use a per-file logger, and the usage doesn't need `Envoy::Logger::Loggable` any
-  more. The administration interface usage is similar. Please see `Administration interface
-  <https://www.envoyproxy.io/docs/envoy/latest/operations/admin>`_ for more detail.
+  interface. If enabled, main log macros including ``ENVOY_LOG``, ``ENVOY_CONN_LOG``, ``ENVOY_STREAM_LOG`` and
+  ``ENVOY_FLUSH_LOG`` will use a per-file logger, and the usage doesn't need ``Envoy::Logger::Loggable`` any
+  more. The administration interface usage is similar. Please see :ref:`Administration interface
+  <operations_admin_interface>` for more detail.
 
 .. option:: --socket-path <path string>
 
@@ -350,3 +351,10 @@ following are the command line options that Envoy supports.
   * build mode - either ``RELEASE`` or ``DEBUG``,
 
   * TLS library - either ``BoringSSL`` or ``BoringSSL-FIPS``.
+
+.. option:: --enable-core-dump
+
+  *(optional)* This flag is intended for Linux-based systems and it's a no-op for all other platforms.
+  It enables core dumps by invoking `prctl <https://man7.org/linux/man-pages/man2/prctl.2.html>`_ using the
+  PR_SET_DUMPABLE option. This is useful for container environments when using capabilities, given that when
+  Envoy has more capabilities than its base environment core dumping will be disabled by the kernel.

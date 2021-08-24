@@ -6,11 +6,11 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
-#include "common/config/datasource.h"
-#include "common/config/filesystem_subscription_impl.h"
-#include "common/secret/sds_api.h"
-#include "common/ssl/certificate_validation_context_config_impl.h"
-#include "common/ssl/tls_certificate_config_impl.h"
+#include "source/common/config/datasource.h"
+#include "source/common/config/filesystem_subscription_impl.h"
+#include "source/common/secret/sds_api.h"
+#include "source/common/ssl/certificate_validation_context_config_impl.h"
+#include "source/common/ssl/tls_certificate_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/config/mocks.h"
@@ -20,6 +20,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/secret/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -109,7 +110,8 @@ TEST_F(SdsApiTest, InitManagerInitialised) {
       .WillOnce(Invoke([this, &sds_config_path, &resource_decoder,
                         &stats](const envoy::config::core::v3::ConfigSource&, absl::string_view,
                                 Stats::Scope&, Config::SubscriptionCallbacks& cbs,
-                                Config::OpaqueResourceDecoder&, bool) -> Config::SubscriptionPtr {
+                                Config::OpaqueResourceDecoder&,
+                                const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
         return std::make_unique<Config::FilesystemSubscriptionImpl>(*dispatcher_, sds_config_path,
                                                                     cbs, resource_decoder, stats,
                                                                     validation_visitor_, *api_);
@@ -175,7 +177,8 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
 
-  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret(), nullptr, *api_);
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
+  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret(), ctx, *api_);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -185,8 +188,6 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             tls_config.privateKey());
-
-  handle->remove();
 }
 
 class SdsRotationApiTest : public SdsApiTestBase {
@@ -201,7 +202,7 @@ protected:
   }
 
   Secret::MockSecretCallbacks secret_callback_;
-  Common::CallbackHandle* handle_{};
+  Common::CallbackHandlePtr handle_;
   std::vector<Filesystem::Watcher::OnChangedCb> watch_cbs_;
   Event::MockDispatcher mock_dispatcher_;
   Filesystem::MockInstance filesystem_;
@@ -221,8 +222,6 @@ protected:
     initialize();
     handle_ = sds_api_->addUpdateCallback([this]() { secret_callback_.onAddOrUpdateSecret(); });
   }
-
-  ~TlsCertificateSdsRotationApiTest() override { handle_->remove(); }
 
   void onConfigUpdate(const std::string& cert_value, const std::string& key_value) {
     const std::string yaml = fmt::format(
@@ -291,8 +290,6 @@ protected:
     initialize();
     handle_ = sds_api_->addUpdateCallback([this]() { secret_callback_.onAddOrUpdateSecret(); });
   }
-
-  ~CertificateValidationContextSdsRotationApiTest() override { handle_->remove(); }
 
   void onConfigUpdate(const std::string& trusted_ca_path, const std::string& trusted_ca_value,
                       const std::string& watch_path) {
@@ -577,7 +574,8 @@ TEST_F(SdsApiTest, DeltaUpdateSuccess) {
   initialize();
   subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "");
 
-  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret(), nullptr, *api_);
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
+  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret(), ctx, *api_);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -587,8 +585,6 @@ TEST_F(SdsApiTest, DeltaUpdateSuccess) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             tls_config.privateKey());
-
-  handle->remove();
 }
 
 // Validate that CertificateValidationContextSdsApi updates secrets successfully if
@@ -625,8 +621,6 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
             cvc_config.caCert());
-
-  handle->remove();
 }
 
 class CvcValidationCallback {
@@ -713,9 +707,6 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   // secret contains SPKI list from dynamic CertificateValidationContext.
   EXPECT_EQ(1, cvc_config.verifyCertificateSpkiList().size());
   EXPECT_EQ(dynamic_verify_certificate_spki, cvc_config.verifyCertificateSpkiList()[0]);
-
-  handle->remove();
-  validation_handle->remove();
 }
 
 class GenericSecretValidationCallback {
@@ -774,9 +765,6 @@ generic_secret:
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/aes_128_key";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(secret_path)),
             Config::DataSource::read(generic_secret.secret(), true, *api_));
-
-  handle->remove();
-  validation_handle->remove();
 }
 
 // Validate that SdsApi throws exception if an empty secret is passed to onConfigUpdate().

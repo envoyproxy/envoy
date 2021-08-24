@@ -59,16 +59,13 @@ to binaries, libraries, headers, etc.
 
 # Adding external dependencies to Envoy (Python)
 
-Python dependencies should be added via `pip3` and `rules_python`. The process
+Python dependencies should be added via `pip` and `rules_python`. The process
 is:
 
-1. Define a `pip3_import()` pointing at your target `requirements.txt` in
+1. Define a `pip_install()` pointing at your target `requirements.txt` in
    [`bazel/repositories_extra.bzl`](repositories_extra.bzl)
 
-2. Add a `pip_install()` invocation in
-   [`bazel/dependency_imports.bzl`](dependency_imports.bzl).
-
-3. Add a `requirements("<package name")` in the `BUILD` file that depends on
+2. Add a `requirements("<package name")` in the `BUILD` file that depends on
    this package.
 
 You can use [`tools/config_validation/BUILD`](../tools/config_validation/BUILD) as an example
@@ -91,7 +88,7 @@ The name of the dependency can be found in
 [the repository locations file.](https://github.com/envoyproxy/envoy/blob/main/bazel/repository_locations.bzl)
 The path of the local copy has to be absolute path.
 
-For repositories built by `envoy_cmake_external()` in `bazel/foreign_cc/BUILD`,
+For repositories built by `envoy_cmake()` in `bazel/foreign_cc/BUILD`,
 it is necessary to populate the local copy with some additional Bazel machinery
 to support `--override_repository`:
 1. Place an empty `WORKSPACE` in the root.
@@ -111,6 +108,9 @@ dependencies:
   libevent processing.
 
 * `nghttp2`: set `ENVOY_NGHTTP2_TRACE` in the environment and run at `-l trace`.
+
+* `QUICHE`: set `ENVOY_QUICHE_VERBOSITY=n` in the environment to display
+  verbose logs up to level `n`.
 
 # Distdir - prefetching dependencies
 

@@ -1,4 +1,4 @@
-#include "common/upstream/outlier_detection_impl.h"
+#include "source/common/upstream/outlier_detection_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -12,12 +12,12 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/http/codes.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/codes.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -250,8 +250,11 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
       enforcing_local_origin_success_rate_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_local_origin_success_rate,
                                           DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE))),
-      max_ejection_time_ms_(static_cast<uint64_t>(
-          PROTOBUF_GET_MS_OR_DEFAULT(config, max_ejection_time, DEFAULT_MAX_EJECTION_TIME_MS))) {}
+      // If max_ejection_time was not specified in the config, apply the default or
+      // base_ejection_time whatever is larger.
+      max_ejection_time_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(
+          config, max_ejection_time,
+          std::max(DEFAULT_MAX_EJECTION_TIME_MS, base_ejection_time_ms_)))) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::config::cluster::v3::OutlierDetection& config,
@@ -299,7 +302,7 @@ void DetectorImpl::initialize(const Cluster& cluster) {
       addHostMonitor(host);
     }
   }
-  cluster.prioritySet().addMemberUpdateCb(
+  member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
       [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         for (const HostSharedPtr& host : hosts_added) {
           addHostMonitor(host);

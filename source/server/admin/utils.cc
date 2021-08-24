@@ -1,7 +1,7 @@
-#include "server/admin/utils.h"
+#include "source/server/admin/utils.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/http/headers.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/http/headers.h"
 
 namespace Envoy {
 namespace Server {
@@ -44,9 +44,9 @@ bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
   auto p = params.find("filter");
   if (p != params.end()) {
     const std::string& pattern = p->second;
-    try {
-      regex = std::regex(pattern);
-    } catch (std::regex_error& error) {
+    TRY_ASSERT_MAIN_THREAD { regex = std::regex(pattern); }
+    END_TRY
+    catch (std::regex_error& error) {
       // Include the offending pattern in the log, but not the error message.
       response.add(fmt::format("Invalid regex: \"{}\"\n", error.what()));
       ENVOY_LOG_MISC(error, "admin: Invalid regex: \"{}\": {}", error.what(), pattern);

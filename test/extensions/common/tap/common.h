@@ -1,8 +1,9 @@
+#pragma once
+
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/common/tap/tap.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/common/tap/tap.h"
 
 #include "test/test_common/utility.h"
 

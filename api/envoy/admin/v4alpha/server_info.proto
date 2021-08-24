@@ -58,7 +58,7 @@ message ServerInfo {
   config.core.v4alpha.Node node = 7;
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v3.CommandLineOptions";
 
@@ -188,4 +188,7 @@ message CommandLineOptions {
 
   // See :option:`--socket-mode` for details.
   uint32 socket_mode = 36;
+
+  // See :option:`--enable-core-dump` for details.
+  bool enable_core_dump = 37;
 }

@@ -1,5 +1,5 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/grpc/codec.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/grpc/codec.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"

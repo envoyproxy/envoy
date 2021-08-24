@@ -18,7 +18,7 @@ MockAsyncStream::MockAsyncStream() = default;
 MockAsyncStream::~MockAsyncStream() = default;
 
 MockAsyncClientFactory::MockAsyncClientFactory() {
-  ON_CALL(*this, create()).WillByDefault(Invoke([] {
+  ON_CALL(*this, createUncachedRawAsyncClient()).WillByDefault(Invoke([] {
     return std::make_unique<testing::NiceMock<Grpc::MockAsyncClient>>();
   }));
 }

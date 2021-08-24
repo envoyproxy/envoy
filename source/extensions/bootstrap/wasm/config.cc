@@ -1,13 +1,12 @@
-#include "extensions/bootstrap/wasm/config.h"
+#include "source/extensions/bootstrap/wasm/config.h"
 
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 
-#include "common/common/empty_string.h"
-#include "common/config/datasource.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/common/wasm/wasm.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/config/datasource.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,10 +17,8 @@ void WasmServiceExtension::onServerInitialized() { createWasm(context_); }
 
 void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContext& context) {
   auto plugin = std::make_shared<Common::Wasm::Plugin>(
-      config_.config().name(), config_.config().root_id(), config_.config().vm_config().vm_id(),
-      config_.config().vm_config().runtime(),
-      Common::Wasm::anyToBytes(config_.config().configuration()), config_.config().fail_open(),
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, context.localInfo(), nullptr);
+      config_.config(), envoy::config::core::v3::TrafficDirection::UNSPECIFIED, context.localInfo(),
+      nullptr);
 
   auto callback = [this, &context, plugin](Common::Wasm::WasmHandleSharedPtr base_wasm) {
     if (!base_wasm) {
@@ -42,18 +39,19 @@ void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContex
     // Per-thread WASM VM.
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
     auto tls_slot =
-        ThreadLocal::TypedSlot<Common::Wasm::PluginHandle>::makeUnique(context.threadLocal());
+        ThreadLocal::TypedSlot<Common::Wasm::PluginHandleSharedPtrThreadLocal>::makeUnique(
+            context.threadLocal());
     tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
-      return Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher);
+      return std::make_shared<Common::Wasm::PluginHandleSharedPtrThreadLocal>(
+          Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher));
     });
     wasm_service_ = std::make_unique<WasmService>(plugin, std::move(tls_slot));
   };
 
-  if (!Common::Wasm::createWasm(
-          config_.config().vm_config(), config_.config().capability_restriction_config(), plugin,
-          context.scope().createScope(""), context.clusterManager(), context.initManager(),
-          context.dispatcher(), context.api(), context.lifecycleNotifier(), remote_data_provider_,
-          std::move(callback))) {
+  if (!Common::Wasm::createWasm(plugin, context.scope().createScope(""), context.clusterManager(),
+                                context.initManager(), context.dispatcher(), context.api(),
+                                context.lifecycleNotifier(), remote_data_provider_,
+                                std::move(callback))) {
     // NB: throw if we get a synchronous configuration failures as this is how such failures are
     // reported to xDS.
     throw Common::Wasm::WasmException(

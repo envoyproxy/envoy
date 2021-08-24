@@ -1,8 +1,7 @@
 #pragma once
 
-#include "common/common/hash.h"
-
-#include "server/hot_restarting_base.h"
+#include "source/common/common/hash.h"
+#include "source/server/hot_restarting_base.h"
 
 namespace Envoy {
 namespace Server {
@@ -12,7 +11,7 @@ namespace Server {
  * This outer class only handles evented socket I/O. The actual hot restart logic lives in
  * HotRestartingParent::Internal.
  */
-class HotRestartingParent : HotRestartingBase, Logger::Loggable<Logger::Id::main> {
+class HotRestartingParent : HotRestartingBase {
 public:
   HotRestartingParent(int base_id, int restart_epoch, const std::string& socket_path,
                       mode_t socket_mode);

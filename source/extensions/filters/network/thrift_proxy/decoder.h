@@ -2,12 +2,11 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/thrift_proxy/filters/filter.h"
-#include "extensions/filters/network/thrift_proxy/protocol.h"
-#include "extensions/filters/network/thrift_proxy/transport.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol.h"
+#include "source/extensions/filters/network/thrift_proxy/transport.h"
 
 namespace Envoy {
 namespace Extensions {

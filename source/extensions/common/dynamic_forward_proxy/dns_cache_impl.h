@@ -6,10 +6,9 @@
 #include "envoy/network/dns.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/cleanup.h"
-
-#include "extensions/common/dynamic_forward_proxy/dns_cache.h"
-#include "extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
+#include "source/common/common/cleanup.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -25,6 +24,7 @@ namespace DynamicForwardProxy {
   COUNTER(dns_query_attempt)                                                                       \
   COUNTER(dns_query_failure)                                                                       \
   COUNTER(dns_query_success)                                                                       \
+  COUNTER(dns_query_timeout)                                                                       \
   COUNTER(host_added)                                                                              \
   COUNTER(host_address_changed)                                                                    \
   COUNTER(host_overflow)                                                                           \
@@ -46,6 +46,9 @@ public:
                const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   ~DnsCacheImpl() override;
   static DnsCacheStats generateDnsCacheStats(Stats::Scope& scope);
+  static Network::DnsResolverSharedPtr selectDnsResolver(
+      const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
+      Event::Dispatcher& main_thread_dispatcher);
 
   // DnsCache
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
@@ -68,11 +71,22 @@ private:
     LoadDnsCacheEntryCallbacks& callbacks_;
   };
 
+  class DnsHostInfoImpl;
+  using DnsHostInfoImplSharedPtr = std::shared_ptr<DnsHostInfoImpl>;
+
+  struct HostMapUpdateInfo {
+    HostMapUpdateInfo(const std::string& host, DnsHostInfoImplSharedPtr info)
+        : host_(host), info_(std::move(info)) {}
+    std::string host_;
+    DnsHostInfoImplSharedPtr info_;
+  };
+  using HostMapUpdateInfoSharedPtr = std::shared_ptr<HostMapUpdateInfo>;
+
   // Per-thread DNS cache info including pending callbacks.
   struct ThreadLocalHostInfo : public ThreadLocal::ThreadLocalObject {
     ThreadLocalHostInfo(DnsCacheImpl& parent) : parent_{parent} {}
     ~ThreadLocalHostInfo() override;
-    void onHostMapUpdate(std::shared_ptr<const std::string> resolved_host);
+    void onHostMapUpdate(const HostMapUpdateInfoSharedPtr& resolved_info);
     absl::flat_hash_map<std::string, std::list<LoadDnsCacheEntryHandleImpl*>> pending_resolutions_;
     DnsCacheImpl& parent_;
   };
@@ -123,17 +137,17 @@ private:
     bool first_resolve_complete_ ABSL_GUARDED_BY(resolve_lock_){false};
   };
 
-  using DnsHostInfoImplSharedPtr = std::shared_ptr<DnsHostInfoImpl>;
-
   // Primary host information that accounts for TTL, re-resolution, etc.
   struct PrimaryHostInfo {
     PrimaryHostInfo(DnsCacheImpl& parent, absl::string_view host_to_resolve, uint16_t port,
-                    bool is_ip_address, const Event::TimerCb& timer_cb);
+                    bool is_ip_address, const Event::TimerCb& refresh_timer_cb,
+                    const Event::TimerCb& timeout_timer_cb);
     ~PrimaryHostInfo();
 
     DnsCacheImpl& parent_;
     const uint16_t port_;
     const Event::TimerPtr refresh_timer_;
+    const Event::TimerPtr timeout_timer_;
     const DnsHostInfoImplSharedPtr host_info_;
     Network::ActiveDnsQuery* active_query_{};
   };
@@ -159,8 +173,10 @@ private:
                      std::list<Network::DnsResponse>&& response);
   void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);
   void runRemoveCallbacks(const std::string& host);
-  void notifyThreads(const std::string& host);
+  void notifyThreads(const std::string& host, const DnsHostInfoImplSharedPtr& resolved_info);
   void onReResolve(const std::string& host);
+  void onResolveTimeout(const std::string& host);
+  PrimaryHostInfo& getPrimaryHost(const std::string& host);
 
   Event::Dispatcher& main_thread_dispatcher_;
   const Network::DnsLookupFamily dns_lookup_family_;
@@ -174,6 +190,7 @@ private:
       primary_hosts_ ABSL_GUARDED_BY(primary_hosts_lock_);
   DnsCacheResourceManagerImpl resource_manager_;
   const std::chrono::milliseconds refresh_interval_;
+  const std::chrono::milliseconds timeout_interval_;
   const BackOffStrategyPtr failure_backoff_strategy_;
   const std::chrono::milliseconds host_ttl_;
   const uint32_t max_hosts_;

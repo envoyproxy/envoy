@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace ProtobufMessage {

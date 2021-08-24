@@ -37,6 +37,9 @@ The user account running the examples will need to have permission to use Docker
 
 Full instructions for installing Docker can be found on the `Docker website <https://docs.docker.com/get-docker/>`_
 
+If you want to use the Windows based Envoy images make sure that you
+`switch Docker to use Windows containers <https://docs.docker.com/docker-for-windows/#switch-between-windows-and-linux-containers>`_.
+
 .. _start_sandboxes_setup_docker_compose:
 
 Install Docker Compose
@@ -108,6 +111,17 @@ whether it be ``HTTP`` response data, logs or statistics.
 
 Instructions for installing `jq <https://stedolan.github.io/jq/>`_ on many platforms and operating systems
 can be `found on the jq website <https://stedolan.github.io/jq/download/>`_.
+
+.. _start_sandboxes_setup_netcat:
+
+netcat
+~~~~~~
+
+Binary distributions of `Netcat <https://nmap.org/ncat/>`_ are available for Mac OS with `brew <https://brew.sh>`_
+and in most flavours of Linux.
+
+Ncat is integrated with Nmap and is available in the standard Nmap download packages (including source code and Linux, Windows, and Mac binaries) available from the `Nmap download page <http://nmap.org/download.html>`_.
+
 
 .. _start_sandboxes_setup_openssl:
 

@@ -3,12 +3,15 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/instance.h"
 
-#include "server/configuration_impl.h"
+#include "source/server/configuration_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
+
+// MetricsService sink
+constexpr char MetricsServiceName[] = "envoy.stat_sinks.metrics_service";
 
 /**
  * Config registration for the MetricsService stats sink. @see StatsSinkFactory.

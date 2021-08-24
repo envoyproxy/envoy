@@ -2,8 +2,8 @@
 
 #include "envoy/network/socket.h"
 
-#include "common/common/assert.h"
-#include "common/common/dump_state_utils.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
 
 namespace Envoy {
 namespace Network {
@@ -19,12 +19,13 @@ public:
     direct_remote_address_ = direct_remote_address;
   }
 
-  void dumpState(std::ostream& os, int indent_level) const {
+  void dumpState(std::ostream& os, int indent_level) const override {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "SocketAddressSetterImpl " << this
        << DUMP_NULLABLE_MEMBER(remote_address_, remote_address_->asStringView())
        << DUMP_NULLABLE_MEMBER(direct_remote_address_, direct_remote_address_->asStringView())
-       << DUMP_NULLABLE_MEMBER(local_address_, local_address_->asStringView()) << "\n";
+       << DUMP_NULLABLE_MEMBER(local_address_, local_address_->asStringView())
+       << DUMP_MEMBER(server_name_) << "\n";
   }
 
   // SocketAddressSetter
@@ -44,12 +45,25 @@ public:
   const Address::InstanceConstSharedPtr& directRemoteAddress() const override {
     return direct_remote_address_;
   }
+  absl::string_view requestedServerName() const override { return server_name_; }
+  void setRequestedServerName(const absl::string_view requested_server_name) override {
+    server_name_ = std::string(requested_server_name);
+  }
+  absl::optional<uint64_t> connectionID() const override { return connection_id_; }
+  void setConnectionID(uint64_t id) override { connection_id_ = id; }
+  Ssl::ConnectionInfoConstSharedPtr sslConnection() const override { return ssl_info_; }
+  void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
+    ssl_info_ = ssl_connection_info;
+  }
 
 private:
   Address::InstanceConstSharedPtr local_address_;
   bool local_address_restored_{false};
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr direct_remote_address_;
+  std::string server_name_;
+  absl::optional<uint64_t> connection_id_;
+  Ssl::ConnectionInfoConstSharedPtr ssl_info_;
 };
 
 class SocketImpl : public virtual Socket {
@@ -98,6 +112,10 @@ public:
                                         socklen_t optlen) override;
   Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
                                         socklen_t* optlen) const override;
+  Api::SysCallIntResult ioctl(unsigned long control_code, void* in_buffer,
+                              unsigned long in_buffer_len, void* out_buffer,
+                              unsigned long out_buffer_len, unsigned long* bytes_returned) override;
+
   Api::SysCallIntResult setBlockingForTest(bool blocking) override;
 
   const OptionsSharedPtr& options() const override { return options_; }

@@ -1,13 +1,13 @@
-#include "common/config/filesystem_subscription_impl.h"
+#include "source/common/config/filesystem_subscription_impl.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/config/decoded_resource_impl.h"
-#include "common/config/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {
@@ -61,7 +61,7 @@ void FilesystemSubscriptionImpl::refresh() {
   ENVOY_LOG(debug, "Filesystem config refresh for {}", path_);
   stats_.update_attempt_.inc();
   ProtobufTypes::MessagePtr config_update;
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     const std::string version = refreshInternal(&config_update);
     stats_.update_time_.set(DateUtil::nowToMilliseconds(api_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(version));
@@ -69,9 +69,12 @@ void FilesystemSubscriptionImpl::refresh() {
     stats_.update_success_.inc();
     ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_,
               config_update->DebugString());
-  } catch (const ProtobufMessage::UnknownProtoFieldException& e) {
+  }
+  END_TRY
+  catch (const ProtobufMessage::UnknownProtoFieldException& e) {
     configRejected(e, config_update == nullptr ? "" : config_update->DebugString());
-  } catch (const EnvoyException& e) {
+  }
+  catch (const EnvoyException& e) {
     if (config_update != nullptr) {
       configRejected(e, config_update->DebugString());
     } else {

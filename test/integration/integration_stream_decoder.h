@@ -9,8 +9,13 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
 
+#include "source/common/common/dump_state_utils.h"
+
+#include "test/test_common/utility.h"
+
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 /**
@@ -29,14 +34,17 @@ public:
   const Http::ResponseTrailerMapPtr& trailers() { return trailers_; }
   const Http::MetadataMap& metadataMap() { return *metadata_map_; }
   uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
+  uint32_t metadataMapsDecodedCount() const { return metadata_maps_decoded_count_; }
   void waitForContinueHeaders();
   void waitForHeaders();
   // This function waits until body_ has at least size bytes in it (it might have more). clearBody()
   // can be used if the previous body data is not relevant and the test wants to wait for a specific
   // amount of new data without considering the existing body size.
   void waitForBodyData(uint64_t size);
-  void waitForEndStream();
-  void waitForReset();
+  ABSL_MUST_USE_RESULT testing::AssertionResult
+  waitForEndStream(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+  ABSL_MUST_USE_RESULT testing::AssertionResult
+  waitForReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void clearBody() { body_.clear(); }
 
   // Http::StreamDecoder
@@ -47,6 +55,9 @@ public:
   void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
+  void dumpState(std::ostream& os, int indent_level) const override {
+    DUMP_STATE_UNIMPLEMENTED(DecoderShim);
+  }
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -70,6 +81,7 @@ private:
   bool waiting_for_headers_{};
   bool saw_reset_{};
   Http::StreamResetReason reset_reason_{};
+  uint32_t metadata_maps_decoded_count_{};
 };
 
 using IntegrationStreamDecoderPtr = std::unique_ptr<IntegrationStreamDecoder>;

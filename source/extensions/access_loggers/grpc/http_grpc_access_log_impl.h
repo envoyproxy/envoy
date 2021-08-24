@@ -10,10 +10,9 @@
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/grpc/typed_async_client.h"
-
-#include "extensions/access_loggers/common/access_log_base.h"
-#include "extensions/access_loggers/grpc/grpc_access_log_impl.h"
+#include "source/common/grpc/typed_async_client.h"
+#include "source/extensions/access_loggers/common/access_log_base.h"
+#include "source/extensions/access_loggers/grpc/grpc_access_log_impl.h"
 
 namespace Envoy {
 namespace Extensions {

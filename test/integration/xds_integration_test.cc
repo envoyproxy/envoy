@@ -1,7 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
@@ -21,13 +21,13 @@ using testing::HasSubstr;
 class XdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
-  XdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  XdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
   }
 
   void createEnvoy() override {
     createEnvoyServer({
-        "test/config/integration/server_xds.bootstrap.yaml",
+        "test/config/integration/server_xds.bootstrap.yml",
         "test/config/integration/server_xds.cds.yaml",
         "test/config/integration/server_xds.eds.yaml",
         "test/config/integration/server_xds.lds.yaml",
@@ -59,7 +59,7 @@ public:
 
   void createEnvoy() override {
     createEnvoyServer({
-        "test/config/integration/server_xds.bootstrap.yaml",
+        "test/config/integration/server_xds.bootstrap.yml",
         "test/config/integration/server_xds.cds.yaml",
         "test/config/integration/server_xds.eds.yaml",
         "test/config/integration/server_xds.lds.typed_struct.yaml",
@@ -124,6 +124,18 @@ public:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_1
+  - name: another_listener_to_avoid_worker_thread_routine_exit
+    address:
+      socket_address:
+        address: "127.0.0.1"
+        port_value: 0
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp_stats
+          cluster: cluster_0
 )EOF") {}
 
   void initialize() override {
@@ -147,8 +159,8 @@ public:
 
     BaseIntegrationTest::initialize();
 
-    context_manager_ =
-        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+    context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+        BaseIntegrationTest::timeSystem());
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
   }
 
@@ -279,8 +291,7 @@ class LdsInplaceUpdateHttpIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
 public:
-  LdsInplaceUpdateHttpIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  LdsInplaceUpdateHttpIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void inplaceInitialize(bool add_default_filter_chain = false) {
     autonomous_upstream_ = true;
@@ -359,7 +370,7 @@ public:
     IntegrationStreamDecoderPtr response =
         codec_client.makeHeaderOnlyRequest(default_request_headers_);
 
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
     if (expect_close) {
@@ -521,7 +532,7 @@ using LdsIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP1}, {FakeHttpConnection::Type::HTTP1})),
+                             {Http::CodecType::HTTP1}, {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Sample test making sure our config framework correctly reloads listeners.
@@ -558,6 +569,34 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
   EXPECT_THAT(response2, HasSubstr("HTTP/1.0 200 OK\r\n"));
 }
 
+// Verify that a listener that goes through the individual warming path (not server init) is
+// failed and removed correctly if there are issues with final pre-worker init.
+TEST_P(LdsIntegrationTest, NewListenerWithBadPostListenSocketOption) {
+  autonomous_upstream_ = true;
+  initialize();
+  // Given we're using LDS in this test, initialize() will not complete until
+  // the initial LDS file has loaded.
+  EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
+
+  // Reserve a port that we can then use on the integration listener with reuse_port.
+  auto addr_socket =
+      Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        listener->mutable_address()->mutable_socket_address()->set_port_value(
+            addr_socket.second->addressProvider().localAddress()->ip()->port());
+        auto socket_option = listener->add_socket_options();
+        socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
+        socket_option->set_level(10000);     // Invalid level.
+        socket_option->set_int_value(10000); // Invalid value.
+      });
+  new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+}
+
 // Sample test making sure our config framework informs on listener failure.
 TEST_P(LdsIntegrationTest, FailConfigLoad) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -567,6 +606,68 @@ TEST_P(LdsIntegrationTest, FailConfigLoad) {
     filter_chain->mutable_filters(0)->set_name("grewgragra");
   });
   EXPECT_DEATH(initialize(), "Didn't find a registered implementation for name: 'grewgragra'");
+}
+
+// This test case uses `SimulatedTimeSystem` to stack two listener update in the same time point.
+class LdsStsIntegrationTest : public Event::SimulatedTimeSystem,
+                              public LdsInplaceUpdateTcpProxyIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, LdsStsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verify that the listener in place update will accomplish anyway if the listener is removed.
+TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsRemoved) {
+  // The in place listener update takes 2 seconds. We will remove the listener.
+  drain_time_ = std::chrono::seconds(2);
+  // 1. Start the first in place listener update.
+  setUpstreamCount(2);
+  initialize();
+  std::string response_0;
+  auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
+  client_conn_0->waitForConnection();
+  FakeRawConnectionPtr fake_upstream_connection_0;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
+
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        listener->mutable_filter_chains()->RemoveLast();
+      });
+  new_config_helper.setLds("1");
+
+  // 2. Remove the tcp listener immediately. This listener update should stack in the same poller
+  // cycle so that this listener update has the same time stamp as the first update.
+  ConfigHelper new_config_helper1(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  new_config_helper1.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->Swap(
+            bootstrap.mutable_static_resources()->mutable_listeners(1));
+        bootstrap.mutable_static_resources()->mutable_listeners()->RemoveLast();
+      });
+  new_config_helper1.setLds("2");
+
+  std::string observed_data_0;
+  ASSERT_TRUE(fake_upstream_connection_0->waitForData(5, &observed_data_0));
+  EXPECT_EQ("hello", observed_data_0);
+
+  ASSERT_TRUE(fake_upstream_connection_0->write("world"));
+  while (response_0.find("world") == std::string::npos) {
+    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  client_conn_0->close();
+  while (!client_conn_0->closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  // Wait for the filter chain removal start. Ideally we have `drain_time_` to detect the
+  // value 1. Increase the drain_time_ at the beginning of the test if the test is flaky.
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
+  // Wait for the filter chain removal at worker thread. When the value drops from 1, all pending
+  // removal at the worker is completed. This is the end of the in place update.
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
 }
 } // namespace
 } // namespace Envoy

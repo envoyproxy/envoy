@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/network/filter.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fakes.h"
@@ -21,7 +23,7 @@ public:
     ON_CALL(Const(cb_), dynamicMetadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
 
-  void fuzz(Network::ListenerFilter& filter,
+  void fuzz(Network::ListenerFilterPtr filter,
             const test::extensions::filters::listener::FilterFuzzTestCase& input);
 
 private:

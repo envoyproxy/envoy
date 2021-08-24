@@ -1,11 +1,11 @@
-#include "extensions/filters/udp/dns_filter/dns_parser.h"
+#include "source/extensions/filters/udp/dns_filter/dns_parser.h"
 
 #include "envoy/network/address.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/udp/dns_filter/dns_filter_utils.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 #include "ares.h"
 
@@ -171,7 +171,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
       state = DnsQueryParseState::Flags;
       break;
     case DnsQueryParseState::Flags:
-      ::memcpy(static_cast<void*>(&context->header_.flags), &data, field_size);
+      safeMemcpyUnsafeDst(static_cast<void*>(&context->header_.flags), &data);
       state = DnsQueryParseState::Questions;
       break;
     case DnsQueryParseState::Questions:
@@ -743,7 +743,7 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
   buffer.writeBEInt<uint16_t>(query_context->response_header_.id);
 
   uint16_t flags;
-  ::memcpy(&flags, static_cast<void*>(&query_context->response_header_.flags), sizeof(uint16_t));
+  safeMemcpyUnsafeSrc(&flags, static_cast<void*>(&query_context->response_header_.flags));
   buffer.writeBEInt<uint16_t>(flags);
 
   buffer.writeBEInt<uint16_t>(query_context->response_header_.questions);

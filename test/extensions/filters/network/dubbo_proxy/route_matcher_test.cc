@@ -3,10 +3,9 @@
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.validate.h"
 
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/network/dubbo_proxy/router/route_matcher.h"
-#include "extensions/filters/network/dubbo_proxy/serializer_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/route_matcher.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -36,7 +35,132 @@ parseDubboProxyFromV2Yaml(const std::string& yaml) {
   return config;
 }
 
+void setDefaultInvocationCallback(RpcInvocationImpl& invo) {
+  invo.setParametersLazyCallback([]() -> RpcInvocationImpl::ParametersPtr {
+    return std::make_unique<RpcInvocationImpl::Parameters>();
+  });
+
+  invo.setAttachmentLazyCallback([]() -> RpcInvocationImpl::AttachmentPtr {
+    auto map = std::make_unique<RpcInvocationImpl::Attachment::Map>();
+    return std::make_unique<RpcInvocationImpl::Attachment>(std::move(map), 0);
+  });
+}
+
 } // namespace
+
+TEST(DubboRouteMatcherTest, RouteByServiceNameWithWildcard) {
+  {
+    const std::string yaml = R"EOF(
+name: local_route
+interface: "*"
+routes:
+  - match:
+      method:
+        name:
+          exact: "add"
+    route:
+        cluster: user_service_dubbo_server
+)EOF";
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+        parseRouteConfigurationFromV2Yaml(yaml);
+
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+    SingleRouteMatcherImpl matcher(config, context);
+    auto invo = std::make_shared<RpcInvocationImpl>();
+    MessageMetadata metadata;
+    metadata.setInvocationInfo(invo);
+    invo->setMethodName("add");
+    EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+
+    invo->setServiceName("unknown");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+    invo->setServiceName("random");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+    invo->setServiceName("fake_service");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+  }
+  {
+    const std::string yaml = R"EOF(
+name: local_route
+interface: "*.test.com"
+routes:
+  - match:
+      method:
+        name:
+          exact: "add"
+    route:
+        cluster: user_service_dubbo_server
+)EOF";
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+        parseRouteConfigurationFromV2Yaml(yaml);
+
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+    SingleRouteMatcherImpl matcher(config, context);
+    auto invo = std::make_shared<RpcInvocationImpl>();
+    MessageMetadata metadata;
+    metadata.setInvocationInfo(invo);
+    invo->setMethodName("add");
+    EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+
+    invo->setServiceName(".test.com");
+    EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+
+    invo->setServiceName("code.test.com");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+    invo->setServiceName("fake.test.com");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+    invo->setServiceName("fake_service");
+
+    EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+  }
+  {
+    const std::string yaml = R"EOF(
+name: local_route
+interface: "com.test.*"
+routes:
+  - match:
+      method:
+        name:
+          exact: "add"
+    route:
+        cluster: user_service_dubbo_server
+)EOF";
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+        parseRouteConfigurationFromV2Yaml(yaml);
+
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+    SingleRouteMatcherImpl matcher(config, context);
+    auto invo = std::make_shared<RpcInvocationImpl>();
+    MessageMetadata metadata;
+    metadata.setInvocationInfo(invo);
+    invo->setMethodName("add");
+    EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+
+    invo->setServiceName("com.test.");
+    EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+
+    invo->setServiceName("com.test.code");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+    invo->setServiceName("com.test.fake");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+    invo->setServiceName("fake_service");
+
+    EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+  }
+}
 
 TEST(DubboRouteMatcherTest, RouteByServiceNameWithAnyMethod) {
   {
@@ -113,12 +237,16 @@ routes:
     metadata.setInvocationInfo(invo);
     invo->setMethodName("test");
     invo->setServiceName("org.apache.dubbo.demo.DemoService");
+
+    setDefaultInvocationCallback(*invo);
+
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
     invo->setServiceGroup("test");
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
     invo->setServiceVersion("1.0.0");
+
     EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
   }
 
@@ -190,6 +318,9 @@ routes:
     metadata.setInvocationInfo(invo);
     invo->setMethodName("test");
     invo->setServiceName("org.apache.dubbo.demo.DemoService");
+
+    setDefaultInvocationCallback(*invo);
+
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
     invo->setServiceGroup("test");
@@ -335,6 +466,107 @@ routes:
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
 
+TEST(DubboRouteMatcherTest, RouteByParamterWithNoParameter) {
+  const std::string yaml = R"EOF(
+name: local_route
+interface: org.apache.dubbo.demo.DemoService
+routes:
+  - match:
+      method:
+        name:
+          exact: "add"
+        params_match:
+          0:
+            range_match:
+              start: 100
+              end: 200
+    route:
+        cluster: user_service_dubbo_server
+)EOF";
+
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+  auto invo = std::make_shared<RpcInvocationImpl>();
+  MessageMetadata metadata;
+  metadata.setInvocationInfo(invo);
+  invo->setServiceName("org.apache.dubbo.demo.DemoService");
+  invo->setMethodName("add");
+
+  setDefaultInvocationCallback(*invo);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  SingleRouteMatcherImpl matcher(config, context);
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+}
+
+TEST(DubboRouteMatcherTest, RouteByParamterWithErrorIndex) {
+  const std::string yaml = R"EOF(
+name: local_route
+interface: org.apache.dubbo.demo.DemoService
+routes:
+  - match:
+      method:
+        name:
+          exact: "add"
+        params_match:
+          3:
+            range_match:
+              start: 100
+              end: 200
+    route:
+        cluster: user_service_dubbo_server
+)EOF";
+
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+  auto invo = std::make_shared<RpcInvocationImpl>();
+  MessageMetadata metadata;
+  metadata.setInvocationInfo(invo);
+  invo->setServiceName("org.apache.dubbo.demo.DemoService");
+  invo->setMethodName("add");
+
+  setDefaultInvocationCallback(*invo);
+  invo->mutableParameters()->push_back(std::make_unique<Hessian2::StringObject>("150"));
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  SingleRouteMatcherImpl matcher(config, context);
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+}
+
+TEST(DubboRouteMatcherTest, RouteByParameterWithErrorType) {
+  const std::string yaml = R"EOF(
+name: local_route
+interface: org.apache.dubbo.demo.DemoService
+routes:
+  - match:
+      method:
+        name:
+          exact: "add"
+        params_match:
+          0:
+            range_match:
+              start: 100
+              end: 200
+    route:
+        cluster: user_service_dubbo_server
+)EOF";
+
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+  auto invo = std::make_shared<RpcInvocationImpl>();
+  MessageMetadata metadata;
+  metadata.setInvocationInfo(invo);
+  invo->setServiceName("org.apache.dubbo.demo.DemoService");
+  invo->setMethodName("add");
+
+  setDefaultInvocationCallback(*invo);
+  invo->mutableParameters()->push_back(std::make_unique<Hessian2::NullObject>());
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  SingleRouteMatcherImpl matcher(config, context);
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+}
+
 TEST(DubboRouteMatcherTest, RouteByParameterWithRangeMatch) {
   const std::string yaml = R"EOF(
 name: local_route
@@ -360,11 +592,47 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
   invo->setMethodName("add");
-  invo->addParameterValue(0, "150");
+
+  setDefaultInvocationCallback(*invo);
+  invo->mutableParameters()->push_back(std::make_unique<Hessian2::StringObject>("150"));
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+}
+
+TEST(DubboRouteMatcherTest, RouteByParameterWithRangeMatchButNotMatch) {
+  const std::string yaml = R"EOF(
+name: local_route
+interface: org.apache.dubbo.demo.DemoService
+routes:
+  - match:
+      method:
+        name:
+          exact: "add"
+        params_match:
+          0:
+            range_match:
+              start: 100
+              end: 200
+    route:
+        cluster: user_service_dubbo_server
+)EOF";
+
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+  auto invo = std::make_shared<RpcInvocationImpl>();
+  MessageMetadata metadata;
+  metadata.setInvocationInfo(invo);
+  invo->setServiceName("org.apache.dubbo.demo.DemoService");
+  invo->setMethodName("add");
+
+  setDefaultInvocationCallback(*invo);
+  invo->mutableParameters()->push_back(std::make_unique<Hessian2::StringObject>("300"));
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  SingleRouteMatcherImpl matcher(config, context);
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
 
 TEST(DubboRouteMatcherTest, RouteByParameterWithExactMatch) {
@@ -390,7 +658,10 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
   invo->setMethodName("add");
-  invo->addParameterValue(1, "user_id:94562");
+
+  setDefaultInvocationCallback(*invo);
+  invo->mutableParameters()->resize(2);
+  invo->mutableParameters()->back() = std::make_unique<Hessian2::StringObject>("user_id:94562");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
@@ -408,9 +679,11 @@ routes:
           exact: "add"
       headers:
       - name: custom
-        exact_match: "123"
+        string_match:
+          exact: "123"
       - name: custom1
-        exact_match: "123"
+        string_match:
+          exact: "123"
         invert_match: true
     route:
         cluster: user_service_dubbo_server
@@ -423,21 +696,21 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
   invo->setMethodName("add");
-  invo->addHeader("custom", "123");
-  std::string test_value("123");
 
-  Envoy::Http::LowerCaseString test_key("custom1");
-  invo->addHeaderReference(test_key, test_value);
+  setDefaultInvocationCallback(*invo);
+
+  invo->mutableAttachment()->insert("custom", "123");
+  invo->mutableAttachment()->insert("custom1", "123");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
-  test_value = "456";
+  invo->mutableAttachment()->insert("custom1", "456");
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
   EXPECT_EQ(nullptr, matcher.route(metadata, 0)->routeEntry()->metadataMatchCriteria());
 
-  test_value = "123";
+  invo->mutableAttachment()->insert("custom1", "123");
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
 
@@ -477,7 +750,10 @@ route_config:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
   invo->setMethodName("add");
-  invo->addParameterValue(1, "user_id");
+
+  setDefaultInvocationCallback(*invo);
+  invo->mutableParameters()->resize(2);
+  invo->mutableParameters()->back() = std::make_unique<Hessian2::StringObject>("user_id");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MultiRouteMatcher matcher(config.route_config(), context);
@@ -514,22 +790,32 @@ routes:
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
   invo->setMethodName("add");
 
+  setDefaultInvocationCallback(*invo);
+
   // There is no parameter information in metadata.
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
   // The parameter is empty.
-  invo->addParameterValue(1, "");
+  invo->mutableParameters()->resize(2);
+  invo->mutableParameters()->back() = std::make_unique<Hessian2::StringObject>("");
+
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
   {
     auto invo = std::make_shared<RpcInvocationImpl>();
+
+    setDefaultInvocationCallback(*invo);
+
+    // Error parameter.
+    invo->mutableParameters()->resize(2);
+    invo->mutableParameters()->back() = std::make_unique<Hessian2::StringObject>("user_id:562");
+
     MessageMetadata metadata;
     metadata.setInvocationInfo(invo);
     invo->setServiceName("org.apache.dubbo.demo.DemoService");
     invo->setMethodName("add");
-    invo->addParameterValue(1, "user_id:562");
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
   }
 }

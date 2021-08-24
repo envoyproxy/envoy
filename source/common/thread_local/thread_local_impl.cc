@@ -1,4 +1,4 @@
-#include "common/thread_local/thread_local_impl.h"
+#include "source/common/thread_local/thread_local_impl.h"
 
 #include <algorithm>
 #include <atomic>
@@ -7,8 +7,8 @@
 
 #include "envoy/event/dispatcher.h"
 
-#include "common/common/assert.h"
-#include "common/common/stl_helpers.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/stl_helpers.h"
 
 namespace Envoy {
 namespace ThreadLocal {

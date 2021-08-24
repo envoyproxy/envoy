@@ -4,11 +4,11 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/memory/stats.h"
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/memory/stats.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 #include "test/fuzz/utility.h"
 
@@ -72,6 +72,11 @@ public:
     // Not implemented well.
     ASSERT(false);
     drain_tracker();
+  }
+
+  void bindAccount(Buffer::BufferMemoryAccountSharedPtr) override {
+    // Not implemented.
+    ASSERT(false);
   }
 
   void add(const void* data, uint64_t size) override {
@@ -188,6 +193,7 @@ public:
     // WatermarkBuffer implementations.
     ASSERT(false);
   }
+
   uint32_t highWatermark() const override { return 0; }
   bool highWatermarkTriggered() const override { return false; }
 
@@ -355,7 +361,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     const ssize_t rc = ::write(pipe_fds[1], data.data(), max_length);
     FUZZ_ASSERT(rc > 0);
     Api::IoCallUint64Result result = io_handle.read(target_buffer, max_length);
-    FUZZ_ASSERT(result.rc_ == static_cast<uint64_t>(rc));
+    FUZZ_ASSERT(result.return_value_ == static_cast<uint64_t>(rc));
     FUZZ_ASSERT(::close(pipe_fds[1]) == 0);
     break;
   }
@@ -365,23 +371,24 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     Network::IoSocketHandleImpl io_handle(pipe_fds[1]);
     FUZZ_ASSERT(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) == 0);
     FUZZ_ASSERT(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK) == 0);
-    uint64_t rc;
+    uint64_t return_value;
     do {
       const bool empty = target_buffer.length() == 0;
       const std::string previous_data = target_buffer.toString();
       const auto result = io_handle.write(target_buffer);
       FUZZ_ASSERT(result.ok());
-      rc = result.rc_;
-      ENVOY_LOG_MISC(trace, "Write rc: {} errno: {}", rc,
+      return_value = result.return_value_;
+      ENVOY_LOG_MISC(trace, "Write return_value: {} errno: {}", return_value,
                      result.err_ != nullptr ? result.err_->getErrorDetails() : "-");
       if (empty) {
-        FUZZ_ASSERT(rc == 0);
+        FUZZ_ASSERT(return_value == 0);
       } else {
-        auto buf = std::make_unique<char[]>(rc);
-        FUZZ_ASSERT(static_cast<uint64_t>(::read(pipe_fds[0], buf.get(), rc)) == rc);
-        FUZZ_ASSERT(::memcmp(buf.get(), previous_data.data(), rc) == 0);
+        auto buf = std::make_unique<char[]>(return_value);
+        FUZZ_ASSERT(static_cast<uint64_t>(::read(pipe_fds[0], buf.get(), return_value)) ==
+                    return_value);
+        FUZZ_ASSERT(::memcmp(buf.get(), previous_data.data(), return_value) == 0);
       }
-    } while (rc > 0);
+    } while (return_value > 0);
     FUZZ_ASSERT(::close(pipe_fds[0]) == 0);
     break;
   }

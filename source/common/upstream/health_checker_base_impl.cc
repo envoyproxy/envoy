@@ -1,12 +1,12 @@
-#include "common/upstream/health_checker_base_impl.h"
+#include "source/common/upstream/health_checker_base_impl.h"
 
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/network/utility.h"
-#include "common/router/router.h"
+#include "source/common/network/utility.h"
+#include "source/common/router/router.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -38,12 +38,11 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       healthy_edge_interval_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, healthy_edge_interval, interval_.count())),
       transport_socket_options_(initTransportSocketOptions(config)),
-      transport_socket_match_metadata_(initTransportSocketMatchMetadata(config)) {
-  cluster_.prioritySet().addMemberUpdateCb(
-      [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
-        onClusterMemberUpdate(hosts_added, hosts_removed);
-      });
-}
+      transport_socket_match_metadata_(initTransportSocketMatchMetadata(config)),
+      member_update_cb_{cluster_.prioritySet().addMemberUpdateCb(
+          [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
+            onClusterMemberUpdate(hosts_added, hosts_removed);
+          })} {}
 
 std::shared_ptr<const Network::TransportSocketOptionsImpl>
 HealthCheckerImplBase::initTransportSocketOptions(

@@ -8,8 +8,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
 
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
 
 #include "absl/container/node_hash_map.h"
 

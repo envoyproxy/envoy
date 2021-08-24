@@ -1,10 +1,9 @@
 #include "envoy/http/header_map.h"
 #include "envoy/registry/registry.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/http/cache/cache_headers_utils.h"
-#include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/test_common/simulated_time_system.h"
@@ -33,7 +32,7 @@ protected:
   SimpleHttpCacheTest() : vary_allow_list_(getConfig().allowed_vary_headers()) {
     request_headers_.setMethod("GET");
     request_headers_.setHost("example.com");
-    request_headers_.setForwardedProto("https");
+    request_headers_.setScheme("https");
     request_headers_.setCopy(Http::CustomHeaders::get().CacheControl, "max-age=3600");
   }
 
@@ -220,7 +219,7 @@ TEST_F(SimpleHttpCacheTest, StreamingPut) {
 
 TEST(Registration, GetFactory) {
   HttpCacheFactory* factory = Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(
-      "envoy.source.extensions.filters.http.cache.SimpleHttpCacheConfig");
+      "envoy.extensions.cache.simple_http_cache.v3alpha.SimpleHttpCacheConfig");
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
   config.mutable_typed_config()->PackFrom(*factory->createEmptyConfigProto());
@@ -253,8 +252,35 @@ TEST_F(SimpleHttpCacheTest, VaryResponses) {
   insert(move(second_value_vary), response_headers, Body2);
   EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath).get(), Body2));
 
+  request_headers_.setCopy(Http::LowerCaseString("accept"), "image/*");
+  LookupContextPtr first_value_lookup2 = lookup(RequestPath);
   // Looks up first version again to be sure it wasn't replaced with the second one.
-  EXPECT_TRUE(expectLookupSuccessWithBody(first_value_vary.get(), Body1));
+  EXPECT_TRUE(expectLookupSuccessWithBody(first_value_lookup2.get(), Body1));
+
+  // Create a new allow list to make sure a now disallowed cached vary entry is not served.
+  Protobuf::RepeatedPtrField<::envoy::type::matcher::v3::StringMatcher> proto_allow_list;
+  ::envoy::type::matcher::v3::StringMatcher* matcher = proto_allow_list.Add();
+  matcher->set_exact("width");
+  vary_allow_list_ = VaryHeader(proto_allow_list);
+  lookup(RequestPath);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+}
+
+TEST_F(SimpleHttpCacheTest, VaryOnDisallowedKey) {
+  // Responses will vary on accept.
+  const std::string RequestPath("some-resource");
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"cache-control", "public,max-age=3600"},
+                                                   {"vary", "user-agent"}};
+
+  // First request.
+  request_headers_.setCopy(Http::LowerCaseString("user-agent"), "user_agent_one");
+  LookupContextPtr first_value_vary = lookup(RequestPath);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+  const std::string Body1("one");
+  insert(move(first_value_vary), response_headers, Body1);
+  first_value_vary = lookup(RequestPath);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 }
 
 } // namespace

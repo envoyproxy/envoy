@@ -5,13 +5,15 @@ Hot restart
 
 Ease of operation is one of the primary goals of Envoy. In addition to robust statistics and a local
 administration interface, Envoy has the ability to “hot” or “live” restart itself. This means that
-Envoy can fully reload itself (both code and configuration) without dropping any connections. The
-hot restart functionality has the following general architecture:
+Envoy can fully reload itself (both code and configuration) without dropping existing connections
+during the :ref:`drain process <arch_overview_draining>`. The hot restart functionality has the
+following general architecture:
 
-* Statistics and some locks are kept in a shared memory region. This means that gauges will be
-  consistent across both processes as restart is taking place.
 * The two active processes communicate with each other over unix domain sockets using a basic RPC
-  protocol.
+  protocol. All counters are sent from the old process to the new process over the unix domain, and
+  gauges are transported except those marked with `NeverImport`. After hot restart is finished, the
+  gauges transported from the old process will be cleanup, but special gauge like
+  :ref:`server.hot_restart_generation statistic <server_statistics>` is retained.
 * The new process fully initializes itself (loads the configuration, does an initial service
   discovery and health checking phase, etc.) before it asks for copies of the listen sockets from
   the old process. The new process starts listening and then tells the old process to start
@@ -32,3 +34,22 @@ a given host: an active Envoy server process and, potentially, a draining Envoy 
 will exit as described above. The :option:`--base-id` or :option:`--use-dynamic-base-id` options
 may be used to allow multiple, distinctly configured Envoys to run on the same host and hot restart
 independently.
+
+.. note::
+
+ This feature is not supported on Windows.
+
+Socket handling
+---------------
+
+By default, Envoy uses :ref:`reuse_port
+<envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>` sockets on Linux for better
+performance. This feature workers correctly during hot restart because Envoy passes each socket
+to the new process by worker index. Thus, no connections are dropped in the accept queues of
+the draining process.
+
+.. attention::
+
+  In the uncommon case in which concurrency changes during hot restart, no connections will be
+  dropped if concurrency increases. However, if concurrency decreases some connections may be
+  dropped in the accept queues of the old process workers.

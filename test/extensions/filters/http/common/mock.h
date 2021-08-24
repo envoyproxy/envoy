@@ -2,9 +2,8 @@
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 
-#include "common/http/message_impl.h"
-
-#include "extensions/filters/http/common/jwks_fetcher.h"
+#include "source/common/http/message_impl.h"
+#include "source/extensions/filters/http/common/jwks_fetcher.h"
 
 #include "test/mocks/upstream/mocks.h"
 
@@ -18,9 +17,7 @@ namespace Common {
 class MockJwksFetcher : public JwksFetcher {
 public:
   MOCK_METHOD(void, cancel, ());
-  MOCK_METHOD(void, fetch,
-              (const envoy::config::core::v3::HttpUri& uri, Tracing::Span& parent_span,
-               JwksReceiver& receiver));
+  MOCK_METHOD(void, fetch, (Tracing::Span & parent_span, JwksReceiver& receiver));
 };
 
 // A mock HTTP upstream.

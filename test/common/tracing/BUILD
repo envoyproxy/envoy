@@ -14,12 +14,10 @@ envoy_cc_test(
         "http_tracer_impl_test.cc",
     ],
     deps = [
-        "//include/envoy/http:request_id_extension_interface",
         "//source/common/common:base64_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
-        "//source/common/http:request_id_extension_lib",
         "//source/common/network:address_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/tracing:http_tracer_lib",
@@ -43,9 +41,9 @@ envoy_cc_test(
         "http_tracer_manager_impl_test.cc",
     ],
     deps = [
-        "//source/common/tracing:http_tracer_config_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:http_tracer_manager_lib",
+        "//source/common/tracing:tracer_config_lib",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:tracer_factory_mocks",
         "//test/mocks/tracing:tracing_mocks",

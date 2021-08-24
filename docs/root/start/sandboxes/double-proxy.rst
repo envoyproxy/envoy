@@ -8,10 +8,10 @@ Double proxy (with ``mTLS`` encryption)
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
+        Used to make ``HTTP`` requests.
 
    :ref:`openssl <start_sandboxes_setup_openssl>`
-	Generate ``SSL`` keys and certificates.
+        Generate ``SSL`` keys and certificates.
 
 This sandbox demonstrates a basic "double proxy" configuration, in which a simple Flask app
 connects to a PostgreSQL database, with two Envoy proxies in between.
@@ -146,7 +146,7 @@ Note the ``subjectAltName``. This is used for reciprocally matching and validati
 At this point you should have the necessary keys and certificates to secure the connection between
 the proxies.
 
-They keys and certificates are stored in the ``certs/`` directory.
+The keys and certificates are stored in the ``certs/`` directory.
 
 Step 5: Start all of our containers
 ***********************************

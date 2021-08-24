@@ -9,20 +9,18 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/config/metadata.h"
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
-
-#include "server/configuration_impl.h"
-#include "server/filter_chain_manager_impl.h"
-#include "server/listener_manager_impl.h"
-
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/config/metadata.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/server/configuration_impl.h"
+#include "source/server/filter_chain_manager_impl.h"
+#include "source/server/listener_manager_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"
@@ -84,7 +82,7 @@ public:
     mock_socket->address_provider_->setLocalAddress(local_address_);
 
     ON_CALL(*mock_socket, requestedServerName())
-        .WillByDefault(Return(absl::string_view(server_name)));
+        .WillByDefault(Return(absl::AsciiStrToLower(server_name)));
     ON_CALL(*mock_socket, detectedTransportProtocol())
         .WillByDefault(Return(absl::string_view(transport_protocol)));
     ON_CALL(*mock_socket, requestedApplicationProtocols())
@@ -147,6 +145,17 @@ public:
 TEST_F(FilterChainManagerImplTest, FilterChainMatchNothing) {
   auto filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
+}
+
+TEST_F(FilterChainManagerImplTest, FilterChainMatchCaseInSensitive) {
+  envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
+  new_filter_chain.mutable_filter_chain_match()->add_server_names("foo.EXAMPLE.com");
+  filter_chain_manager_.addFilterChains(
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&new_filter_chain}, nullptr,
+      filter_chain_factory_builder_, filter_chain_manager_);
+  auto filter_chain =
+      findFilterChainHelper(10000, "127.0.0.1", "FOO.example.com", "tls", {}, "8.8.8.8", 111);
+  EXPECT_NE(filter_chain, nullptr);
 }
 
 TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {

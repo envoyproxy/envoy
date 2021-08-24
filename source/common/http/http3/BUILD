@@ -9,17 +9,30 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "quic_codec_factory_lib",
-    hdrs = ["quic_codec_factory.h"],
+    name = "conn_pool_lib",
+    srcs = ["conn_pool.cc"],
+    hdrs = ["conn_pool.h"],
     deps = [
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/http:codec_interface",
-        "//include/envoy/network:connection_interface",
+        ":quic_client_connection_factory_lib",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/http:codec_client_lib",
+        "//source/common/http:conn_pool_base_lib",
+        "//source/common/quic:client_connection_factory_lib",
     ],
 )
 
 envoy_cc_library(
-    name = "well_known_names",
-    hdrs = ["well_known_names.h"],
-    deps = ["//source/common/singleton:const_singleton"],
+    name = "quic_client_connection_factory_lib",
+    hdrs = ["quic_client_connection_factory.h"],
+)
+
+envoy_cc_library(
+    name = "codec_stats_lib",
+    hdrs = ["codec_stats.h"],
+    deps = [
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
+        "//source/common/common:thread_lib",
+    ],
 )

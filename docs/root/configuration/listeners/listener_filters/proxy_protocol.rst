@@ -29,7 +29,7 @@ If there is a protocol error or an unsupported address family
 Statistics
 ----------
 
-This filter emits the following statistics: 
+This filter emits the following statistics:
 
 .. csv-table::
   :header: Name, Type, Description

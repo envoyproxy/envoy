@@ -1,0 +1,15 @@
+diff --git a/python/pip_install/repositories.bzl b/python/pip_install/repositories.bzl
+index df63674..80824e4 100644
+--- a/python/pip_install/repositories.bzl
++++ b/python/pip_install/repositories.bzl
+@@ -16,8 +16,8 @@ _RULE_DEPS = [
+     ),
+     (
+         "pypi__setuptools",
+-        "https://files.pythonhosted.org/packages/54/28/c45d8b54c1339f9644b87663945e54a8503cfef59cf0f65b3ff5dd17cf64/setuptools-42.0.2-py2.py3-none-any.whl",
+-        "c8abd0f3574bc23afd2f6fd2c415ba7d9e097c8a99b845473b0d957ba1e2dac6",
++        "https://files.pythonhosted.org/packages/70/06/849cc805ac6332210083f2114a95b22ee252ce81ed4e1be4f1d2b87c9108/setuptools-54.0.0-py3-none-any.whl",
++        "d85b57c41e88b69ab87065c964134ec85b7573cbab0fdaa7ef32330ed764600a",
+     ),
+     (
+         "pypi__wheel",

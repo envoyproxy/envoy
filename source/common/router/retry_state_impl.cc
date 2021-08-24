@@ -1,4 +1,4 @@
-#include "common/router/retry_state_impl.h"
+#include "source/common/router/retry_state_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -7,30 +7,15 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/http/codes.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Router {
-
-// These are defined in envoy/router/router.h, however during certain cases the compiler is
-// refusing to use the header version so allocate space here.
-const uint32_t RetryPolicy::RETRY_ON_5XX;
-const uint32_t RetryPolicy::RETRY_ON_GATEWAY_ERROR;
-const uint32_t RetryPolicy::RETRY_ON_CONNECT_FAILURE;
-const uint32_t RetryPolicy::RETRY_ON_ENVOY_RATE_LIMITED;
-const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
-const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
-const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
-const uint32_t RetryPolicy::RETRY_ON_RESET;
-const uint32_t RetryPolicy::RETRY_ON_GRPC_CANCELLED;
-const uint32_t RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
-const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
-const uint32_t RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE;
 
 RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
                                      Http::RequestHeaderMap& request_headers,

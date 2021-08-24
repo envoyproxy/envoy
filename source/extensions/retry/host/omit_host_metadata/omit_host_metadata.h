@@ -3,7 +3,7 @@
 #include "envoy/upstream/retry.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/well_known_names.h"
+#include "source/common/config/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

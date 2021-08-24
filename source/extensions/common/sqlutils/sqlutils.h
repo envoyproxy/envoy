@@ -1,4 +1,6 @@
-#include "common/protobuf/utility.h"
+#pragma once
+
+#include "source/common/protobuf/utility.h"
 
 #include "include/sqlparser/SQLParser.h"
 

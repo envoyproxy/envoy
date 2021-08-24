@@ -6,12 +6,11 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-#include "common/grpc/codec.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
 #include "google/api/http.pb.h"
 #include "grpc_transcoding/path_matcher.h"
@@ -43,16 +42,12 @@ struct VariableBinding {
 
 struct MethodInfo {
   const Protobuf::MethodDescriptor* descriptor_ = nullptr;
-  std::vector<const Protobuf::Field*> request_body_field_path;
-  std::vector<const Protobuf::Field*> response_body_field_path;
+  std::vector<const ProtobufWkt::Field*> request_body_field_path;
+  std::vector<const ProtobufWkt::Field*> response_body_field_path;
   bool request_type_is_http_body_ = false;
   bool response_type_is_http_body_ = false;
 };
 using MethodInfoSharedPtr = std::shared_ptr<MethodInfo>;
-
-void createHttpBodyEnvelope(Buffer::Instance& output,
-                            const std::vector<const Protobuf::Field*>& request_body_field_path,
-                            std::string content_type, uint64_t content_length);
 
 /**
  * Global configuration for the gRPC JSON transcoder filter. Factory for the Transcoder interface.
@@ -71,13 +66,15 @@ public:
       Api::Api& api);
 
   /**
-   * Create an instance of Transcoder interface based on incoming request
-   * @param headers headers received from decoder
-   * @param request_input a ZeroCopyInputStream reading from downstream request body
-   * @param response_input a TranscoderInputStream reading from upstream response body
-   * @param transcoder output parameter for the instance of Transcoder interface
-   * @param method_descriptor output parameter for the method looked up from config
-   * @return status whether the Transcoder instance are successfully created or not
+   * Create an instance of Transcoder interface based on incoming request.
+   * @param headers headers received from decoder.
+   * @param request_input a ZeroCopyInputStream reading from downstream request body.
+   * @param response_input a TranscoderInputStream reading from upstream response body.
+   * @param transcoder output parameter for the instance of Transcoder interface.
+   * @param method_descriptor output parameter for the method looked up from config.
+   * @return status whether the Transcoder instance are successfully created or not. If the method
+   *         is not found, status with Code::NOT_FOUND is returned. If the method is found, but
+   * fields cannot be resolved, status with Code::INVALID_ARGUMENT is returned.
    */
   ProtobufUtil::Status
   createTranscoder(const Http::RequestHeaderMap& headers,
@@ -107,7 +104,8 @@ public:
 
   bool disabled() const { return disabled_; }
 
-  bool strict_http_request_validation_{false};
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
+      RequestValidationOptions request_validation_options_{};
 
 private:
   /**
@@ -120,7 +118,7 @@ private:
   void addBuiltinSymbolDescriptor(const std::string& symbol_name);
   ProtobufUtil::Status resolveField(const Protobuf::Descriptor* descriptor,
                                     const std::string& field_path_str,
-                                    std::vector<const Protobuf::Field*>* field_path,
+                                    std::vector<const ProtobufWkt::Field*>* field_path,
                                     bool* is_http_body);
   ProtobufUtil::Status createMethodInfo(const Protobuf::MethodDescriptor* descriptor,
                                         const google::api::HttpRule& http_rule,
@@ -185,6 +183,10 @@ private:
   bool hasHttpBodyAsOutputType();
   void doTrailers(Http::ResponseHeaderOrTrailerMap& headers_or_trailers);
   void initPerRouteConfig();
+
+  // Helpers for flow control.
+  bool decoderBufferLimitReached(uint64_t buffer_length);
+  bool encoderBufferLimitReached(uint64_t buffer_length);
 
   JsonTranscoderConfig& config_;
   const JsonTranscoderConfig* per_route_config_{};

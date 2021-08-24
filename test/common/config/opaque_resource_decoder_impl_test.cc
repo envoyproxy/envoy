@@ -1,8 +1,8 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 
-#include "common/config/opaque_resource_decoder_impl.h"
-#include "common/protobuf/message_validator_impl.h"
+#include "source/common/config/opaque_resource_decoder_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -70,8 +70,7 @@ TEST_F(OpaqueResourceDecoderImplTest, ValidateIgnored) {
 
 // Handling of smuggled deprecated fields during Any conversion.
 TEST_F(OpaqueResourceDecoderImplTest, HiddenEnvoyDeprecatedFields) {
-  // This test is only valid in API-v3, and should be updated for API-v4, as
-  // the deprecated fields of API-v2 will be removed.
+  // This test is only valid in API-v3, and should be updated for API-v4
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
       TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(R"EOF(
       cluster_name: fare

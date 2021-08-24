@@ -1,8 +1,10 @@
+#pragma once
+
 #include <cstdint>
 #include <memory>
 #include <vector>
 
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"

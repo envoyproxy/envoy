@@ -1,4 +1,4 @@
-#include "extensions/filters/http/aws_lambda/aws_lambda_filter.h"
+#include "source/extensions/filters/http/aws_lambda/aws_lambda_filter.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

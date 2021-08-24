@@ -53,6 +53,8 @@ stable releases and sending announcements about them. This role is rotating on a
 | 2020 Q3 | Yuchen Dai ([lambdai](https://github.com/lambdai))             |
 | 2020 Q4 | Christoph Pakulski ([cpakulski](https://github.com/cpakulski)) |
 | 2021 Q1 | Rei Shimizu ([Shikugawa](https://github.com/Shikugawa))        |
+| 2021 Q2 | Dmitri Dolguikh ([dmitri-d](https://github.com/dmitri-d))      |
+| 2021 Q3 | Takeshi Yoneda ([mathetake](https://github.com/mathetake))     |
 
 ## Release schedule
 
@@ -68,6 +70,8 @@ deadline of 3 weeks.
 | 1.15.0  | 2020/06/30 | 2020/07/07 |   +7 days  | 2021/07/07  |
 | 1.16.0  | 2020/09/30 | 2020/10/08 |   +8 days  | 2021/10/08  |
 | 1.17.0  | 2020/12/31 | 2021/01/11 |  +11 days  | 2022/01/11  |
-| 1.18.0  | 2021/03/31 |            |            |             |
+| 1.18.0  | 2021/03/31 | 2021/04/15 |  +15 days  | 2022/04/15  |
+| 1.19.0  | 2021/06/30 | 2021/07/13 |  +13 days  | 2022/07/13  |
+| 1.20.0  | 2021/09/30 |            |            |             |
 
 [repokitteh]: https://github.com/repokitteh

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <memory>
 
 #include "envoy/common/pure.h"
@@ -17,7 +16,8 @@ public:
   virtual ~ExternalProcessorStream() = default;
   virtual void send(envoy::service::ext_proc::v3alpha::ProcessingRequest&& request,
                     bool end_stream) PURE;
-  virtual void close() PURE;
+  // Idempotent close. Return true if it actually closed.
+  virtual bool close() PURE;
 };
 
 using ExternalProcessorStreamPtr = std::unique_ptr<ExternalProcessorStream>;
@@ -34,8 +34,7 @@ public:
 class ExternalProcessorClient {
 public:
   virtual ~ExternalProcessorClient() = default;
-  virtual ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks,
-                                           const std::chrono::milliseconds& timeout) PURE;
+  virtual ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks) PURE;
 };
 
 using ExternalProcessorClientPtr = std::unique_ptr<ExternalProcessorClient>;

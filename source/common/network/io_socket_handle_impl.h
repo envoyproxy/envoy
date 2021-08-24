@@ -6,8 +6,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/io_handle.h"
 
-#include "common/common/logger.h"
-#include "common/network/io_socket_error_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/io_socket_error_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -61,6 +61,9 @@ public:
   Api::SysCallIntResult setOption(int level, int optname, const void* optval,
                                   socklen_t optlen) override;
   Api::SysCallIntResult getOption(int level, int optname, void* optval, socklen_t* optlen) override;
+  Api::SysCallIntResult ioctl(unsigned long control_code, void* in_buffer,
+                              unsigned long in_buffer_len, void* out_buffer,
+                              unsigned long out_buffer_len, unsigned long* bytes_returned) override;
   Api::SysCallIntResult setBlocking(bool blocking) override;
   absl::optional<int> domain() override;
   Address::InstanceConstSharedPtr localAddress() override;
@@ -82,9 +85,9 @@ protected:
   // Converts a SysCallSizeResult to IoCallUint64Result.
   template <typename T>
   Api::IoCallUint64Result sysCallResultToIoCallResult(const Api::SysCallResult<T>& result) {
-    if (result.rc_ >= 0) {
+    if (result.return_value_ >= 0) {
       // Return nullptr as IoError upon success.
-      return Api::IoCallUint64Result(result.rc_,
+      return Api::IoCallUint64Result(result.return_value_,
                                      Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
     }
     RELEASE_ASSERT(result.errno_ != SOCKET_ERROR_INVAL, "Invalid argument passed in.");

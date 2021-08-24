@@ -6,7 +6,7 @@ Locality weighted load balancing
 One approach to determining how to weight assignments across different zones
 and geographical locations is by using explicit weights supplied via EDS in the
 :ref:`LocalityLbEndpoints <envoy_v3_api_msg_config.endpoint.v3.LocalityLbEndpoints>` message.
-This approach is mutually exclusive with 
+This approach is mutually exclusive with
 :ref:`zone aware routing <arch_overview_load_balancing_zone_aware_routing>`, since
 in the case of locality aware LB, we rely on the management server to provide the
 locality weighting, rather than the Envoy-side heuristics used in zone aware
@@ -69,4 +69,3 @@ identifying the location of the upstream hosts via :ref:`locality
 This feature is not compatible with :ref:`load balancer subsetting
 <arch_overview_load_balancer_subsets>`, since it is not straightforward to
 reconcile locality level weighting with sensible weights for individual subsets.
-

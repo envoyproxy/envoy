@@ -1,4 +1,4 @@
-#include "extensions/filters/http/grpc_http1_bridge/config.h"
+#include "source/extensions/filters/http/grpc_http1_bridge/config.h"
 
 #include "test/mocks/server/factory_context.h"
 

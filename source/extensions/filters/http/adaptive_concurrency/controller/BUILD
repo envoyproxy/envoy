@@ -23,7 +23,8 @@ envoy_cc_library(
         "libcircllhist",
     ],
     deps = [
-        "//include/envoy/common:time_interface",
+        "//envoy/common:time_interface",
+        "//source/common/common:thread_synchronizer_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/protobuf",
         "//source/common/runtime:runtime_lib",

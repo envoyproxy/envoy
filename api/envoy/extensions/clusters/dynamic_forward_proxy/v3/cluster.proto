@@ -24,12 +24,12 @@ message ClusterConfig {
 
   // The DNS cache configuration that the cluster will attach to. Note this configuration must
   // match that of associated :ref:`dynamic forward proxy HTTP filter configuration
-  // <envoy_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.dns_cache_config>`.
+  // <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.dns_cache_config>`.
   common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 1
       [(validate.rules).message = {required: true}];
 
   // If true allow the cluster configuration to disable the auto_sni and auto_san_validation options
   // in the :ref:`cluster's upstream_http_protocol_options
-  // <envoy_api_field_config.cluster.v3.Cluster.upstream_http_protocol_options>`
+  // <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_http_protocol_options>`
   bool allow_insecure_cluster_options = 2;
 }

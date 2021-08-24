@@ -1,19 +1,19 @@
-#include "common/config/http_subscription_impl.h"
+#include "source/common/config/http_subscription_impl.h"
 
 #include <memory>
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/config/decoded_resource_impl.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/http/headers.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/http/headers.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "google/api/annotations.pb.h"
 
@@ -82,13 +82,15 @@ void HttpSubscriptionImpl::createRequest(Http::RequestMessage& request) {
 void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) {
   disableInitFetchTimeoutTimer();
   envoy::service::discovery::v3::DiscoveryResponse message;
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_);
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
     handleFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     return;
   }
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     const auto decoded_resources =
         DecodedResourcesWrapper(resource_decoder_, message.resources(), message.version_info());
     callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info());
@@ -97,7 +99,9 @@ void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) 
     stats_.version_.set(HashUtil::xxHash64(request_.version_info()));
     stats_.version_text_.set(request_.version_info());
     stats_.update_success_.inc();
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
     handleFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);
   }
 }

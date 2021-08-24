@@ -1,9 +1,11 @@
-#include "server/hot_restarting_base.h"
+#include "source/server/hot_restarting_base.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/stats/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/mem_block_builder.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Server {
@@ -11,12 +13,14 @@ namespace Server {
 using HotRestartMessage = envoy::HotRestartMessage;
 
 static constexpr uint64_t MaxSendmsgSize = 4096;
+static constexpr absl::Duration CONNECTION_REFUSED_RETRY_DELAY = absl::Seconds(1);
+static constexpr int SENDMSG_MAX_RETRIES = 10;
 
 HotRestartingBase::~HotRestartingBase() {
   if (my_domain_socket_ != -1) {
     Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
     Api::SysCallIntResult result = os_sys_calls.close(my_domain_socket_);
-    ASSERT(result.rc_ == 0);
+    ASSERT(result.return_value_ == 0);
   }
 }
 
@@ -36,8 +40,9 @@ sockaddr_un HotRestartingBase::createDomainSocketAddress(uint64_t id, const std:
   initDomainSocketAddress(&address);
   Network::Address::PipeInstance addr(fmt::format(socket_path + "_{}_{}", role, base_id_ + id),
                                       socket_mode, nullptr);
-  memcpy(&address, addr.sockAddr(), addr.sockAddrLen());
+  safeMemcpy(&address, &(addr.getSockAddr()));
   fchmod(my_domain_socket_, socket_mode);
+
   return address;
 }
 
@@ -51,7 +56,7 @@ void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role,
   unlink(address.sun_path);
   Api::SysCallIntResult result =
       os_sys_calls.bind(my_domain_socket_, reinterpret_cast<sockaddr*>(&address), sizeof(address));
-  if (result.rc_ != 0) {
+  if (result.return_value_ != 0) {
     const auto msg = fmt::format(
         "unable to bind domain socket with base_id={}, id={}, errno={} (see --base-id option)",
         base_id_, id, result.errno_);
@@ -64,6 +69,7 @@ void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role,
 
 void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
                                               const HotRestartMessage& proto) {
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   const uint64_t serialized_size = proto.ByteSizeLong();
   const uint64_t total_size = sizeof(uint64_t) + serialized_size;
   // Fill with uint64_t 'length' followed by the serialized HotRestartMessage.
@@ -107,10 +113,36 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
       ASSERT(sent == total_size, "an fd passing message was too long for one sendmsg().");
     }
 
-    const int rc = sendmsg(my_domain_socket_, &message, 0);
-    RELEASE_ASSERT(rc == static_cast<int>(cur_chunk_size),
-                   fmt::format("hot restart sendmsg() failed: returned {}, errno {}", rc, errno));
+    // A transient connection refused error probably means the old process is not ready.
+    int saved_errno = 0;
+    int rc = 0;
+    bool sent = false;
+    for (int i = 0; i < SENDMSG_MAX_RETRIES; i++) {
+      auto result = os_sys_calls.sendmsg(my_domain_socket_, &message, 0);
+      rc = result.return_value_;
+      saved_errno = result.errno_;
+
+      if (rc == static_cast<int>(cur_chunk_size)) {
+        sent = true;
+        break;
+      }
+
+      if (saved_errno == ECONNREFUSED) {
+        ENVOY_LOG(error, "hot restart sendmsg() connection refused, retrying");
+        absl::SleepFor(CONNECTION_REFUSED_RETRY_DELAY);
+        continue;
+      }
+
+      RELEASE_ASSERT(false, fmt::format("hot restart sendmsg() failed: returned {}, errno {}", rc,
+                                        saved_errno));
+    }
+
+    if (!sent) {
+      RELEASE_ASSERT(false, fmt::format("hot restart sendmsg() failed: returned {}, errno {}", rc,
+                                        saved_errno));
+    }
   }
+
   RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, O_NONBLOCK) != -1,
                  fmt::format("Set domain socket nonblocking failed, errno = {}", errno));
 }

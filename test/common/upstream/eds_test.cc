@@ -7,11 +7,10 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/utility.h"
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/eds.h"
-
-#include "server/transport_socket_config_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/eds.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
@@ -57,6 +56,36 @@ public:
                  Cluster::InitializePhase::Secondary);
   }
 
+  //  Define a cluster with secure and unsecure (default) transport
+  //  sockets.
+  void resetClusterWithTransportSockets() {
+    resetCluster(R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: ROUND_ROBIN
+      eds_cluster_config:
+        service_name: fare
+        eds_config:
+          api_config_source:
+            api_type: REST
+            cluster_names:
+            - eds
+            refresh_delay: 1s
+      transport_socket_matches:
+      - match:
+          secure: enabled
+        name: secure-mode
+        transport_socket:
+          name: envoy.transport_sockets.tls
+      - match: {}
+        name: default-mode
+        transport_socket:
+          name: envoy.transport_sockets.raw_buffer
+ )EOF",
+                 Cluster::InitializePhase::Secondary);
+  }
+
   void resetClusterDrainOnHostRemoval() {
     resetCluster(R"EOF(
         name: name
@@ -97,7 +126,7 @@ public:
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
-        singleton_manager_, tls_, validation_visitor_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_);
     cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_, factory_context,
                                                 std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
@@ -118,7 +147,7 @@ public:
 
   bool initialized_{};
   Stats::TestUtil::TestStore stats_;
-  Ssl::MockContextManager ssl_context_manager_;
+  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   envoy::config::cluster::v3::Cluster eds_cluster_;
   NiceMock<MockClusterManager> cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -132,6 +161,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
+  Server::MockOptions options_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
@@ -442,14 +472,59 @@ TEST_F(EdsTest, EndpointMetadata) {
   // New resources with Metadata updated.
   Config::Metadata::mutableMetadataValue(*canary->mutable_metadata(),
                                          Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("v2");
+      .set_string_value("v3");
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   auto& nhosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(nhosts.size(), 2);
   EXPECT_EQ(Config::Metadata::metadataValue(nhosts[1]->metadata().get(),
                                             Config::MetadataFilters::get().ENVOY_LB, "version")
                 .string_value(),
-            "v2");
+            "v3");
+}
+
+// Test verifies that updating metadata updates
+// data members dependent on metadata values.
+// Specifically, it transport socket matcher has changed,
+// the transport socket factory should also be updated.
+TEST_F(EdsTest, EndpointMetadataWithTransportSocket) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  resetClusterWithTransportSockets();
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  // Add single endpoint to the cluster.
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* endpoint = endpoints->add_lb_endpoints();
+
+  auto* socket_address = endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(80);
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(hosts.size(), 1);
+  auto* upstream_host = hosts[0].get();
+
+  // Verify that default transport socket is raw (does not implement secure transport).
+  EXPECT_FALSE(upstream_host->transportSocketFactory().implementsSecureTransport());
+
+  // Create metadata with transport socket match pointing to secure mode.
+  auto metadata = new envoy::config::core::v3::Metadata();
+  MetadataConstSharedPtr metadata_sharedptr(metadata);
+  Config::Metadata::mutableMetadataValue(
+      *metadata, Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKET_MATCH, "secure")
+      .set_string_value("enabled");
+
+  // Update metadata.
+  upstream_host->metadata(metadata_sharedptr);
+
+  // Transport socket factory should point to tls, which implements secure transport.
+  EXPECT_TRUE(upstream_host->transportSocketFactory().implementsSecureTransport());
 }
 
 // Validate that onConfigUpdate() updates endpoint health status.
@@ -459,7 +534,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   auto* endpoints = cluster_load_assignment.add_endpoints();
 
   // First check that EDS is correctly mapping
-  // envoy::api::v2::core::HealthStatus values to the expected health() status.
+  // HealthStatus values to the expected health() status.
   const std::vector<std::pair<envoy::config::core::v3::HealthStatus, Host::Health>>
       health_status_expected = {
           {envoy::config::core::v3::UNKNOWN, Host::Health::Healthy},
@@ -882,10 +957,11 @@ TEST_F(EdsTest, EndpointMovedToNewPriorityWithDrain) {
   add_endpoint(80, 1);
 
   // Verify that no hosts gets added or removed to/from the PrioritySet.
-  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
-    EXPECT_TRUE(added.empty());
-    EXPECT_TRUE(removed.empty());
-  });
+  auto member_update_cb =
+      cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+        EXPECT_TRUE(added.empty());
+        EXPECT_TRUE(removed.empty());
+      });
 
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
@@ -995,10 +1071,11 @@ TEST_F(EdsTest, EndpointMovedWithDrain) {
   add_endpoint(81, 0);
   add_endpoint(80, 1);
   // Verify that no hosts gets added or removed to/from the PrioritySet.
-  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
-    EXPECT_TRUE(added.empty());
-    EXPECT_TRUE(removed.empty());
-  });
+  auto member_update_cb =
+      cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+        EXPECT_TRUE(added.empty());
+        EXPECT_TRUE(removed.empty());
+      });
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
   {
@@ -1076,10 +1153,11 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
   add_endpoint(80, 1);
 
   // Verify that no hosts gets added or removed to/from the PrioritySet.
-  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
-    EXPECT_TRUE(added.empty());
-    EXPECT_TRUE(removed.empty());
-  });
+  auto member_update_cb =
+      cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+        EXPECT_TRUE(added.empty());
+        EXPECT_TRUE(removed.empty());
+      });
 
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
@@ -1189,10 +1267,11 @@ TEST_F(EdsTest, EndpointMoved) {
   add_endpoint(81, 0);
   add_endpoint(80, 1);
   // Verify that no hosts gets added or removed to/from the PrioritySet.
-  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
-    EXPECT_TRUE(added.empty());
-    EXPECT_TRUE(removed.empty());
-  });
+  auto member_update_cb =
+      cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+        EXPECT_TRUE(added.empty());
+        EXPECT_TRUE(removed.empty());
+      });
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
   {
@@ -1276,10 +1355,11 @@ TEST_F(EdsTest, EndpointMovedToNewPriorityWithHealthAddressChange) {
   add_endpoint(81, 0, 82);
 
   // Changing a health check endpoint at the same time as priority is an add and immediate remove
-  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
-    EXPECT_EQ(added.size(), 1);
-    EXPECT_EQ(removed.size(), 1);
-  });
+  auto member_update_cb =
+      cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+        EXPECT_EQ(added.size(), 1);
+        EXPECT_EQ(removed.size(), 1);
+      });
 
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
@@ -1298,10 +1378,11 @@ TEST_F(EdsTest, EndpointMovedToNewPriorityWithHealthAddressChange) {
   add_endpoint(81, 1, 83);
 
   // Changing a health check endpoint at the same time as priority is an add and immediate remove
-  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
-    EXPECT_EQ(added.size(), 1);
-    EXPECT_EQ(removed.size(), 1);
-  });
+  auto member_update_cb2 =
+      cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+        EXPECT_EQ(added.size(), 1);
+        EXPECT_EQ(removed.size(), 1);
+      });
 
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 

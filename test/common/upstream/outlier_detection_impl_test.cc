@@ -8,9 +8,9 @@
 #include "envoy/config/cluster/v3/outlier_detection.pb.h"
 #include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
 
-#include "common/network/utility.h"
-#include "common/upstream/outlier_detection_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/outlier_detection_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
@@ -208,6 +208,26 @@ max_ejection_time: 3s
   ASSERT_THROW(DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_,
                                     time_system_, event_logger_),
                EnvoyException);
+}
+
+// Test verifies that legacy config without max_ejection_time value
+// specified and base_ejection_time value larger than default value
+// of max_ejection_time will be accepted.
+// Values of base_ejection_time and max_ejection_time will be equal.
+TEST_F(OutlierDetectorImplTest, DetectorStaticConfigBaseLargerThanMaxNoMax) {
+  const std::string yaml = R"EOF(
+interval: 0.1s
+base_ejection_time: 400s
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, outlier_detection, dispatcher_, runtime_, time_system_, event_logger_));
+
+  EXPECT_EQ(100UL, detector->config().intervalMs());
+  EXPECT_EQ(400000UL, detector->config().baseEjectionTimeMs());
+  EXPECT_EQ(400000UL, detector->config().maxEjectionTimeMs());
 }
 
 TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
@@ -1894,7 +1914,9 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   absl::optional<MonotonicTime> monotonic_time;
   NiceMock<MockDetector> detector;
 
-  EXPECT_CALL(log_manager, createAccessLog("foo")).WillOnce(Return(file));
+  EXPECT_CALL(log_manager, createAccessLog(Filesystem::FilePathAndType{
+                               Filesystem::DestinationType::File, "foo"}))
+      .WillOnce(Return(file));
   EventLoggerImpl event_logger(log_manager, "foo", time_system);
 
   StringViewSaver log1;

@@ -10,8 +10,6 @@
 namespace Envoy {
 namespace Server {
 
-using ::testing::NiceMock;
-using ::testing::ReturnNew;
 using ::testing::ReturnRef;
 
 MockThreadLocalOverloadState::MockThreadLocalOverloadState()

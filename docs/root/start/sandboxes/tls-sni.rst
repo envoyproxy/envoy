@@ -8,10 +8,10 @@ TLS Server name indication (``SNI``)
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
+        Used to make ``HTTP`` requests.
 
    :ref:`jq <start_sandboxes_setup_jq>`
-	Parse ``json`` output from the upstream echo servers.
+        Parse ``json`` output from the upstream echo servers.
 
 This example demonstrates an Envoy proxy that listens on three ``TLS`` domains
 on the same ``IP`` address.
@@ -43,9 +43,9 @@ Create self-signed certificates for these endpoints as follows:
    $ mkdir -p certs
 
    $ openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
-	    -subj "/C=US/ST=CA/O=MyExample, Inc./CN=domain1.example.com" \
-	    -keyout certs/domain1.key.pem \
-	    -out certs/domain1.crt.pem
+            -subj "/C=US/ST=CA/O=MyExample, Inc./CN=domain1.example.com" \
+            -keyout certs/domain1.key.pem \
+            -out certs/domain1.crt.pem
    Generating a RSA private key
    .............+++++
    ...................+++++
@@ -53,9 +53,9 @@ Create self-signed certificates for these endpoints as follows:
    -----
 
    $ openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
-	    -subj "/C=US/ST=CA/O=MyExample, Inc./CN=domain2.example.com" \
-	    -keyout certs/domain2.key.pem \
-	    -out certs/domain2.crt.pem
+            -subj "/C=US/ST=CA/O=MyExample, Inc./CN=domain2.example.com" \
+            -keyout certs/domain2.key.pem \
+            -out certs/domain2.crt.pem
    Generating a RSA private key
    .............+++++
    ...................+++++
@@ -125,18 +125,18 @@ Each endpoint should proxy to the respective ``http-upstream`` or ``https-upstre
 .. code-block:: console
 
    $ curl -sk --resolve domain1.example.com:10000:127.0.0.1 \
-	 https://domain1.example.com:10000 \
-	| jq -r '.os.hostname'
+         https://domain1.example.com:10000 \
+        | jq -r '.os.hostname'
    http-upstream1
 
    $ curl -sk --resolve domain2.example.com:10000:127.0.0.1 \
-	 https://domain2.example.com:10000 \
-	| jq -r '.os.hostname'
+         https://domain2.example.com:10000 \
+        | jq -r '.os.hostname'
    http-upstream2
 
    $ curl -sk --resolve domain3.example.com:10000:127.0.0.1 \
-	 https://domain3.example.com:10000 \
-	| jq -r '.os.hostname'
+         https://domain3.example.com:10000 \
+        | jq -r '.os.hostname'
    https-upstream3
 
 Step 3: Query the ``SNI`` endpoints via an Envoy proxy client

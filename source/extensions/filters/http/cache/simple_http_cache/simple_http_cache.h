@@ -1,12 +1,14 @@
 #pragma once
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/cache/http_cache.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/cache/http_cache.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
+
+// included to make code_format happy
+#include "envoy/extensions/cache/simple_http_cache/v3alpha/config.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -42,7 +44,7 @@ public:
   // Inserts a response that has been varied on certain headers.
   void varyInsert(const Key& request_key, Http::ResponseHeaderMapPtr&& response_headers,
                   ResponseMetadata&& metadata, std::string&& body,
-                  const Http::RequestHeaderMap& request_vary_headers);
+                  const Http::RequestHeaderMap& request_headers, const VaryHeader& vary_allow_list);
 
   absl::Mutex mutex_;
   absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_ ABSL_GUARDED_BY(mutex_);

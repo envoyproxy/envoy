@@ -22,7 +22,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":network_utility_lib",
-        "//include/envoy/server:options_interface",
+        "//envoy/server:options_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:macros",
@@ -44,7 +44,7 @@ envoy_cc_test_library(
     hdrs = ["network_utility.h"],
     deps = [
         ":utility_lib",
-        "//include/envoy/network:filter_interface",
+        "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
@@ -81,7 +81,7 @@ envoy_cc_library(
     srcs = ["printers.cc"],
     hdrs = ["printers.h"],
     deps = [
-        "//include/envoy/network:address_interface",
+        "//envoy/network:address_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
     ],
@@ -91,7 +91,7 @@ envoy_cc_test_library(
     name = "registry_lib",
     hdrs = ["registry.h"],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
     ],
 )
 
@@ -115,9 +115,9 @@ envoy_cc_test_library(
         ":resources_lib",
         ":test_time_lib",
         ":thread_factory_for_test_lib",
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/http:codec_interface",
-        "//include/envoy/network:address_interface",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/http:codec_interface",
+        "//envoy/network:address_interface",
         "//source/common/api:api_lib",
         "//source/common/common:empty_string",
         "//source/common/common:thread_lib",
@@ -128,12 +128,14 @@ envoy_cc_test_library(
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/stats:stats_mocks",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
@@ -250,8 +252,8 @@ envoy_cc_test_library(
     deps = [
         ":global_lib",
         ":only_one_thread_lib",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
         "//source/common/common:thread_lib",
     ],
 )
@@ -320,4 +322,12 @@ envoy_basic_cc_library(
     name = "test_version_linkstamp",
     srcs = ["test_version_linkstamp.cc"],
     alwayslink = 1,
+)
+
+envoy_cc_test_library(
+    name = "delegating_route_utility_lib",
+    srcs = ["delegating_route_utility.h"],
+    deps = [
+        "//source/common/router:delegating_route_lib",
+    ],
 )

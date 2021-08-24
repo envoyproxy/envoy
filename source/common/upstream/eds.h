@@ -15,11 +15,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/locality.h"
 
-#include "common/config/subscription_base.h"
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/clusters/well_known_names.h"
+#include "source/common/config/subscription_base.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -52,7 +50,8 @@ private:
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
                               const HostVector& new_hosts, LocalityWeightsMap& locality_weights_map,
                               LocalityWeightsMap& new_locality_weights_map,
-                              PriorityStateManager& priority_state_manager, HostMap& updated_hosts,
+                              PriorityStateManager& priority_state_manager,
+                              const HostMap& all_hosts,
                               const absl::flat_hash_set<std::string>& all_new_hosts);
   bool validateUpdateSize(int num_resources);
 
@@ -80,7 +79,6 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
-  HostMap all_hosts_;
   Event::TimerPtr assignment_timeout_;
   InitializePhase initialize_phase_;
 };
@@ -89,7 +87,7 @@ using EdsClusterImplSharedPtr = std::shared_ptr<EdsClusterImpl>;
 
 class EdsClusterFactory : public ClusterFactoryImplBase {
 public:
-  EdsClusterFactory() : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().Eds) {}
+  EdsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.eds") {}
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(

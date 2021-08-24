@@ -59,7 +59,7 @@ protected:
     auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-    response->waitForEndStream();
+    RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
 
     return response;
   }
@@ -68,7 +68,7 @@ protected:
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
-    response->waitForEndStream();
+    RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
 
     return response;
   }

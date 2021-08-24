@@ -3,7 +3,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "xds/core/v3/collection_entry.pb.h"
 

@@ -1,7 +1,6 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/zero_copy_input_stream_impl.h"
-
-#include "extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
 
 #include "test/proto/bookstore.pb.h"
 
@@ -20,7 +19,7 @@ public:
 
   void setBodyFieldPath(const std::vector<int>& body_field_path) {
     for (int field_number : body_field_path) {
-      Protobuf::Field field;
+      ProtobufWkt::Field field;
       field.set_number(field_number);
       raw_body_field_path_.emplace_back(std::move(field));
     }
@@ -76,8 +75,8 @@ public:
     EXPECT_FALSE(HttpBodyUtils::parseMessageByFieldPath(&stream, body_field_path_, &http_body));
   }
 
-  std::vector<Protobuf::Field> raw_body_field_path_;
-  std::vector<const Protobuf::Field*> body_field_path_;
+  std::vector<ProtobufWkt::Field> raw_body_field_path_;
+  std::vector<const ProtobufWkt::Field*> body_field_path_;
 };
 
 TEST_F(HttpBodyUtilsTest, EmptyFieldsList) {

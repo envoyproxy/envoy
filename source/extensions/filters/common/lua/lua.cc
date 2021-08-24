@@ -1,12 +1,12 @@
-#include "extensions/filters/common/lua/lua.h"
+#include "source/extensions/filters/common/lua/lua.h"
 
 #include <memory>
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -70,10 +70,14 @@ int ThreadLocalState::getGlobalRef(uint64_t slot) {
   return tls.global_slots_[slot];
 }
 
-uint64_t ThreadLocalState::registerGlobal(const std::string& global) {
-  tls_slot_->runOnAllThreads([global](OptRef<LuaThreadLocal> tls) {
+uint64_t ThreadLocalState::registerGlobal(const std::string& global,
+                                          const InitializerList& initializers) {
+  tls_slot_->runOnAllThreads([global, initializers](OptRef<LuaThreadLocal> tls) {
     lua_getglobal(tls->state_.get(), global.c_str());
     if (lua_isfunction(tls->state_.get(), -1)) {
+      for (const auto& initialize : initializers) {
+        initialize(tls->state_.get());
+      }
       tls->global_slots_.push_back(luaL_ref(tls->state_.get(), LUA_REGISTRYINDEX));
     } else {
       ENVOY_LOG(debug, "definition for '{}' not found in script", global);

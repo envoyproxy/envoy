@@ -1,4 +1,4 @@
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include <cassert> // use direct system-assert to avoid cyclic dependency.
 #include <cstdint>
@@ -6,7 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "common/common/lock_guard.h"
+#include "source/common/common/json_escape_string.h"
+#include "source/common/common/lock_guard.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
@@ -207,6 +208,12 @@ void Registry::setLogFormat(const std::string& log_format) {
         ->add_flag<CustomFlagFormatter::EscapeMessageNewLine>(
             CustomFlagFormatter::EscapeMessageNewLine::Placeholder)
         .set_pattern(log_format);
+
+    // Escape log payload as JSON string when it sees "%j".
+    formatter
+        ->add_flag<CustomFlagFormatter::EscapeMessageJsonString>(
+            CustomFlagFormatter::EscapeMessageJsonString::Placeholder)
+        .set_pattern(log_format);
     logger.logger_->set_formatter(std::move(formatter));
   }
 }
@@ -226,8 +233,21 @@ namespace CustomFlagFormatter {
 
 void EscapeMessageNewLine::format(const spdlog::details::log_msg& msg, const std::tm&,
                                   spdlog::memory_buf_t& dest) {
-  auto escaped = absl::StrReplaceAll(absl::string_view(msg.payload.data(), msg.payload.size()),
-                                     replacements());
+  const std::string escaped = absl::StrReplaceAll(
+      absl::string_view(msg.payload.data(), msg.payload.size()), replacements());
+  dest.append(escaped.data(), escaped.data() + escaped.size());
+}
+
+void EscapeMessageJsonString::format(const spdlog::details::log_msg& msg, const std::tm&,
+                                     spdlog::memory_buf_t& dest) {
+
+  absl::string_view payload = absl::string_view(msg.payload.data(), msg.payload.size());
+  const uint64_t required_space = JsonEscaper::extraSpace(payload);
+  if (required_space == 0) {
+    dest.append(payload.data(), payload.data() + payload.size());
+    return;
+  }
+  const std::string escaped = JsonEscaper::escapeString(payload, required_space);
   dest.append(escaped.data(), escaped.data() + escaped.size());
 }
 

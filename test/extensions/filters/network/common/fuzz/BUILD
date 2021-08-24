@@ -12,6 +12,10 @@ load(
 
 licenses(["notice"])  # Apache 2
 
+exports_files([
+    "uber_per_readfilter.cc",
+])
+
 envoy_package()
 
 envoy_proto_library(
@@ -98,7 +102,6 @@ envoy_cc_fuzz_test(
     deps = [
         ":uber_writefilter_lib",
         "//source/common/config:utility_lib",
-        "//source/extensions/filters/network/kafka:kafka_broker_config_lib",
         "//source/extensions/filters/network/mongo_proxy:config",
         "//source/extensions/filters/network/mysql_proxy:config",
         "//source/extensions/filters/network/zookeeper_proxy:config",

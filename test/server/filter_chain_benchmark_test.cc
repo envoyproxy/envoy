@@ -7,11 +7,8 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/protobuf/message_validator.h"
 
-#include "common/network/socket_impl.h"
-
-#include "server/filter_chain_manager_impl.h"
-
-#include "extensions/transport_sockets/well_known_names.h"
+#include "source/common/network/socket_impl.h"
+#include "source/server/filter_chain_manager_impl.h"
 
 #include "test/benchmark/main.h"
 #include "test/mocks/network/mocks.h"
@@ -64,6 +61,8 @@ public:
     } else {
       res->address_provider_->setRemoteAddress(
           Network::Utility::parseInternetAddress(source_address, source_port));
+      res->address_provider_->setDirectRemoteAddressForTest(
+          Network::Utility::parseInternetAddress(source_address, source_port));
     }
     res->server_name_ = server_name;
     res->transport_protocol_ = transport_protocol;
@@ -113,6 +112,10 @@ public:
   Api::SysCallIntResult setSocketOption(int, int, const void*, socklen_t) override {
     return {0, 0};
   }
+  Api::SysCallIntResult ioctl(unsigned long, void*, unsigned long, void*, unsigned long,
+                              unsigned long*) override {
+    return {0, 0};
+  }
   Api::SysCallIntResult getSocketOption(int, int, void*, socklen_t*) const override {
     return {0, 0};
   }
@@ -123,7 +126,7 @@ public:
 private:
   Network::IoHandlePtr io_handle_;
   OptionsSharedPtr options_;
-  Network::SocketAddressSetterSharedPtr address_provider_;
+  std::shared_ptr<Network::SocketAddressSetterImpl> address_provider_;
   std::string server_name_;
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
@@ -133,7 +136,6 @@ const char YamlHeader[] = R"EOF(
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         # empty

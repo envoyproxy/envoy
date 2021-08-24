@@ -1,6 +1,6 @@
 #pragma once
 
-#include "extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
 
 #include "absl/strings/string_view.h"
 

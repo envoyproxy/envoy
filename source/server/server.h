@@ -23,27 +23,27 @@
 #include "envoy/stats/timespan.h"
 #include "envoy/tracing/http_tracer.h"
 
-#include "common/access_log/access_log_manager_impl.h"
-#include "common/common/assert.h"
-#include "common/common/cleanup.h"
-#include "common/common/logger_delegates.h"
-#include "common/grpc/async_client_manager_impl.h"
-#include "common/grpc/context_impl.h"
-#include "common/http/context_impl.h"
-#include "common/init/manager_impl.h"
-#include "common/memory/heap_shrinker.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/router/context_impl.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/secret/secret_manager_impl.h"
-#include "common/upstream/health_discovery_service.h"
-
-#include "server/admin/admin.h"
-#include "server/configuration_impl.h"
-#include "server/listener_hooks.h"
-#include "server/listener_manager_impl.h"
-#include "server/overload_manager_impl.h"
-#include "server/worker_impl.h"
+#include "source/common/access_log/access_log_manager_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/logger_delegates.h"
+#include "source/common/grpc/async_client_manager_impl.h"
+#include "source/common/grpc/context_impl.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/memory/heap_shrinker.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/quic/quic_stat_names.h"
+#include "source/common/router/context_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/secret/secret_manager_impl.h"
+#include "source/common/upstream/health_discovery_service.h"
+#include "source/server/admin/admin.h"
+#include "source/server/configuration_impl.h"
+#include "source/server/listener_hooks.h"
+#include "source/server/listener_manager_impl.h"
+#include "source/server/overload_manager_impl.h"
+#include "source/server/worker_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
@@ -71,9 +71,10 @@ struct ServerCompilationSettingsStats {
   COUNTER(envoy_bug_failures)                                                                      \
   COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(static_unknown_fields)                                                                   \
+  COUNTER(dropped_stat_flushes)                                                                    \
   GAUGE(concurrency, NeverImport)                                                                  \
-  GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
-  GAUGE(seconds_until_first_ocsp_response_expiring, Accumulate)                                    \
+  GAUGE(days_until_first_cert_expiring, NeverImport)                                               \
+  GAUGE(seconds_until_first_ocsp_response_expiring, NeverImport)                                   \
   GAUGE(hot_restart_epoch, NeverImport)                                                            \
   /* hot_restart_generation is an Accumulate gauge; we omit it here for testing dynamics. */       \
   GAUGE(live, NeverImport)                                                                         \
@@ -174,6 +175,7 @@ public:
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
+  const Server::Options& options() override { return server_.options(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return server_.messageValidationContext();
@@ -190,12 +192,14 @@ public:
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
   Stats::Store& stats() override { return server_.stats(); }
   Init::Manager& initManager() override { return server_.initManager(); }
+  AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     // Server has two message validation visitors, one for static and
     // other for dynamic configuration. Choose the dynamic validation
@@ -268,25 +272,24 @@ public:
   Router::Context& routerContext() override { return router_context_; }
   ProcessContextOptRef processContext() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
+  LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
   void flushStats() override;
-
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
-
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
-
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
   }
-
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
-
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
   }
+  bool enableReusePortDefault() override;
+
+  Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
   // ServerLifecycleNotifier
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
@@ -294,11 +297,13 @@ public:
   registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
 
 private:
+  enum class ReusePortDefault { True, False, Runtime };
+
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                  ComponentFactory& component_factory, ListenerHooks& hooks);
+                  ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
@@ -340,6 +345,7 @@ private:
   Assert::ActionRegistrationPtr envoy_bug_action_registration_;
   ThreadLocal::Instance& thread_local_;
   Random::RandomGeneratorPtr random_generator_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<AdminImpl> admin_;
@@ -362,7 +368,6 @@ private:
   std::unique_ptr<Server::GuardDog> worker_guard_dog_;
   bool terminated_;
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
-  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
@@ -380,8 +385,11 @@ private:
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
   ListenerHooks& hooks_;
-
+  Quic::QuicStatNames quic_stat_names_;
   ServerFactoryContextImpl server_contexts_;
+  absl::optional<ReusePortDefault> enable_reuse_port_default_;
+
+  bool stats_flush_in_progress_ : 1;
 
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {

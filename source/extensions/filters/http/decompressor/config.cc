@@ -1,10 +1,9 @@
-#include "extensions/filters/http/decompressor/config.h"
+#include "source/extensions/filters/http/decompressor/config.h"
 
 #include "envoy/compression/decompressor/config.h"
 
-#include "common/config/utility.h"
-
-#include "extensions/filters/http/decompressor/decompressor_filter.h"
+#include "source/common/config/utility.h"
+#include "source/extensions/filters/http/decompressor/decompressor_filter.h"
 
 namespace Envoy {
 namespace Extensions {

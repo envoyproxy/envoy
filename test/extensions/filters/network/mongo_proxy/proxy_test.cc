@@ -7,11 +7,11 @@
 #include "envoy/stats/stats.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "extensions/filters/network/mongo_proxy/bson_impl.h"
-#include "extensions/filters/network/mongo_proxy/codec_impl.h"
-#include "extensions/filters/network/mongo_proxy/mongo_stats.h"
-#include "extensions/filters/network/mongo_proxy/proxy.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/mongo_proxy/bson_impl.h"
+#include "source/extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "source/extensions/filters/network/mongo_proxy/mongo_stats.h"
+#include "source/extensions/filters/network/mongo_proxy/proxy.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/access_log/mocks.h"

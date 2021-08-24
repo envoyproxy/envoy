@@ -18,9 +18,12 @@ dynamic_resources:
 
 static_resources:
   clusters:
-  - connect_timeout: 1s
-    type: strict_dns
-    http2_protocol_options: {}
+  - type: STRICT_DNS
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
     name: xds_cluster
     load_assignment:
       cluster_name: xds_cluster
@@ -33,7 +36,6 @@ static_resources:
                 port_value: 18000
 
 admin:
-  access_log_path: /dev/null
   address:
     socket_address:
       address: 0.0.0.0

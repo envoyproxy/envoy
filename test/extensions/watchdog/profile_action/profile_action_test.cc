@@ -8,12 +8,11 @@
 #include "envoy/server/guarddog_config.h"
 #include "envoy/thread/thread.h"
 
-#include "common/common/assert.h"
-#include "common/filesystem/directory.h"
-#include "common/profiler/profiler.h"
-
-#include "extensions/watchdog/profile_action/config.h"
-#include "extensions/watchdog/profile_action/profile_action.h"
+#include "source/common/common/assert.h"
+#include "source/common/filesystem/directory.h"
+#include "source/common/profiler/profiler.h"
+#include "source/extensions/watchdog/profile_action/config.h"
+#include "source/extensions/watchdog/profile_action/profile_action.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"

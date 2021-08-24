@@ -13,9 +13,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/synchronization/mutex.h"
@@ -135,6 +134,11 @@ public:
   Ssl::HandshakerCapabilities capabilities() const override {
     // The default handshaker impl requires Envoy to handle all enumerated behaviors.
     return Ssl::HandshakerCapabilities{};
+  }
+
+  Ssl::SslCtxCb sslctxCb(Ssl::HandshakerFactoryContext&) const override {
+    // The default handshaker impl doesn't additionally modify SSL_CTX.
+    return nullptr;
   }
 
   static HandshakerFactory* getDefaultHandshakerFactory() {

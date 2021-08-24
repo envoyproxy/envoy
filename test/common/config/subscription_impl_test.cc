@@ -179,9 +179,9 @@ TEST_P(SubscriptionImplInitFetchTimeoutTest, InitialFetchTimeout) {
   expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
-  if (GetParam() == SubscriptionType::Http) {
-    expectDisableInitFetchTimeoutTimer();
-  }
+
+  expectDisableInitFetchTimeoutTimer();
+
   expectConfigUpdateFailed();
 
   callInitFetchTimeoutCb();

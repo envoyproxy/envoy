@@ -5,12 +5,11 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/service/accesslog/v3/als.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/grpc/typed_async_client.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/access_loggers/common/grpc_access_logger.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/grpc/typed_async_client.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/access_loggers/common/grpc_access_logger.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -20,7 +19,6 @@
 #include "test/test_common/test_runtime.h"
 
 using testing::_;
-using testing::AnyNumber;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -52,7 +50,7 @@ class MockGrpcAccessLoggerImpl
     : public Common::GrpcAccessLogger<ProtobufWkt::Struct, ProtobufWkt::Empty, ProtobufWkt::Struct,
                                       ProtobufWkt::Struct> {
 public:
-  MockGrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client,
+  MockGrpcAccessLoggerImpl(const Grpc::RawAsyncClientSharedPtr& client,
                            std::chrono::milliseconds buffer_flush_interval_msec,
                            uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                            Stats::Scope& scope, std::string access_log_prefix,
@@ -327,7 +325,7 @@ private:
   // Common::GrpcAccessLoggerCache
   MockGrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Grpc::RawAsyncClientPtr&& client,
+               envoy::config::core::v3::ApiVersion, const Grpc::RawAsyncClientSharedPtr& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) override {
     return std::make_shared<MockGrpcAccessLoggerImpl>(
@@ -345,7 +343,7 @@ public:
     async_client_ = new Grpc::MockAsyncClient;
     EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, false))
         .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
+          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
           }));
           return Grpc::AsyncClientFactoryPtr{factory_};
@@ -368,31 +366,36 @@ TEST_F(GrpcAccessLoggerCacheTest, Deduplication) {
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-1");
 
   expectClientCreation();
-  MockGrpcAccessLoggerImpl::SharedPtr logger1 =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope);
+  MockGrpcAccessLoggerImpl::SharedPtr logger1 = logger_cache_.getOrCreateLogger(
+      config, envoy::config::core::v3::ApiVersion::V3, Common::GrpcAccessLoggerType::HTTP, scope);
   EXPECT_EQ(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::HTTP, scope));
 
   // Do not deduplicate different types of logger
   expectClientCreation();
   EXPECT_NE(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::TCP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::TCP, scope));
 
   // Changing log name leads to another logger.
   config.set_log_name("log-2");
   expectClientCreation();
   EXPECT_NE(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::HTTP, scope));
 
   config.set_log_name("log-1");
   EXPECT_EQ(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::HTTP, scope));
 
   // Changing cluster name leads to another logger.
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-2");
   expectClientCreation();
   EXPECT_NE(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::HTTP, scope));
 }
 
 } // namespace

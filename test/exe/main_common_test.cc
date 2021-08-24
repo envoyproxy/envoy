@@ -1,14 +1,13 @@
 #include "envoy/common/platform.h"
 
-#include "common/common/lock_guard.h"
-#include "common/common/mutex_tracer_impl.h"
-#include "common/common/random_generator.h"
-#include "common/common/thread.h"
-#include "common/runtime/runtime_impl.h"
-
-#include "exe/main_common.h"
-
-#include "server/options_impl.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/mutex_tracer_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/common/thread.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/exe/main_common.h"
+#include "source/exe/platform_impl.h"
+#include "source/server/options_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/contention.h"
@@ -19,7 +18,7 @@
 #include "gtest/gtest.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "common/signal/signal_action.h"
+#include "source/common/signal/signal_action.h"
 #endif
 
 #include "absl/synchronization/notification.h"
@@ -105,6 +104,17 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   EXPECT_TRUE(main_common.run());
 }
 
+TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInitWithVectorArgs) {
+  addArg("--disable-hot-restart");
+  initOnly();
+  std::vector<std::string> args(argv_.size());
+  for (size_t i = 0; i < argv_.size() - 1; ++i) {
+    args[i] = std::string(argv_[i]);
+  }
+  MainCommon main_common(args);
+  EXPECT_TRUE(main_common.run());
+}
+
 // Exercise base-id-path option.
 TEST_P(MainCommonTest, ConstructWritesBasePathId) {
 #ifdef ENVOY_HOT_RESTART
@@ -117,10 +127,46 @@ TEST_P(MainCommonTest, ConstructWritesBasePathId) {
 #endif
 }
 
+// Exercise enabling core dump and succeeding.
+// Note: this test will call the real system call, which is what we want.
+TEST_P(MainCommonTest, EnableCoreDump) {
+#ifdef __linux__
+  addArg("--enable-core-dump");
+  auto test = [&]() { MainCommon main_common(argc(), argv()); };
+  EXPECT_LOG_CONTAINS("info", "core dump enabled", test());
+#endif
+}
+
+class MockPlatformImpl : public PlatformImpl {
+public:
+  MOCK_METHOD(bool, enableCoreDump, ());
+};
+
+// Exercise enabling core dump and failing.
+TEST_P(MainCommonTest, EnableCoreDumpFails) {
+  Event::TestRealTimeSystem real_time_system;
+  DefaultListenerHooks default_listener_hooks;
+  ProdComponentFactory prod_component_factory;
+
+  const auto args = std::vector<std::string>(
+      {"envoy-static", "--use-dynamic-base-id", "-c", config_file_, "--enable-core-dump"});
+  OptionsImpl options(args, &MainCommon::hotRestartVersion, spdlog::level::info);
+
+  auto test = [&]() {
+    auto* platform_impl = new NiceMock<MockPlatformImpl>();
+    EXPECT_CALL(*platform_impl, enableCoreDump()).WillOnce(Return(false));
+    MainCommonBase first(options, real_time_system, default_listener_hooks, prod_component_factory,
+                         std::unique_ptr<PlatformImpl>{platform_impl},
+                         std::make_unique<Random::RandomGeneratorImpl>(), nullptr);
+  };
+
+  EXPECT_NO_THROW(test());
+  EXPECT_LOG_CONTAINS("warn", "failed to enable core dump", test());
+}
+
 // Test that an in-use base id triggers a retry and that we eventually give up.
 TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
 #ifdef ENVOY_HOT_RESTART
-  PlatformImpl platform;
   Event::TestRealTimeSystem real_time_system;
   DefaultListenerHooks default_listener_hooks;
   ProdComponentFactory prod_component_factory;
@@ -131,8 +177,8 @@ TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
                                                     config_file_, "--base-id-path", base_id_path});
   OptionsImpl first_options(first_args, &MainCommon::hotRestartVersion, spdlog::level::info);
   MainCommonBase first(first_options, real_time_system, default_listener_hooks,
-                       prod_component_factory, std::make_unique<Random::RandomGeneratorImpl>(),
-                       platform.threadFactory(), platform.fileSystem(), nullptr);
+                       prod_component_factory, std::make_unique<PlatformImpl>(),
+                       std::make_unique<Random::RandomGeneratorImpl>(), nullptr);
 
   const std::string base_id_str = TestEnvironment::readFileToStringForTest(base_id_path);
   uint32_t base_id;
@@ -145,11 +191,11 @@ TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
       std::vector<std::string>({"envoy-static", "--use-dynamic-base-id", "-c", config_file_});
   OptionsImpl second_options(second_args, &MainCommon::hotRestartVersion, spdlog::level::info);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      MainCommonBase(second_options, real_time_system, default_listener_hooks,
-                     prod_component_factory, std::unique_ptr<Random::RandomGenerator>{mock_rng},
-                     platform.threadFactory(), platform.fileSystem(), nullptr),
-      EnvoyException, "unable to select a dynamic base id");
+  EXPECT_THROW_WITH_MESSAGE(MainCommonBase(second_options, real_time_system, default_listener_hooks,
+                                           prod_component_factory, std::make_unique<PlatformImpl>(),
+                                           std::unique_ptr<Random::RandomGenerator>{mock_rng},
+                                           nullptr),
+                            EnvoyException, "unable to select a dynamic base id");
 #endif
 }
 

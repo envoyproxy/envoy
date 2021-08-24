@@ -1,4 +1,4 @@
-#include "extensions/filters/listener/http_inspector/http_inspector.h"
+#include "source/extensions/filters/listener/http_inspector/http_inspector.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
@@ -22,7 +22,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCas
   auto filter = std::make_unique<Filter>(cfg);
 
   ListenerFilterFuzzer fuzzer;
-  fuzzer.fuzz(*filter, input);
+  fuzzer.fuzz(std::move(filter), input);
 }
 
 } // namespace HttpInspector

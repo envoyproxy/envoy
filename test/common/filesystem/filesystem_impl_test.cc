@@ -2,9 +2,9 @@
 #include <filesystem>
 #include <string>
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/filesystem/filesystem_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
+#include "source/common/filesystem/filesystem_impl.h"
 
 #include "test/test_common/environment.h"
 
@@ -21,22 +21,16 @@ static constexpr FlagSet DefaultFlags{
 class FileSystemImplTest : public testing::Test {
 protected:
   filesystem_os_id_t getFd(File* file) {
-#ifdef WIN32
-    auto file_impl = dynamic_cast<FileImplWin32*>(file);
-#else
-    auto file_impl = dynamic_cast<FileImplPosix*>(file);
-#endif
+    auto file_impl = dynamic_cast<FileImpl*>(file);
     RELEASE_ASSERT(file_impl != nullptr, "failed to cast File* to FileImpl*");
     return file_impl->fd_;
   }
-#ifdef WIN32
-  InstanceImplWin32 file_system_;
-#else
+#ifndef WIN32
   Api::SysCallStringResult canonicalPath(const std::string& path) {
     return file_system_.canonicalPath(path);
   }
-  InstanceImplPosix file_system_;
 #endif
+  InstanceImpl file_system_;
 };
 
 TEST_F(FileSystemImplTest, FileExists) {
@@ -118,13 +112,15 @@ TEST_F(FileSystemImplTest, FileReadToEndDenylisted) {
 }
 
 #ifndef WIN32
-TEST_F(FileSystemImplTest, CanonicalPathSuccess) { EXPECT_EQ("/", canonicalPath("//").rc_); }
+TEST_F(FileSystemImplTest, CanonicalPathSuccess) {
+  EXPECT_EQ("/", canonicalPath("//").return_value_);
+}
 #endif
 
 #ifndef WIN32
 TEST_F(FileSystemImplTest, CanonicalPathFail) {
   const Api::SysCallStringResult result = canonicalPath("/_some_non_existent_file");
-  EXPECT_TRUE(result.rc_.empty());
+  EXPECT_TRUE(result.return_value_.empty());
   EXPECT_EQ("No such file or directory", errorDetails(result.errno_));
 }
 #endif
@@ -224,11 +220,40 @@ TEST_F(FileSystemImplTest, IllegalPath) {
 #endif
 }
 
+TEST_F(FileSystemImplTest, ConstructedFile) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
+  ::unlink(new_file_path.c_str());
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+
+  FilePtr file = file_system_.createFile(new_file_info);
+  EXPECT_EQ(file->path(), new_file_path);
+  EXPECT_EQ(file->destinationType(), Filesystem::DestinationType::File);
+}
+
+TEST_F(FileSystemImplTest, ConstructedStdErrFile) {
+  FilePathAndType new_file_info{Filesystem::DestinationType::Stderr, ""};
+
+  FilePtr file = file_system_.createFile(new_file_info);
+  EXPECT_FALSE(file->isOpen());
+  EXPECT_EQ(file->destinationType(), Filesystem::DestinationType::Stderr);
+  EXPECT_EQ(file->path(), "/dev/stderr");
+}
+
+TEST_F(FileSystemImplTest, ConstructedStdOutFile) {
+  FilePathAndType new_file_info{Filesystem::DestinationType::Stdout, ""};
+
+  FilePtr file = file_system_.createFile(new_file_info);
+  EXPECT_FALSE(file->isOpen());
+  EXPECT_EQ(file->destinationType(), Filesystem::DestinationType::Stdout);
+  EXPECT_EQ(file->path(), "/dev/stdout");
+}
+
 TEST_F(FileSystemImplTest, ConstructedFileNotOpen) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());
 
-  FilePtr file = file_system_.createFile(new_file_path);
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
   EXPECT_FALSE(file->isOpen());
 }
 
@@ -236,9 +261,10 @@ TEST_F(FileSystemImplTest, Open) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());
 
-  FilePtr file = file_system_.createFile(new_file_path);
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
   const Api::IoCallBoolResult result = file->open(DefaultFlags);
-  EXPECT_TRUE(result.rc_);
+  EXPECT_TRUE(result.return_value_);
   EXPECT_TRUE(file->isOpen());
 }
 
@@ -248,9 +274,11 @@ TEST_F(FileSystemImplTest, OpenReadOnly) {
   static constexpr FlagSet ReadOnlyFlags{1 << Filesystem::File::Operation::Read |
                                          1 << Filesystem::File::Operation::Create |
                                          1 << Filesystem::File::Operation::Append};
-  FilePtr file = file_system_.createFile(new_file_path);
+
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
   const Api::IoCallBoolResult result = file->open(ReadOnlyFlags);
-  EXPECT_TRUE(result.rc_);
+  EXPECT_TRUE(result.return_value_);
   EXPECT_TRUE(file->isOpen());
 }
 
@@ -258,25 +286,27 @@ TEST_F(FileSystemImplTest, OpenTwice) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());
 
-  FilePtr file = file_system_.createFile(new_file_path);
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
   EXPECT_EQ(getFd(file.get()), INVALID_HANDLE);
 
   const Api::IoCallBoolResult result1 = file->open(DefaultFlags);
   const filesystem_os_id_t initial_fd = getFd(file.get());
-  EXPECT_TRUE(result1.rc_);
+  EXPECT_TRUE(result1.return_value_);
   EXPECT_TRUE(file->isOpen());
 
   // check that we don't leak a file descriptor
   const Api::IoCallBoolResult result2 = file->open(DefaultFlags);
   EXPECT_EQ(initial_fd, getFd(file.get()));
-  EXPECT_TRUE(result2.rc_);
+  EXPECT_TRUE(result2.return_value_);
   EXPECT_TRUE(file->isOpen());
 }
 
 TEST_F(FileSystemImplTest, OpenBadFilePath) {
-  FilePtr file = file_system_.createFile("");
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, ""};
+  FilePtr file = file_system_.createFile(new_file_info);
   const Api::IoCallBoolResult result = file->open(DefaultFlags);
-  EXPECT_FALSE(result.rc_);
+  EXPECT_FALSE(result.return_value_);
 }
 
 TEST_F(FileSystemImplTest, ExistingFile) {
@@ -284,12 +314,13 @@ TEST_F(FileSystemImplTest, ExistingFile) {
       TestEnvironment::writeStringToFileForTest("test_envoy", "existing file");
 
   {
-    FilePtr file = file_system_.createFile(file_path);
+    FilePathAndType new_file_info{Filesystem::DestinationType::File, file_path};
+    FilePtr file = file_system_.createFile(new_file_info);
     const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
-    EXPECT_TRUE(open_result.rc_);
+    EXPECT_TRUE(open_result.return_value_);
     std::string data(" new data");
     const Api::IoCallSizeResult result = file->write(data);
-    EXPECT_EQ(data.length(), result.rc_);
+    EXPECT_EQ(data.length(), result.return_value_);
   }
 
   auto contents = TestEnvironment::readFileToStringForTest(file_path);
@@ -301,29 +332,70 @@ TEST_F(FileSystemImplTest, NonExistingFile) {
   ::unlink(new_file_path.c_str());
 
   {
-    FilePtr file = file_system_.createFile(new_file_path);
+    FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+    FilePtr file = file_system_.createFile(new_file_info);
     const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
-    EXPECT_TRUE(open_result.rc_);
+    EXPECT_TRUE(open_result.return_value_);
     std::string data(" new data");
     const Api::IoCallSizeResult result = file->write(data);
-    EXPECT_EQ(data.length(), result.rc_);
+    EXPECT_EQ(data.length(), result.return_value_);
   }
 
   auto contents = TestEnvironment::readFileToStringForTest(new_file_path);
   EXPECT_EQ(" new data", contents);
 }
 
+TEST_F(FileSystemImplTest, StdOut) {
+  FilePathAndType file_info{Filesystem::DestinationType::Stdout, ""};
+  FilePtr file = file_system_.createFile(file_info);
+  const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
+  EXPECT_TRUE(open_result.return_value_);
+  EXPECT_TRUE(file->isOpen());
+  std::string data(" new data\n");
+  const Api::IoCallSizeResult result = file->write(data);
+  EXPECT_EQ(data.length(), result.return_value_)
+      << fmt::format("{}", result.err_->getErrorDetails());
+}
+
+TEST_F(FileSystemImplTest, StdErr) {
+  FilePathAndType file_info{Filesystem::DestinationType::Stderr, ""};
+  FilePtr file = file_system_.createFile(file_info);
+  const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
+  EXPECT_TRUE(open_result.return_value_) << fmt::format("{}", open_result.err_->getErrorDetails());
+  EXPECT_TRUE(file->isOpen());
+  std::string data(" new data\n");
+  const Api::IoCallSizeResult result = file->write(data);
+  EXPECT_EQ(data.length(), result.return_value_)
+      << fmt::format("{}", result.err_->getErrorDetails());
+}
+
+#ifdef WIN32
+TEST_F(FileSystemImplTest, Win32InvalidHandleThrows) {
+  FilePathAndType file_info{Filesystem::DestinationType::Stdout, ""};
+  FilePtr file = file_system_.createFile(file_info);
+  // We need to flush just to make sure that the write has been completed.
+  auto hh = GetStdHandle(STD_OUTPUT_HANDLE);
+  FlushFileBuffers(hh);
+  auto original_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+  EXPECT_TRUE(SetStdHandle(STD_OUTPUT_HANDLE, NULL));
+  const Api::IoCallBoolResult result = file->open(DefaultFlags);
+  EXPECT_FALSE(result.return_value_);
+  EXPECT_TRUE(SetStdHandle(STD_OUTPUT_HANDLE, original_handle));
+}
+#endif
+
 TEST_F(FileSystemImplTest, Close) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());
 
-  FilePtr file = file_system_.createFile(new_file_path);
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
   const Api::IoCallBoolResult result1 = file->open(DefaultFlags);
-  EXPECT_TRUE(result1.rc_);
+  EXPECT_TRUE(result1.return_value_);
   EXPECT_TRUE(file->isOpen());
 
   const Api::IoCallBoolResult result2 = file->close();
-  EXPECT_TRUE(result2.rc_);
+  EXPECT_TRUE(result2.return_value_);
   EXPECT_FALSE(file->isOpen());
 }
 
@@ -331,13 +403,14 @@ TEST_F(FileSystemImplTest, WriteAfterClose) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());
 
-  FilePtr file = file_system_.createFile(new_file_path);
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
   const Api::IoCallBoolResult bool_result1 = file->open(DefaultFlags);
-  EXPECT_TRUE(bool_result1.rc_);
+  EXPECT_TRUE(bool_result1.return_value_);
   const Api::IoCallBoolResult bool_result2 = file->close();
-  EXPECT_TRUE(bool_result2.rc_);
+  EXPECT_TRUE(bool_result2.return_value_);
   const Api::IoCallSizeResult size_result = file->write(" new data");
-  EXPECT_EQ(-1, size_result.rc_);
+  EXPECT_EQ(-1, size_result.return_value_);
   EXPECT_EQ(IoFileError::IoErrorCode::BadFd, size_result.err_->getErrorCode());
 }
 
@@ -346,9 +419,10 @@ TEST_F(FileSystemImplTest, NonExistingFileAndReadOnly) {
   ::unlink(new_file_path.c_str());
 
   static constexpr FlagSet flag(static_cast<size_t>(Filesystem::File::Operation::Read));
-  FilePtr file = file_system_.createFile(new_file_path);
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
   const Api::IoCallBoolResult open_result = file->open(flag);
-  EXPECT_FALSE(open_result.rc_);
+  EXPECT_FALSE(open_result.return_value_);
 }
 
 TEST_F(FileSystemImplTest, ExistingReadOnlyFileAndWrite) {
@@ -357,12 +431,13 @@ TEST_F(FileSystemImplTest, ExistingReadOnlyFileAndWrite) {
 
   {
     static constexpr FlagSet flag(static_cast<size_t>(Filesystem::File::Operation::Read));
-    FilePtr file = file_system_.createFile(file_path);
+    FilePathAndType new_file_info{Filesystem::DestinationType::File, file_path};
+    FilePtr file = file_system_.createFile(new_file_info);
     const Api::IoCallBoolResult open_result = file->open(flag);
-    EXPECT_TRUE(open_result.rc_);
+    EXPECT_TRUE(open_result.return_value_);
     std::string data(" new data");
     const Api::IoCallSizeResult result = file->write(data);
-    EXPECT_TRUE(result.rc_ < 0);
+    EXPECT_TRUE(result.return_value_ < 0);
 #ifdef WIN32
     EXPECT_EQ(IoFileError::IoErrorCode::Permission, result.err_->getErrorCode());
 #else

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
@@ -7,11 +8,10 @@
 #include "envoy/thread_local/thread_local_object.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "common/common/logger.h"
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/clusters/aggregate/lb_context.h"
+#include "source/common/common/logger.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/clusters/aggregate/lb_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -127,6 +127,7 @@ private:
   PriorityContextPtr priority_context_;
   const ClusterSetConstSharedPtr clusters_;
   Upstream::ClusterUpdateCallbacksHandlePtr handle_;
+  absl::flat_hash_map<std::string, Envoy::Common::CallbackHandlePtr> member_update_cbs_;
 };
 
 // Load balancer factory created by the main thread and will be called in each worker thread to
@@ -158,8 +159,7 @@ struct AggregateThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalanc
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
                            envoy::extensions::clusters::aggregate::v3::ClusterConfig> {
 public:
-  ClusterFactory()
-      : ConfigurableClusterFactoryBase(Extensions::Clusters::ClusterTypes::get().Aggregate) {}
+  ClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.aggregate") {}
 
 private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>

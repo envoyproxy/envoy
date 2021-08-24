@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
-    extension_name = "envoy.filters.http.dynamic_forward_proxy",
+    extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/transport_sockets/raw_buffer:config",
@@ -25,6 +25,7 @@ envoy_extension_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:options_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:load_balancer_mocks",

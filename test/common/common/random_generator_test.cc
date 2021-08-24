@@ -1,7 +1,7 @@
 #include <numeric>
 
-#include "common/common/interval_value.h"
-#include "common/common/random_generator.h"
+#include "source/common/common/interval_value.h"
+#include "source/common/common/random_generator.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

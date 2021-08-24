@@ -5,6 +5,7 @@ load(
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_select_boringssl",
 )
 
 licenses(["notice"])  # Apache 2
@@ -23,6 +24,28 @@ envoy_cc_test(
 envoy_cc_test(
     name = "assert_test",
     srcs = ["assert_test.cc"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "containers_test",
+    srcs = ["containers_test.cc"],
+    deps = [
+        "//source/common/common:containers_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    # Same as assert_test above, but with ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE
+    name = "assert_enabled_in_release_test",
+    srcs = ["assert_test.cc"],
+    copts = ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
     deps = [
         "//source/common/common:assert_lib",
         "//test/test_common:logging_lib",
@@ -87,6 +110,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "safe_memcpy_test",
+    srcs = ["safe_memcpy_test.cc"],
+    deps = ["//source/common/common:safe_memcpy_lib"],
+)
+
+envoy_cc_test(
     name = "phantom_test",
     srcs = ["phantom_test.cc"],
     deps = ["//source/common/common:phantom"],
@@ -111,6 +140,16 @@ envoy_cc_test(
     name = "hex_test",
     srcs = ["hex_test.cc"],
     deps = ["//source/common/common:hex_lib"],
+)
+
+envoy_cc_test(
+    name = "key_value_store_test",
+    srcs = ["key_value_store_test.cc"],
+    deps = [
+        "//source/common/common:key_value_store_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:file_system_for_test_lib",
+    ],
 )
 
 envoy_cc_test(
@@ -277,9 +316,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "shared_token_bucket_impl_test",
+    srcs = ["shared_token_bucket_impl_test.cc"],
+    deps = [
+        "//source/common/common:shared_token_bucket_impl_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "callback_impl_test",
     srcs = ["callback_impl_test.cc"],
-    deps = ["//source/common/common:callback_impl_lib"],
+    deps = [
+        "//source/common/common:callback_impl_lib",
+        "//test/mocks/event:event_mocks",
+    ],
 )
 
 envoy_cc_benchmark_binary(
@@ -351,12 +403,19 @@ envoy_cc_test(
 envoy_cc_test(
     name = "version_test",
     srcs = ["version_test.cc"],
+    copts = envoy_select_boringssl(["-DENVOY_SSL_FIPS"]),
     external_deps = [
         "abseil_strings",
     ],
     deps = [
         "//source/common/version:version_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "api_version_test",
+    srcs = ["api_version_test.cc"],
+    deps = ["//source/common/version:api_version_lib"],
 )
 
 envoy_cc_test(
@@ -383,5 +442,14 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//test/mocks:common_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "scope_tracked_object_stack_test",
+    srcs = ["scope_tracked_object_stack_test.cc"],
+    deps = [
+        "//source/common/common:scope_tracked_object_stack",
+        "//source/common/common:utility_lib",
     ],
 )

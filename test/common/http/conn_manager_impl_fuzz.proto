@@ -42,7 +42,7 @@ message DecoderFilterCallbackAction {
     bool streaming = 2;
   }
   oneof decoder_filter_callback_action_selector {
-    // TODO(htuch): More decoder filer callback actions
+    // TODO(htuch): More decoder filter callback actions
     AddDecodedData add_decoded_data = 1;
   }
 }

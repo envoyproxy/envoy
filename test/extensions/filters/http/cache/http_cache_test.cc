@@ -1,9 +1,8 @@
 #include <chrono>
 #include <string>
 
-#include "extensions/filters/http/cache/cache_headers_utils.h"
-#include "extensions/filters/http/cache/http_cache.h"
-#include "extensions/filters/http/cache/inline_headers_handles.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/http_cache.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/mocks/http/mocks.h"
@@ -44,10 +43,8 @@ public:
   LookupRequestTest() : vary_allow_list_(getConfig().allowed_vary_headers()) {}
 
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
-  Http::TestRequestHeaderMapImpl request_headers_{{":path", "/"},
-                                                  {":method", "GET"},
-                                                  {"x-forwarded-proto", "https"},
-                                                  {":authority", "example.com"}};
+  Http::TestRequestHeaderMapImpl request_headers_{
+      {":path", "/"}, {":method", "GET"}, {":scheme", "https"}, {":authority", "example.com"}};
 
   VaryHeader vary_allow_list_;
 
@@ -202,7 +199,7 @@ TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
   ASSERT_TRUE(lookup_response.headers_);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
   EXPECT_THAT(*lookup_response.headers_,
-              HeaderHasValueRef(Http::Headers::get().Age, GetParam().expected_age));
+              HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, 0);
   EXPECT_TRUE(lookup_response.response_ranges_.empty());
   EXPECT_FALSE(lookup_response.has_trailers_);
@@ -224,7 +221,7 @@ TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
   ASSERT_TRUE(lookup_response.headers_);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
   EXPECT_THAT(*lookup_response.headers_,
-              HeaderHasValueRef(Http::Headers::get().Age, GetParam().expected_age));
+              HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, content_length);
   EXPECT_TRUE(lookup_response.response_ranges_.empty());
   EXPECT_FALSE(lookup_response.has_trailers_);
@@ -627,17 +624,6 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(ParseInvalidRangeHeaderTest, InvalidRangeReturnsEmpty) {
   std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(range(), 5);
   ASSERT_EQ(0, result_vector.size());
-}
-
-TEST_F(LookupRequestTest, VariedHeaders) {
-  request_headers_.addCopy("accept", "image/*");
-  request_headers_.addCopy("other-header", "abc123");
-  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
-  const Http::RequestHeaderMap& result = lookup_request.getVaryHeaders();
-
-  ASSERT_FALSE(result.get(Http::LowerCaseString("accept")).empty());
-  ASSERT_EQ(result.get(Http::LowerCaseString("accept"))[0]->value().getStringView(), "image/*");
-  ASSERT_TRUE(result.get(Http::LowerCaseString("other-header")).empty());
 }
 
 } // namespace

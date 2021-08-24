@@ -5,7 +5,7 @@ namespace Extensions {
 namespace ListenerFilters {
 
 void ListenerFilterFuzzer::fuzz(
-    Network::ListenerFilter& filter,
+    Network::ListenerFilterPtr filter,
     const test::extensions::filters::listener::FilterFuzzTestCase& input) {
   try {
     socket_.addressProvider().setLocalAddress(
@@ -32,7 +32,7 @@ void ListenerFilterFuzzer::fuzz(
                                       testing::ReturnNew<NiceMock<Event::MockFileEvent>>()));
   }
 
-  filter.onAccept(cb_);
+  filter->onAccept(cb_);
 
   if (file_event_callback_ == nullptr) {
     // If filter does not call createFileEvent (i.e. original_dst and original_src)
@@ -40,13 +40,13 @@ void ListenerFilterFuzzer::fuzz(
   }
 
   if (!data.empty()) {
-    ON_CALL(os_sys_calls_, ioctl(kFakeSocketFd, FIONREAD, _))
-        .WillByDefault(
-            Invoke([&data](os_fd_t, unsigned long int, void* argp) -> Api::SysCallIntResult {
-              int bytes_avail = static_cast<int>(data.size());
-              memcpy(argp, &bytes_avail, sizeof(int));
-              return Api::SysCallIntResult{bytes_avail, 0};
-            }));
+    ON_CALL(os_sys_calls_, ioctl(kFakeSocketFd, FIONREAD, _, _, _, _, _))
+        .WillByDefault(Invoke([&data](os_fd_t, unsigned long, void* argp, unsigned long, void*,
+                                      unsigned long, unsigned long*) -> Api::SysCallIntResult {
+          int bytes_avail = static_cast<int>(data.size());
+          memcpy(argp, &bytes_avail, sizeof(int));
+          return Api::SysCallIntResult{bytes_avail, 0};
+        }));
     {
       testing::InSequence s;
 

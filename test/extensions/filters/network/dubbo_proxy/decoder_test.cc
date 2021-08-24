@@ -1,7 +1,7 @@
-#include "extensions/filters/network/dubbo_proxy/decoder.h"
-#include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
-#include "extensions/filters/network/dubbo_proxy/metadata.h"
+#include "source/extensions/filters/network/dubbo_proxy/decoder.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/metadata.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/extensions/filters/network/dubbo_proxy/utility.h"

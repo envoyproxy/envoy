@@ -13,7 +13,6 @@ A minimal fully static bootstrap config is provided below:
   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
-    access_log_path: /tmp/admin_access.log
     address:
       socket_address: { address: 127.0.0.1, port_value: 9901 }
 
@@ -66,7 +65,6 @@ on 127.0.0.1:5678 is provided below:
   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
-    access_log_path: /tmp/admin_access.log
     address:
       socket_address: { address: 127.0.0.1, port_value: 9901 }
 
@@ -137,7 +135,7 @@ an otherwise completely dynamic configurations, some static resources need to
 be defined to point Envoy at its xDS management server(s).
 
 It's important to set appropriate :ref:`TCP Keep-Alive options <envoy_v3_api_msg_config.core.v3.TcpKeepalive>`
-in the `tcp_keepalive` block. This will help detect TCP half open connections to the xDS management
+in the ``tcp_keepalive`` block. This will help detect TCP half open connections to the xDS management
 server and re-establish a full connection.
 
 In the above example, the EDS management server could then return a proto encoding of a
@@ -174,7 +172,6 @@ below:
   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
-    access_log_path: /tmp/admin_access.log
     address:
       socket_address: { address: 127.0.0.1, port_value: 9901 }
 
@@ -305,3 +302,36 @@ The management server could respond to EDS requests with:
             socket_address:
               address: 127.0.0.2
               port_value: 1234
+
+Special YAML usage
+~~~~~~~~~~~~~~~~~~
+
+When loading YAML configuration, the Envoy loader will interpret map keys tagged with !ignore
+specially, and omit them entirely from the native configuration tree. Ordinarily, the YAML stream
+must adhere strictly to the proto schemas defined for Envoy configuration. This allows content to
+be declared that is explicitly handled as a non-represented type.
+
+This lets you split your file into two parts: one in which we have YAML content not subject to
+parsing according to the schema and another part that is parsed. YAML anchors in the first part
+may be referenced by aliases in the second part. This mechanism can simplify setups that need to
+re-use or dynamically generate configuration fragments.
+
+See the following example:
+
+.. literalinclude:: _include/tagged.yaml
+    :language: yaml
+
+.. warning::
+    If you parse Envoy YAML configuration using external loaders, you may need to inform these
+    loaders about the !ignore tag. Compliant YAML loaders will typically expose an interface to
+    allow you to choose how to handle a custom tag.
+
+For example, this will instruct `PyYAML <https://github.com/yaml/pyyaml>`_ to treat an ignored
+node as a simple scalar when loading:
+
+.. code-block:: python3
+
+    yaml.SafeLoader.add_constructor('!ignore', yaml.loader.SafeConstructor.construct_scalar)
+
+Alternatively, :repo:`this is how <tools/config_validation/validate_fragment.py>`
+Envoy registers the !ignore tag in config validation.

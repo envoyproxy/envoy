@@ -6,5 +6,8 @@ proto_library(
     name = "freeze_protos",
     srcs = ["active_non_terminal.proto"],
     visibility = ["//visibility:public"],
-    deps = ["@com_github_cncf_udpa//udpa/annotations:pkg"],
+    deps = [
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@envoy_api//envoy/annotations:pkg",
+    ],
 )

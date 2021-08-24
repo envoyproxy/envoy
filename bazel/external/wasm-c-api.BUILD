@@ -9,9 +9,6 @@ cc_library(
     hdrs = [
         "include/wasm.h",
     ],
-    defines = [
-        "ENVOY_WASM_WASMTIME",
-    ],
     include_prefix = "wasmtime",
     deps = [
         "@com_github_wasmtime//:rust_c_api",

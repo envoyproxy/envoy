@@ -2,7 +2,7 @@
 
 #include <list>
 
-#include "common/config/update_ack.h"
+#include "source/common/config/update_ack.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -23,6 +23,7 @@ public:
   void pause(const std::string& type_url);
   void resume(const std::string& type_url);
   bool paused(const std::string& type_url) const;
+  void clear();
 
 private:
   // It's ok for non-existent subs to be paused/resumed. The cleanest way to support that is to give

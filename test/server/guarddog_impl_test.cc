@@ -10,12 +10,11 @@
 #include "envoy/server/watchdog.h"
 #include "envoy/thread/thread.h"
 
-#include "common/api/api_impl.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/protobuf/utility.h"
-
-#include "server/guarddog_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/server/guarddog_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"

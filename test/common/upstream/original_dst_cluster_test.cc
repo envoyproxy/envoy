@@ -4,16 +4,16 @@
 #include <tuple>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/original_dst_cluster.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "server/transport_socket_config_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/original_dst_cluster.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
@@ -82,10 +82,10 @@ public:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_);
     cluster_ = std::make_shared<OriginalDstCluster>(cluster_config, runtime_, factory_context,
                                                     std::move(scope), false);
-    cluster_->prioritySet().addPriorityUpdateCb(
+    priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
         });
@@ -94,11 +94,11 @@ public:
 
   Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   OriginalDstClusterSharedPtr cluster_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* cleanup_timer_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -107,6 +107,8 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
+  Server::MockOptions options_;
+  Common::CallbackHandlePtr priority_update_cb_;
 };
 
 TEST(OriginalDstClusterConfigTest, GoodConfig) {
@@ -139,28 +141,8 @@ TEST_F(OriginalDstClusterTest, BadConfigWithLoadAssignment) {
                 port_value: 8000
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      setupFromYaml(yaml), EnvoyException,
-      "ORIGINAL_DST clusters must have no load assignment or hosts configured");
-}
-
-TEST_F(OriginalDstClusterTest, DEPRECATED_FEATURE_TEST(BadConfigWithDeprecatedHosts)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
-    cleanup_interval: 1s
-    hosts:
-      - socket_address:
-          address: 127.0.0.1
-          port_value: 8000
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(
-      setupFromYaml(yaml, false), EnvoyException,
-      "ORIGINAL_DST clusters must have no load assignment or hosts configured");
+  EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml), EnvoyException,
+                            "ORIGINAL_DST clusters must have no load assignment configured");
 }
 
 TEST_F(OriginalDstClusterTest, CleanupInterval) {
@@ -471,7 +453,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   setupFromYaml(yaml);
 
   PrioritySetImpl second;
-  cluster_->prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster_->prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector& added, const HostVector& removed) -> void {
         // Update second hostset accordingly;
         HostVectorSharedPtr new_hosts(

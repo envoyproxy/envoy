@@ -74,7 +74,9 @@ file_descriptor_set_text(
 file_descriptor_set_text(
     name = "all_protos_with_ext_pb_text",
     with_external_deps = True,
-    deps = ["@envoy_api_canonical//:all_protos"],
+    deps = [
+        "@envoy_api_canonical//:all_protos",
+    ],
 )
 
 proto_cc_source(
