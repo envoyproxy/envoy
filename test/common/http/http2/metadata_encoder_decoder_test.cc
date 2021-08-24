@@ -187,11 +187,11 @@ TEST_F(MetadataEncoderDecoderTest, TestTotalPayloadSize) {
 
   const std::string payload = std::string(1024, 'a');
   EXPECT_EQ(0, decoder_->totalPayloadSize());
-  EXPECT_TRUE(decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()),
-                                        payload.size()));
+  EXPECT_TRUE(
+      decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()), payload.size()));
   EXPECT_EQ(payload.size(), decoder_->totalPayloadSize());
-  EXPECT_TRUE(decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()),
-                                        payload.size()));
+  EXPECT_TRUE(
+      decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()), payload.size()));
   EXPECT_EQ(2 * payload.size(), decoder_->totalPayloadSize());
   cleanUp();
 }
