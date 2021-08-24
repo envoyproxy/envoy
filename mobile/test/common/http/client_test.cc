@@ -638,61 +638,7 @@ TEST_P(ClientTest, MultipleStreams) {
   ASSERT_EQ(cc_.on_complete_calls, 1);
 }
 
-TEST_P(ClientTest, EnvoyLocalReplyNotAnError) {
-  cc_.expected_status_ = "503";
-
-  envoy_headers c_headers = defaultRequestHeaders();
-
-  // Create a stream, and set up request_decoder_ and response_encoder_
-  createStream();
-
-  // Send request headers.
-  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
-  EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(stream_, c_headers, true);
-
-  // Encode response headers. A non-200 code triggers an on_error callback chain. In particular, a
-  // 503 should have an ENVOY_CONNECTION_FAILURE error code.
-  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
-  EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  TestResponseHeaderMapImpl response_headers{{":status", "503"}};
-  response_encoder_->encodeHeaders(response_headers, true);
-  // Ensure that the callbacks on the bridge_callbacks_ were called.
-  ASSERT_EQ(cc_.on_headers_calls, 1);
-  ASSERT_EQ(cc_.on_complete_calls, 1);
-  ASSERT_EQ(cc_.on_error_calls, 0);
-}
-
-TEST_P(ClientTest, EnvoyLocalReplyNon503NotAnError) {
-  cc_.expected_status_ = "504";
-
-  // Create a stream, and set up request_decoder_ and response_encoder_
-  createStream();
-
-  // Send request headers.
-  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
-  EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  envoy_headers c_headers = defaultRequestHeaders();
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  http_client_.sendHeaders(stream_, c_headers, true);
-
-  // Encode response headers. A non-200 code triggers an on_error callback chain. In particular, a
-  // non-503 should have an ENVOY_UNDEFINED_ERROR error code.
-  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
-  EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  TestResponseHeaderMapImpl response_headers{{":status", "504"}};
-  response_encoder_->encodeHeaders(response_headers, true);
-  // Ensure that the callbacks on the bridge_callbacks_ were called.
-  ASSERT_EQ(cc_.on_headers_calls, 1);
-  ASSERT_EQ(cc_.on_complete_calls, 1);
-  ASSERT_EQ(cc_.on_error_calls, 0);
-}
-
-TEST_P(ClientTest, EnvoyResponseWithErrorCode) {
-  cc_.expected_status_ = "218";
+TEST_P(ClientTest, EnvoyLocalError) {
   // Override the on_error default with some custom checks.
   bridge_callbacks_.on_error = [](envoy_error error, envoy_stream_intel, void* context) -> void* {
     EXPECT_EQ(error.error_code, ENVOY_CONNECTION_FAILURE);
@@ -715,16 +661,13 @@ TEST_P(ClientTest, EnvoyResponseWithErrorCode) {
 
   // Encode response headers. A non-200 code triggers an on_error callback chain. In particular, a
   // 503 should have an ENVOY_CONNECTION_FAILURE error code.
-  EXPECT_CALL(dispatcher_, pushTrackedObject(_)).Times(2);
-  EXPECT_CALL(dispatcher_, popTrackedObject(_)).Times(2);
+  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
+  EXPECT_CALL(dispatcher_, popTrackedObject(_));
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  TestResponseHeaderMapImpl response_headers{
-      {":status", "218"},
-      {"x-internal-error-code", std::to_string(ENVOY_CONNECTION_FAILURE)},
-      {"x-internal-error-message", "no internet"},
-      {"x-envoy-attempt-count", "123"},
-  };
-  response_encoder_->encodeHeaders(response_headers, true);
+  stream_info_.setResponseCode(503);
+  stream_info_.setResponseCodeDetails("nope");
+  stream_info_.setAttemptCount(123);
+  response_encoder_->getStream().resetStream(Http::StreamResetReason::ConnectionFailure);
   ASSERT_EQ(cc_.on_headers_calls, 0);
   // Ensure that the callbacks on the bridge_callbacks_ were called.
   ASSERT_EQ(cc_.on_complete_calls, 0);
@@ -773,7 +716,7 @@ TEST_P(ClientTest, RemoteResetAfterStreamStart) {
   bridge_callbacks_.on_error = [](envoy_error error, envoy_stream_intel, void* context) -> void* {
     EXPECT_EQ(error.error_code, ENVOY_STREAM_RESET);
     EXPECT_EQ(error.message.length, 0);
-    EXPECT_EQ(error.attempt_count, -1);
+    EXPECT_EQ(error.attempt_count, 0);
     // This will use envoy_noop_release.
     release_envoy_error(error);
     callbacks_called* cc = static_cast<callbacks_called*>(context);

@@ -173,13 +173,12 @@ private:
     void sendDataToBridge(Buffer::Instance& data, bool end_stream);
     void sendTrailersToBridge(const ResponseTrailerMap& trailers);
     envoy_stream_intel streamIntel();
+    envoy_error streamError();
 
     DirectStream& direct_stream_;
     const envoy_http_callbacks bridge_callbacks_;
     Client& http_client_;
-    absl::optional<envoy_error_code_t> error_code_;
-    absl::optional<envoy_data> error_message_;
-    absl::optional<int32_t> error_attempt_count_;
+    absl::optional<envoy_error> error_;
     bool success_{};
 
     // Buffered response data when in explicit flow control mode.

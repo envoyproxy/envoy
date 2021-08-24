@@ -4,17 +4,17 @@
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
-namespace Types {
+namespace Bridge {
 
 TEST(EnvoyMapConvenientInitializerTest, FromCppToCEmpty) {
-  const auto map = Envoy::Bridge::makeEnvoyMap({});
+  const auto map = Utility::makeEnvoyMap({});
 
   EXPECT_EQ(map.length, 0);
   release_envoy_map(map);
 }
 
 TEST(EnvoyMapConvenientInitializerTest, FromCppToC) {
-  const auto map = Envoy::Bridge::makeEnvoyMap({{"foo", "bar"}});
+  const auto map = Utility::makeEnvoyMap({{"foo", "bar"}});
 
   EXPECT_EQ(Data::Utility::copyToString(map.entries[0].key), "foo");
   EXPECT_EQ(Data::Utility::copyToString(map.entries[0].value), "bar");
@@ -22,5 +22,5 @@ TEST(EnvoyMapConvenientInitializerTest, FromCppToC) {
   release_envoy_map(map);
 }
 
-} // namespace Types
+} // namespace Bridge
 } // namespace Envoy

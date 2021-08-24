@@ -7,6 +7,7 @@ final class CancelStreamTests: XCTestCase {
   func testCancelStream() {
     // swiftlint:disable:next line_length
     let emhcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
+    let lefType = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
     // swiftlint:disable:next line_length
     let pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
     let filterName = "cancel_validation_filter"
@@ -31,6 +32,9 @@ static_resources:
               - match: { prefix: "/" }
                 route: { cluster: fake_remote }
           http_filters:
+          - name: envoy.filters.http.local_error
+            typed_config:
+              "@type": \(lefType)
           - name: envoy.filters.http.platform_bridge
             typed_config:
               "@type": \(pbfType)
@@ -105,6 +109,6 @@ static_resources:
       .sendHeaders(requestHeaders, endStream: false)
       .cancel()
 
-    XCTAssertEqual(XCTWaiter.wait(for: [filterExpectation, runExpectation], timeout: 1), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: [filterExpectation, runExpectation], timeout: 3), .completed)
   }
 }

@@ -92,6 +92,16 @@ envoy_mobile_swift_test(
 )
 
 envoy_mobile_swift_test(
+    name = "idle_timeout_test",
+    srcs = [
+        "IdleTimeoutTest.swift",
+    ],
+    deps = [
+        "//library/objective-c:envoy_engine_objc_lib",
+    ],
+)
+
+envoy_mobile_swift_test(
     name = "receive_data_test",
     srcs = [
         "ReceiveDataTest.swift",

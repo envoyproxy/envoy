@@ -21,7 +21,7 @@ TestEventTrackerFilterConfig::TestEventTrackerFilterConfig(
 }
 
 Http::FilterHeadersStatus TestEventTrackerFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  config_->track(Envoy::Bridge::makeEnvoyMap(config_->attributes()));
+  config_->track(Bridge::Utility::makeEnvoyMap(config_->attributes()));
   return Http::FilterHeadersStatus::Continue;
 }
 
