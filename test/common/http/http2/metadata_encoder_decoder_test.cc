@@ -185,7 +185,7 @@ TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
 TEST_F(MetadataEncoderDecoderTest, TestTotalPayloadSize) {
   initialize([](MetadataMapPtr&&) {});
 
-  std::string payload = std::string(1024, 'a');
+  const std::string payload = std::string(1024, 'a');
   EXPECT_EQ(0, decoder_->totalPayloadSize());
   EXPECT_TRUE(decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()),
                                         payload.size()));
