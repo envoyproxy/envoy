@@ -74,7 +74,7 @@ TEST_F(UpstreamRequestTest, DumpsStateWithoutAllocatingMemory) {
 
   // Check Contents
   EXPECT_THAT(ostream.contents(), HasSubstr("UpstreamRequest "));
-  EXPECT_THAT(ostream.contents(), HasSubstr("addressProvider: \n  SocketAddressSetterImpl "));
+  EXPECT_THAT(ostream.contents(), HasSubstr("addressProvider: \n  ConnectionInfoSetterImpl "));
   EXPECT_THAT(ostream.contents(), HasSubstr("request_headers: \n"));
 }
 

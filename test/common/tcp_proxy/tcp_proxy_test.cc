@@ -136,15 +136,8 @@ public:
   }
 };
 
-TEST_F(TcpProxyTest, DefaultRoutes) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
-
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::WeightedCluster::ClusterWeight*
-      ignored_cluster = config.mutable_weighted_clusters()->mutable_clusters()->Add();
-  ignored_cluster->set_name("ignored_cluster");
-  ignored_cluster->set_weight(10);
-
-  configure(config);
+TEST_F(TcpProxyTest, ExplicitCluster) {
+  configure(defaultConfig());
 
   NiceMock<Network::MockConnection> connection;
   EXPECT_EQ(std::string("fake_cluster"), config_->getRouteFromEntries(connection)->clusterName());
