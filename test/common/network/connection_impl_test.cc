@@ -47,6 +47,7 @@ using testing::Optional;
 using testing::Return;
 using testing::SaveArg;
 using testing::Sequence;
+using testing::StartsWith;
 using testing::StrictMock;
 
 namespace Envoy {
@@ -392,6 +393,8 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_THAT(client_connection_->transportFailureReason(), StartsWith("immediate connect error"));
 }
 
 TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
@@ -1333,6 +1336,7 @@ TEST_P(ConnectionImplTest, BindFromSocketTest) {
 
   disconnect(true);
 }
+
 TEST_P(ConnectionImplTest, BindFailureTest) {
   // Swap the constraints from BindTest to create an address family mismatch.
   if (GetParam() == Network::Address::IpVersion::v6) {
@@ -1359,6 +1363,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   EXPECT_CALL(connection_stats.bind_errors_, inc());
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_THAT(client_connection_->transportFailureReason(), StartsWith("failed to bind to"));
 }
 
 // ReadOnCloseTest verifies that the read filter's onData function is invoked with available data
@@ -1918,7 +1923,7 @@ TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
   const auto contents = ostream.contents();
   EXPECT_THAT(contents, HasSubstr("ListenSocketImpl"));
   EXPECT_THAT(contents, HasSubstr("transport_protocol_: "));
-  EXPECT_THAT(contents, HasSubstr("SocketAddressSetterImpl"));
+  EXPECT_THAT(contents, HasSubstr("ConnectionInfoSetterImpl"));
   if (GetParam() == Network::Address::IpVersion::v4) {
     EXPECT_THAT(
         contents,
@@ -2921,6 +2926,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   connection->connect();
   connection->noDelay(true);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_THAT(connection->transportFailureReason(), StartsWith("delayed connect error"));
 }
 
 class PipeClientConnectionImplTest : public testing::Test {

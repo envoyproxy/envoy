@@ -75,7 +75,7 @@ public:
   }
   bool healthCheck() const override { return health_check_request_; }
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
-  const Network::SocketAddressSetter& downstreamAddressProvider() const override {
+  const Network::ConnectionInfoSetter& downstreamAddressProvider() const override {
     return *downstream_address_provider_;
   }
 
@@ -241,8 +241,8 @@ public:
   bool health_check_request_{};
   std::string route_name_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  Network::SocketAddressSetterSharedPtr downstream_address_provider_{
-      std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr)};
+  Network::ConnectionInfoSetterSharedPtr downstream_address_provider_{
+      std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)};
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   Router::RouteConstSharedPtr route_;
