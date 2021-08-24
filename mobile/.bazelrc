@@ -106,6 +106,9 @@ build:remote-ci-common --bes_results_url=https://envoy.cluster.engflow.com/invoc
 build:remote-ci-common --bes_lifecycle_events
 build:remote-ci-common --jobs=40
 build:remote-ci-common --verbose_failures
+# Avoid hanging if the remote side closes the connection without a TCP RST. Only
+# sends a keepalive if we don't receive any messages (server updates every 60s).
+build:remote-ci-common --grpc_keepalive_time=61s
 #############################################################################
 # remote-ci-linux: These options are linux-only
 # TODO(lfpino): Add --remote_default_exec_properties=Pool=linux once the pool is defined
