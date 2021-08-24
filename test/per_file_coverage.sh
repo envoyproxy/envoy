@@ -30,7 +30,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/expr:96.4"
 "source/extensions/filters/common/fault:94.6"
 "source/extensions/filters/common/rbac:88.6"
-"source/extensions/filters/http/cache:92.7"
+"source/extensions/filters/http/cache:92.6"
 "source/extensions/filters/http/cache/simple_http_cache:95.6"
 "source/extensions/filters/http/grpc_json_transcoder:95.6"
 "source/extensions/filters/http/ip_tagging:91.2"
