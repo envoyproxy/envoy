@@ -5,7 +5,7 @@
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
-
+// add argument: safe -> load YAML | not safe -> don't load
 DefaultsProfile::DefaultsProfile() {
   MessageUtil::loadFromYaml(manifest_yaml, defaults_manifest_,
                             ProtobufMessage::getNullValidationVisitor());
@@ -13,6 +13,7 @@ DefaultsProfile::DefaultsProfile() {
 
 const DefaultsProfile& DefaultsProfile::get() {
   if (DefaultsProfileSingleton::getExisting()) {
+    printf("yup\n");
     return DefaultsProfileSingleton::get();
   }
 

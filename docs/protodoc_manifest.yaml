@@ -49,7 +49,7 @@ fields:
     edge_config:
       note: >
         This timeout is not compatible with streaming requests.
-      example: 300s  # 5 mins
+      example: 0s # 300s  # 5 mins
   envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address:
     edge_config: {example: false} # flipped this bool to pass test/extensions/filters/network/http_connection_manager:config_test
   envoy.config.listener.v3.QuicProtocolOptions.quic_protocol_options:

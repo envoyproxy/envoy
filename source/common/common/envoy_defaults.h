@@ -37,6 +37,7 @@ struct DefaultsProfile {
     ConfigContext() = default;
     ConfigContext(const Protobuf::Message& config) : ctx_(config.GetDescriptor()->full_name()) {}
     ConfigContext(const ConfigContext& context) : ctx_(context.ctx_) {}
+    ConfigContext(const std::string& context) : ctx_(context) {}
     const absl::string_view getContext() const { return ctx_; }
     ConfigContext& appendField(absl::string_view field) {
       absl::StrAppend(&ctx_, ".", field);

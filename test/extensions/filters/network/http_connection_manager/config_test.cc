@@ -1262,6 +1262,34 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotFalse) {
   EXPECT_EQ(false, config.shouldStripTrailingHostDot());
 }
 
+// Verify that values are pulled from the defaults profile.
+TEST_F(HttpConnectionManagerConfigTest, TestDefaultsProfile) {
+  std::unique_ptr<ScopedDefaultsProfileSingleton> dp =
+      std::make_unique<ScopedDefaultsProfileSingleton>(std::make_unique<DefaultsProfile>());
+  DefaultsProfile::ConfigContext context = DefaultsProfile::ConfigContext(
+      "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager");
+
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+
+  EXPECT_EQ(DefaultsProfileSingleton::get().getMs(context, "stream_idle_timeout", -1).count(),
+            config.streamIdleTimeout().count());
+  EXPECT_EQ(DefaultsProfileSingleton::get().getMs(context, "request_headers_timeout", -1).count(),
+            config.requestHeadersTimeout().count());
+  EXPECT_EQ(DefaultsProfileSingleton::get().getMs(context, "request_timeout", -1).count(),
+            config.requestTimeout().count());
+}
+
 // Validated that by default we allow requests with header names containing underscores.
 TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresAllowedByDefault) {
   const std::string yaml_string = R"EOF(
