@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.udp.udp_proxy.v3;
 
 import "envoy/config/core/v3/udp_socket_config.proto";
+import "envoy/extensions/filters/udp/udp_proxy/v3/route.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -20,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.udp_listener.udp_proxy]
 
 // Configuration for the UDP proxy filter.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message UdpProxyConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
@@ -51,6 +52,9 @@ message UdpProxyConfig {
 
     // The upstream cluster to connect to.
     string cluster = 2 [(validate.rules).string = {min_len: 1}];
+
+    // The route table for the connection manager is static and is specified in this property.
+    RouteConfiguration route_config = 7;
   }
 
   // The idle timeout for sessions. Idle is defined as no datagrams between received or sent by

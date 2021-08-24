@@ -49,6 +49,7 @@ envoy_cc_extension(
         ":udp_proxy_filter_lib",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/udp/udp_proxy/router:router_lib",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],
 )
