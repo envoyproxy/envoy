@@ -18,33 +18,34 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
+
 /**
  * Main entry point.
  * Decoded request bytes are passed to processor, that calls us back with enriched request.
- * Request then gets invoked with upstream Kafka facade, which maintains thread-local list of
- * (enriched) Kafka producers. Filter is going to maintain a list of in-flight-request so it can
- * send responses when they finish.
+ * Request then gets invoked to starts its processing.
+ * Filter is going to maintain a list of in-flight-request so it can send responses when they
+ * finish.
  *
  *
  * +----------------+    <creates>    +-----------------------+
  * |RequestProcessor+----------------->AbstractInFlightRequest|
- * +-------^--------+                 +------^--^-------------+
- *         |                                 |  |
- *         |                                 |  |
- * +-------+-------+   <in-flight-reference> |  |
- * |KafkaMeshFilter+-------------------------+  |
- * +-------+-------+                            |
- *         |                                    |
- *         |                                    |
- * +-------v-----------+                        |<in-flight-reference>
- * |UpstreamKafkaFacade|                        |(for callback when finished)
- * +-------+-----------+                        |
- *         |                                    |
- *         |                                    |
- * +-------v--------------+       +-------------+---+       +-----------------+
- * |<<ThreadLocalObject>> +------->RichKafkaProducer+-------><<librdkafka>>   |
- * |ThreadLocalKafkaFacade|       +-----------------+       |RdKafka::Producer|
- * +----------------------+                                 +-----------------+
+ * +-------^--------+                 +----^-----^------------+
+ *         |                               |     | <subclass>
+ *         |                               |   +-+------------------+
+ * +-------+-------+ <in-flight-reference> |   |ProduceRequestHolder|
+ * |KafkaMeshFilter+-----------------------+   +-+------------------+
+ * +-------+-------+                             |
+ *         |                                     |
+ *         |                                     |
+ * +-------v-----------+                         |<in-flight-reference>
+ * |UpstreamKafkaFacade|                         |(for callback when finished)
+ * +-------+-----------+                         |
+ *         |                                     |
+ *         |                                     |
+ * +-------v--------------+       +--------------v--+    +-----------------+
+ * |<<ThreadLocalObject>> +------->RichKafkaProducer+--->><<librdkafka>>   |
+ * |ThreadLocalKafkaFacade|       +-----------------+    |RdKafka::Producer|
+ * +----------------------+                              +-----------------+
  **/
 class KafkaMeshFilter : public Network::ReadFilter,
                         public Network::ConnectionCallbacks,

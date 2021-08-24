@@ -18,9 +18,10 @@ namespace Mesh {
 struct DeliveryMemento {
 
   // Pointer to byte array that was passed to Kafka producer.
-  // This is used to find the original record sent upstream.
-  // Important: we do not free this memory, it's still part of the 'Request' object two levels
-  // above.
+  // We use this to tell apart messages.
+  // Important: we do not free this memory, it's still part of the 'ProduceRequestHandler' object.
+  // Future work: adopt Kafka's opaque-pointer functionality so we use less memory instead of
+  // keeping whole payload until we receive a confirmation.
   const void* data_;
 
   // Kafka producer error code.
