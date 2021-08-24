@@ -5,8 +5,9 @@ import pytest
 
 import gidgethub
 
+from aio.functional import async_property
+
 from tools.base import aio
-from tools.base.functional import async_property
 from tools.github.release import exceptions as github_errors, release as github_release
 
 

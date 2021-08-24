@@ -13,11 +13,12 @@ import aiohttp
 
 import gidgethub.abc
 
-from tools.base import abstract
-from tools.base.functional import async_property
+import abstracts
+
+from aio.functional import async_property
 
 
-class AGithubReleaseAssets(metaclass=abstract.Abstraction):
+class AGithubReleaseAssets(metaclass=abstracts.Abstraction):
     """Base class for Github release assets pusher/fetcher"""
 
     @abstractmethod
@@ -47,7 +48,7 @@ class AGithubReleaseAssets(metaclass=abstract.Abstraction):
         raise NotImplementedError
 
 
-class AGithubReleaseAssetsFetcher(AGithubReleaseAssets, metaclass=abstract.Abstraction):
+class AGithubReleaseAssetsFetcher(AGithubReleaseAssets, metaclass=abstracts.Abstraction):
     """Fetcher of Github release assets"""
 
     @abstractmethod
@@ -93,7 +94,7 @@ class AGithubReleaseAssetsFetcher(AGithubReleaseAssets, metaclass=abstract.Abstr
         raise NotImplementedError
 
 
-class AGithubReleaseAssetsPusher(AGithubReleaseAssets, metaclass=abstract.Abstraction):
+class AGithubReleaseAssetsPusher(AGithubReleaseAssets, metaclass=abstracts.Abstraction):
     """Pusher of Github release assets"""
 
     @abstractmethod
@@ -107,7 +108,7 @@ class AGithubReleaseAssetsPusher(AGithubReleaseAssets, metaclass=abstract.Abstra
         raise NotImplementedError
 
 
-class AGithubRelease(metaclass=abstract.Abstraction):
+class AGithubRelease(metaclass=abstracts.Abstraction):
     """A Github tagged release version
 
     Provides CRUD operations for a release and its assets, and therefore
@@ -207,7 +208,7 @@ class AGithubRelease(metaclass=abstract.Abstraction):
         raise NotImplementedError
 
 
-class AGithubReleaseManager(metaclass=abstract.Abstraction):
+class AGithubReleaseManager(metaclass=abstracts.Abstraction):
     """This utility wraps the github API to provide the ability to
     create and manage releases and release assets.
 

@@ -9,8 +9,11 @@ import aiohttp
 import gidgethub.abc
 import gidgethub.aiohttp
 
-from tools.base import abstract, aio
-from tools.base.functional import async_property
+import abstracts
+
+from aio.functional import async_property
+
+from tools.base import aio
 
 from tools.github.release.abstract import (
     AGithubRelease, AGithubReleaseAssetsFetcher, AGithubReleaseAssetsPusher, AGithubReleaseManager)
@@ -18,7 +21,7 @@ from tools.github.release.abstract import (
 from tools.github.release.exceptions import GithubReleaseError
 
 
-@abstract.implementer(AGithubRelease)
+@abstracts.implementer(AGithubRelease)
 class GithubRelease:
     file_exts = {"deb", "changes", "rpm"}
 

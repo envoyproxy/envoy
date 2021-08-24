@@ -12,8 +12,9 @@ import aiohttp
 import gidgethub.abc
 import gidgethub.aiohttp
 
-from tools.base import abstract
-from tools.base.functional import async_property
+import abstracts
+
+from aio.functional import async_property
 
 from tools.github.release.abstract import AGithubRelease, AGithubReleaseManager
 from tools.github.release.exceptions import GithubReleaseError
@@ -22,7 +23,7 @@ from tools.github.release.exceptions import GithubReleaseError
 VERSION_MIN = packaging.version.Version("0")
 
 
-@abstract.implementer(AGithubReleaseManager)
+@abstracts.implementer(AGithubReleaseManager)
 class GithubReleaseManager:
 
     _version_re = r"v(\w+)"

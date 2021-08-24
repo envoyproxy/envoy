@@ -2,6 +2,7 @@ load("@github_pip3//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_py_library")
+load("@base_pip3//:requirements.bzl", base_requirement = "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -11,9 +12,9 @@ py_library(
     name = "abstract",
     srcs = ["abstract.py"],
     deps = [
-        "//tools/base:abstract",
-        "//tools/base:functional",
+        "//tools/base:aio",
         "//tools/base:utils",
+        requirement("abstracts"),
         requirement("aiohttp"),
         requirement("gidgethub"),
         requirement("packaging"),
@@ -30,9 +31,9 @@ envoy_py_library(
     deps = [
         ":abstract",
         ":exceptions",
-        "//tools/base:abstract",
-        "//tools/base:functional",
         "//tools/base:utils",
+        base_requirement("aio.functional"),
+        requirement("abstracts"),
         requirement("aiohttp"),
         requirement("gidgethub"),
         requirement("packaging"),
@@ -45,8 +46,8 @@ envoy_py_library(
         ":abstract",
         ":exceptions",
         "//tools/base:aio",
-        "//tools/base:functional",
         "//tools/base:utils",
+        base_requirement("aio.functional"),
         requirement("gidgethub"),
     ],
 )
