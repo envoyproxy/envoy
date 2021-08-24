@@ -4,7 +4,7 @@ import sys
 from functools import cached_property
 from typing import Iterator, List, Pattern
 
-from tools.base import checker
+from envoy.base import checker
 
 INVALID_REFLINK = r".* ref:.*"
 REF_WITH_PUNCTUATION_REGEX = r".*\. <[^<]*>`\s*"

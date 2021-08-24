@@ -45,7 +45,7 @@ py_binary(
 envoy_py_binary(
     name = "tools.dependency.pip_check",
     deps = [
-        "//tools/base:checker",
+        base_requirement("envoy.base.checker"),
         base_requirement("envoy.base.utils"),
     ],
 )

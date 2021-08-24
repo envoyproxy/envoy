@@ -7,10 +7,3 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_py_library("tools.base.abstract")
-
-envoy_py_library(
-    "tools.base.checker",
-    deps = [
-        requirement("envoy.base.runner"),
-    ],
-)

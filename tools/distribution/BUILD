@@ -24,7 +24,7 @@ envoy_py_binary(
 envoy_py_binary(
     name = "tools.distribution.verify",
     deps = [
-        "//tools/base:checker",
+        base_requirement("envoy.base.checker"),
         requirement("envoy.distribution.distrotest"),
     ],
 )

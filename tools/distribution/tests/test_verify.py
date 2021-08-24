@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
 
+from envoy.base.checker import AsyncChecker
 from envoy.distribution import distrotest
 
-from tools.base.checker import AsyncChecker
 from tools.distribution import verify
 
 

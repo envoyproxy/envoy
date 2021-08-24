@@ -47,6 +47,6 @@ envoy_py_binary(
 envoy_py_binary(
     name = "tools.testing.all_pytests",
     deps = [
-        "//tools/base:checker",
+        base_requirement("envoy.base.checker"),
     ],
 )

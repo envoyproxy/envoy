@@ -26,9 +26,7 @@ import yapf  # type:ignore
 from aio.subprocess import async_subprocess
 from aio.tasks import concurrent
 
-from envoy.base import utils
-
-from tools.base import checker
+from envoy.base import checker, utils
 
 FLAKE8_CONFIG = '.flake8'
 YAPF_CONFIG = '.style.yapf'

@@ -16,12 +16,12 @@ exports_files([
 envoy_py_binary(
     name = "tools.code_format.python_check",
     deps = [
-        "//tools/base:checker",
         requirement("aio.subprocess"),
         requirement("aio.tasks"),
         requirement("flake8"),
         requirement("pep8-naming"),
         requirement("yapf"),
+        base_requirement("envoy.base.checker"),
         base_requirement("envoy.base.utils"),
     ],
 )

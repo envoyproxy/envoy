@@ -25,10 +25,8 @@ from typing import Optional, Type
 
 import aiodocker
 
-from envoy.base import utils
+from envoy.base import checker, utils
 from envoy.distribution import distrotest
-
-from tools.base import checker
 
 
 # TODO(phlax): make this configurable

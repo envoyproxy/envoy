@@ -79,5 +79,5 @@ envoy_py_binary(
 envoy_py_binary(
     name = "tools.docs.rst_check",
     data = ["//docs:root/version_history/current.rst"],
-    deps = ["//tools/base:checker"],
+    deps = [base_requirement("envoy.base.checker")],
 )

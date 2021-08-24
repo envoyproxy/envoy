@@ -386,11 +386,11 @@ $ ./tools/sometools/mytool.py -h
 ...
 ```
 
-### Using the `tools.base.checker.Checker` class
+### Using the `envoy.base.checker.Checker` class
 
 A base class for writing checkers (for example, linting tools) has also been provided.
 
-Any classes subclassing `tools.base.checker.Checker` should provide a tuple of `__class__.checks`.
+Any classes subclassing `envoy.base.checker.Checker` should provide a tuple of `__class__.checks`.
 
 For each named check in `checks` the `Checker` will expect a method of the same name with the prefix `check_`.
 
@@ -406,7 +406,7 @@ Edit `tools/sometools/BUILD` and add a `tools.sometools.mychecker` target with a
 envoy_py_binary(
     name = "tools.sometools.mychecker",
     deps = [
-        "//tools/base:checker",
+        requirement("envoy.base.runner"),
     ],
 )
 ```
@@ -418,7 +418,7 @@ Next add the `MyChecker` class to `tools/sometools/mychecker.py` as follows:
 
 import sys
 
-from tools.base.checker import Checker
+from envoy.base.checker import Checker
 
 
 class MyChecker(Checker):

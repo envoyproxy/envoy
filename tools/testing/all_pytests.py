@@ -12,9 +12,7 @@ import sys
 from functools import cached_property
 from typing import Optional
 
-from envoy.base import runner
-
-from tools.base import checker
+from envoy.base import checker, runner
 
 
 class PytestChecker(checker.BazelChecker):
