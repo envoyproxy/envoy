@@ -256,7 +256,7 @@ bool maybeAdjustForIpv6(absl::string_view absolute_url, uint64_t& offset, uint64
 
 void forEachCookie(
     const HeaderMap& headers, const LowerCaseString& cookie_header,
-    const std::function<bool(const absl::string_view&, const absl::string_view&)> cookie_consumer) {
+    const std::function<bool(absl::string_view, absl::string_view)> cookie_consumer) {
   const Http::HeaderMap::GetResult cookie_headers = headers.get(cookie_header);
 
   for (size_t index = 0; index < cookie_headers.size(); index++) {
@@ -295,7 +295,7 @@ std::string parseCookie(const HeaderMap& headers, const std::string& key,
 
   // Iterate over each cookie & return if its value is not empty.
   forEachCookie(headers, cookie,
-                [&key, &value](const absl::string_view& k, const absl::string_view& v) -> bool {
+                [&key, &value](absl::string_view k, absl::string_view v) -> bool {
                   if (key == k && !v.empty()) {
                     value = std::string{v};
                     return false;
@@ -312,7 +312,7 @@ std::map<std::string, std::string> Utility::parseCookies(const RequestHeaderMap&
   std::map<std::string, std::string> cookies;
 
   forEachCookie(headers, Http::Headers::get().Cookie,
-                [&cookies](const absl::string_view& k, const absl::string_view& v) -> bool {
+                [&cookies](absl::string_view k, absl::string_view v) -> bool {
                   cookies.emplace(std::string{k}, std::string{v});
 
                   // continue iterating until all cookies are processed.
