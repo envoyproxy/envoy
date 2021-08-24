@@ -95,20 +95,18 @@ void IntegrationTestServer::unsetDynamicContextParam(absl::string_view resource_
   });
 }
 
-void IntegrationTestServer::start(const Network::Address::IpVersion version,
-                                  std::function<void()> on_server_init_function, absl::optional<uint64_t> deterministic_value,
-                                  bool defer_listener_finalization,
-                                  ProcessObjectOptRef process_object,
-                                  Server::FieldValidationConfig validator_config,
-                                  uint32_t concurrency, std::chrono::seconds drain_time,
-                                  Server::DrainStrategy drain_strategy,
-                                  Buffer::WatermarkFactorySharedPtr watermark_factory) {
+void IntegrationTestServer::start(
+    const Network::Address::IpVersion version, std::function<void()> on_server_init_function,
+    absl::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
+    ProcessObjectOptRef process_object, Server::FieldValidationConfig validator_config,
+    uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
+    Buffer::WatermarkFactorySharedPtr watermark_factory) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_ = api_.threadFactory().createThread([version, deterministic, process_object,
+  thread_ = api_.threadFactory().createThread([version, deterministic_value, process_object,
                                                validator_config, concurrency, drain_time,
                                                drain_strategy, watermark_factory, this]() -> void {
-    threadRoutine(version, deterministic, process_object, validator_config, concurrency, drain_time,
+    threadRoutine(version, deterministic_value, process_object, validator_config, concurrency, drain_time,
                   drain_strategy, watermark_factory);
   });
 
@@ -183,7 +181,8 @@ void IntegrationTestServer::serverReady() {
 }
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
-                                          absl::optional<uint64_t> deterministic_value,, ProcessObjectOptRef process_object,
+                                          absl::optional<uint64_t> deterministic_value,
+                                          ProcessObjectOptRef process_object,
                                           Server::FieldValidationConfig validation_config,
                                           uint32_t concurrency, std::chrono::seconds drain_time,
                                           Server::DrainStrategy drain_strategy,
