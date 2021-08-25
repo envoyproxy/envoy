@@ -15,6 +15,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/network/utility.h"
+#include "source/common/network/resolver_impl.h"
 
 #include "absl/strings/str_join.h"
 #include "ares.h"

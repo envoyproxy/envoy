@@ -122,6 +122,17 @@ protected:
   DnsResolverSharedPtr resolver_;
 };
 
+// By default in MacOS, it creates an AppleDnsResolver typed config.
+TEST_F(AppleDnsImplTest, DefaultAppleDnsResolverConstruction) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::config::cluster::v3::Cluster config;
+  Envoy::Network::makeDnsResolverConfig(config, typed_dns_resolver_config);
+  EXPECT_EQ(typed_dns_resolver_config.name(), AppleDnsResolver);
+  EXPECT_EQ(
+      typed_dns_resolver_config.typed_config().type_url(),
+      "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
+}
+
 // Validate that when AppleDnsResolverImpl is destructed with outstanding requests,
 // that we don't invoke any callbacks if the query was cancelled. This is a regression test from
 // development, where segfaults were encountered due to callback invocations on

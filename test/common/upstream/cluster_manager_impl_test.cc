@@ -3329,6 +3329,8 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedOveridingDeprecate
 // e.g, "@type":
 // type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig, the
 // default behavior is enforced: i.e, if dns_resolution_config is in place, use it.
+// In MacOS, this type is registered, but envoy.restart_features.use_apple_api_for_dns_lookups
+// is disabled for this test, thus the expected behavior is same.
 TEST_F(ClusterManagerImplTest,
        TypedDnsResolverConfigSpecifiedUnregisteredDnsResolutionConfigInPlace) {
   const std::string yaml = R"EOF(
@@ -3391,6 +3393,8 @@ TEST_F(ClusterManagerImplTest,
 // type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig, the
 // default behavior is enforced: i.e, if dns_resolution_config is not in place, but dns_resolvers
 // and use_tcp_for_dns_lookups are in place, use them.
+// In MacOS, this type is registered, but envoy.restart_features.use_apple_api_for_dns_lookups
+// is disabled for this test, thus the expected behavior is same.
 TEST_F(ClusterManagerImplTest,
        TypedDnsResolverConfigSpecifiedUnregisteredDnsResolversConfigInPlace) {
   const std::string yaml = R"EOF(
@@ -3451,6 +3455,8 @@ TEST_F(ClusterManagerImplTest,
 // type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig, the
 // default behavior is enforced: i.e, if neither dns_resolution_config, nor dns_resolvers or
 // use_tcp_for_dns_lookups is in place, then typed_dns_resolver_config is default value.
+// In MacOS, this type is registered, but envoy.restart_features.use_apple_api_for_dns_lookups
+// is disabled for this test, thus the expected behavior is same.
 TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedUnregisteredNoConfigInPlace) {
   const std::string yaml = R"EOF(
   static_resources:

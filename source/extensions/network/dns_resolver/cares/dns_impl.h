@@ -11,7 +11,6 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
-#include "source/common/network/resolver_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "ares.h"

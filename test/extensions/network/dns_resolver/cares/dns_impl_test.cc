@@ -392,6 +392,76 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   ares_free_data(resolvers);
 }
 
+TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {
+  char addr4str[INET_ADDRSTRLEN];
+  // we pick a port that isn't 53 as the default resolve.conf might be
+  // set to point to localhost.
+  auto addr4_a = Network::Utility::parseInternetAddressAndPort("1.2.3.4:80");
+  auto addr4_b = Network::Utility::parseInternetAddressAndPort("5.6.7.8:81");
+  char addr6str[INET6_ADDRSTRLEN];
+  auto addr6_a = Network::Utility::parseInternetAddressAndPort("[::2]:90");
+  auto addr6_b = Network::Utility::parseInternetAddressAndPort("[::3]:91");
+
+  // convert the address and options into typed_dns_resolver_config
+  auto dns_resolvers = envoy::config::core::v3::Address();
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  // copy addr4_a
+  dns_resolvers.mutable_socket_address()->set_address(addr4_a->ip()->addressAsString());
+  dns_resolvers.mutable_socket_address()->set_port_value(addr4_a->ip()->port());
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  dns_resolvers.Clear();
+
+  // copy addr4_b
+  dns_resolvers.mutable_socket_address()->set_address(addr4_b->ip()->addressAsString());
+  dns_resolvers.mutable_socket_address()->set_port_value(addr4_b->ip()->port());
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  dns_resolvers.Clear();
+
+  // copy addr6_a
+  dns_resolvers.mutable_socket_address()->set_address(addr6_a->ip()->addressAsString());
+  dns_resolvers.mutable_socket_address()->set_port_value(addr6_a->ip()->port());
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  dns_resolvers.Clear();
+
+  // copy addr6_b
+  dns_resolvers.mutable_socket_address()->set_address(addr6_b->ip()->addressAsString());
+  dns_resolvers.mutable_socket_address()->set_port_value(addr6_b->ip()->port());
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
+
+  auto resolver = dispatcher_->createDnsResolver(typed_dns_resolver_config);
+  auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+  ares_addr_port_node* resolvers;
+  int result = ares_get_servers_ports(peer->channel(), &resolvers);
+  EXPECT_EQ(result, ARES_SUCCESS);
+  // check v4
+  EXPECT_EQ(resolvers->family, AF_INET);
+  EXPECT_EQ(resolvers->udp_port, 80);
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
+  EXPECT_EQ(resolvers->next->family, AF_INET);
+  EXPECT_EQ(resolvers->next->udp_port, 81);
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->next->addr.addr4, addr4str, INET_ADDRSTRLEN),
+               "5.6.7.8");
+  // check v6
+  EXPECT_EQ(resolvers->next->next->family, AF_INET6);
+  EXPECT_EQ(resolvers->next->next->udp_port, 90);
+  EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
+               "::2");
+  EXPECT_EQ(resolvers->next->next->next->family, AF_INET6);
+  EXPECT_EQ(resolvers->next->next->next->udp_port, 91);
+  EXPECT_STREQ(
+      inet_ntop(AF_INET6, &resolvers->next->next->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
+      "::3");
+
+  ares_free_data(resolvers);
+}
+
 // Custom instance that dispatches everything to a regular instance except for asString(), where
 // it borks the port.
 class CustomInstance : public Address::Instance {

@@ -49,7 +49,10 @@ envoy_cc_library(
         "//source/common/network:listener_lib",
         "//source/extensions/network/dns_resolver/cares:config",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:apple": ["//source/extensions/network/dns_resolver/apple:config"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_library(
