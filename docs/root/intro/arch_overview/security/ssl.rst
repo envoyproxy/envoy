@@ -223,7 +223,7 @@ Envoy to support various key management schemes (such as TPM) and TLS
 acceleration. This mechanism uses `BoringSSL private key method interface
 <https://github.com/google/boringssl/blob/c0b4c72b6d4c6f4828a373ec454bd646390017d4/include/openssl/ssl.h#L1169>`_.
 :ref:`CryptoMb private key provider
-<envoy_v3_api_msg_extensions.contrib.private_key_providers.cryptomb.v3alpha.CryptoMbPrivateKeyMethodConfig>`
+<envoy_v3_api_msg_extensions.private_key_providers.cryptomb.v3alpha.CryptoMbPrivateKeyMethodConfig>`
 is one such private key provider for ECDSA and RSA operations.
 
 .. _arch_overview_ssl_trouble_shooting:
