@@ -15,16 +15,13 @@ exports_files([
 envoy_py_binary(
     name = "tools.distribution.sign",
     deps = [
-        requirement("envoy.gpg.identity"),
-        base_requirement("envoy.base.runner"),
-        base_requirement("envoy.base.utils"),
+        requirement("envoy.gpg.sign"),
     ],
 )
 
 envoy_py_binary(
     name = "tools.distribution.verify",
     deps = [
-        base_requirement("envoy.base.checker"),
-        requirement("envoy.distribution.distrotest"),
+        requirement("envoy.distribution.verify"),
     ],
 )

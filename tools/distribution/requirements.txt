@@ -81,18 +81,26 @@ envoy.base.checker==0.0.1 \
     # via
     #   -r tools/distribution/requirements.txt
     #   envoy.distribution.distrotest
+    #   envoy.distribution.verify
 envoy.base.runner==0.0.1 \
     --hash=sha256:5e9c1130cb175400580ba7e87770a43c8cded554b352f842544d63580033021f
     # via
     #   -r tools/distribution/requirements.txt
     #   envoy.base.checker
+    #   envoy.gpg.sign
 envoy.base.utils==0.0.2 \
     --hash=sha256:1b2c7604128158c31110d0d60eb16912be3b1417db7230c7e4ac7d21073dafa6
     # via
     #   -r tools/distribution/requirements.txt
     #   envoy.distribution.distrotest
+    #   envoy.gpg.sign
 envoy.distribution.distrotest==0.0.2 \
     --hash=sha256:578371d68eb6850c8644662022e87009dbc1903cdfbfeb8e037187c96e403d86
+    # via
+    #   -r tools/distribution/requirements.txt
+    #   envoy.distribution.verify
+envoy.distribution.verify==0.0.1 \
+    --hash=sha256:3754a0e210de9367dc4ea56535f09dbbf1331ea72dd648690fba14954baed54c
     # via -r tools/distribution/requirements.txt
 envoy.docker.utils==0.0.1 \
     --hash=sha256:5b6e4ae8a89cc4df8951dc5a32dc2f0fe59c01a889c716dd72254c4cd6309f0d
@@ -101,6 +109,11 @@ envoy.docker.utils==0.0.1 \
     #   envoy.distribution.distrotest
 envoy.gpg.identity==0.0.1 \
     --hash=sha256:3f665f927d5df9cb99e0c142a8b555678dfb620b1ec73dce6418128d49dc9438
+    # via
+    #   -r tools/distribution/requirements.txt
+    #   envoy.gpg.sign
+envoy.gpg.sign==0.0.2 \
+    --hash=sha256:f348d25c7de5da6970c688319268a4f344b24d357005799d00f17c60f6cbd573
     # via -r tools/distribution/requirements.txt
 frozendict==2.0.6 \
     --hash=sha256:3f00de72805cf4c9e81b334f3f04809278b967d2fed84552313a0fcce511beb1 \
