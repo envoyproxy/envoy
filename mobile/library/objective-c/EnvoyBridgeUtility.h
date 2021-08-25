@@ -103,14 +103,14 @@ static inline NSString *to_ios_string(envoy_data data) {
 static inline EnvoyEvent *to_ios_map(envoy_map map) {
   NSMutableDictionary *newMap = [NSMutableDictionary new];
   for (envoy_map_size_t i = 0; i < map.length; i++) {
-    envoy_map_entry header = map.entries[i];
-    NSString *headerKey = [[NSString alloc] initWithBytes:header.key.bytes
-                                                   length:header.key.length
-                                                 encoding:NSUTF8StringEncoding];
-    NSString *headerValue = [[NSString alloc] initWithBytes:header.value.bytes
-                                                     length:header.value.length
-                                                   encoding:NSUTF8StringEncoding];
-    newMap[headerKey] = headerValue;
+    envoy_map_entry entry = map.entries[i];
+    NSString *entryKey = [[NSString alloc] initWithBytes:entry.key.bytes
+                                                  length:entry.key.length
+                                                encoding:NSUTF8StringEncoding];
+    NSString *entryValue = [[NSString alloc] initWithBytes:entry.value.bytes
+                                                    length:entry.value.length
+                                                  encoding:NSUTF8StringEncoding];
+    newMap[entryKey] = entryValue;
   }
 
   release_envoy_map(map);
