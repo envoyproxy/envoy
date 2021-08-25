@@ -295,6 +295,12 @@ EXTENSIONS = {
     "envoy.formatter.req_without_query":                "//source/extensions/formatter/req_without_query:config",
 
     #
+    # Key value store
+    #
+
+    "envoy.key_value.file_based":     "//source/extensions/key_value/file_based:config_lib",
+
+    #
     # DNS Resolver
     #
 

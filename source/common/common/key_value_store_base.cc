@@ -72,37 +72,13 @@ absl::optional<absl::string_view> KeyValueStoreBase::get(absl::string_view key) 
   return it->second;
 }
 
-FileBasedKeyValueStore::FileBasedKeyValueStore(Event::Dispatcher& dispatcher,
-                                               std::chrono::seconds flush_interval,
-                                               Filesystem::Instance& file_system,
-                                               const std::string& filename)
-    : KeyValueStoreBase(dispatcher, flush_interval), file_system_(file_system),
-      filename_(filename) {
-  if (!file_system_.fileExists(filename_)) {
-    return;
+void KeyValueStoreBase::iterate(ConstIterateCb cb) const {
+  for (const auto& [key, value] : store_) {
+    Iterate ret = cb(key, value);
+    if (ret == Iterate::Break) {
+      return;
+    }
   }
-  const std::string contents = file_system_.fileReadToEnd(filename_);
-  if (!parseContents(contents, store_)) {
-    ENVOY_LOG(warn, "Failed to parse key value store file {}", filename);
-  }
-}
-
-void FileBasedKeyValueStore::flush() {
-  static constexpr Filesystem::FlagSet DefaultFlags{1 << Filesystem::File::Operation::Write |
-                                                    1 << Filesystem::File::Operation::Create};
-  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, filename_};
-  auto file = file_system_.createFile(file_info);
-  if (!file || !file->open(DefaultFlags).return_value_) {
-    ENVOY_LOG(error, "Failed to flush cache to file {}", filename_);
-    return;
-  }
-  for (const auto& it : store_) {
-    file->write(absl::StrCat(it.first.length(), "\n"));
-    file->write(it.first);
-    file->write(absl::StrCat(it.second.length(), "\n"));
-    file->write(it.second);
-  }
-  file->close();
 }
 
 } // namespace Envoy

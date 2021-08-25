@@ -2,6 +2,7 @@
 #include <string>
 
 #include "source/common/common/key_value_store_base.h"
+#include "source/extensions/key_value/file_based/config.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
@@ -13,6 +14,8 @@
 using testing::NiceMock;
 
 namespace Envoy {
+namespace Extensions {
+namespace KeyValue {
 namespace {
 
 class KeyValueStoreTest : public testing::Test {
@@ -48,8 +51,38 @@ TEST_F(KeyValueStoreTest, Persist) {
 
   createStore();
 
+  KeyValueStore::ConstIterateCb validate = [](const std::string& key, const std::string&) {
+    EXPECT_TRUE(key == "foo" || key == "ba\nz");
+    return KeyValueStore::Iterate::Continue;
+  };
+
   EXPECT_EQ("bar", store_->get("foo").value());
   EXPECT_EQ("ee\np", store_->get("ba\nz").value());
+  store_->iterate(validate);
+}
+
+TEST_F(KeyValueStoreTest, Iterate) {
+  store_->addOrUpdate("foo", "bar");
+  store_->addOrUpdate("baz", "eep");
+
+  int full_counter = 0;
+  KeyValueStore::ConstIterateCb validate = [&full_counter](const std::string& key,
+                                                           const std::string&) {
+    ++full_counter;
+    EXPECT_TRUE(key == "foo" || key == "baz");
+    return KeyValueStore::Iterate::Continue;
+  };
+  store_->iterate(validate);
+  EXPECT_EQ(2, full_counter);
+
+  int stop_early_counter = 0;
+  KeyValueStore::ConstIterateCb stop_early = [&stop_early_counter](const std::string&,
+                                                                   const std::string&) {
+    ++stop_early_counter;
+    return KeyValueStore::Iterate::Break;
+  };
+  store_->iterate(stop_early);
+  EXPECT_EQ(1, stop_early_counter);
 }
 
 TEST_F(KeyValueStoreTest, HandleBadFile) {
@@ -75,4 +108,6 @@ TEST_F(KeyValueStoreTest, HandleInvalidFile) {
 #endif
 
 } // namespace
+} // namespace KeyValue
+} // namespace Extensions
 } // namespace Envoy
