@@ -155,11 +155,11 @@ bool HappyEyeballsConnectionImpl::readEnabled() const {
   return connections_[0]->readEnabled();
 }
 
-const SocketAddressProvider& HappyEyeballsConnectionImpl::addressProvider() const {
+const ConnectionInfoProvider& HappyEyeballsConnectionImpl::addressProvider() const {
   return connections_[0]->addressProvider();
 }
 
-SocketAddressProviderSharedPtr HappyEyeballsConnectionImpl::addressProviderSharedPtr() const {
+ConnectionInfoProviderSharedPtr HappyEyeballsConnectionImpl::addressProviderSharedPtr() const {
   return connections_[0]->addressProviderSharedPtr();
 }
 

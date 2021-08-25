@@ -12,7 +12,7 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/source/extensions/filters/network/kafka"
+  directory: "/contrib/kafka/filters/network/source"
   schedule:
     interval: "daily"
 

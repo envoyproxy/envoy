@@ -58,6 +58,8 @@ int io_handle_read(BIO* b, char* out, int outl) {
     auto err = result.err_->getErrorCode();
     if (err == Api::IoError::IoErrorCode::Again || err == Api::IoError::IoErrorCode::Interrupt) {
       BIO_set_retry_read(b);
+    } else {
+      ERR_put_error(ERR_LIB_SYS, 0, result.err_->getSystemErrorCode(), __FILE__, __LINE__);
     }
     return -1;
   }
@@ -75,6 +77,8 @@ int io_handle_write(BIO* b, const char* in, int inl) {
     auto err = result.err_->getErrorCode();
     if (err == Api::IoError::IoErrorCode::Again || err == Api::IoError::IoErrorCode::Interrupt) {
       BIO_set_retry_write(b);
+    } else {
+      ERR_put_error(ERR_LIB_SYS, 0, result.err_->getSystemErrorCode(), __FILE__, __LINE__);
     }
     return -1;
   }
