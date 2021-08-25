@@ -178,8 +178,8 @@ TEST_F(WeightedClusterIntegrationTest, SplitTrafficRandomly) {
     sendRequestAndValidateResponse(upstream_indices);
   }
 
-  // Check that all the upstream cluster have been routed to at least once.
   std::string target_name;
+  // Check that all the upstream cluster have been routed to at least once.
   for (int i = 0; i < TotalUpstreamClusterCount; ++i) {
     target_name = absl::StrFormat("cluster.cluster_%d.upstream_cx_total", i);
     EXPECT_GE(test_server_->counter(target_name)->value(), 1);
