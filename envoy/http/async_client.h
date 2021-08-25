@@ -18,8 +18,8 @@
 namespace Envoy {
 namespace Http {
 namespace {
-static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
-static constexpr uint32_t RetryMaxDelayMilliseconds = 10 * 1000;
+constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
+constexpr uint32_t RetryMaxDelayMilliseconds = 10 * 1000;
 } // namespace
 
 /**
