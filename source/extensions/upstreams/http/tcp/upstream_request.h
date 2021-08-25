@@ -84,11 +84,12 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
-  void setBytesMeterer(const StreamInfo::BytesMetererSharedPtr&) override {}
+  StreamInfo::BytesMetererSharedPtr& bytesMeterer() override { return bytes_meterer_; }
 
 private:
   Router::UpstreamToDownstream* upstream_request_;
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
+  StreamInfo::BytesMetererSharedPtr bytes_meterer_;
 };
 
 } // namespace Tcp

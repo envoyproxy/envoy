@@ -212,7 +212,7 @@ public:
   // Http::RequestDecoder
   void decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::RequestTrailerMapPtr&& trailers) override;
-  const StreamInfo::StreamInfo& streamInfo() const override {
+  StreamInfo::StreamInfo& streamInfo() override {
     RELEASE_ASSERT(false, "initialize if this is needed");
     return *stream_info_;
   }

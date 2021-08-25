@@ -425,7 +425,7 @@ void UpstreamRequest::onPoolReady(
         info.downstreamAddressProvider().connectionID().value());
   }
 
-  upstream_->setBytesMeterer(streamInfo().getUpstreamBytesMeterer());
+  stream_info_.setUpstreamBytesMeterer(upstream_->bytesMeterer());
   StreamInfo::StreamInfo::syncUpstreamAndDownstreamBytesMeterer(parent_.callbacks()->streamInfo(),
                                                                 stream_info_);
 

@@ -807,7 +807,7 @@ Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
                  hd->stream_id, hd->length);
   current_stream_id_ = hd->stream_id;
   StreamImpl* stream = getStream(hd->stream_id);
-  if (stream != nullptr && stream->bytes_meterer_ != nullptr) {
+  if (stream != nullptr) {
     if (hd->type != METADATA_FRAME_TYPE) {
       stream->bytes_meterer_->addWireBytesReceived(hd->length + H2_FRAME_HEADER_SIZE);
     }
@@ -947,7 +947,7 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "sent frame type={}, stream_id={}, length={}", connection_,
                  static_cast<uint64_t>(frame->hd.type), frame->hd.stream_id, frame->hd.length);
   StreamImpl* stream = getStream(frame->hd.stream_id);
-  if (stream != nullptr && stream->bytes_meterer_ != nullptr) {
+  if (stream != nullptr) {
     if (frame->hd.type != METADATA_FRAME_TYPE) {
       stream->bytes_meterer_->addWireBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
     }

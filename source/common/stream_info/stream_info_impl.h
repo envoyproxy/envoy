@@ -280,10 +280,20 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
-  BytesMetererSharedPtr getUpstreamBytesMeterer() const override { return upstream_bytes_meterer_; }
+  const BytesMetererSharedPtr& getUpstreamBytesMeterer() const override {
+    return upstream_bytes_meterer_;
+  }
 
-  BytesMetererSharedPtr getDownstreamBytesMeterer() const override {
+  const BytesMetererSharedPtr& getDownstreamBytesMeterer() const override {
     return downstream_bytes_meterer_;
+  }
+
+  void setUpstreamBytesMeterer(const BytesMetererSharedPtr& upstream_bytes_meterer) override {
+    upstream_bytes_meterer_ = upstream_bytes_meterer;
+  }
+
+  void setDownstreamBytesMeterer(const BytesMetererSharedPtr& downstream_bytes_meterer) override {
+    downstream_bytes_meterer_ = downstream_bytes_meterer;
   }
 
   TimeSource& time_source_;
@@ -327,14 +337,6 @@ private:
                                          ? downstream_address_provider
                                          : emptyDownstreamAddressProvider()),
         trace_reason_(Tracing::Reason::NotTraceable) {}
-
-  void setUpstreamBytesMeterer(const BytesMetererSharedPtr& upstream_bytes_meterer) override {
-    upstream_bytes_meterer_ = upstream_bytes_meterer;
-  }
-
-  void setDownstreamBytesMeterer(const BytesMetererSharedPtr& downstream_bytes_meterer) override {
-    downstream_bytes_meterer_ = downstream_bytes_meterer;
-  }
 
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};

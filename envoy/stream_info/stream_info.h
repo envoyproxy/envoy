@@ -623,20 +623,19 @@ public:
    */
   virtual absl::optional<uint32_t> attemptCount() const PURE;
 
-  virtual BytesMetererSharedPtr getUpstreamBytesMeterer() const PURE;
+  virtual const BytesMetererSharedPtr& getUpstreamBytesMeterer() const PURE;
 
-  virtual BytesMetererSharedPtr getDownstreamBytesMeterer() const PURE;
+  virtual const BytesMetererSharedPtr& getDownstreamBytesMeterer() const PURE;
+
+  virtual void setUpstreamBytesMeterer(const BytesMetererSharedPtr&) PURE;
+
+  virtual void setDownstreamBytesMeterer(const BytesMetererSharedPtr&) PURE;
 
   static void syncUpstreamAndDownstreamBytesMeterer(StreamInfo& downstream_info,
                                                     StreamInfo& upstream_info) {
     downstream_info.setUpstreamBytesMeterer(upstream_info.getUpstreamBytesMeterer());
     upstream_info.setDownstreamBytesMeterer(downstream_info.getDownstreamBytesMeterer());
   }
-
-private:
-  virtual void setUpstreamBytesMeterer(const BytesMetererSharedPtr&) PURE;
-
-  virtual void setDownstreamBytesMeterer(const BytesMetererSharedPtr&) PURE;
 };
 
 } // namespace StreamInfo

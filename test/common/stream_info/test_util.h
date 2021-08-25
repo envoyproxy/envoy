@@ -221,12 +221,22 @@ public:
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
-  Envoy::StreamInfo::BytesMetererSharedPtr getUpstreamBytesMeterer() const override {
+  const Envoy::StreamInfo::BytesMetererSharedPtr& getUpstreamBytesMeterer() const override {
     return upstream_bytes_meterer_;
   }
 
-  Envoy::StreamInfo::BytesMetererSharedPtr getDownstreamBytesMeterer() const override {
+  const Envoy::StreamInfo::BytesMetererSharedPtr& getDownstreamBytesMeterer() const override {
     return downstream_bytes_meterer_;
+  }
+
+  void setUpstreamBytesMeterer(
+      const Envoy::StreamInfo::BytesMetererSharedPtr& upstream_bytes_meterer) override {
+    upstream_bytes_meterer_ = upstream_bytes_meterer;
+  }
+
+  void setDownstreamBytesMeterer(
+      const Envoy::StreamInfo::BytesMetererSharedPtr& downstream_bytes_meterer) override {
+    downstream_bytes_meterer_ = downstream_bytes_meterer;
   }
 
   Random::RandomGeneratorImpl random_;
@@ -276,17 +286,6 @@ public:
       std::make_shared<Envoy::StreamInfo::BytesMeterer>();
   Envoy::StreamInfo::BytesMetererSharedPtr downstream_bytes_meterer_ =
       std::make_shared<Envoy::StreamInfo::BytesMeterer>();
-
-private:
-  void setUpstreamBytesMeterer(
-      const Envoy::StreamInfo::BytesMetererSharedPtr& upstream_bytes_meterer) override {
-    upstream_bytes_meterer_ = upstream_bytes_meterer;
-  }
-
-  void setDownstreamBytesMeterer(
-      const Envoy::StreamInfo::BytesMetererSharedPtr& downstream_bytes_meterer) override {
-    downstream_bytes_meterer_ = downstream_bytes_meterer;
-  }
 };
 
 } // namespace Envoy

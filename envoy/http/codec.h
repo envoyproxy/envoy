@@ -225,7 +225,7 @@ public:
   /**
    * @return StreamInfo::StreamInfo& the stream_info for this stream.
    */
-  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 };
 
 /**
@@ -357,9 +357,7 @@ public:
    */
   virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
 
-  virtual StreamInfo::BytesMeterer* bytesMeterer() PURE;
-
-  virtual void setBytesMeterer(const StreamInfo::BytesMetererSharedPtr&) {}
+  virtual StreamInfo::BytesMetererSharedPtr& bytesMeterer() PURE;
 };
 
 /**

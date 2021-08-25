@@ -2829,10 +2829,10 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountDownstream) {
                "%DOWNSTREAM_BODY_BYTES_SENT% %DOWNSTREAM_BODY_BYTES_RECEIVED%\n");
   testRouterRequestAndResponseWithBody(100, 100, false);
   expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 244, 0, 106, 10, 177, 109, 100,
-                                         100);
+                                           100);
 }
 
-TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUsptream) {
+TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUpstream) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
@@ -2845,6 +2845,21 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUsptream) {
   testTrailers(10, 20, true, true);
 
   expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 248, 120, 15, 29, 172, 81, 19, 29);
+}
+
+TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountDownstream) {
+  // we only care about upstream protocol.
+  if (upstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+               "%DOWNSTREAM_BODY_BYTES_SENT% %DOWNSTREAM_BODY_BYTES_RECEIVED%\n");
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+
+  testTrailers(10, 20, true, true);
+
+  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 206, 0, 26, 9, 136, 58, 29, 19);
 }
 
 TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireBytesCountUpstream) {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bits/stdint-uintn.h>
+
 #include <array>
 #include <cstdint>
 #include <list>
@@ -83,11 +85,7 @@ public:
 
   void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
 
-  StreamInfo::BytesMeterer* bytesMeterer() override { return bytes_meterer_.get(); }
-
-  void setBytesMeterer(const StreamInfo::BytesMetererSharedPtr& bytes_meterer) override {
-    bytes_meterer_ = bytes_meterer;
-  }
+  StreamInfo::BytesMetererSharedPtr& bytesMeterer() override { return bytes_meterer_; }
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection);
@@ -136,7 +134,7 @@ private:
   void flushOutput(bool end_encode = false);
 
   absl::string_view details_;
-  StreamInfo::BytesMetererSharedPtr bytes_meterer_;
+  StreamInfo::BytesMetererSharedPtr bytes_meterer_{std::make_shared<StreamInfo::BytesMeterer>()};
 };
 
 /**
@@ -219,7 +217,7 @@ public:
    */
   virtual void onEncodeComplete() PURE;
 
-  virtual StreamInfo::BytesMeterer* getBytesMeterer() PURE;
+  virtual StreamInfo::BytesMetererSharedPtr& getBytesMeterer() PURE;
 
   /**
    * Called when resetStream() has been called on an active stream. In HTTP/1.1 the only
@@ -499,11 +497,9 @@ private:
   Status onUrl(const char* data, size_t length) override;
   // ConnectionImpl
   void onEncodeComplete() override;
-  virtual StreamInfo::BytesMeterer* getBytesMeterer() override {
-    if (active_request_.has_value()) {
-      return active_request_->response_encoder_.getStream().bytesMeterer();
-    }
-    return nullptr;
+  virtual StreamInfo::BytesMetererSharedPtr& getBytesMeterer() override {
+    ASSERT(active_request_.has_value());
+    return active_request_->response_encoder_.getStream().bytesMeterer();
   }
   Status onMessageBeginBase() override;
   Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
@@ -590,11 +586,9 @@ private:
   // ConnectionImpl
   Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}
-  virtual StreamInfo::BytesMeterer* getBytesMeterer() override {
-    if (pending_response_.has_value()) {
-      return pending_response_->encoder_.getStream().bytesMeterer();
-    }
-    return nullptr;
+  virtual StreamInfo::BytesMetererSharedPtr& getBytesMeterer() override {
+    ASSERT(pending_response_.has_value());
+    return pending_response_->encoder_.getStream().bytesMeterer();
   }
   Status onMessageBeginBase() override { return okStatus(); }
   Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
@@ -648,6 +642,8 @@ private:
 
   // The default limit of 80 KiB is the vanilla http_parser behaviour.
   static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
+
+  uint64_t dispatched_bytes_{};
 };
 
 } // namespace Http1

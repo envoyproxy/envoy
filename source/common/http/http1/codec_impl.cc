@@ -252,9 +252,7 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
       connection_.buffer().add(CRLF);
       body_frame_size += 2;
     }
-    if (bytes_meterer_) {
-      bytes_meterer_->addBodyBytesSent(body_frame_size);
-    }
+    bytes_meterer_->addBodyBytesSent(body_frame_size);
   }
 
   if (end_stream) {
@@ -266,9 +264,7 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 
 void StreamEncoderImpl::flushOutput(bool end_encode) {
   auto encoded_bytes = connection_.flushOutput(end_encode);
-  if (bytes_meterer_) {
-    bytes_meterer_->addWireBytesSent(encoded_bytes);
-  }
+  bytes_meterer_->addWireBytesSent(encoded_bytes);
 }
 
 void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
@@ -581,12 +577,12 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
 
 Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
   if (pending_response_.has_value()) {
-    StreamInfo::BytesMeterer* bytes_meterer =
+    StreamInfo::BytesMetererSharedPtr& bytes_meterer =
         pending_response_.value().encoder_.getStream().bytesMeterer();
-        ASSERT(bytes_meterer);
-    if (bytes_meterer) {
-      bytes_meterer->addWireBytesReceived(data.length());
-    }
+    bytes_meterer->addWireBytesReceived(data.length());
+  } else {
+    // Bytes dispatched before we create pending response.
+    dispatched_bytes_ += data.length();
   }
   Http::Status status = ConnectionImpl::dispatch(data);
   if (status.ok() && data.length() > 0) {
@@ -856,11 +852,11 @@ void ConnectionImpl::onChunkHeader(int content_length) {
     content_length /= 10;
   } while (content_length > 0);
 
-  StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
+  StreamInfo::BytesMetererSharedPtr& bytes_meterer = getBytesMeterer();
   // Count overhead of chunk encoding per chunk.
-  if (bytes_meterer) {
-    bytes_meterer->addBodyBytesReceived(is_final_chunk ? 3 : 4 + content_length_digits);
-  }
+
+  bytes_meterer->addBodyBytesReceived(is_final_chunk ? 3 : 4 + content_length_digits);
+
   if (is_final_chunk) {
     // Dispatch body before parsing trailers, so body ends up dispatched even if an error is found
     // while processing trailers.
@@ -1312,6 +1308,9 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
   ASSERT(pending_response_done_);
   pending_response_.emplace(*this, &response_decoder);
   pending_response_done_ = false;
+  StreamInfo::BytesMetererSharedPtr& bytes_meterer =
+      pending_response_.value().encoder_.getStream().bytesMeterer();
+  bytes_meterer->addWireBytesReceived(dispatched_bytes_);
   return pending_response_.value().encoder_;
 }
 
@@ -1393,11 +1392,11 @@ void ClientConnectionImpl::onBody(Buffer::Instance& data) {
   ASSERT(!deferred_end_stream_headers_);
   if (pending_response_.has_value()) {
     ASSERT(!pending_response_done_);
-    StreamInfo::BytesMeterer* bytes_meterer =
+    StreamInfo::BytesMetererSharedPtr& bytes_meterer =
         pending_response_.value().encoder_.getStream().bytesMeterer();
-    if (bytes_meterer) {
-      bytes_meterer->addBodyBytesReceived(data.length());
-    }
+
+    bytes_meterer->addBodyBytesReceived(data.length());
+
     pending_response_.value().decoder_->decodeData(data, false);
   }
 }

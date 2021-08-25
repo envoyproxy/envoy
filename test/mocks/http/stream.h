@@ -39,7 +39,9 @@ public:
     }
   }
 
-  StreamInfo::BytesMeterer* bytesMeterer() override { return nullptr; }
+  StreamInfo::BytesMetererSharedPtr& bytesMeterer() override { return bytes_meterer_; }
+
+  StreamInfo::BytesMetererSharedPtr bytes_meterer_{std::make_shared<StreamInfo::BytesMeterer>()};
 };
 
 } // namespace Http
