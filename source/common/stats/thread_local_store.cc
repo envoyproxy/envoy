@@ -845,7 +845,7 @@ ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
       cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_, supported_buckets),
       cumulative_statistics_(cumulative_histogram_, supported_buckets), merged_(false), id_(id),
-      is_cunstom_metric_(is_custom_metric) {}
+      is_custom_metric_(is_custom_metric) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   thread_local_store_.releaseHistogramCrossThread(id_);
@@ -905,7 +905,7 @@ SymbolTable& ParentHistogramImpl::symbolTable() { return thread_local_store_.sym
 Histogram::Unit ParentHistogramImpl::unit() const { return unit_; }
 
 void ParentHistogramImpl::recordValue(uint64_t value) {
-  Histogram& tls_histogram = thread_local_store_.tlsHistogram(*this, id_, is_cunstom_metric_);
+  Histogram& tls_histogram = thread_local_store_.tlsHistogram(*this, id_, is_custom_metric_);
   tls_histogram.recordValue(value);
   thread_local_store_.deliverHistogramToSinks(*this, value);
 }
@@ -915,7 +915,7 @@ bool ParentHistogramImpl::used() const {
   return merged_;
 }
 
-bool ParentHistogramImpl::isCustomMetric() const { return is_cunstom_metric_; }
+bool ParentHistogramImpl::isCustomMetric() const { return is_custom_metric_; }
 
 void ParentHistogramImpl::merge() {
   Thread::ReleasableLockGuard lock(merge_lock_);

@@ -121,6 +121,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "options_lib",
+    hdrs = ["options.h"],
+    deps = [
+        "//envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "store_impl_lib",
     hdrs = ["store_impl.h"],
     deps = [
