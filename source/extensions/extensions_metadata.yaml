@@ -709,3 +709,8 @@ envoy.watchdog.profile_action:
   - envoy.guarddog_actions
   security_posture: data_plane_agnostic
   status: alpha
+envoy.key_value.file_based:
+  categories:
+  - envoy.common.key_value
+  security_posture: data_plane_agnostic
+  status: alpha
