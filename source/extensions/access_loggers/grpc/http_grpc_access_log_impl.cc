@@ -51,9 +51,9 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
         config_.common_config(), transport_version, Common::GrpcAccessLoggerType::HTTP, scope_));
   });
 
-  if (config_.has_common_config() && config_.common_config().has_buffer_log_filter()) {
+  if (config_.has_common_config() && config_.common_config().has_critical_buffer_log_filter()) {
     critical_log_filter_ = AccessLog::FilterFactory::fromProto(
-        config_.common_config().buffer_log_filter(), context.runtime(),
+        config_.common_config().critical_buffer_log_filter(), context.runtime(),
         context.api().randomGenerator(), context.messageValidationVisitor());
   }
 }

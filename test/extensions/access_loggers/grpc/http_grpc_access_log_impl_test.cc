@@ -763,7 +763,7 @@ status_code_filter:
 
   envoy::config::accesslog::v3::AccessLogFilter config;
   TestUtility::loadFromYaml(filter_yaml, config);
-  *config_.mutable_common_config()->mutable_buffer_log_filter() = config;
+  *config_.mutable_common_config()->mutable_critical_buffer_log_filter() = config;
 
   init();
 

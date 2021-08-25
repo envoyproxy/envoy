@@ -28,7 +28,7 @@ service AccessLogService {
 
   // This endpoint provides acknowledgment of logs marked as requiring this.
   // The requirement for an acknowledgment can be set in
-  // :ref:`buffer_log_filter <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.buffer_log_filter>`.
+  // :ref:`critical_buffer_log_filter <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.critical_buffer_log_filter>`.
   // Log messages that match this filter will be guaranteed delivery. In order to guarantee
   // the arrival, this endpoint performs the following process.
   //
@@ -47,7 +47,7 @@ service AccessLogService {
   // Buffers for guaranteed reachability can be extremely memory-intensive. Therefore, the following points
   // should be considered when using this endpoint.
   //
-  // 1. :ref:`buffer_log_filter <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.buffer_log_filter>`
+  // 1. :ref:`critical_buffer_log_filter <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.critical_buffer_log_filter>`
   //    should be set strictly. A loose filter may encourage rapid buffer overwhelm and leading to OOM.
   // 2. :ref:`pending_critical_buffer_size_bytes <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.pending_critical_buffer_size_bytes>`
   //    should be set appropriately to prevent OOM.
@@ -146,7 +146,7 @@ message BufferedCriticalAccessLogsMessage {
   // The body of the log message sent to BufferedCriticalAccessLogs.
   StreamAccessLogsMessage message = 1;
 
-  // This is an ID to identify the message, and can be added to the Critical Endpoint
-  // response message to uniquely identify the message being buffered in the Envoy.
+  // This is an ID to identify the message, and should be added to the Critical Endpoint
+  // response message to uniquely identify the message being ACK/NACKed.
   uint64 id = 4;
 }

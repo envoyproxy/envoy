@@ -88,14 +88,14 @@ message CommonGrpcAccessLogConfig {
   // Logger will call `FilterState::Object::serializeAsProto` to serialize the filter state object.
   repeated string filter_state_objects_to_log = 5;
 
-  // Define the log condition as a filter to ensure that the destination is reached.
+  // Define the log condition for critical access logs.
   // Logs that match the filter are not forwarded to the normal endpoint,
   // but are sent to a special endpoint.
-  config.accesslog.v3.AccessLogFilter buffer_log_filter = 7;
+  config.accesslog.v3.AccessLogFilter critical_buffer_log_filter = 7;
 
   // The time to wait for an ACK message. If no ACK message is returned after this time,
   // the message is considered undeliverable and the failed transmission is buffered again.
-  // The re-buffered message will be sent again at the next time the critical log is sent.
+  // The re-buffered message will be sent again at the next time a log matching *critical_critical_buffer_log_filter* is queued.
   google.protobuf.Duration message_ack_timeout = 8
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 

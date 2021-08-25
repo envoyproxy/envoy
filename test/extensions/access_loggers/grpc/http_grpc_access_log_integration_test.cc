@@ -158,7 +158,7 @@ public:
 
           envoy::config::accesslog::v3::AccessLogFilter filter_config;
           TestUtility::loadFromYaml(filter_yaml, filter_config);
-          *common_config->mutable_buffer_log_filter() = filter_config;
+          *common_config->mutable_critical_buffer_log_filter() = filter_config;
           access_log->mutable_typed_config()->PackFrom(config);
         });
 
