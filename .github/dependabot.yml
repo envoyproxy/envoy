@@ -47,11 +47,6 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/docker"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/tools/dependency"
   schedule:
     interval: "daily"
@@ -62,7 +57,7 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/gpg"
+  directory: "/tools/distribution"
   schedule:
     interval: "daily"
 

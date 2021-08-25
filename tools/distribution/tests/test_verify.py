@@ -3,8 +3,10 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
 
+from envoy.distribution import distrotest
+
 from tools.base.checker import AsyncChecker
-from tools.distribution import distrotest, verify
+from tools.distribution import verify
 
 
 def test_checker_constructor(patches):

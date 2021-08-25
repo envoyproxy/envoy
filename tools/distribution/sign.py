@@ -31,8 +31,9 @@ from typing import Iterator, Optional, Tuple, Type, Union
 
 import verboselogs  # type:ignore
 
+from envoy.gpg import identity
+
 from tools.base import runner, utils
-from tools.gpg import identity
 
 # Replacable `__` maintainer/gpg config - python interpolation doesnt work easily
 # with this string

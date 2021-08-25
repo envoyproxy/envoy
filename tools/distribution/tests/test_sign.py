@@ -3,9 +3,10 @@ from unittest.mock import MagicMock, PropertyMock
 
 import pytest
 
+from envoy.gpg import identity
+
 from tools.base import runner
 from tools.distribution import sign
-from tools.gpg import identity
 
 
 # DirectorySigningUtil

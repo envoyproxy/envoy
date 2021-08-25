@@ -25,8 +25,9 @@ from typing import Optional, Type
 
 import aiodocker
 
+from envoy.distribution import distrotest
+
 from tools.base import checker, utils
-from tools.distribution import distrotest
 
 # TODO(phlax): make this configurable
 ENVOY_MAINTAINER = "Envoy maintainers <envoy-maintainers@googlegroups.com>"
