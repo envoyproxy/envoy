@@ -100,8 +100,10 @@ public:
                                 const Headers& headers_to_remove = Headers{}) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    Http::TestRequestHeaderMapImpl headers{
-        {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+    Http::TestRequestHeaderMapImpl headers{{":method", "POST"},     {":path", "/test"},
+                                           {":scheme", "http"},     {":authority", "host"},
+                                           {"x-duplicate", "one"},  {"x-duplicate", "two"},
+                                           {"x-duplicate", "three"}};
 
     // Initialize headers to append. If the authorization server returns any matching keys with one
     // of value in headers_to_add, the header entry from authorization server replaces the one in
@@ -152,6 +154,9 @@ public:
     EXPECT_TRUE(attributes->request().has_time());
     EXPECT_EQ("value_1", attributes->destination().labels().at("label_1"));
     EXPECT_EQ("value_2", attributes->destination().labels().at("label_2"));
+
+    // Duplicate headers in the check request should be merged.
+    EXPECT_EQ("one,two,three", (*http_request->mutable_headers())["x-duplicate"]);
 
     // Clear fields which are not relevant.
     attributes->clear_source();
@@ -445,6 +450,9 @@ public:
         {"baz", "foo"},
         {"bat", "foo"},
         {"remove-me", "upstream-should-not-see-me"},
+        {"x-duplicate", "one"},
+        {"x-duplicate", "two"},
+        {"x-duplicate", "three"},
     });
   }
 
@@ -456,6 +464,12 @@ public:
     RELEASE_ASSERT(result, result.message());
     result = ext_authz_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
+
+    // Duplicate headers in the check request should be merged.
+    const auto duplicate =
+        ext_authz_request_->headers().get(Http::LowerCaseString(std::string("x-duplicate")));
+    EXPECT_EQ(1, duplicate.size());
+    EXPECT_EQ("one,two,three", duplicate[0]->value().getStringView());
 
     // Send back authorization response with "baz" and "bat" headers.
     // Also add multiple values "append-foo" and "append-bar" for key "x-append-bat".
@@ -569,6 +583,7 @@ public:
       allowed_headers:
         patterns:
         - exact: X-Case-Sensitive-Header
+        - exact: x-duplicate
 
     authorization_response:
       allowed_upstream_headers:

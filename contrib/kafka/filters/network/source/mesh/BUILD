@@ -43,10 +43,12 @@ envoy_cc_library(
     deps = [
         ":abstract_command_lib",
         ":upstream_config_lib",
+        ":upstream_kafka_facade_lib",
         "//contrib/kafka/filters/network/source:kafka_request_codec_lib",
         "//contrib/kafka/filters/network/source:kafka_request_parser_lib",
         "//contrib/kafka/filters/network/source/mesh/command_handlers:api_versions_lib",
         "//contrib/kafka/filters/network/source/mesh/command_handlers:metadata_lib",
+        "//contrib/kafka/filters/network/source/mesh/command_handlers:produce_lib",
         "//source/common/common:minimal_logger_lib",
     ],
 )
