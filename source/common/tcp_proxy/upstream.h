@@ -53,8 +53,7 @@ public:
                Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks, Http::CodecType type);
   ~HttpConnPool() override;
 
-  // HTTP/3 upstreams are not supported at the moment.
-  bool valid() const { return conn_pool_data_.has_value() && type_ <= Http::CodecType::HTTP2; }
+  bool valid() const { return conn_pool_data_.has_value(); }
 
   // GenericConnPool
   void newStream(GenericConnectionPoolCallbacks& callbacks) override;

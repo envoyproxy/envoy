@@ -117,7 +117,7 @@ ConfigHelper::HttpModifierFunction setRouteUsingWebsocket() {
 }
 
 void WebsocketIntegrationTest::initialize() {
-  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           ConfigHelper::HttpProtocolOptions protocol_options;
