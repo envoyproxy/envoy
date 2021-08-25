@@ -88,9 +88,9 @@ public:
   }
 
   Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                       bool) override {
+                                       bool is_custom_metric) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->counterFromStatNameWithTags(name, tags);
+    return wrapped_scope_->counterFromStatNameWithTags(name, tags, is_custom_metric);
   }
 
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,

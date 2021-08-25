@@ -70,9 +70,9 @@ private:
   uint64_t current_active_;
   histogram_t* histograms_[2];
   std::atomic<bool> used_;
+  const bool is_custom_metric_;
   std::thread::id created_thread_id_;
   SymbolTable& symbol_table_;
-  bool is_custom_metric_;
 };
 
 using TlsHistogramSharedPtr = RefcountPtr<ThreadLocalHistogramImpl>;
@@ -136,10 +136,10 @@ private:
   mutable Thread::MutexBasicLockable merge_lock_;
   std::list<TlsHistogramSharedPtr> tls_histograms_ ABSL_GUARDED_BY(merge_lock_);
   bool merged_;
+  const bool is_custom_metric_;
   std::atomic<bool> shutting_down_{false};
   std::atomic<uint32_t> ref_count_{0};
   const uint64_t id_; // Index into TlsCache::histogram_cache_.
-  bool is_cunstom_metric_;
 };
 
 using ParentHistogramImplSharedPtr = RefcountPtr<ParentHistogramImpl>;

@@ -115,7 +115,7 @@ public:
 
 private:
   Unit unit_;
-  bool is_custom_metric_;
+  const bool is_custom_metric_;
 
   // This is used for delivering the histogram data to sinks.
   Store& parent_;

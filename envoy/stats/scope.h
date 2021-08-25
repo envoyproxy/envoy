@@ -82,7 +82,7 @@ public:
    */
   virtual Counter& counterFromStatNameWithTags(const StatName& name,
                                                StatNameTagVectorOptConstRef tags,
-                                               bool is_custom_metri = false) PURE;
+                                               bool is_custom_metric = false) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.

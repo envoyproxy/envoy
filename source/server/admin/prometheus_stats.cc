@@ -111,7 +111,7 @@ uint64_t outputStatType(
 
   for (auto& group : groups) {
     // We assume that custom metric flag is the same across all metrics with the same
-    // tagExtractedStatName. Callsites of defining these metrics must meet this criteria.
+    // tagExtractedStatName. Call sites of defining these metrics must meet this criteria.
     const bool is_custom_metric = group.second.front()->isCustomMetric();
     const std::string prefixed_tag_extracted_name = PrometheusStatsFormatter::metricName(
         global_symbol_table.toString(group.first), is_custom_metric);
