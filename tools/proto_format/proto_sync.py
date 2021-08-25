@@ -46,6 +46,7 @@ CONTRIB_V3_ALLOW_LIST = [
     # Extensions moved from core to contrib.
     'envoy.extensions.filters.http.squash.v3',
     'envoy.extensions.filters.network.kafka_broker.v3',
+    'envoy.extensions.filters.network.rocketmq_proxy.v3',
 ]
 
 BUILD_FILE_TEMPLATE = string.Template(
@@ -175,7 +176,7 @@ def get_destination_path(src):
     # contrib API files have the standard namespace but are in a contrib folder for clarity.
     # The following prepends contrib for contrib packages so we wind up with the real final path.
     if 'contrib' in src:
-        if 'v3alpha' not in package and package not in CONTRIB_V3_ALLOW_LIST:
+        if 'v3alpha' not in package and 'v4alpha' not in package and package not in CONTRIB_V3_ALLOW_LIST:
             raise ProtoSyncError(
                 "contrib extension package '{}' does not use v3alpha namespace. "
                 "Add to CONTRIB_V3_ALLOW_LIST with an explanation if this is on purpose.".format(
@@ -306,7 +307,7 @@ def get_import_deps(proto_path):
                     imports.append(
                         external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP[import_path])
                     continue
-                if import_path.startswith('envoy/'):
+                if import_path.startswith('envoy/') or import_path.startswith('contrib/'):
                     # Ignore package internal imports.
                     if os.path.dirname(proto_path).endswith(os.path.dirname(import_path)):
                         continue

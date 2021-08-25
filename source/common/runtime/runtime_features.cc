@@ -73,6 +73,8 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http2_consume_stream_refused_errors",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
     "envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",
+    "envoy.reloadable_features.http_reject_path_with_fragment",
+    "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled",
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.improved_stream_limit_handling",
     "envoy.reloadable_features.internal_redirects_with_body",
@@ -98,6 +100,7 @@ constexpr const char* runtime_features[] = {
     "envoy.restart_features.use_apple_api_for_dns_lookups",
     "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
     "envoy.reloadable_features.sanitize_http_header_referer",
+    "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection",
 };
 
 // This is a section for officially sanctioned runtime features which are too

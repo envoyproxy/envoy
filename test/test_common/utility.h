@@ -21,7 +21,6 @@
 #include "source/common/common/thread.h"
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/opaque_resource_decoder_impl.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -601,34 +600,20 @@ public:
   static std::string nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges);
 
   // Strict variants of Protobuf::MessageUtil
-  static void loadFromJson(const std::string& json, Protobuf::Message& message,
-                           bool preserve_original_type = false, bool avoid_boosting = false) {
-    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor(),
-                              !avoid_boosting);
-    if (!preserve_original_type) {
-      Config::VersionConverter::eraseOriginalTypeInformation(message);
-    }
+  static void loadFromJson(const std::string& json, Protobuf::Message& message) {
+    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
   }
 
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
     MessageUtil::loadFromJson(json, message);
   }
 
-  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                           bool preserve_original_type = false, bool avoid_boosting = false) {
-    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor(),
-                              !avoid_boosting);
-    if (!preserve_original_type) {
-      Config::VersionConverter::eraseOriginalTypeInformation(message);
-    }
+  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
+    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
   }
 
-  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api,
-                           bool preserve_original_type = false) {
+  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
     MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(), api);
-    if (!preserve_original_type) {
-      Config::VersionConverter::eraseOriginalTypeInformation(message);
-    }
   }
 
   template <class MessageType>
@@ -637,14 +622,9 @@ public:
   }
 
   template <class MessageType>
-  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
-                                      bool preserve_original_type = false,
-                                      bool avoid_boosting = false) {
-    MessageUtil::loadFromYamlAndValidate(
-        yaml, message, ProtobufMessage::getStrictValidationVisitor(), avoid_boosting);
-    if (!preserve_original_type) {
-      Config::VersionConverter::eraseOriginalTypeInformation(message);
-    }
+  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
+    MessageUtil::loadFromYamlAndValidate(yaml, message,
+                                         ProtobufMessage::getStrictValidationVisitor());
   }
 
   template <class MessageType> static void validate(const MessageType& message) {
@@ -775,50 +755,6 @@ public:
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
-  }
-
-  /**
-   * Returns the fully-qualified name of a service, rendered from service_full_name_template.
-   *
-   * @param service_full_name_template the service fully-qualified name template.
-   * @param api_version version of a service.
-   * @param service_namespace to override the service namespace.
-   * @return std::string full path of a service method.
-   */
-  static std::string
-  getVersionedServiceFullName(const std::string& service_full_name_template,
-                              envoy::config::core::v3::ApiVersion api_version,
-                              const std::string& service_namespace = EMPTY_STRING) {
-    switch (api_version) {
-    case envoy::config::core::v3::ApiVersion::AUTO:
-      FALLTHRU;
-    case envoy::config::core::v3::ApiVersion::V2:
-      return fmt::format(service_full_name_template, "v2", service_namespace);
-
-    case envoy::config::core::v3::ApiVersion::V3:
-      return fmt::format(service_full_name_template, "v3", service_namespace);
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-  }
-
-  /**
-   * Returns the full path of a service method.
-   *
-   * @param service_full_name_template the service fully-qualified name template.
-   * @param method_name the method name.
-   * @param api_version version of a service method.
-   * @param service_namespace to override the service namespace.
-   * @return std::string full path of a service method.
-   */
-  static std::string getVersionedMethodPath(const std::string& service_full_name_template,
-                                            absl::string_view method_name,
-                                            envoy::config::core::v3::ApiVersion api_version,
-                                            const std::string& service_namespace = EMPTY_STRING) {
-    return absl::StrCat(
-        "/",
-        getVersionedServiceFullName(service_full_name_template, api_version, service_namespace),
-        "/", method_name);
   }
 };
 
