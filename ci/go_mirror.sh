@@ -9,4 +9,6 @@ MAIN_BRANCH="refs/heads/main"
 
 if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS}" tools/api/generate_go_protobuf.py --sync
+else
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS}" tools/api/generate_go_protobuf.py
 fi
