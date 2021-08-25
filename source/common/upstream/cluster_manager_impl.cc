@@ -23,7 +23,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/grpc/async_client_manager_impl.h"
 #include "source/common/http/async_client_impl.h"
@@ -185,9 +184,9 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // avoid double pause ClusterLoadAssignment.
       Config::ScopedResume maybe_resume_eds;
       if (cm_.adsMux()) {
-        const auto type_urls =
-            Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-        maybe_resume_eds = cm_.adsMux()->pause(type_urls);
+        const auto type_url =
+            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+        maybe_resume_eds = cm_.adsMux()->pause(type_url);
       }
       initializeSecondaryClusters();
     }
@@ -338,22 +337,18 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (dyn_resources.has_ads_config()) {
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
+      Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
                                                          dyn_resources.ads_config(), stats, false)
               ->createUncachedRawAsyncClient(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
-                      envoy::config::core::v3::ApiVersion::V3
-                  // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
-                  // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
-                  ? "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"
-                  : "envoy.service.discovery.v2.AggregatedDiscoveryService."
-                    "DeltaAggregatedResources"),
-          Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
+              "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
+          random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
     } else {
+      Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info,
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
@@ -361,15 +356,8 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->createUncachedRawAsyncClient(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
-                      envoy::config::core::v3::ApiVersion::V3
-                  // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
-                  // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
-                  ? "envoy.service.discovery.v3.AggregatedDiscoveryService."
-                    "StreamAggregatedResources"
-                  : "envoy.service.discovery.v2.AggregatedDiscoveryService."
-                    "StreamAggregatedResources"),
-          Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
+              "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+          random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
           bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
     }
@@ -444,12 +432,13 @@ void ClusterManagerImpl::initializeSecondaryClusters(
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
 
+    Config::Utility::checkTransportVersion(load_stats_config);
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info_, *this, stats_,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
                                                        stats_, false)
             ->createUncachedRawAsyncClient(),
-        Config::Utility::getAndCheckTransportVersion(load_stats_config), dispatcher_);
+        dispatcher_);
   }
 }
 
@@ -485,7 +474,7 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
         if (cluster.info()->lbConfig().close_connections_on_host_set_change()) {
           for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
             // This will drain all tcp and http connection pools.
-            postThreadLocalDrainConnections(cluster, host_set->hosts());
+            postThreadLocalRemoveHosts(cluster, host_set->hosts());
           }
         } else {
           // TODO(snowp): Should this be subject to merge windows?
@@ -495,7 +484,7 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
           // enabled, this case will be covered by first `if` statement, where all
           // connection pools are drained.
           if (!hosts_removed.empty()) {
-            postThreadLocalDrainConnections(cluster, hosts_removed);
+            postThreadLocalRemoveHosts(cluster, hosts_removed);
           }
         }
       });
@@ -859,10 +848,10 @@ void ClusterManagerImpl::updateClusterCounts() {
   const bool all_clusters_initialized =
       init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
   if (all_clusters_initialized && ads_mux_) {
-    const auto type_urls = Config::getAllVersionTypeUrls<envoy::config::cluster::v3::Cluster>();
+    const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
-      resume_cds_ = ads_mux_->pause(type_urls);
+      resume_cds_ = ads_mux_->pause(type_url);
     } else if (previous_warming > 0 && warming_clusters_.empty()) {
       ASSERT(resume_cds_ != nullptr);
       resume_cds_.reset();
@@ -956,8 +945,25 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   return data;
 }
 
-void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
-                                                         const HostVector& hosts_removed) {
+void ClusterManagerImpl::drainConnections(const std::string& cluster) {
+  tls_.runOnAllThreads([cluster](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    auto cluster_entry = cluster_manager->thread_local_clusters_.find(cluster);
+    if (cluster_entry != cluster_manager->thread_local_clusters_.end()) {
+      cluster_entry->second->drainConnPools();
+    }
+  });
+}
+
+void ClusterManagerImpl::drainConnections() {
+  tls_.runOnAllThreads([](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    for (const auto& cluster_entry : cluster_manager->thread_local_clusters_) {
+      cluster_entry.second->drainConnPools();
+    }
+  });
+}
+
+void ClusterManagerImpl::postThreadLocalRemoveHosts(const Cluster& cluster,
+                                                    const HostVector& hosts_removed) {
   tls_.runOnAllThreads([name = cluster.info()->name(),
                         hosts_removed](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     cluster_manager->removeHosts(name, hosts_removed);
@@ -1091,13 +1097,13 @@ ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_match
     }
     if (!cluster.added_via_api_) {
       auto& static_cluster = *config_dump->mutable_static_clusters()->Add();
-      static_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));
+      static_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
       TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                             *(static_cluster.mutable_last_updated()));
     } else {
       auto& dynamic_cluster = *config_dump->mutable_dynamic_active_clusters()->Add();
       dynamic_cluster.set_version_info(cluster.version_info_);
-      dynamic_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));
+      dynamic_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
       TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                             *(dynamic_cluster.mutable_last_updated()));
     }
@@ -1110,7 +1116,7 @@ ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_match
     }
     auto& dynamic_cluster = *config_dump->mutable_dynamic_warming_clusters()->Add();
     dynamic_cluster.set_version_info(cluster.version_info_);
-    dynamic_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));
+    dynamic_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
     TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                           *(dynamic_cluster.mutable_last_updated()));
   }
@@ -1387,6 +1393,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   }
 }
 
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnPools() {
+  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
+    parent_.drainConnPools(host_set->hosts());
+  }
+}
+
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry() {
   // We need to drain all connection pools for the cluster being removed. Then we can remove the
   // cluster.
@@ -1394,9 +1406,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
   // TODO(mattklein123): Optimally, we would just fire member changed callbacks and remove all of
   // the hosts inside of the HostImpl destructor. That is a change with wide implications, so we are
   // going with a more targeted approach for now.
-  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
-    parent_.drainConnPools(host_set->hosts());
-  }
+  drainConnPools();
 }
 
 Http::ConnectionPool::Instance*

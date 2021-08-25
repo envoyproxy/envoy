@@ -466,7 +466,7 @@ public:
   /**
    * @return the downstream address provider.
    */
-  virtual const Network::SocketAddressProvider& downstreamAddressProvider() const PURE;
+  virtual const Network::ConnectionInfoProvider& downstreamAddressProvider() const PURE;
 
   /**
    * @param connection_info sets the upstream ssl connection.
