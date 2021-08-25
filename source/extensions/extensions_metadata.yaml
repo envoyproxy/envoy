@@ -348,16 +348,6 @@ envoy.filters.network.mongo_proxy:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: stable
-envoy.filters.network.mysql_proxy:
-  categories:
-  - envoy.filters.network
-  security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
-envoy.filters.network.postgres_proxy:
-  categories:
-  - envoy.filters.network
-  security_posture: requires_trusted_downstream_and_upstream
-  status: stable
 envoy.filters.network.ratelimit:
   categories:
   - envoy.filters.network

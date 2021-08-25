@@ -59,6 +59,8 @@ proto_library(
     deps = [
         "//contrib/envoy/extensions/filters/http/squash/v3:pkg",
         "//contrib/envoy/extensions/filters/network/kafka_broker/v3:pkg",
+        "//contrib/envoy/extensions/filters/network/mysql_proxy/v3:pkg",
+        "//contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/rocketmq_proxy/v3:pkg",
         "//envoy/admin/v3:pkg",
         "//envoy/config/accesslog/v3:pkg",
@@ -164,8 +166,6 @@ proto_library(
         "//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
         "//envoy/extensions/filters/network/local_ratelimit/v3:pkg",
         "//envoy/extensions/filters/network/mongo_proxy/v3:pkg",
-        "//envoy/extensions/filters/network/mysql_proxy/v3:pkg",
-        "//envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg",
         "//envoy/extensions/filters/network/ratelimit/v3:pkg",
         "//envoy/extensions/filters/network/rbac/v3:pkg",
         "//envoy/extensions/filters/network/redis_proxy/v3:pkg",
