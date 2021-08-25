@@ -60,10 +60,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/tracers/xray @abaptiste @lavignes @mattklein123
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @dio @lizan @Shikugawa
-# mysql_proxy extension
-/*/extensions/filters/network/mysql_proxy @rshriram @venilnoronha @mattklein123
-# postgres_proxy extension
-/*/extensions/filters/network/postgres_proxy @fabriziomello @cpakulski @dio
 # quic extension
 /*/extensions/quic/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
 # zookeeper_proxy extension
@@ -108,7 +104,6 @@ extensions/filters/common/original_src @snowp @klarose
 # common crypto extension
 /*/extensions/common/crypto @lizan @bdecoste @asraa
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
-/*/extensions/common/sqlutils @cpakulski @dio
 /*/extensions/filters/http/grpc_http1_bridge @snowp @jose
 /*/extensions/filters/http/gzip @gsagula @dio
 /*/extensions/filters/http/fault @rshriram @alyssawilk
@@ -201,6 +196,9 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
+/contrib/common/sqlutils/ @cpakulski @dio
 /contrib/squash/ @yuval-k @alyssawilk
 /contrib/kafka/ @mattklein123 @adamkotwasinski
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui @lizan
+/contrib/mysql_proxy/ @rshriram @venilnoronha
+/contrib/postgres_proxy/ @fabriziomello @cpakulski @dio
