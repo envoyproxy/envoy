@@ -38,7 +38,7 @@ CryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
 
   Ssl::PrivateKeyMethodProviderSharedPtr provider =
       std::make_shared<CryptoMbPrivateKeyMethodProvider>(conf, private_key_provider_context, ipp);
-  if (!provider == nullptr) {
+  if (provider == nullptr) {
     ENVOY_LOG(debug, "Failed to create cryptomb provider");
   }
 
