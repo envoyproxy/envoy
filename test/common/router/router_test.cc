@@ -5968,6 +5968,7 @@ TEST_F(RouterTest, ConnectPauseAndResume) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.setMethod("CONNECT");
+  headers.removePath();
   router_.decodeHeaders(headers, false);
 
   // Make sure any early data does not go upstream.
@@ -6040,6 +6041,7 @@ TEST_F(RouterTest, ConnectPauseNoResume) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.setMethod("CONNECT");
+  headers.removePath();
   router_.decodeHeaders(headers, false);
 
   // Make sure any early data does not go upstream.
@@ -6070,6 +6072,7 @@ TEST_F(RouterTest, ConnectExplicitTcpUpstream) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.setMethod("CONNECT");
+  headers.removePath();
   router_.decodeHeaders(headers, false);
 
   router_.onDestroy();

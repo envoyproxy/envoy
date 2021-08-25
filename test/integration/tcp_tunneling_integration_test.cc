@@ -14,15 +14,14 @@ namespace {
 // Terminating CONNECT and sending raw TCP upstream.
 class ConnectTerminationIntegrationTest : public HttpProtocolIntegrationTest {
 public:
-  ConnectTerminationIntegrationTest() : HttpProtocolIntegrationTest() {
-    enableHalfClose(true);
-  }
+  ConnectTerminationIntegrationTest() : HttpProtocolIntegrationTest() { enableHalfClose(true); }
 
   void initialize() override {
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
-          ConfigHelper::setConnectConfig(hcm, true, allow_post_);
+          ConfigHelper::setConnectConfig(hcm, true, allow_post_,
+                                         downstream_protocol_ == Http::CodecType::HTTP3);
 
           if (enable_timeout_) {
             hcm.mutable_stream_idle_timeout()->set_seconds(0);
@@ -171,10 +170,6 @@ TEST_P(ConnectTerminationIntegrationTest, DownstreamReset) {
 }
 
 TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
-  if (downstream_protocol_ == Http::CodecType::HTTP3) {
-    // TODO(#16291) Debug why this test takes 40x longer for HTTP/3.
-    return;
-  }
   initialize();
 
   setUpConnection();
@@ -182,7 +177,13 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
 
   // Tear down by closing the upstream connection.
   ASSERT_TRUE(fake_raw_upstream_connection_->close());
-  ASSERT_TRUE(response_->waitForReset());
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    // In HTTP/3 the end stream will be sent when the connection is close, and
+    // STOP_SENDING frame sent instead of reset.
+    ASSERT_TRUE(response_->waitForEndStream());
+  } else {
+    ASSERT_TRUE(response_->waitForReset());
+  }
 }
 
 TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
@@ -226,10 +227,6 @@ TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
 }
 
 TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    // TODO(#16291) Debug why this test takes 10x longer for HTTP/1.
-    return;
-  }
   setUpstreamProtocol(upstreamProtocol());
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
@@ -260,7 +257,10 @@ public:
   void initialize() override {
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void { ConfigHelper::setConnectConfig(hcm, false, false); });
+                hcm) -> void {
+          ConfigHelper::setConnectConfig(hcm, false, false,
+                                         downstream_protocol_ == Http::CodecType::HTTP3);
+        });
 
     HttpProtocolIntegrationTest::initialize();
   }
@@ -275,7 +275,8 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(Protocols, ProxyingConnectIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3},
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
+                              Http::CodecType::HTTP3},
                              {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
@@ -460,12 +461,12 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithIP) {
   cleanupUpstreamAndDownstream();
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    HttpAndIpVersions, ConnectTerminationIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-        {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3},
-        {Http::CodecType::HTTP1})),
-    HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(HttpAndIpVersions, ConnectTerminationIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
+                              Http::CodecType::HTTP3},
+                             {Http::CodecType::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 using Params = std::tuple<Network::Address::IpVersion, Http::CodecType>;
 
@@ -488,8 +489,7 @@ public:
           auto* listener = bootstrap.mutable_static_resources()->add_listeners();
           listener->set_name("tcp_proxy");
           auto* socket_address = listener->mutable_address()->mutable_socket_address();
-          socket_address->set_address(
-              Network::Test::getLoopbackAddressString(version_));
+          socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
           socket_address->set_port_value(0);
 
           auto* filter_chain = listener->add_filter_chains();
@@ -712,10 +712,6 @@ TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
 
 // Test that a downstream flush works correctly (all data is flushed)
 TEST_P(TcpTunnelingIntegrationTest, TcpProxyDownstreamFlush) {
-  if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#16291) Debug why this test takes 10x longer for HTTP/3.
-    return;
-  }
   // Use a very large size to make sure it is larger than the kernel socket read buffer.
   const uint32_t size = 50 * 1024 * 1024;
   config_helper_.setBufferLimits(size / 4, size / 4);
@@ -756,10 +752,6 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyDownstreamFlush) {
 
 // Test that an upstream flush works correctly (all data is flushed)
 TEST_P(TcpTunnelingIntegrationTest, TcpProxyUpstreamFlush) {
-  if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(#16291) Debug why this test does not work with h3 and enable it.
-    return;
-  }
   // Use a very large size to make sure it is larger than the kernel socket read buffer.
   const uint32_t size = 50 * 1024 * 1024;
   config_helper_.setBufferLimits(size, size);
@@ -1091,11 +1083,11 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamDisconnectBeforeResponseReceived) {
   tcp_client->close();
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    IpAndHttpVersions, TcpTunnelingIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpAndHttpVersions, TcpTunnelingIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP1},
-                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3})),
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
+                              Http::CodecType::HTTP3})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 } // namespace
 } // namespace Envoy

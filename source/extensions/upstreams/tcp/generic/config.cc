@@ -21,7 +21,6 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
       pool_type = Http::CodecType::HTTP2;
     } else if ((thread_local_cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP3) !=
                0) {
-      // TODO(15649) Properly support the case when both HTTP/2 and HTTP/3 are enabled.
       pool_type = Http::CodecType::HTTP3;
     } else {
       pool_type = Http::CodecType::HTTP1;

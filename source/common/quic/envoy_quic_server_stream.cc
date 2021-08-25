@@ -155,7 +155,9 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     onStreamError(close_connection_upon_invalid_header_);
     return;
   }
-  if (Http::HeaderUtility::requestHeadersValid(*headers) != absl::nullopt) {
+  if (Http::HeaderUtility::requestHeadersValid(*headers) != absl::nullopt ||
+      Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
+      (headers->Protocol() && !http3_options_.allow_upgrade_connect())) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(absl::nullopt);
     return;
