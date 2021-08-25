@@ -249,8 +249,8 @@ upstream_http_protocol_options: {}
 
   EXPECT_THROW_WITH_MESSAGE(
       createCluster(yaml_config), EnvoyException,
-      "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true when "
-      "configured with upstream_http_protocol_options");
+      "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true unless "
+      "allow_insecure_cluster_options is set.");
 }
 
 TEST_F(ClusterFactoryTest, InsecureUpstreamHttpProtocolOptions) {
