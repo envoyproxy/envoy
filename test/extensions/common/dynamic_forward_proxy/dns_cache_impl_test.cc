@@ -1001,7 +1001,9 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfig) {
   EXPECT_CALL(dispatcher,
               createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
-  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
+  NiceMock<Filesystem::MockInstance> filesystem;
+  Envoy::ProtobufMessage::MockValidationVisitor visitor;
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, filesystem, loader, store, visitor, config);
 }
 
 // Test dns_resolution_config is in place, use it and overriding use_tcp_for_dns_lookups.
@@ -1041,7 +1043,9 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfigOverridingUseTcp) {
   EXPECT_CALL(dispatcher,
               createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
-  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
+  NiceMock<Filesystem::MockInstance> filesystem;
+  Envoy::ProtobufMessage::MockValidationVisitor visitor;
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, filesystem, loader, store, visitor, config);
 }
 
 // Test the case that the typed_dns_resolver_config is specified, and it overrides all
