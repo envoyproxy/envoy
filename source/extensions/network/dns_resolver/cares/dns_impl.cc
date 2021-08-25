@@ -325,7 +325,7 @@ void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
 // c-ares DNS resolver factory
 class CaresDnsResolverFactoryImpl : public DnsResolverFactory {
 public:
-  std::string name() const override { return CaresDnsResolver; }
+  std::string name() const override { return std::string(CaresDnsResolver); }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{

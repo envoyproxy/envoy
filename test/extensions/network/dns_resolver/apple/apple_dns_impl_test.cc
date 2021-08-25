@@ -127,7 +127,7 @@ TEST_F(AppleDnsImplTest, DefaultAppleDnsResolverConstruction) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::config::cluster::v3::Cluster config;
   Envoy::Network::makeDnsResolverConfig(config, typed_dns_resolver_config);
-  EXPECT_EQ(typed_dns_resolver_config.name(), AppleDnsResolver);
+  EXPECT_EQ(typed_dns_resolver_config.name(), std::string(AppleDnsResolver));
   EXPECT_EQ(
       typed_dns_resolver_config.typed_config().type_url(),
       "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");

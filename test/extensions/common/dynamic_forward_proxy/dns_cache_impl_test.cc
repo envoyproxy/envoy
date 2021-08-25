@@ -112,6 +112,17 @@ MATCHER_P(CustomTypedDnsResolverConfigEquals, expectedTypedDnsResolverConfig, ""
   return TestUtility::protoEqual(expectedTypedDnsResolverConfig, arg);
 }
 
+void verifyCaresDnsConfigAndUnpack(
+    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
+    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& cares) {
+  // Verify typed DNS resolver config is c-ares.
+  EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::CaresDnsResolver));
+  EXPECT_EQ(
+      typed_dns_resolver_config.typed_config().type_url(),
+      "type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
+  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
+}
+
 TEST_F(DnsCacheImplTest, PreresolveSuccess) {
   Network::DnsResolver::ResolveCb resolve_cb;
   std::string hostname = "bar.baz.com";
@@ -851,9 +862,9 @@ TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionSetDeprecatedField) {
       .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(resolver_)));
   DnsCacheImpl dns_cache_(dispatcher_, tls_, random_, filesystem_, loader_, store_,
                           validation_visitor_, config_);
-  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
 
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   // `true` here means dns_resolver_options.use_tcp_for_dns_lookups is set to true.
   EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
 }
@@ -870,7 +881,7 @@ TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionSet) {
   DnsCacheImpl dns_cache_(dispatcher_, tls_, random_, filesystem_, loader_, store_,
                           validation_visitor_, config_);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   // `true` here means dns_resolver_options.use_tcp_for_dns_lookups is set to true.
   EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
 }
@@ -887,8 +898,7 @@ TEST_F(DnsCacheImplTest, NoDefaultSearchDomainOptionSet) {
   DnsCacheImpl dns_cache_(dispatcher_, tls_, random_, filesystem_, loader_, store_,
                           validation_visitor_, config_);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
-
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   // `true` here means dns_resolver_options.no_default_search_domain is set to true.
   EXPECT_EQ(true, cares.dns_resolver_options().no_default_search_domain());
 }
@@ -901,8 +911,9 @@ TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionUnSet) {
       .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(resolver_)));
   DnsCacheImpl dns_cache_(dispatcher_, tls_, random_, filesystem_, loader_, store_,
                           validation_visitor_, config_);
+
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
 
   // `false` here means dns_resolver_options.use_tcp_for_dns_lookups is set to false.
   EXPECT_EQ(false, cares.dns_resolver_options().use_tcp_for_dns_lookups());
@@ -916,9 +927,9 @@ TEST_F(DnsCacheImplTest, NoDefaultSearchDomainOptionUnSet) {
       .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(resolver_)));
   DnsCacheImpl dns_cache_(dispatcher_, tls_, random_, filesystem_, loader_, store_,
                           validation_visitor_, config_);
-  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-  typed_dns_resolver_config.typed_config().UnpackTo(&cares);
 
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   // `false` here means dns_resolver_options.no_default_search_domain is set to false.
   EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
 }
@@ -969,7 +980,7 @@ TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolutionConfig) {
   envoy::config::core::v3::TypedExtensionConfig empty_typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   empty_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  empty_typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
+  empty_typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   EXPECT_CALL(dispatcher, createDnsResolver(
                               CustomTypedDnsResolverConfigEquals(empty_typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
@@ -997,7 +1008,7 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfig) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.add_resolvers()->MergeFrom(*dns_resolvers);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   EXPECT_CALL(dispatcher,
               createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
@@ -1038,7 +1049,7 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfigOverridingUseTcp) {
   cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(true);
   cares.mutable_dns_resolver_options()->set_no_default_search_domain(true);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
   EXPECT_CALL(dispatcher,
               createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
@@ -1083,12 +1094,12 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyTypedDnsResolverConfig) {
   cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(true);
   cares.mutable_dns_resolver_options()->set_no_default_search_domain(true);
   config.mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(cares);
-  config.mutable_typed_dns_resolver_config()->set_name(Envoy::Network::CaresDnsResolver);
+  config.mutable_typed_dns_resolver_config()->set_name(std::string(Network::CaresDnsResolver));
 
   // setup the expected function call parameter.
   envoy::config::core::v3::TypedExtensionConfig expected_typed_dns_resolver_config;
   expected_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  expected_typed_dns_resolver_config.set_name(Envoy::Network::CaresDnsResolver);
+  expected_typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
   EXPECT_CALL(dispatcher, createDnsResolver(CustomTypedDnsResolverConfigEquals(
                               expected_typed_dns_resolver_config)))

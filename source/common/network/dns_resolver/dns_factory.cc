@@ -8,7 +8,7 @@ void makeEmptyCaresDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(CaresDnsResolver);
+  typed_dns_resolver_config.set_name(std::string(CaresDnsResolver));
 }
 
 // Create an empty apple DNS resolver typed config.
@@ -16,7 +16,7 @@ void makeEmptyAppleDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig apple;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(apple);
-  typed_dns_resolver_config.set_name(AppleDnsResolver);
+  typed_dns_resolver_config.set_name(std::string(AppleDnsResolver));
 }
 
 // Special handling for DnsFilterConfig, which don't need to copy anything over.
@@ -42,7 +42,7 @@ void handleLegacyDnsResolverData<envoy::config::cluster::v3::Cluster>(
     cares.mutable_resolvers()->MergeFrom(config.dns_resolvers());
   }
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(CaresDnsResolver);
+  typed_dns_resolver_config.set_name(std::string(CaresDnsResolver));
 }
 
 } // namespace Network

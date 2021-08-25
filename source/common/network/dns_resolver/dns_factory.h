@@ -16,9 +16,9 @@
 namespace Envoy {
 namespace Network {
 
-const std::string CaresDnsResolver = "envoy.network.dns_resolver.cares";
-const std::string AppleDnsResolver = "envoy.network.dns_resolver.apple";
-const std::string DnsResolverCategory = "envoy.network.dns_resolver";
+constexpr absl::string_view CaresDnsResolver = "envoy.network.dns_resolver.cares";
+constexpr absl::string_view AppleDnsResolver = "envoy.network.dns_resolver.apple";
+constexpr absl::string_view DnsResolverCategory = "envoy.network.dns_resolver";
 
 class DnsResolverFactory : public Config::TypedFactory {
 public:
@@ -32,7 +32,7 @@ public:
       Event::Dispatcher& dispatcher, Api::Api& api,
       const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) PURE;
 
-  std::string category() const override { return DnsResolverCategory; }
+  std::string category() const override { return std::string(DnsResolverCategory); }
 };
 
 // Create an empty c-ares DNS resolver typed config.
@@ -54,7 +54,7 @@ bool checkTypedDnsResolverConfigExist(
         Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(
             config.typed_dns_resolver_config(), true);
     if ((dns_resolver_factory != nullptr) &&
-        (dns_resolver_factory->category() == DnsResolverCategory)) {
+        (dns_resolver_factory->category() == std::string(DnsResolverCategory))) {
       typed_dns_resolver_config.MergeFrom(config.typed_dns_resolver_config());
       return true;
     }
@@ -76,7 +76,7 @@ bool checkDnsResolutionConfigExist(
     cares.mutable_dns_resolver_options()->MergeFrom(
         config.dns_resolution_config().dns_resolver_options());
     typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-    typed_dns_resolver_config.set_name(CaresDnsResolver);
+    typed_dns_resolver_config.set_name(std::string(CaresDnsResolver));
     return true;
   }
   return false;
@@ -92,7 +92,7 @@ void handleLegacyDnsResolverData(
   cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(
       config.use_tcp_for_dns_lookups());
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
-  typed_dns_resolver_config.set_name(CaresDnsResolver);
+  typed_dns_resolver_config.set_name(std::string(CaresDnsResolver));
 }
 
 // Special handling for DnsFilterConfig, which don't need to copy anything over.
@@ -123,7 +123,7 @@ void makeDnsResolverConfig(
 
   // If it is MacOS and the run time flag: envoy.restart_features.use_apple_api_for_dns_lookups
   // is enabled, synthetic an AppleDnsResolverConfig typed config.
-  if ((Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(AppleDnsResolver,
+  if ((Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(std::string(AppleDnsResolver),
                                                                               true) != nullptr) &&
       Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups")) {
     makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);

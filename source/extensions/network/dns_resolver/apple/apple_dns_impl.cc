@@ -326,7 +326,7 @@ AppleDnsResolverImpl::PendingResolution::buildDnsResponse(const struct sockaddr*
 // apple DNS resolver factory
 class AppleDnsResolverFactoryImpl : public DnsResolverFactory {
 public:
-  std::string name() const override { return AppleDnsResolver; }
+  std::string name() const override { return std::string(AppleDnsResolver); }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{
         new envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig()};
