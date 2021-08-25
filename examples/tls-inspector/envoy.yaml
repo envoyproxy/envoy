@@ -1,5 +1,4 @@
 admin:
-  access_log_path: "/dev/null"
   address:
     socket_address:
       address: 0.0.0.0

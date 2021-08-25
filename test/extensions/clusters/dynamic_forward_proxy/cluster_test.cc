@@ -203,9 +203,9 @@ TEST_F(ClusterTest, PopulatedCache) {
 
 class ClusterFactoryTest : public testing::Test {
 protected:
-  void createCluster(const std::string& yaml_config, bool avoid_boosting = true) {
+  void createCluster(const std::string& yaml_config) {
     envoy::config::cluster::v3::Cluster cluster_config =
-        Upstream::parseClusterFromV3Yaml(yaml_config, avoid_boosting);
+        Upstream::parseClusterFromV3Yaml(yaml_config);
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
         cm_, stats_store_, tls_, nullptr, ssl_context_manager_, runtime_, dispatcher_, log_manager_,
         local_info_, admin_, singleton_manager_, nullptr, true, validation_visitor_, *api_,

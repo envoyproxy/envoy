@@ -22,7 +22,7 @@
 # original_src common extension
 extensions/filters/common/original_src @snowp @klarose
 # dubbo_proxy extension
-/*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan
+/*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan @wbpcode
 # thrift_proxy extension
 /*/extensions/filters/network/thrift_proxy @zuercher @rgs1
 # cdn_loop extension

@@ -9,6 +9,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
+
 namespace Envoy {
 namespace Logger {
 
@@ -149,6 +151,32 @@ TEST_F(LoggerCustomFlagsTest, LogMessageAsJsonStringEscaped) {
       "\"transport: Error while dialing dial tcp [::1]:15012: connect: connection refused\"",
       "StreamAggregatedResources gRPC config stream closed: 14, connection error: desc = "
       "\\\"transport: Error while dialing dial tcp [::1]:15012: connect: connection refused\\\"");
+}
+
+struct NamedLogSink : SinkDelegate {
+  NamedLogSink(DelegatingLogSinkSharedPtr log_sink) : SinkDelegate(log_sink) { setDelegate(); }
+  ~NamedLogSink() override { restoreDelegate(); }
+
+  MOCK_METHOD(void, log, (absl::string_view));
+  MOCK_METHOD(void, logWithStableName,
+              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
+  void flush() override {}
+};
+
+class NamedLogTest : public Loggable<Id::assert>, public testing::Test {};
+
+TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
+  NamedLogSink sink(Envoy::Logger::Registry::getSink());
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  // Log level is above debug, so we shouldn't get any logs.
+  ENVOY_LOG_EVENT(debug, "test_event", "not logged");
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
+  EXPECT_CALL(sink, log(_));
+  EXPECT_CALL(sink, logWithStableName("test_event", "debug", "assert", "test log 1"));
+  ENVOY_LOG_EVENT(debug, "test_event", "test {} {}", "log", 1);
 }
 
 } // namespace Logger
