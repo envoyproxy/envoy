@@ -6802,6 +6802,131 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, EnsureMatchingAllConditions) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: local_service
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          tls_context:
+            presented: true
+          runtime_fraction:
+            default_value:
+              numerator: 50
+              denominator: MILLION
+            runtime_key: "bogus_key"
+          headers:
+          - name: :path
+            string_match:
+              prefix: "/foo"
+          query_parameters:
+            - name: param
+              string_match:
+                exact: test
+          grpc: {}
+        route:
+          cluster: bar_cluster
+      - match:
+          prefix: "/"
+        route:
+          cluster: foo_cluster
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"foo_cluster", "bar_cluster"}, {});
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*connection_info, peerCertificateValidated()).WillRepeatedly(Return(true));
+  stream_info.downstream_address_provider_->setSslConnection(connection_info);
+
+  // all the conditions are matched.
+  {
+    Runtime::MockSnapshot snapshot;
+    ON_CALL(factory_context_.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
+
+    EXPECT_CALL(snapshot,
+                featureEnabled("bogus_key",
+                               testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 41))
+        .WillRepeatedly(Return(true));
+    auto headers = genHeaders("www.lyft.com", "/foo?param=test", "GET");
+    headers.addCopy("content-type", "application/grpc");
+    EXPECT_EQ("bar_cluster", config.route(headers, stream_info, 41)->routeEntry()->clusterName());
+  }
+  // not a grpc
+  {
+    Runtime::MockSnapshot snapshot;
+    ON_CALL(factory_context_.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
+
+    EXPECT_CALL(snapshot,
+                featureEnabled("bogus_key",
+                               testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 41))
+        .WillRepeatedly(Return(true));
+    auto headers = genHeaders("www.lyft.com", "/foo?param=test", "GET");
+    EXPECT_EQ("foo_cluster", config.route(headers, stream_info, 41)->routeEntry()->clusterName());
+  }
+  // runtime_fraction isn't matched.
+  {
+    Runtime::MockSnapshot snapshot;
+    ON_CALL(factory_context_.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
+
+    EXPECT_CALL(snapshot,
+                featureEnabled("bogus_key",
+                               testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 43))
+        .WillRepeatedly(Return(false));
+    auto headers = genHeaders("www.lyft.com", "/foo?param=test", "GET");
+    headers.addCopy("content-type", "application/grpc");
+    EXPECT_EQ("foo_cluster", config.route(headers, stream_info, 43)->routeEntry()->clusterName());
+  }
+  // header isn't matched.
+  {
+    Runtime::MockSnapshot snapshot;
+    ON_CALL(factory_context_.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
+
+    EXPECT_CALL(snapshot,
+                featureEnabled("bogus_key",
+                               testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 41))
+        .WillRepeatedly(Return(true));
+    auto headers = genHeaders("www.lyft.com", "/?param=test", "GET");
+    headers.addCopy("content-type", "application/grpc");
+    EXPECT_EQ("foo_cluster", config.route(headers, stream_info, 41)->routeEntry()->clusterName());
+  }
+  // no tls.
+  {
+    Runtime::MockSnapshot snapshot;
+    ON_CALL(factory_context_.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
+
+    EXPECT_CALL(snapshot,
+                featureEnabled("bogus_key",
+                               testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 41))
+        .WillRepeatedly(Return(true));
+    auto headers = genHeaders("www.lyft.com", "/foo?param=test", "GET");
+    headers.addCopy("content-type", "application/grpc");
+    EXPECT_EQ("foo_cluster", config.route(headers, 41)->routeEntry()->clusterName());
+  }
+  // missing query parameter.
+  {
+    Runtime::MockSnapshot snapshot;
+    ON_CALL(factory_context_.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
+
+    EXPECT_CALL(snapshot,
+                featureEnabled("bogus_key",
+                               testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 41))
+        .WillRepeatedly(Return(true));
+    auto headers = genHeaders("www.lyft.com", "/foo", "GET");
+    headers.addCopy("content-type", "application/grpc");
+    EXPECT_EQ("foo_cluster", config.route(headers, stream_info, 41)->routeEntry()->clusterName());
+  }
+}
+
 // Test Route Matching based on connection Tls Context.
 // Validate configured and default settings are routed to the correct cluster.
 TEST_F(RouteMatcherTest, TlsContextMatching) {
