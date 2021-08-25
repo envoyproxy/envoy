@@ -9,6 +9,17 @@ licenses(["notice"])  # Apache 2
 envoy_contrib_package()
 
 envoy_cc_test(
+    name = "produce_unit_test",
+    srcs = ["produce_unit_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//contrib/kafka/filters/network/source/mesh/command_handlers:produce_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/stats:stats_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "metadata_unit_test",
     srcs = ["metadata_unit_test.cc"],
     tags = ["skip_on_windows"],
