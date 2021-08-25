@@ -466,7 +466,7 @@ public:
 
 #define ENVOY_LOG_EVENT_TO_LOGGER(LOGGER, LEVEL, EVENT_NAME, ...)                                  \
   do {                                                                                             \
-    ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                               \
+    ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
       ::Envoy::Logger::Registry::getSink()->logWithStableName(EVENT_NAME, #LEVEL, (LOGGER).name(), \
                                                               ##__VA_ARGS__);                      \
