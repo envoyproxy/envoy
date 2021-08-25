@@ -13,6 +13,14 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
+// TODO(kbaichoo): refactor into a utility.
+Stats::Counter& getCounter(Stats::Scope& scope, absl::string_view name_of_stat) {
+  Envoy::Stats::StatNameManagedStorage stat_name(name_of_stat, scope.symbolTable());
+  return scope.counterFromStatName(stat_name.statName());
+}
+
+} // namespace
 
 WorkerPtr ProdWorkerFactory::createWorker(uint32_t index, OverloadManager& overload_manager,
                                           const std::string& worker_name) {
@@ -27,7 +35,8 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
                        Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler,
                        OverloadManager& overload_manager, Api::Api& api)
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
-      api_(api) {
+      api_(api), reset_streams_counter_(getCounter(
+                     api.rootScope(), OverloadActionStatsNames::get().ResetStreamsCount)) {
   tls_.registerThread(*dispatcher_, false);
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
@@ -152,7 +161,9 @@ void WorkerImpl::rejectIncomingConnectionsCb(OverloadActionState state) {
 }
 
 void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState state) {
-  dispatcher_->getWatermarkFactory().resetAccountsGivenPressure(state.value().value());
+  uint64_t streams_reset_count =
+      dispatcher_->getWatermarkFactory().resetAccountsGivenPressure(state.value().value());
+  reset_streams_counter_.add(streams_reset_count);
 }
 
 } // namespace Server

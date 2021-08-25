@@ -529,8 +529,9 @@ public:
    *
    * @param pressure scaled threshold pressure used to compute the buckets to
    *  reset internally.
+   * @return the number of streams reset
    */
-  virtual void resetAccountsGivenPressure(float pressure) PURE;
+  virtual uint64_t resetAccountsGivenPressure(float pressure) PURE;
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;

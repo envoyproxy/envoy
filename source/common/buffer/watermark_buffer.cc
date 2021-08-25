@@ -186,7 +186,7 @@ void WatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPt
   }
 }
 
-void WatermarkBufferFactory::resetAccountsGivenPressure(float pressure) {
+uint64_t WatermarkBufferFactory::resetAccountsGivenPressure(float pressure) {
   ASSERT(pressure >= 0.0 && pressure <= 1.0, "Provided pressure is out of range [0, 1].");
 
   // Compute buckets to clear
@@ -195,7 +195,7 @@ void WatermarkBufferFactory::resetAccountsGivenPressure(float pressure) {
   uint32_t bucket_idx = BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - buckets_to_clear;
 
   ENVOY_LOG_MISC(warn, "resetting streams in buckets >= {}", bucket_idx);
-
+  uint64_t num_streams_reset = 0;
   // TODO(kbaichoo): Add a limit to the number of streams we reset
   // per-invocation of this function.
   // Clear buckets
@@ -210,10 +210,13 @@ void WatermarkBufferFactory::resetAccountsGivenPressure(float pressure) {
       // iterator *it*. *next* is still valid.
       (*it)->resetDownstream();
       it = next;
+      ++num_streams_reset;
     }
 
     ++bucket_idx;
   }
+
+  return num_streams_reset;
 }
 
 WatermarkBufferFactory::WatermarkBufferFactory(

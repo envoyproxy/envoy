@@ -525,7 +525,7 @@ TEST(WatermarkBufferFactoryTest, ShouldOnlyResetAllStreamsGreatThanOrEqualToProv
 
   EXPECT_CALL(stream_that_should_not_be_reset, resetStream(_)).Times(0);
   // Should call resetStream on all streams in bucket >= 1.
-  factory.resetAccountsGivenPressure(0.85);
+  EXPECT_EQ(factory.resetAccountsGivenPressure(0.85), 2);
 
   account_to_not_reset->credit(kMinimumBalanceToTrack);
   account_to_not_reset->clearDownstream();
@@ -563,7 +563,7 @@ TEST(WatermarkBufferFactoryTest, ComputesBucketToResetCorrectly) {
       current_account->clearDownstream();
     }));
 
-    factory.resetAccountsGivenPressure(pressure);
+    EXPECT_EQ(factory.resetAccountsGivenPressure(pressure), 1);
 
     // Move onto next reset handler and account
     accounts.pop_back();

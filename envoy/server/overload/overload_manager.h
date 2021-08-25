@@ -42,6 +42,17 @@ public:
 using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;
 
 /**
+ * Well-known overload action stats.
+ */
+class OverloadActionStatsNameValues {
+public:
+  // Count of ther number of streams the reset streams action has reset
+  const std::string ResetStreamsCount = "envoy.overload_actions.reset_streams.count";
+};
+
+using OverloadActionStatsNames = ConstSingleton<OverloadActionStatsNameValues>;
+
+/**
  * The OverloadManager protects the Envoy instance from being overwhelmed by client
  * requests. It monitors a set of resources and notifies registered listeners if
  * configured thresholds for those resources have been exceeded.
