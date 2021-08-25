@@ -4,6 +4,9 @@
 #
 #    pip-compile --generate-hashes tools/github/requirements.txt
 #
+abstracts==0.0.8 \
+    --hash=sha256:a0aedf05742059764f7f7975a0a0fb2b57598a3175a635bbefc7343533fd8bce
+    # via -r tools/github/requirements.txt
 aio.functional==0.0.4 \
     --hash=sha256:e4293287491c4f592bcaad69eb2d75ebe988210314cc3dce5d5c61e8992471e0
     # via -r tools/github/requirements.txt
