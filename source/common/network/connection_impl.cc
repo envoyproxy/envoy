@@ -678,7 +678,8 @@ void ConnectionImpl::onWriteReady() {
         return;
       }
     } else {
-      ENVOY_CONN_LOG(debug, "delayed connection error: {}", *this, error);
+      failure_reason_ = absl::StrCat("delayed connect error: ", error);
+      ENVOY_CONN_LOG(debug, "{}", *this, failure_reason_);
       closeSocket(ConnectionEvent::RemoteClose);
       return;
     }
@@ -761,6 +762,13 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 }
 
 absl::string_view ConnectionImpl::transportFailureReason() const {
+  // TODO(mattklein123): Is it possible for there to be a local failure reason and a transport
+  // failure reason? If so we may need to combine these somehow.
+  ENVOY_BUG(!(!failure_reason_.empty() && !transport_socket_->failureReason().empty()),
+            "both connection and transport failure reason are not empty");
+  if (!failure_reason_.empty()) {
+    return failure_reason_;
+  }
   return transport_socket_->failureReason();
 }
 
@@ -853,9 +861,9 @@ ClientConnectionImpl::ClientConnectionImpl(
   if (*source != nullptr) {
     Api::SysCallIntResult result = socket_->bind(*source);
     if (result.return_value_ < 0) {
-      // TODO(lizan): consider add this error into transportFailureReason.
-      ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source->get()->asString(),
-                     errorDetails(result.errno_));
+      failure_reason_ = absl::StrCat("failed to bind to ", source->get()->asString(), ": ",
+                                     errorDetails(result.errno_));
+      ENVOY_LOG_MISC(debug, failure_reason_);
       bind_error_ = true;
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect".
@@ -891,7 +899,8 @@ void ClientConnectionImpl::connect() {
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
-    ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, result.errno_);
+    failure_reason_ = absl::StrCat("immediate connect error: ", result.errno_);
+    ENVOY_CONN_LOG(debug, "{}", *this, failure_reason_);
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.
     ioHandle().activateFileEvents(Event::FileReadyType::Write);

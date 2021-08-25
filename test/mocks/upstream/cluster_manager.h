@@ -69,6 +69,7 @@ public:
     return cluster_timeout_budget_stat_names_;
   }
   MOCK_METHOD(void, drainConnections, (const std::string& cluster));
+  MOCK_METHOD(void, drainConnections, ());
 
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   envoy::config::core::v3::BindConfig bind_config_;

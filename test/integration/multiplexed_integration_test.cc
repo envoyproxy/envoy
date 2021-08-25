@@ -1671,6 +1671,35 @@ TEST_P(Http2FrameIntegrationTest, SetDetailsTwice) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("too_many_headers"));
 }
 
+TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
+  beginSession();
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  const uint32_t client_stream_idx = 1;
+  // Start a request request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  // Send RST_STREAM, GOAWAY and SETTINGS(0 max streams)
+  const Http2Frame rst_stream =
+      Http2Frame::makeResetStreamFrame(client_stream_idx, Http2Frame::ErrorCode::FlowControlError);
+  const Http2Frame go_away_frame =
+      Http2Frame::makeEmptyGoAwayFrame(12345, Http2Frame::ErrorCode::NoError);
+  const Http2Frame settings_max_connections_frame = Http2Frame::makeSettingsFrame(
+      Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 0}});
+  ;
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(rst_stream) + std::string(go_away_frame) +
+                                              std::string(settings_max_connections_frame)));
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

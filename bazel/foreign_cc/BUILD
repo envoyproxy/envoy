@@ -1,6 +1,6 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("//bazel:envoy_build_system.bzl", "envoy_cmake", "envoy_package")
-load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
+load("//bazel:envoy_build_system.bzl", "envoy_cmake_external", "envoy_package")
+load("@rules_foreign_cc//tools/build_defs:configure.bzl", "configure_make")
 
 licenses(["notice"])  # Apache 2
 
@@ -20,14 +20,12 @@ configure_make(
     }),
     lib_source = "@com_github_gperftools_gperftools//:all",
     linkopts = ["-lpthread"],
-    out_static_libs = select({
+    make_commands = ["make install-libLTLIBRARIES install-perftoolsincludeHEADERS"],
+    static_libraries = select({
         "//bazel:debug_tcmalloc": ["libtcmalloc_debug.a"],
         "//conditions:default": ["libtcmalloc_and_profiler.a"],
     }),
     tags = ["skip_on_windows"],
-    targets = [
-        "install-libLTLIBRARIES install-perftoolsincludeHEADERS",
-    ],
 )
 
 # Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/227
@@ -42,7 +40,7 @@ cc_library(
 configure_make(
     name = "luajit",
     configure_command = "build.py",
-    env = select({
+    configure_env_vars = select({
         # This shouldn't be needed! See
         # https://github.com/envoyproxy/envoy/issues/6084
         # TODO(htuch): Remove when #6084 is fixed
@@ -52,18 +50,18 @@ configure_make(
         "//conditions:default": {},
     }),
     lib_source = "@com_github_luajit_luajit//:all",
+    make_commands = [],
     out_include_dir = "include/luajit-2.1",
-    out_static_libs = select({
+    static_libraries = select({
         "//bazel:windows_x86_64": ["lua51.lib"],
         "//conditions:default": ["libluajit-5.1.a"],
     }),
-    targets = [],
 )
 
 configure_make(
     name = "moonjit",
     configure_command = "build.py",
-    env = select({
+    configure_env_vars = select({
         # This shouldn't be needed! See
         # https://github.com/envoyproxy/envoy/issues/6084
         # TODO(htuch): Remove when #6084 is fixed
@@ -72,12 +70,13 @@ configure_make(
         "//conditions:default": {},
     }),
     lib_source = "@com_github_moonjit_moonjit//:all",
+    make_commands = [],
     out_include_dir = "include/moonjit-2.2",
-    out_static_libs = ["libluajit-5.1.a"],
+    static_libraries = ["libluajit-5.1.a"],
     tags = ["skip_on_windows"],
 )
 
-envoy_cmake(
+envoy_cmake_external(
     name = "ares",
     cache_entries = {
         "CARES_BUILD_TOOLS": "no",
@@ -92,17 +91,17 @@ envoy_cmake(
         "//bazel:apple": ["-lresolv"],
         "//conditions:default": [],
     }),
-    out_static_libs = select({
+    postfix_script = select({
+        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_nameser.h $INSTALLDIR/include/ares_nameser.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
+        "//conditions:default": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
+    }),
+    static_libraries = select({
         "//bazel:windows_x86_64": ["cares.lib"],
         "//conditions:default": ["libcares.a"],
     }),
-    postfix_script = select({
-        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_nameser.h $INSTALLDIR/include/ares_nameser.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
-        "//conditions:default": "rm -f $INSTALLDIR/include/ares_dns.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
-    }),
 )
 
-envoy_cmake(
+envoy_cmake_external(
     name = "curl",
     cache_entries = {
         "BUILD_CURL_EXE": "off",
@@ -143,7 +142,7 @@ envoy_cmake(
     defines = ["CURL_STATICLIB"],
     generate_crosstool_file = True,
     lib_source = "@com_github_curl//:all",
-    out_static_libs = select({
+    static_libraries = select({
         "//bazel:windows_x86_64": ["libcurl.lib"],
         "//conditions:default": ["libcurl.a"],
     }),
@@ -155,7 +154,7 @@ envoy_cmake(
     ],
 )
 
-envoy_cmake(
+envoy_cmake_external(
     name = "event",
     cache_entries = {
         "EVENT__DISABLE_OPENSSL": "on",
@@ -172,7 +171,7 @@ envoy_cmake(
         "_GNU_SOURCE": "on",
     },
     lib_source = "@com_github_libevent_libevent//:all",
-    out_static_libs = select({
+    static_libraries = select({
         # macOS organization of libevent is different from Windows/Linux.
         # Including libevent_core is a requirement on those platforms, but
         # results in duplicate symbols when built on macOS.
@@ -193,7 +192,7 @@ envoy_cmake(
     }),
 )
 
-envoy_cmake(
+envoy_cmake_external(
     name = "llvm",
     cache_entries = {
         # Disable both: BUILD and INCLUDE, since some of the INCLUDE
@@ -224,7 +223,7 @@ envoy_cmake(
         # using -l:libstdc++.a.
         "CMAKE_CXX_FLAGS": "-lstdc++",
     },
-    env = {
+    env_vars = {
         # Workaround for the -DDEBUG flag added in fastbuild on macOS,
         # which conflicts with DEBUG macro used in LLVM.
         "CFLAGS": "-UDEBUG",
@@ -232,7 +231,7 @@ envoy_cmake(
         "ASMFLAGS": "-UDEBUG",
     },
     lib_source = "@org_llvm_llvm//:all",
-    out_static_libs = select({
+    static_libraries = select({
         "//conditions:default": [
             # Order from llvm-config --libnames asmparser core debuginfodwarf
             # engine lto mcparser mirparser orcjit passes runtimedyld
@@ -293,7 +292,7 @@ envoy_cmake(
     alwayslink = True,
 )
 
-envoy_cmake(
+envoy_cmake_external(
     name = "nghttp2",
     cache_entries = {
         "ENABLE_LIB_ONLY": "on",
@@ -306,13 +305,13 @@ envoy_cmake(
     debug_cache_entries = {"ENABLE_DEBUG": "on"},
     defines = ["NGHTTP2_STATICLIB"],
     lib_source = "@com_github_nghttp2_nghttp2//:all",
-    out_static_libs = select({
+    static_libraries = select({
         "//bazel:windows_x86_64": ["nghttp2.lib"],
         "//conditions:default": ["libnghttp2.a"],
     }),
 )
 
-envoy_cmake(
+envoy_cmake_external(
     name = "wamr",
     cache_entries = {
         "LLVM_DIR": "$EXT_BUILD_DEPS/copy_llvm/llvm/lib/cmake/llvm",
@@ -325,13 +324,14 @@ envoy_cmake(
         "WAMR_BUILD_TAIL_CALL": "1",
     },
     lib_source = "@com_github_wamr//:all",
-    out_static_libs = ["libvmlib.a"],
+    static_libraries = ["libvmlib.a"],
     tags = ["skip_on_windows"],
     deps = [":llvm"],
 )
 
-envoy_cmake(
+envoy_cmake_external(
     name = "wavm",
+    binaries = ["wavm"],
     cache_entries = {
         "LLVM_DIR": "$EXT_BUILD_DEPS/copy_llvm/llvm/lib/cmake/llvm",
         "WAVM_ENABLE_STATIC_LINKING": "on",
@@ -341,7 +341,7 @@ envoy_cmake(
         # using -l:libstdc++.a.
         "CMAKE_CXX_FLAGS": "-lstdc++ -Wno-unused-command-line-argument",
     },
-    env = {
+    env_vars = {
         # Workaround for the -DDEBUG flag added in fastbuild on macOS,
         # which conflicts with DEBUG macro used in LLVM.
         "CFLAGS": "-UDEBUG",
@@ -349,8 +349,7 @@ envoy_cmake(
         "ASMFLAGS": "-UDEBUG",
     },
     lib_source = "@com_github_wavm_wavm//:all",
-    out_binaries = ["wavm"],
-    out_static_libs = select({
+    static_libraries = select({
         "//conditions:default": [
             "libWAVM.a",
             "libWAVMUnwind.a",
@@ -360,7 +359,7 @@ envoy_cmake(
     deps = [":llvm"],
 )
 
-envoy_cmake(
+envoy_cmake_external(
     name = "zlib",
     cache_entries = {
         "CMAKE_CXX_COMPILER_FORCED": "on",
@@ -393,7 +392,7 @@ envoy_cmake(
         "//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:all",
         "//conditions:default": "@net_zlib//:all",
     }),
-    out_static_libs = select({
+    static_libraries = select({
         "//bazel:windows_x86_64": ["zlib.lib"],
         "//conditions:default": ["libz.a"],
     }),
