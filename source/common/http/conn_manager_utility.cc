@@ -100,6 +100,18 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   request_headers.removeProxyConnection();
   request_headers.removeTransferEncoding();
 
+  // Sanitize referer field if exists.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_http_header_referer")) {
+    auto result = request_headers.get(Http::CustomHeaders::get().Referer);
+    if (!result.empty()) {
+      Utility::Url url;
+      if (result.size() > 1 || !url.initialize(result[0]->value().getStringView(), false)) {
+        // A request header shouldn't have multiple referer field.
+        request_headers.remove(Http::CustomHeaders::get().Referer);
+      }
+    }
+  }
+
   // If we are "using remote address" this means that we create/append to XFF with our immediate
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
   // our peer to have already properly set XFF, etc.
@@ -472,6 +484,20 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
                                              const ConnectionManagerConfig& config) {
   if (!request_headers.Path()) {
     return NormalizePathAction::Continue; // It's as valid as it is going to get.
+  }
+
+  auto fragment_pos = request_headers.getPathValue().find('#');
+  if (fragment_pos != absl::string_view::npos) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_reject_path_with_fragment")) {
+      return NormalizePathAction::Reject;
+    }
+    // Check runtime override and throw away fragment from URI path
+    // TODO(yanavlasov): remove this override after deprecation period.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled")) {
+      request_headers.setPath(request_headers.getPathValue().substr(0, fragment_pos));
+    }
   }
 
   NormalizePathAction final_action = NormalizePathAction::Continue;

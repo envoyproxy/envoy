@@ -42,9 +42,7 @@ public:
   VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    const std::string& stat_prefix,
-                   absl::optional<RouteConfigProvider*>& route_config_providers,
-                   const envoy::config::core::v3::ApiVersion resource_api_version =
-                       envoy::config::core::v3::ApiVersion::AUTO);
+                   absl::optional<RouteConfigProvider*>& route_config_providers);
   ~VhdsSubscription() override { init_target_.ready(); }
 
   void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }

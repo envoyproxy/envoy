@@ -4,7 +4,6 @@ node:
   user_agent_name: test-ci-user-agent
   user_agent_version: test
 admin:
-  access_log_path: "{{ null_device_path }}"
   address:
     socket_address:
       address: "{{ ntop_ip_loopback_address }}"
