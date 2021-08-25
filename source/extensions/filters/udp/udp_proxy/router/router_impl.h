@@ -14,6 +14,7 @@ namespace Router {
 class ClusterRouteEntry : public RouteEntry, public Route {
 public:
   ClusterRouteEntry(const envoy::extensions::filters::udp::udp_proxy::v3::Route& route);
+  ClusterRouteEntry(const std::string& cluster);
   ~ClusterRouteEntry() override = default;
 
   // Router::RouteEntry
@@ -32,13 +33,16 @@ public:
   ~ConfigImpl() override = default;
 
   // Router::Config
-  RouteConstSharedPtr route(std::string& key) const override;
+  RouteConstSharedPtr route(Network::Address::InstanceConstSharedPtr address) const override;
 
 private:
   using SourceIPsTrie = Network::LcTrie::LcTrie<RouteConstSharedPtr>;
 
-  std::string cluster_;
+  RouteConstSharedPtr cluster_;
   SourceIPsTrie source_ips_trie_;
+
+  SourceIPsTrie
+  buildRouteTrie(const envoy::extensions::filters::udp::udp_proxy::v3::RouteConfiguration& config);
 };
 
 } // namespace Router

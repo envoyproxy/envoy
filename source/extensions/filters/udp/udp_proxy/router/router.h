@@ -49,7 +49,7 @@ class Config {
 public:
   virtual ~Config() = default;
 
-  virtual RouteConstSharedPtr route(std::string& key) const PURE;
+  virtual RouteConstSharedPtr route(Network::Address::InstanceConstSharedPtr address) const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;

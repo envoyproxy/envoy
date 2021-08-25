@@ -9,19 +9,53 @@ namespace Router {
 ClusterRouteEntry::ClusterRouteEntry(
     const envoy::extensions::filters::udp::udp_proxy::v3::Route& route)
     : cluster_name_(route.route().cluster()) {}
+ClusterRouteEntry::ClusterRouteEntry(const std::string& cluster) : cluster_name_(cluster) {}
 
 ConfigImpl::ConfigImpl(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config)
-    : cluster_(config.cluster()), source_ips_trie_({}) {
-  // TODO(zhxie): Not finished
-}
+    : cluster_(std::make_shared<ClusterRouteEntry>(config.cluster())),
+      source_ips_trie_(buildRouteTrie(config.route_config())) {}
 
-RouteConstSharedPtr ConfigImpl::route(std::string& key) const {
+RouteConstSharedPtr ConfigImpl::route(Network::Address::InstanceConstSharedPtr address) const {
   // TODO(zhxie): Not finished
-  if (key.length() == 0) {
-    return nullptr;
+  if (!cluster_->routeEntry()->clusterName().empty()) {
+    return cluster_;
+  }
+
+  const auto& data = source_ips_trie_.getData(address);
+  if (!data.empty()) {
+    ASSERT(data.size() == 1);
+    return data.back();
   }
 
   return nullptr;
+}
+
+ConfigImpl::SourceIPsTrie ConfigImpl::buildRouteTrie(
+    const envoy::extensions::filters::udp::udp_proxy::v3::RouteConfiguration& config) {
+  std::vector<std::pair<RouteConstSharedPtr, std::vector<Network::Address::CidrRange>>>
+      source_ips_list;
+  source_ips_list.reserve(config.routes().size());
+
+  auto convertAddress = [](const auto& prefix_ranges) -> std::vector<Network::Address::CidrRange> {
+    std::vector<Network::Address::CidrRange> ips;
+    ips.reserve(prefix_ranges.size());
+    for (const auto& ip : prefix_ranges) {
+      const auto& cidr_range = Network::Address::CidrRange::create(ip);
+      ips.push_back(cidr_range);
+    }
+    return ips;
+  };
+
+  for (auto& route : config.routes()) {
+    // TODO(zhxie): Currently we only have one route match, and we should add matchers in the
+    // future.
+    auto ranges = route.match().source_prefix_ranges();
+    auto route_entry = std::make_shared<ClusterRouteEntry>(route);
+
+    source_ips_list.push_back(make_pair(route_entry, convertAddress(ranges)));
+  }
+
+  return {source_ips_list, true};
 }
 
 } // namespace Router
