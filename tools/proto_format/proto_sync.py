@@ -337,6 +337,10 @@ def get_previous_message_type_deps(proto_path):
         pkg = get_directory_from_package(m)
         if pkg in IGNORED_V2_PROTOS:
             continue
+
+        if 'contrib' in proto_path:
+            pkg = 'contrib/%s' % pkg
+
         deps.append('//%s:pkg' % pkg)
     return deps
 
