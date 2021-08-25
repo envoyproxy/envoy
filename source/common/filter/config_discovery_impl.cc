@@ -267,11 +267,9 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
 
   Envoy::Http::FilterFactoryCb default_config = nullptr;
   if (config_source.has_default_config()) {
-    validateTypeUrlHelper(Config::Utility::getFactoryType(config_source.default_config()),
-                          require_type_urls);
-    default_config =
-        getDefaultConfig(config_source.default_config(), filter_config_name, factory_context,
-                         stat_prefix, last_filter_in_filter_config, filter_chain_type);
+    default_config = getDefaultConfig(config_source.default_config(), filter_config_name,
+                                      factory_context, stat_prefix, last_filter_in_filter_config,
+                                      filter_chain_type, require_type_urls);
   }
 
   auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(
@@ -289,7 +287,8 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
 Http::FilterFactoryCb HttpFilterConfigProviderManagerImpl::getDefaultConfig(
     const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-    bool last_filter_in_filter_config, const std::string& filter_chain_type) const {
+    bool last_filter_in_filter_config, const std::string& filter_chain_type,
+    const absl::flat_hash_set<std::string> require_type_urls) const {
   auto* default_factory =
       Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
           proto_config);
@@ -298,6 +297,7 @@ Http::FilterFactoryCb HttpFilterConfigProviderManagerImpl::getDefaultConfig(
                                      "configuration with type URL {}.",
                                      filter_config_name, proto_config.type_url()));
   }
+  validateTypeUrlHelper(Config::Utility::getFactoryType(proto_config), require_type_urls);
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       proto_config, factory_context.messageValidationVisitor(), *default_factory);
   Config::Utility::validateTerminalFilters(

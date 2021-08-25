@@ -276,17 +276,18 @@ protected:
   getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
                    Server::Configuration::FactoryContext& factory_context,
                    const std::string& stat_prefix, bool last_filter_in_filter_config,
-                   const std::string& filter_chain_type) const PURE;
+                   const std::string& filter_chain_type,
+                   const absl::flat_hash_set<std::string> require_type_urls) const PURE;
 };
 
 class HttpFilterConfigProviderManagerImpl : public FilterConfigProviderManagerImpl {
 protected:
-  Http::FilterFactoryCb getDefaultConfig(const ProtobufWkt::Any& proto_config,
-                                         const std::string& filter_config_name,
-                                         Server::Configuration::FactoryContext& factory_context,
-                                         const std::string& stat_prefix,
-                                         bool last_filter_in_filter_config,
-                                         const std::string& filter_chain_type) const override;
+  Http::FilterFactoryCb
+  getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
+                   Server::Configuration::FactoryContext& factory_context,
+                   const std::string& stat_prefix, bool last_filter_in_filter_config,
+                   const std::string& filter_chain_type,
+                   const absl::flat_hash_set<std::string> require_type_urls) const override;
 };
 
 } // namespace Filter
