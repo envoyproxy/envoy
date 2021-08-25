@@ -14,8 +14,7 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
     : UdpListenerReadFilter(callbacks), config_(config),
       cluster_update_callbacks_(
           config->clusterManager().addThreadLocalClusterUpdateCallbacks(*this)),
-      cluster_infos_(absl::flat_hash_map<std::string, std::shared_ptr<ClusterInfo>>())
-{
+      cluster_infos_(absl::flat_hash_map<std::string, std::shared_ptr<ClusterInfo>>()) {
   for (const auto& entry : config_->entries()) {
     Upstream::ThreadLocalCluster* cluster =
         config->clusterManager().getThreadLocalCluster(entry->clusterName());
@@ -28,7 +27,8 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
 void UdpProxyFilter::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
   auto cluster_name = cluster.info()->name();
   ENVOY_LOG(debug, "udp proxy: attaching to cluster {}", cluster_name);
-  ASSERT((!cluster_infos_.contains(cluster_name)) || &cluster_infos_[cluster_name]->cluster_ != &cluster);
+  ASSERT((!cluster_infos_.contains(cluster_name)) ||
+         &cluster_infos_[cluster_name]->cluster_ != &cluster);
   cluster_infos_.emplace(cluster_name, std::make_shared<ClusterInfo>(*this, cluster));
 }
 
