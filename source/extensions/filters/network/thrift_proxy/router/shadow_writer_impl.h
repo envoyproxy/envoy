@@ -235,7 +235,7 @@ struct ShadowWriterStats {
 class ActiveRouters : public ThreadLocal::ThreadLocalObject {
 public:
   ActiveRouters(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
-  ~ActiveRouters() {
+  ~ActiveRouters() override {
     while (!active_routers_.empty()) {
       auto& router = active_routers_.front();
       router->resetStream();
