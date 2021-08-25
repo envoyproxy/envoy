@@ -55,7 +55,7 @@ AppleDnsResolverStats AppleDnsResolverImpl::generateAppleDnsResolverStats(Stats:
 AppleDnsResolverImpl::StartResolutionResult
 AppleDnsResolverImpl::startResolution(const std::string& dns_name,
                                       DnsLookupFamily dns_lookup_family, ResolveCb callback) {
-  ENVOY_LOG_EVENT(debug, "apple_dns_started", "DNS resolution for {} started", dns_name);
+  ENVOY_LOG_EVENT(debug, "apple_dns_start", "DNS resolution for {} started", dns_name);
 
   // When an IP address is submitted to c-ares in DnsResolverImpl, c-ares synchronously returns
   // the IP without submitting a DNS query. Because Envoy has come to rely on this behavior, this
