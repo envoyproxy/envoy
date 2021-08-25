@@ -310,10 +310,9 @@ TEST(HttpUtility, createSslRedirectPath) {
 
 namespace {
 
-envoy::config::core::v3::Http2ProtocolOptions
-parseHttp2OptionsFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
+envoy::config::core::v3::Http2ProtocolOptions parseHttp2OptionsFromV3Yaml(const std::string& yaml) {
   envoy::config::core::v3::Http2ProtocolOptions http2_options;
-  TestUtility::loadFromYamlAndValidate(yaml, http2_options, false, avoid_boosting);
+  TestUtility::loadFromYamlAndValidate(yaml, http2_options);
   return ::Envoy::Http2::Utility::initializeAndValidateOptions(http2_options);
 }
 

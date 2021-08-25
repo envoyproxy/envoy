@@ -107,6 +107,8 @@ public:
   virtual ~SinkDelegate();
 
   virtual void log(absl::string_view msg) PURE;
+  virtual void logWithStableName(absl::string_view stable_name, absl::string_view level,
+                                 absl::string_view component, absl::string_view msg);
   virtual void flush() PURE;
 
 protected:
@@ -157,6 +159,12 @@ public:
   void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
   void clearLock() { stderr_sink_->clearLock(); }
 
+  template <class... Args>
+  void logWithStableName(absl::string_view stable_name, absl::string_view level,
+                         absl::string_view component, Args... msg) {
+    absl::ReaderMutexLock sink_lock(&sink_mutex_);
+    sink_->logWithStableName(stable_name, level, component, fmt::format(msg...));
+  }
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
   void flush() override {
@@ -444,6 +452,26 @@ public:
  * Command line options for log macros: use Fancy Logger or not.
  */
 #define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
+
+/**
+ * Log with a stable event name. This allows emitting a log line with a stable name in addition to
+ * the standard log line. The stable log line is passed to custom sinks that may want to intercept
+ * these log messages.
+ *
+ * By default these named logs are not handled, but a custom log sink may intercept them by
+ * implementing the logWithStableName function.
+ */
+#define ENVOY_LOG_EVENT(LEVEL, EVENT_NAME, ...)                                                    \
+  ENVOY_LOG_EVENT_TO_LOGGER(ENVOY_LOGGER(), LEVEL, EVENT_NAME, ##__VA_ARGS__)
+
+#define ENVOY_LOG_EVENT_TO_LOGGER(LOGGER, LEVEL, EVENT_NAME, ...)                                  \
+  do {                                                                                             \
+    ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                               \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      ::Envoy::Logger::Registry::getSink()->logWithStableName(EVENT_NAME, #LEVEL, (LOGGER).name(), \
+                                                              ##__VA_ARGS__);                      \
+    }                                                                                              \
+  } while (0)
 
 #define ENVOY_LOG_FIRST_N_TO_LOGGER(LOGGER, LEVEL, N, ...)                                         \
   do {                                                                                             \

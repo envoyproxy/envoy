@@ -36,18 +36,18 @@ const ReplacementMap& emptySpaceReplacement() {
 
 struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(TimeSource& time_source,
-                 const Network::SocketAddressProviderSharedPtr& downstream_address_provider,
+                 const Network::ConnectionInfoProviderSharedPtr& downstream_address_provider,
                  FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain)
       : StreamInfoImpl(absl::nullopt, time_source, downstream_address_provider,
                        std::make_shared<FilterStateImpl>(life_span)) {}
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
-                 const Network::SocketAddressProviderSharedPtr& downstream_address_provider)
+                 const Network::ConnectionInfoProviderSharedPtr& downstream_address_provider)
       : StreamInfoImpl(protocol, time_source, downstream_address_provider,
                        std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
-                 const Network::SocketAddressProviderSharedPtr& downstream_address_provider,
+                 const Network::ConnectionInfoProviderSharedPtr& downstream_address_provider,
                  FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan life_span)
       : StreamInfoImpl(
             protocol, time_source, downstream_address_provider,
@@ -197,7 +197,7 @@ struct StreamInfoImpl : public StreamInfo {
 
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
 
-  const Network::SocketAddressProvider& downstreamAddressProvider() const override {
+  const Network::ConnectionInfoProvider& downstreamAddressProvider() const override {
     return *downstream_address_provider_;
   }
 
@@ -305,14 +305,14 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<uint32_t> attempt_count_;
 
 private:
-  static Network::SocketAddressProviderSharedPtr emptyDownstreamAddressProvider() {
+  static Network::ConnectionInfoProviderSharedPtr emptyDownstreamAddressProvider() {
     MUTABLE_CONSTRUCT_ON_FIRST_USE(
-        Network::SocketAddressProviderSharedPtr,
-        std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr));
+        Network::ConnectionInfoProviderSharedPtr,
+        std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr));
   }
 
   StreamInfoImpl(absl::optional<Http::Protocol> protocol, TimeSource& time_source,
-                 const Network::SocketAddressProviderSharedPtr& downstream_address_provider,
+                 const Network::ConnectionInfoProviderSharedPtr& downstream_address_provider,
                  FilterStateSharedPtr filter_state)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
@@ -325,7 +325,7 @@ private:
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  const Network::SocketAddressProviderSharedPtr downstream_address_provider_;
+  const Network::ConnectionInfoProviderSharedPtr downstream_address_provider_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
