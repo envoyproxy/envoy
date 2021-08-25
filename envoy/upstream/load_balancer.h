@@ -83,6 +83,16 @@ public:
    * Returns the transport socket options which should be applied on upstream connections
    */
   virtual Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const PURE;
+
+  using ExpectedHostStatus = uint32_t;
+  using ExpectedHost = std::pair<std::string, ExpectedHostStatus>;
+
+  /**
+   * Returns the host the load balancer shouled slected directly. If the expected host exists and
+   * the health status of the host matches the expectation, the load balancer can bypass the load
+   * balancing algorithm and return the corresponding host directly.
+   */
+  virtual absl::optional<ExpectedHost> overrideHostToSelect() const PURE;
 };
 
 /**

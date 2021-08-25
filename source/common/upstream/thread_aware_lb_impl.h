@@ -87,6 +87,10 @@ public:
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
   void initialize() override;
 
+  // ThreadAwareLoadBalancerBase LoadBalancerBase, but in fact the `chooseHost` method should never
+  // be called.
+  HostConstSharedPtr chooseHost(LoadBalancerContext*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
   // Upstream::LoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -100,7 +104,7 @@ protected:
       Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
-        factory_(new LoadBalancerFactoryImpl(stats, random)) {}
+        factory_(new LoadBalancerFactoryImpl(stats, random, *this)) {}
 
 private:
   struct PerPriorityState {
@@ -110,8 +114,9 @@ private:
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
 
   struct LoadBalancerImpl : public LoadBalancer {
-    LoadBalancerImpl(ClusterStats& stats, Random::RandomGenerator& random)
-        : stats_(stats), random_(random) {}
+    LoadBalancerImpl(ClusterStats& stats, Random::RandomGenerator& random,
+                     HostMapConstSharedPtr host_map)
+        : stats_(stats), random_(random), cross_priority_host_map_(std::move(host_map)) {}
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -123,14 +128,20 @@ private:
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_;
+
+    // Cross priority host map.
+    HostMapConstSharedPtr cross_priority_host_map_;
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
-    LoadBalancerFactoryImpl(ClusterStats& stats, Random::RandomGenerator& random)
-        : stats_(stats), random_(random) {}
+    LoadBalancerFactoryImpl(ClusterStats& stats, Random::RandomGenerator& random,
+                            ThreadAwareLoadBalancerBase& thread_aware_lb)
+        : thread_aware_lb_(thread_aware_lb), stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancerFactory
     LoadBalancerPtr create() override;
+
+    ThreadAwareLoadBalancerBase& thread_aware_lb_;
 
     ClusterStats& stats_;
     Random::RandomGenerator& random_;

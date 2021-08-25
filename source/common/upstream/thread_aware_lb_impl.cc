@@ -1,5 +1,6 @@
 #include "source/common/upstream/thread_aware_lb_impl.h"
 
+#include <atomic>
 #include <memory>
 #include <random>
 
@@ -141,6 +142,12 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
     return nullptr;
   }
 
+  HostConstSharedPtr host;
+  host = LoadBalancerBase::selectOverrideHost(cross_priority_host_map_.get(), context);
+  if (host != nullptr && !context->shouldSelectAnotherHost(*host)) {
+    return host;
+  }
+
   // If there is no hash in the context, just choose a random value (this effectively becomes
   // the random LB but it won't crash if someone configures it this way).
   // computeHashKey() may be computed on demand, so get it only once.
@@ -158,7 +165,6 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
     stats_.lb_healthy_panic_.inc();
   }
 
-  HostConstSharedPtr host;
   const uint32_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
   for (uint32_t i = 0; i < max_attempts; ++i) {
     host = per_priority_state->current_lb_->chooseHost(h, i);
@@ -173,7 +179,8 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
 }
 
 LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
-  auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_);
+  auto lb = std::make_unique<LoadBalancerImpl>(
+      stats_, random_, std::atomic_load(&thread_aware_lb_.cross_priority_host_map_));
 
   // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple
   // threads. All complex processing has already been precalculated however.

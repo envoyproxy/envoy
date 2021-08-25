@@ -42,6 +42,9 @@ public:
 
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
+  static HostConstSharedPtr selectOverrideHost(const HostMap* host_map,
+                                               LoadBalancerContext* context);
+
 protected:
   /**
    * By implementing this method instead of chooseHost, host selection will
@@ -159,12 +162,20 @@ protected:
   // The total count of healthy hosts across all priority levels.
   uint32_t total_healthy_hosts_;
 
+  // Cross priority host map for fast cross priority host searching. When the priority update
+  // callback is executed, the host map will also be updated.
+  HostMapConstSharedPtr cross_priority_host_map_;
+
 private:
   Common::CallbackHandlePtr priority_update_cb_;
 };
 
 class LoadBalancerContextBase : public LoadBalancerContext {
 public:
+  static ExpectedHostStatus createExpectedHostStatus(
+      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus>& statuses);
+  static bool validateExpectedHostStatus(Host::Health health, ExpectedHostStatus status);
+
   absl::optional<uint64_t> computeHashKey() override { return {}; }
 
   const Network::Connection* downstreamConnection() const override { return nullptr; }
@@ -188,6 +199,8 @@ public:
   Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
     return nullptr;
   }
+
+  absl::optional<ExpectedHost> overrideHostToSelect() const override { return {}; }
 };
 
 /**
