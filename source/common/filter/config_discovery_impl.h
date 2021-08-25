@@ -24,7 +24,6 @@ namespace Envoy {
 namespace Filter {
 
 class FilterConfigProviderManagerImplBase;
-class FilterConfigProviderManagerImpl;
 class FilterConfigSubscription;
 
 using FilterConfigSubscriptionSharedPtr = std::shared_ptr<FilterConfigSubscription>;
