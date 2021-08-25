@@ -8,6 +8,7 @@
 
 #include "absl/container/flat_hash_map.h"
 
+// TODO(alyssawilk) move to a common extension dir.
 namespace Envoy {
 
 // This is the base implementation of the KeyValueStore. It handles the various
@@ -32,27 +33,11 @@ public:
   void addOrUpdate(absl::string_view key, absl::string_view value) override;
   void remove(absl::string_view key) override;
   absl::optional<absl::string_view> get(absl::string_view key) override;
+  void iterate(ConstIterateCb cb) const override;
 
 protected:
   const Event::TimerPtr flush_timer_;
   absl::flat_hash_map<std::string, std::string> store_;
-};
-
-// A filesystem based key value store, which loads from and flushes to the file
-// provided.
-//
-// All keys and values are flushed to a single file as
-// [length]\n[key][length]\n[value]
-class FileBasedKeyValueStore : public KeyValueStoreBase {
-public:
-  FileBasedKeyValueStore(Event::Dispatcher& dispatcher, std::chrono::seconds flush_interval,
-                         Filesystem::Instance& file_system, const std::string& filename);
-  // KeyValueStore
-  void flush() override;
-
-private:
-  Filesystem::Instance& file_system_;
-  const std::string filename_;
 };
 
 } // namespace Envoy

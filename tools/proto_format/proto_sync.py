@@ -46,6 +46,7 @@ CONTRIB_V3_ALLOW_LIST = [
     # Extensions moved from core to contrib.
     'envoy.extensions.filters.http.squash.v3',
     'envoy.extensions.filters.network.kafka_broker.v3',
+    'envoy.extensions.filters.network.mysql_proxy.v3',
     'envoy.extensions.filters.network.rocketmq_proxy.v3',
 ]
 
