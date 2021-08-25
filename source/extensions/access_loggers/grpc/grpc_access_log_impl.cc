@@ -19,16 +19,11 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
     const Grpc::RawAsyncClientSharedPtr& client,
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
     std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
-    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-    envoy::config::core::v3::ApiVersion transport_api_version)
-    : GrpcAccessLogger(
-          std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher, scope,
-          GRPC_LOG_STATS_PREFIX.data(),
-          Grpc::VersionedMethods("envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs",
-                                 "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs")
-              .getMethodDescriptorForVersion(transport_api_version),
-          transport_api_version),
-      // TODO(shikugawa): configure approximate_critical_message_size_bytes
+    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
+    : GrpcAccessLogger(std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes,
+                       dispatcher, scope, GRPC_LOG_STATS_PREFIX.data(),
+                       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                           "envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs")),
       approximate_critical_message_size_bytes_(max_buffer_size_bytes), log_name_(config.log_name()),
       local_info_(local_info) {
   critical_client_ = std::make_unique<CriticalAccessLoggerGrpcClientImpl<
@@ -37,8 +32,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.accesslog.v3.AccessLogService.BufferedCriticalAccessLogs"),
       dispatcher, scope, PROTOBUF_GET_MS_OR_DEFAULT(config, message_ack_timeout, 5000),
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, pending_critical_buffer_size_bytes, 16384),
-      transport_api_version);
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, pending_critical_buffer_size_bytes, 16384));
 }
 
 void GrpcAccessLoggerImpl::addEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
@@ -112,13 +106,12 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& a
 
 GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-    envoy::config::core::v3::ApiVersion transport_version,
     const Grpc::RawAsyncClientSharedPtr& client,
     std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
     Event::Dispatcher& dispatcher, Stats::Scope& scope) {
   return std::make_shared<GrpcAccessLoggerImpl>(client, config, buffer_flush_interval_msec,
                                                 max_buffer_size_bytes, dispatcher, local_info_,
-                                                scope, transport_version);
+                                                scope);
 }
 
 } // namespace GrpcCommon

@@ -79,7 +79,7 @@ protected:
     class SyntheticConnection : public Network::Connection {
     public:
       SyntheticConnection(SyntheticReadCallbacks& parent)
-          : parent_(parent), address_provider_(std::make_shared<Network::SocketAddressSetterImpl>(
+          : parent_(parent), address_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
                                  parent.parent_.address_, parent.parent_.address_)),
             stream_info_(parent_.parent_.factory_context_.timeSource(), address_provider_),
             options_(std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>()) {}
@@ -120,10 +120,10 @@ protected:
       void readDisable(bool) override {}
       void detectEarlyCloseWhenReadDisabled(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       bool readEnabled() const override { return true; }
-      const Network::SocketAddressSetter& addressProvider() const override {
+      const Network::ConnectionInfoSetter& addressProvider() const override {
         return *address_provider_;
       }
-      Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+      Network::ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
         return address_provider_;
       }
       absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
@@ -152,7 +152,7 @@ protected:
       void dumpState(std::ostream& os, int) const override { os << "SyntheticConnection"; }
 
       SyntheticReadCallbacks& parent_;
-      Network::SocketAddressSetterSharedPtr address_provider_;
+      Network::ConnectionInfoSetterSharedPtr address_provider_;
       StreamInfo::StreamInfoImpl stream_info_;
       Network::ConnectionSocket::OptionsSharedPtr options_;
       std::list<Network::ConnectionCallbacks*> callbacks_;

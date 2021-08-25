@@ -206,8 +206,7 @@ bool DnsFilterEnvoyConfig::loadServerConfig(
     // is thrown. If no table can be read, the filter will refer all queries to an external
     // DNS server, if configured, otherwise all queries will be responded to with Name Error.
     MessageUtil::loadFromFile(datasource.filename(), table,
-                              ProtobufMessage::getNullValidationVisitor(), api_,
-                              false /* do_boosting */);
+                              ProtobufMessage::getNullValidationVisitor(), api_);
     data_source_loaded = true;
   } catch (const ProtobufMessage::UnknownProtoFieldException& e) {
     ENVOY_LOG(warn, "Invalid field in DNS Filter datasource configuration: {}", e.what());

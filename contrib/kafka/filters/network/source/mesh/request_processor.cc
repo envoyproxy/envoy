@@ -4,6 +4,7 @@
 
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/api_versions.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/metadata.h"
+#include "contrib/kafka/filters/network/source/mesh/command_handlers/produce.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -12,8 +13,10 @@ namespace Kafka {
 namespace Mesh {
 
 RequestProcessor::RequestProcessor(AbstractRequestListener& origin,
-                                   const UpstreamKafkaConfiguration& configuration)
-    : origin_{origin}, configuration_{configuration} {}
+                                   const UpstreamKafkaConfiguration& configuration,
+                                   UpstreamKafkaFacade& upstream_kafka_facade)
+    : origin_{origin}, configuration_{configuration}, upstream_kafka_facade_{
+                                                          upstream_kafka_facade} {}
 
 // Helper function. Throws a nice message. Filter will react by closing the connection.
 static void throwOnUnsupportedRequest(const std::string& reason, const RequestHeader& header) {
@@ -23,6 +26,9 @@ static void throwOnUnsupportedRequest(const std::string& reason, const RequestHe
 
 void RequestProcessor::onMessage(AbstractRequestSharedPtr arg) {
   switch (arg->request_header_.api_key_) {
+  case PRODUCE_REQUEST_API_KEY:
+    process(std::dynamic_pointer_cast<Request<ProduceRequest>>(arg));
+    break;
   case METADATA_REQUEST_API_KEY:
     process(std::dynamic_pointer_cast<Request<MetadataRequest>>(arg));
     break;
@@ -34,6 +40,11 @@ void RequestProcessor::onMessage(AbstractRequestSharedPtr arg) {
     throwOnUnsupportedRequest("unsupported (bad client API invoked?)", arg->request_header_);
     break;
   } // switch
+}
+
+void RequestProcessor::process(const std::shared_ptr<Request<ProduceRequest>> request) const {
+  auto res = std::make_shared<ProduceRequestHolder>(origin_, upstream_kafka_facade_, request);
+  origin_.onRequest(res);
 }
 
 void RequestProcessor::process(const std::shared_ptr<Request<MetadataRequest>> request) const {

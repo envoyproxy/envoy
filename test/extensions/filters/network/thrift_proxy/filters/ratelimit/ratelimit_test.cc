@@ -53,7 +53,7 @@ public:
   void setupTest(const std::string& yaml) {
     envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit
         proto_config{};
-    TestUtility::loadFromYaml(yaml, proto_config, false, true);
+    TestUtility::loadFromYaml(yaml, proto_config);
 
     config_ = std::make_shared<Config>(proto_config, local_info_, stats_store_, runtime_, cm_);
 

@@ -42,15 +42,8 @@ public:
                                      Event::Dispatcher& dispatcher, Stats::Scope& scope,
                                      uint64_t message_ack_timeout,
                                      uint64_t max_critical_buffer_size_bytes)
-      : CriticalAccessLoggerGrpcClientImpl(client, method, dispatcher, scope, message_ack_timeout,
-                                           max_critical_buffer_size_bytes, absl::nullopt) {}
-  CriticalAccessLoggerGrpcClientImpl(
-      const Grpc::RawAsyncClientSharedPtr& client, const Protobuf::MethodDescriptor& method,
-      Event::Dispatcher& dispatcher, Stats::Scope& scope, uint64_t message_ack_timeout,
-      uint64_t max_critical_buffer_size_bytes,
-      absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version)
       : client_(client), service_method_(method), dispatcher_(dispatcher),
-        message_ack_timeout_(message_ack_timeout), transport_api_version_(transport_api_version),
+        message_ack_timeout_(message_ack_timeout),
         stats_({CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(
             POOL_COUNTER_PREFIX(scope, GRPC_LOG_STATS_PREFIX.data()),
             POOL_GAUGE_PREFIX(scope, GRPC_LOG_STATS_PREFIX.data()))}),
@@ -156,12 +149,7 @@ public:
       });
       buffered_message.second.timer_->enableTimer(message_ack_timeout_);
 
-      if (transport_api_version_.has_value()) {
-        active_stream_->stream_->sendMessage(buffered_message.second.message_,
-                                             transport_api_version_.value(), false);
-      } else {
-        active_stream_->stream_->sendMessage(buffered_message.second.message_, false);
-      }
+      active_stream_->stream_->sendMessage(buffered_message.second.message_, false);
     }
   }
 
@@ -178,7 +166,6 @@ private:
   const Protobuf::MethodDescriptor& service_method_;
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds message_ack_timeout_;
-  const absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version_;
   CriticalAccessLoggerGrpcClientStats stats_;
   uint64_t current_critical_buffer_size_bytes_ = 0;
   const uint64_t max_critical_buffer_size_bytes_;
@@ -194,8 +181,7 @@ public:
       const Grpc::RawAsyncClientSharedPtr& client,
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
       std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
-      Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-      envoy::config::core::v3::ApiVersion transport_api_version);
+      Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
 
 private:
   bool isCriticalMessageEmpty();
@@ -235,7 +221,6 @@ private:
   // Common::GrpcAccessLoggerCache
   GrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               envoy::config::core::v3::ApiVersion transport_version,
                const Grpc::RawAsyncClientSharedPtr& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) override;

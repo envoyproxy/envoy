@@ -72,22 +72,16 @@ public:
    * @param config supplies the configuration for the logger.
    * @return GrpcAccessLoggerSharedPtr ready for logging requests.
    */
-  virtual typename GrpcAccessLogger::SharedPtr
-  getOrCreateLogger(const ConfigProto& config,
-                    envoy::config::core::v3::ApiVersion transport_version,
-                    GrpcAccessLoggerType logger_type, Stats::Scope& scope) PURE;
+  virtual typename GrpcAccessLogger::SharedPtr getOrCreateLogger(const ConfigProto& config,
+                                                                 GrpcAccessLoggerType logger_type,
+                                                                 Stats::Scope& scope) PURE;
 };
 
 template <typename LogRequest, typename LogResponse> class GrpcAccessLogClient {
 public:
   GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
                       const Protobuf::MethodDescriptor& service_method)
-      : GrpcAccessLogClient(client, service_method, absl::nullopt) {}
-  GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
-                      const Protobuf::MethodDescriptor& service_method,
-                      envoy::config::core::v3::ApiVersion transport_api_version)
-      : client_(client), service_method_(service_method),
-        transport_api_version_(transport_api_version) {}
+      : client_(client), service_method_(service_method) {}
 
 public:
   struct LocalStream : public Grpc::AsyncStreamCallbacks<LogResponse> {
@@ -127,11 +121,7 @@ public:
       if (stream_->stream_->isAboveWriteBufferHighWatermark()) {
         return false;
       }
-      if (transport_api_version_.has_value()) {
-        stream_->stream_->sendMessage(request, transport_api_version_.value(), false);
-      } else {
-        stream_->stream_->sendMessage(request, false);
-      }
+      stream_->stream_->sendMessage(request, false);
     } else {
       // Clear out the stream data due to stream creation failure.
       stream_.reset();
@@ -142,7 +132,6 @@ public:
   Grpc::AsyncClient<LogRequest, LogResponse> client_;
   std::unique_ptr<LocalStream> stream_;
   const Protobuf::MethodDescriptor& service_method_;
-  const absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version_;
 };
 
 } // namespace Detail
@@ -196,16 +185,7 @@ public:
                    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                    Stats::Scope& scope, std::string access_log_prefix,
                    const Protobuf::MethodDescriptor& service_method)
-      : GrpcAccessLogger(client, buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher,
-                         scope, access_log_prefix, service_method, absl::nullopt) {}
-  GrpcAccessLogger(const Grpc::RawAsyncClientSharedPtr& client,
-                   std::chrono::milliseconds buffer_flush_interval_msec,
-                   uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
-                   Stats::Scope& scope, std::string access_log_prefix,
-                   const Protobuf::MethodDescriptor& service_method,
-                   envoy::config::core::v3::ApiVersion transport_api_version)
-      : client_(client, service_method, transport_api_version),
-        buffer_flush_interval_msec_(buffer_flush_interval_msec),
+      : client_(client, service_method), buffer_flush_interval_msec_(buffer_flush_interval_msec),
         flush_timer_(dispatcher.createTimer([this]() {
           flush();
           flushCriticalMessage();
@@ -315,10 +295,9 @@ public:
     });
   }
 
-  typename GrpcAccessLogger::SharedPtr
-  getOrCreateLogger(const ConfigProto& config,
-                    envoy::config::core::v3::ApiVersion transport_version,
-                    GrpcAccessLoggerType logger_type, Stats::Scope& scope) override {
+  typename GrpcAccessLogger::SharedPtr getOrCreateLogger(const ConfigProto& config,
+                                                         GrpcAccessLoggerType logger_type,
+                                                         Stats::Scope& scope) override {
     // TODO(euroelessar): Consider cleaning up loggers.
     auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
     const auto cache_key = std::make_pair(MessageUtil::hash(config), logger_type);
@@ -327,7 +306,7 @@ public:
       return it->second;
     }
     const auto logger = createLogger(
-        config, transport_version,
+        config,
         async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, false)
             ->createUncachedRawAsyncClient(),
         std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
@@ -353,8 +332,7 @@ private:
 
   // Create the specific logger type for this cache.
   virtual typename GrpcAccessLogger::SharedPtr
-  createLogger(const ConfigProto& config, envoy::config::core::v3::ApiVersion transport_version,
-               const Grpc::RawAsyncClientSharedPtr& client,
+  createLogger(const ConfigProto& config, const Grpc::RawAsyncClientSharedPtr& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) PURE;
 

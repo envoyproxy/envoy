@@ -19,7 +19,7 @@ using testing::AssertionResult;
 namespace Envoy {
 namespace {
 
-class AccessLogIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
+class AccessLogIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
   AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
@@ -30,9 +30,6 @@ public:
   }
 
   void initialize() override {
-    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
-      config_helper_.enableDeprecatedV2Api();
-    }
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -50,21 +47,13 @@ public:
           envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config;
           auto* common_config = config.mutable_common_config();
           common_config->set_log_name("foo");
-          common_config->set_transport_api_version(apiVersion());
+          common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
           setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                          fake_upstreams_.back()->localAddress());
           access_log->mutable_typed_config()->PackFrom(config);
         });
 
     HttpIntegrationTest::initialize();
-  }
-
-  static ProtobufTypes::MessagePtr scrubHiddenEnvoyDeprecated(const Protobuf::Message& message) {
-    ProtobufTypes::MessagePtr mutable_clone;
-    mutable_clone.reset(message.New());
-    mutable_clone->MergeFrom(message);
-    Config::VersionUtil::scrubHiddenEnvoyDeprecated(*mutable_clone);
-    return mutable_clone;
   }
 
   ABSL_MUST_USE_RESULT
@@ -82,8 +71,7 @@ public:
     envoy::service::accesslog::v3::StreamAccessLogsMessage request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
     EXPECT_EQ("POST", access_log_request_->headers().getMethodValue());
-    EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.accesslog.{}.AccessLogService",
-                                                  "StreamAccessLogs", apiVersion()),
+    EXPECT_EQ("/envoy.service.accesslog.v3.AccessLogService/StreamAccessLogs",
               access_log_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", access_log_request_->headers().getContentTypeValue());
 
@@ -105,8 +93,6 @@ public:
       node->clear_extensions();
       node->clear_user_agent_build_version();
     }
-    Config::VersionUtil::scrubHiddenEnvoyDeprecated(request_msg);
-    Config::VersionUtil::scrubHiddenEnvoyDeprecated(expected_request_msg);
     EXPECT_THAT(request_msg, ProtoEq(expected_request_msg));
     return AssertionSuccess();
   }
@@ -144,21 +130,23 @@ public:
           envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config;
           auto* common_config = config.mutable_common_config();
           common_config->set_log_name("foo");
-          common_config->set_transport_api_version(apiVersion());
+          common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
           setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                          fake_upstreams_.back()->localAddress());
+
           const std::string filter_yaml = R"EOF(
           status_code_filter:
             comparison:
               op: GE
               value:
-                default_value: 100
+                default_value: 400
                 runtime_key: access_log.access_error.status
             )EOF";
 
           envoy::config::accesslog::v3::AccessLogFilter filter_config;
           TestUtility::loadFromYaml(filter_yaml, filter_config);
           *common_config->mutable_critical_buffer_log_filter() = filter_config;
+
           access_log->mutable_typed_config()->PackFrom(config);
         });
 
@@ -192,8 +180,6 @@ public:
       node->clear_extensions();
       node->clear_user_agent_build_version();
     }
-    Config::VersionUtil::scrubHiddenEnvoyDeprecated(request_msg);
-    Config::VersionUtil::scrubHiddenEnvoyDeprecated(expected_request_msg);
     EXPECT_GE(request_msg.id(), 0);
     pending_message_id_ = request_msg.id();
     request_msg.clear_id();
@@ -205,11 +191,10 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, CriticalAccessLogIntegrationTest,
-                         ONLYV3_GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 TEST_P(CriticalAccessLogIntegrationTest, BasicAckFlow) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   testRouterNotFound();
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
@@ -267,7 +252,6 @@ message:
 }
 
 TEST_P(CriticalAccessLogIntegrationTest, BasicNackFlow) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   testRouterNotFound();
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
@@ -363,12 +347,11 @@ message:
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, AccessLogIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Test a basic full access logging flow.
 TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   testRouterNotFound();
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());

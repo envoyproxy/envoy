@@ -90,9 +90,9 @@ public:
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
     EXPECT_CALL(*timer_, enableTimer(_, _));
     config_.set_log_name("test_log_name");
-    logger_ = std::make_unique<GrpcAccessLoggerImpl>(
-        Grpc::RawAsyncClientPtr{async_client_}, config_, FlushInterval, BUFFER_SIZE_BYTES,
-        dispatcher_, local_info_, stats_store_, envoy::config::core::v3::ApiVersion::AUTO);
+    logger_ = std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_},
+                                                     config_, FlushInterval, BUFFER_SIZE_BYTES,
+                                                     dispatcher_, local_info_, stats_store_);
   }
 
   Grpc::MockAsyncClient* async_client_;
@@ -183,9 +183,9 @@ public:
     EXPECT_CALL(*timer_, enableTimer(_, _));
     config_.set_log_name("test_log_name");
     config_.mutable_pending_critical_buffer_size_bytes()->set_value(0);
-    logger_ = std::make_unique<GrpcAccessLoggerImpl>(
-        Grpc::RawAsyncClientPtr{async_client_}, config_, FlushInterval, BUFFER_SIZE_BYTES,
-        dispatcher_, local_info_, stats_store_, envoy::config::core::v3::ApiVersion::AUTO);
+    logger_ = std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_},
+                                                     config_, FlushInterval, BUFFER_SIZE_BYTES,
+                                                     dispatcher_, local_info_, stats_store_);
   }
 
   Grpc::MockAsyncClient* async_client_;
@@ -242,8 +242,8 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   // Force a flush for every log entry.
   config.mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
-  GrpcAccessLoggerSharedPtr logger = logger_cache_.getOrCreateLogger(
-      config, envoy::config::core::v3::ApiVersion::V3, Common::GrpcAccessLoggerType::HTTP, scope_);
+  GrpcAccessLoggerSharedPtr logger =
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope_);
   // Note that the local info node() method is mocked, so the node is not really configurable.
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   identifier:
