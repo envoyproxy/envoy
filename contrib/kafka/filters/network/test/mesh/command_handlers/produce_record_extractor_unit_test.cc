@@ -200,35 +200,35 @@ absl::string_view bytesToStringView(const Bytes& bytes) {
   return {reinterpret_cast<const char*>(bytes.data()), bytes.size()};
 }
 
-TEST(RecordExtractorImpl, shouldExtractElementData) {
+TEST(RecordExtractorImpl, shouldExtractByteArray) {
   {
     const Bytes noBytes = Bytes(0);
     auto arg = bytesToStringView(noBytes);
-    EXPECT_THROW_WITH_REGEX(RecordExtractorImpl::extractElement(arg), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(RecordExtractorImpl::extractByteArray(arg), EnvoyException,
                             "byte array length not present");
   }
   {
     const Bytes nullValueBytes = {0b00000001}; // Length = -1.
     auto arg = bytesToStringView(nullValueBytes);
-    EXPECT_EQ(RecordExtractorImpl::extractElement(arg), absl::string_view());
+    EXPECT_EQ(RecordExtractorImpl::extractByteArray(arg), absl::string_view());
   }
   {
     const Bytes negativeLengthBytes = {0b01111111}; // Length = -64.
     auto arg = bytesToStringView(negativeLengthBytes);
-    EXPECT_THROW_WITH_REGEX(RecordExtractorImpl::extractElement(arg), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(RecordExtractorImpl::extractByteArray(arg), EnvoyException,
                             "byte array length less than -1: -64");
   }
   {
     const Bytes bigLengthBytes = {0b01111110}; // Length = 63.
     auto arg = bytesToStringView(bigLengthBytes);
-    EXPECT_THROW_WITH_REGEX(RecordExtractorImpl::extractElement(arg), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(RecordExtractorImpl::extractByteArray(arg), EnvoyException,
                             "byte array length larger than data provided: 63 vs 0");
   }
   {
-    // Length = 4, 7 bytes follow, 4 should be consumed, 13s should stay.
+    // Length = 4, 7 bytes follow, 4 should be consumed, 13s should stay unconsumed.
     const Bytes goodBytes = {0b00001000, 42, 42, 42, 42, 13, 13, 13};
     auto arg = bytesToStringView(goodBytes);
-    EXPECT_EQ(RecordExtractorImpl::extractElement(arg),
+    EXPECT_EQ(RecordExtractorImpl::extractByteArray(arg),
               absl::string_view(reinterpret_cast<const char*>(goodBytes.data() + 1), 4));
     EXPECT_EQ(arg.data(), reinterpret_cast<const char*>(goodBytes.data() + 5));
     EXPECT_EQ(arg.size(), 3);

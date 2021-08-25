@@ -22,64 +22,76 @@ RecordExtractorImpl::extractRecords(const std::vector<TopicProduceData>& data) c
   return result;
 }
 
+// Fields common to any record batch payload.
+// See:
+// https://github.com/apache/kafka/blob/2.4.1/clients/src/main/java/org/apache/kafka/common/record/DefaultRecordBatch.java#L46
+constexpr unsigned int RECORD_BATCH_COMMON_FIELDS_SIZE = /* BaseOffset */ sizeof(int64_t) +
+                                                         /* Length */ sizeof(int32_t) +
+                                                         /* PartitionLeaderEpoch */ sizeof(int32_t);
+
+// Magic format introduced around Kafka 1.0.0 and still used with Kafka 2.4.
+// We can extract records out of record batches that use this magic.
+constexpr int8_t SUPPORTED_MAGIC = 2;
+
+// Reference implementation:
+// https://github.com/apache/kafka/blob/2.4.1/clients/src/main/java/org/apache/kafka/common/record/DefaultRecordBatch.java#L443
 std::vector<OutboundRecord> RecordExtractorImpl::extractPartitionRecords(const std::string& topic,
                                                                          const int32_t partition,
                                                                          const Bytes& bytes) const {
 
-  // Reference implementation:
-  // org.apache.kafka.common.record.DefaultRecordBatch.writeHeader(ByteBuffer, long, int, int, byte,
-  // CompressionType, TimestampType, long, long, long, short, int, boolean, boolean, int, int)
   absl::string_view data = {reinterpret_cast<const char*>(bytes.data()), bytes.size()};
 
-  // Fields common to any records payload. Magic will follow.
-  const unsigned int common_fields_size =
-      /* BaseOffset */ 8 + /* Length */ 4 + /* PartitionLeaderEpoch */ 4;
-  if (data.length() < common_fields_size) {
+  // Let's skip these common fields, because we are not using them.
+  if (data.length() < RECORD_BATCH_COMMON_FIELDS_SIZE) {
     throw EnvoyException(fmt::format("record batch for [{}-{}] is too short (no common fields): {}",
                                      topic, partition, data.length()));
   }
-  // Let's skip these common fields, because we are not using them.
-  data = {data.data() + common_fields_size, data.length() - common_fields_size};
+  data = {data.data() + RECORD_BATCH_COMMON_FIELDS_SIZE,
+          data.length() - RECORD_BATCH_COMMON_FIELDS_SIZE};
 
-  // Extract magic.
-  // Magic tells us what is the format of records present in the byte array.
+  // Extract magic - it what is the format of records present in the bytes provided.
   Int8Deserializer magic_deserializer;
   magic_deserializer.feed(data);
-  if (magic_deserializer.ready()) {
-    int8_t magic = magic_deserializer.get();
-    if (2 == magic) {
-      // Magic format introduced around Kafka 1.0.0 and still used with Kafka 2.4.
-      // We can extract the records out of the record batch.
-      return extractRecordsOutOfBatchWithMagicEqualTo2(topic, partition, data);
-    } else {
-      // Old client sending old magic, or Apache Kafka introducing new magic.
-      throw EnvoyException(fmt::format("unknown magic value in record batch for [{}-{}]: {}", topic,
-                                       partition, magic));
-    }
-  } else {
+  if (!magic_deserializer.ready()) {
     throw EnvoyException(
         fmt::format("magic byte is not present in record batch for [{}-{}]", topic, partition));
   }
+
+  // Old client sending old magic, or Apache Kafka introducing new magic.
+  const int8_t magic = magic_deserializer.get();
+  if (SUPPORTED_MAGIC != magic) {
+    throw EnvoyException(fmt::format("unknown magic value in record batch for [{}-{}]: {}", topic,
+                                     partition, magic));
+  }
+
+  // We have received a record batch with good magic.
+  return processRecordBatch(topic, partition, data);
 }
 
-std::vector<OutboundRecord> RecordExtractorImpl::extractRecordsOutOfBatchWithMagicEqualTo2(
-    const std::string& topic, const int32_t partition, absl::string_view data) const {
+// Record batch fields we are going to ignore (because we rip it up and send its contents).
+// See:
+// https://github.com/apache/kafka/blob/2.4.1/clients/src/main/java/org/apache/kafka/common/record/DefaultRecordBatch.java#L50
+// and:
+// https://github.com/apache/kafka/blob/2.4.1/clients/src/main/java/org/apache/kafka/common/record/DefaultRecordBatch.java#L471
+constexpr unsigned int IGNORED_FIELDS_SIZE =
+    /* CRC */ sizeof(int32_t) + /* Attributes */ sizeof(int16_t) +
+    /* LastOffsetDelta */ sizeof(int32_t) + /* FirstTimestamp */ sizeof(int64_t) +
+    /* MaxTimestamp */ sizeof(int64_t) + /* ProducerId */ sizeof(int64_t) +
+    /* ProducerEpoch */ sizeof(int16_t) + /* BaseSequence */ sizeof(int32_t) +
+    /* RecordCount */ sizeof(int32_t);
 
-  // Not going to reuse the information in these fields, because we are going to republish.
-  unsigned int ignored_fields_size =
-      /* CRC */ 4 + /* Attributes */ 2 + /* LastOffsetDelta */ 4 +
-      /* FirstTimestamp */ 8 + /* MaxTimestamp */ 8 + /* ProducerId */ 8 +
-      /* ProducerEpoch */ 2 + /* BaseSequence */ 4 + /* RecordCount */ 4;
+std::vector<OutboundRecord> RecordExtractorImpl::processRecordBatch(const std::string& topic,
+                                                                    const int32_t partition,
+                                                                    absl::string_view data) const {
 
-  if (data.length() < ignored_fields_size) {
+  if (data.length() < IGNORED_FIELDS_SIZE) {
     throw EnvoyException(
         fmt::format("record batch for [{}-{}] is too short (no attribute fields): {}", topic,
                     partition, data.length()));
   }
-  data = {data.data() + ignored_fields_size, data.length() - ignored_fields_size};
+  data = {data.data() + IGNORED_FIELDS_SIZE, data.length() - IGNORED_FIELDS_SIZE};
 
   // We have managed to consume all the fancy bytes, now it's time to get to records.
-
   std::vector<OutboundRecord> result;
   while (!data.empty()) {
     const OutboundRecord record = extractRecord(topic, partition, data);
@@ -88,11 +100,10 @@ std::vector<OutboundRecord> RecordExtractorImpl::extractRecordsOutOfBatchWithMag
   return result;
 }
 
+// Reference implementation:
+// https://github.com/apache/kafka/blob/2.4.1/clients/src/main/java/org/apache/kafka/common/record/DefaultRecord.java#L179
 OutboundRecord RecordExtractorImpl::extractRecord(const std::string& topic, const int32_t partition,
                                                   absl::string_view& data) const {
-  // The reference implementation is:
-  // org.apache.kafka.common.record.DefaultRecord.writeTo(DataOutputStream, int, long, ByteBuffer,
-  // ByteBuffer, Header[])
 
   VarInt32Deserializer length;
   length.feed(data);
@@ -112,6 +123,8 @@ OutboundRecord RecordExtractorImpl::extractRecord(const std::string& topic, cons
 
   const absl::string_view expected_end_of_record = {data.data() + len, data.length() - len};
 
+  // We throw away the following batch fields: attributes, timestamp delta, offset delta (cannot do
+  // an easy jump, as some are variable-length).
   Int8Deserializer attributes;
   attributes.feed(data);
   VarInt64Deserializer tsDelta;
@@ -123,9 +136,11 @@ OutboundRecord RecordExtractorImpl::extractRecord(const std::string& topic, cons
         fmt::format("attributes not present in record for [{}-{}]", topic, partition));
   }
 
-  absl::string_view key = extractElement(data);
-  absl::string_view value = extractElement(data);
+  // Record key and value.
+  const absl::string_view key = extractByteArray(data);
+  const absl::string_view value = extractByteArray(data);
 
+  // Headers.
   VarInt32Deserializer headers_count_deserializer;
   headers_count_deserializer.feed(data);
   if (!headers_count_deserializer.ready()) {
@@ -138,8 +153,9 @@ OutboundRecord RecordExtractorImpl::extractRecord(const std::string& topic, cons
                                      partition, headers_count));
   }
   for (int32_t i = 0; i < headers_count; ++i) {
-    extractElement(data); // header key
-    extractElement(data); // header value
+    // For now, we ignore headers.
+    extractByteArray(data); // Header key.
+    extractByteArray(data); // Header value.
   }
 
   if (data == expected_end_of_record) {
@@ -152,32 +168,37 @@ OutboundRecord RecordExtractorImpl::extractRecord(const std::string& topic, cons
   }
 }
 
-// Most of the fields in records are kept as variable-encoded length and following bytes.
-// So here we have a helper function to get the data (such as key, value) out of given input.
-absl::string_view RecordExtractorImpl::extractElement(absl::string_view& input) {
+absl::string_view RecordExtractorImpl::extractByteArray(absl::string_view& input) {
+
+  // Get the length.
   VarInt32Deserializer length_deserializer;
   length_deserializer.feed(input);
   if (!length_deserializer.ready()) {
     throw EnvoyException("byte array length not present");
   }
   const int32_t length = length_deserializer.get();
-  // Length can be negative (null value was published by client).
+
+  // Length can be -1 (null value was published by client).
   if (-1 == length) {
     return {};
   }
 
-  if (length >= 0) {
-    if (static_cast<absl::string_view::size_type>(length) > input.size()) {
-      throw EnvoyException(fmt::format("byte array length larger than data provided: {} vs {}",
-                                       length, input.size()));
-    }
-    const absl::string_view result = {input.data(),
-                                      static_cast<absl::string_view::size_type>(length)};
-    input = {input.data() + length, input.length() - length};
-    return result;
-  } else {
+  // Otherwise, length cannot be negative.
+  if (length < 0) {
     throw EnvoyException(fmt::format("byte array length less than -1: {}", length));
   }
+
+  // Underflow handling.
+  if (static_cast<absl::string_view::size_type>(length) > input.size()) {
+    throw EnvoyException(
+        fmt::format("byte array length larger than data provided: {} vs {}", length, input.size()));
+  }
+
+  // We have enough data to return it.
+  const absl::string_view result = {input.data(),
+                                    static_cast<absl::string_view::size_type>(length)};
+  input = {input.data() + length, input.length() - length};
+  return result;
 }
 
 } // namespace Mesh
