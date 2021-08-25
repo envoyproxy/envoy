@@ -37,4 +37,8 @@ done
 
 # tar is having issues with -C for some reason so just cd into OUT_DIR.
 # Ignore files that don't exist so this script works for both core and contrib.
+# shellcheck disable=SC2046
+# shellcheck disable=SC2035
+# TODO(mattklein123): I can't make this work when using the shellcheck suggestions. Try
+# to fix this.
 (cd "$OUT_DIR"; tar -hcvf example_configs.tar -- $(ls *.yaml certs/*.pem certs/*.der protos/*.pb lib/*.wasm lib/*.lua 2>/dev/null))
