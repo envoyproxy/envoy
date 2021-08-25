@@ -513,13 +513,22 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
 
   if (match_grpc_) {
     matches &= Grpc::Common::isGrpcRequestHeaders(headers);
+    if (!matches) {
+      return false;
+    }
   }
 
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
+  if (!matches) {
+    return false;
+  }
   if (!config_query_parameters_.empty()) {
     Http::Utility::QueryParams query_parameters =
         Http::Utility::parseQueryString(headers.getPathValue());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
+    if (!matches) {
+      return false;
+    }
   }
 
   matches &= evaluateTlsContextMatch(stream_info);

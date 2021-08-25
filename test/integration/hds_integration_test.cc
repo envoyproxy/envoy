@@ -206,9 +206,6 @@ transport_socket_matches:
     health_check.mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check.mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
     health_check.mutable_health_checks(0)->mutable_grpc_health_check();
-    health_check.mutable_health_checks(0)
-        ->mutable_http_health_check()
-        ->set_hidden_envoy_deprecated_use_http2(false);
     health_check.mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
 
     return health_check;
@@ -818,9 +815,6 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
   health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
   health_check->mutable_health_checks(0)->mutable_grpc_health_check();
-  health_check->mutable_health_checks(0)
-      ->mutable_http_health_check()
-      ->set_hidden_envoy_deprecated_use_http2(false);
   health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
 
   // Server asks for health checking with the new message
