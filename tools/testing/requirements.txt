@@ -73,8 +73,8 @@ iniconfig==1.1.1 \
     #   -r tools/testing/requirements.txt
     #   pytest
 packaging==21.0 \
-    --hash=sha256:c86254f9220d55e31cc94d69bade760f0847da8000def4dfe1c6b872fd14ff14 \
-    --hash=sha256:7dc96269f53a4ccec5c0670940a4281106dd0bb343f47b7471f779df49c2fbe7
+    --hash=sha256:7dc96269f53a4ccec5c0670940a4281106dd0bb343f47b7471f779df49c2fbe7 \
+    --hash=sha256:c86254f9220d55e31cc94d69bade760f0847da8000def4dfe1c6b872fd14ff14
     # via
     #   -r tools/testing/requirements.txt
     #   pytest
@@ -104,6 +104,9 @@ pytest-cov==2.12.1 \
     --hash=sha256:261bb9e47e65bd099c89c3edf92972865210c36813f80ede5277dceb77a4a62a \
     --hash=sha256:261ceeb8c227b726249b376b8526b600f38667ee314f910353fa318caa01f4d7
     # via -r tools/testing/requirements.txt
+pytest-patches==0.0.1 \
+    --hash=sha256:48fe763f7e603f20a73a8c09684d31ec9929646b86fceb496599970fe86685b0
+    # via -r tools/testing/requirements.txt
 pytest==6.2.4 \
     --hash=sha256:50bcad0a0b9c5a72c8e4e7c9855a3ad496ca6a881a3641b4260605450772c54b \
     --hash=sha256:91ef2131a9bd6be8f76f1f08eac5c5317221d6ad1e143ae03894b862e8976890
@@ -111,6 +114,7 @@ pytest==6.2.4 \
     #   -r tools/testing/requirements.txt
     #   pytest-asyncio
     #   pytest-cov
+    #   pytest-patches
 toml==0.10.2 \
     --hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b \
     --hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f

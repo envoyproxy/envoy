@@ -69,7 +69,7 @@ public:
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamLocalAddress, (), (const));
   MOCK_METHOD(bool, healthCheck, (), (const));
   MOCK_METHOD(void, healthCheck, (bool is_health_check));
-  MOCK_METHOD(const Network::SocketAddressProvider&, downstreamAddressProvider, (), (const));
+  MOCK_METHOD(const Network::ConnectionInfoProvider&, downstreamAddressProvider, (), (const));
   MOCK_METHOD(void, setUpstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, upstreamSslConnection, (), (const));
   MOCK_METHOD(Router::RouteConstSharedPtr, route, (), (const));
@@ -131,7 +131,7 @@ public:
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  std::shared_ptr<Network::SocketAddressSetterImpl> downstream_address_provider_;
+  std::shared_ptr<Network::ConnectionInfoSetterImpl> downstream_address_provider_;
   BytesMetererSharedPtr upstream_bytes_meterer_;
   BytesMetererSharedPtr downstream_bytes_meterer_;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;

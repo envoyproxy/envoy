@@ -18,7 +18,6 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
   ON_CALL(*this, configProto()).WillByDefault(ReturnRef(config_proto_));
   ON_CALL(*this, configYaml()).WillByDefault(ReturnRef(config_yaml_));
-  ON_CALL(*this, bootstrapVersion()).WillByDefault(ReturnRef(bootstrap_version_));
   ON_CALL(*this, allowUnknownStaticFields()).WillByDefault(Invoke([this] {
     return allow_unknown_static_fields_;
   }));

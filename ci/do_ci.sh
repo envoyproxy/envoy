@@ -192,7 +192,7 @@ else
     # We test contrib on release only.
     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "//contrib/...")
   fi
-  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_googlesource_quiche//:ci_tests")
+  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests")
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
@@ -366,6 +366,8 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
   echo "Validating API structure..."
   "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
+  echo "Validate Golang protobuf generation..."
+  "${ENVOY_SRCDIR}"/tools/api/generate_go_protobuf.py
   echo "Testing API and API Boosting..."
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api_canonical//test/... @envoy_api_canonical//tools/... \
     @envoy_api_canonical//tools:tap2pcap_test @envoy_dev//clang_tools/api_booster/...

@@ -852,10 +852,11 @@ void ConnectionImpl::onChunkHeader(int content_length) {
     content_length /= 10;
   } while (content_length > 0);
 
-  StreamInfo::BytesMetererSharedPtr& bytes_meterer = getBytesMeterer();
+  StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
   // Count overhead of chunk encoding per chunk.
-
-  bytes_meterer->addBodyBytesReceived(is_final_chunk ? 3 : 4 + content_length_digits);
+  if (bytes_meterer) {
+    bytes_meterer->addBodyBytesReceived(is_final_chunk ? 3 : 4 + content_length_digits);
+  }
 
   if (is_final_chunk) {
     // Dispatch body before parsing trailers, so body ends up dispatched even if an error is found

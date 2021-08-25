@@ -278,10 +278,6 @@ class Checker(BaseChecker):
         return super().on_checks_complete()
 
 
-class ForkingChecker(runner.ForkingRunner, Checker):
-    pass
-
-
 class BazelChecker(runner.BazelRunner, Checker):
     pass
 
