@@ -8,12 +8,6 @@ export MANUAL=true
 
 set -e
 
-run_log "Generate front envoy certificates"
-openssl req -x509 -newkey rsa:2048 \
-    -keyout serverkey.pem \
-    -out  servercert.pem \
-    -days 3650 -nodes -subj '/CN=front-envoy'
-
 run_log "Bring up HTTP protocol stack"
 bring_up_example
 
@@ -45,7 +39,3 @@ for path in "${path_list[@]}"; do
 done
 
 docker-compose -f docker-compose-h3-client.yaml rm --force --stop
-
-run_log "Clean up generated certificates and keys"
-rm serverkey.pem || true
-rm servercert.pem || true

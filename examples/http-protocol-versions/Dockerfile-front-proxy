@@ -1,14 +1,8 @@
 FROM envoyproxy/envoy-dev:latest
 
-COPY ./envoy.yaml /etc/envoy.yaml
-COPY ./servercert.pem /etc/certs/servercert.pem
-COPY ./serverkey.pem /etc/certs/serverkey.pem
+USER 1000
 
-# Don't bake secrets into the image in production.
-# This is meant for TESTING PURPOSES only
-RUN chmod go+r /etc/envoy.yaml \
-               /etc/certs/servercert.pem \
-               /etc/certs/serverkey.pem
+COPY ./envoy.yaml /etc/envoy.yaml
 
 CMD ["/usr/local/bin/envoy", "-c", "/etc/envoy.yaml", \
                              "--log-level", "debug", \

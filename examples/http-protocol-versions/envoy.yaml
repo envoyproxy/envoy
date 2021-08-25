@@ -20,8 +20,58 @@ static_resources:
           common_tls_context:
             alpn_protocols: ["http/1.1"]
             tls_certificates:
-            - certificate_chain: { filename: "/etc/certs/servercert.pem" }
-              private_key: { filename: "/etc/certs/serverkey.pem" }
+            - certificate_chain:
+                inline_string: |
+                  -----BEGIN CERTIFICATE-----
+                  MIIDDTCCAfWgAwIBAgIUQ+BbsQhrJnksmVctCmoGSAzZyVkwDQYJKoZIhvcNAQEL
+                  BQAwFjEUMBIGA1UEAwwLZnJvbnQtZW52b3kwHhcNMjEwODI1MTQxODUzWhcNMzEw
+                  ODIzMTQxODUzWjAWMRQwEgYDVQQDDAtmcm9udC1lbnZveTCCASIwDQYJKoZIhvcN
+                  AQEBBQADggEPADCCAQoCggEBAK3kBEvcNXT3EFXEz6k2SseK6towINPYSmCGKjrq
+                  nYRfGIXbo+E/lIIYLWAinOQhxpepj1+fW7QkQFYXyZ7Cyq/A6GAmmkCTjK+/yKhO
+                  gCB8HZEZLwFHF+AsgW3nHluM6BlbTYnEhJWqIoYY1uQdQBxRnH9r0oha9+j1UKi1
+                  0pYdowIKoPXPKnjkHPUCR3Qq10VC2kO98C4lDe4qBNKqjd5yR6Rtlurvo1DL2dGZ
+                  mEBQLcdCB4W8gb+ZE+0zo73r+PdZU3wkFcZUwVf2mgIRpj/VGA9c/abMzcGXTNu9
+                  JY0nXjd5UHzCCjN4DK06IfNj2os5B0kkiWFfjOikcItziZECAwEAAaNTMFEwHQYD
+                  VR0OBBYEFEsrfNZMDgm1wHdkyIob5eAwzeQzMB8GA1UdIwQYMBaAFEsrfNZMDgm1
+                  wHdkyIob5eAwzeQzMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEB
+                  ACzXwVTdAsF4GuqDQzVO2P/PqlkXW890qODCRS/y8dbmN5qGJNCqghanY3SZ5sup
+                  9AOFOhpLVHjnsdFiJ+wa1s1rQdk+1kMuL2iZIoTqFxRTdNkrh7+STXax9RmvaafG
+                  dtnNYQX0DRy5iJX0GwBXxTu+T3gZenBQkKryZnJ+YoZEe7ZwGhpVzZAlsmMY6gnM
+                  HF94NQ5sYfvU49OFVMhMxAIFMl3Rd5RZCnI4LYqOZ5e6lYQPF+dieaXMWuX93I2A
+                  U4PHhR5uw8jVRZnMIWryR4t8mPY7M94X/mWsJCvRbky09B22FIqwEp5a/4/ligL2
+                  h5MSMfwSHPRnv2jxQdXVm/w=
+                  -----END CERTIFICATE-----
+              private_key:
+                inline_string: |
+                  -----BEGIN PRIVATE KEY-----
+                  MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCt5ARL3DV09xBV
+                  xM+pNkrHiuraMCDT2Epghio66p2EXxiF26PhP5SCGC1gIpzkIcaXqY9fn1u0JEBW
+                  F8mewsqvwOhgJppAk4yvv8ioToAgfB2RGS8BRxfgLIFt5x5bjOgZW02JxISVqiKG
+                  GNbkHUAcUZx/a9KIWvfo9VCotdKWHaMCCqD1zyp45Bz1Akd0KtdFQtpDvfAuJQ3u
+                  KgTSqo3eckekbZbq76NQy9nRmZhAUC3HQgeFvIG/mRPtM6O96/j3WVN8JBXGVMFX
+                  9poCEaY/1RgPXP2mzM3Bl0zbvSWNJ143eVB8wgozeAytOiHzY9qLOQdJJIlhX4zo
+                  pHCLc4mRAgMBAAECggEAJ+PYwHZBpRVQH/zIDm8v9Fp/yZGk1jQVy9K7OUy82bLe
+                  80YRcAifzsAxGI6YIxVEc2IoS61I4ig2wgku7UaOLIc6R2RTmmC+s0pxg3qOleUi
+                  +zgluktOxNQw1L9iDWpji/2P6fy01Yhz5wMnuKilHlnyZqCbaUBFAqHT4P/k0R6W
+                  ShFg0/BpXfXvZuIKofV/WDXsC9H1lHn+Jdb6YH8XOh45v8DUy2waj+BfaxYBwjMe
+                  PetyU60e5mIOcbga15WkTMyPDXpn1wBzdjbWdK2cVJmzevkiohSI2BOnjlZy0Hip
+                  HVl6NXkA00+ebwgZi+Lh79WA1H+/AzL82UCREve6YQKBgQDi1fhDnR7W6ZramUyF
+                  XFE0bm+Y3I/AQNTQhehTuHe8OcDIt/U0wbEyDpV/PtyIkwlRJAebry4LMREoUlfx
+                  +VZCuG38jP6wx+I7e3r8q4dnpY8iwtqegIhW8RsIuw5N2b02lT3aJhIfeNKZWeZP
+                  /Q+zML0FFOUxjrcy76rf5B3iDQKBgQDEP2vZUomdy7axQ+FTAIT8AMt8fq3W/769
+                  zT95dquEwg8eTorDsY4rCQQiDJnmor0QLlGb+XB74MKeeLl+E3NZ6X3rc83QUJ6v
+                  kZacFhITylwpUz3s8ETBQC5aGBETLmZ72rio/3uaArxOdzaohCGVV7OK+TfkoQD2
+                  959g+6TYlQKBgEGtD/+Lm2VAJ8zI++XU79INc5Q/sANLAhMJ4lVzIH/H/PBgisdm
+                  mUZUAKbh7XpBkD4E/4rs8pjc8QnKpZnyxi31NiscK5XFmdP9EYPcqgyxW7sFzcR8
+                  lH0Pu/MQLbkOpQELvufNhAvGsLsj01Ivg/8uyluRTDbICnTd/YxrgNd1AoGAVBox
+                  6AK9Q0ioVLOYfu+8DhtxGTtY2MjlP4YUa8N1ogFgZUaXpWIUYVEN2mG4GuUnTSXs
+                  h4GQuSYLgcqPA/7l8mRkOGF6lInYV7l26BF1UdHpSTSJV19ot8D/nFCwEJ5UAUQs
+                  2xASMmB1vtLMM8/cbJoXMbm4QFzXgv9/6Bov/TkCgYBZ48J2B8rFSJmTR312TtXY
+                  BHLJt/kZFm9oV2R1ZD/OMdjzXjglVTIFhVxpSM0NEKsRnA0pLFbC5B3HKnnrp9fh
+                  rkz95P2mvjMlrqXEuB3tsvwmVZHPUJgtDq8cMMlBVRoGmR+YI2u/nSrSqxoK2C52
+                  L6tQDA8M5JPPctM27Dl8Qg==
+                  -----END PRIVATE KEY-----
+
       filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
@@ -66,8 +116,57 @@ static_resources:
           common_tls_context:
             alpn_protocols: ["h2"]
             tls_certificates:
-            - certificate_chain: { filename: "/etc/certs/servercert.pem" }
-              private_key: { filename: "/etc/certs/serverkey.pem" }
+            - certificate_chain:
+                inline_string: |
+                  -----BEGIN CERTIFICATE-----
+                  MIIDDTCCAfWgAwIBAgIUQ+BbsQhrJnksmVctCmoGSAzZyVkwDQYJKoZIhvcNAQEL
+                  BQAwFjEUMBIGA1UEAwwLZnJvbnQtZW52b3kwHhcNMjEwODI1MTQxODUzWhcNMzEw
+                  ODIzMTQxODUzWjAWMRQwEgYDVQQDDAtmcm9udC1lbnZveTCCASIwDQYJKoZIhvcN
+                  AQEBBQADggEPADCCAQoCggEBAK3kBEvcNXT3EFXEz6k2SseK6towINPYSmCGKjrq
+                  nYRfGIXbo+E/lIIYLWAinOQhxpepj1+fW7QkQFYXyZ7Cyq/A6GAmmkCTjK+/yKhO
+                  gCB8HZEZLwFHF+AsgW3nHluM6BlbTYnEhJWqIoYY1uQdQBxRnH9r0oha9+j1UKi1
+                  0pYdowIKoPXPKnjkHPUCR3Qq10VC2kO98C4lDe4qBNKqjd5yR6Rtlurvo1DL2dGZ
+                  mEBQLcdCB4W8gb+ZE+0zo73r+PdZU3wkFcZUwVf2mgIRpj/VGA9c/abMzcGXTNu9
+                  JY0nXjd5UHzCCjN4DK06IfNj2os5B0kkiWFfjOikcItziZECAwEAAaNTMFEwHQYD
+                  VR0OBBYEFEsrfNZMDgm1wHdkyIob5eAwzeQzMB8GA1UdIwQYMBaAFEsrfNZMDgm1
+                  wHdkyIob5eAwzeQzMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEB
+                  ACzXwVTdAsF4GuqDQzVO2P/PqlkXW890qODCRS/y8dbmN5qGJNCqghanY3SZ5sup
+                  9AOFOhpLVHjnsdFiJ+wa1s1rQdk+1kMuL2iZIoTqFxRTdNkrh7+STXax9RmvaafG
+                  dtnNYQX0DRy5iJX0GwBXxTu+T3gZenBQkKryZnJ+YoZEe7ZwGhpVzZAlsmMY6gnM
+                  HF94NQ5sYfvU49OFVMhMxAIFMl3Rd5RZCnI4LYqOZ5e6lYQPF+dieaXMWuX93I2A
+                  U4PHhR5uw8jVRZnMIWryR4t8mPY7M94X/mWsJCvRbky09B22FIqwEp5a/4/ligL2
+                  h5MSMfwSHPRnv2jxQdXVm/w=
+                  -----END CERTIFICATE-----
+              private_key:
+                inline_string: |
+                  -----BEGIN PRIVATE KEY-----
+                  MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCt5ARL3DV09xBV
+                  xM+pNkrHiuraMCDT2Epghio66p2EXxiF26PhP5SCGC1gIpzkIcaXqY9fn1u0JEBW
+                  F8mewsqvwOhgJppAk4yvv8ioToAgfB2RGS8BRxfgLIFt5x5bjOgZW02JxISVqiKG
+                  GNbkHUAcUZx/a9KIWvfo9VCotdKWHaMCCqD1zyp45Bz1Akd0KtdFQtpDvfAuJQ3u
+                  KgTSqo3eckekbZbq76NQy9nRmZhAUC3HQgeFvIG/mRPtM6O96/j3WVN8JBXGVMFX
+                  9poCEaY/1RgPXP2mzM3Bl0zbvSWNJ143eVB8wgozeAytOiHzY9qLOQdJJIlhX4zo
+                  pHCLc4mRAgMBAAECggEAJ+PYwHZBpRVQH/zIDm8v9Fp/yZGk1jQVy9K7OUy82bLe
+                  80YRcAifzsAxGI6YIxVEc2IoS61I4ig2wgku7UaOLIc6R2RTmmC+s0pxg3qOleUi
+                  +zgluktOxNQw1L9iDWpji/2P6fy01Yhz5wMnuKilHlnyZqCbaUBFAqHT4P/k0R6W
+                  ShFg0/BpXfXvZuIKofV/WDXsC9H1lHn+Jdb6YH8XOh45v8DUy2waj+BfaxYBwjMe
+                  PetyU60e5mIOcbga15WkTMyPDXpn1wBzdjbWdK2cVJmzevkiohSI2BOnjlZy0Hip
+                  HVl6NXkA00+ebwgZi+Lh79WA1H+/AzL82UCREve6YQKBgQDi1fhDnR7W6ZramUyF
+                  XFE0bm+Y3I/AQNTQhehTuHe8OcDIt/U0wbEyDpV/PtyIkwlRJAebry4LMREoUlfx
+                  +VZCuG38jP6wx+I7e3r8q4dnpY8iwtqegIhW8RsIuw5N2b02lT3aJhIfeNKZWeZP
+                  /Q+zML0FFOUxjrcy76rf5B3iDQKBgQDEP2vZUomdy7axQ+FTAIT8AMt8fq3W/769
+                  zT95dquEwg8eTorDsY4rCQQiDJnmor0QLlGb+XB74MKeeLl+E3NZ6X3rc83QUJ6v
+                  kZacFhITylwpUz3s8ETBQC5aGBETLmZ72rio/3uaArxOdzaohCGVV7OK+TfkoQD2
+                  959g+6TYlQKBgEGtD/+Lm2VAJ8zI++XU79INc5Q/sANLAhMJ4lVzIH/H/PBgisdm
+                  mUZUAKbh7XpBkD4E/4rs8pjc8QnKpZnyxi31NiscK5XFmdP9EYPcqgyxW7sFzcR8
+                  lH0Pu/MQLbkOpQELvufNhAvGsLsj01Ivg/8uyluRTDbICnTd/YxrgNd1AoGAVBox
+                  6AK9Q0ioVLOYfu+8DhtxGTtY2MjlP4YUa8N1ogFgZUaXpWIUYVEN2mG4GuUnTSXs
+                  h4GQuSYLgcqPA/7l8mRkOGF6lInYV7l26BF1UdHpSTSJV19ot8D/nFCwEJ5UAUQs
+                  2xASMmB1vtLMM8/cbJoXMbm4QFzXgv9/6Bov/TkCgYBZ48J2B8rFSJmTR312TtXY
+                  BHLJt/kZFm9oV2R1ZD/OMdjzXjglVTIFhVxpSM0NEKsRnA0pLFbC5B3HKnnrp9fh
+                  rkz95P2mvjMlrqXEuB3tsvwmVZHPUJgtDq8cMMlBVRoGmR+YI2u/nSrSqxoK2C52
+                  L6tQDA8M5JPPctM27Dl8Qg==
+                  -----END PRIVATE KEY-----
       filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
@@ -117,8 +216,57 @@ static_resources:
             common_tls_context:
               alpn_protocols: ["h3"]
               tls_certificates:
-              - certificate_chain: { filename: "/etc/certs/servercert.pem" }
-                private_key: { filename: "/etc/certs/serverkey.pem" }
+              - certificate_chain:
+                  inline_string: |
+                    -----BEGIN CERTIFICATE-----
+                    MIIDDTCCAfWgAwIBAgIUQ+BbsQhrJnksmVctCmoGSAzZyVkwDQYJKoZIhvcNAQEL
+                    BQAwFjEUMBIGA1UEAwwLZnJvbnQtZW52b3kwHhcNMjEwODI1MTQxODUzWhcNMzEw
+                    ODIzMTQxODUzWjAWMRQwEgYDVQQDDAtmcm9udC1lbnZveTCCASIwDQYJKoZIhvcN
+                    AQEBBQADggEPADCCAQoCggEBAK3kBEvcNXT3EFXEz6k2SseK6towINPYSmCGKjrq
+                    nYRfGIXbo+E/lIIYLWAinOQhxpepj1+fW7QkQFYXyZ7Cyq/A6GAmmkCTjK+/yKhO
+                    gCB8HZEZLwFHF+AsgW3nHluM6BlbTYnEhJWqIoYY1uQdQBxRnH9r0oha9+j1UKi1
+                    0pYdowIKoPXPKnjkHPUCR3Qq10VC2kO98C4lDe4qBNKqjd5yR6Rtlurvo1DL2dGZ
+                    mEBQLcdCB4W8gb+ZE+0zo73r+PdZU3wkFcZUwVf2mgIRpj/VGA9c/abMzcGXTNu9
+                    JY0nXjd5UHzCCjN4DK06IfNj2os5B0kkiWFfjOikcItziZECAwEAAaNTMFEwHQYD
+                    VR0OBBYEFEsrfNZMDgm1wHdkyIob5eAwzeQzMB8GA1UdIwQYMBaAFEsrfNZMDgm1
+                    wHdkyIob5eAwzeQzMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEB
+                    ACzXwVTdAsF4GuqDQzVO2P/PqlkXW890qODCRS/y8dbmN5qGJNCqghanY3SZ5sup
+                    9AOFOhpLVHjnsdFiJ+wa1s1rQdk+1kMuL2iZIoTqFxRTdNkrh7+STXax9RmvaafG
+                    dtnNYQX0DRy5iJX0GwBXxTu+T3gZenBQkKryZnJ+YoZEe7ZwGhpVzZAlsmMY6gnM
+                    HF94NQ5sYfvU49OFVMhMxAIFMl3Rd5RZCnI4LYqOZ5e6lYQPF+dieaXMWuX93I2A
+                    U4PHhR5uw8jVRZnMIWryR4t8mPY7M94X/mWsJCvRbky09B22FIqwEp5a/4/ligL2
+                    h5MSMfwSHPRnv2jxQdXVm/w=
+                    -----END CERTIFICATE-----
+                private_key:
+                  inline_string: |
+                    -----BEGIN PRIVATE KEY-----
+                    MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCt5ARL3DV09xBV
+                    xM+pNkrHiuraMCDT2Epghio66p2EXxiF26PhP5SCGC1gIpzkIcaXqY9fn1u0JEBW
+                    F8mewsqvwOhgJppAk4yvv8ioToAgfB2RGS8BRxfgLIFt5x5bjOgZW02JxISVqiKG
+                    GNbkHUAcUZx/a9KIWvfo9VCotdKWHaMCCqD1zyp45Bz1Akd0KtdFQtpDvfAuJQ3u
+                    KgTSqo3eckekbZbq76NQy9nRmZhAUC3HQgeFvIG/mRPtM6O96/j3WVN8JBXGVMFX
+                    9poCEaY/1RgPXP2mzM3Bl0zbvSWNJ143eVB8wgozeAytOiHzY9qLOQdJJIlhX4zo
+                    pHCLc4mRAgMBAAECggEAJ+PYwHZBpRVQH/zIDm8v9Fp/yZGk1jQVy9K7OUy82bLe
+                    80YRcAifzsAxGI6YIxVEc2IoS61I4ig2wgku7UaOLIc6R2RTmmC+s0pxg3qOleUi
+                    +zgluktOxNQw1L9iDWpji/2P6fy01Yhz5wMnuKilHlnyZqCbaUBFAqHT4P/k0R6W
+                    ShFg0/BpXfXvZuIKofV/WDXsC9H1lHn+Jdb6YH8XOh45v8DUy2waj+BfaxYBwjMe
+                    PetyU60e5mIOcbga15WkTMyPDXpn1wBzdjbWdK2cVJmzevkiohSI2BOnjlZy0Hip
+                    HVl6NXkA00+ebwgZi+Lh79WA1H+/AzL82UCREve6YQKBgQDi1fhDnR7W6ZramUyF
+                    XFE0bm+Y3I/AQNTQhehTuHe8OcDIt/U0wbEyDpV/PtyIkwlRJAebry4LMREoUlfx
+                    +VZCuG38jP6wx+I7e3r8q4dnpY8iwtqegIhW8RsIuw5N2b02lT3aJhIfeNKZWeZP
+                    /Q+zML0FFOUxjrcy76rf5B3iDQKBgQDEP2vZUomdy7axQ+FTAIT8AMt8fq3W/769
+                    zT95dquEwg8eTorDsY4rCQQiDJnmor0QLlGb+XB74MKeeLl+E3NZ6X3rc83QUJ6v
+                    kZacFhITylwpUz3s8ETBQC5aGBETLmZ72rio/3uaArxOdzaohCGVV7OK+TfkoQD2
+                    959g+6TYlQKBgEGtD/+Lm2VAJ8zI++XU79INc5Q/sANLAhMJ4lVzIH/H/PBgisdm
+                    mUZUAKbh7XpBkD4E/4rs8pjc8QnKpZnyxi31NiscK5XFmdP9EYPcqgyxW7sFzcR8
+                    lH0Pu/MQLbkOpQELvufNhAvGsLsj01Ivg/8uyluRTDbICnTd/YxrgNd1AoGAVBox
+                    6AK9Q0ioVLOYfu+8DhtxGTtY2MjlP4YUa8N1ogFgZUaXpWIUYVEN2mG4GuUnTSXs
+                    h4GQuSYLgcqPA/7l8mRkOGF6lInYV7l26BF1UdHpSTSJV19ot8D/nFCwEJ5UAUQs
+                    2xASMmB1vtLMM8/cbJoXMbm4QFzXgv9/6Bov/TkCgYBZ48J2B8rFSJmTR312TtXY
+                    BHLJt/kZFm9oV2R1ZD/OMdjzXjglVTIFhVxpSM0NEKsRnA0pLFbC5B3HKnnrp9fh
+                    rkz95P2mvjMlrqXEuB3tsvwmVZHPUJgtDq8cMMlBVRoGmR+YI2u/nSrSqxoK2C52
+                    L6tQDA8M5JPPctM27Dl8Qg==
+                    -----END PRIVATE KEY-----
       filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:

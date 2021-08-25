@@ -4,6 +4,7 @@ COPY http3-client/*.go http3-client/go.mod http3-client/go.sum ./
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o h3client .
 
 FROM scratch
+USER 2000
 WORKDIR /root/
 COPY --from=build /go/src/github.com/envoyproxy/envoy/examples/http-protocol-options/http3-client/h3client ./
 ENTRYPOINT ["/root/h3client"]
