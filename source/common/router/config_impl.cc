@@ -970,7 +970,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
 RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMap& headers,
                                                             const uint64_t random_value,
                                                             const bool ignore_overflow) const {
-  uint64_t selected_value = random_value % total_cluster_weight_;
+  const uint64_t selected_value = random_value % total_cluster_weight_;
   uint64_t begin = 0;
   uint64_t end = 0;
 
@@ -1013,7 +1013,7 @@ void RouteEntryImplBase::validateClusters(
   // the future we might decide to also have a config option that turns off
   // checks for static route tables. This would enable the all CDS with static
   // route table case.
-  // For weighted clusters, we only verifies that the `cluster_header_name` is
+  // For weighted clusters, we only verify that the `cluster_header_name` is
   // not empty because the cluster name is not set yet at config time (hence the
   // validation here).
   if (!cluster_name_.empty()) {

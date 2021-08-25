@@ -14,17 +14,20 @@
 namespace Envoy {
 namespace {
 
+constexpr int TotalUpstreamClusterCount = Envoy::RepickClusterFilter::TotalUpstreamClusterCount;
+constexpr int TotalUpstreamClusterWithNameCount =
+    Envoy::RepickClusterFilter::TotalUpstreamClusterCount -
+    Envoy::RepickClusterFilter::TotalUpstreamClusterWithHeaderCount;
+
 class WeightedClusterIntegrationTest : public testing::Test, public HttpIntegrationTest {
 public:
   WeightedClusterIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, Network::Address::IpVersion::v6) {
-    default_weights_.reserve(upstream_count_);
-    int total_cluster_with_name_count =
-        upstream_count_ - Envoy::RepickClusterFilter::TotalUpstreamClusterWithHeaderCount;
+    default_weights_.reserve(TotalUpstreamClusterCount);
     // For the simplicity of testing purpose, the default weighted cluster array
     // starts with weights for clusters with `name` filed and followed by
     // weights for clusters with `cluster_header` field.
-    std::fill_n(std::back_inserter(default_weights_), total_cluster_with_name_count, 20);
+    std::fill_n(std::back_inserter(default_weights_), TotalUpstreamClusterWithNameCount, 20);
     std::fill_n(std::back_inserter(default_weights_),
                 Envoy::RepickClusterFilter::TotalUpstreamClusterWithHeaderCount, 30);
   }
@@ -32,17 +35,16 @@ public:
   void createUpstreams() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     //  Add fake upstreams
-    for (int i = 0; i < upstream_count_; ++i) {
+    for (int i = 0; i < TotalUpstreamClusterCount; ++i) {
       addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     }
   }
 
   void initializeConfig(const std::vector<uint64_t>& weights) {
-    int total_cluster_with_name_count =
-        upstream_count_ - Envoy::RepickClusterFilter::TotalUpstreamClusterWithHeaderCount;
-
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      for (int i = 1; i < upstream_count_; ++i) {
+      // It starts from 1 here because the first cluster is existing cluster configured by
+      // `mutable_clusters` below.
+      for (int i = 1; i < TotalUpstreamClusterCount; ++i) {
         auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
         cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
         cluster->mutable_load_assignment()
@@ -65,10 +67,10 @@ public:
 
     // Modify route with weighted cluster configuration.
     config_helper_.addConfigModifier(
-        [this, &total_cluster_with_name_count, &weights](
+        [this, &weights](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
-          for (int i = 0; i < total_cluster_with_name_count; ++i) {
+          for (int i = 0; i < TotalUpstreamClusterWithNameCount; ++i) {
             auto* cluster_with_name = hcm.mutable_route_config()
                                           ->mutable_virtual_hosts(0)
                                           ->mutable_routes(0)
@@ -80,7 +82,8 @@ public:
             cluster_with_name->mutable_weight()->set_value(weights[i]);
           }
 
-          for (int i = total_cluster_with_name_count; i < upstream_count_; ++i) {
+          for (int i = TotalUpstreamClusterWithNameCount;
+               i < Envoy::RepickClusterFilter::TotalUpstreamClusterCount; ++i) {
             auto* cluster_with_header = hcm.mutable_route_config()
                                             ->mutable_virtual_hosts(0)
                                             ->mutable_routes(0)
@@ -104,7 +107,6 @@ public:
     HttpIntegrationTest::initialize();
   }
 
-  int getUpstreamCount() { return upstream_count_; }
   const std::vector<uint64_t>& getDefaultWeights() { return default_weights_; }
 
   void sendRequestAndValidateResponse(const std::vector<uint64_t>& upstream_indices) {
@@ -136,13 +138,11 @@ public:
   }
 
 private:
-  int upstream_count_ = Envoy::RepickClusterFilter::TotalUpstreamClusterCount;
   std::vector<uint64_t> default_weights_;
 };
 
 TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithName) {
   setDeterministicValue(0);
-
   initializeConfig(getDefaultWeights());
 
   // The expected destination cluster upstream is index 0 since the selected
@@ -152,35 +152,37 @@ TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithName) {
 
 TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithHeader) {
   const std::vector<uint64_t>& default_weights = getDefaultWeights();
-  int total_cluster_with_name_count =
-      getUpstreamCount() - Envoy::RepickClusterFilter::TotalUpstreamClusterWithHeaderCount;
   uint64_t deterministric_value = std::accumulate(
-      default_weights.begin(), default_weights.begin() + total_cluster_with_name_count, 0UL);
-
+      default_weights.begin(), default_weights.begin() + TotalUpstreamClusterWithNameCount, 0UL);
   setDeterministicValue(deterministric_value);
-
   initializeConfig(default_weights);
 
   // The expected destination cluster upstream is index
-  // `total_cluster_with_name_count`.
-  sendRequestAndValidateResponse({static_cast<uint64_t>(total_cluster_with_name_count)});
+  // `TotalUpstreamClusterWithNameCount`.
+  sendRequestAndValidateResponse({static_cast<uint64_t>(TotalUpstreamClusterWithNameCount)});
 }
 
 TEST_F(WeightedClusterIntegrationTest, SplitTrafficRandomly) {
-  std::vector<uint64_t> weights = {25, 25};
+  std::vector<uint64_t> weights;
+  weights.reserve(TotalUpstreamClusterCount);
+  std::fill_n(std::back_inserter(weights), TotalUpstreamClusterCount, 25);
   initializeConfig(weights);
 
-  std::vector<uint64_t> upstream_indices(getUpstreamCount());
+  std::vector<uint64_t> upstream_indices(TotalUpstreamClusterCount);
   std::iota(std::begin(upstream_indices), std::end(upstream_indices), 0);
-  for (int i = 0; i < 100; ++i) {
+  int request_num = 100;
+  for (int i = 0; i < request_num; ++i) {
     // The expected destination cluster upstream is randomly selected based on
     // weight, so all the upstreams needs to be available for selection.
     sendRequestAndValidateResponse(upstream_indices);
   }
 
   // Check that all the upstream cluster have been routed to at least once.
-  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
-  EXPECT_GE(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+  std::string target_name;
+  for (int i = 0; i < TotalUpstreamClusterCount; ++i) {
+    target_name = absl::StrFormat("cluster.cluster_%d.upstream_cx_total", i);
+    EXPECT_GE(test_server_->counter(target_name)->value(), 1);
+  }
 }
 
 } // namespace

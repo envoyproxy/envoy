@@ -406,10 +406,10 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
 IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
     const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
-    int upstream_index, std::chrono::milliseconds timeout) {
-  return sendRequestAndWaitForResponse(
-      request_headers, request_body_size, response_headers, response_body_size,
-      std::vector<uint64_t>{static_cast<uint64_t>(upstream_index)}, timeout);
+    uint64_t upstream_index, std::chrono::milliseconds timeout) {
+  return sendRequestAndWaitForResponse(request_headers, request_body_size, response_headers,
+                                       response_body_size, std::vector<uint64_t>{upstream_index},
+                                       timeout);
 }
 
 void HttpIntegrationTest::cleanupUpstreamAndDownstream() {

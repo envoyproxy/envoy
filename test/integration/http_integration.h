@@ -136,7 +136,7 @@ protected:
   IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
       const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
       const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
-      int upstream_index = 0, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+      uint64_t upstream_index = 0, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
       const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,

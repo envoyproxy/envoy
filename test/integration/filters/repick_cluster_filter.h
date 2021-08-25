@@ -6,10 +6,9 @@
 namespace Envoy {
 namespace RepickClusterFilter {
 
-// TODO(tyxia) Consider improve the implementation here to make it untangled
-// with `weighted_cluster_integration_test`. But the cluster names and cluster
-// headers need to be correlated correctly between those two places, to make
-// sure that header modifications have been done on the correct target.
+// The cluster names and cluster headers here need to be correlated correctly with
+// weighted_cluster_integration_test or any other end users, to make sure that header modifications
+// have been done on the correct target. So they are declared and defined here.
 inline constexpr absl::string_view ClusterName = "cluster_%d";
 inline constexpr absl::string_view ClusterHeaderName = "cluster_header_%d";
 // Currently, for the simplicity of testing purpose:
