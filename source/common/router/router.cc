@@ -238,14 +238,12 @@ FilterUtility::tryParseHeaderTimeout(const Http::HeaderEntry& header_timeout_ent
   return absl::nullopt;
 }
 
-bool FilterUtility::trySetGlobalTimeout(const Http::HeaderEntry& header_timeout_entry,
+void FilterUtility::trySetGlobalTimeout(const Http::HeaderEntry& header_timeout_entry,
                                         TimeoutData& timeout) {
   const auto timeout_ms = tryParseHeaderTimeout(header_timeout_entry);
   if (timeout_ms.has_value()) {
     timeout.global_timeout_ = timeout_ms.value();
-    return true;
   }
-  return false;
 }
 
 FilterUtility::HedgingParams

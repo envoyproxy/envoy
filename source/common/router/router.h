@@ -160,9 +160,8 @@ public:
    *
    * @param header_timeout_entry header entry which may contain a timeout value.
    * @param timeout timeout data to set from header timeout entry.
-   * @return whether set timeout from header was succeeded or not.
    */
-  static bool trySetGlobalTimeout(const Http::HeaderEntry& header_timeout_entry,
+  static void trySetGlobalTimeout(const Http::HeaderEntry& header_timeout_entry,
                                   TimeoutData& timeout);
 
   /**
