@@ -62,12 +62,13 @@ public:
       cluster_with_name->set_name(absl::StrFormat(Envoy::RepickClusterFilter::ClusterName, 0));
       ConfigHelper::setHttp2(*cluster_with_name);
 
+      // Add the custom filter.
       config_helper_.addFilter("name: repick-cluster-filter");
     });
 
     // Modify route with weighted cluster configuration.
     config_helper_.addConfigModifier(
-        [this, &weights](
+        [&weights](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           for (int i = 0; i < TotalUpstreamClusterWithNameCount; ++i) {
