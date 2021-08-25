@@ -274,7 +274,7 @@ connection_balance_config:
 #if defined(ENVOY_ENABLE_QUIC)
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
                           "connection_balance_config is configured for QUIC listener which doesn't "
-                          "work with connection balencer.");
+                          "work with connection balancer.");
 #else
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
                           "QUIC is configured but not enabled in the build.");

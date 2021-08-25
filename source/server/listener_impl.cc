@@ -446,7 +446,7 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
 #ifdef ENVOY_ENABLE_QUIC
     if (config_.has_connection_balance_config()) {
       throw EnvoyException("connection_balance_config is configured for QUIC listener which "
-                           "doesn't work with connection balencer.");
+                           "doesn't work with connection balancer.");
     }
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_);
