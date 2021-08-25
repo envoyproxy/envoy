@@ -4493,6 +4493,47 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
                    .value());
 }
 
+TEST_F(RouterTest, InternalRedirectStripsFragment) {
+  enableRedirects();
+  default_request_headers_.setForwardedProto("http");
+  sendRequest();
+
+  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  Http::ResponseHeaderMapPtr redirect_headers{new Http::TestResponseHeaderMapImpl{
+      {":status", "302"}, {"location", "http://www.foo.com/#fragment"}}};
+  response_decoder_->decodeHeaders(std::move(redirect_headers), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  // In production, the HCM recreateStream would have called this.
+  router_.onDestroy();
+  EXPECT_EQ("/", default_request_headers_.getPathValue());
+}
+
+TEST_F(RouterTest, InternalRedirectKeepsFragmentWithOveride) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
+  enableRedirects();
+  default_request_headers_.setForwardedProto("http");
+  sendRequest();
+
+  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+  Http::ResponseHeaderMapPtr redirect_headers{new Http::TestResponseHeaderMapImpl{
+      {":status", "302"}, {"location", "http://www.foo.com/#fragment"}}};
+  response_decoder_->decodeHeaders(std::move(redirect_headers), false);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  // In production, the HCM recreateStream would have called this.
+  router_.onDestroy();
+  EXPECT_EQ("/#fragment", default_request_headers_.getPathValue());
+}
+
 TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   enableRedirects(3);

@@ -243,9 +243,9 @@ public:
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
-  SocketAddressSetter& addressProvider() override { return *address_provider_; }
-  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
-  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+  ConnectionInfoSetter& addressProvider() override { return *address_provider_; }
+  const ConnectionInfoProvider& addressProvider() const override { return *address_provider_; }
+  ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
     return address_provider_;
   }
   MOCK_METHOD(IoHandle&, ioHandle, ());
@@ -272,7 +272,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
 
   std::unique_ptr<MockIoHandle> io_handle_;
-  Network::SocketAddressSetterSharedPtr address_provider_;
+  Network::ConnectionInfoSetterSharedPtr address_provider_;
   OptionsSharedPtr options_;
   bool socket_is_open_ = true;
 };
@@ -297,9 +297,9 @@ public:
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
-  SocketAddressSetter& addressProvider() override { return *address_provider_; }
-  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
-  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+  ConnectionInfoSetter& addressProvider() override { return *address_provider_; }
+  const ConnectionInfoProvider& addressProvider() const override { return *address_provider_; }
+  ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
     return address_provider_;
   }
   MOCK_METHOD(void, setDetectedTransportProtocol, (absl::string_view));
@@ -334,7 +334,7 @@ public:
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   IoHandlePtr io_handle_;
-  std::shared_ptr<Network::SocketAddressSetterImpl> address_provider_;
+  std::shared_ptr<Network::ConnectionInfoSetterImpl> address_provider_;
   bool is_closed_;
 };
 

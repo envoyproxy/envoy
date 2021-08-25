@@ -27,14 +27,7 @@ maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& 
   }
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       QUERY_PARAMETER_MATCH_SPECIFIER_NOT_SET: {
-    if (config.hidden_envoy_deprecated_value().empty()) {
-      // Present match.
-      return absl::nullopt;
-    }
-
-    envoy::type::matcher::v3::StringMatcher matcher_config;
-    matcher_config.set_exact(config.hidden_envoy_deprecated_value());
-    return Matchers::StringMatcherImpl(matcher_config);
+    return absl::nullopt;
   }
   }
 
