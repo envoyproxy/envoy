@@ -355,18 +355,18 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersForMissingKey) {
 TEST_F(SimpleHttpCacheTest, UpdateHeadersDisabledForVaryHeaders) {
   const std::string request_path_1("/name");
   Http::TestResponseHeaderMapImpl response_headers_1{{"date", formatter_.fromTime(current_time_)},
-                                                   {"cache-control", "public,max-age=3600"},
-                                                   {"accept", "image/*"},
-                                                   {"vary", "accept"}};
+                                                     {"cache-control", "public,max-age=3600"},
+                                                     {"accept", "image/*"},
+                                                     {"vary", "accept"}};
   insert(request_path_1, response_headers_1, "body");
   EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
 
   // Update the date field in the headers
   time_source_.advanceTimeWait(Seconds(3601));
   Http::TestResponseHeaderMapImpl response_headers_2{{"date", formatter_.fromTime(current_time_)},
-                                                   {"cache-control", "public,max-age=3600"},
-                                                   {"accept", "image/*"},
-                                                   {"vary", "accept"}};
+                                                     {"cache-control", "public,max-age=3600"},
+                                                     {"accept", "image/*"},
+                                                     {"vary", "accept"}};
   updateHeaders(request_path_1, response_headers_2, {current_time_});
 
   EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
