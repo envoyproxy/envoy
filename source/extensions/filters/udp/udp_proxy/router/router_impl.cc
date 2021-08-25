@@ -1,5 +1,7 @@
 #include "source/extensions/filters/udp/udp_proxy/router/router_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
@@ -9,14 +11,15 @@ namespace Router {
 ClusterRouteEntry::ClusterRouteEntry(
     const envoy::extensions::filters::udp::udp_proxy::v3::Route& route)
     : cluster_name_(route.route().cluster()) {}
+
 ClusterRouteEntry::ClusterRouteEntry(const std::string& cluster) : cluster_name_(cluster) {}
 
 ConfigImpl::ConfigImpl(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config)
     : cluster_(std::make_shared<ClusterRouteEntry>(config.cluster())),
-      source_ips_trie_(buildRouteTrie(config.route_config())) {}
+      source_ips_trie_(buildRouteTrie(config.route_config())),
+      entries_(buildEntryList(config.cluster(), config.route_config())) {}
 
 RouteConstSharedPtr ConfigImpl::route(Network::Address::InstanceConstSharedPtr address) const {
-  // TODO(zhxie): Not finished
   if (!cluster_->routeEntry()->clusterName().empty()) {
     return cluster_;
   }
@@ -47,8 +50,6 @@ ConfigImpl::SourceIPsTrie ConfigImpl::buildRouteTrie(
   };
 
   for (auto& route : config.routes()) {
-    // TODO(zhxie): Currently we only have one route match, and we should add matchers in the
-    // future.
     auto ranges = route.match().source_prefix_ranges();
     auto route_entry = std::make_shared<ClusterRouteEntry>(route);
 
@@ -56,6 +57,32 @@ ConfigImpl::SourceIPsTrie ConfigImpl::buildRouteTrie(
   }
 
   return {source_ips_list, true};
+}
+
+std::vector<RouteEntryPtr> ConfigImpl::buildEntryList(
+    const std::string& cluster,
+    const envoy::extensions::filters::udp::udp_proxy::v3::RouteConfiguration& config) {
+  auto set = absl::flat_hash_set<RouteEntryPtr>();
+
+  if (!cluster.empty()) {
+    set.emplace(std::make_shared<ClusterRouteEntry>(cluster));
+  }
+
+  for (const auto& route : config.routes()) {
+    auto route_entry = std::make_shared<ClusterRouteEntry>(route);
+    auto cluster_name = route_entry->routeEntry()->clusterName();
+    if (!cluster_name.empty()) {
+      set.emplace(std::make_shared<ClusterRouteEntry>(cluster_name));
+    }
+  }
+
+  auto list = std::vector<RouteEntryPtr>();
+  list.reserve(set.size());
+  for (const auto& entry : set) {
+    list.push_back(entry);
+  }
+
+  return list;
 }
 
 } // namespace Router

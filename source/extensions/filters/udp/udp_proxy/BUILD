@@ -33,10 +33,12 @@ envoy_cc_library(
         "//envoy/network:listener_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:empty_string",
         "//source/common/network:socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:load_balancer_lib",
+        "//source/extensions/filters/udp/udp_proxy/router:router_lib",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -49,7 +51,6 @@ envoy_cc_extension(
         ":udp_proxy_filter_lib",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
-        "//source/extensions/filters/udp/udp_proxy/router:router_lib",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],
 )

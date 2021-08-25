@@ -50,6 +50,7 @@ public:
   virtual ~Config() = default;
 
   virtual RouteConstSharedPtr route(Network::Address::InstanceConstSharedPtr address) const PURE;
+  virtual const std::vector<RouteEntryPtr>& entries() const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;

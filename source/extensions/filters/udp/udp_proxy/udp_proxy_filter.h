@@ -7,13 +7,16 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/empty_string.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/hash_policy_impl.h"
+#include "source/extensions/filters/udp/udp_proxy/router/router_impl.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 
 // TODO(mattklein123): UDP session access logging.
@@ -67,7 +70,8 @@ public:
   UdpProxyFilterConfig(Upstream::ClusterManager& cluster_manager, TimeSource& time_source,
                        Stats::Scope& root_scope,
                        const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config)
-      : cluster_manager_(cluster_manager), time_source_(time_source), cluster_(config.cluster()),
+      : cluster_manager_(cluster_manager), time_source_(time_source),
+        router_config_(std::make_shared<Router::ConfigImpl>(config)),
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
         use_original_src_ip_(config.use_original_src_ip()),
         stats_(generateStats(config.stat_prefix(), root_scope)),
@@ -83,7 +87,15 @@ public:
     }
   }
 
-  const std::string& cluster() const { return cluster_; }
+  const std::string& cluster(Network::Address::InstanceConstSharedPtr address) const {
+    auto route = router_config_->route(address);
+    if (!route) {
+      return EMPTY_STRING;
+    }
+
+    return route->routeEntry()->clusterName();
+  }
+  const std::vector<Router::RouteEntryPtr>& entries() const { return router_config_->entries(); }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   std::chrono::milliseconds sessionTimeout() const { return session_timeout_; }
   bool usingOriginalSrcIp() const { return use_original_src_ip_; }
@@ -104,7 +116,7 @@ private:
 
   Upstream::ClusterManager& cluster_manager_;
   TimeSource& time_source_;
-  const std::string cluster_;
+  Router::ConfigConstSharedPtr router_config_;
   const std::chrono::milliseconds session_timeout_;
   const bool use_original_src_ip_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
@@ -280,10 +292,7 @@ private:
 
   const UdpProxyFilterConfigSharedPtr config_;
   const Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_callbacks_;
-  // Right now we support a single cluster to route to. It is highly likely in the future that
-  // we will support additional routing options either using filter chain matching, weighting,
-  // etc.
-  absl::optional<ClusterInfo> cluster_info_;
+  absl::flat_hash_map<std::string, std::shared_ptr<ClusterInfo>> cluster_infos_;
 };
 
 } // namespace UdpProxy

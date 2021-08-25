@@ -34,15 +34,20 @@ public:
 
   // Router::Config
   RouteConstSharedPtr route(Network::Address::InstanceConstSharedPtr address) const override;
+  const std::vector<RouteEntryPtr>& entries() const override { return entries_; }
 
 private:
   using SourceIPsTrie = Network::LcTrie::LcTrie<RouteConstSharedPtr>;
 
   RouteConstSharedPtr cluster_;
-  SourceIPsTrie source_ips_trie_;
+  const SourceIPsTrie source_ips_trie_;
+  const std::vector<RouteEntryPtr> entries_;
 
   SourceIPsTrie
   buildRouteTrie(const envoy::extensions::filters::udp::udp_proxy::v3::RouteConfiguration& config);
+  std::vector<RouteEntryPtr>
+  buildEntryList(const std::string& cluster,
+                 const envoy::extensions::filters::udp::udp_proxy::v3::RouteConfiguration& config);
 };
 
 } // namespace Router
