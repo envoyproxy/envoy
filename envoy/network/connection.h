@@ -192,7 +192,7 @@ public:
   virtual bool readEnabled() const PURE;
 
   /**
-   * @return the address provider backing this connection.
+   * @return the connection info provider backing this connection.
    */
   virtual const ConnectionInfoProvider& connectionInfoProvider() const PURE;
   virtual ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const PURE;
