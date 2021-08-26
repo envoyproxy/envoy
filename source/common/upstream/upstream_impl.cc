@@ -1162,12 +1162,13 @@ void ClusterImplBase::onInitDone() {
 
     // We use a weak pointer to 'this' to ensure that we don't segfault if the callback runs after
     // 'this' is deleted.
-    auto self = weak_from_this();
+    auto weak_self = weak_from_this();
     // TODO(mattklein123): Remove this callback when done.
-    health_checker_->addHostCheckCompleteCb([this, self](HostSharedPtr, HealthTransition) -> void {
-      if (self.lock()) {
-        if (pending_initialize_health_checks_ > 0 && --pending_initialize_health_checks_ == 0) {
-          finishInitialization();
+    health_checker_->addHostCheckCompleteCb([weak_self](HostSharedPtr, HealthTransition) -> void {
+      if (auto self = weak_self.lock()) {
+        if (self->pending_initialize_health_checks_ > 0 &&
+            --self->pending_initialize_health_checks_ == 0) {
+          self->finishInitialization();
         }
       }
     });

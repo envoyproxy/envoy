@@ -772,13 +772,13 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   if (new_cluster->healthChecker() != nullptr) {
     auto weak_self = weak_from_this();
     new_cluster->healthChecker()->addHostCheckCompleteCb(
-        [this, weak_self](HostSharedPtr host, HealthTransition changed_state) {
+        [weak_self](HostSharedPtr host, HealthTransition changed_state) {
           // Protect against running this callback after the cluster manager has been destroyed by
           // locking the weak pointer to 'this'.
-          if (weak_self.lock()) {
+          if (auto self = weak_self.lock()) {
             if (changed_state == HealthTransition::Changed &&
                 host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-              postThreadLocalHealthFailure(host);
+              self->postThreadLocalHealthFailure(host);
             }
           }
         });
