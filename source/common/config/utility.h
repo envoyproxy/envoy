@@ -185,15 +185,11 @@ public:
       const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
-   * Access transport_api_version field in ApiConfigSource, while validating version
-   * compatibility.
+   * Validate transport_api_version field in ApiConfigSource.
    * @param api_config_source the config source to extract transport API version from.
-   * @return envoy::config::core::v3::ApiVersion transport API version
    * @throws DeprecatedMajorVersionException when the transport version is disabled.
    */
-  template <class Proto>
-  static envoy::config::core::v3::ApiVersion
-  getAndCheckTransportVersion(const Proto& api_config_source) {
+  template <class Proto> static void checkTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
     ASSERT(Thread::MainThread::isMainThread());
     if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO ||
@@ -206,12 +202,8 @@ public:
           "following the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition.",
           api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
-      if (!Runtime::runtimeFeatureEnabled(
-              "envoy.test_only.broken_in_production.enable_deprecated_v2_api")) {
-        throw DeprecatedMajorVersionException(warning);
-      }
+      throw DeprecatedMajorVersionException(warning);
     }
-    return transport_api_version;
   }
 
   /**

@@ -28,6 +28,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "upstream_kafka_facade_unit_test",
+    srcs = ["upstream_kafka_facade_unit_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//contrib/kafka/filters/network/source/mesh:upstream_kafka_facade_lib",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "abstract_command_unit_test",
     srcs = ["abstract_command_unit_test.cc"],
     tags = ["skip_on_windows"],

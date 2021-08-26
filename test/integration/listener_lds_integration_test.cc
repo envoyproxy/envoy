@@ -9,7 +9,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/api_version.h"
-#include "source/common/config/version_converter.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/v2_link_hacks.h"
