@@ -33,8 +33,11 @@ message ZipkinConfig {
     // Hence the motivation of adding HTTP_JSON_V1 as the default is to avoid a breaking change when
     // user upgrading Envoy with this change. Furthermore, we also immediately deprecate this field,
     // since in Zipkin realm this v1 version is considered to be not preferable anymore.]
-    hidden_envoy_deprecated_HTTP_JSON_V1 = 0
-        [deprecated = true, (envoy.annotations.disallowed_by_default_enum) = true];
+    hidden_envoy_deprecated_HTTP_JSON_V1 = 0 [
+      deprecated = true,
+      (envoy.annotations.disallowed_by_default_enum) = true,
+      (envoy.annotations.deprecated_at_minor_version_enum) = "3.0"
+    ];
 
     // Zipkin API v2, JSON over HTTP.
     HTTP_JSON = 1;

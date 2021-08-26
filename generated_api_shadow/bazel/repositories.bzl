@@ -23,6 +23,9 @@ def api_dependencies():
         name = "com_google_googleapis",
     )
     external_http_archive(
+        name = "com_github_bazelbuild_buildtools",
+    )
+    external_http_archive(
         name = "com_github_cncf_udpa",
     )
 
@@ -44,6 +47,11 @@ def api_dependencies():
         name = "opentelemetry_proto",
         build_file_content = OPENTELEMETRY_LOGS_BUILD_CONTENT,
     )
+    external_http_archive(
+        name = "com_github_bufbuild_buf",
+        build_file_content = BUF_BUILD_CONTENT,
+        tags = ["manual"],
+    )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
@@ -52,7 +60,7 @@ load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 api_cc_py_proto_library(
     name = "client_model",
     srcs = [
-        "metrics.proto",
+        "io/prometheus/client/metrics.proto",
     ],
     visibility = ["//visibility:public"],
 )
@@ -107,23 +115,57 @@ go_proto_library(
 """
 
 OPENTELEMETRY_LOGS_BUILD_CONTENT = """
-load("@rules_proto//proto:defs.bzl", "proto_library")
-load("@rules_cc//cc:defs.bzl", "cc_proto_library")
+load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
+load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
-proto_library(
-    name = "logs",
+api_cc_py_proto_library(
+    name = "common",
     srcs = [
-        "opentelemetry/proto/collector/logs/v1/logs_service.proto",
         "opentelemetry/proto/common/v1/common.proto",
-        "opentelemetry/proto/logs/v1/logs.proto",
-        "opentelemetry/proto/resource/v1/resource.proto",
     ],
     visibility = ["//visibility:public"],
 )
 
-cc_proto_library(
-    name = "logs_cc_proto",
-    deps = [":logs"],
+go_proto_library(
+    name = "common_go_proto",
+    importpath = "go.opentelemetry.io/proto/otlp/common/v1",
+    proto = ":common",
     visibility = ["//visibility:public"],
+)
+
+# TODO(snowp): Generating one Go package from all of these protos could cause problems in the future,
+# but nothing references symbols from collector or resource so we're fine for now.
+api_cc_py_proto_library(
+    name = "logs",
+    srcs = [
+        "opentelemetry/proto/collector/logs/v1/logs_service.proto",
+        "opentelemetry/proto/logs/v1/logs.proto",
+        "opentelemetry/proto/resource/v1/resource.proto",
+    ],
+    deps = [
+        "//:common",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+go_proto_library(
+    name = "logs_go_proto",
+    importpath = "go.opentelemetry.io/proto/otlp/logs/v1",
+    proto = ":logs",
+    visibility = ["//visibility:public"],
+)
+"""
+
+BUF_BUILD_CONTENT = """
+package(
+    default_visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "buf",
+    srcs = [
+        "@com_github_bufbuild_buf//:bin/buf",
+    ],
+    tags = ["manual"], # buf is downloaded as a linux binary; tagged manual to prevent build for non-linux users
 )
 """

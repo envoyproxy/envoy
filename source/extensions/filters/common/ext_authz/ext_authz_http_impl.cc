@@ -355,8 +355,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   }
 
   // Create a Denied authorization response.
-  SuccessResponse denied{message->headers(),
-                         config_->clientHeaderMatchers(),
+  SuccessResponse denied{message->headers(), config_->clientHeaderMatchers(),
                          config_->upstreamHeaderToAppendMatchers(),
                          config_->clientHeaderOnSuccessMatchers(),
                          config_->dynamicMetadataMatchers(),

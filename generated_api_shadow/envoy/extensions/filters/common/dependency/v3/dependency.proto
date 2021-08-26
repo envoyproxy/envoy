@@ -42,3 +42,18 @@ message FilterDependencies {
   // A list of dependencies provided on the encode path.
   repeated Dependency encode_provided = 4;
 }
+
+// Matching requirements for a filter. For a match tree to be used with a filter, the match
+// requirements must be satisfied.
+//
+// This protobuf is provided by the filter implementation as a way to communicate the matching
+// requirements to the filter factories, allowing for config rejection if the requirements are
+// not satisfied.
+message MatchingRequirements {
+  message DataInputAllowList {
+    // An explicit list of data inputs that are allowed to be used with this filter.
+    repeated string type_url = 1;
+  }
+
+  DataInputAllowList data_input_allow_list = 1;
+}
