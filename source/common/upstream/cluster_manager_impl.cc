@@ -949,6 +949,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
 }
 
 void ClusterManagerImpl::drainConnections(const std::string& cluster) {
+  ENVOY_LOG_EVENT(debug, "drain_connections_called", "drainConnections called for cluster {}",
+                  cluster);
+
   tls_.runOnAllThreads([cluster](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     auto cluster_entry = cluster_manager->thread_local_clusters_.find(cluster);
     if (cluster_entry != cluster_manager->thread_local_clusters_.end()) {
