@@ -126,7 +126,9 @@ private:
   Thread::CondVar cv_;
   Http::ClientPtr http_client_;
   Event::ProvisionalDispatcherPtr dispatcher_;
-  Logger::LambdaDelegatePtr lambda_logger_{};
+  // Used by the cerr logger to ensure logs don't overwrite each other.
+  absl::Mutex log_mutex_;
+  Logger::EventTrackingDelegatePtr log_delegate_ptr_{};
   Server::Instance* server_{};
   Server::ServerLifecycleNotifier::HandlePtr postinit_callback_handler_;
   std::atomic<envoy_network_t>& preferred_network_;

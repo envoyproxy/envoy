@@ -35,6 +35,7 @@ objc_library(
     deps = [
         ":envoy_objc_bridge_lib",
         "//library/common:envoy_main_interface_lib",
+        "//library/common/api:c_types",
     ],
 )
 
