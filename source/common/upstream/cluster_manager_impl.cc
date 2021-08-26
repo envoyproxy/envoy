@@ -23,7 +23,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/grpc/async_client_manager_impl.h"
 #include "source/common/http/async_client_impl.h"
@@ -185,9 +184,9 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // avoid double pause ClusterLoadAssignment.
       Config::ScopedResume maybe_resume_eds;
       if (cm_.adsMux()) {
-        const auto type_urls =
-            Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-        maybe_resume_eds = cm_.adsMux()->pause(type_urls);
+        const auto type_url =
+            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+        maybe_resume_eds = cm_.adsMux()->pause(type_url);
       }
       initializeSecondaryClusters();
     }
@@ -338,22 +337,18 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (dyn_resources.has_ads_config()) {
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
+      Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
                                                          dyn_resources.ads_config(), stats, false)
               ->createUncachedRawAsyncClient(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
-                      envoy::config::core::v3::ApiVersion::V3
-                  // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
-                  // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
-                  ? "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"
-                  : "envoy.service.discovery.v2.AggregatedDiscoveryService."
-                    "DeltaAggregatedResources"),
-          Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
+              "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
+          random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
     } else {
+      Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info,
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
@@ -361,15 +356,8 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->createUncachedRawAsyncClient(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
-                      envoy::config::core::v3::ApiVersion::V3
-                  // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
-                  // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
-                  ? "envoy.service.discovery.v3.AggregatedDiscoveryService."
-                    "StreamAggregatedResources"
-                  : "envoy.service.discovery.v2.AggregatedDiscoveryService."
-                    "StreamAggregatedResources"),
-          Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
+              "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+          random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
           bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
     }
@@ -444,12 +432,13 @@ void ClusterManagerImpl::initializeSecondaryClusters(
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
 
+    Config::Utility::checkTransportVersion(load_stats_config);
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info_, *this, stats_,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
                                                        stats_, false)
             ->createUncachedRawAsyncClient(),
-        Config::Utility::getAndCheckTransportVersion(load_stats_config), dispatcher_);
+        dispatcher_);
   }
 }
 
@@ -859,10 +848,10 @@ void ClusterManagerImpl::updateClusterCounts() {
   const bool all_clusters_initialized =
       init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
   if (all_clusters_initialized && ads_mux_) {
-    const auto type_urls = Config::getAllVersionTypeUrls<envoy::config::cluster::v3::Cluster>();
+    const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
-      resume_cds_ = ads_mux_->pause(type_urls);
+      resume_cds_ = ads_mux_->pause(type_url);
     } else if (previous_warming > 0 && warming_clusters_.empty()) {
       ASSERT(resume_cds_ != nullptr);
       resume_cds_.reset();
@@ -1108,13 +1097,13 @@ ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_match
     }
     if (!cluster.added_via_api_) {
       auto& static_cluster = *config_dump->mutable_static_clusters()->Add();
-      static_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));
+      static_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
       TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                             *(static_cluster.mutable_last_updated()));
     } else {
       auto& dynamic_cluster = *config_dump->mutable_dynamic_active_clusters()->Add();
       dynamic_cluster.set_version_info(cluster.version_info_);
-      dynamic_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));
+      dynamic_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
       TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                             *(dynamic_cluster.mutable_last_updated()));
     }
@@ -1127,7 +1116,7 @@ ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_match
     }
     auto& dynamic_cluster = *config_dump->mutable_dynamic_warming_clusters()->Add();
     dynamic_cluster.set_version_info(cluster.version_info_);
-    dynamic_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));
+    dynamic_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
     TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                           *(dynamic_cluster.mutable_last_updated()));
   }

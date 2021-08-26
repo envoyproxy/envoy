@@ -13,8 +13,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/api_type_oracle.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"

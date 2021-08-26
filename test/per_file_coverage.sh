@@ -6,14 +6,13 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.5" # Raise when QUIC coverage goes up
 "source/common/api:75.3"
 "source/common/api/posix:73.9"
-"source/common/common:96.3"
 "source/common/common/posix:94.1"
 "source/common/crypto:0.0"
 "source/common/event:94.2" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2"
 "source/common/json:90.9"
 "source/common/network:95.0"  # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl` do not always report LCOV
-"source/common/protobuf:94.8"
+"source/common/protobuf:94.7"
 "source/common/signal:84.5" # Death tests don't report LCOV
 "source/common/singleton:95.8"
 "source/common/thread:0.0" # Death tests don't report LCOV
@@ -32,7 +31,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/fault:94.6"
 "source/extensions/filters/common/rbac:88.6"
 "source/extensions/filters/http/cache:92.6"
-"source/extensions/filters/http/cache/simple_http_cache:95.2"
+"source/extensions/filters/http/cache/simple_http_cache:95.6"
 "source/extensions/filters/http/grpc_json_transcoder:95.6"
 "source/extensions/filters/http/ip_tagging:91.2"
 "source/extensions/filters/http/kill_request:85.0" # Death tests don't report LCOV
@@ -49,11 +48,11 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/stat_sinks/graphite_statsd:85.7"
 "source/extensions/stat_sinks/statsd:85.2"
 "source/extensions/tracers/opencensus:94.2"
-"source/extensions/tracers/xray:96.0"
-"source/extensions/transport_sockets:95.7"
+"source/extensions/tracers/xray:96.4"
+"source/extensions/transport_sockets:95.8"
 "source/extensions/transport_sockets/tls/cert_validator:96.5"
 "source/extensions/transport_sockets/tls/private_key:76.9"
-"source/extensions/transport_sockets/tls:95.1"
+"source/extensions/transport_sockets/tls:95.2"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build

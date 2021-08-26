@@ -81,7 +81,7 @@ public:
     EXPECT_CALL(*timer_, enableTimer(_, _));
     logger_ = std::make_unique<GrpcAccessLoggerImpl>(
         Grpc::RawAsyncClientPtr{async_client_}, "test_log_name", FlushInterval, BUFFER_SIZE_BYTES,
-        dispatcher_, local_info_, stats_store_, envoy::config::core::v3::ApiVersion::V3);
+        dispatcher_, local_info_, stats_store_);
   }
 
   Grpc::MockAsyncClient* async_client_;
@@ -178,8 +178,8 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   // Force a flush for every log entry.
   config.mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
-  GrpcAccessLoggerSharedPtr logger = logger_cache_.getOrCreateLogger(
-      config, envoy::config::core::v3::ApiVersion::V3, Common::GrpcAccessLoggerType::HTTP, scope_);
+  GrpcAccessLoggerSharedPtr logger =
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope_);
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   resource_logs:
     resource:
