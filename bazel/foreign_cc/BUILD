@@ -39,6 +39,31 @@ cc_library(
     ],
 )
 
+# librdkafka build generates extra headers that need to be copied into source to get it to compile.
+configure_make(
+    name = "librdkafka_build",
+    configure_in_place = True,
+    configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd && cp Makefile.config src/.. && cp config.h src/.."],
+    lib_source = "@edenhill_librdkafka//:all",
+    out_static_libs = [
+        "librdkafka.a",
+        "librdkafka++.a",
+    ],
+    tags = ["skip_on_windows"],
+    targets = [
+        "libs install-subdirs",
+    ],
+    alwayslink = True,
+)
+
+cc_library(
+    name = "librdkafka",
+    tags = ["skip_on_windows"],
+    deps = [
+        "librdkafka_build",
+    ],
+)
+
 configure_make(
     name = "luajit",
     configure_command = "build.py",
