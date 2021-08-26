@@ -155,12 +155,13 @@ bool HappyEyeballsConnectionImpl::readEnabled() const {
   return connections_[0]->readEnabled();
 }
 
-const ConnectionInfoProvider& HappyEyeballsConnectionImpl::addressProvider() const {
-  return connections_[0]->addressProvider();
+const ConnectionInfoProvider& HappyEyeballsConnectionImpl::connectionInfoProvider() const {
+  return connections_[0]->connectionInfoProvider();
 }
 
-ConnectionInfoProviderSharedPtr HappyEyeballsConnectionImpl::addressProviderSharedPtr() const {
-  return connections_[0]->addressProviderSharedPtr();
+ConnectionInfoProviderSharedPtr
+HappyEyeballsConnectionImpl::connectionInfoProviderSharedPtr() const {
+  return connections_[0]->connectionInfoProviderSharedPtr();
 }
 
 absl::optional<Connection::UnixDomainSocketPeerCredentials>
