@@ -85,7 +85,7 @@ def create_issues(dep ,repo , metadata_version , release_date, latest_release):
     body = f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>:{latest_release.tag_name}@<{latest_release.created_at}>'
     title = f'{dep} has a newer release {latest_release.tag_name}'
     try:
-        repo.create_issue(title, body=body, assignees=None, labels=labels)
+        repo.create_issue(title, body=body, assignee=None, labels=labels)
     except github.GithubException as e:
         try:
             repo.create_issue(title, body=body, labels=labels)
