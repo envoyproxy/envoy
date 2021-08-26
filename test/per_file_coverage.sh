@@ -11,7 +11,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/event:94.2" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.2"
 "source/common/json:90.9"
-"source/common/http/http2:96.5"
 "source/common/network:95.0"  # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl` do not always report LCOV
 "source/common/protobuf:94.7"
 "source/common/signal:84.5" # Death tests don't report LCOV
