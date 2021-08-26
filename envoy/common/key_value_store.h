@@ -1,6 +1,10 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/filesystem/filesystem.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -37,6 +41,45 @@ public:
    * Flushes the store to long term storage.
    */
   virtual void flush() PURE;
+
+  // Returns for the iterate function.
+  enum class Iterate { Continue, Break };
+
+  /**
+   * Callback when calling iterate() in a key value store.
+   * @param key is the key for a given entry
+   * @param value is the value for a given entry
+   * @return Iterate::Continue to continue iteration, or Iterate::Break to stop.
+   */
+  using ConstIterateCb = std::function<Iterate(const std::string& key, const std::string& value)>;
+
+  /**
+   * Iterate over a key value store.
+   * @param cb supplies the iteration callback.
+   */
+  virtual void iterate(ConstIterateCb cb) const PURE;
+};
+
+using KeyValueStorePtr = std::unique_ptr<KeyValueStore>;
+
+// A factory for creating key value stores.
+class KeyValueStoreFactory : public Envoy::Config::TypedFactory {
+public:
+  /**
+   * Function to create KeyValueStores from the specified config.
+   * @param cb supplies the key value store configuration
+   * @param validation_visitor the configuration validator
+   * @dispatcher the dispatcher for the thread, for flush alarms.
+   * @file_system the file system.
+   * @return a new key value store.
+   */
+  virtual KeyValueStorePtr createStore(const Protobuf::Message& config,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                                       Event::Dispatcher& dispatcher,
+                                       Filesystem::Instance& file_system) PURE;
+
+  // @brief the category of the key value store for factory registration.
+  std::string category() const override { return "envoy.common.key_value"; }
 };
 
 } // namespace Envoy

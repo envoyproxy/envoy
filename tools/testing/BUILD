@@ -24,6 +24,7 @@ envoy_py_binary(
         requirement("pytest"),
         requirement("pytest-asyncio"),
         requirement("pytest-cov"),
+        requirement("pytest-patches"),
         "//tools/base:runner",
         "//tools/base:utils",
     ],
