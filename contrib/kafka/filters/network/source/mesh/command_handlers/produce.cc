@@ -13,7 +13,7 @@ constexpr static int16_t NO_ERROR = 0;
 ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,
                                            UpstreamKafkaFacade& kafka_facade,
                                            const std::shared_ptr<Request<ProduceRequest>> request)
-    : ProduceRequestHolder{filter, kafka_facade, PlaceholderRecordExtractor{}, request} {};
+    : ProduceRequestHolder{filter, kafka_facade, RecordExtractorImpl{}, request} {};
 
 ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,
                                            UpstreamKafkaFacade& kafka_facade,
