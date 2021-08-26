@@ -581,7 +581,7 @@ public:
     // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
     envoy::config::core::v3::DnsResolverOptions dns_resolver_options = dns_resolver_options_;
     auto typed_dns_resolver_config_in_construct = getTypedDnsResolverConfig(
-        {socket_->addressProvider().localAddress()}, dns_resolver_options);
+        {socket_->connectionInfoProvider().localAddress()}, dns_resolver_options);
     auto typed_dns_resolver_config_not_in_construct =
         getTypedDnsResolverConfig({}, dns_resolver_options);
 
@@ -596,8 +596,8 @@ public:
     if (tcpOnly()) {
       peer_->resetChannelTcpOnly(zeroTimeout());
     }
-    ares_set_servers_ports_csv(peer_->channel(),
-                               socket_->addressProvider().localAddress()->asString().c_str());
+    ares_set_servers_ports_csv(
+        peer_->channel(), socket_->connectionInfoProvider().localAddress()->asString().c_str());
   }
 
   void TearDown() override {
@@ -732,7 +732,7 @@ TEST_P(DnsImplTest, DestructCallback) {
   // a subsequent result to call ares_destroy.
   peer_->resetChannelTcpOnly(zeroTimeout());
   ares_set_servers_ports_csv(peer_->channel(),
-                             socket_->addressProvider().localAddress()->asString().c_str());
+                             socket_->connectionInfoProvider().localAddress()->asString().c_str());
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -860,7 +860,7 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
     peer_->resetChannelTcpOnly(zeroTimeout());
   }
   ares_set_servers_ports_csv(peer_->channel(),
-                             socket_->addressProvider().localAddress()->asString().c_str());
+                             socket_->connectionInfoProvider().localAddress()->asString().c_str());
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success,
