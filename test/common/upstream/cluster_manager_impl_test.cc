@@ -3501,9 +3501,10 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedUnregisteredNoConf
 }
 
 // Test that when typed_dns_resolver_config is configured but with type not DNS category,
-// e.g, some random "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-// default behavior is enforced: i.e, if neither dns_resolution_config, nor dns_resolvers or
-// use_tcp_for_dns_lookups is in place, then typed_dns_resolver_config is default value.
+// e.g, some random "@type":
+// type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext default behavior
+// is enforced: i.e, if neither dns_resolution_config, nor dns_resolvers or use_tcp_for_dns_lookups
+// is in place, then typed_dns_resolver_config is default value.
 TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedNotDnsCategoryNoConfigInPlace) {
   const std::string yaml = R"EOF(
   static_resources:
@@ -3535,8 +3536,6 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedNotDnsCategoryNoCo
   EXPECT_EQ(0, cares.resolvers().size());
   factory_.tls_.shutdownThread();
 }
-
-
 
 // Test that when typed_dns_resolver_config is configured but with none DNS resolver type,
 // "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

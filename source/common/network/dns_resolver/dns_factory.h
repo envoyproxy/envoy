@@ -123,8 +123,8 @@ void makeDnsResolverConfig(
 
   // If it is MacOS and the run time flag: envoy.restart_features.use_apple_api_for_dns_lookups
   // is enabled, synthetic an AppleDnsResolverConfig typed config.
-  if ((Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(std::string(AppleDnsResolver),
-                                                                              true) != nullptr) &&
+  if ((Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(
+           std::string(AppleDnsResolver), true) != nullptr) &&
       Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups")) {
     makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);
     return;
