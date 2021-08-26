@@ -1923,7 +1923,7 @@ TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
   const auto contents = ostream.contents();
   EXPECT_THAT(contents, HasSubstr("ListenSocketImpl"));
   EXPECT_THAT(contents, HasSubstr("transport_protocol_: "));
-  EXPECT_THAT(contents, HasSubstr("SocketAddressSetterImpl"));
+  EXPECT_THAT(contents, HasSubstr("ConnectionInfoSetterImpl"));
   if (GetParam() == Network::Address::IpVersion::v4) {
     EXPECT_THAT(
         contents,

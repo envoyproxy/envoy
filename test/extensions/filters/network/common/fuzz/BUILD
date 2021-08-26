@@ -103,7 +103,6 @@ envoy_cc_fuzz_test(
         ":uber_writefilter_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/network/mongo_proxy:config",
-        "//source/extensions/filters/network/mysql_proxy:config",
         "//source/extensions/filters/network/zookeeper_proxy:config",
         "//test/config:utility_lib",
     ],

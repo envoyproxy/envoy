@@ -8,10 +8,10 @@
 namespace Envoy {
 namespace Network {
 
-class SocketAddressSetterImpl : public SocketAddressSetter {
+class ConnectionInfoSetterImpl : public ConnectionInfoSetter {
 public:
-  SocketAddressSetterImpl(const Address::InstanceConstSharedPtr& local_address,
-                          const Address::InstanceConstSharedPtr& remote_address)
+  ConnectionInfoSetterImpl(const Address::InstanceConstSharedPtr& local_address,
+                           const Address::InstanceConstSharedPtr& remote_address)
       : local_address_(local_address), remote_address_(remote_address),
         direct_remote_address_(remote_address) {}
 
@@ -21,14 +21,14 @@ public:
 
   void dumpState(std::ostream& os, int indent_level) const override {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "SocketAddressSetterImpl " << this
+    os << spaces << "ConnectionInfoSetterImpl " << this
        << DUMP_NULLABLE_MEMBER(remote_address_, remote_address_->asStringView())
        << DUMP_NULLABLE_MEMBER(direct_remote_address_, direct_remote_address_->asStringView())
        << DUMP_NULLABLE_MEMBER(local_address_, local_address_->asStringView())
        << DUMP_MEMBER(server_name_) << "\n";
   }
 
-  // SocketAddressSetter
+  // ConnectionInfoSetter
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;
@@ -72,9 +72,9 @@ public:
              const Address::InstanceConstSharedPtr& remote_address);
 
   // Network::Socket
-  SocketAddressSetter& addressProvider() override { return *address_provider_; }
-  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
-  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+  ConnectionInfoSetter& addressProvider() override { return *address_provider_; }
+  const ConnectionInfoProvider& addressProvider() const override { return *address_provider_; }
+  ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
     return address_provider_;
   }
   SocketPtr duplicate() override {
@@ -128,7 +128,7 @@ protected:
              const Address::InstanceConstSharedPtr& remote_address);
 
   const IoHandlePtr io_handle_;
-  const std::shared_ptr<SocketAddressSetterImpl> address_provider_;
+  const std::shared_ptr<ConnectionInfoSetterImpl> address_provider_;
   OptionsSharedPtr options_;
   Socket::Type sock_type_;
   Address::Type addr_type_;
