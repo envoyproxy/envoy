@@ -549,6 +549,17 @@ TEST(HttpUtility, TestParseCookie) {
   EXPECT_EQ(value, "abc123");
 }
 
+TEST(HttpUtility, TestParseCookieDuplicates) {
+  TestRequestHeaderMapImpl headers{
+      {"someheader", "10.0.0.1"},
+      {"cookie", "a=; b=1; a=2"},
+      {"cookie", "a=3; b=2"},
+      {"cookie", "b=3"}};
+
+  EXPECT_EQ(Utility::parseCookieValue(headers, "a"), "");
+  EXPECT_EQ(Utility::parseCookieValue(headers, "b"), "1");
+}
+
 TEST(HttpUtility, TestParseSetCookie) {
   TestRequestHeaderMapImpl headers{
       {"someheader", "10.0.0.1"},
@@ -611,6 +622,19 @@ TEST(HttpUtility, TestParseCookies) {
   EXPECT_EQ(cookies.at("dquote"), "\"");
   EXPECT_EQ(cookies.at("quoteddquote"), "\"");
   EXPECT_EQ(cookies.at("leadingdquote"), "\"foobar");
+}
+
+TEST(HttpUtility, TestParseCookiesDuplicates) {
+  TestRequestHeaderMapImpl headers{
+      {"someheader", "10.0.0.1"},
+      {"cookie", "a=; b=1; a=2"},
+      {"cookie", "a=3; b=2"},
+      {"cookie", "b=3"}};
+
+  const auto& cookies = Utility::parseCookies(headers);
+
+  EXPECT_EQ(cookies.at("a"), "");
+  EXPECT_EQ(cookies.at("b"), "1");
 }
 
 TEST(HttpUtility, TestParseSetCookieWithQuotes) {

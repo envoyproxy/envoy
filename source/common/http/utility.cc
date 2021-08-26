@@ -294,7 +294,7 @@ std::string parseCookie(const HeaderMap& headers, const std::string& key,
 
   // Iterate over each cookie & return if its value is not empty.
   forEachCookie(headers, cookie, [&key, &value](absl::string_view k, absl::string_view v) -> bool {
-    if (key == k && !v.empty()) {
+    if (key == k) {
       value = std::string{v};
       return false;
     }
