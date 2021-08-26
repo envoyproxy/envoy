@@ -312,7 +312,7 @@ Utility::parseCookies(const RequestHeaderMap& headers) {
 
   forEachCookie(headers, Http::Headers::get().Cookie,
                 [&cookies](absl::string_view k, absl::string_view v) -> bool {
-                  cookies.emplace(std::string{k}, std::string{v});
+                  cookies.emplace(k, v);
 
                   // continue iterating until all cookies are processed.
                   return true;
