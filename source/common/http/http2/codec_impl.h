@@ -326,10 +326,9 @@ protected:
           headers_or_trailers_(ResponseHeaderMapImpl::create()) {}
 
     // Http::MultiplexedStreamImplBase
-    void setFlushTimeout(std::chrono::milliseconds /*timeout*/) override {
-      // Client streams do not need a flush timer because we currently assume that any failure
-      // to flush would be covered by a request/stream/etc. timeout.
-    }
+    // Client streams do not need a flush timer because we currently assume that any failure
+    // to flush would be covered by a request/stream/etc. timeout.
+    void setFlushTimeout(std::chrono::milliseconds /*timeout*/) override {}
     // StreamImpl
     void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) override;
     // Do not use deferred reset on upstream connections.
