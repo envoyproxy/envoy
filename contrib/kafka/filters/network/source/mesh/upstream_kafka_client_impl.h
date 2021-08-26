@@ -74,14 +74,13 @@ public:
   // RdKafka::DeliveryReportCb
   void dr_cb(RdKafka::Message& message) override;
 
-  std::list<ProduceFinishCbSharedPtr>& getUnfinishedRequestsForTest();
-
-private:
-
   // Processes the delivery confirmation.
   // Executed in Envoy worker thread.
   void processDelivery(const DeliveryMemento& memento);
 
+  std::list<ProduceFinishCbSharedPtr>& getUnfinishedRequestsForTest();
+
+private:
   Event::Dispatcher& dispatcher_;
 
   std::list<ProduceFinishCbSharedPtr> unfinished_produce_requests_;

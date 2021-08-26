@@ -27,7 +27,6 @@ class LibRdKafkaUtilsImpl : public LibRdKafkaUtils {
                                                     std::string& errstr) const override {
     return std::unique_ptr<RdKafka::Producer>(RdKafka::Producer::create(conf, errstr));
   }
-
 };
 
 RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
@@ -85,7 +84,8 @@ void RichKafkaProducer::send(const ProduceFinishCbSharedPtr origin, const std::s
                              const absl::string_view value) {
   {
     void* value_data = const_cast<char*>(value.data()); // Needed for Kafka API.
-    ENVOY_LOG(trace, "Sending [{}] to [{}/{}]", reinterpret_cast<long>(value_data), topic, partition);
+    ENVOY_LOG(trace, "Sending [{}] to [{}/{}]", reinterpret_cast<long>(value_data), topic,
+              partition);
     // No flags, we leave all the memory management to Envoy, as we will use address of value data
     // in message callback to tell apart the requests.
     const int flags = 0;
@@ -96,8 +96,10 @@ void RichKafkaProducer::send(const ProduceFinishCbSharedPtr origin, const std::s
       unfinished_produce_requests_.push_back(origin);
     } else {
       // We could not submit data to producer.
-      // Let's treat that as a normal failure (Envoy is a broker after all) and propagate downstream.
-      ENVOY_LOG(trace, "Produce failure: {}, while sending [{}] to [{}/{}]", ec, reinterpret_cast<long>(value_data), topic, partition);
+      // Let's treat that as a normal failure (Envoy is a broker after all) and propagate
+      // downstream.
+      ENVOY_LOG(trace, "Produce failure: {}, while sending [{}] to [{}/{}]", ec,
+                reinterpret_cast<long>(value_data), topic, partition);
       const DeliveryMemento memento = {value_data, ec, 0};
       origin->accept(memento);
     }
@@ -121,7 +123,8 @@ void RichKafkaProducer::dr_cb(RdKafka::Message& message) {
             message.err(), reinterpret_cast<long>(message.payload()), message.topic_name(),
             message.partition(), message.offset());
   const DeliveryMemento memento = {message.payload(), message.err(), message.offset()};
-  // Because this method gets executed in poller thread, we need to pass the data through dispatcher.
+  // Because this method gets executed in poller thread, we need to pass the data through
+  // dispatcher.
   const Event::PostCb callback = [this, memento]() -> void { processDelivery(memento); };
   dispatcher_.post(callback);
 }

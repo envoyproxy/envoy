@@ -11,7 +11,6 @@ namespace Mesh {
 
 class MockKafkaProducer : public RdKafka::Producer {
 public:
-
   // Producer API.
   MOCK_METHOD(RdKafka::ErrorCode, produce,
               (RdKafka::Topic*, int32_t, int, void*, size_t, const std::string*, void*), ());
@@ -37,7 +36,7 @@ public:
               ());
   MOCK_METHOD(RdKafka::Error*, commit_transaction, (int), ());
   MOCK_METHOD(RdKafka::Error*, abort_transaction, (int), ());
-  
+
   // Handle API (unused by us).
   MOCK_METHOD(const std::string, name, (), (const));
   MOCK_METHOD(const std::string, memberid, (), (const));

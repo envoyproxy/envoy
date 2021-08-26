@@ -58,7 +58,8 @@ public:
    *
    * @param origin origin of payload to be notified when delivery finishes.
    * @param topic Kafka topic.
-   * @param partition Kafka partition (as clients do partitioning, we just reuse what downstream gave us).
+   * @param partition Kafka partition (as clients do partitioning, we just reuse what downstream
+   * gave us).
    * @param key Kafka message key.
    * @param value Kafka message value.
    */
