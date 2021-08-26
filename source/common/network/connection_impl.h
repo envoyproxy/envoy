@@ -253,9 +253,6 @@ public:
   void connect() override;
 
 private:
-  void setup(const Address::InstanceConstSharedPtr& remote_address,
-             const Network::Address::InstanceConstSharedPtr& source_address,
-             const Network::ConnectionSocket::OptionsSharedPtr& options);
   StreamInfo::StreamInfoImpl stream_info_;
 };
 
