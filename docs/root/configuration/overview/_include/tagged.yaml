@@ -1,7 +1,7 @@
 !ignore dynamic_sockets:
 - &admin_address {address: 127.0.0.1, port_value: 9901}
 - &listener_address {address: 127.0.0.1, port_value: 10000}
-- &lb_address {address: 127.0.0.2, port_value: 1234}
+- &lb_address {address: 127.0.0.1, port_value: 1234}
 
 admin:
   address:
