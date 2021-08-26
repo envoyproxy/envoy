@@ -106,8 +106,8 @@ absl::optional<RangeDetails> createRangeDetails(const absl::string_view range_he
 // Simple utility to extract the range header from the request header map.
 absl::optional<absl::string_view> getRangeHeader(const Envoy::Http::RequestHeaderMap& headers);
 
-// Create RangeDetails indicating satisfiability and, if satisfiable, adjusted
-// byte ranges to fit the provided content_length.
+// Create RangeDetails indicating if the range request is satisfiable, and, if
+// so, create adjusted byte ranges to fit the provided content_length.
 RangeDetails createAdjustedRangeDetails(const std::vector<RawByteRange>& request_range_spec,
                                         uint64_t content_length);
 

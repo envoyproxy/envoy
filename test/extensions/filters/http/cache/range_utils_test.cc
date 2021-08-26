@@ -303,7 +303,7 @@ TEST(GetRangeDetailsTest, MultipleSatisfiableRanges) {
   // Because we do not support multi-part responses for now, we are limiting
   // parsing of a single range, so we return false to indicate to the
   // CacheFilter that the request should be handled as if this were not a range
-  // request (ie. return a 200).
+  // request.
 
   Envoy::Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
                                                         {":method", "GET"},
