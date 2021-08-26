@@ -54,11 +54,11 @@ def verify_and_print_latest_release(dep, repo, metadata_version, release_date):
         print(
             f'{Fore.YELLOW}*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>: '
             f'{latest_release.tag_name}@<{latest_release.created_at}>{Style.RESET_ALL}')
-        create_issues(dep , repo , metadata_version, release_date, latest_release)
+        create_issues(dep, repo, metadata_version, release_date, latest_release)
 
 
 # create issue for lagging deps
-def create_issues(dep ,repo , metadata_version , release_date, latest_release):
+def create_issues(dep, repo, metadata_version, release_date, latest_release):
     """Create issues in GitHub.
 
     Args:
