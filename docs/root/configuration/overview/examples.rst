@@ -50,7 +50,7 @@ A minimal fully static bootstrap config is provided below:
           - endpoint:
               address:
                 socket_address:
-                  address: 127.0.0.1
+                  address: 127.0.0.2
                   port_value: 1234
 
 Mostly static with dynamic EDS
