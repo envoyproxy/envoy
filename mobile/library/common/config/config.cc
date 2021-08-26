@@ -77,6 +77,9 @@ const std::string config_header = R"(
               name: preserve_case
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig
+      upstream_http_protocol_options:
+        auto_sni: true
+        auto_san_validation: true
 
 !ignore admin_interface_defs: &admin_interface
     address:
