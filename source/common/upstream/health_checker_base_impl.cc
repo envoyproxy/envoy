@@ -260,9 +260,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
   onDeferredDelete();
 
   // Run callbacks in case something is waiting for health checks to run which will now never run.
-  if (first_check_) {
-    parent_.runCallbacks(host_, HealthTransition::Unchanged);
-  }
+  parent_.runCallbacks(host_, HealthTransition::Unchanged);
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degraded) {

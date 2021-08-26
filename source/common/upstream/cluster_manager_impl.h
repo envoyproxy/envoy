@@ -229,7 +229,9 @@ struct ClusterManagerStats {
  * Implementation of ClusterManager that reads from a proto configuration, maintains a central
  * cluster list, as well as thread local caches of each cluster and associated connection pools.
  */
-class ClusterManagerImpl : public ClusterManager, Logger::Loggable<Logger::Id::upstream> {
+class ClusterManagerImpl : public ClusterManager,
+                           Logger::Loggable<Logger::Id::upstream>,
+                           std::enable_shared_from_this<ClusterManagerImpl> {
 public:
   ClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                      ClusterManagerFactory& factory, Stats::Store& stats,
