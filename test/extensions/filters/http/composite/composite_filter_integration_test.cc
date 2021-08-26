@@ -24,7 +24,7 @@ public:
       name: composite
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
-    matcher:
+    xds_matcher:
       matcher_tree:
         input:
           name: request-headers

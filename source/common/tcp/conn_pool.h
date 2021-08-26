@@ -145,7 +145,12 @@ public:
                                                 transport_socket_options, state) {}
   ~ConnPoolImpl() override { destructAllConnections(); }
 
-  void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
+  // Event::DeferredDeletable
+  void deleteIsPending() override { deleteIsPendingImpl(); }
+
+  void addIdleCallback(IdleCb cb) override { addIdleCallbackImpl(cb); }
+  bool isIdle() const override { return isIdleImpl(); }
+  void startDrain() override { startDrainImpl(); }
   void drainConnections() override {
     drainConnectionsImpl();
     // Legacy behavior for the TCP connection pool marks all connecting clients
@@ -171,10 +176,10 @@ public:
   }
   ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
     TcpAttachContext context(&callbacks);
-    return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
+    return newStreamImpl(context);
   }
   bool maybePreconnect(float preconnect_ratio) override {
-    return Envoy::ConnectionPool::ConnPoolImplBase::maybePreconnect(preconnect_ratio);
+    return maybePreconnectImpl(preconnect_ratio);
   }
 
   ConnectionPool::Cancellable*

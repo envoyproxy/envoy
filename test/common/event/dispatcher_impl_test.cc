@@ -1534,7 +1534,7 @@ TEST_F(DispatcherWithWatchdogTest, TouchBeforeTimer) {
 }
 
 TEST_F(DispatcherWithWatchdogTest, TouchBeforeFdEvent) {
-  os_fd_t fd = os_sys_calls_.socket(AF_INET6, SOCK_DGRAM, 0).rc_;
+  os_fd_t fd = os_sys_calls_.socket(AF_INET6, SOCK_DGRAM, 0).return_value_;
   ASSERT_TRUE(SOCKET_VALID(fd));
 
   ReadyWatcher watcher;

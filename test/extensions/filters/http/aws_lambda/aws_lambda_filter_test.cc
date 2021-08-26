@@ -100,7 +100,7 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigWrongClusterMetadata) {
 
   setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
   FilterSettings route_settings{arn_, InvocationMode::Synchronous, true /*passthrough*/};
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.aws_lambda"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.aws_lambda"))
       .WillByDefault(Return(&route_settings));
 
   ON_CALL(*decoder_callbacks_.cluster_info_, metadata()).WillByDefault(ReturnRef(metadata));
@@ -122,7 +122,7 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigWrongClusterMetadata) {
 TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectClusterMetadata) {
   setupFilter({arn_, InvocationMode::Synchronous, true /*passthrough*/});
   FilterSettings route_settings{arn_, InvocationMode::Synchronous, true /*passthrough*/};
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.aws_lambda"))
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.aws_lambda"))
       .WillByDefault(Return(&route_settings));
 
   Http::TestRequestHeaderMapImpl headers;

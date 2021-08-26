@@ -149,7 +149,7 @@ public:
   FieldMatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
 
-    ENVOY_LOG(debug, "Attempting to match {}", input);
+    ENVOY_LOG(trace, "Attempting to match {}", input);
     if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
       return {MatchState::UnableToMatch, absl::nullopt};
     }
@@ -157,11 +157,11 @@ public:
     const auto current_match = input_matcher_->match(input.data_);
     if (!current_match && input.data_availability_ ==
                               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
-      ENVOY_LOG(debug, "No match yet; delaying result as more data might be available.");
+      ENVOY_LOG(trace, "No match yet; delaying result as more data might be available.");
       return {MatchState::UnableToMatch, absl::nullopt};
     }
 
-    ENVOY_LOG(debug, "Match result: {}", current_match);
+    ENVOY_LOG(trace, "Match result: {}", current_match);
 
     return {MatchState::MatchComplete, current_match};
   }

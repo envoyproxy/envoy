@@ -280,30 +280,18 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
   connection_cb_->onBelowWriteBufferLowWatermark();
 }
 
-TEST_F(CodecClientTest, SSLConnectionInfo) {
-  initialize();
-  std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
-  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(session_id));
-  EXPECT_CALL(*connection_, ssl()).WillRepeatedly(Return(connection_info));
-  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
-  EXPECT_NE(nullptr, stream_info_.downstreamSslConnection());
-  EXPECT_EQ(session_id, stream_info_.downstreamSslConnection()->sessionId());
-}
-
 // Test the codec getting input from a real TCP connection.
 class CodecNetworkTest : public Event::TestUsingSimulatedTime,
                          public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   CodecNetworkTest() : api_(Api::createApiForTest()), stream_info_(api_->timeSource(), nullptr) {
     dispatcher_ = api_->allocateDispatcher("test_thread");
-    auto socket = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+    auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()));
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket->addressProvider().localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), nullptr);
-    upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_, true,
-                                                     ENVOY_TCP_BACKLOG_SIZE);
+    upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_, true);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 

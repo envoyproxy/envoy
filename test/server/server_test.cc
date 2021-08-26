@@ -18,6 +18,7 @@
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/stats/stat_test_utility.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
@@ -334,6 +335,98 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// The finalize() of Http::CustomInlineHeaderRegistry will be called When InstanceImpl is
+// instantiated. For this reason, the test case for inline headers must precede all other test
+// cases.
+
+// Test the case where inline headers contain names that cannot be registered as inline headers.
+TEST_P(ServerInstanceImplTest, WithErrorCustomInlineHeaders) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/bootstrap_inline_headers_error.yaml"),
+      EnvoyException, "Header set-cookie cannot be registered as an inline header.");
+}
+
+TEST_P(ServerInstanceImplTest, WithDeathCustomInlineHeaders) {
+#if !defined(NDEBUG)
+  // The finalize() of Http::CustomInlineHeaderRegistry will be called after the first successful
+  // instantiation of InstanceImpl. If InstanceImpl is instantiated again and the inline header is
+  // registered again, the assertion will be triggered.
+  EXPECT_DEATH(
+      {
+        initialize("test/server/test_data/server/bootstrap_inline_headers.yaml");
+        initialize("test/server/test_data/server/bootstrap_inline_headers.yaml");
+      },
+      "");
+#endif // !defined(NDEBUG)
+}
+
+// Test whether the custom inline headers can be registered correctly.
+TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
+  static bool is_registered = false;
+
+  if (!is_registered) {
+    // Avoid repeated registration of custom inline headers in the current process after the
+    // finalize() of Http::CustomInlineHeaderRegistry has already been called.
+    EXPECT_NO_THROW(initialize("test/server/test_data/server/bootstrap_inline_headers.yaml"));
+    is_registered = true;
+  }
+
+  EXPECT_TRUE(
+      Http::CustomInlineHeaderRegistry::getInlineHeader<Http::RequestHeaderMap::header_map_type>(
+          Http::LowerCaseString("test1"))
+          .has_value());
+  EXPECT_TRUE(
+      Http::CustomInlineHeaderRegistry::getInlineHeader<Http::RequestTrailerMap::header_map_type>(
+          Http::LowerCaseString("test2"))
+          .has_value());
+  EXPECT_TRUE(
+      Http::CustomInlineHeaderRegistry::getInlineHeader<Http::ResponseHeaderMap::header_map_type>(
+          Http::LowerCaseString("test3"))
+          .has_value());
+  EXPECT_TRUE(
+      Http::CustomInlineHeaderRegistry::getInlineHeader<Http::ResponseTrailerMap::header_map_type>(
+          Http::LowerCaseString("test4"))
+          .has_value());
+
+  {
+    Http::TestRequestHeaderMapImpl headers{
+        {"test1", "test1_value1"},
+        {"test1", "test1_value2"},
+        {"test3", "test3_value1"},
+        {"test3", "test3_value2"},
+    };
+
+    // 'test1' is registered as the inline request header.
+    auto test1_headers = headers.get(Http::LowerCaseString("test1"));
+    EXPECT_EQ(1, test1_headers.size());
+    EXPECT_EQ("test1_value1,test1_value2", headers.get_("test1"));
+
+    // 'test3' is not registered as an inline request header.
+    auto test3_headers = headers.get(Http::LowerCaseString("test3"));
+    EXPECT_EQ(2, test3_headers.size());
+    EXPECT_EQ("test3_value1", headers.get_("test3"));
+  }
+
+  {
+    Http::TestResponseHeaderMapImpl headers{
+        {"test1", "test1_value1"},
+        {"test1", "test1_value2"},
+        {"test3", "test3_value1"},
+        {"test3", "test3_value2"},
+    };
+
+    // 'test1' is not registered as the inline response header.
+    auto test1_headers = headers.get(Http::LowerCaseString("test1"));
+    EXPECT_EQ(2, test1_headers.size());
+    EXPECT_EQ("test1_value1", headers.get_("test1"));
+
+    // 'test3' is registered as an inline response header.
+    auto test3_headers = headers.get(Http::LowerCaseString("test3"));
+    EXPECT_EQ(1, test3_headers.size());
+    EXPECT_EQ("test3_value1,test3_value2", headers.get_("test3"));
+  }
+}
+
 // Validates that server stats are flushed even when server is stuck with initialization.
 TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   CustomStatsSinkFactory factory;
@@ -347,6 +440,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.state")->value());
   EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
 
+  EXPECT_TRUE(server_->enableReusePortDefault());
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
 }
@@ -585,17 +679,6 @@ TEST_P(ServerInstanceImplTest, ShutdownBeforeWorkersStarted) {
   server_thread->join();
 }
 
-TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
-  options_.service_cluster_name_ = "some_cluster_name";
-  options_.service_node_name_ = "some_node_name";
-  try {
-    initialize("test/server/test_data/server/unparseable_bootstrap.yaml");
-    FAIL();
-  } catch (const EnvoyException& e) {
-    EXPECT_THAT(e.what(), HasSubstr("Unable to parse JSON as proto"));
-  }
-}
-
 TEST_P(ServerInstanceImplTest, Stats) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
@@ -695,7 +778,6 @@ TEST_P(ServerStatsTest, FlushStats) {
 TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
-  options_.bootstrap_version_ = 3;
   auto server_thread =
       startTestServer("test/server/test_data/server/stats_sink_manual_flush_bootstrap.yaml", true);
   EXPECT_TRUE(server_->statsConfig().flushOnAdmin());
@@ -722,7 +804,6 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
 TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
-  options_.bootstrap_version_ = 3;
 
   bool workers_started = false;
   absl::Notification workers_started_fired;
@@ -832,21 +913,6 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStaticRejectDynamic) {
 }
 
 // Validate server localInfo() from bootstrap Node.
-// Deprecated testing of the envoy.api.v2.core.Node.build_version field
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(BootstrapNodeDeprecated)) {
-  initialize("test/server/test_data/server/node_bootstrap.yaml");
-  EXPECT_EQ("bootstrap_zone", server_->localInfo().zoneName());
-  EXPECT_EQ("bootstrap_cluster", server_->localInfo().clusterName());
-  EXPECT_EQ("bootstrap_id", server_->localInfo().nodeName());
-  EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
-  EXPECT_EQ(VersionInfo::version(),
-            server_->localInfo().node().hidden_envoy_deprecated_build_version());
-  EXPECT_EQ("envoy", server_->localInfo().node().user_agent_name());
-  EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
-  expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
-}
-
-// Validate server localInfo() from bootstrap Node.
 TEST_P(ServerInstanceImplTest, BootstrapNode) {
   initialize("test/server/test_data/server/node_bootstrap.yaml");
   EXPECT_EQ("bootstrap_zone", server_->localInfo().zoneName());
@@ -883,126 +949,6 @@ TEST_P(ServerInstanceImplTest, UserAgentOverrideFromNode) {
   EXPECT_EQ(7, server_->localInfo().node().user_agent_build_version().version().patch());
 }
 
-// Validate deprecated user agent version field from bootstrap Node.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(UserAgentBuildDeprecatedOverrideFromNode)) {
-  initialize("test/server/test_data/server/node_bootstrap_agent_deprecated_override.yaml");
-  EXPECT_EQ("test-ci-user-agent", server_->localInfo().node().user_agent_name());
-  EXPECT_EQ("test", server_->localInfo().node().hidden_envoy_deprecated_build_version());
-}
-
-// Validate that bootstrap with v2 dynamic transport is rejected when --bootstrap-version is not
-// set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(FailToLoadV2TransportWithoutExplicitVersion)) {
-  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/dynamic_v2.yaml"),
-                          DeprecatedMajorVersionException,
-                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
-}
-
-// Validate that bootstrap with v2 ADS transport is rejected when --bootstrap-version is not
-// set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(FailToLoadV2AdsTransportWithoutExplicitVersion)) {
-  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/ads_v2.yaml"),
-                          DeprecatedMajorVersionException,
-                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
-}
-
-// Validate that bootstrap with v2 HDS transport is rejected when --bootstrap-version is not
-// set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(FailToLoadV2HdsTransportWithoutExplicitVersion)) {
-  // HDS cluster initialization happens through callbacks after runtime initialization. Exceptions
-  // are caught and will result in server shutdown.
-  EXPECT_LOG_CONTAINS("warn",
-                      "Skipping initialization of HDS cluster: V2 (and AUTO) xDS transport "
-                      "protocol versions are deprecated",
-                      initialize("test/server/test_data/server/hds_v2.yaml"));
-}
-
-// Validate that bootstrap v2 is rejected when --bootstrap-version is not set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(FailToLoadV2BootstrapWithoutExplicitVersion)) {
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
-      DeprecatedMajorVersionException,
-      "Support for v2 will be removed from Envoy at the start of Q1 2021.");
-}
-
-// Validate that bootstrap v2 pb_text with deprecated fields loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2BootstrapWithExplicitVersionFromPbText)) {
-  options_.bootstrap_version_ = 2;
-  initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text");
-  EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
-}
-
-// Validate that bootstrap v2 pb_text with deprecated fields fails to load when
-// --bootstrap-version is not set.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailToLoadV2BootstrapFromPbText)) {
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
-      EnvoyException, "The v2 xDS major version is deprecated and disabled by default.");
-}
-
-// Validate that bootstrap v2 YAML with deprecated fields loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2BootstrapWithExplicitVersionFromYaml)) {
-  options_.bootstrap_version_ = 2;
-  EXPECT_LOG_CONTAINS(
-      "trace", "Configuration does not parse cleanly as v3",
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"));
-  EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
-}
-
-// Validate that bootstrap v2 YAML with deprecated fields fails to load when
-// --bootstrap-version is not set.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailsToLoadV2BootstrapFromYaml)) {
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"),
-      EnvoyException, "The v2 xDS major version is deprecated and disabled by default.");
-}
-
-// Validate that bootstrap v3 pb_text with new fields loads fails if V2 config is specified.
-TEST_P(ServerInstanceImplTest, DISABLED_FailToLoadV3ConfigWhenV2SelectedFromPbText) {
-  options_.bootstrap_version_ = 2;
-
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text"),
-      EnvoyException, "Unable to parse file");
-}
-
-// Validate that bootstrap v3 YAML with new fields loads fails if V2 config is specified.
-TEST_P(ServerInstanceImplTest, DISABLED_FailToLoadV3ConfigWhenV2SelectedFromYaml) {
-  options_.bootstrap_version_ = 2;
-
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.yaml"),
-      EnvoyException, "has unknown fields");
-}
-
-// Validate that we correctly parse a V2 pb_text file when configured to do so.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2ConfigWhenV2SelectedFromPbText)) {
-  options_.bootstrap_version_ = 2;
-
-  EXPECT_LOG_CONTAINS(
-      "trace", "Configuration does not parse cleanly as v3",
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"));
-  EXPECT_EQ(server_->localInfo().node().id(), "bootstrap_id");
-}
-
-// Validate that we correctly parse a V2 YAML file when configured to do so.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2ConfigWhenV2SelectedFromYaml)) {
-  options_.bootstrap_version_ = 2;
-
-  EXPECT_LOG_CONTAINS(
-      "trace", "Configuration does not parse cleanly as v3",
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"));
-  EXPECT_EQ(server_->localInfo().node().id(), "bootstrap_id");
-}
-
 // Validate that we correctly parse a V3 pb_text file without explicit version configuration.
 TEST_P(ServerInstanceImplTest, LoadsV3ConfigFromPbText) {
   EXPECT_LOG_NOT_CONTAINS(
@@ -1019,8 +965,6 @@ TEST_P(ServerInstanceImplTest, LoadsV3ConfigFromYaml) {
 
 // Validate that we correctly parse a V3 pb_text file when configured to do so.
 TEST_P(ServerInstanceImplTest, LoadsV3ConfigWhenV3SelectedFromPbText) {
-  options_.bootstrap_version_ = 3;
-
   EXPECT_LOG_NOT_CONTAINS(
       "trace", "Configuration does not parse cleanly as v3",
       initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text"));
@@ -1028,50 +972,9 @@ TEST_P(ServerInstanceImplTest, LoadsV3ConfigWhenV3SelectedFromPbText) {
 
 // Validate that we correctly parse a V3 YAML file when configured to do so.
 TEST_P(ServerInstanceImplTest, LoadsV3ConfigWhenV3SelectedFromYaml) {
-  options_.bootstrap_version_ = 3;
-
   EXPECT_LOG_NOT_CONTAINS(
       "trace", "Configuration does not parse cleanly as v3",
       initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.yaml"));
-}
-
-// Validate that bootstrap v2 pb_text with deprecated fields loads fails if V3 config is specified.
-TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromPbText) {
-  options_.bootstrap_version_ = 3;
-
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
-      EnvoyException, "Unable to parse file");
-}
-
-// Validate that bootstrap v2 YAML with deprecated fields loads fails if V3 config is specified.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailToLoadV2ConfigWhenV3SelectedFromYaml)) {
-  options_.bootstrap_version_ = 3;
-
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"),
-      EnvoyException, "has unknown fields");
-}
-
-// Validate that bootstrap with v2 dynamic transport loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2TransportWithoutExplicitVersion)) {
-  options_.bootstrap_version_ = 2;
-  initialize("test/server/test_data/server/dynamic_v2.yaml");
-}
-
-// Validate that bootstrap with v2 ADS transport loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2AdsTransportWithoutExplicitVersion)) {
-  options_.bootstrap_version_ = 2;
-  initialize("test/server/test_data/server/ads_v2.yaml");
-}
-
-// Validate that bootstrap with v2 HDS transport loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2HdsTransportWithoutExplicitVersion)) {
-  options_.bootstrap_version_ = 2;
-  initialize("test/server/test_data/server/hds_v2.yaml");
 }
 
 // Validate that bootstrap pb_text loads.
@@ -1079,24 +982,6 @@ TEST_P(ServerInstanceImplTest, LoadsBootstrapFromPbText) {
   EXPECT_LOG_NOT_CONTAINS("trace", "Configuration does not parse cleanly as v3",
                           initialize("test/server/test_data/server/node_bootstrap.pb_text"));
   EXPECT_EQ("bootstrap_id", server_->localInfo().node().id());
-}
-
-// Validate that we blow up on invalid version number.
-TEST_P(ServerInstanceImplTest, InvalidBootstrapVersion) {
-  options_.bootstrap_version_ = 1;
-
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
-      EnvoyException, "Unknown bootstrap version 1.");
-}
-
-// Validate that we always reject v2.
-TEST_P(ServerInstanceImplTest, InvalidV2Bootstrap) {
-  options_.bootstrap_version_ = 2;
-
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
-      EnvoyException, "v2 bootstrap is deprecated and no longer supported.");
 }
 
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {
@@ -1135,6 +1020,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
+  EXPECT_FALSE(server_->enableReusePortDefault());
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo").value().get());
   // This should access via the override/some_service overlay.
   EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz").value().get());
@@ -1170,13 +1056,6 @@ TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
   options_.service_node_name_ = "some_node_name";
   EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/runtime_bootstrap_ads_eds.yaml"),
                           EnvoyException, "Unknown gRPC client cluster");
-}
-
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(DISABLED_InvalidLegacyBootstrapRuntime)) {
-  options_.bootstrap_version_ = 2;
-  EXPECT_THROW_WITH_MESSAGE(
-      initialize("test/server/test_data/server/invalid_legacy_runtime_bootstrap.yaml"),
-      EnvoyException, "Invalid runtime entry value for foo");
 }
 
 // Validate invalid runtime in bootstrap is rejected.
@@ -1269,7 +1148,7 @@ void bindAndListenTcpSocket(const Network::Address::InstanceConstSharedPtr& addr
   auto socket = std::make_unique<Network::TcpListenSocket>(address, options, true);
   // Some kernels erroneously allow `bind` without SO_REUSEPORT for addresses
   // with some other socket already listening on it, see #7636.
-  if (SOCKET_FAILURE(socket->ioHandle().listen(1).rc_)) {
+  if (SOCKET_FAILURE(socket->ioHandle().listen(1).return_value_)) {
     // Mimic bind exception for the test simplicity.
     throw Network::SocketBindException(fmt::format("cannot listen: {}", errorDetails(errno)),
                                        errno);
@@ -1431,7 +1310,6 @@ TEST_P(ServerInstanceImplTest, NoHttpTracing) {
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(DISABLED_ZipkinHttpTracingEnabled)) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  options_.bootstrap_version_ = 2;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/zipkin_tracing_deprecated_config.yaml"));
   EXPECT_EQ("zipkin", server_->httpContext().defaultTracingConfig().http().name());
 }

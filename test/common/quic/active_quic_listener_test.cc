@@ -73,21 +73,14 @@ public:
   }
 };
 
-class ActiveQuicListenerTest : public QuicMultiVersionTest {
+class ActiveQuicListenerTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   ActiveQuicListenerTest()
-      : version_(GetParam().first), api_(Api::createApiForTest(simulated_time_system_)),
+      : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
-        connection_handler_(*dispatcher_, absl::nullopt), quic_version_([]() {
-          if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
-            return quic::CurrentSupportedVersionsWithQuicCrypto();
-          }
-          bool use_http3 = GetParam().second == QuicVersionType::Iquic;
-          SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
-          SetQuicReloadableFlag(quic_enable_version_rfcv1, use_http3);
-          return quic::CurrentSupportedVersions();
-        }()[0]),
+        connection_handler_(*dispatcher_, absl::nullopt),
+        quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
   template <typename A, typename B>
@@ -106,9 +99,11 @@ protected:
         std::make_shared<Network::UdpListenSocket>(local_address_, nullptr, /*bind*/ true);
     listen_socket_->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+    ASSERT_TRUE(Network::Socket::applyOptions(listen_socket_->options(), *listen_socket_,
+                                              envoy::config::core::v3::SocketOption::STATE_BOUND));
 
     ON_CALL(listener_config_, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
-    ON_CALL(socket_factory_, getListenSocket()).WillByDefault(Return(listen_socket_));
+    ON_CALL(socket_factory_, getListenSocket(_)).WillByDefault(Return(listen_socket_));
 
     // Use UdpGsoBatchWriter to perform non-batched writes for the purpose of this test, if it is
     // supported.
@@ -207,17 +202,15 @@ protected:
   void sendCHLO(quic::QuicConnectionId connection_id) {
     client_sockets_.push_back(std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram,
                                                                     local_address_, nullptr));
-    Buffer::OwnedImpl payload = generateChloPacketToSend(
-        quic_version_, quic_config_, ActiveQuicListenerPeer::cryptoConfig(*quic_listener_),
-        connection_id, clock_, envoyIpAddressToQuicSocketAddress(local_address_->ip()),
-        envoyIpAddressToQuicSocketAddress(local_address_->ip()), "test.example.org");
+    Buffer::OwnedImpl payload =
+        generateChloPacketToSend(quic_version_, quic_config_, connection_id);
     Buffer::RawSliceVector slice = payload.getRawSlices();
     ASSERT_EQ(1u, slice.size());
     // Send a full CHLO to finish 0-RTT handshake.
     auto send_rc =
         Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(), slice.data(), 1,
                                         nullptr, *listen_socket_->addressProvider().localAddress());
-    ASSERT_EQ(slice[0].len_, send_rc.rc_);
+    ASSERT_EQ(slice[0].len_, send_rc.return_value_);
 
 #if defined(__APPLE__)
     // This sleep makes the tests pass more reliably. Some debugging showed that without this,
@@ -240,7 +233,7 @@ protected:
             client_socket->ioHandle().read(*result_buffer, bytes_to_read - bytes_read);
 
         if (result.ok()) {
-          bytes_read += result.rc_;
+          bytes_read += result.return_value_;
         } else if (retry == 10 || result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
           break;
         }
@@ -330,26 +323,8 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerTests, ActiveQuicListenerTest,
-                         testing::ValuesIn(generateTestParam()), testParamsToString);
-
-TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
-  initialize();
-  auto option = std::make_unique<Network::MockSocketOption>();
-  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
-      .WillOnce(Return(false));
-  auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
-  options->emplace_back(std::move(option));
-  quic_listener_.reset();
-  EnvoyQuicCryptoServerStreamFactoryImpl crypto_stream_factory;
-  EnvoyQuicProofSourceFactoryImpl proof_source_factory;
-  EXPECT_THROW_WITH_REGEX((void)std::make_unique<ActiveQuicListener>(
-                              0, 1, *dispatcher_, connection_handler_, listen_socket_,
-                              listener_config_, quic_config_, options, false,
-                              ActiveQuicListenerFactoryPeer::runtimeEnabled(
-                                  static_cast<ActiveQuicListenerFactory*>(listener_factory_.get())),
-                              quic_stat_names_, 32u, crypto_stream_factory, proof_source_factory),
-                          Network::CreateListenerException, "Failed to apply socket options.");
-}
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   initialize();
@@ -372,22 +347,14 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   EXPECT_EQ(quic::kMinimumFlowControlSendWindow, const_cast<quic::QuicSession*>(session)
                                                      ->config()
                                                      ->GetInitialSessionFlowControlWindowToSend());
-  // IETF Quic supports low flow control limit. But Google Quic only supports flow control window no
-  // smaller than 16kB.
-  if (GetParam().second == QuicVersionType::Iquic) {
-    EXPECT_EQ(stream_window_size_, const_cast<quic::QuicSession*>(session)
-                                       ->config()
-                                       ->GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
-  } else {
-    EXPECT_EQ(quic::kMinimumFlowControlSendWindow, const_cast<quic::QuicSession*>(session)
-                                                       ->config()
-                                                       ->GetInitialStreamFlowControlWindowToSend());
-  }
+  EXPECT_EQ(stream_window_size_, const_cast<quic::QuicSession*>(session)
+                                     ->config()
+                                     ->GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
   readFromClientSockets();
 }
 
 TEST_P(ActiveQuicListenerTest, ConfigureReasonableInitialFlowControlWindow) {
-  // These initial flow control windows should be accepted by both Google QUIC and IETF QUIC.
+  // These initial flow control windows should be accepted by QUIC.
   connection_window_size_ = 64 * 1024;
   stream_window_size_ = 32 * 1024;
   initialize();
@@ -481,7 +448,8 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerEmptyFlagConfigTests,
                          ActiveQuicListenerEmptyFlagConfigTest,
-                         testing::ValuesIn(generateTestParam()), testParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Quic listener should be enabled by default, if not enabled explicitly in config.
 TEST_P(ActiveQuicListenerEmptyFlagConfigTest, ReceiveFullQuicCHLO) {

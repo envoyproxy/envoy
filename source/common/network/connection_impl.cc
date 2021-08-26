@@ -99,6 +99,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
   // TODO(soulxu): generate the connection id inside the addressProvider directly,
   // then we don't need a setter or any of the optional stuff.
   socket_->addressProvider().setConnectionID(id());
+  socket_->addressProvider().setSslConnection(transport_socket_->ssl());
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -288,13 +289,13 @@ void ConnectionImpl::noDelay(bool enable) {
   Api::SysCallIntResult result =
       socket_->setSocketOption(IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
 #if defined(__APPLE__)
-  if (SOCKET_FAILURE(result.rc_) && result.errno_ == SOCKET_ERROR_INVAL) {
+  if (SOCKET_FAILURE(result.return_value_) && result.errno_ == SOCKET_ERROR_INVAL) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
     // enabled despite this result.
     return;
   }
 #elif defined(WIN32)
-  if (SOCKET_FAILURE(result.rc_) &&
+  if (SOCKET_FAILURE(result.return_value_) &&
       (result.errno_ == SOCKET_ERROR_AGAIN || result.errno_ == SOCKET_ERROR_INVAL)) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
     // enabled despite this result.
@@ -302,8 +303,9 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 #endif
 
-  RELEASE_ASSERT(result.rc_ == 0, fmt::format("Failed to set TCP_NODELAY with error {}, {}",
-                                              result.errno_, errorDetails(result.errno_)));
+  RELEASE_ASSERT(result.return_value_ == 0,
+                 fmt::format("Failed to set TCP_NODELAY with error {}, {}", result.errno_,
+                             errorDetails(result.errno_)));
 }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
@@ -580,7 +582,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   }
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
-  // In this case ignore write event processing.
+  // In this case ignore read event processing.
   if (ioHandle().isOpen() && (events & Event::FileReadyType::Read)) {
     onReadReady();
   }
@@ -648,7 +650,7 @@ ConnectionImpl::unixSocketPeerCredentials() const {
 #else
   struct ucred ucred;
   socklen_t ucred_size = sizeof(ucred);
-  int rc = socket_->getSocketOption(SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size).rc_;
+  int rc = socket_->getSocketOption(SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size).return_value_;
   if (SOCKET_FAILURE(rc)) {
     return absl::nullopt;
   }
@@ -663,8 +665,8 @@ void ConnectionImpl::onWriteReady() {
   if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
-    RELEASE_ASSERT(socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).rc_ == 0,
-                   "");
+    RELEASE_ASSERT(
+        socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).return_value_ == 0, "");
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
@@ -676,7 +678,8 @@ void ConnectionImpl::onWriteReady() {
         return;
       }
     } else {
-      ENVOY_CONN_LOG(debug, "delayed connection error: {}", *this, error);
+      failure_reason_ = absl::StrCat("delayed connect error: ", error);
+      ENVOY_CONN_LOG(debug, "{}", *this, failure_reason_);
       closeSocket(ConnectionEvent::RemoteClose);
       return;
     }
@@ -759,6 +762,13 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 }
 
 absl::string_view ConnectionImpl::transportFailureReason() const {
+  // TODO(mattklein123): Is it possible for there to be a local failure reason and a transport
+  // failure reason? If so we may need to combine these somehow.
+  ENVOY_BUG(!(!failure_reason_.empty() && !transport_socket_->failureReason().empty()),
+            "both connection and transport failure reason are not empty");
+  if (!failure_reason_.empty()) {
+    return failure_reason_;
+  }
   return transport_socket_->failureReason();
 }
 
@@ -787,10 +797,13 @@ ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info,
                      connected) {}
 
-void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) {
+void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
+                                                            Stats::Counter& timeout_stat) {
   if (!transport_connect_pending_) {
     return;
   }
+
+  transport_socket_timeout_stat_ = &timeout_stat;
   if (transport_socket_connect_timer_ == nullptr) {
     transport_socket_connect_timer_ =
         dispatcher_.createScaledTimer(Event::ScaledTimerType::TransportSocketConnectTimeout,
@@ -813,6 +826,7 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
 void ServerConnectionImpl::onTransportSocketConnectTimeout() {
   stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
   closeConnectionImmediately();
+  transport_socket_timeout_stat_->inc();
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
@@ -846,10 +860,10 @@ ClientConnectionImpl::ClientConnectionImpl(
 
   if (*source != nullptr) {
     Api::SysCallIntResult result = socket_->bind(*source);
-    if (result.rc_ < 0) {
-      // TODO(lizan): consider add this error into transportFailureReason.
-      ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source->get()->asString(),
-                     errorDetails(result.errno_));
+    if (result.return_value_ < 0) {
+      failure_reason_ = absl::StrCat("failed to bind to ", source->get()->asString(), ": ",
+                                     errorDetails(result.errno_));
+      ENVOY_LOG_MISC(debug, failure_reason_);
       bind_error_ = true;
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect".
@@ -865,13 +879,13 @@ void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this,
                  socket_->addressProvider().remoteAddress()->asString());
   const Api::SysCallIntResult result = socket_->connect(socket_->addressProvider().remoteAddress());
-  if (result.rc_ == 0) {
+  if (result.return_value_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
     return;
   }
 
-  ASSERT(SOCKET_FAILURE(result.rc_));
+  ASSERT(SOCKET_FAILURE(result.return_value_));
 #ifdef WIN32
   // winsock2 connect returns EWOULDBLOCK if the socket is non-blocking and the connection
   // cannot be completed immediately. We do not check for `EINPROGRESS` as that error is for
@@ -885,7 +899,8 @@ void ClientConnectionImpl::connect() {
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
-    ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, result.errno_);
+    failure_reason_ = absl::StrCat("immediate connect error: ", result.errno_);
+    ENVOY_CONN_LOG(debug, "{}", *this, failure_reason_);
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.
     ioHandle().activateFileEvents(Event::FileReadyType::Write);

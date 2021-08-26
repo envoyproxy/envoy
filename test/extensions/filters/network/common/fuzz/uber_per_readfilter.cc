@@ -26,6 +26,7 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
         Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
     const std::vector<absl::string_view> supported_filter_names = {
         NetworkFilterNames::get().ClientSslAuth, NetworkFilterNames::get().ExtAuthorization,
+        NetworkFilterNames::get().EnvoyMobileHttpConnectionManager,
         // A dedicated http_connection_manager fuzzer can be found in
         // test/common/http/conn_manager_impl_fuzz_test.cc
         NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().LocalRateLimit,
@@ -71,20 +72,17 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
           return async_request_.get();
         })));
 
-    EXPECT_CALL(*async_client_factory_, create()).WillOnce(Invoke([&] {
-      return std::move(async_client_);
-    }));
+    ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
+            getOrCreateRawAsyncClient(_, _, _, _))
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                  Grpc::CacheOption) { return async_client_; }));
 
-    EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_,
-                factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          return std::move(async_client_factory_);
-        }));
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
         pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
         pipe_addr_);
-  } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
+  } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager ||
+             filter_name == NetworkFilterNames::get().EnvoyMobileHttpConnectionManager) {
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
         pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
@@ -104,15 +102,10 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
           return async_request_.get();
         })));
 
-    EXPECT_CALL(*async_client_factory_, create()).WillOnce(Invoke([&] {
-      return std::move(async_client_);
-    }));
-
-    EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_,
-                factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          return std::move(async_client_factory_);
-        }));
+    ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
+            getOrCreateRawAsyncClient(_, _, _, _))
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                  Grpc::CacheOption) { return async_client_; }));
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
         pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
@@ -160,6 +153,20 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
       throw EnvoyException(absl::StrCat(
           "http_conn_manager trying to use Quiche which we won't fuzz here. Config:\n{}",
           config.DebugString()));
+    }
+  } else if (filter_name == NetworkFilterNames::get().EnvoyMobileHttpConnectionManager) {
+    envoy::extensions::filters::network::http_connection_manager::v3::
+        EnvoyMobileHttpConnectionManager& config =
+            dynamic_cast<envoy::extensions::filters::network::http_connection_manager::v3::
+                             EnvoyMobileHttpConnectionManager&>(*config_message);
+    if (config.config().codec_type() ==
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+            HTTP3) {
+      // Quiche is still in progress and http_conn_manager has a dedicated fuzzer.
+      // So we won't fuzz it here with complex mocks.
+      throw EnvoyException(absl::StrCat("envoy_mobile_http_conn_manager trying to use Quiche which "
+                                        "we won't fuzz here. Config:\n{}",
+                                        config.DebugString()));
     }
   }
 }

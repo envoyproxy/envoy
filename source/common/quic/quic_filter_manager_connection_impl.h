@@ -41,8 +41,6 @@ public:
   QuicFilterManagerConnectionImpl(QuicNetworkConnection& connection,
                                   const quic::QuicConnectionId& connection_id,
                                   Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
-  ~QuicFilterManagerConnectionImpl() override = default;
-
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
@@ -70,10 +68,10 @@ public:
   void readDisable(bool /*disable*/) override { ASSERT(false); }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
   bool readEnabled() const override { return true; }
-  const Network::SocketAddressSetter& addressProvider() const override {
+  const Network::ConnectionInfoSetter& addressProvider() const override {
     return network_connection_->connectionSocket()->addressProvider();
   }
-  Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+  Network::ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
     return network_connection_->connectionSocket()->addressProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>

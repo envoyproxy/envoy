@@ -22,7 +22,7 @@ uint32_t OptionsImplPlatformLinux::getCpuAffinityCount(unsigned int hw_threads) 
   CPU_ZERO(&mask);
   const Api::SysCallIntResult result =
       linux_os_syscalls.sched_getaffinity(pid, sizeof(cpu_set_t), &mask);
-  if (result.rc_ == -1) {
+  if (result.return_value_ == -1) {
     // Fall back to number of hardware threads.
     return hw_threads;
   }

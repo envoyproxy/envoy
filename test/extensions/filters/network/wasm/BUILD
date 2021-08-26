@@ -46,6 +46,7 @@ envoy_extension_cc_test(
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/network/wasm/test_data:test_cpp.wasm",
     ]) + envoy_select_wasm_rust_tests([
+        "//test/extensions/filters/network/wasm/test_data:close_stream_rust.wasm",
         "//test/extensions/filters/network/wasm/test_data:logging_rust.wasm",
         "//test/extensions/filters/network/wasm/test_data:panic_rust.wasm",
         "//test/extensions/filters/network/wasm/test_data:resume_call_rust.wasm",

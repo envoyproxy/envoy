@@ -28,6 +28,11 @@ public:
     uint64_t parent_connections_ = 0;
   };
 
+  struct AdminShutdownResponse {
+    time_t original_start_time_;
+    bool enable_reuse_port_default_;
+  };
+
   virtual ~HotRestart() = default;
 
   /**
@@ -40,9 +45,11 @@ public:
    * Retrieve a listening socket on the specified address from the parent process. The socket will
    * be duplicated across process boundaries.
    * @param address supplies the address of the socket to duplicate, e.g. tcp://127.0.0.1:5000.
+   * @param worker_index supplies the socket/worker index to fetch. When using reuse_port sockets
+   *        each socket is fetched individually to ensure no connection loss.
    * @return int the fd or -1 if there is no bound listen port in the parent.
    */
-  virtual int duplicateParentListenSocket(const std::string& address) PURE;
+  virtual int duplicateParentListenSocket(const std::string& address, uint32_t worker_index) PURE;
 
   /**
    * Initialize the parent logic of our restarter. Meant to be called after initialization of a
@@ -54,9 +61,9 @@ public:
   /**
    * Shutdown admin processing in the parent process if applicable. This allows admin processing
    * to start up in the new process.
-   * @param original_start_time will be filled with information from our parent, if retrieved.
+   * @return response if the parent is alive.
    */
-  virtual void sendParentAdminShutdownRequest(time_t& original_start_time) PURE;
+  virtual absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() PURE;
 
   /**
    * Tell our parent process to gracefully terminate itself.

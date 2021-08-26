@@ -8,6 +8,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/scope_tracker.h"
+#include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
@@ -61,7 +62,8 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
     : name_(name), api_(api),
       buffer_factory_(watermark_factory != nullptr
                           ? watermark_factory
-                          : std::make_shared<Buffer::WatermarkBufferFactory>()),
+                          : std::make_shared<Buffer::WatermarkBufferFactory>(
+                                api.bootstrap().overload_manager().buffer_factory_config())),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       thread_local_delete_cb_(
           base_scheduler_.createSchedulableCallback([this]() -> void { runThreadLocalDelete(); })),
@@ -198,10 +200,10 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
 
 Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
                                                     Network::TcpListenerCallbacks& cb,
-                                                    bool bind_to_port, uint32_t backlog_size) {
+                                                    bool bind_to_port) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::TcpListenerImpl>(
-      *this, api_.randomGenerator(), std::move(socket), cb, bind_to_port, backlog_size);
+  return std::make_unique<Network::TcpListenerImpl>(*this, api_.randomGenerator(),
+                                                    std::move(socket), cb, bind_to_port);
 }
 
 Network::UdpListenerPtr
@@ -247,10 +249,13 @@ TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   ASSERT(isThreadSafe());
-  current_to_delete_->emplace_back(std::move(to_delete));
-  ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
-  if (current_to_delete_->size() == 1) {
-    deferred_delete_cb_->scheduleCallbackCurrentIteration();
+  if (to_delete != nullptr) {
+    to_delete->deleteIsPending();
+    current_to_delete_->emplace_back(std::move(to_delete));
+    ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
+    if (current_to_delete_->size() == 1) {
+      deferred_delete_cb_->scheduleCallbackCurrentIteration();
+    }
   }
 }
 

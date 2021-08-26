@@ -35,7 +35,7 @@
 #include <arpa/nameser.h>
 #include <arpa/nameser_compat.h>
 #else
-#include "nameser.h"
+#include "ares_nameser.h"
 #endif
 
 using testing::_;
@@ -437,15 +437,17 @@ public:
   void SetUp() override {
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
     server_ = std::make_unique<TestDnsServer>(*dispatcher_);
-    socket_ = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ = dispatcher_->createListener(socket_, *server_, true, ENVOY_TCP_BACKLOG_SIZE);
+    socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()));
+    listener_ = dispatcher_->createListener(socket_, *server_, true);
     updateDnsResolverOptions();
+    // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
+    envoy::config::core::v3::DnsResolverOptions dns_resolver_options = dns_resolver_options_;
     if (setResolverInConstructor()) {
       resolver_ = dispatcher_->createDnsResolver({socket_->addressProvider().localAddress()},
-                                                 dns_resolver_options_);
+                                                 dns_resolver_options);
     } else {
-      resolver_ = dispatcher_->createDnsResolver({}, dns_resolver_options_);
+      resolver_ = dispatcher_->createDnsResolver({}, dns_resolver_options);
     }
 
     // Point c-ares at the listener with no search domains and TCP-only.

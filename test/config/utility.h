@@ -144,39 +144,32 @@ public:
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
   static std::string discoveredClustersBootstrap(const std::string& api_type);
-  static std::string adsBootstrap(const std::string& api_type,
-                                  envoy::config::core::v3::ApiVersion resource_api_version,
-                                  envoy::config::core::v3::ApiVersion transport_api_version =
-                                      envoy::config::core::v3::ApiVersion::AUTO);
+  static std::string adsBootstrap(const std::string& api_type);
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
   static envoy::config::cluster::v3::Cluster buildStaticCluster(const std::string& name, int port,
                                                                 const std::string& address);
 
   // ADS configurations
-  static envoy::config::cluster::v3::Cluster buildCluster(
-      const std::string& name, const std::string& lb_policy = "ROUND_ROBIN",
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::cluster::v3::Cluster
+  buildCluster(const std::string& name, const std::string& lb_policy = "ROUND_ROBIN");
 
-  static envoy::config::cluster::v3::Cluster buildTlsCluster(
-      const std::string& name, const std::string& lb_policy = "ROUND_ROBIN",
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::cluster::v3::Cluster
+  buildTlsCluster(const std::string& name, const std::string& lb_policy = "ROUND_ROBIN");
 
-  static envoy::config::endpoint::v3::ClusterLoadAssignment buildClusterLoadAssignment(
-      const std::string& name, const std::string& ip_version, uint32_t port,
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignment(const std::string& name, const std::string& ip_version, uint32_t port);
 
-  static envoy::config::listener::v3::Listener buildBaseListener(
-      const std::string& name, const std::string& address, const std::string& filter_chains = "",
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::listener::v3::Listener
+  buildBaseListener(const std::string& name, const std::string& address,
+                    const std::string& filter_chains = "");
 
-  static envoy::config::listener::v3::Listener buildListener(
-      const std::string& name, const std::string& route_config, const std::string& address,
-      const std::string& stat_prefix,
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::listener::v3::Listener buildListener(const std::string& name,
+                                                             const std::string& route_config,
+                                                             const std::string& address,
+                                                             const std::string& stat_prefix);
 
-  static envoy::config::route::v3::RouteConfiguration buildRouteConfig(
-      const std::string& name, const std::string& cluster,
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& name,
+                                                                       const std::string& cluster);
 
   // Builds a standard Endpoint suitable for population by finalize().
   static envoy::config::endpoint::v3::Endpoint buildEndpoint(const std::string& address);
@@ -211,6 +204,9 @@ public:
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
+  // Set the max_requests_per_connection for downstream through the HttpConnectionManager.
+  void setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection);
+
   envoy::config::route::v3::VirtualHost createVirtualHost(const char* host, const char* route = "/",
                                                           const char* cluster = "cluster_0");
 
@@ -243,7 +239,7 @@ public:
   void addSslConfig() { addSslConfig({}); }
 
   // Add the default SSL configuration for QUIC downstream.
-  void addQuicDownstreamTransportSocketConfig(bool reuse_port);
+  void addQuicDownstreamTransportSocketConfig();
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.
@@ -335,14 +331,6 @@ public:
                               size_t http3_max_stream_receive_window);
 
 private:
-  static bool shouldBoost(envoy::config::core::v3::ApiVersion api_version) {
-    return api_version == envoy::config::core::v3::ApiVersion::V2;
-  }
-
-  static std::string apiVersionStr(envoy::config::core::v3::ApiVersion api_version) {
-    return api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3";
-  }
-
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(HttpConnectionManager& hcm);
   // Take the contents of the provided HCM proto and stuff them into the first HCM

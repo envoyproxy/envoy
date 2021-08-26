@@ -61,7 +61,8 @@ protected:
  */
 class ActiveRawUdpListener : public ActiveUdpListenerBase,
                              public Network::UdpListenerFilterManager,
-                             public Network::UdpReadFilterCallbacks {
+                             public Network::UdpReadFilterCallbacks,
+                             Logger::Loggable<Logger::Id::conn_handler> {
 public:
   ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                        Network::UdpConnectionHandler& parent, Event::Dispatcher& dispatcher,

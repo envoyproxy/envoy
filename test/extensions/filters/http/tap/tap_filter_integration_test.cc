@@ -239,11 +239,13 @@ tap_config:
         - http_request_headers_match:
             headers:
               - name: foo
-                exact_match: bar
+                string_match:
+                  exact: bar
         - http_response_headers_match:
             headers:
               - name: bar
-                exact_match: baz
+                string_match:
+                  exact: baz
   output_config:
     sinks:
       - streaming_admin: {}
@@ -305,11 +307,13 @@ tap_config:
         - http_request_headers_match:
             headers:
               - name: foo
-                exact_match: bar
+                string_match:
+                  exact: bar
         - http_response_headers_match:
             headers:
               - name: bar
-                exact_match: baz
+                string_match:
+                  exact: baz
   output_config:
     sinks:
       - streaming_admin: {}
@@ -349,11 +353,13 @@ tap_config:
         - http_request_trailers_match:
             headers:
               - name: foo_trailer
-                exact_match: bar
+                string_match:
+                  exact: bar
         - http_response_trailers_match:
             headers:
               - name: bar_trailer
-                exact_match: baz
+                string_match:
+                  exact: baz
   output_config:
     sinks:
       - streaming_admin: {}
@@ -398,11 +404,13 @@ tap_config:
         - http_request_trailers_match:
             headers:
               - name: foo_trailer
-                exact_match: bar
+                string_match:
+                  exact: bar
         - http_response_trailers_match:
             headers:
               - name: bar_trailer
-                exact_match: baz
+                string_match:
+                  exact: baz
   output_config:
     sinks:
       - streaming_admin: {}
@@ -535,7 +543,8 @@ typed_config:
         http_request_headers_match:
           headers:
             - name: foo
-              exact_match: bar
+              string_match:
+                exact: bar
       output_config:
         streaming: true
         sinks:
@@ -581,7 +590,8 @@ typed_config:
         http_response_headers_match:
           headers:
             - name: bar
-              exact_match: baz
+              string_match:
+                exact: baz
       output_config:
         streaming: true
         sinks:

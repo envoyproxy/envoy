@@ -46,17 +46,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "cache_entry_utils_lib",
-    srcs = ["cache_entry_utils.cc"],
-    hdrs = ["cache_entry_utils.h"],
-    deps = [
-        ":cache_headers_utils_lib",
-        "//envoy/common:time_interface",
-        "//source/common/common:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "cache_policy_lib",
     hdrs = ["cache_policy.h"],
     deps = [
@@ -126,6 +115,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
+        "@com_google_absl//absl/container:btree",
         "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
     ],
 )

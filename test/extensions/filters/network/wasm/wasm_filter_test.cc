@@ -427,10 +427,6 @@ TEST_P(WasmNetworkFilterTest, PanicOnUpstreamData) {
 }
 
 TEST_P(WasmNetworkFilterTest, CloseDownstream) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(mathetake): not yet supported in the Rust SDK.
-    return;
-  }
   setupConfig("", "close_stream");
   setupFilter();
   EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
@@ -445,10 +441,6 @@ TEST_P(WasmNetworkFilterTest, CloseDownstream) {
 }
 
 TEST_P(WasmNetworkFilterTest, CloseUpstream) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(mathetake): not yet supported in the Rust SDK.
-    return;
-  }
   setupConfig("", "close_stream");
   setupFilter();
   EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);

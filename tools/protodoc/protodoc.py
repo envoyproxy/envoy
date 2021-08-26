@@ -24,6 +24,7 @@ sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
+from tools.base import utils
 from tools.config_validation import validate_fragment
 
 from tools.protodoc import manifest_pb2
@@ -55,7 +56,7 @@ EXTENSION_TEMPLATE = Template(
 .. _extension_{{extension}}:
 
 This extension may be referenced by the qualified name ``{{extension}}``
-
+{{contrib}}
 .. note::
   {{status}}
 
@@ -76,11 +77,21 @@ EXTENSION_CATEGORY_TEMPLATE = Template(
 .. _extension_category_{{category}}:
 
 .. tip::
+{% if extensions %}
   This extension category has the following known extensions:
 
 {% for ext in extensions %}
   - :ref:`{{ext}} <extension_{{ext}}>`
 {% endfor %}
+
+{% endif %}
+{% if contrib_extensions %}
+  The following extensions are available in :ref:`contrib <install_contrib>` images only:
+
+{% for ext in contrib_extensions %}
+  - :ref:`{{ext}} <extension_{{ext}}>`
+{% endfor %}
+{% endif %}
 
 """)
 
@@ -115,14 +126,21 @@ EXTENSION_STATUS_VALUES = {
 
 r = runfiles.Create()
 
-with open(r.Rlocation("envoy/source/extensions/extensions_metadata.yaml")) as f:
-    EXTENSION_DB = yaml.safe_load(f.read())
+EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/source/extensions/extensions_metadata.yaml"))
+CONTRIB_EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/contrib/extensions_metadata.yaml"))
+
 
 # create an index of extension categories from extension db
-EXTENSION_CATEGORIES = {}
-for _k, _v in EXTENSION_DB.items():
-    for _cat in _v['categories']:
-        EXTENSION_CATEGORIES.setdefault(_cat, []).append(_k)
+def build_categories(extensions_db):
+    ret = {}
+    for _k, _v in extensions_db.items():
+        for _cat in _v['categories']:
+            ret.setdefault(_cat, []).append(_k)
+    return ret
+
+
+EXTENSION_CATEGORIES = build_categories(EXTENSION_DB)
+CONTRIB_EXTENSION_CATEGORIES = build_categories(CONTRIB_EXTENSION_DB)
 
 V2_LINK_TEMPLATE = Template(
     """
@@ -241,18 +259,29 @@ def format_extension(extension):
         RST formatted extension description.
     """
     try:
-        extension_metadata = EXTENSION_DB[extension]
+        extension_metadata = EXTENSION_DB.get(extension, None)
+        contrib = ''
+        if extension_metadata is None:
+            extension_metadata = CONTRIB_EXTENSION_DB[extension]
+            contrib = """
+
+.. note::
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+"""
         status = EXTENSION_STATUS_VALUES.get(extension_metadata.get('status'), '')
         security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
         categories = extension_metadata["categories"]
     except KeyError as e:
         sys.stderr.write(
-            f"\n\nDid you forget to add '{extension}' to source/extensions/extensions_build_config.bzl?\n\n"
-        )
+            f"\n\nDid you forget to add '{extension}' to extensions_build_config.bzl, "
+            "extensions_metadata.yaml, contrib_build_config.bzl, "
+            "or contrib/extensions_metadata.yaml?\n\n")
         exit(1)  # Raising the error buries the above message in tracebacks.
 
     return EXTENSION_TEMPLATE.render(
         extension=extension,
+        contrib=contrib,
         status=status,
         security_posture=security_posture,
         categories=categories)
@@ -267,12 +296,14 @@ def format_extension_category(extension_category):
     Returns:
         RST formatted extension category description.
     """
-    try:
-        extensions = EXTENSION_CATEGORIES[extension_category]
-    except KeyError as e:
+    extensions = EXTENSION_CATEGORIES.get(extension_category, [])
+    contrib_extensions = CONTRIB_EXTENSION_CATEGORIES.get(extension_category, [])
+    if not extensions and not contrib_extensions:
         raise ProtodocError(f"\n\nUnable to find extension category:  {extension_category}\n\n")
     return EXTENSION_CATEGORY_TEMPLATE.render(
-        category=extension_category, extensions=sorted(extensions))
+        category=extension_category,
+        extensions=sorted(extensions),
+        contrib_extensions=sorted(contrib_extensions))
 
 
 def format_header_from_file(style, source_code_info, proto_name, v2_link):
@@ -666,12 +697,12 @@ class RstFormatVisitor(visitor.Visitor):
         with open(r.Rlocation('envoy/docs/v2_mapping.json'), 'r') as f:
             self.v2_mapping = json.load(f)
 
-        with open(r.Rlocation('envoy/docs/protodoc_manifest.yaml'), 'r') as f:
-            # Load as YAML, emit as JSON and then parse as proto to provide type
-            # checking.
-            protodoc_manifest_untyped = yaml.safe_load(f.read())
-            self.protodoc_manifest = manifest_pb2.Manifest()
-            json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
+        # Load as YAML, emit as JSON and then parse as proto to provide type
+        # checking.
+        protodoc_manifest_untyped = utils.from_yaml(
+            r.Rlocation('envoy/docs/protodoc_manifest.yaml'))
+        self.protodoc_manifest = manifest_pb2.Manifest()
+        json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
 
     def visit_enum(self, enum_proto, type_context):
         normal_enum_type = normalize_type_context_name(type_context.name)

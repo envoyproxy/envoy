@@ -1865,7 +1865,7 @@ message RateLimit {
 //   value.
 //
 //  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message HeaderMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.HeaderMatcher";
 
@@ -1880,12 +1880,16 @@ message HeaderMatcher {
   // Specifies how the header match will be performed to route the request.
   oneof header_match_specifier {
     // If specified, header match will be performed based on the value of the header.
-    string exact_match = 4;
+    // This field is deprecated. Please use :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>`.
+    string exact_match = 4
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the
     // request header value matches the regex.
-    type.matcher.v3.RegexMatcher safe_regex_match = 11;
+    // This field is deprecated. Please use :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>`.
+    type.matcher.v3.RegexMatcher safe_regex_match = 11
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // If specified, header match will be performed based on range.
     // The rule will match if the request header value is within this range.
@@ -1906,28 +1910,46 @@ message HeaderMatcher {
 
     // If specified, header match will be performed based on the prefix of the header value.
     // Note: empty prefix is not allowed, please use present_match instead.
+    // This field is deprecated. Please use :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>`.
     //
     // Examples:
     //
     // * The prefix *abcd* matches the value *abcdxyz*, but not for *abcxyz*.
-    string prefix_match = 9 [(validate.rules).string = {min_len: 1}];
+    string prefix_match = 9 [
+      deprecated = true,
+      (validate.rules).string = {min_len: 1},
+      (envoy.annotations.deprecated_at_minor_version) = "3.0"
+    ];
 
     // If specified, header match will be performed based on the suffix of the header value.
     // Note: empty suffix is not allowed, please use present_match instead.
+    // This field is deprecated. Please use :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>`.
     //
     // Examples:
     //
     // * The suffix *abcd* matches the value *xyzabcd*, but not for *xyzbcd*.
-    string suffix_match = 10 [(validate.rules).string = {min_len: 1}];
+    string suffix_match = 10 [
+      deprecated = true,
+      (validate.rules).string = {min_len: 1},
+      (envoy.annotations.deprecated_at_minor_version) = "3.0"
+    ];
 
     // If specified, header match will be performed based on whether the header value contains
     // the given value or not.
     // Note: empty contains match is not allowed, please use present_match instead.
+    // This field is deprecated. Please use :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>`.
     //
     // Examples:
     //
     // * The value *abcd* matches the value *xyzabcdpqr*, but not for *xyzbcdpqr*.
-    string contains_match = 12 [(validate.rules).string = {min_len: 1}];
+    string contains_match = 12 [
+      deprecated = true,
+      (validate.rules).string = {min_len: 1},
+      (envoy.annotations.deprecated_at_minor_version) = "3.0"
+    ];
+
+    // If specified, header match will be performed based on the string match of the header value.
+    type.matcher.v3.StringMatcher string_match = 13;
   }
 
   // If specified, the match result will be inverted before checking. Defaults to false.

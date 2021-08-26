@@ -22,8 +22,8 @@ namespace Server {
 class ApiListenerTest : public testing::Test {
 protected:
   ApiListenerTest()
-      : listener_manager_(std::make_unique<ListenerManagerImpl>(server_, listener_factory_,
-                                                                worker_factory_, false)) {}
+      : listener_manager_(std::make_unique<ListenerManagerImpl>(
+            server_, listener_factory_, worker_factory_, false, server_.quic_stat_names_)) {}
 
   NiceMock<MockInstance> server_;
   NiceMock<MockListenerComponentFactory> listener_factory_;
@@ -53,6 +53,41 @@ api_listener:
                 prefix: "/"
               route:
                 cluster: dynamic_forward_proxy_cluster
+  )EOF";
+
+  const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
+  auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
+
+  ASSERT_EQ("test_api_listener", http_api_listener.name());
+  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener.type());
+  ASSERT_TRUE(http_api_listener.http().has_value());
+}
+
+TEST_F(ApiListenerTest, MobileApiListener) {
+  const std::string yaml = R"EOF(
+name: test_api_listener
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+api_listener:
+  api_listener:
+    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager
+    config:
+      stat_prefix: hcm
+      route_config:
+        name: api_router
+        virtual_hosts:
+          - name: api
+            domains:
+              - "*"
+            routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: dynamic_forward_proxy_cluster
   )EOF";
 
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
