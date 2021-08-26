@@ -84,9 +84,8 @@ public:
   virtual bool used() const PURE;
 
   /**
-   * Indicates whether this metric is a custom metric or not. A custom metric is the one
-   * created by non Envoy core. For example, all the metrics defined by Wasm extensions
-   * are custom metrics.
+   * Indicates whether this metric is a custom metric or not. Custom metrics are created by
+   * extensions outside the Envoy codebase, such as Wasm.
    */
   virtual bool isCustomMetric() const PURE;
 
