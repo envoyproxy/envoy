@@ -62,15 +62,9 @@ bool ShadowRouterImpl::createUpstreamRequest() {
   return true;
 }
 
-bool ShadowRouterImpl::requestStarted() {
-  const bool started =
-      upstream_request_->conn_data_ != nullptr && upstream_request_->upgrade_response_ == nullptr;
-
-  if (started) {
-    flushPendingCallbacks();
-  }
-
-  return started;
+bool ShadowRouterImpl::requestStarted() const {
+  return upstream_request_->conn_data_ != nullptr &&
+         upstream_request_->upgrade_response_ == nullptr;
 }
 
 void ShadowRouterImpl::flushPendingCallbacks() {

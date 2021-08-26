@@ -200,7 +200,7 @@ private:
 
   void writeRequest();
   bool requestInProgress();
-  bool requestStarted();
+  bool requestStarted() const;
   void flushPendingCallbacks();
 
   ShadowWriterImpl& parent_;
