@@ -150,6 +150,11 @@ protected:
 
     return std::min<uint32_t>(health + degraded, 100);
   }
+
+  virtual void setCrossPriorityHostMap(HostMapConstSharedPtr host_map) {
+    cross_priority_host_map_ = std::move(host_map);
+  }
+
   // The percentage load (0-100) for each priority level when targeting healthy hosts and
   // the percentage load (0-100) for each priority level when targeting degraded hosts.
   HealthyAndDegradedLoad per_priority_load_;

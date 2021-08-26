@@ -87,8 +87,8 @@ public:
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
   void initialize() override;
 
-  // ThreadAwareLoadBalancerBase LoadBalancerBase, but in fact the `chooseHost` method should never
-  // be called.
+  // ThreadAwareLoadBalancerBase inherits LoadBalancerBase, but in fact the `chooseHost` method
+  // should never be called.
   HostConstSharedPtr chooseHost(LoadBalancerContext*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   // Upstream::LoadBalancerBase
@@ -105,6 +105,10 @@ protected:
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
         factory_(new LoadBalancerFactoryImpl(stats, random, *this)) {}
+
+  void setCrossPriorityHostMap(HostMapConstSharedPtr host_map) override {
+    threadSafeSetCrossPriorityHostMap(std::move(host_map));
+  }
 
 private:
   struct PerPriorityState {
@@ -157,8 +161,28 @@ private:
                      double min_normalized_weight, double max_normalized_weight) PURE;
   void refresh();
 
+  void threadSafeSetCrossPriorityHostMap(HostMapConstSharedPtr host_map) {
+    absl::MutexLock ml(&cross_priority_host_map_mutex_);
+    cross_priority_host_map_ = std::move(host_map);
+  }
+  HostMapConstSharedPtr threadSafeGetCrossPriorityHostMap() {
+    absl::MutexLock ml(&cross_priority_host_map_mutex_);
+    return cross_priority_host_map_;
+  }
+
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
   Common::CallbackHandlePtr priority_update_cb_;
+
+  // Whenever the membership changes, the following events will occur:
+  // 1. Since ThreadAwareLoadBalancerBase inherits LoadBalancerBase, the cross_priority_host_map_
+  //    will be updated automatically.
+  // 2. Since ThreadAwareLoadBalancerBase is thread aware, all workers will create a new worker
+  //    local load balancer and copy the cross_priority_host_map_.
+  //
+  // This leads to the possibility of simultaneous reading and writing of cross_priority_host_map_
+  // in different threads. For this reason, an additional mutex is necessary to guard
+  // cross_priority_host_map_.
+  absl::Mutex cross_priority_host_map_mutex_;
 };
 
 } // namespace Upstream

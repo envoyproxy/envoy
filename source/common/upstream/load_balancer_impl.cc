@@ -132,10 +132,8 @@ LoadBalancerBase::LoadBalancerBase(
         recalculatePerPriorityPanic();
         stashed_random_.clear();
 
-        // Update cross priority host map. Derived classes of LoadBalancerBase may access cross
-        // priority host map in multiple threads at the same time, so use the atomic method to
-        // update the cross priority host map.
-        std::atomic_store(&cross_priority_host_map_, priority_set_.crossPriorityHostMap());
+        // Update cross priority host map.
+        setCrossPriorityHostMap(priority_set_.crossPriorityHostMap());
       });
 }
 

@@ -180,7 +180,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
 
 LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
   auto lb = std::make_unique<LoadBalancerImpl>(
-      stats_, random_, std::atomic_load(&thread_aware_lb_.cross_priority_host_map_));
+      stats_, random_, thread_aware_lb_.threadSafeGetCrossPriorityHostMap());
 
   // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple
   // threads. All complex processing has already been precalculated however.

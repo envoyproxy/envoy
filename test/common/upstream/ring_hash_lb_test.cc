@@ -111,7 +111,7 @@ TEST_P(RingHashLoadBalancerTest, SelectOverrideHost) {
                      1u << static_cast<size_t>(Host::Health::Degraded)};
   EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::make_optional(expected_host)));
 
-  // Mock memebership update and update host map shared pointer in the lb.
+  // Mock membership update and update host map shared pointer in the lb.
   auto host_map = std::make_shared<HostMap>();
   host_map->insert({"1.2.3.4", mock_host});
   priority_set_.cross_priority_host_map_ = host_map;
