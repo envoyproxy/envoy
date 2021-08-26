@@ -33,8 +33,7 @@ RouteConstSharedPtr ConfigImpl::route(Network::Address::InstanceConstSharedPtr a
   return nullptr;
 }
 
-ConfigImpl::SourceIPsTrie ConfigImpl::buildRouteTrie(
-    const envoy::extensions::filters::udp::udp_proxy::v3::RouteConfiguration& config) {
+ConfigImpl::SourceIPsTrie ConfigImpl::buildRouteTrie(const RouteConfiguration& config) {
   std::vector<std::pair<RouteConstSharedPtr, std::vector<Network::Address::CidrRange>>>
       source_ips_list;
   source_ips_list.reserve(config.routes().size());
@@ -59,10 +58,9 @@ ConfigImpl::SourceIPsTrie ConfigImpl::buildRouteTrie(
   return {source_ips_list, true};
 }
 
-std::vector<RouteEntryPtr> ConfigImpl::buildEntryList(
-    const std::string& cluster,
-    const envoy::extensions::filters::udp::udp_proxy::v3::RouteConfiguration& config) {
-  auto set = absl::flat_hash_set<RouteEntryPtr>();
+std::vector<RouteEntryConstSharedPtr> ConfigImpl::buildEntryList(const std::string& cluster,
+                                                                 const RouteConfiguration& config) {
+  auto set = absl::flat_hash_set<RouteEntryConstSharedPtr>();
 
   if (!cluster.empty()) {
     set.emplace(std::make_shared<ClusterRouteEntry>(cluster));
@@ -76,7 +74,7 @@ std::vector<RouteEntryPtr> ConfigImpl::buildEntryList(
     }
   }
 
-  auto list = std::vector<RouteEntryPtr>();
+  auto list = std::vector<RouteEntryConstSharedPtr>();
   list.reserve(set.size());
   for (const auto& entry : set) {
     list.push_back(entry);

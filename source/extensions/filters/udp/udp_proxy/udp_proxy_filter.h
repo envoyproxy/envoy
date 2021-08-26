@@ -95,7 +95,9 @@ public:
 
     return route->routeEntry()->clusterName();
   }
-  const std::vector<Router::RouteEntryPtr>& entries() const { return router_config_->entries(); }
+  const std::vector<Router::RouteEntryConstSharedPtr>& entries() const {
+    return router_config_->entries();
+  }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   std::chrono::milliseconds sessionTimeout() const { return session_timeout_; }
   bool usingOriginalSrcIp() const { return use_original_src_ip_; }

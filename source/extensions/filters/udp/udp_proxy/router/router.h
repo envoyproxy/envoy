@@ -24,7 +24,7 @@ public:
   virtual const std::string& clusterName() const PURE;
 };
 
-using RouteEntryPtr = std::shared_ptr<RouteEntry>;
+using RouteEntryConstSharedPtr = std::shared_ptr<const RouteEntry>;
 
 /**
  * Route holds the RouteEntry for a request.
@@ -40,7 +40,6 @@ public:
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
-using RouteSharedPtr = std::shared_ptr<Route>;
 
 /**
  * The router configuration.
@@ -50,7 +49,7 @@ public:
   virtual ~Config() = default;
 
   virtual RouteConstSharedPtr route(Network::Address::InstanceConstSharedPtr address) const PURE;
-  virtual const std::vector<RouteEntryPtr>& entries() const PURE;
+  virtual const std::vector<RouteEntryConstSharedPtr>& entries() const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;

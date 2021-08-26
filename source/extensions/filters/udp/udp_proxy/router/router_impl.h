@@ -27,27 +27,26 @@ private:
   const std::string cluster_name_;
 };
 
-class ConfigImpl : public Router::Config {
+class ConfigImpl : public Config {
 public:
   ConfigImpl(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config);
   ~ConfigImpl() override = default;
 
   // Router::Config
   RouteConstSharedPtr route(Network::Address::InstanceConstSharedPtr address) const override;
-  const std::vector<RouteEntryPtr>& entries() const override { return entries_; }
+  const std::vector<RouteEntryConstSharedPtr>& entries() const override { return entries_; }
 
 private:
   using SourceIPsTrie = Network::LcTrie::LcTrie<RouteConstSharedPtr>;
+  using RouteConfiguration = envoy::extensions::filters::udp::udp_proxy::v3::RouteConfiguration;
 
   RouteConstSharedPtr cluster_;
   const SourceIPsTrie source_ips_trie_;
-  const std::vector<RouteEntryPtr> entries_;
+  const std::vector<RouteEntryConstSharedPtr> entries_;
 
-  SourceIPsTrie
-  buildRouteTrie(const envoy::extensions::filters::udp::udp_proxy::v3::RouteConfiguration& config);
-  std::vector<RouteEntryPtr>
-  buildEntryList(const std::string& cluster,
-                 const envoy::extensions::filters::udp::udp_proxy::v3::RouteConfiguration& config);
+  SourceIPsTrie buildRouteTrie(const RouteConfiguration& config);
+  std::vector<RouteEntryConstSharedPtr> buildEntryList(const std::string& cluster,
+                                                       const RouteConfiguration& config);
 };
 
 } // namespace Router
