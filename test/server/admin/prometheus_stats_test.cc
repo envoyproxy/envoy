@@ -328,6 +328,8 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
            {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
   addGauge("my_custom_metric.test.bar",
            {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}}, true);
+  // Custom metrics with "envoy_" prefix should be ignored since it would collide with native ones.
+  addCounter("envoy_foo", {}, true);
 
   const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
   HistogramWrapper h1_cumulative;

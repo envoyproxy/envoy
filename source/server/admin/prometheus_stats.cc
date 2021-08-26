@@ -30,8 +30,20 @@ std::string sanitizeName(const std::string& name) {
 template <class StatType>
 static bool shouldShowMetric(const StatType& metric, const bool used_only,
                              const absl::optional<std::regex>& regex) {
-  return ((!used_only || metric.used()) &&
-          (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
+  if (used_only && !metric.used()) {
+    return false;
+  } else if (!metric.isCustomMetric()) {
+    return !regex.has_value() || std::regex_search(metric.name(), regex.value());
+  } else {
+    const std::string name = metric.name();
+    return (!regex.has_value() || std::regex_search(name, regex.value())) &&
+           // If this is custom metric and starts with envoy_,
+           // it would potentially collides with the native matrics,
+           // and might end up breaking the assumption that the exposed
+           // prometheus metric names are unique. Thefore
+           // we do not show such custom metrics.
+           !absl::StartsWith(name, "envoy_");
+  }
 }
 
 /*
@@ -96,8 +108,10 @@ uint64_t outputStatType(
 
   // Sorted collection of metrics sorted by their tagExtractedName, to satisfy the requirements
   // of the exposition format.
-  std::map<Stats::StatName, StatTypeUnsortedCollection, Stats::StatNameLessThan> groups(
-      global_symbol_table);
+  using SortedCollections =
+      std::map<Stats::StatName, StatTypeUnsortedCollection, Stats::StatNameLessThan>;
+  // Map isCustomMetric() to SortedCollections.
+  std::map<bool, SortedCollections> groups;
 
   for (const auto& metric : metrics) {
     ASSERT(&global_symbol_table == &metric->constSymbolTable());
@@ -106,28 +120,30 @@ uint64_t outputStatType(
       continue;
     }
 
-    groups[metric->tagExtractedStatName()].push_back(metric.get());
+    auto iter = groups.try_emplace(metric->isCustomMetric(), global_symbol_table);
+    iter.first->second[metric->tagExtractedStatName()].push_back(metric.get());
   }
 
-  for (auto& group : groups) {
-    // We assume that custom metric flag is the same across all metrics with the same
-    // tagExtractedStatName. Call sites of defining these metrics must meet this criteria.
-    const bool is_custom_metric = group.second.front()->isCustomMetric();
-    const std::string prefixed_tag_extracted_name = PrometheusStatsFormatter::metricName(
-        global_symbol_table.toString(group.first), is_custom_metric);
-    response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, type));
+  auto result = 0;
+  for (auto& it : groups) {
+    for (auto& group : it.second) {
+      result++;
+      const std::string prefixed_tag_extracted_name =
+          PrometheusStatsFormatter::metricName(global_symbol_table.toString(group.first), it.first);
+      response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, type));
 
-    // Sort before producing the final output to satisfy the "preferred" ordering from the
-    // prometheus spec: metrics will be sorted by their tags' textual representation, which will
-    // be consistent across calls.
-    std::sort(group.second.begin(), group.second.end(), MetricLessThan());
+      // Sort before producing the final output to satisfy the "preferred" ordering from the
+      // prometheus spec: metrics will be sorted by their tags' textual representation, which will
+      // be consistent across calls.
+      std::sort(group.second.begin(), group.second.end(), MetricLessThan());
 
-    for (const auto& metric : group.second) {
-      response.add(generate_output(*metric, prefixed_tag_extracted_name));
+      for (const auto& metric : group.second) {
+        response.add(generate_output(*metric, prefixed_tag_extracted_name));
+      }
+      response.add("\n");
     }
-    response.add("\n");
   }
-  return groups.size();
+  return result;
 }
 
 /*
