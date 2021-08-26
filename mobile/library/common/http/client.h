@@ -299,7 +299,7 @@ private:
   };
   DirectStreamSharedPtr getStream(envoy_stream_t stream_handle, GetStreamFilters filters);
   void removeStream(envoy_stream_t stream_handle);
-  void setDestinationCluster(RequestHeaderMap& headers, bool alternate);
+  void setDestinationCluster(RequestHeaderMap& headers);
 
   ApiListener& api_listener_;
   Event::ProvisionalDispatcher& dispatcher_;
