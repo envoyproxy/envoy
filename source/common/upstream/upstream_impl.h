@@ -940,6 +940,10 @@ private:
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
   Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context_{};
+
+  // callback_lifetime_guard_ is used from callbacks that might run after this ClusterInfoBase has
+  // been deleted to determine whether to run operations that reference other fields.
+  std::shared_ptr<uint32_t> callback_lifetime_guard_;
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;

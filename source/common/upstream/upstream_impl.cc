@@ -1017,7 +1017,8 @@ ClusterImplBase::ClusterImplBase(
       local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
                      cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
-          factory_context.singletonManager(), factory_context.dispatcher())) {
+          factory_context.singletonManager(), factory_context.dispatcher())),
+      callback_lifetime_guard_(std::make_shared<uint32_t>(1)) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   auto* raw_factory_pointer = socket_factory.get();
@@ -1160,18 +1161,18 @@ void ClusterImplBase::onInitDone() {
       pending_initialize_health_checks_ += host_set->hosts().size();
     }
 
-    // We use a weak pointer to 'this' to ensure that we don't segfault if the callback runs after
-    // 'this' is deleted.
-    auto weak_self = weak_from_this();
+    // We use a weak pointer to callback_lifetime_guard_ to ensure that we don't segfault if the
+    // callback runs after 'this' is deleted.
+    std::weak_ptr<uint32_t> lifetime_guard = callback_lifetime_guard_;
     // TODO(mattklein123): Remove this callback when done.
-    health_checker_->addHostCheckCompleteCb([weak_self](HostSharedPtr, HealthTransition) -> void {
-      if (auto self = weak_self.lock()) {
-        if (self->pending_initialize_health_checks_ > 0 &&
-            --self->pending_initialize_health_checks_ == 0) {
-          self->finishInitialization();
-        }
-      }
-    });
+    health_checker_->addHostCheckCompleteCb(
+        [this, lifetime_guard](HostSharedPtr, HealthTransition) -> void {
+          if (lifetime_guard.lock()) {
+            if (pending_initialize_health_checks_ > 0 && --pending_initialize_health_checks_ == 0) {
+              finishInitialization();
+            }
+          }
+        });
   }
 
   if (pending_initialize_health_checks_ == 0) {
