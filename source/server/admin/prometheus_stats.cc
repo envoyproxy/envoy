@@ -38,9 +38,9 @@ static bool shouldShowMetric(const StatType& metric, const bool used_only,
     const std::string name = metric.name();
     return (!regex.has_value() || std::regex_search(name, regex.value())) &&
            // If this is custom metric and starts with envoy_,
-           // it would potentially collides with the native matrics,
+           // it would potentially collides with the native metrics,
            // and might end up breaking the assumption that the exposed
-           // prometheus metric names are unique. Thefore
+           // prometheus metric names are unique. Therefore
            // we do not show such custom metrics.
            !absl::StartsWith(name, "envoy_");
   }
