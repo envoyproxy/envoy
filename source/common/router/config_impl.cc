@@ -183,7 +183,7 @@ InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
     auto& factory =
         Envoy::Config::Utility::getAndCheckFactory<InternalRedirectPredicateFactory>(predicate);
     auto config = factory.createEmptyConfigProto();
-    Envoy::Config::Utility::translateOpaqueConfig(predicate.typed_config(), {}, validator, *config);
+    Envoy::Config::Utility::translateOpaqueConfig(predicate.typed_config(), validator, *config);
     predicate_factories_.emplace_back(&factory, std::move(config));
   }
 }
@@ -1536,7 +1536,7 @@ RouteConstSharedPtr ConfigImpl::route(const RouteCallback& cb,
 
 RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFilterConfig(
     const std::string& name, const ProtobufWkt::Any& typed_config,
-    const ProtobufWkt::Struct& config, const OptionalHttpFilters& optional_http_filters,
+    const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   bool is_optional = (optional_http_filters.find(name) != optional_http_filters.end());
@@ -1548,7 +1548,7 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
   }
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validator, *proto_config);
+  Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *proto_config);
   auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
   if (object == nullptr) {
     if (Runtime::runtimeFeatureEnabled(
@@ -1579,7 +1579,7 @@ PerFilterConfigs::PerFilterConfigs(
         Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
     auto object =
-        createRouteSpecificFilterConfig(name, it.second, ProtobufWkt::Struct::default_instance(),
+        createRouteSpecificFilterConfig(name, it.second,
                                         optional_http_filters, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);

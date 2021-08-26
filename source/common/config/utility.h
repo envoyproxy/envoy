@@ -375,9 +375,7 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
 
-    translateOpaqueConfig(enclosing_message.typed_config(),
-                          enclosing_message.hidden_envoy_deprecated_config(), validation_visitor,
-                          *config);
+    translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config);
     return config;
   }
 
@@ -401,7 +399,7 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
 
-    translateOpaqueConfig(typed_config, ProtobufWkt::Struct(), validation_visitor, *config);
+    translateOpaqueConfig(typed_config, validation_visitor, *config);
     return config;
   }
 
@@ -453,7 +451,6 @@ public:
    * @param out_proto the proto message instantiated by extensions
    */
   static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
-                                    const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto);
 
