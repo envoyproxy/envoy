@@ -675,7 +675,7 @@ void ConnectionImpl::sendKeepalive() {
 }
 
 void ConnectionImpl::onKeepaliveResponse() {
-  ENVOY_LOG_EVENT(debug, "h2_ping_ack", "[C{}] Received keepalive PING ack {}", connection_.id());
+  ENVOY_LOG_EVENT(debug, "h2_ping_ack", "[C{}] Received keepalive PING ack", connection_.id());
   // Check the timers for nullptr in case the peer sent an unsolicited PING ACK.
   if (keepalive_timeout_timer_ != nullptr) {
     keepalive_timeout_timer_->disableTimer();
