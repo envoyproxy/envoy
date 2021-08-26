@@ -281,8 +281,7 @@ void forEachCookie(
         v = v.substr(1, v.size() - 2);
       }
 
-      bool continue_iteration = cookie_consumer(k, v);
-      if (!continue_iteration) {
+      if (!cookie_consumer(k, v)) {
         return;
       }
     }
