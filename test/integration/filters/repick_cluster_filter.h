@@ -1,5 +1,4 @@
-#ifndef THIRD_PARTY_ENVOY_SRC_TEST_INTEGRATION_FILTERS_REPICK_CLUSTER_FILTER_H_
-#define THIRD_PARTY_ENVOY_SRC_TEST_INTEGRATION_FILTERS_REPICK_CLUSTER_FILTER_H_
+#pragma once
 
 #include "absl/strings/string_view.h"
 
@@ -21,4 +20,3 @@ inline constexpr int TotalUpstreamClusterWithHeaderCount = 1;
 
 } // namespace RepickClusterFilter
 } // namespace Envoy
-#endif // THIRD_PARTY_ENVOY_SRC_TEST_INTEGRATION_FILTERS_REPICK_CLUSTER_FILTER_H_
