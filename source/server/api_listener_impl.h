@@ -120,10 +120,10 @@ protected:
       void readDisable(bool) override {}
       void detectEarlyCloseWhenReadDisabled(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       bool readEnabled() const override { return true; }
-      const Network::ConnectionInfoSetter& addressProvider() const override {
+      const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
         return *address_provider_;
       }
-      Network::ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
+      Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
         return address_provider_;
       }
       absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>

@@ -98,8 +98,8 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 
   // TODO(soulxu): generate the connection id inside the addressProvider directly,
   // then we don't need a setter or any of the optional stuff.
-  socket_->addressProvider().setConnectionID(id());
-  socket_->addressProvider().setSslConnection(transport_socket_->ssl());
+  socket_->connectionInfoProvider().setConnectionID(id());
+  socket_->connectionInfoProvider().setSslConnection(transport_socket_->ssl());
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -844,11 +844,11 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info_,
                      false),
-      stream_info_(dispatcher.timeSource(), socket_->addressProviderSharedPtr()) {
+      stream_info_(dispatcher.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
 
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
-  if (socket_->addressProviderSharedPtr()->remoteAddress()->ip() == nullptr) {
+  if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip() == nullptr) {
     return;
   }
   if (!Network::Socket::applyOptions(options, *socket_,
@@ -863,8 +863,8 @@ ClientConnectionImpl::ClientConnectionImpl(
 
   const Network::Address::InstanceConstSharedPtr* source = &source_address;
 
-  if (socket_->addressProvider().localAddress()) {
-    source = &socket_->addressProvider().localAddress();
+  if (socket_->connectionInfoProvider().localAddress()) {
+    source = &socket_->connectionInfoProvider().localAddress();
   }
 
   if (*source != nullptr) {
@@ -886,8 +886,9 @@ ClientConnectionImpl::ClientConnectionImpl(
 
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this,
-                 socket_->addressProvider().remoteAddress()->asString());
-  const Api::SysCallIntResult result = socket_->connect(socket_->addressProvider().remoteAddress());
+                 socket_->connectionInfoProvider().remoteAddress()->asString());
+  const Api::SysCallIntResult result =
+      socket_->connect(socket_->connectionInfoProvider().remoteAddress());
   if (result.return_value_ == 0) {
     // write will become ready.
     ASSERT(connecting_);

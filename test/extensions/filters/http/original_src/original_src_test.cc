@@ -94,7 +94,7 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressAddsOption) {
   for (const auto& option : *options) {
     option->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   }
-  EXPECT_EQ(*socket.addressProvider().localAddress(),
+  EXPECT_EQ(*socket.connectionInfoProvider().localAddress(),
             *callbacks_.stream_info_.downstream_address_provider_->remoteAddress());
 }
 
@@ -129,7 +129,7 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressBleachesPort) {
   for (const auto& option : *options) {
     option->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   }
-  EXPECT_EQ(*socket.addressProvider().localAddress(), *expected_address);
+  EXPECT_EQ(*socket.connectionInfoProvider().localAddress(), *expected_address);
 }
 
 TEST_F(OriginalSrcHttpTest, FilterAddsTransparentOption) {

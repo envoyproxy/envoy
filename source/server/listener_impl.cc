@@ -93,7 +93,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
   sockets_.push_back(createListenSocketAndApplyOptions(factory, socket_type, 0));
 
   if (sockets_[0] != nullptr && local_address_->ip() && local_address_->ip()->port() == 0) {
-    local_address_ = sockets_[0]->addressProvider().localAddress();
+    local_address_ = sockets_[0]->connectionInfoProvider().localAddress();
   }
   ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name,
             local_address_->asString());
@@ -185,7 +185,7 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
                                        envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
       throw Network::SocketOptionException(
           fmt::format("cannot set post-listen socket option on socket: {}",
-                      socket->addressProvider().localAddress()->asString()));
+                      socket->connectionInfoProvider().localAddress()->asString()));
     }
   };
   // On all platforms we should listen on the first socket.
