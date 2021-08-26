@@ -320,7 +320,8 @@ TEST(MainInterfaceTest, RegisterPlatformApi) {
   ASSERT_TRUE(
       engine_cbs_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
-  EXPECT_EQ(ENVOY_SUCCESS, register_platform_api("api", nullptr));
+  uint64_t fake_api;
+  EXPECT_EQ(ENVOY_SUCCESS, register_platform_api("api", &fake_api));
 
   terminate_engine(0);
 
