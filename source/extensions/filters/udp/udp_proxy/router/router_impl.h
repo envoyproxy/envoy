@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/filters/udp/udp_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 
 #include "source/common/network/lc_trie.h"
