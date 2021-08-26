@@ -348,10 +348,7 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   if (direct_stream) {
     ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
     RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
-    // The second argument here specifies whether to use an 'alternate' cluster (see discussion
-    // below in cluster definitions). Random selection avoids determinism resulting from consistent
-    // patterns in, e.g., mobile application flows.
-    setDestinationCluster(*internal_headers, random_.random() % 2);
+    setDestinationCluster(*internal_headers);
     // Set the x-forwarded-proto header to https because Envoy Mobile only has clusters with TLS
     // enabled. This is done here because the ApiListener's synthetic connection would make the
     // Http::ConnectionManager set the scheme to http otherwise. In the future we might want to
@@ -527,53 +524,34 @@ const LowerCaseString H2UpstreamHeader{"x-envoy-mobile-upstream-protocol"};
 // Long-term we will be working to generally provide more responsive connection handling within
 // Envoy itself.
 
-const char* BaseClusters[][3] = {{
-                                     "base",
-                                     "base_wlan",
-                                     "base_wwan",
-                                 },
-                                 {
-                                     "base_alt",
-                                     "base_wlan_alt",
-                                     "base_wwan_alt",
-                                 }};
+const size_t ClustersPerPool = 3;
+const char* BaseClusters[ClustersPerPool] = {
+    "base",
+    "base_wlan",
+    "base_wwan",
+};
 
-const char* H2Clusters[][3] = {{
-                                   "base_h2",
-                                   "base_wlan_h2",
-                                   "base_wwan_h2",
-                               },
-                               {
-                                   "base_h2_alt",
-                                   "base_wlan_h2_alt",
-                                   "base_wwan_h2_alt",
-                               }};
+const char* H2Clusters[ClustersPerPool] = {
+    "base_h2",
+    "base_wlan_h2",
+    "base_wwan_h2",
+};
 
-const char* ClearTextClusters[][3] = {{
-                                          "base_clear",
-                                          "base_wlan_clear",
-                                          "base_wwan_clear",
-                                      },
-                                      {
-                                          "base_clear_alt",
-                                          "base_wlan_clear_alt",
-                                          "base_wwan_clear_alt",
-                                      }};
+const char* ClearTextClusters[ClustersPerPool] = {
+    "base_clear",
+    "base_wlan_clear",
+    "base_wwan_clear",
+};
 
-const char* AlpnClusters[][3] = {{
-                                     "base_alpn",
-                                     "base_wlan_alpn",
-                                     "base_wwan_alpn",
-                                 },
-                                 {
-                                     "base_alpn_alt",
-                                     "base_wlan_alpn_alt",
-                                     "base_wwan_alpn_alt",
-                                 }};
+const char* AlpnClusters[ClustersPerPool] = {
+    "base_alpn",
+    "base_wlan_alpn",
+    "base_wwan_alpn",
+};
 
 } // namespace
 
-void Client::setDestinationCluster(Http::RequestHeaderMap& headers, bool alternate) {
+void Client::setDestinationCluster(Http::RequestHeaderMap& headers) {
   // Determine upstream cluster:
   // - Use TLS by default.
   // - Use http/2 or ALPN if requested explicitly via x-envoy-mobile-upstream-protocol.
@@ -581,23 +559,24 @@ void Client::setDestinationCluster(Http::RequestHeaderMap& headers, bool alterna
   const char* cluster{};
   auto h2_header = headers.get(H2UpstreamHeader);
   auto network = preferred_network_.load();
-  ASSERT(network >= 0 && network < 3, "preferred_network_ must be valid index into cluster array");
+  ASSERT(network >= 0 && network < ClustersPerPool,
+         "preferred_network_ must be valid index into cluster array");
 
   if (headers.getSchemeValue() == Headers::get().SchemeValues.Http) {
-    cluster = ClearTextClusters[alternate][network];
+    cluster = ClearTextClusters[network];
   } else if (!h2_header.empty()) {
     ASSERT(h2_header.size() == 1);
     const auto value = h2_header[0]->value().getStringView();
     if (value == "http2") {
-      cluster = H2Clusters[alternate][network];
+      cluster = H2Clusters[network];
     } else if (value == "alpn") {
-      cluster = AlpnClusters[alternate][network];
+      cluster = AlpnClusters[network];
     } else {
       RELEASE_ASSERT(value == "http1", fmt::format("using unsupported protocol version {}", value));
-      cluster = BaseClusters[alternate][network];
+      cluster = BaseClusters[network];
     }
   } else {
-    cluster = BaseClusters[alternate][network];
+    cluster = BaseClusters[network];
   }
 
   if (!h2_header.empty()) {

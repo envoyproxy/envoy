@@ -147,7 +147,6 @@ public:
   envoy_http_callbacks bridge_callbacks_;
   callbacks_called cc_ = {0, 0, 0, 0, 0, 0, 0, "200", true, ""};
   std::atomic<envoy_network_t> preferred_network_{ENVOY_NET_GENERIC};
-  uint64_t alt_cluster_ = 0;
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   bool explicit_flow_control_{GetParam()};
@@ -158,8 +157,6 @@ public:
 INSTANTIATE_TEST_SUITE_P(TestModes, ClientTest, ::testing::Bool());
 
 TEST_P(ClientTest, SetDestinationCluster) {
-  ON_CALL(random_, random()).WillByDefault(ReturnPointee(&alt_cluster_));
-
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
 
@@ -193,14 +190,13 @@ TEST_P(ClientTest, SetDestinationCluster) {
   envoy_headers c_headers2 = Utility::toBridgeHeaders(headers2);
 
   preferred_network_.store(ENVOY_NET_WLAN);
-  alt_cluster_ = 1;
 
   TestRequestHeaderMapImpl expected_headers2{
       {":scheme", "https"},
       {":method", "GET"},
       {":authority", "host"},
       {":path", "/"},
-      {"x-envoy-mobile-cluster", "base_wlan_alt"},
+      {"x-envoy-mobile-cluster", "base_wlan"},
       {"x-forwarded-proto", "https"},
   };
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -214,7 +210,6 @@ TEST_P(ClientTest, SetDestinationCluster) {
   envoy_headers c_headers3 = Utility::toBridgeHeaders(headers3);
 
   preferred_network_.store(ENVOY_NET_WWAN);
-  alt_cluster_ = 0;
 
   TestRequestHeaderMapImpl expected_headers3{
       {":scheme", "https"},
@@ -241,8 +236,6 @@ TEST_P(ClientTest, SetDestinationCluster) {
 }
 
 TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
-  ON_CALL(random_, random()).WillByDefault(ReturnPointee(&alt_cluster_));
-
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
 
@@ -256,14 +249,13 @@ TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
   envoy_headers c_headers1 = Utility::toBridgeHeaders(headers1);
 
   preferred_network_.store(ENVOY_NET_GENERIC);
-  alt_cluster_ = 1;
 
   TestResponseHeaderMapImpl expected_headers1{
       {":scheme", "https"},
       {":method", "GET"},
       {":authority", "host"},
       {":path", "/"},
-      {"x-envoy-mobile-cluster", "base_h2_alt"},
+      {"x-envoy-mobile-cluster", "base_h2"},
       {"x-forwarded-proto", "https"},
   };
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -277,7 +269,6 @@ TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
   envoy_headers c_headers2 = Utility::toBridgeHeaders(headers2);
 
   preferred_network_.store(ENVOY_NET_WLAN);
-  alt_cluster_ = 0;
 
   TestResponseHeaderMapImpl expected_headers2{
       {":scheme", "https"},
@@ -298,14 +289,13 @@ TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
   envoy_headers c_headers3 = Utility::toBridgeHeaders(headers3);
 
   preferred_network_.store(ENVOY_NET_WWAN);
-  alt_cluster_ = 1;
 
   TestResponseHeaderMapImpl expected_headers3{
       {":scheme", "https"},
       {":method", "GET"},
       {":authority", "host"},
       {":path", "/"},
-      {"x-envoy-mobile-cluster", "base_wwan_h2_alt"},
+      {"x-envoy-mobile-cluster", "base_wwan_h2"},
       {"x-forwarded-proto", "https"},
   };
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -320,14 +310,13 @@ TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
   envoy_headers c_headers_alpn = Utility::toBridgeHeaders(headers_alpn);
 
   preferred_network_.store(ENVOY_NET_WWAN);
-  alt_cluster_ = 1;
 
   TestResponseHeaderMapImpl expected_headers_alpn{
       {":scheme", "https"},
       {":method", "GET"},
       {":authority", "host"},
       {":path", "/"},
-      {"x-envoy-mobile-cluster", "base_wwan_alpn_alt"},
+      {"x-envoy-mobile-cluster", "base_wwan_alpn"},
       {"x-forwarded-proto", "https"},
   };
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -342,7 +331,6 @@ TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
   envoy_headers c_headers4 = Utility::toBridgeHeaders(headers4);
 
   preferred_network_.store(ENVOY_NET_WWAN);
-  alt_cluster_ = 0;
 
   TestResponseHeaderMapImpl expected_headers4{
       {":scheme", "https"},
