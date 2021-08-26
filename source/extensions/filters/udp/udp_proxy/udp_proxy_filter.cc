@@ -13,8 +13,7 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
                                const UdpProxyFilterConfigSharedPtr& config)
     : UdpListenerReadFilter(callbacks), config_(config),
       cluster_update_callbacks_(
-          config->clusterManager().addThreadLocalClusterUpdateCallbacks(*this)),
-      cluster_infos_(absl::flat_hash_map<std::string, std::shared_ptr<ClusterInfo>>()) {
+          config->clusterManager().addThreadLocalClusterUpdateCallbacks(*this)) {
   for (const auto& entry : config_->entries()) {
     Upstream::ThreadLocalCluster* cluster =
         config->clusterManager().getThreadLocalCluster(entry->clusterName());
