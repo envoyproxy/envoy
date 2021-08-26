@@ -203,7 +203,7 @@ public:
 
   // Return the local peer's socket address.
   const Network::Address::InstanceConstSharedPtr& localAddress() {
-    return socket_->addressProvider().localAddress();
+    return socket_->connectionInfoProvider().localAddress();
   }
 
 private:

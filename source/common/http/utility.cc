@@ -552,7 +552,8 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
       // status.
       // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
       // https://github.com/envoyproxy/envoy/blob/main/source/common/formatter/substitution_formatter.cc#L129
-      if (body_text[body_text.length() - 1] == '\n') {
+      if (content_type == Headers::get().ContentTypeValues.Json &&
+          body_text[body_text.length() - 1] == '\n') {
         body_text = body_text.substr(0, body_text.length() - 1);
       }
       response_headers->setGrpcMessage(PercentEncoding::encode(body_text));

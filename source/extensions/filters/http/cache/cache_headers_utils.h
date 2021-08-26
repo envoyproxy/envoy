@@ -122,37 +122,40 @@ public:
   parseCommaDelimitedHeader(const Http::HeaderMap::GetResult& entry);
 };
 
-class VaryHeader {
+class VaryAllowList {
 public:
-  // Checks if the headers contain a non-empty value in the Vary header.
-  static bool hasVary(const Http::ResponseHeaderMap& headers);
-
-  // Retrieve all the individual header values from the provided response header
-  // map across all vary header entries.
-  static absl::btree_set<absl::string_view>
-  getVaryValues(const Envoy::Http::ResponseHeaderMap& headers);
-
-  // Checks if this header is allowed to vary cache entries.
-  bool allowsHeader(const absl::string_view header) const;
-
-  // Creates a single string combining the values of the varied headers from
-  // entry_headers. Returns an absl::nullopt if no valid vary key can be created
-  // and the response should not be cached (eg. when disallowed vary headers are
-  // present in the response).
-  absl::optional<std::string>
-  createVaryIdentifier(const absl::btree_set<absl::string_view>& vary_header_values,
-                       const Envoy::Http::RequestHeaderMap& request_headers) const;
-
   // Parses the allow list from the Cache Config into the object's private allow_list_.
-  VaryHeader(const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list);
+  VaryAllowList(
+      const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list);
 
   // Checks if the headers contain an allowed value in the Vary header.
-  bool isAllowed(const Http::ResponseHeaderMap& headers) const;
+  bool allowsHeaders(const Http::ResponseHeaderMap& headers) const;
+
+  // Checks if this vary header value is allowed to vary cache entries.
+  bool allowsValue(const absl::string_view header) const;
 
 private:
   // Stores the matching rules that define whether a header is allowed to be varied.
   std::vector<Matchers::StringMatcherPtr> allow_list_;
 };
+
+namespace VaryHeaderUtils {
+// Checks if the headers contain a non-empty value in the Vary header.
+bool hasVary(const Http::ResponseHeaderMap& headers);
+
+// Retrieve all the individual header values from the provided response header
+// map across all vary header entries.
+absl::btree_set<absl::string_view> getVaryValues(const Envoy::Http::ResponseHeaderMap& headers);
+
+// Creates a single string combining the values of the varied headers from
+// entry_headers. Returns an absl::nullopt if no valid vary key can be created
+// and the response should not be cached (eg. when disallowed vary headers are
+// present in the response).
+absl::optional<std::string>
+createVaryIdentifier(const VaryAllowList& allow_list,
+                     const absl::btree_set<absl::string_view>& vary_header_values,
+                     const Envoy::Http::RequestHeaderMap& request_headers);
+} // namespace VaryHeaderUtils
 
 } // namespace Cache
 } // namespace HttpFilters

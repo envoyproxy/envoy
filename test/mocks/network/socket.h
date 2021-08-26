@@ -14,9 +14,11 @@ public:
   MockSocket();
   ~MockSocket() override;
 
-  SocketAddressSetter& addressProvider() override { return *address_provider_; }
-  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
-  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+  ConnectionInfoSetter& connectionInfoProvider() override { return *address_provider_; }
+  const ConnectionInfoProvider& connectionInfoProvider() const override {
+    return *address_provider_;
+  }
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
     return address_provider_;
   }
   IoHandle& ioHandle() override;
@@ -43,7 +45,7 @@ public:
   MOCK_METHOD(void, addOptions, (const Socket::OptionsSharedPtr&), (override));
 
   const std::unique_ptr<MockIoHandle> io_handle_;
-  Network::SocketAddressSetterSharedPtr address_provider_;
+  Network::ConnectionInfoSetterSharedPtr address_provider_;
 };
 
 } // namespace Network
