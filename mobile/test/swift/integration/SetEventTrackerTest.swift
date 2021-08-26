@@ -1,10 +1,13 @@
 import Envoy
 import EnvoyEngine
 import Foundation
+import TestExtensions
 import XCTest
 
 final class SetEventTrackerTest: XCTestCase {
   func testEmitEventWithoutSettingEventTracker() throws {
+    register_test_extensions()
+
     let eventExpectation =
       self.expectation(description: "Passed event tracker receives an event")
 
