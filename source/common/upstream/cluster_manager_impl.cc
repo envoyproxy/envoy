@@ -793,6 +793,9 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   if (new_cluster->outlierDetector() != nullptr) {
     new_cluster->outlierDetector()->addChangedStateCb([this](HostSharedPtr host) {
       if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+        ENVOY_LOG_EVENT(debug, "outlier_detection_ejection",
+                        "host {} in cluster {} was ejected by the outlier detector",
+                        host->address(), host->cluster().name());
         postThreadLocalHealthFailure(host);
       }
     });
