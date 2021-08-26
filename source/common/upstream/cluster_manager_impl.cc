@@ -283,7 +283,8 @@ ClusterManagerImpl::ClusterManagerImpl(
       cluster_request_response_size_stat_names_(stats.symbolTable()),
       cluster_timeout_budget_stat_names_(stats.symbolTable()),
       subscription_factory_(local_info, main_thread_dispatcher, *this,
-                            validation_context.dynamicValidationVisitor(), api) {
+                            validation_context.dynamicValidationVisitor(), api),
+      callback_lifetime_guard_(std::make_shared<uint32_t>(1)) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();
@@ -770,15 +771,15 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   }
 
   if (new_cluster->healthChecker() != nullptr) {
-    auto weak_self = weak_from_this();
+    std::weak_ptr<uint32_t> lifetime_guard = callback_lifetime_guard_;
     new_cluster->healthChecker()->addHostCheckCompleteCb(
-        [weak_self](HostSharedPtr host, HealthTransition changed_state) {
+        [this, lifetime_guard](HostSharedPtr host, HealthTransition changed_state) {
           // Protect against running this callback after the cluster manager has been destroyed by
-          // locking the weak pointer to 'this'.
-          if (auto self = weak_self.lock()) {
+          // locking the weak pointer to the callback_lifetime_guard_ field on 'this'.
+          if (lifetime_guard.lock()) {
             if (changed_state == HealthTransition::Changed &&
                 host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-              self->postThreadLocalHealthFailure(host);
+              postThreadLocalHealthFailure(host);
             }
           }
         });
