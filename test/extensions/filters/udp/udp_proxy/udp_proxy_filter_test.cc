@@ -851,6 +851,67 @@ hash_policies:
   test_sessions_[0].recvDataFromUpstream("world");
 }
 
+// UDP proxy with router based on source_prefix_range. Test with the same conditions as BasicFlow.
+TEST_F(UdpProxyFilterTest, RouteWithSourcePrefixRange) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 10.0.0.0
+        prefix_len: 24
+    route:
+      cluster: fake_cluster
+upstream_socket_config:
+  prefer_gro: false
+  )EOF",
+        true, false);
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+  test_sessions_[0].recvDataFromUpstream("world");
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+
+  test_sessions_[0].expectWriteToUpstream("hello2");
+  test_sessions_[0].expectWriteToUpstream("hello3");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
+  checkTransferStats(11 /*rx_bytes*/, 2 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello3");
+  checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+
+  test_sessions_[0].recvDataFromUpstream("world2");
+  checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 11 /*tx_bytes*/, 2 /*tx_datagrams*/);
+  test_sessions_[0].recvDataFromUpstream("world3");
+  checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 17 /*tx_bytes*/, 3 /*tx_datagrams*/);
+}
+
+// No route.
+TEST_F(UdpProxyFilterTest, NoRoute) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 10.0.0.3
+        prefix_len: 32
+    route:
+      cluster: fake_cluster
+  )EOF");
+
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_no_route_.value());
+}
+
 } // namespace
 } // namespace UdpProxy
 } // namespace UdpFilters
