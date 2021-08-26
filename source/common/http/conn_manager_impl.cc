@@ -129,8 +129,8 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     read_callbacks_->connection().streamInfo().filterState()->setData(
         Network::ProxyProtocolFilterState::key(),
         std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-            read_callbacks_->connection().addressProvider().remoteAddress(),
-            read_callbacks_->connection().addressProvider().localAddress()}),
+            read_callbacks_->connection().connectionInfoProvider().remoteAddress(),
+            read_callbacks_->connection().connectionInfoProvider().localAddress()}),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
@@ -821,7 +821,7 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 }
 
 uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
-  auto ip = connection()->addressProvider().localAddress()->ip();
+  auto ip = connection()->connectionInfoProvider().localAddress()->ip();
   if (ip == nullptr) {
     return 0;
   }
