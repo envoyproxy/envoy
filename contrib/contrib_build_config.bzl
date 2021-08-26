@@ -9,8 +9,8 @@ CONTRIB_EXTENSIONS = {
     #
     # Network filters
     #
-    "envoy.filters.network.kafka_broker":                       "//contrib/kafka/filters/network/source:kafka_broker_config_lib",
-    "envoy.filters.network.mysql_proxy":                        "//contrib/mysql_proxy/filters/network/source:config",
-    "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
-    "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
+    "envoy.filters.network.kafka_broker": "//contrib/kafka/filters/network/source:kafka_broker_config_lib",
+    "envoy.filters.network.mysql_proxy": "//contrib/mysql_proxy/filters/network/source:config",
+    "envoy.filters.network.postgres_proxy": "//contrib/postgres_proxy/filters/network/source:config",
+    "envoy.filters.network.rocketmq_proxy": "//contrib/rocketmq_proxy/filters/network/source:config",
 }
