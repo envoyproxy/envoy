@@ -17,10 +17,6 @@ Network::FilterFactoryCb ConfigFactory::createFilterFactoryFromProtoTyped(
   ASSERT(!proto_config.stat_prefix().empty());
   auto _ = Envoy::Router::HeaderParser::configure(proto_config.tunneling_config().headers_to_add());
 
-  if (proto_config.has_hidden_envoy_deprecated_deprecated_v1()) {
-    ASSERT(proto_config.hidden_envoy_deprecated_deprecated_v1().routes_size() > 0);
-  }
-
   Envoy::TcpProxy::ConfigSharedPtr filter_config(
       std::make_shared<Envoy::TcpProxy::Config>(proto_config, context));
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {

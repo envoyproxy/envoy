@@ -78,9 +78,7 @@ public:
     config_helper_.addConfigModifier(
         [route_config](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) {
-          TestUtility::loadFromYaml(route_config, *hcm.mutable_route_config(), true);
-        });
+                hcm) { TestUtility::loadFromYaml(route_config, *hcm.mutable_route_config()); });
     initialize();
   }
 

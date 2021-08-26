@@ -45,9 +45,6 @@ public:
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
-  void setFlushTimeout(std::chrono::milliseconds) override {
-    // TODO(mattklein123): Actually implement this for HTTP/3 similar to HTTP/2.
-  }
 
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
@@ -78,6 +75,10 @@ protected:
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                  const quic::QuicHeaderList& header_list) override;
   void OnHeadersTooLarge() override;
+
+  // Http::MultiplexedStreamImplBase
+  void onPendingFlushTimer() override;
+  bool hasPendingData() override;
 
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();
