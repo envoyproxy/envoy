@@ -750,6 +750,7 @@ envoy_cc_test_library(
         ":integration_tcp_client_lib",
         ":utility_lib",
         "//source/common/config:api_version_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",

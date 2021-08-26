@@ -31,6 +31,7 @@ envoy_cc_test(
         "//source/common/network:listen_socket_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
