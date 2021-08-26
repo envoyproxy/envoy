@@ -4026,8 +4026,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-  EXPECT_TRUE(socket.addressProvider().localAddressRestored());
-  EXPECT_EQ("127.0.0.2:2345", socket.addressProvider().localAddress()->asString());
+  EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
+  EXPECT_EQ("127.0.0.2:2345", socket.connectionInfoProvider().localAddress()->asString());
 #endif
 }
 
@@ -4123,8 +4123,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-  EXPECT_TRUE(socket.addressProvider().localAddressRestored());
-  EXPECT_EQ("127.0.0.2:2345", socket.addressProvider().localAddress()->asString());
+  EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
+  EXPECT_EQ("127.0.0.2:2345", socket.connectionInfoProvider().localAddress()->asString());
 #endif
 }
 
@@ -4204,8 +4204,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-  EXPECT_TRUE(socket.addressProvider().localAddressRestored());
-  EXPECT_EQ("[1::2]:2345", socket.addressProvider().localAddress()->asString());
+  EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
+  EXPECT_EQ("[1::2]:2345", socket.connectionInfoProvider().localAddress()->asString());
 }
 
 // Validate that when neither transparent nor freebind is not set in the

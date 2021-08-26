@@ -14,9 +14,11 @@ public:
   MockSocket();
   ~MockSocket() override;
 
-  ConnectionInfoSetter& addressProvider() override { return *address_provider_; }
-  const ConnectionInfoProvider& addressProvider() const override { return *address_provider_; }
-  ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
+  ConnectionInfoSetter& connectionInfoProvider() override { return *address_provider_; }
+  const ConnectionInfoProvider& connectionInfoProvider() const override {
+    return *address_provider_;
+  }
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
     return address_provider_;
   }
   IoHandle& ioHandle() override;

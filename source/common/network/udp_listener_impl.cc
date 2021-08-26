@@ -66,7 +66,7 @@ void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
   cb_.onReadReady();
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
-      socket_->ioHandle(), *socket_->addressProvider().localAddress(), *this, time_source_,
+      socket_->ioHandle(), *socket_->connectionInfoProvider().localAddress(), *this, time_source_,
       config_.prefer_gro_, packets_dropped_);
   if (result == nullptr) {
     // No error. The number of reads was limited by read rate. There are more packets to read.
@@ -102,7 +102,7 @@ void UdpListenerImpl::handleWriteCallback() {
 Event::Dispatcher& UdpListenerImpl::dispatcher() { return dispatcher_; }
 
 const Address::InstanceConstSharedPtr& UdpListenerImpl::localAddress() const {
-  return socket_->addressProvider().localAddress();
+  return socket_->connectionInfoProvider().localAddress();
 }
 
 Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
