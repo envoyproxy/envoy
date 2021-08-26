@@ -1578,9 +1578,8 @@ PerFilterConfigs::PerFilterConfigs(
     const auto& name =
         Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
-    auto object =
-        createRouteSpecificFilterConfig(name, it.second,
-                                        optional_http_filters, factory_context, validator);
+    auto object = createRouteSpecificFilterConfig(name, it.second, optional_http_filters,
+                                                  factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
     }
