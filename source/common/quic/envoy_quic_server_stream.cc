@@ -249,14 +249,20 @@ bool EnvoyQuicServerStream::OnStopSending(quic::QuicRstStreamErrorCode error) {
   stats_.rx_reset_.inc();
   bool end_stream_encoded = local_end_stream_;
   // This call will close write.
-  bool ret = quic::QuicSpdyServerStreamBase::OnStopSending(error);
+  if (!quic::QuicSpdyServerStreamBase::OnStopSending(error)) {
+    return false;
+  }
   ASSERT(write_side_closed());
-  if (read_side_closed() && !end_stream_encoded) {
+  // Also stop reading because the peer already didn't care about the response any more.
+  if (!reading_stopped()) {
+    StopReading();
+  }
+  if (!end_stream_encoded) {
     // If both directions are closed but end stream hasn't been encoded yet, notify reset callbacks.
     // Treat this as a remote reset, since the stream will be closed in both directions.
     runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error));
   }
-  return ret;
+  return true;
 }
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {

@@ -72,9 +72,9 @@ public:
   bool isHalfCloseEnabled() override;
   std::string nextProtocol() const override;
   // Note, this might change before connect finishes.
-  const SocketAddressProvider& addressProvider() const override;
+  const ConnectionInfoProvider& addressProvider() const override;
   // Note, this might change before connect finishes.
-  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override;
+  ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override;
   // Note, this might change before connect finishes.
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   // Note, this might change before connect finishes.

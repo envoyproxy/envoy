@@ -9,6 +9,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
+# This test sets up multiple services, and this can take variable amount of time (30-60 seconds).
 envoy_py_test(
     name = "kafka_broker_integration_test",
     srcs = [
@@ -16,14 +17,13 @@ envoy_py_test(
         "@kafka_python_client//:all",
     ],
     data = [
-        "//source/exe:envoy-static",
+        "//contrib/exe:envoy-static",
         "//bazel:remote_jdk11",
         "@kafka_server_binary//:all",
     ] + glob(["*.j2"]),
     flaky = True,
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = ["manual"],
     deps = [
         requirement("Jinja2"),
         requirement("MarkupSafe"),

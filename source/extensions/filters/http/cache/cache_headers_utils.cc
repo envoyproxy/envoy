@@ -228,7 +228,7 @@ CacheHeadersUtils::parseCommaDelimitedHeader(const Http::HeaderMap::GetResult& e
   return values;
 }
 
-VaryHeader::VaryHeader(
+VaryAllowList::VaryAllowList(
     const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list) {
 
   for (const auto& rule : allow_list) {
@@ -238,17 +238,17 @@ VaryHeader::VaryHeader(
   }
 }
 
-bool VaryHeader::allowsHeader(const absl::string_view header) const {
+bool VaryAllowList::allowsValue(const absl::string_view vary_value) const {
   for (const auto& rule : allow_list_) {
-    if (rule->match(header)) {
+    if (rule->match(vary_value)) {
       return true;
     }
   }
   return false;
 }
 
-bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) const {
-  if (!VaryHeader::hasVary(headers)) {
+bool VaryAllowList::allowsHeaders(const Http::ResponseHeaderMap& headers) const {
+  if (!VaryHeaderUtils::hasVary(headers)) {
     return true;
   }
 
@@ -264,7 +264,7 @@ bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) const {
       return false;
     }
 
-    if (allowsHeader(header)) {
+    if (allowsValue(header)) {
       valid = true;
     }
 
@@ -276,14 +276,14 @@ bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) const {
   return true;
 }
 
-bool VaryHeader::hasVary(const Http::ResponseHeaderMap& headers) {
+bool VaryHeaderUtils::hasVary(const Http::ResponseHeaderMap& headers) {
   // TODO(mattklein123): Support multiple vary headers and/or just make the vary header inline.
   const auto vary_header = headers.get(Http::CustomHeaders::get().Vary);
   return !vary_header.empty() && !vary_header[0]->value().empty();
 }
 
 absl::btree_set<absl::string_view>
-VaryHeader::getVaryValues(const Http::ResponseHeaderMap& headers) {
+VaryHeaderUtils::getVaryValues(const Http::ResponseHeaderMap& headers) {
   Http::HeaderMap::GetResult vary_headers = headers.get(Http::CustomHeaders::get().Vary);
   if (vary_headers.empty()) {
     return {};
@@ -306,18 +306,20 @@ constexpr absl::string_view inValueSeparator = "\r";
 }; // namespace
 
 absl::optional<std::string>
-VaryHeader::createVaryIdentifier(const absl::btree_set<absl::string_view>& vary_header_values,
-                                 const Http::RequestHeaderMap& request_headers) const {
+VaryHeaderUtils::createVaryIdentifier(const VaryAllowList& allow_list,
+                                      const absl::btree_set<absl::string_view>& vary_header_values,
+                                      const Http::RequestHeaderMap& request_headers) {
   std::string vary_identifier = "vary-id\n";
   if (vary_header_values.empty()) {
     return vary_identifier;
   }
 
-  for (const absl::string_view& header : vary_header_values) {
-    if (header.empty()) {
+  for (const absl::string_view& value : vary_header_values) {
+    if (value.empty()) {
+      // Empty headers are ignored.
       continue;
     }
-    if (!allowsHeader(header)) {
+    if (!allow_list.allowsValue(value)) {
       // The backend tried to vary on a header that we don't allow, so return
       // absl::nullopt to indicate we are unable to cache this request. This
       // also may occur if the allow list has changed since an item was cached,
@@ -334,8 +336,8 @@ VaryHeader::createVaryIdentifier(const absl::btree_set<absl::string_view>& vary_
     // be used as an inspiration for some bucketing configuration. The config
     // should enable and control the bucketing wanted.
     const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(
-        request_headers, Http::LowerCaseString(std::string(header)), inValueSeparator);
-    absl::StrAppend(&vary_identifier, header, inValueSeparator,
+        request_headers, Http::LowerCaseString(std::string(value)), inValueSeparator);
+    absl::StrAppend(&vary_identifier, value, inValueSeparator,
                     all_values.result().has_value() ? all_values.result().value() : "",
                     headerSeparator);
   }
