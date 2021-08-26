@@ -23,6 +23,9 @@ from colorama import Fore, Style
 from packaging import version
 
 
+# Tag issues created with these labels.
+LABELS = ['deprecation', 'tech debt', 'no stalebot']
+
 # Thrown on errors related to release date or version.
 class ReleaseDateVersionError(Exception):
     pass
@@ -51,6 +54,45 @@ def verify_and_print_latest_release(dep, repo, metadata_version, release_date):
         print(
             f'{Fore.YELLOW}*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>: '
             f'{latest_release.tag_name}@<{latest_release.created_at}>{Style.RESET_ALL}')
+        create_issues(dep , repo , metadata_version, release_date, latest_release)
+
+
+# create issue for lagging deps
+def create_issues(dep ,repo , metadata_version , release_date, latest_release):
+    """Create issues in GitHub.
+
+    Args:
+        dep : name of the deps
+        repo : BaseURL of the repo
+        metadata_version :
+        release_date : old release_date
+        latest_release : latest_release (name and date )
+    """
+    access_token = os.getenv('GITHUB_TOKEN')
+    git = github.Github(access_token)
+    repo = git.get_repo('envoyproxy/envoy')
+
+    # Find GitHub label objects for LABELS.
+    labels = []
+    for label in repo.get_labels():
+        if label.name in LABELS:
+            labels.append(label)
+    if len(labels) != len(LABELS):
+        raise DeprecateVersionError('Unknown labels (expected %s, got %s)' % (LABELS, labels))
+
+    # if get_confirmation():
+    print('Creating issues...')
+    body = f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>:{latest_release.tag_name}@<{latest_release.created_at}>'
+    title = f'{dep} has a newer release {latest_release.tag_name}'
+    try:
+        repo.create_issue(title, body=body, assignees=None, labels=labels)
+    except github.GithubException as e:
+        try:
+            repo.create_issue(title, body=body, labels=labels)
+            print('unable to assign issue . Add them to the Envoy proxy org')
+        except github.GithubException as e:
+            print('GithubException while creating issue.')
+            raise
 
 
 # Print GitHub release date, throw ReleaseDateVersionError on mismatch with metadata release date.
@@ -61,7 +103,6 @@ def verify_and_print_release_date(dep, github_release_date, metadata_release_dat
     if iso_release_date != metadata_release_date:
         raise ReleaseDateVersionError(
             f'Mismatch with metadata release date of {metadata_release_date}')
-
 
 # Extract release date from GitHub API for tagged releases.
 def get_tagged_release_date(repo, metadata_version, github_release):
