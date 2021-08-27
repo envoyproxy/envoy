@@ -3,20 +3,6 @@ version: v1
 deps:
   - remote: buf.build
     owner: beta
-    repository: gogo
-    branch: main
-    commit: 2b52cca11cf242b09346114eeda81384
-    digest: b1-3_owLgnpQ3S9GCClrVq3aBuqFMx0yZ5N545nF0SiyS4=
-    create_time: 2021-02-09T19:58:24.352989Z
-  - remote: buf.build
-    owner: beta
-    repository: googleapis
-    branch: main
-    commit: ac0d624de3f746c3b8ef55c74b6f5244
-    digest: b1-GubXb4hZ56wTohZYDL-Muute9Jxx8J4TtIYucS30TBM=
-    create_time: 2021-08-12T19:53:55.128813Z
-  - remote: buf.build
-    owner: beta
     repository: opencensus
     branch: main
     commit: 5f5f8259293649d68707d2e5b6285748
@@ -50,3 +36,17 @@ deps:
     commit: 45f850b92541434cbde4aece01bc7d53
     digest: b1-QZUL5DC6-nVgMMlajH_hlImwghg5HjRsqlEAOl0dZgI=
     create_time: 2021-08-09T14:37:06.872899Z
+  - remote: buf.build
+    owner: gogo
+    repository: protobuf
+    branch: main
+    commit: 4df00b267f944190a229ce3695781e99
+    digest: b1-sjLgsg7CzrkOrIjBDh3s-l0aMjE6oqTj85-OsoopKAw=
+    create_time: 2021-08-10T00:14:28.345069Z
+  - remote: buf.build
+    owner: googleapis
+    repository: googleapis
+    branch: main
+    commit: d1a849b8f8304950832335723096e954
+    digest: b1-zJkwX0YeOp1Wa0Jaj_RqMLa2-oEzePH6PJEK8aaMeI4=
+    create_time: 2021-08-26T15:07:19.652533Z
