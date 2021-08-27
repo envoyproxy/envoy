@@ -243,18 +243,9 @@ TestPrivateKeyMethodProvider::getBoringSslPrivateKeyMethod() {
 }
 
 bool TestPrivateKeyMethodProvider::checkFips() {
-  if (mode_ == "rsa") {
-    RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey_.get());
-    if (rsa_private_key == nullptr || !RSA_check_fips(rsa_private_key)) {
-      return false;
-    }
-  } else { // if (mode_ == "ecdsa")
-    const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey_.get());
-    if (ecdsa_private_key == nullptr || !EC_KEY_check_fips(ecdsa_private_key)) {
-      return false;
-    }
-  }
-  return true;
+  // Underlying library is not fips-certified at the moment
+  // (https://github.com/intel/ipp-crypto#certification).
+  return false;
 }
 
 TestPrivateKeyConnection::TestPrivateKeyConnection(

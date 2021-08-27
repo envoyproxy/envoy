@@ -73,7 +73,7 @@ TEST_F(CryptoMbConfigTest, CreateRsa1024) {
 
   Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
   EXPECT_NE(nullptr, provider);
-  EXPECT_EQ(true, provider->checkFips());
+  EXPECT_EQ(false, provider->checkFips());
   Ssl::BoringSslPrivateKeyMethodSharedPtr method = provider->getBoringSslPrivateKeyMethod();
   EXPECT_NE(nullptr, method);
 
@@ -161,7 +161,7 @@ TEST_F(CryptoMbConfigTest, CreateEcdsaP256) {
 
   Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
   EXPECT_NE(nullptr, provider);
-  EXPECT_EQ(true, provider->checkFips());
+  EXPECT_EQ(false, provider->checkFips());
   Ssl::BoringSslPrivateKeyMethodSharedPtr method = provider->getBoringSslPrivateKeyMethod();
   EXPECT_NE(nullptr, method);
 

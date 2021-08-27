@@ -50,21 +50,23 @@ void CryptoMbContext::scheduleCallback(enum RequestStatus status) {
   schedulable_->scheduleCallbackNextIteration();
 }
 
-bool CryptoMbEcdsaContext::ecdsaInit(EC_KEY* ec, const uint8_t* in, size_t in_len) {
-  const BIGNUM* priv_key = EC_KEY_get0_private_key(ec);
-  uint8_t* key_bytes = static_cast<uint8_t*>(OPENSSL_malloc(BN_num_bytes(priv_key)));
+bool CryptoMbEcdsaContext::ecdsaInit(const uint8_t* in, size_t in_len) {
+  if (ec_key_ == nullptr) {
+    return false;
+  }
 
-  BN_bn2bin(priv_key, key_bytes);
+  s_ = EC_KEY_get0_private_key(ec_key_.get());
+  CSmartPtr<void, OPENSSL_free> key_bytes(OPENSSL_malloc(BN_num_bytes(s_.get())));
+
+  BN_bn2bin(s_.get(), static_cast<uint8_t*>(key_bytes.get()));
 
   // Calculate hash of the private key and the message to be signed.
   uint8_t additional_data[SHA512_DIGEST_LENGTH] = {0};
   SHA512_CTX sha;
   SHA512_Init(&sha);
-  SHA512_Update(&sha, key_bytes, BN_num_bytes(priv_key));
+  SHA512_Update(&sha, static_cast<uint8_t*>(key_bytes.get()), BN_num_bytes(s_.get()));
   SHA512_Update(&sha, in, in_len);
   SHA512_Final(additional_data, &sha);
-
-  OPENSSL_free(key_bytes);
 
   // Make the ephemeral key "k" to be a random number in the group, using the
   // hash as additional data. This is made to closely follow the way how
@@ -72,42 +74,43 @@ bool CryptoMbEcdsaContext::ecdsaInit(EC_KEY* ec, const uint8_t* in, size_t in_le
   // also https://tools.ietf.org/html/rfc6979#section-3.2
 
   EC_SCALAR k;
-  const EC_GROUP* group = EC_KEY_get0_group(ec);
+  const EC_GROUP* group = EC_KEY_get0_group(ec_key_.get());
   if (!ec_random_nonzero_scalar(group, &k, additional_data)) {
     return false;
   } else {
-    const BIGNUM* order = EC_GROUP_get0_order(group);
-    uint8_t* k_bytes = static_cast<uint8_t*>(OPENSSL_malloc(BN_num_bytes(order)));
+    BIGNUMConstPtr order(EC_GROUP_get0_order(group));
+    CSmartPtr<void, OPENSSL_free> k_bytes(OPENSSL_malloc(BN_num_bytes(order.get())));
     size_t k_len;
     // Convert the scalar first to bytes...
-    ec_scalar_to_bytes(group, k_bytes, &k_len, &k);
+    ec_scalar_to_bytes(group, static_cast<uint8_t*>(k_bytes.get()), &k_len, &k);
     // ... and then to BIGNUM to be usable in the multi-buffer function.
-    BN_bin2bn(k_bytes, k_len, &k_);
-    OPENSSL_free(k_bytes);
+    BN_bin2bn(static_cast<uint8_t*>(k_bytes.get()), k_len, &k_);
   }
-
-  s_ = priv_key;
 
   in_buf_ = std::make_unique<uint8_t[]>(in_len);
   memcpy(in_buf_.get(), in, in_len); // NOLINT(safe-memcpy)
 
-  ecdsa_sig_size_ = ECDSA_size(ec);
+  ecdsa_sig_size_ = ECDSA_size(ec_key_.get());
 
   return true;
 }
 
-bool CryptoMbRsaContext::rsaInit(RSA* rsa, const uint8_t* in, size_t in_len) {
+bool CryptoMbRsaContext::rsaInit(const uint8_t* in, size_t in_len) {
+  if (rsa_ == nullptr) {
+    return false;
+  }
+
   // Initialize the values with the RSA key.
   size_t in_buf_size = in_len;
-  out_len_ = RSA_size(rsa);
+  out_len_ = RSA_size(rsa_.get());
 
   if (out_len_ > in_buf_size) {
     in_buf_size = out_len_;
   }
 
-  RSA_get0_key(static_cast<RSA*>(rsa), &n_, &e_, &d_);
-  RSA_get0_factors(static_cast<RSA*>(rsa), &p_, &q_);
-  RSA_get0_crt_params(static_cast<RSA*>(rsa), &dmp1_, &dmq1_, &iqmp_);
+  RSA_get0_key(rsa_.get(), &n_, &e_, &d_);
+  RSA_get0_factors(rsa_.get(), &p_, &q_);
+  RSA_get0_crt_params(rsa_.get(), &dmp1_, &dmq1_, &iqmp_);
 
   if (p_ == nullptr || q_ == nullptr || dmp1_ == nullptr || dmq1_ == nullptr || iqmp_ == nullptr) {
     return false;
@@ -152,22 +155,17 @@ ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnectio
     return ssl_private_key_failure;
   }
 
-  EVP_PKEY* pkey = ops->getPrivateKey();
-  if (EVP_PKEY_id(pkey) != SSL_get_signature_algorithm_key_type(signature_algorithm)) {
-    return ssl_private_key_failure;
-  }
-
-  bssl::UniquePtr<EC_KEY> ec_key(EVP_PKEY_get1_EC_KEY(pkey));
-  if (ec_key == nullptr) {
+  bssl::UniquePtr<EVP_PKEY> pkey = ops->getPrivateKey();
+  if (EVP_PKEY_id(pkey.get()) != SSL_get_signature_algorithm_key_type(signature_algorithm)) {
     return ssl_private_key_failure;
   }
 
   // Create MB context which will be used for this particular
   // signing/decryption.
   CryptoMbEcdsaContextSharedPtr mb_ctx =
-      std::make_shared<CryptoMbEcdsaContext>(ops->dispatcher_, ops->cb_);
+      std::make_shared<CryptoMbEcdsaContext>(std::move(pkey), ops->dispatcher_, ops->cb_);
 
-  if (!mb_ctx->ecdsaInit(ec_key.get(), hash, hash_len)) {
+  if (!mb_ctx->ecdsaInit(hash, hash_len)) {
     return ssl_private_key_failure;
   }
 
@@ -215,13 +213,14 @@ ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection*
     return status;
   }
 
-  EVP_PKEY* rsa_pkey = ops->getPrivateKey();
+  bssl::UniquePtr<EVP_PKEY> pkey = ops->getPrivateKey();
+
   // Check if the SSL instance has correct data attached to it.
-  if (EVP_PKEY_id(rsa_pkey) != SSL_get_signature_algorithm_key_type(signature_algorithm)) {
+  if (EVP_PKEY_id(pkey.get()) != SSL_get_signature_algorithm_key_type(signature_algorithm)) {
     return status;
   }
 
-  RSA* rsa = EVP_PKEY_get0_RSA(rsa_pkey);
+  bssl::UniquePtr<RSA> rsa(EVP_PKEY_get1_RSA(pkey.get()));
   if (rsa == nullptr) {
     return status;
   }
@@ -243,16 +242,16 @@ ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection*
 
   // Add RSA padding to the the hash. Supported types are `PSS` and `PKCS1`.
   if (SSL_is_signature_algorithm_rsa_pss(signature_algorithm)) {
-    msg_len = RSA_size(rsa);
+    msg_len = RSA_size(rsa.get());
+    // We have to do manual memory management here, because BoringSSL tells in `prefix_allocated`
+    // variable whether or not memory needs to be freed.
     msg = static_cast<uint8_t*>(OPENSSL_malloc(msg_len));
     if (msg == nullptr) {
       return status;
     }
     prefix_allocated = 1;
-    if (!RSA_padding_add_PKCS1_PSS_mgf1(rsa, msg, hash, md, nullptr, -1)) {
-      if (prefix_allocated) {
-        OPENSSL_free(msg);
-      }
+    if (!RSA_padding_add_PKCS1_PSS_mgf1(rsa.get(), msg, hash, md, nullptr, -1)) {
+      OPENSSL_free(msg);
       return status;
     }
   } else {
@@ -267,9 +266,9 @@ ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection*
   // Create MB context which will be used for this particular
   // signing/decryption.
   CryptoMbRsaContextSharedPtr mb_ctx =
-      std::make_shared<CryptoMbRsaContext>(ops->dispatcher_, ops->cb_);
+      std::make_shared<CryptoMbRsaContext>(std::move(pkey), ops->dispatcher_, ops->cb_);
 
-  if (!mb_ctx->rsaInit(rsa, msg, msg_len)) {
+  if (!mb_ctx->rsaInit(msg, msg_len)) {
     if (prefix_allocated) {
       OPENSSL_free(msg);
     }
@@ -318,22 +317,17 @@ ssl_private_key_result_t rsaPrivateKeyDecryptInternal(CryptoMbPrivateKeyConnecti
     return ssl_private_key_failure;
   }
 
-  EVP_PKEY* rsa_pkey = ops->getPrivateKey();
+  bssl::UniquePtr<EVP_PKEY> pkey = ops->getPrivateKey();
 
   // Check if the SSL instance has correct data attached to it.
-  if (rsa_pkey == nullptr) {
-    return ssl_private_key_failure;
-  }
-
-  RSA* rsa = EVP_PKEY_get0_RSA(rsa_pkey);
-  if (rsa == nullptr) {
+  if (pkey == nullptr) {
     return ssl_private_key_failure;
   }
 
   CryptoMbRsaContextSharedPtr mb_ctx =
-      std::make_shared<CryptoMbRsaContext>(ops->dispatcher_, ops->cb_);
+      std::make_shared<CryptoMbRsaContext>(std::move(pkey), ops->dispatcher_, ops->cb_);
 
-  if (!mb_ctx->rsaInit(rsa, in, in_len)) {
+  if (!mb_ctx->rsaInit(in, in_len)) {
     return ssl_private_key_failure;
   }
 
@@ -489,7 +483,7 @@ void CryptoMbQueue::processEcdsaRequests() {
     const CryptoMbContextSharedPtr& mb_ctx = request_queue_[req_num];
     ecdsa_priv_from[req_num] = mb_ctx->in_buf_.get();
     pa_eph_skey[req_num] = &static_cast<CryptoMbEcdsaContext*>(mb_ctx.get())->k_;
-    pa_reg_skey[req_num] = static_cast<CryptoMbEcdsaContext*>(mb_ctx.get())->s_;
+    pa_reg_skey[req_num] = static_cast<CryptoMbEcdsaContext*>(mb_ctx.get())->s_.get();
   }
 
   ENVOY_LOG(debug, "Multibuffer ECDSA process {} requests", request_queue_.size());
@@ -514,7 +508,8 @@ void CryptoMbQueue::processEcdsaRequests() {
       ENVOY_LOG(debug, "Multibuffer ECDSA request {} success", req_num);
       status[req_num] = RequestStatus::Success;
 
-      // Use previously known size of the r and s (32).
+      // Use previously known size of the r and s (32). Ownership is passed
+      // to BoringSSL in ECDSA_SIG_set0, so not using smart pointers.
       BIGNUM* r = BN_bin2bn(pa_sign_r[req_num], 32, nullptr);
       BIGNUM* s = BN_bin2bn(pa_sign_s[req_num], 32, nullptr);
 
@@ -656,26 +651,8 @@ bool CryptoMbPrivateKeyConnection::addToQueue(CryptoMbContextSharedPtr mb_ctx) {
 }
 
 bool CryptoMbPrivateKeyMethodProvider::checkFips() {
-  ASSERT(pkey_);
-
-  switch (key_type_) {
-  case KeyType::Rsa: {
-    // TODO: should we disallow 1024-bit RSA keys, or just assume that RSA_check_fips() does the
-    // right thing?
-    RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey_.get());
-    if (rsa_private_key && RSA_check_fips(rsa_private_key)) {
-      return true;
-    }
-    break;
-  }
-  case KeyType::Ec: {
-    const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey_.get());
-    if (ecdsa_private_key && EC_KEY_check_fips(ecdsa_private_key)) {
-      return true;
-    }
-    break;
-  }
-  }
+  // `ipp-crypto` library is not fips-certified at the moment
+  // (https://github.com/intel/ipp-crypto#certification).
   return false;
 }
 
@@ -751,8 +728,8 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     ASSERT(key_size / 8 <= CryptoMbContext::MAX_SIGNATURE_SIZE);
 
     BIGNUM e_check;
+    // const BIGNUMs, memory managed by BoringSSL in RSA key structure.
     const BIGNUM *e, *n, *d;
-
     RSA_get0_key(rsa, &n, &e, &d);
     BN_init(&e_check);
     BN_add_word(&e_check, 65537);
@@ -770,13 +747,15 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     method_->decrypt = ecdsaPrivateKeyDecrypt;
     method_->complete = privateKeyComplete;
 
-    EC_KEY* eckey = EVP_PKEY_get0_EC_KEY(pkey.get());
-    const EC_GROUP* ecdsa_group = EC_KEY_get0_group(eckey);
-    const BIGNUM* order = EC_GROUP_get0_order(ecdsa_group);
-    if (ecdsa_group == nullptr || EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
+    const EC_GROUP* ecdsa_group = EC_KEY_get0_group(EVP_PKEY_get0_EC_KEY(pkey.get()));
+    if (ecdsa_group == nullptr) {
+      throw EnvoyException("Invalid ECDSA key.");
+    }
+    BIGNUMConstPtr order(EC_GROUP_get0_order(ecdsa_group));
+    if (EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
       throw EnvoyException("Only P-256 ECDSA keys are supported.");
     }
-    if (BN_num_bits(order) < 160) {
+    if (BN_num_bits(order.get()) < 160) {
       throw EnvoyException("Too few significant bits.");
     }
     key_size = EC_GROUP_get_degree(ecdsa_group);

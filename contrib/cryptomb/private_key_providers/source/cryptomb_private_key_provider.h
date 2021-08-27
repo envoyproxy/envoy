@@ -6,6 +6,7 @@
 #include "envoy/ssl/private_key/private_key_config.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/common/c_smart_ptr.h"
 #include "source/common/common/logger.h"
 
 #include "contrib/cryptomb/private_key_providers/source/ipp_crypto.h"
@@ -15,6 +16,11 @@ namespace Envoy {
 namespace Extensions {
 namespace PrivateKeyMethodProvider {
 namespace CryptoMb {
+
+namespace {
+void dontFreeBN(const BIGNUM*) { return; }
+} // namespace
+using BIGNUMConstPtr = CSmartPtr<const BIGNUM, dontFreeBN>;
 
 enum class RequestStatus { Retry, Success, Error };
 enum class KeyType { Rsa, Ec };
@@ -54,14 +60,17 @@ private:
 // custom initialization function.
 class CryptoMbEcdsaContext : public CryptoMbContext {
 public:
-  CryptoMbEcdsaContext(Event::Dispatcher& dispatcher, Ssl::PrivateKeyConnectionCallbacks& cb)
-      : CryptoMbContext(dispatcher, cb) {}
+  CryptoMbEcdsaContext(bssl::UniquePtr<EVP_PKEY> pkey, Event::Dispatcher& dispatcher,
+                       Ssl::PrivateKeyConnectionCallbacks& cb)
+      : CryptoMbContext(dispatcher, cb), ec_key_(EVP_PKEY_get1_EC_KEY(pkey.get())) {}
   ~CryptoMbEcdsaContext() override { BN_free(&k_); }
-  bool ecdsaInit(EC_KEY* ec, const uint8_t* in, size_t in_len);
+  bool ecdsaInit(const uint8_t* in, size_t in_len);
 
+  // ECDSA key.
+  bssl::UniquePtr<EC_KEY> ec_key_{};
   // EC parameters.
-  const BIGNUM* s_{}; // secret key
-  BIGNUM k_{};        // integer, chosen by HMAC of s and msg
+  BIGNUMConstPtr s_{}; // secret key
+  BIGNUM k_{};         // integer, chosen by HMAC of s and msg
   size_t ecdsa_sig_size_{};
 };
 
@@ -70,11 +79,16 @@ public:
 // verification.
 class CryptoMbRsaContext : public CryptoMbContext {
 public:
-  CryptoMbRsaContext(Event::Dispatcher& dispatcher, Ssl::PrivateKeyConnectionCallbacks& cb)
-      : CryptoMbContext(dispatcher, cb) {}
-  bool rsaInit(RSA* rsa, const uint8_t* in, size_t in_len);
+  CryptoMbRsaContext(bssl::UniquePtr<EVP_PKEY> pkey, Event::Dispatcher& dispatcher,
+                     Ssl::PrivateKeyConnectionCallbacks& cb)
+      : CryptoMbContext(dispatcher, cb), rsa_(EVP_PKEY_get1_RSA(pkey.get())) {}
+  bool rsaInit(const uint8_t* in, size_t in_len);
 
-  // RSA parameters.
+  // RSA key.
+  bssl::UniquePtr<RSA> rsa_{};
+  // RSA parameters. Const pointers, which will contain values whose memory is
+  // managed within BoringSSL RSA key structure, so not wrapped in smart
+  // pointers.
   const BIGNUM* d_{};
   const BIGNUM* e_{};
   const BIGNUM* n_{};
@@ -141,7 +155,7 @@ public:
                                CryptoMbQueue& queue);
   virtual ~CryptoMbPrivateKeyConnection() = default;
 
-  EVP_PKEY* getPrivateKey() { return pkey_.get(); };
+  bssl::UniquePtr<EVP_PKEY> getPrivateKey() { return bssl::UpRef(pkey_); };
   void logDebugMsg(std::string msg) { ENVOY_LOG(debug, "CryptoMb: {}", msg); }
   void logWarnMsg(std::string msg) { ENVOY_LOG(warn, "CryptoMb: {}", msg); }
   // return true if processing is synchronous
