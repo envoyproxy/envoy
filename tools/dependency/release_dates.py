@@ -31,6 +31,11 @@ class ReleaseDateVersionError(Exception):
     pass
 
 
+# Errors that happen during issue creation.
+class DeprecateVersionError(Exception):
+    pass
+
+
 # Format a datetime object as UTC YYYY-MM-DD.
 def format_utc_date(date):
     # We only handle naive datetime objects right now, which is what PyGithub
