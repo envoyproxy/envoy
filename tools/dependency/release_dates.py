@@ -61,7 +61,7 @@ def verify_and_print_latest_release(dep, repo, metadata_version, release_date):
             f'{latest_release.tag_name}@<{latest_release.created_at}>{Style.RESET_ALL}')
         # check for --cron flag, To run this only on github action schedule
         # and it does not bloat CI on every push
-        if str(sys.argv[2]).split("")[1] == "--cron" :
+        if str(sys.argv[2]).split("")[1] == "--cron":
             create_issues(dep, repo, metadata_version, release_date, latest_release)
 
 
@@ -91,7 +91,7 @@ def create_issues(dep, repo, metadata_version, release_date, latest_release):
     title = f'{dep} has a newer release {latest_release.tag_name}'
     exists = repo.legacy_search_issues('open', title) or repo.legacy_search_issues('close', title)
     # TODO(htuch): Figure out how to do this without legacy and faster.
-    if exists :
+    if exists:
         print("Issue with %s already exists" % title)
         print(exists)
         print('  >> Issue already exists, not posting!')
@@ -183,7 +183,7 @@ def verify_and_print_release_dates(repository_locations, github_instance):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2 :
+    if len(sys.argv) != 2:
         print('Usage: %s <path to repository_locations.bzl>' % sys.argv[0])
         sys.exit(1)
     access_token = os.getenv('GITHUB_TOKEN')
