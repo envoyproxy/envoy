@@ -1,5 +1,5 @@
 syntax = "proto3";
-package test.protos.breaking;
+package test.protos.allowed;
 
 message SearchRequest {
   string query = 1;

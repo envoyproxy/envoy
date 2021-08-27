@@ -1,7 +1,7 @@
 syntax = "proto3";
-package test.protos.breaking;
+package test.protos.allowed;
 
-message SampleMessage {
+message AddFieldMessage {
     string three = 3;
     float four = 4;
 }

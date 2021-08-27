@@ -1,6 +1,6 @@
 syntax = "proto3";
 package test.protos.breaking;
 
-message SampleMessage {
-    float three = 3;
+message ChangeFieldTypeMessage {
+  float pi = 314;
 }

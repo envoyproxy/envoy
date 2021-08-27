@@ -18,7 +18,8 @@ def detect_breaking_changes_git(path_to_buf, ref):
         buf_path=path_to_buf,
         config_file_loc=CONFIG_FILE_LOC,
         git_ref=ref,
-        git_path=GIT_PATH)
+        git_path=GIT_PATH,
+        subdir="api")
     detector.run_detector()
     breaking = detector.is_breaking()
 

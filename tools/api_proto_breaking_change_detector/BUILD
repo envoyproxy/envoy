@@ -50,6 +50,7 @@ py_test(
     tags = ["manual"],
     deps = [
         ":proto_breaking_change_detector",
+        "//tools:run_command",
         "@rules_python//python/runfiles",
     ],
 )
