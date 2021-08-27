@@ -39,7 +39,8 @@ class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 class MockConnectionSocket : public Network::ConnectionSocket {
 public:
   MockConnectionSocket()
-      : connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)) {}
+      : connection_info_provider_(
+            std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)) {}
 
   static std::unique_ptr<MockConnectionSocket>
   createMockConnectionSocket(uint16_t destination_port, const std::string& destination_address,
@@ -75,7 +76,9 @@ public:
   const std::vector<std::string>& requestedApplicationProtocols() const override {
     return application_protocols_;
   }
-  Network::ConnectionInfoSetter& connectionInfoProvider() override { return *connection_info_provider_; }
+  Network::ConnectionInfoSetter& connectionInfoProvider() override {
+    return *connection_info_provider_;
+  }
   const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
     return *connection_info_provider_;
   }

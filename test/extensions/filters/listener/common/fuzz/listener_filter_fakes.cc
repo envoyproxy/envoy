@@ -13,7 +13,8 @@ Network::Address::Type FakeConnectionSocket::addressType() const {
 }
 
 absl::optional<Network::Address::IpVersion> FakeConnectionSocket::ipVersion() const {
-  if (connection_info_provider_->localAddress() == nullptr || addressType() != Network::Address::Type::Ip) {
+  if (connection_info_provider_->localAddress() == nullptr ||
+      addressType() != Network::Address::Type::Ip) {
     return absl::nullopt;
   }
 

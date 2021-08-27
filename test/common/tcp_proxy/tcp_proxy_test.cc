@@ -74,8 +74,9 @@ public:
       conn_pool_handles_.push_back(
           std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
       ON_CALL(*upstream_hosts_.at(i), address()).WillByDefault(Return(upstream_remote_address_));
-      upstream_connections_.at(i)->stream_info_.downstream_connection_info_provider_->setLocalAddress(
-          upstream_local_address_);
+      upstream_connections_.at(i)
+          ->stream_info_.downstream_connection_info_provider_->setLocalAddress(
+              upstream_local_address_);
       EXPECT_CALL(*upstream_connections_.at(i), dispatcher())
           .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
     }
@@ -122,8 +123,8 @@ public:
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
-      filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setSslConnection(
-          filter_callbacks_.connection_.ssl());
+      filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+          ->setSslConnection(filter_callbacks_.connection_.ssl());
     }
 
     if (connections > 0) {

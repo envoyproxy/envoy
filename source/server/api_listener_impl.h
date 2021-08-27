@@ -79,8 +79,9 @@ protected:
     class SyntheticConnection : public Network::Connection {
     public:
       SyntheticConnection(SyntheticReadCallbacks& parent)
-          : parent_(parent), connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
-                                 parent.parent_.address_, parent.parent_.address_)),
+          : parent_(parent),
+            connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
+                parent.parent_.address_, parent.parent_.address_)),
             stream_info_(parent_.parent_.factory_context_.timeSource(), connection_info_provider_),
             options_(std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>()) {}
 

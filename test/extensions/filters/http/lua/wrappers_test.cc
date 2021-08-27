@@ -290,7 +290,8 @@ TEST_F(LuaStreamInfoWrapperTest, ReturnCurrentDownstreamAddresses) {
   auto downstream_direct_remote =
       Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("8.8.8.8", 3000)};
   stream_info.downstream_connection_info_provider_->setLocalAddress(address);
-  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(downstream_direct_remote);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(
+      downstream_direct_remote);
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_CALL(printer_, testPrint(address->asString()));
