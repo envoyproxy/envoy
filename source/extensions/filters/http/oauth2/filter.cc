@@ -144,7 +144,9 @@ FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope&
 
 void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
                                       const std::string& secret) {
-  const auto& cookies = Http::Utility::parseCookies(headers);
+  const auto& cookies = Http::Utility::parseCookies(headers, [](absl::string_view key) -> bool {
+    return key == "OauthExpires" || key == "BearerToken" || key == "OauthHMAC";
+  });
 
   expires_ = findValue(cookies, "OauthExpires");
   token_ = findValue(cookies, "BearerToken");

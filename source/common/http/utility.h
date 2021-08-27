@@ -258,6 +258,16 @@ std::string parseCookieValue(const HeaderMap& headers, const std::string& key);
 /**
  * Parse cookies from header into a map.
  * @param headers supplies the headers to get cookies from.
+ * @param key_filter predicate that returns true for every cookie key to be included.
+ * @return absl::flat_hash_map cookie map.
+ **/
+absl::flat_hash_map<std::string, std::string>
+parseCookies(const RequestHeaderMap& headers,
+             const std::function<bool(absl::string_view)>& key_filter);
+
+/**
+ * Parse cookies from header into a map.
+ * @param headers supplies the headers to get cookies from.
  * @return absl::flat_hash_map cookie map.
  **/
 absl::flat_hash_map<std::string, std::string> parseCookies(const RequestHeaderMap& headers);
