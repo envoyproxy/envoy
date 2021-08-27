@@ -812,11 +812,7 @@ private:
         const std::string& filter_name,
         std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
-<<<<<<< HEAD
     const Http::LowerCaseString& clusterHeaderName() const { return cluster_header_name_; }
-=======
-    const Http::LowerCaseString& clusterHeaderName() { return cluster_header_name_; }
->>>>>>> ef70185f3ac241d09eabfe15c65b0d631134f74f
 
   private:
     const std::string runtime_key_;
