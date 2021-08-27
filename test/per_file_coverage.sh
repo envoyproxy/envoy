@@ -12,7 +12,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/filesystem/posix:96.2"
 "source/common/json:90.9"
 "source/common/network:95.0"  # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl` do not always report LCOV
-"source/common/network/dns_resolver:94.0"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts 
+"source/common/network/dns_resolver:94.0"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
 "source/common/protobuf:94.7"
 "source/common/signal:84.5" # Death tests don't report LCOV
 "source/common/singleton:95.8"
