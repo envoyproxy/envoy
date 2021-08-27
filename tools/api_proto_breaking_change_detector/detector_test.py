@@ -7,7 +7,6 @@ already tests for these circumstances, these specify Envoy's requirements
 and ensure that tool behavior is consistent across dependency updates.
 """
 
-import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,7 +15,7 @@ from shutil import copyfile, copytree
 from rules_python.python.runfiles import runfiles
 
 from buf_utils import pull_buf_deps
-from detector import ProtoBreakingChangeDetector, BufWrapper
+from detector import BufWrapper
 from tools.base.utils import cd_and_return
 from tools.run_command import run_command
 
@@ -100,6 +99,7 @@ class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
     def setUpClass(cls):
         try:
             # make temp dir
+            # buf requires protobuf files to be in a subdirectory of the directory containing the yaml file
             cls._temp_dir = tempfile.TemporaryDirectory(dir=Path.cwd())
             cls._config_file_loc = Path(cls._temp_dir.name, "buf.yaml")
 
@@ -109,7 +109,7 @@ class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
             copytree(testdata_path, cls._temp_dir.name, dirs_exist_ok=True)
 
             # copy in buf config
-            bazel_buf_config_loc = Path(".", "external", "envoy_api_canonical", "buf.yaml")
+            bazel_buf_config_loc = Path.cwd().joinpath("external", "envoy_api_canonical", "buf.yaml")
             copyfile(bazel_buf_config_loc, cls._config_file_loc)
 
             # pull buf dependencies and initialize git repo with test data files

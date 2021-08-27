@@ -24,18 +24,10 @@ def _generate_buf_args(target_path, config_file_loc, additional_args):
     return buf_args
 
 
-def _cd_into_config_parent(func):
+def _cd_into_config_parent(config_file_loc):
+    config_parent = Path(config_file_loc).parent if config_file_loc else Path.cwd()
+    return cd_and_return(config_parent)
 
-    def cd_wrapper(*args, **kwargs):
-        config_file_loc = kwargs.get("config_file_loc")
-        config_parent = Path(config_file_loc).parent if config_file_loc else Path.cwd()
-        with cd_and_return(config_parent):
-            return func(*args, **kwargs)
-
-    return cd_wrapper
-
-
-@_cd_into_config_parent
 def pull_buf_deps(
         buf_path: Union[str, Path],
         target_path: Union[str, Path],
@@ -56,22 +48,22 @@ def pull_buf_deps(
     Raises:
         ChangeDetectorInitializeError: if buf encounters an error while attempting to update the buf.lock file or build afterward
     """
-    buf_args = _generate_buf_args(target_path, config_file_loc, additional_args)
+    with _cd_into_config_parent(config_file_loc):
+        buf_args = _generate_buf_args(target_path, config_file_loc, additional_args)
 
-    update_code, _, update_err = run_command(f'{buf_path} mod update')
-    # for some reason buf prints out the "downloading..." lines on stderr
-    if update_code != 0:
-        raise ChangeDetectorInitializeError(
-            f"Error running `buf mod update`: exit status code {update_code} | stderr: {''.join(update_err)}"
-        )
-    if not Path(Path.cwd(), "buf.lock").exists():
-        raise ChangeDetectorInitializeError(
-            "buf mod update did not generate a buf.lock file (silent error... incorrect config?)")
+        update_code, _, update_err = run_command(f'{buf_path} mod update')
+        # for some reason buf prints out the "downloading..." lines on stderr
+        if update_code != 0:
+            raise ChangeDetectorInitializeError(
+                f"Error running `buf mod update`: exit status code {update_code} | stderr: {''.join(update_err)}"
+            )
+        if not Path.cwd().joinpath("buf.lock").exists():
+            raise ChangeDetectorInitializeError(
+                "buf mod update did not generate a buf.lock file (silent error... incorrect config?)")
 
-    run_command(' '.join([f'{buf_path} build', *buf_args]))
+        run_command(' '.join([f'{buf_path} build', *buf_args]))
 
 
-@_cd_into_config_parent
 def check_breaking(
         buf_path: Union[str, Path],
         target_path: Union[str, Path],
@@ -95,16 +87,17 @@ def check_breaking(
     Returns:
         Tuple[int, List[str], List[str]] -- tuple of (exit status code, stdout, stderr) as provided by run_command. Note stdout/stderr are provided as string lists
     """
-    if not Path(git_path).exists():
-        raise ChangeDetectorError(f'path to .git folder {git_path} does not exist')
+    with _cd_into_config_parent(config_file_loc):
+        if not Path(git_path).exists():
+            raise ChangeDetectorError(f'path to .git folder {git_path} does not exist')
 
-    buf_args = _generate_buf_args(target_path, config_file_loc, additional_args)
+        buf_args = _generate_buf_args(target_path, config_file_loc, additional_args)
 
-    initial_state_input = f'{git_path}#ref={git_ref}'
+        initial_state_input = f'{git_path}#ref={git_ref}'
 
-    if subdir:
-        initial_state_input += f',subdir={subdir}'
+        if subdir:
+            initial_state_input += f',subdir={subdir}'
 
-    final_code, final_out, final_err = run_command(
-        ' '.join([buf_path, f"breaking --against {initial_state_input}", *buf_args]))
-    return final_code, final_out, final_err
+        final_code, final_out, final_err = run_command(
+            ' '.join([buf_path, f"breaking --against {initial_state_input}", *buf_args]))
+        return final_code, final_out, final_err

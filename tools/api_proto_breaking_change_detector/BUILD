@@ -3,7 +3,7 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 licenses(["notice"])  # Apache 2
 
 py_binary(
-    name = "proto_breaking_change_detector",
+    name = "detector",
     srcs = [
         "detector.py",
     ],
@@ -15,7 +15,7 @@ py_binary(
     tags = ["manual"],
     deps = [
         ":buf_utils",
-        ":proto_breaking_change_detector_errors",
+        ":detector_errors",
         "//tools:run_command",
     ],
 )
@@ -26,20 +26,20 @@ py_library(
         "buf_utils.py",
     ],
     deps = [
-        ":proto_breaking_change_detector_errors",
+        ":detector_errors",
         "//tools/base:utils",
     ],
 )
 
 py_library(
-    name = "proto_breaking_change_detector_errors",
+    name = "detector_errors",
     srcs = [
         "detector_errors.py",
     ],
 )
 
 py_test(
-    name = "proto_breaking_change_detector_test",
+    name = "detector_test",
     srcs = ["detector_test.py"],
     data = [
         "//tools/testdata/api_proto_breaking_change_detector:proto_breaking_change_detector_testdata",
@@ -49,7 +49,7 @@ py_test(
     srcs_version = "PY3",
     tags = ["manual"],
     deps = [
-        ":proto_breaking_change_detector",
+        ":detector",
         "//tools:run_command",
         "@rules_python//python/runfiles",
     ],

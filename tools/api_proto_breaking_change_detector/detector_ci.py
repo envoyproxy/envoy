@@ -7,7 +7,7 @@ from pathlib import Path
 from detector import BufWrapper
 
 API_DIR = Path("api").resolve()
-GIT_PATH = Path(".", ".git").resolve()
+GIT_PATH = Path.cwd().joinpath(".git")
 CONFIG_FILE_LOC = Path(API_DIR, "buf.yaml")
 
 
@@ -40,6 +40,5 @@ if __name__ == '__main__':
         'git_ref', type=str, help='git reference to check against for breaking changes')
     args = parser.parse_args()
 
-    exit_status = 0
-    exit_status &= detect_breaking_changes_git(args.buf_path, args.git_ref)
+    exit_status = detect_breaking_changes_git(args.buf_path, args.git_ref)
     sys.exit(exit_status)
