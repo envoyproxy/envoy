@@ -28,7 +28,7 @@ int ec_random_nonzero_scalar(const EC_GROUP* group, EC_SCALAR* out,
                              const uint8_t additional_data[32]);
 // NOLINTNEXTLINE(readability-identifier-naming)
 void ec_scalar_to_bytes(const EC_GROUP* group, uint8_t* out, size_t* out_len, const EC_SCALAR* in);
-} // extern "C"
+}
 
 namespace Envoy {
 namespace Extensions {
@@ -241,7 +241,7 @@ ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection*
   size_t msg_len;
   int prefix_allocated = 0;
 
-  // Add RSA padding to the the hash. Supported types are PSS and PKCS1.
+  // Add RSA padding to the the hash. Supported types are `PSS` and `PKCS1`.
   if (SSL_is_signature_algorithm_rsa_pss(signature_algorithm)) {
     msg_len = RSA_size(rsa);
     msg = static_cast<uint8_t*>(OPENSSL_malloc(msg_len));
@@ -528,7 +528,7 @@ void CryptoMbQueue::processEcdsaRequests() {
         if (CryptoMbContext::MAX_SIGNATURE_SIZE < mb_ctx->ecdsa_sig_size_) {
           status[req_num] = RequestStatus::Error;
         } else {
-          // BoringSSL uses CBB to marshaling the signature to out_buf_.
+          // BoringSSL uses `CBB` for marshaling the signature to out_buf_.
           CBB cbb;
           if (!CBB_init_fixed(&cbb, mb_ctx->out_buf_, mb_ctx->ecdsa_sig_size_) ||
               !ECDSA_SIG_marshal(&cbb, sig) || !CBB_finish(&cbb, nullptr, &mb_ctx->out_len_)) {
@@ -596,7 +596,7 @@ void CryptoMbQueue::processRsaRequests() {
       status[req_num] = RequestStatus::Error;
     }
 
-    // Lenstra check (validate that we get the same result back).
+    // `Lenstra` check (validate that we get the same result back).
     rsa_priv_from[req_num] = rsa_priv_to[req_num];
     rsa_priv_to[req_num] = mb_ctx->lenstra_to_;
     rsa_lenstra_e[req_num] = mb_ctx->e_;

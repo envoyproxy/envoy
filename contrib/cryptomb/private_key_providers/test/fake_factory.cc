@@ -107,13 +107,13 @@ uint32_t FakeIppCryptoImpl::mbxRsaPrivateCrtSslMb8(
     RSA_set0_factors(rsa, BN_dup(p_pa[i]), BN_dup(q_pa[i]));
     RSA_set0_crt_params(rsa, BN_dup(dp_pa[i]), BN_dup(dq_pa[i]), BN_dup(iq_pa[i]));
 
-    // The real mbx_rsa_private_crt_ssl_mb8 doesn't require these parameters to
+    // The real `mbx_rsa_private_crt_ssl_mb8` doesn't require these parameters to
     // be set, but BoringSSL does. That's why they are provided out-of-band in
     // the factory initialization.
     RSA_set0_key(rsa, BN_dup(n_), BN_dup(e_), BN_dup(d_));
 
-    // From the docs: "Memory buffers of the plain- and ciphertext must be ceil(rsaBitlen/8) bytes
-    // length."
+    // From the docs: "Memory buffers of the plain- and `ciphertext` must be `ceil(rsaBitlen/8)`
+    // bytes length."
     ret = RSA_sign_raw(rsa, &out_len, to_pa[i], expected_rsa_bitsize / 8, from_pa[i],
                        expected_rsa_bitsize / 8, RSA_NO_PADDING);
 

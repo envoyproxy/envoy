@@ -21,7 +21,7 @@ enum class KeyType { Rsa, Ec };
 
 // CryptoMbContext holds the actual data to be signed or encrypted. It also has a
 // reference to the worker thread dispatcher for communicating that it has
-// has ran the AVX code and the result is ready to be used.
+// has ran the `AVX-512` code and the result is ready to be used.
 class CryptoMbContext {
 public:
   static constexpr ssize_t MAX_SIGNATURE_SIZE = 512;
@@ -84,7 +84,7 @@ public:
   const BIGNUM* dmq1_{};
   const BIGNUM* iqmp_{};
 
-  // Buffer for Lenstra check.
+  // Buffer for `Lenstra` check.
   unsigned char lenstra_to_[MAX_SIGNATURE_SIZE];
 };
 
