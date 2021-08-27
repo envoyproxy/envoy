@@ -52,10 +52,8 @@ public:
   RichKafkaProducer(Event::Dispatcher& dispatcher, Thread::ThreadFactory& thread_factory,
                     const RawKafkaProducerConfig& configuration, const LibRdKafkaUtils& utils);
 
-  /**
-   * More complex than usual.
-   * Marks that monitoring thread should finish and waits for it to join.
-   */
+  // More complex than usual.
+  // Marks that monitoring thread should finish and waits for it to join.
   ~RichKafkaProducer() override;
 
   // KafkaProducer
@@ -66,7 +64,7 @@ public:
             const int32_t partition, const absl::string_view key,
             const absl::string_view value) override;
 
-  // Runnable executed by monitoring thread.
+  // This method gets executed by monitoring thread.
   // Does not finish until this object gets 'markFinished' invoked or gets destroyed.
   // Executed in dedicated monitoring thread.
   void checkDeliveryReports();

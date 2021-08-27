@@ -39,6 +39,7 @@ cc_library(
     ],
 )
 
+# Kafka client dependency used by Kafka-mesh filter.
 # librdkafka build generates extra headers that need to be copied into source to get it to compile.
 configure_make(
     name = "librdkafka_build",

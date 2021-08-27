@@ -72,7 +72,7 @@ RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
 
 RichKafkaProducer::~RichKafkaProducer() {
   ENVOY_LOG(debug, "Shutting down worker thread");
-  poller_thread_active_ = false;
+  poller_thread_active_ = false; // This should never be needed, as we call 'markFinished' earlier.
   poller_thread_->join();
   ENVOY_LOG(debug, "Worker thread shut down successfully");
 }
@@ -84,10 +84,9 @@ void RichKafkaProducer::send(const ProduceFinishCbSharedPtr origin, const std::s
                              const absl::string_view value) {
   {
     void* value_data = const_cast<char*>(value.data()); // Needed for Kafka API.
-    ENVOY_LOG(trace, "Sending [{}] to [{}/{}]", reinterpret_cast<long>(value_data), topic,
-              partition);
-    // No flags, we leave all the memory management to Envoy, as we will use address of value data
-    // in message callback to tell apart the requests.
+    // Data is a pointer into request internals, and it is going to be managed by
+    // ProduceRequestHolder lifecycle. So we are not going to use any of librdkafka's memory
+    // management.
     const int flags = 0;
     const RdKafka::ErrorCode ec = producer_->produce(
         topic, partition, flags, value_data, value.size(), key.data(), key.size(), 0, nullptr);
@@ -98,8 +97,7 @@ void RichKafkaProducer::send(const ProduceFinishCbSharedPtr origin, const std::s
       // We could not submit data to producer.
       // Let's treat that as a normal failure (Envoy is a broker after all) and propagate
       // downstream.
-      ENVOY_LOG(trace, "Produce failure: {}, while sending [{}] to [{}/{}]", ec,
-                reinterpret_cast<long>(value_data), topic, partition);
+      ENVOY_LOG(trace, "Produce failure: {}, while sending to [{}/{}]", ec, topic, partition);
       const DeliveryMemento memento = {value_data, ec, 0};
       origin->accept(memento);
     }
@@ -119,9 +117,8 @@ void RichKafkaProducer::checkDeliveryReports() {
 
 // Kafka callback that contains the delivery information.
 void RichKafkaProducer::dr_cb(RdKafka::Message& message) {
-  ENVOY_LOG(trace, "Delivery finished: {}, payload [{}] has been saved at offset {} in {}/{}",
-            message.err(), reinterpret_cast<long>(message.payload()), message.topic_name(),
-            message.partition(), message.offset());
+  ENVOY_LOG(trace, "Delivery finished: {}, payload has been saved at offset {} in {}/{}",
+            message.err(), message.topic_name(), message.partition(), message.offset());
   const DeliveryMemento memento = {message.payload(), message.err(), message.offset()};
   // Because this method gets executed in poller thread, we need to pass the data through
   // dispatcher.
