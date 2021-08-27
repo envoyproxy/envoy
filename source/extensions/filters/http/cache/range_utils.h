@@ -88,8 +88,14 @@ inline bool operator==(const AdjustedByteRange& lhs, const AdjustedByteRange& rh
   return lhs.begin() == rhs.begin() && lhs.end() == rhs.end();
 }
 
+// Contains details about whether the ranges requested can be satisfied and, if
+// so, what those ranges are after being adjusted to fit the content.
 struct RangeDetails {
+  // Indicates whether the requested ranges can be satisfied by the content
+  // stored in the cache. If not, we need to go to the backend to fill the
+  // cache.
   bool satisfiable_ = false;
+  // The ranges that will be served by the cache, if satisfiable_ = true.
   std::vector<AdjustedByteRange> ranges_;
 };
 
