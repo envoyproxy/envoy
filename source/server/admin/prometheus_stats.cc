@@ -126,10 +126,11 @@ uint64_t outputStatType(
 
   auto result = 0;
   for (auto& it : groups) {
+    const bool is_custom_metric = it.first;
+    result += it.second.size();
     for (auto& group : it.second) {
-      result++;
-      const std::string prefixed_tag_extracted_name =
-          PrometheusStatsFormatter::metricName(global_symbol_table.toString(group.first), it.first);
+      const std::string prefixed_tag_extracted_name = PrometheusStatsFormatter::metricName(
+          global_symbol_table.toString(group.first), is_custom_metric);
       response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, type));
 
       // Sort before producing the final output to satisfy the "preferred" ordering from the

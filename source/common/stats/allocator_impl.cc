@@ -272,6 +272,7 @@ CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracte
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
   auto iter = counters_.find(name);
   if (iter != counters_.end()) {
+    ASSERT((*iter)->isCustomMetric() == is_custom_metric);
     return CounterSharedPtr(*iter);
   }
   auto counter = CounterSharedPtr(
@@ -288,6 +289,7 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_na
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
   auto iter = gauges_.find(name);
   if (iter != gauges_.end()) {
+    ASSERT((*iter)->isCustomMetric() == is_custom_metric);
     return GaugeSharedPtr(*iter);
   }
   auto gauge = GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, stat_name_tags,
