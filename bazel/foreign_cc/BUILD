@@ -46,7 +46,7 @@ configure_make(
     configure_in_place = True,
     configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd && cp Makefile.config src/.. && cp config.h src/.."],
     env = {
-        "ARFLAGS": "v",
+        "AR_FLAGS": "v",
     },
     lib_source = "@edenhill_librdkafka//:all",
     out_static_libs = [
