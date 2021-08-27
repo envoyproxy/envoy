@@ -812,6 +812,8 @@ private:
         const std::string& filter_name,
         std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
+    const Http::LowerCaseString& clusterHeaderName() { return cluster_header_name_; }
+
   private:
     const std::string runtime_key_;
     Runtime::Loader& loader_;
@@ -821,6 +823,7 @@ private:
     HeaderParserPtr response_headers_parser_;
     PerFilterConfigs per_filter_configs_;
     const std::string host_rewrite_;
+    const Http::LowerCaseString cluster_header_name_;
   };
 
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
