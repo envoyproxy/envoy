@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 56]
+// [#next-free-field: 57]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -337,6 +337,35 @@ message Cluster {
     bool list_as_any = 7;
   }
 
+  // Configuration for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`.
+  message SlowStartConfig {
+    // Represents the size of slow start window.
+    // If set, the newly created host remains in slow start mode starting from its creation time
+    // for the duration of slow start window.
+    google.protobuf.Duration slow_start_window = 1;
+
+    // This parameter controls the speed of traffic increase over the slow start window. Defaults to 1.0,
+    // so that endpoint would get linearly increasing amount of traffic.
+    // When increasing the value for this parameter, the speed of traffic ramp-up increases non-linearly.
+    // The value of aggression parameter should be greater than 0.0.
+    // By tuning the parameter, is possible to achieve polynomial or exponential shape of ramp-up curve.
+    //
+    // During slow start window, effective weight of an endpoint would be scaled with time factor and aggression:
+    // `new_weight = weight * time_factor ^ (1 / aggression)`,
+    // where `time_factor=(time_since_start_seconds / slow_start_time_seconds)`.
+    //
+    // As time progresses, more and more traffic would be sent to endpoint, which is in slow start window.
+    // Once host exits slow start, time_factor and aggression no longer affect its weight.
+    core.v3.RuntimeDouble aggression = 2;
+  }
+
+  // Specific configuration for the RoundRobin load balancing policy.
+  message RoundRobinLbConfig {
+    // Configuration for slow start mode.
+    // If this configuration is not set, slow start will not be not enabled.
+    SlowStartConfig slow_start_config = 1;
+  }
+
   // Specific configuration for the LeastRequest load balancing policy.
   message LeastRequestLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
@@ -370,6 +399,10 @@ message Cluster {
     // .. note::
     //   This setting only takes effect if all host weights are not equal.
     core.v3.RuntimeDouble active_request_bias = 2;
+
+    // Configuration for slow start mode.
+    // If this configuration is not set, slow start will not be not enabled.
+    SlowStartConfig slow_start_config = 3;
   }
 
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
@@ -441,7 +474,7 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
-  // [#next-free-field: 9]
+  // [#next-free-field: 8]
   message CommonLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.CommonLbConfig";
@@ -509,28 +542,6 @@ message Cluster {
       google.protobuf.UInt32Value hash_balance_factor = 2 [(validate.rules).uint32 = {gte: 100}];
     }
 
-    // Configuration for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`.
-    message SlowStartConfig {
-      // Represents the size of slow start window.
-      // If set, the newly created host remains in slow start mode starting from its creation time
-      // for the duration of slow start window.
-      google.protobuf.Duration slow_start_window = 1;
-
-      // This parameter controls the speed of traffic increase over the slow start window. Defaults to 1.0,
-      // so that endpoint would get linearly increasing amount of traffic.
-      // When increasing the value for this parameter, the speed of traffic ramp-up increases non-linearly.
-      // The value of aggression parameter should be greater than 0.0.
-      // By tuning the parameter, is possible to achieve polynomial or exponential shape of ramp-up curve.
-      //
-      // During slow start window, effective weight of an endpoint would be scaled with time factor and aggression:
-      // `new_weight = weight * time_factor ^ (1 / aggression)`,
-      // where `time_factor=(time_since_start_seconds / slow_start_time_seconds)`.
-      //
-      // As time progresses, more and more traffic would be sent to endpoint, which is in slow start window.
-      // Once host exits slow start, time_factor and aggression no longer affect its weight.
-      core.v3.RuntimeDouble aggression = 2;
-    }    
-
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.
     // If not specified, the default is 50%.
     // To disable panic mode, set to 0%.
@@ -572,10 +583,6 @@ message Cluster {
 
     // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
     ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
-
-    // Configuration for slow start mode.
-    // If this configuration is not set, slow start will not be not enabled.
-    SlowStartConfig slow_start_config = 8;
   }
 
   message RefreshRate {
@@ -584,10 +591,8 @@ message Cluster {
     // Specifies the base interval between refreshes. This parameter is required and must be greater
     // than zero and less than
     // :ref:`max_interval <envoy_v3_api_field_config.cluster.v3.Cluster.RefreshRate.max_interval>`.
-    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
-      required: true
-      gt {nanos: 1000000}
-    }];
+    google.protobuf.Duration base_interval = 1
+        [(validate.rules).duration = {required: true gt {nanos: 1000000}}];
 
     // Specifies the maximum interval between refreshes. This parameter is optional, but must be
     // greater than or equal to the
@@ -977,6 +982,9 @@ message Cluster {
 
     // Optional configuration for the LeastRequest load balancing policy.
     LeastRequestLbConfig least_request_lb_config = 37;
+
+    // Optional configuration for the RoundRobin load balancing policy.
+    RoundRobinLbConfig round_robin_lb_config = 56;
   }
 
   // Common configuration for all load balancer implementations.

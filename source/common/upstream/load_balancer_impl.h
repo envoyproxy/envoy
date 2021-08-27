@@ -378,11 +378,12 @@ private:
 class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase,
                             Logger::Loggable<Logger::Id::upstream> {
 public:
-  EdfLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                      ClusterStats& stats, Runtime::Loader& runtime,
-                      Random::RandomGenerator& random,
-                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-                      TimeSource& time_source);
+  EdfLoadBalancerBase(
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+      Runtime::Loader& runtime, Random::RandomGenerator& random,
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+      const absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig> slow_start_cofig,
+      TimeSource& time_source);
 
   // Upstream::LoadBalancerBase
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
@@ -444,13 +445,20 @@ protected:
  */
 class RoundRobinLoadBalancer : public EdfLoadBalancerBase {
 public:
-  RoundRobinLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                         ClusterStats& stats, Runtime::Loader& runtime,
-                         Random::RandomGenerator& random,
-                         const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-                         TimeSource& time_source)
-      : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random, common_config,
-                            time_source) {
+  RoundRobinLoadBalancer(
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+      Runtime::Loader& runtime, Random::RandomGenerator& random,
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+      const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
+          round_robin_config,
+      TimeSource& time_source)
+      : EdfLoadBalancerBase(
+            priority_set, local_priority_set, stats, runtime, random, common_config,
+            (round_robin_config.has_value() && round_robin_config.value().has_slow_start_config())
+                ? absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig>(
+                      round_robin_config.value().slow_start_config())
+                : absl::nullopt,
+            time_source) {
     initialize();
   }
 
@@ -522,8 +530,14 @@ public:
       const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
           least_request_config,
       TimeSource& time_source)
-      : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random, common_config,
-                            time_source),
+      : EdfLoadBalancerBase(
+            priority_set, local_priority_set, stats, runtime, random, common_config,
+            (least_request_config.has_value() &&
+             least_request_config.value().has_slow_start_config())
+                ? absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig>(
+                      least_request_config.value().slow_start_config())
+                : absl::nullopt,
+            time_source),
         choice_count_(
             least_request_config.has_value()
                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.value(), choice_count, 2)
@@ -612,12 +626,7 @@ public:
                      ClusterStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                                  common_config) {
-    if (common_config.has_slow_start_config()) {
-      // TODO(nezdolik) maybe use error status
-      ENVOY_LOG(warn, "Slow start mode is not supported for random lb");
-    }
-  }
+                                  common_config) {}
 
   // Upstream::LoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;

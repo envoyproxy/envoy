@@ -696,17 +696,19 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+    const absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig> slow_start_config,
     TimeSource& time_source)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 common_config),
       seed_(random_.random()),
-      slow_start_window_(std::chrono::milliseconds(
-          PROTOBUF_GET_MS_OR_DEFAULT(common_config.slow_start_config(), slow_start_window, 0))),
-      aggression_runtime_(common_config.has_slow_start_config() &&
-                                  common_config.slow_start_config().has_aggression()
-                              ? std::make_unique<Runtime::Double>(
-                                    common_config.slow_start_config().aggression(), runtime)
-                              : nullptr),
+      slow_start_window_(slow_start_config.has_value()
+                             ? std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+                                   slow_start_config.value().slow_start_window()))
+                             : std::chrono::milliseconds(0)),
+      aggression_runtime_(
+          slow_start_config.has_value() && slow_start_config.value().has_aggression()
+              ? std::make_unique<Runtime::Double>(slow_start_config.value().aggression(), runtime)
+              : nullptr),
       time_source_(time_source),
       slow_start_enabled_(slow_start_window_ > std::chrono::milliseconds(0)),
       latest_host_added_time_(time_source_.monotonicTime()) {

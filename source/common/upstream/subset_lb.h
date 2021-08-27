@@ -30,6 +30,8 @@ public:
       const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
           lb_ring_hash_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>& lb_maglev_config,
+      const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&
+          round_robin_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
           least_request_config,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
@@ -236,6 +238,7 @@ private:
   const LoadBalancerType lb_type_;
   const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
+  const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config_;
   const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
       least_request_config_;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
