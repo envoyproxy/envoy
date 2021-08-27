@@ -163,13 +163,6 @@ protected:
   QuicHttpClientConnectionImpl http_connection_;
 };
 
-TEST_F(EnvoyQuicClientSessionTest, QuicUnimplemented) {
-  Buffer::OwnedImpl buffer;
-  EXPECT_DEATH(http_connection_.goAway(), "");
-  EXPECT_DEATH(http_connection_.shutdownNotice(), "");
-  EXPECT_DEATH(http_connection_.dispatch(buffer).code(), "");
-}
-
 TEST_F(EnvoyQuicClientSessionTest, NewStream) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;

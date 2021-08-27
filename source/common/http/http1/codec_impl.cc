@@ -575,12 +575,12 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
   return true;
 }
 
-void ConnectionImpl::onDispatch(Buffer::Instance const& data) {
+void ConnectionImpl::onDispatch(const Buffer::Instance& data) {
   StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
   if (bytes_meterer) {
     bytes_meterer->addWireBytesReceived(data.length());
   } else {
-    // Bytes dispatched before we create pending response.
+    // Bytes dispatched before we create pending response or active request.
     dispatched_bytes_before_stream_ += data.length();
   }
 }
@@ -1315,7 +1315,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
   ASSERT(pending_response_done_);
   pending_response_.emplace(*this, &response_decoder);
   pending_response_done_ = false;
-  getBytesMeterer()->addWireBytesReceived(dispatched_bytes_before_stream_);
+  ASSERT(dispatched_bytes_before_stream_ == 0);
   return pending_response_.value().encoder_;
 }
 

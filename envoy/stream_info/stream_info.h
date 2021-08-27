@@ -627,9 +627,10 @@ public:
 
   virtual const BytesMetererSharedPtr& getDownstreamBytesMeterer() const PURE;
 
-  virtual void setUpstreamBytesMeterer(const BytesMetererSharedPtr&) PURE;
+  virtual void setUpstreamBytesMeterer(const BytesMetererSharedPtr& upstream_bytes_meterer) PURE;
 
-  virtual void setDownstreamBytesMeterer(const BytesMetererSharedPtr&) PURE;
+  virtual void
+  setDownstreamBytesMeterer(const BytesMetererSharedPtr& downstream_bytes_meterer) PURE;
 
   static void syncUpstreamAndDownstreamBytesMeterer(StreamInfo& downstream_info,
                                                     StreamInfo& upstream_info) {
