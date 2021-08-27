@@ -102,7 +102,7 @@ public:
     return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
   }
 
-  void dynamicMetadataTest(CheckStatus status) {
+  void dynamicMetadataTest(CheckStatus status, const std::string &httpStatus) {
     const std::string yaml = R"EOF(
     http_service:
       server_uri:
@@ -137,7 +137,7 @@ public:
                                         AuthzResponseNoAttributes(authz_response))));
 
     const HeaderValueOptionVector http_response_headers = TestCommon::makeHeaderValueOption({
-        {":status", "200", false},
+        {":status", httpStatus, false},
         {"bar", "nope", false},
         {"x-metadata-header-0", "zero", false},
         {"x-metadata-header-1", "2", false},
@@ -467,12 +467,12 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithHeadersToRemove) {
 
 // Test the client when an OK response is received with dynamic metadata in that OK response.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithDynamicMetadata) {
-  dynamicMetadataTest(CheckStatus::OK);
+  dynamicMetadataTest(CheckStatus::OK, "200");
 }
 
 // Test the client when a denied response is received with dynamic metadata in tha denied response.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithDynamicMetadata) {
-  dynamicMetadataTest(CheckStatus::Denied);
+  dynamicMetadataTest(CheckStatus::Denied, "403");
 }
 
 // Test the client when a denied response is received.
