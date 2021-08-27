@@ -23,7 +23,7 @@ responds_with \
     upstream_rq_200 \
     "http://localhost:8081/stats?filter=load_reporting_cluster"
 
-run_log "Check logs: lrs_server is works normally"
+run_log "Check logs: lrs_server works normally"
 docker-compose logs lrs_server | grep "Got stats from cluster"
 
 # TODO(phlax): add some test/docs for interacting with load reporting server
