@@ -1,0 +1,196 @@
+#include "source/common/network/dns_resolver/dns_factory.h"
+
+#include "test/mocks/network/mocks.h"
+
+using testing::NiceMock;
+
+namespace Envoy {
+namespace Network {
+
+class DnsFactoryTest : public testing::Test {
+public:
+  DnsFactoryTest() = default;
+  ~DnsFactoryTest() = default;
+
+  // Verify typed config is c-ares, and unpack to c-ares object.
+  void verifyCaresDnsConfigAndUnpack(
+      envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
+      envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& cares) {
+    // Verify typed DNS resolver config is c-ares.
+    EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::CaresDnsResolver));
+    EXPECT_EQ(typed_dns_resolver_config.typed_config().type_url(),
+              "type.googleapis.com/"
+              "envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
+    typed_dns_resolver_config.typed_config().UnpackTo(&cares);
+  }
+
+  // Verify the c-ares object is empty.
+  void verifyCaresDnsConfigEmpty(
+      const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& cares) {
+    EXPECT_EQ(false, cares.dns_resolver_options().use_tcp_for_dns_lookups());
+    EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
+    EXPECT_TRUE(cares.resolvers().empty());
+  }
+};
+
+// Test empty c-ares DNS resolver typed config creation is expected.
+TEST_F(DnsFactoryTest, MakeEmptyCaresDnsResolverTest) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  makeEmptyCaresDnsResolverConfig(typed_dns_resolver_config);
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  verifyCaresDnsConfigEmpty(cares);
+}
+
+// Test empty apple DNS resolver typed config creation is expected.
+TEST_F(DnsFactoryTest, MakeEmptyAppleDnsResolverTest) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);
+  EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::AppleDnsResolver));
+  EXPECT_EQ(
+      typed_dns_resolver_config.typed_config().type_url(),
+      "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
+}
+
+// Test handleLegacyDnsResolverData() function with DnsFilterConfig type.
+TEST_F(DnsFactoryTest, LegacyDnsResolverDataDnsFilterConfig) {
+  envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig::ClientContextConfig
+      dns_filter_config;
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  handleLegacyDnsResolverData(dns_filter_config, typed_dns_resolver_config);
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  verifyCaresDnsConfigEmpty(cares);
+}
+
+// Test handleLegacyDnsResolverData() function with Cluster type, and empty config.
+TEST_F(DnsFactoryTest, LegacyDnsResolverDataClusterConfigEmpty) {
+  envoy::config::cluster::v3::Cluster cluster_config;
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  handleLegacyDnsResolverData(cluster_config, typed_dns_resolver_config);
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  verifyCaresDnsConfigEmpty(cares);
+}
+
+// Test handleLegacyDnsResolverData() function with Cluster type, and non-empty config.
+TEST_F(DnsFactoryTest, LegacyDnsResolverDataClusterConfigNonEmpty) {
+  envoy::config::cluster::v3::Cluster cluster_config;
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cluster_config.set_use_tcp_for_dns_lookups(true);
+  envoy::config::core::v3::Address* dns_resolvers = cluster_config.add_dns_resolvers();
+  dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
+  dns_resolvers->mutable_socket_address()->set_port_value(8080);
+  handleLegacyDnsResolverData(cluster_config, typed_dns_resolver_config);
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
+  EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
+  EXPECT_FALSE(cares.resolvers().empty());
+  auto resolvers = envoy::config::core::v3::Address();
+  resolvers.mutable_socket_address()->set_address("1.2.3.4");
+  resolvers.mutable_socket_address()->set_port_value(8080);
+  EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
+}
+
+// Test handleLegacyDnsResolverData() function with Bootstrap type, and non-empty config.
+TEST_F(DnsFactoryTest, LegacyDnsResolverDataBootstrapConfigNonEmpty) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_config;
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  bootstrap_config.set_use_tcp_for_dns_lookups(true);
+  handleLegacyDnsResolverData(bootstrap_config, typed_dns_resolver_config);
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
+  EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
+  EXPECT_TRUE(cares.resolvers().empty());
+}
+
+// Test handleLegacyDnsResolverData() function with DnsCacheConfig type, and non-empty config.
+TEST_F(DnsFactoryTest, LegacyDnsResolverDataDnsCacheConfigNonEmpty) {
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig dns_cache_config;
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  dns_cache_config.set_use_tcp_for_dns_lookups(true);
+  handleLegacyDnsResolverData(dns_cache_config, typed_dns_resolver_config);
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
+  EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
+  EXPECT_TRUE(cares.resolvers().empty());
+}
+
+// Test checkDnsResolutionConfigExist() function with Bootstrap type,
+// and dns_resolution_config exists.
+TEST_F(DnsFactoryTest, CheckDnsResolutionConfigExistWithBoostrap) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_config;
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  bootstrap_config.mutable_dns_resolution_config()
+      ->mutable_dns_resolver_options()
+      ->set_use_tcp_for_dns_lookups(true);
+  bootstrap_config.mutable_dns_resolution_config()
+      ->mutable_dns_resolver_options()
+      ->set_no_default_search_domain(true);
+  envoy::config::core::v3::Address* dns_resolvers =
+      bootstrap_config.mutable_dns_resolution_config()->add_resolvers();
+  dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
+  dns_resolvers->mutable_socket_address()->set_port_value(8080);
+  EXPECT_TRUE(checkDnsResolutionConfigExist(bootstrap_config, typed_dns_resolver_config));
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
+  EXPECT_EQ(true, cares.dns_resolver_options().no_default_search_domain());
+  EXPECT_FALSE(cares.resolvers().empty());
+  auto resolvers = envoy::config::core::v3::Address();
+  resolvers.mutable_socket_address()->set_address("1.2.3.4");
+  resolvers.mutable_socket_address()->set_port_value(8080);
+  EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
+}
+
+// Test checkTypedDnsResolverConfigExist() function with Bootstrap type,
+// and typed_dns_resolver_config exists.
+TEST_F(DnsFactoryTest, CheckTypedDnsResolverConfigExistWithBoostrap) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_config;
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+
+  cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(true);
+  cares.mutable_dns_resolver_options()->set_no_default_search_domain(true);
+  envoy::config::core::v3::Address* dns_resolvers = cares.add_resolvers();
+  dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
+  dns_resolvers->mutable_socket_address()->set_port_value(8080);
+
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  bootstrap_config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
+  EXPECT_TRUE(bootstrap_config.has_typed_dns_resolver_config());
+  typed_dns_resolver_config.Clear();
+  cares.Clear();
+
+  EXPECT_TRUE(checkTypedDnsResolverConfigExist(bootstrap_config, typed_dns_resolver_config));
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
+  EXPECT_EQ(true, cares.dns_resolver_options().no_default_search_domain());
+  EXPECT_FALSE(cares.resolvers().empty());
+  auto resolvers = envoy::config::core::v3::Address();
+  resolvers.mutable_socket_address()->set_address("1.2.3.4");
+  resolvers.mutable_socket_address()->set_port_value(8080);
+  EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
+}
+
+// Test checkTypedDnsResolverConfigExist() function with Bootstrap type,
+// and typed_dns_resolver_config exists, but with garbage type foo.
+TEST_F(DnsFactoryTest, CheckTypedDnsResolverConfigExistWithBoostrapWrongType) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_config;
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+
+  typed_dns_resolver_config.mutable_typed_config()->set_type_url("type.googleapis.com/foo");
+  typed_dns_resolver_config.mutable_typed_config()->set_value("bar");
+  typed_dns_resolver_config.set_name("baz");
+  bootstrap_config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
+  EXPECT_TRUE(bootstrap_config.has_typed_dns_resolver_config());
+  typed_dns_resolver_config.Clear();
+  EXPECT_FALSE(checkTypedDnsResolverConfigExist(bootstrap_config, typed_dns_resolver_config));
+}
+
+} // namespace Network
+} // namespace Envoy

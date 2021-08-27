@@ -19,20 +19,17 @@ void makeEmptyAppleDnsResolverConfig(
   typed_dns_resolver_config.set_name(std::string(AppleDnsResolver));
 }
 
-// Special handling for DnsFilterConfig, which don't need to copy anything over.
-template <>
-void handleLegacyDnsResolverData<
-    envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig::ClientContextConfig>(
+// Overloading the template function for DnsFilterConfig type, which doesn't need to copy anything.
+void handleLegacyDnsResolverData(
     const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig::
         ClientContextConfig&,
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   makeEmptyCaresDnsResolverConfig(typed_dns_resolver_config);
 }
 
-// Special handling for Cluster config type, which need to copy both set_use_tcp_for_dns_lookups and
-// dns_resolvers.
-template <>
-void handleLegacyDnsResolverData<envoy::config::cluster::v3::Cluster>(
+// Overloading the template function for Cluster config type, which need to copy
+// both set_use_tcp_for_dns_lookups and dns_resolvers.
+void handleLegacyDnsResolverData(
     const envoy::config::cluster::v3::Cluster& config,
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;

@@ -1,0 +1,22 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
+    "envoy_package",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_package()
+
+envoy_cc_test(
+    name = "dns_factory_test",
+    srcs = ["dns_factory_test.cc"],
+    args = [
+        # Used in createDnsResolver to force creation of DnsResolverImpl when running test on macOS.
+        "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
+    ],
+    deps = [
+        "//source/common/network/dns_resolver:dns_factory_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
+    ],
+)
