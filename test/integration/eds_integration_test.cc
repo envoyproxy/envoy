@@ -260,8 +260,8 @@ TEST_P(EdsIntegrationTest, FinishWarmingIgnoreHealthCheck) {
   cds_helper_.setCds({cluster_});
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
 
-  // Clear out the host before the health check completes and ensure that
-  // warming_clusters goes to 0 to avoid a permanent warming state.
+  // Clear out the host before the health check finishes (regardless of success/error/timeout) and
+  // ensure that warming_clusters goes to 0 to avoid a permanent warming state.
   setEndpoints(0, 0, 0, true, absl::nullopt, false);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }

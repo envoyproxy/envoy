@@ -819,9 +819,7 @@ createTransportSocketFactory(const envoy::config::cluster::v3::Cluster& config,
 /**
  * Base class all primary clusters.
  */
-class ClusterImplBase : public Cluster,
-                        protected Logger::Loggable<Logger::Id::upstream>,
-                        public std::enable_shared_from_this<ClusterImplBase> {
+class ClusterImplBase : public Cluster, protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
   // Upstream::Cluster

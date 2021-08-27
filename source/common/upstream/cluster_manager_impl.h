@@ -646,10 +646,6 @@ private:
 
   Config::SubscriptionFactoryImpl subscription_factory_;
   ClusterSet primary_clusters_;
-
-  // callback_lifetime_guard_ is used to test whether this ClusterManagerImpl was deleted from a
-  // callback before attempting to dereference any other fields.
-  std::shared_ptr<uint32_t> callback_lifetime_guard_;
 };
 
 } // namespace Upstream
