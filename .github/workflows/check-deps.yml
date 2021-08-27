@@ -28,5 +28,5 @@ jobs :
       - name: setting up virtualenv
         run : |
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          ./tools/dependency/release_dates.sh ./bazel/repository_locations.bzl
-          ./tools/dependency/release_dates.sh ./api/bazel/repository_locations.bzl
+          ./tools/dependency/release_dates.sh ./bazel/repository_locations.bzl --cron
+          ./tools/dependency/release_dates.sh ./api/bazel/repository_locations.bzl --cron
