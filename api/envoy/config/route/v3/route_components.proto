@@ -5,6 +5,7 @@ package envoy.config.route.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
+import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/metadata/v3/metadata.proto";
@@ -405,7 +406,7 @@ message WeightedCluster {
   string runtime_key_prefix = 2;
 }
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
@@ -518,6 +519,12 @@ message RouteMatch {
   //
   // [#next-major-version: unify with RBAC]
   TlsContextMatchOptions tls_context = 11;
+
+  // Specifies a set of dynamic metadata matchers on which the route should match.
+  // The router will check the dynamic metadata against all the specified dynamic metadata matchers.
+  // If the number of specified dynamic metadata matchers is nonzero, they all must match the
+  // dynamic metadata for a match to occur.
+  repeated type.matcher.v3.MetadataMatcher dynamic_metadata = 13;
 }
 
 // [#next-free-field: 12]
