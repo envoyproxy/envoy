@@ -91,6 +91,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/listener/http_inspector @yxue @lizan
 # attribute context
 /*/extensions/filters/common/expr @kyessenov @yangminzhu @lizan
+/*/extensions/filters/common/attributes @kyessenov @yangminzhu @lizan
 # webassembly access logger extensions
 /*/extensions/access_loggers/wasm @PiotrSikora @mathetake @lizan
 # webassembly bootstrap extensions
