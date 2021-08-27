@@ -61,26 +61,6 @@ separateDirectiveAndArgument(absl::string_view full_directive) {
 // https://httpwg.org/specs/rfc7234.html#collected.abnf
 
 RequestCacheControl::RequestCacheControl(absl::string_view cache_control_header) {
-  applyCacheControlHeader(cache_control_header);
-}
-
-RequestCacheControl::RequestCacheControl(const Envoy::Http::RequestHeaderMap& request_headers) {
-  absl::string_view cache_control_header =
-      request_headers.getInlineValue(CacheCustomHeaders::requestCacheControl());
-
-  if (!cache_control_header.empty()) {
-    applyCacheControlHeader(cache_control_header);
-    return;
-  }
-
-  const absl::string_view pragma_header =
-      request_headers.getInlineValue(CacheCustomHeaders::pragma());
-  if (!pragma_header.empty()) {
-    applyPragmaHeader(pragma_header);
-  }
-}
-
-void RequestCacheControl::applyCacheControlHeader(absl::string_view cache_control_header) {
   const std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
 
   for (auto full_directive : directives) {
@@ -100,57 +80,37 @@ void RequestCacheControl::applyCacheControlHeader(absl::string_view cache_contro
     } else if (directive == "min-fresh") {
       min_fresh_ = parseDuration(argument);
     } else if (directive == "max-stale") {
-      max_stale_ = argument.empty() ? Envoy::SystemTime::duration::max() : parseDuration(argument);
-    }
-  }
-}
-
-void RequestCacheControl::applyPragmaHeader(absl::string_view pragma_header) {
-  // According to: https://httpwg.org/specs/rfc7234.html#header.pragma,
-  // when Cache-Control header is missing, "Pragma:no-cache" is equivalent to
-  // "Cache-Control:no-cache". Any other directives are ignored.
-  const std::vector<absl::string_view> directives = absl::StrSplit(pragma_header, ',');
-
-  for (auto directive : directives) {
-    if (absl::StripAsciiWhitespace(directive) == "no-cache") {
-      must_validate_ = true;
-      break;
+      max_stale_ = argument.empty() ? SystemTime::duration::max() : parseDuration(argument);
     }
   }
 }
 
 ResponseCacheControl::ResponseCacheControl(absl::string_view cache_control_header) {
-  if (!cache_control_header.empty()) {
-    const std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
+  const std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
 
-    for (auto full_directive : directives) {
-      absl::string_view directive, argument;
-      std::tie(directive, argument) = separateDirectiveAndArgument(full_directive);
+  for (auto full_directive : directives) {
+    absl::string_view directive, argument;
+    std::tie(directive, argument) = separateDirectiveAndArgument(full_directive);
 
-      if (directive == "no-cache") {
-        // If no-cache directive has arguments they are ignored - not handled.
-        must_validate_ = true;
-      } else if (directive == "must-revalidate" || directive == "proxy-revalidate") {
-        no_stale_ = true;
-      } else if (directive == "no-store" || directive == "private") {
-        // If private directive has arguments they are ignored - not handled.
-        no_store_ = true;
-      } else if (directive == "no-transform") {
-        no_transform_ = true;
-      } else if (directive == "public") {
-        is_public_ = true;
-      } else if (directive == "s-maxage") {
-        max_age_ = parseDuration(argument);
-      } else if (!max_age_.has_value() && directive == "max-age") {
-        max_age_ = parseDuration(argument);
-      }
+    if (directive == "no-cache") {
+      // If no-cache directive has arguments they are ignored - not handled.
+      must_validate_ = true;
+    } else if (directive == "must-revalidate" || directive == "proxy-revalidate") {
+      no_stale_ = true;
+    } else if (directive == "no-store" || directive == "private") {
+      // If private directive has arguments they are ignored - not handled.
+      no_store_ = true;
+    } else if (directive == "no-transform") {
+      no_transform_ = true;
+    } else if (directive == "public") {
+      is_public_ = true;
+    } else if (directive == "s-maxage") {
+      max_age_ = parseDuration(argument);
+    } else if (!max_age_.has_value() && directive == "max-age") {
+      max_age_ = parseDuration(argument);
     }
   }
 }
-
-ResponseCacheControl::ResponseCacheControl(const Envoy::Http::ResponseHeaderMap& response_headers)
-    : ResponseCacheControl(
-          response_headers.getInlineValue(CacheCustomHeaders::responseCacheControl())) {}
 
 bool operator==(const RequestCacheControl& lhs, const RequestCacheControl& rhs) {
   return (lhs.must_validate_ == rhs.must_validate_) && (lhs.no_store_ == rhs.no_store_) &&
