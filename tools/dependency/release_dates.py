@@ -61,7 +61,7 @@ def verify_and_print_latest_release(dep, repo, metadata_version, release_date):
             f'{latest_release.tag_name}@<{latest_release.created_at}>{Style.RESET_ALL}')
         # check for --cron flag, To run this only on github action schedule
         # and it does not bloat CI on every push
-        if str(sys.argv[2]).split("")[1] == "--cron":
+        if len(sys.argv[1].split(" ")) == 2 and str(sys.argv[1]).split(" ")[1] == "--cron":
             create_issues(dep, repo, metadata_version, release_date, latest_release)
 
 
