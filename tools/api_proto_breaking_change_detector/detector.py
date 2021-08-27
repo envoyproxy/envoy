@@ -64,8 +64,7 @@ class BufWrapper(ProtoBreakingChangeDetector):
 
         The initial state is input as a git ref. The constructor expects
         a git ref string, as well as an absolute path to a .git folder
-        for the repository. Note that exactly one mode must be used for
-        the initial state.
+        for the repository.
 
         Args:
             path_to_changed_dir {str} -- absolute path to a directory containing proto files in the after state
@@ -94,6 +93,7 @@ class BufWrapper(ProtoBreakingChangeDetector):
         self._config_file_loc = config_file_loc
         self._git_ref = git_ref
         self._git_path = git_path
+        self._subdir = subdir
         self._final_result = None
 
         pull_buf_deps(
@@ -106,8 +106,9 @@ class BufWrapper(ProtoBreakingChangeDetector):
         self._final_result = check_breaking(
             self._buf_path,
             self._path_to_changed_dir,
-            self._git_ref,
-            self._git_path,
+            git_ref=self._git_ref,
+            git_path=self._git_path,
+            subdir=self._subdir,
             config_file_loc=self._config_file_loc,
             additional_args=self._additional_args)
 
