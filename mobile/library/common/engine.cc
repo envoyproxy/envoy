@@ -8,6 +8,7 @@
 #include "library/common/config/internal.h"
 #include "library/common/data/utility.h"
 #include "library/common/stats/utility.h"
+#include "types/c_types.h"
 
 namespace Envoy {
 
@@ -242,6 +243,24 @@ envoy_status_t Engine::recordHistogramValue(const std::string& elements, envoy_s
   Stats::Utility::histogramFromElements(*client_scope_, {Stats::DynamicName(name)},
                                         envoy_unit_measure, tags_vctr)
       .recordValue(value);
+  return ENVOY_SUCCESS;
+}
+
+envoy_status_t Engine::makeAdminCall(absl::string_view path, absl::string_view method,
+                                     envoy_data& out) {
+  ENVOY_LOG(trace, "admin call {} {}", method, path);
+
+  ASSERT(dispatcher_->isThreadSafe(), "admin calls must be run from the dispatcher's context");
+  auto response_headers = Http::ResponseHeaderMapImpl::create();
+  std::string body;
+  const auto code = server_->admin().request(path, method, *response_headers, body);
+  if (code != Http::Code::OK) {
+    ENVOY_LOG(warn, "admin call failed with status {} body {}", code, body);
+    return ENVOY_FAILURE;
+  }
+
+  out = Data::Utility::copyToBridgeData(body);
+
   return ENVOY_SUCCESS;
 }
 

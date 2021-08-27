@@ -3,10 +3,12 @@
 #include <atomic>
 #include <string>
 
+#include "absl/synchronization/notification.h"
 #include "library/common/api/external.h"
 #include "library/common/engine.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
 #include "library/common/http/client.h"
+#include "types/c_types.h"
 
 // NOLINT(namespace-envoy)
 
@@ -154,6 +156,63 @@ envoy_status_t record_histogram_value(envoy_engine_t, const char* elements, envo
             e->recordHistogramValue(name, tags, value, unit_measure);
         });
   }
+  return ENVOY_FAILURE;
+}
+
+namespace {
+struct AdminCallContext {
+  envoy_status_t status_{};
+  envoy_data response_{};
+
+  absl::Mutex mutex_{};
+  absl::Notification data_received_{};
+};
+
+absl::optional<envoy_data> blockingAdminCall(absl::string_view path, absl::string_view method,
+                                             std::chrono::milliseconds timeout) {
+  if (auto e = engine()) {
+    // Use a shared ptr here so that we can safely exit this scope in case of a timeout,
+    // allowing the dispatched lambda to clean itself up when it's done.
+    auto context = std::make_shared<AdminCallContext>();
+    const auto status = e->dispatcher().post(
+        [context, path = std::string(path), method = std::string(method)]() -> void {
+          if (auto e = engine()) {
+            absl::MutexLock lock(&context->mutex_);
+
+            context->status_ = e->makeAdminCall(path, method, context->response_);
+            context->data_received_.Notify();
+          }
+        });
+
+    if (status == ENVOY_FAILURE) {
+      return {};
+    }
+
+    if (context->data_received_.WaitForNotificationWithTimeout(
+            absl::Milliseconds(timeout.count()))) {
+      absl::MutexLock lock(&context->mutex_);
+
+      if (context->status_ == ENVOY_FAILURE) {
+        return {};
+      }
+
+      return context->response_;
+    } else {
+      ENVOY_LOG_MISC(warn, "timed out waiting for admin response");
+    }
+  }
+
+  return {};
+}
+} // namespace
+
+envoy_status_t dump_stats(envoy_engine_t, envoy_data* out) {
+  auto maybe_data = blockingAdminCall("/stats?usedonly", "GET", std::chrono::milliseconds(100));
+  if (maybe_data) {
+    *out = *maybe_data;
+    return ENVOY_SUCCESS;
+  }
+
   return ENVOY_FAILURE;
 }
 

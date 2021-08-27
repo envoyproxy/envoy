@@ -101,6 +101,16 @@ public:
                                       uint64_t value, envoy_histogram_stat_unit_t unit_measure);
 
   /**
+   * Issue a call against the admin handler, populating the `out` parameter with the response if
+   * the call was successful.
+   * @param path the admin path to query.
+   * @param method the HTTP method to use (GET or POST).
+   * @param out the response body, populated if the call is successful.
+   * @returns ENVOY_SUCCESS if the call was successful and `out` was populated.
+   */
+  envoy_status_t makeAdminCall(absl::string_view path, absl::string_view method, envoy_data& out);
+
+  /**
    * Flush the stats sinks outside of a flushing interval.
    * Note: stat flushing is done asynchronously, this function will never block.
    * This is a noop if called before the underlying EnvoyEngine has started.

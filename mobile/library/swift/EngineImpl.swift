@@ -62,6 +62,10 @@ extension EngineImpl: Engine {
     self.engine.flushStats()
   }
 
+  func dumpStats() -> String {
+    self.engine.dumpStats()
+  }
+
   func terminate() {
     self.engine.terminate()
   }

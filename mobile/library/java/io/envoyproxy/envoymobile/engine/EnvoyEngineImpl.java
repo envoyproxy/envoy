@@ -52,6 +52,11 @@ public class EnvoyEngineImpl implements EnvoyEngine {
     JniLibrary.flushStats(engineHandle);
   }
 
+  @Override
+  public String dumpStats() {
+    return JniLibrary.dumpStats();
+  }
+
   /**
    * Run the Envoy engine with the provided yaml string and log level.
    *
