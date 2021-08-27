@@ -13,8 +13,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/api_type_oracle.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -93,8 +91,7 @@ void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path, Ap
   // watch addition.
   if (!api.fileSystem().fileExists(path)) {
     throw EnvoyException(fmt::format(
-        "envoy::api::v2::Path must refer to an existing path in the system: '{}' does not exist",
-        path));
+        "paths must refer to an existing path in the system: '{}' does not exist", path));
   }
 }
 

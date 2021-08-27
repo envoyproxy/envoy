@@ -6,6 +6,24 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_py_library("tools.base.abstract")
+
+envoy_py_library(
+    "tools.base.aio",
+    deps = [
+        ":functional",
+    ],
+)
+
+envoy_py_library(
+    "tools.base.checker",
+    deps = [
+        ":runner",
+    ],
+)
+
+envoy_py_library("tools.base.functional")
+
 envoy_py_library(
     "tools.base.runner",
     deps = [
@@ -16,11 +34,10 @@ envoy_py_library(
     ],
 )
 
-envoy_py_library("tools.base.utils")
-
 envoy_py_library(
-    "tools.base.checker",
+    "tools.base.utils",
     deps = [
-        ":runner",
+        requirement("pyyaml"),
+        requirement("setuptools"),
     ],
 )

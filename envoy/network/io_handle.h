@@ -29,7 +29,7 @@ namespace Network {
 struct Win32RedirectRecords {
   // The size of the buffer is selected based on:
   // https://docs.microsoft.com/en-us/windows-hardware/drivers/network/sio-query-wfp-connection-redirect-records
-  uint8_t buf_[1024];
+  uint8_t buf_[2048];
   unsigned long buf_size_;
 };
 

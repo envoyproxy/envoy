@@ -76,7 +76,10 @@ bool SourceClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descrip
 bool DestinationClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                                   const std::string&, const Http::RequestHeaderMap&,
                                                   const StreamInfo::StreamInfo& info) const {
-  descriptor_entry = {"destination_cluster", info.routeEntry()->clusterName()};
+  if (info.route() == nullptr || info.route()->routeEntry() == nullptr) {
+    return false;
+  }
+  descriptor_entry = {"destination_cluster", info.route()->routeEntry()->clusterName()};
   return true;
 }
 
@@ -137,7 +140,7 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
     metadata_source = &info.dynamicMetadata();
     break;
   case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY:
-    metadata_source = &info.routeEntry()->metadata();
+    metadata_source = &info.route()->metadata();
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

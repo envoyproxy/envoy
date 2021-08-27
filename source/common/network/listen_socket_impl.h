@@ -108,7 +108,7 @@ protected:
 #ifndef WIN32
     int on = 1;
     auto status = setSocketOption(SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-    RELEASE_ASSERT(status.rc_ != -1, "failed to set SO_REUSEADDR socket option");
+    RELEASE_ASSERT(status.return_value_ != -1, "failed to set SO_REUSEADDR socket option");
 #endif
   }
 };
@@ -167,10 +167,10 @@ public:
 
   void setRequestedServerName(absl::string_view server_name) override {
     // Always keep the server_name_ as lower case.
-    addressProvider().setRequestedServerName(absl::AsciiStrToLower(server_name));
+    connectionInfoProvider().setRequestedServerName(absl::AsciiStrToLower(server_name));
   }
   absl::string_view requestedServerName() const override {
-    return addressProvider().requestedServerName();
+    return connectionInfoProvider().requestedServerName();
   }
 
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {

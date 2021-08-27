@@ -85,7 +85,7 @@ public:
     socklen_t int_size = static_cast<socklen_t>(sizeof(get_recvbuf_size));
     const Api::SysCallIntResult result2 =
         server_socket_->getSocketOption(SOL_SOCKET, SO_RCVBUF, &get_recvbuf_size, &int_size);
-    EXPECT_EQ(0, result2.rc_);
+    EXPECT_EQ(0, result2.return_value_);
     // Kernel increases the buffer size to allow bookkeeping overhead.
     if (get_recvbuf_size < 4 * 1024 * 1024) {
       recvbuf_large_enough_ = false;
@@ -318,14 +318,14 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
                                                   1, nullptr, *test_peer_address);
 
         if (send_rc.ok()) {
-          total_sent += send_rc.rc_;
+          total_sent += send_rc.return_value_;
           if (total_sent >= data_size) {
             break;
           }
         } else if (send_rc.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
           break;
         }
-      } while (((send_rc.rc_ == 0) &&
+      } while (((send_rc.return_value_ == 0) &&
                 (send_rc.err_->getErrorCode() == Api::IoError::IoErrorCode::Again)) ||
                (total_sent < data_size));
 
@@ -345,7 +345,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
 TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
   setup();
 
-  auto const* server_ip = server_socket_->addressProvider().localAddress()->ip();
+  auto const* server_ip = server_socket_->connectionInfoProvider().localAddress()->ip();
   ASSERT_NE(server_ip, nullptr);
 
   // We first disable the listener and then send two packets.
@@ -394,7 +394,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
 TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   setup();
 
-  auto const* server_ip = server_socket_->addressProvider().localAddress()->ip();
+  auto const* server_ip = server_socket_->connectionInfoProvider().localAddress()->ip();
   ASSERT_NE(server_ip, nullptr);
 
   // When the `receive` system call returns an error, we expect the `onReceiveError`
@@ -460,7 +460,7 @@ TEST_P(UdpListenerImplTest, SendData) {
   // Verify External Flush is a No-op
   auto flush_result = udp_packet_writer_->flush();
   EXPECT_TRUE(flush_result.ok());
-  EXPECT_EQ(0, flush_result.rc_);
+  EXPECT_EQ(0, flush_result.return_value_);
 }
 
 /**
@@ -473,8 +473,8 @@ TEST_P(UdpListenerImplTest, SendDataError) {
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
   // send data to itself
-  UdpSendData send_data{send_to_addr_->ip(), *server_socket_->addressProvider().localAddress(),
-                        *buffer};
+  UdpSendData send_data{send_to_addr_->ip(),
+                        *server_socket_->connectionInfoProvider().localAddress(), *buffer};
 
   // Inject mocked OsSysCalls implementation to mock a write failure.
   Api::MockOsSysCalls os_sys_calls;

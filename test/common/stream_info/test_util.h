@@ -75,16 +75,8 @@ public:
   }
   bool healthCheck() const override { return health_check_request_; }
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
-  const Network::SocketAddressSetter& downstreamAddressProvider() const override {
+  const Network::ConnectionInfoSetter& downstreamAddressProvider() const override {
     return *downstream_address_provider_;
-  }
-  void
-  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
-    downstream_connection_info_ = connection_info;
-  }
-
-  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
-    return downstream_connection_info_;
   }
 
   void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
@@ -99,7 +91,7 @@ public:
   }
   const std::string& getRouteName() const override { return route_name_; }
 
-  const Router::RouteEntry* routeEntry() const override { return route_entry_; }
+  Router::RouteConstSharedPtr route() const override { return route_; }
 
   absl::optional<std::chrono::nanoseconds>
   duration(const absl::optional<MonotonicTime>& time) const {
@@ -219,6 +211,14 @@ public:
 
   const std::string& filterChainName() const override { return filter_chain_name_; }
 
+  void setUpstreamConnectionId(uint64_t id) override { upstream_connection_id_ = id; }
+
+  absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
+
+  void setAttemptCount(uint32_t attempt_count) override { attempt_count_ = attempt_count; }
+
+  absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
+
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -241,11 +241,11 @@ public:
   bool health_check_request_{};
   std::string route_name_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  Network::SocketAddressSetterSharedPtr downstream_address_provider_{
-      std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr)};
+  Network::ConnectionInfoSetterSharedPtr downstream_address_provider_{
+      std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)};
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
-  const Router::RouteEntry* route_entry_{};
+  Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   Envoy::StreamInfo::FilterStateSharedPtr filter_state_{
       std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
@@ -258,9 +258,10 @@ public:
   Envoy::Event::SimulatedTimeSystem test_time_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_{};
   Http::RequestIdStreamInfoProviderSharedPtr request_id_provider_;
-  absl::optional<uint64_t> connection_id_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_{Tracing::Reason::NotTraceable};
+  absl::optional<uint64_t> upstream_connection_id_;
+  absl::optional<uint32_t> attempt_count_;
 };
 
 } // namespace Envoy

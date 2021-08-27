@@ -28,10 +28,9 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-envoy::config::route::v3::RateLimit parseRateLimitFromV3Yaml(const std::string& yaml_string,
-                                                             bool avoid_boosting = true) {
+envoy::config::route::v3::RateLimit parseRateLimitFromV3Yaml(const std::string& yaml_string) {
   envoy::config::route::v3::RateLimit rate_limit;
-  TestUtility::loadFromYaml(yaml_string, rate_limit, false, avoid_boosting);
+  TestUtility::loadFromYaml(yaml_string, rate_limit);
   TestUtility::validate(rate_limit);
   return rate_limit;
 }
@@ -142,12 +141,12 @@ virtual_hosts:
 
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   setupTest(yaml);
-  auto* route =
-      config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info_, 0)->routeEntry();
-  ON_CALL(Const(stream_info_), routeEntry()).WillByDefault(testing::Return(route));
+  auto route = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info_, 0);
+  auto* route_entry = route->routeEntry();
+  ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route));
 
-  EXPECT_EQ(0U, route->rateLimitPolicy().getApplicableRateLimit(0).size());
-  EXPECT_TRUE(route->rateLimitPolicy().empty());
+  EXPECT_EQ(0U, route_entry->rateLimitPolicy().getApplicableRateLimit(0).size());
+  EXPECT_TRUE(route_entry->rateLimitPolicy().empty());
 }
 
 TEST_F(RateLimitConfiguration, TestGetApplicationRateLimit) {
@@ -168,13 +167,13 @@ virtual_hosts:
 
   factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   setupTest(yaml);
-  auto* route =
-      config_->route(genHeaders("www.lyft.com", "/foo", "GET"), stream_info_, 0)->routeEntry();
-  ON_CALL(Const(stream_info_), routeEntry()).WillByDefault(testing::Return(route));
+  auto route = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), stream_info_, 0);
+  auto* route_entry = route->routeEntry();
+  ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route));
 
-  EXPECT_FALSE(route->rateLimitPolicy().empty());
+  EXPECT_FALSE(route_entry->rateLimitPolicy().empty());
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
-      route->rateLimitPolicy().getApplicableRateLimit(0);
+      route_entry->rateLimitPolicy().getApplicableRateLimit(0);
   EXPECT_EQ(1U, rate_limits.size());
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
@@ -203,12 +202,12 @@ virtual_hosts:
 
   factory_context_.cluster_manager_.initializeClusters({"www2test"}, {});
   setupTest(yaml);
-  auto* route =
-      config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info_, 0)->routeEntry();
-  ON_CALL(Const(stream_info_), routeEntry()).WillByDefault(testing::Return(route));
+  auto route = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info_, 0);
+  auto* route_entry = route->routeEntry();
+  ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route));
 
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
-      route->virtualHost().rateLimitPolicy().getApplicableRateLimit(0);
+      route_entry->virtualHost().rateLimitPolicy().getApplicableRateLimit(0);
   EXPECT_EQ(1U, rate_limits.size());
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
@@ -248,12 +247,12 @@ virtual_hosts:
 
   factory_context_.cluster_manager_.initializeClusters({"www2test"}, {});
   setupTest(yaml);
-  auto* route =
-      config_->route(genHeaders("www.lyft.com", "/foo", "GET"), stream_info_, 0)->routeEntry();
-  ON_CALL(Const(stream_info_), routeEntry()).WillByDefault(testing::Return(route));
+  auto route = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), stream_info_, 0);
+  auto* route_entry = route->routeEntry();
+  ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route));
 
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
-      route->rateLimitPolicy().getApplicableRateLimit(0);
+      route_entry->rateLimitPolicy().getApplicableRateLimit(0);
   EXPECT_EQ(2U, rate_limits.size());
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
@@ -274,7 +273,7 @@ virtual_hosts:
 
   descriptors.clear();
   local_descriptors.clear();
-  rate_limits = route->rateLimitPolicy().getApplicableRateLimit(1UL);
+  rate_limits = route_entry->rateLimitPolicy().getApplicableRateLimit(1UL);
   EXPECT_EQ(1U, rate_limits.size());
 
   for (const RateLimitPolicyEntry& rate_limit : rate_limits) {
@@ -286,7 +285,7 @@ virtual_hosts:
               testing::ContainerEq(descriptors));
   EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"remote_address", "10.0.0.1"}}}}),
               testing::ContainerEq(local_descriptors));
-  rate_limits = route->rateLimitPolicy().getApplicableRateLimit(10UL);
+  rate_limits = route_entry->rateLimitPolicy().getApplicableRateLimit(10UL);
   EXPECT_TRUE(rate_limits.empty());
 }
 
@@ -298,12 +297,12 @@ public:
     descriptors_.clear();
     local_descriptors_.clear();
     stream_info_.downstream_address_provider_->setRemoteAddress(default_remote_address_);
-    ON_CALL(Const(stream_info_), routeEntry()).WillByDefault(testing::Return(&route_));
+    ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route_));
   }
 
   std::unique_ptr<RateLimitPolicyEntryImpl> rate_limit_entry_;
   Http::TestRequestHeaderMapImpl header_;
-  NiceMock<MockRouteEntry> route_;
+  std::shared_ptr<MockRoute> route_{new NiceMock<MockRoute>()};
   std::vector<Envoy::RateLimit::Descriptor> descriptors_;
   std::vector<Envoy::RateLimit::LocalDescriptor> local_descriptors_;
   Network::Address::InstanceConstSharedPtr default_remote_address_{
@@ -661,7 +660,7 @@ filter_metadata:
       prop: foo
   )EOF";
 
-  TestUtility::loadFromYaml(metadata_yaml, route_.metadata_);
+  TestUtility::loadFromYaml(metadata_yaml, route_->metadata_);
 
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
   rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header_, stream_info_);

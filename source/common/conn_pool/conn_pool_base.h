@@ -144,6 +144,8 @@ public:
                    Upstream::ClusterConnectivityState& state);
   virtual ~ConnPoolImplBase();
 
+  void deleteIsPendingImpl();
+
   // A helper function to get the specific context type from the base class context.
   template <class T> T& typedContext(AttachContext& context) {
     ASSERT(dynamic_cast<T*>(&context) != nullptr);
@@ -160,8 +162,15 @@ public:
                             int64_t connecting_and_connected_capacity, float preconnect_ratio,
                             bool anticipate_incoming_stream = false);
 
-  void addDrainedCallbackImpl(Instance::DrainedCb cb);
+  // Envoy::ConnectionPool::Instance implementation helpers
+  void addIdleCallbackImpl(Instance::IdleCb cb);
+  // Returns true if the pool is idle.
+  bool isIdleImpl() const;
+  void startDrainImpl();
   void drainConnectionsImpl();
+  const Upstream::HostConstSharedPtr& host() const { return host_; }
+  // Called if this pool is likely to be picked soon, to determine if it's worth preconnecting.
+  bool maybePreconnectImpl(float global_preconnect_ratio);
 
   // Closes and destroys all connections. This must be called in the destructor of
   // derived classes because the derived ActiveClient will downcast parent_ to a more
@@ -192,12 +201,12 @@ public:
 
   void onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                          Network::ConnectionEvent event);
-  // See if the drain process has started and/or completed.
-  void checkForDrained();
+
+  // See if the pool has gone idle. If we're draining, this will also close idle connections.
+  void checkForIdleAndCloseIdleConnsIfDraining();
+
   void scheduleOnUpstreamReady();
-  ConnectionPool::Cancellable* newStream(AttachContext& context);
-  // Called if this pool is likely to be picked soon, to determine if it's worth preconnecting.
-  bool maybePreconnect(float global_preconnect_ratio);
+  ConnectionPool::Cancellable* newStreamImpl(AttachContext& context);
 
   virtual ConnectionPool::Cancellable* newPendingStream(AttachContext& context) PURE;
 
@@ -212,7 +221,6 @@ public:
   // Called by derived classes any time a stream is completed or destroyed for any reason.
   void onStreamClosed(Envoy::ConnectionPool::ActiveClient& client, bool delay_attaching_stream);
 
-  const Upstream::HostConstSharedPtr& host() const { return host_; }
   Event::Dispatcher& dispatcher() { return dispatcher_; }
   Upstream::ResourcePriority priority() const { return priority_; }
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() { return socket_options_; }
@@ -299,7 +307,7 @@ protected:
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 
-  std::list<Instance::DrainedCb> drained_callbacks_;
+  std::list<Instance::IdleCb> idle_callbacks_;
 
   // When calling purgePendingStreams, this list will be used to hold the streams we are about
   // to purge. We need this if one cancelled streams cancels a different pending stream
@@ -324,6 +332,13 @@ private:
 
   // The number of streams currently attached to clients.
   uint32_t num_active_streams_{0};
+
+  // Whether the connection pool is currently in the process of closing
+  // all connections so that it can be gracefully deleted.
+  bool is_draining_{false};
+
+  // True iff this object is in the deferred delete list.
+  bool deferred_deleting_{false};
 
   void onUpstreamReady();
   Event::SchedulableCallbackPtr upstream_ready_cb_;

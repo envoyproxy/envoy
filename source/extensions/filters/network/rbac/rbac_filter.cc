@@ -28,7 +28,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
       "checking connection: requestedServerName: {}, sourceIP: {}, directRemoteIP: {},"
       "remoteIP: {}, localAddress: {}, ssl: {}, dynamicMetadata: {}",
       callbacks_->connection().requestedServerName(),
-      callbacks_->connection().addressProvider().remoteAddress()->asString(),
+      callbacks_->connection().connectionInfoProvider().remoteAddress()->asString(),
       callbacks_->connection()
           .streamInfo()
           .downstreamAddressProvider()

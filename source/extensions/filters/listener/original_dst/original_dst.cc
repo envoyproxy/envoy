@@ -38,7 +38,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
           auto status = socket.ioctl(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS, NULL, 0,
                                      redirect_records->buf_, sizeof(redirect_records->buf_),
                                      &redirect_records->buf_size_);
-          if (status.rc_ != 0) {
+          if (status.return_value_ != 0) {
             ENVOY_LOG(debug,
                       "closing connection: cannot broker connection to original destination "
                       "[Query redirect record failed] with error {}",
@@ -64,7 +64,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
       }
 #endif
       // Restore the local address to the original one.
-      socket.addressProvider().restoreLocalAddress(original_local_address);
+      socket.connectionInfoProvider().restoreLocalAddress(original_local_address);
     }
   }
 

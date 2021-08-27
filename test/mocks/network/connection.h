@@ -65,8 +65,8 @@ public:
   MOCK_METHOD(void, readDisable, (bool disable));                                                  \
   MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));                                     \
   MOCK_METHOD(bool, readEnabled, (), (const));                                                     \
-  MOCK_METHOD(const SocketAddressProvider&, addressProvider, (), (const));                         \
-  MOCK_METHOD(SocketAddressProviderSharedPtr, addressProviderSharedPtr, (), (const));              \
+  MOCK_METHOD(const ConnectionInfoProvider&, connectionInfoProvider, (), (const));                 \
+  MOCK_METHOD(ConnectionInfoProviderSharedPtr, connectionInfoProviderSharedPtr, (), (const));      \
   MOCK_METHOD(absl::optional<Connection::UnixDomainSocketPeerCredentials>,                         \
               unixSocketPeerCredentials, (), (const));                                             \
   MOCK_METHOD(void, setConnectionStats, (const ConnectionStats& stats));                           \
@@ -102,7 +102,7 @@ public:
   DEFINE_MOCK_CONNECTION_MOCK_METHODS;
 
   // Network::ServerConnection
-  MOCK_METHOD(void, setTransportSocketConnectTimeout, (std::chrono::milliseconds));
+  MOCK_METHOD(void, setTransportSocketConnectTimeout, (std::chrono::milliseconds, Stats::Counter&));
 };
 
 /**

@@ -28,8 +28,24 @@ EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address
   const std::string& chain_str = cert_config.certificateChain();
   std::stringstream pem_stream(chain_str);
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
-  return quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>(
+
+  quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> cert_chain(
       new quic::ProofSource::Chain(chain));
+  std::string error_details;
+  bssl::UniquePtr<X509> cert = parseDERCertificate(cert_chain->certs[0], &error_details);
+  if (cert == nullptr) {
+    ENVOY_LOG(warn, absl::StrCat("Invalid leaf cert: ", error_details));
+    return nullptr;
+  }
+
+  bssl::UniquePtr<EVP_PKEY> pub_key(X509_get_pubkey(cert.get()));
+  int sign_alg = deduceSignatureAlgorithmFromPublicKey(pub_key.get(), &error_details);
+  if (sign_alg == 0) {
+    ENVOY_LOG(warn, absl::StrCat("Failed to deduce signature algorithm from public key: ",
+                                 error_details));
+    return nullptr;
+  }
+  return cert_chain;
 }
 
 void EnvoyQuicProofSource::signPayload(
@@ -82,7 +98,7 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
   ENVOY_LOG(trace, "Getting cert chain for {}", hostname);
   // TODO(danzh) modify QUICHE to make quic session or ALPN accessible to avoid hard-coded ALPN.
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
-      listen_socket_.ioHandle(), server_address, client_address, hostname, "h3-29");
+      listen_socket_.ioHandle(), server_address, client_address, hostname, "h3");
   const Network::FilterChain* filter_chain =
       filter_chain_manager_.findFilterChain(*connection_socket);
 

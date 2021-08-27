@@ -1124,12 +1124,20 @@ TEST_P(WasmHttpFilterTest, GrpcCallFailure) {
               filter().decodeHeaders(request_headers, false));
 
     // Test some additional error paths.
-    EXPECT_EQ(filter().grpcSend(99999, "", false), proxy_wasm::WasmResult::BadArgument);
-    EXPECT_EQ(filter().grpcSend(10000, "", false), proxy_wasm::WasmResult::NotFound);
-    EXPECT_EQ(filter().grpcCancel(9999), proxy_wasm::WasmResult::NotFound);
-    EXPECT_EQ(filter().grpcCancel(10000), proxy_wasm::WasmResult::NotFound);
-    EXPECT_EQ(filter().grpcClose(9999), proxy_wasm::WasmResult::NotFound);
-    EXPECT_EQ(filter().grpcClose(10000), proxy_wasm::WasmResult::NotFound);
+    // 0xFF00 (HTTP call).
+    EXPECT_EQ(filter().grpcSend(0xFF00, "", false), proxy_wasm::WasmResult::BadArgument);
+    EXPECT_EQ(filter().grpcCancel(0xFF00), proxy_wasm::WasmResult::BadArgument);
+    EXPECT_EQ(filter().grpcClose(0xFF00), proxy_wasm::WasmResult::BadArgument);
+
+    // 0xFF01 (gRPC call).
+    EXPECT_EQ(filter().grpcSend(0xFF01, "", false), proxy_wasm::WasmResult::BadArgument);
+    EXPECT_EQ(filter().grpcCancel(0xFF01), proxy_wasm::WasmResult::NotFound);
+    EXPECT_EQ(filter().grpcClose(0xFF01), proxy_wasm::WasmResult::NotFound);
+
+    // 0xFF02 (gRPC stream).
+    EXPECT_EQ(filter().grpcSend(0xFF02, "", false), proxy_wasm::WasmResult::NotFound);
+    EXPECT_EQ(filter().grpcCancel(0xFF02), proxy_wasm::WasmResult::NotFound);
+    EXPECT_EQ(filter().grpcClose(0xFF02), proxy_wasm::WasmResult::NotFound);
 
     ProtobufWkt::Value value;
     value.set_string_value("response");
@@ -1769,8 +1777,8 @@ TEST_P(WasmHttpFilterTest, Property) {
   NiceMock<Network::MockConnection> connection;
   EXPECT_CALL(connection, id()).WillRepeatedly(Return(4));
   EXPECT_CALL(encoder_callbacks_, connection()).WillRepeatedly(Return(&connection));
-  NiceMock<Router::MockRouteEntry> route_entry;
-  EXPECT_CALL(request_stream_info_, routeEntry()).WillRepeatedly(Return(&route_entry));
+  std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
+  EXPECT_CALL(request_stream_info_, route()).WillRepeatedly(Return(route));
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host_description(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(

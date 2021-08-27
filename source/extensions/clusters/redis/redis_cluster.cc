@@ -94,19 +94,38 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
   absl::flat_hash_set<std::string> all_new_hosts;
 
   for (const ClusterSlot& slot : *slots) {
-    new_hosts.emplace_back(new RedisHost(info(), "", slot.primary(), *this, true, time_source_));
-    all_new_hosts.emplace(slot.primary()->asString());
+    if (all_new_hosts.count(slot.primary()->asString()) == 0) {
+      new_hosts.emplace_back(new RedisHost(info(), "", slot.primary(), *this, true, time_source_));
+      all_new_hosts.emplace(slot.primary()->asString());
+    }
     for (auto const& replica : slot.replicas()) {
-      new_hosts.emplace_back(new RedisHost(info(), "", replica.second, *this, false, time_source_));
-      all_new_hosts.emplace(replica.first);
+      if (all_new_hosts.count(replica.first) == 0) {
+        new_hosts.emplace_back(
+            new RedisHost(info(), "", replica.second, *this, false, time_source_));
+        all_new_hosts.emplace(replica.first);
+      }
     }
   }
 
-  Upstream::HostMap updated_hosts;
+  // Get the map of all the latest existing hosts, which is used to filter out the existing
+  // hosts in the process of updating cluster memberships.
+  Upstream::HostMapConstSharedPtr all_hosts = priority_set_.crossPriorityHostMap();
+  ASSERT(all_hosts != nullptr);
+
   Upstream::HostVector hosts_added;
   Upstream::HostVector hosts_removed;
   const bool host_updated = updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                                  updated_hosts, all_hosts_, all_new_hosts);
+                                                  *all_hosts, all_new_hosts);
+
+  // Create a map containing all the latest hosts to determine whether the slots are updated.
+  Upstream::HostMap updated_hosts = *all_hosts;
+  for (const auto& host : hosts_removed) {
+    updated_hosts.erase(host->address()->asString());
+  }
+  for (const auto& host : hosts_added) {
+    updated_hosts[host->address()->asString()] = host;
+  }
+
   const bool slot_updated =
       lb_factory_ ? lb_factory_->onClusterSlotUpdate(std::move(slots), updated_hosts) : false;
 
@@ -120,8 +139,6 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
   } else {
     info_->stats().update_no_rebuild_.inc();
   }
-
-  all_hosts_ = std::move(updated_hosts);
 
   // TODO(hyang): If there is an initialize callback, fire it now. Note that if the
   // cluster refers to multiple DNS names, this will return initialized after a single

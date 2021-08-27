@@ -13,14 +13,14 @@ SocketImpl::SocketImpl(Socket::Type sock_type,
                        const Address::InstanceConstSharedPtr& address_for_io_handle,
                        const Address::InstanceConstSharedPtr& remote_address)
     : io_handle_(ioHandleForAddr(sock_type, address_for_io_handle)),
-      address_provider_(std::make_shared<SocketAddressSetterImpl>(nullptr, remote_address)),
+      address_provider_(std::make_shared<ConnectionInfoSetterImpl>(nullptr, remote_address)),
       sock_type_(sock_type), addr_type_(address_for_io_handle->type()) {}
 
 SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
                        const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
     : io_handle_(std::move(io_handle)),
-      address_provider_(std::make_shared<SocketAddressSetterImpl>(local_address, remote_address)) {
+      address_provider_(std::make_shared<ConnectionInfoSetterImpl>(local_address, remote_address)) {
 
   if (address_provider_->localAddress() != nullptr) {
     addr_type_ = address_provider_->localAddress()->type();
@@ -56,9 +56,9 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
     }
     // Not storing a reference to syscalls singleton because of unit test mocks
     bind_result = io_handle_->bind(address);
-    if (pipe->mode() != 0 && !abstract_namespace && bind_result.rc_ == 0) {
+    if (pipe->mode() != 0 && !abstract_namespace && bind_result.return_value_ == 0) {
       auto set_permissions = Api::OsSysCallsSingleton::get().chmod(pipe_sa->sun_path, pipe->mode());
-      if (set_permissions.rc_ != 0) {
+      if (set_permissions.return_value_ != 0) {
         throw EnvoyException(fmt::format("Failed to create socket with mode {}: {}",
                                          std::to_string(pipe->mode()),
                                          errorDetails(set_permissions.errno_)));
@@ -68,7 +68,7 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
   }
 
   bind_result = io_handle_->bind(address);
-  if (bind_result.rc_ == 0 && address->ip()->port() == 0) {
+  if (bind_result.return_value_ == 0 && address->ip()->port() == 0) {
     address_provider_->setLocalAddress(io_handle_->localAddress());
   }
   return bind_result;

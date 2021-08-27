@@ -13,21 +13,30 @@ envoy_package()
 
 exports_files(["example_configs_test_setup.sh"])
 
-envoy_cc_test(
-    name = "example_configs_test",
-    size = "large",
+envoy_cc_test_library(
+    name = "example_configs_test_lib",
     srcs = [
         "example_configs_test.cc",
-    ],
-    data = [
-        "example_configs_test_setup.sh",
-        "//configs:example_configs",
     ],
     deps = [
         ":config_test_lib",
         "//source/common/filesystem:filesystem_lib",
+        "//test/config:v2_link_hacks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "example_configs_test",
+    size = "large",
+    data = [
+        "example_configs_test_setup.sh",
+        "//configs:example_configs",
+    ],
+    env = {"EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar"},
+    deps = [
+        ":example_configs_test_lib",
     ],
 )
 

@@ -92,7 +92,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
   if (add_served_by_header_) {
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
-                          parent_.connection().addressProvider().localAddress()->asString());
+                          parent_.connection().connectionInfoProvider().localAddress()->asString());
   }
 
   postToConnectionThread([this, headers_copy, end_stream]() -> void {
@@ -284,8 +284,12 @@ AssertionResult FakeStream::waitForReset(milliseconds timeout) {
   return AssertionSuccess();
 }
 
-void FakeStream::startGrpcStream() {
-  encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+void FakeStream::startGrpcStream(bool send_headers) {
+  ASSERT(!grpc_stream_started_, "gRPC stream should not be started more than once");
+  grpc_stream_started_ = true;
+  if (send_headers) {
+    encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  }
 }
 
 void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
@@ -749,7 +753,7 @@ void FakeUpstream::sendUdpDatagram(const std::string& buffer,
   dispatcher_->post([this, buffer, peer] {
     const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
                                                     nullptr, *peer);
-    EXPECT_TRUE(rc.rc_ == buffer.length());
+    EXPECT_TRUE(rc.return_value_ == buffer.length());
   });
 }
 
@@ -770,7 +774,7 @@ testing::AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const 
 
 void FakeUpstream::FakeListenSocketFactory::doFinalPreWorkerInit() {
   if (socket_->socketType() == Network::Socket::Type::Stream) {
-    ASSERT_EQ(0, socket_->ioHandle().listen(ENVOY_TCP_BACKLOG_SIZE).rc_);
+    ASSERT_EQ(0, socket_->ioHandle().listen(ENVOY_TCP_BACKLOG_SIZE).return_value_);
   } else {
     ASSERT(socket_->socketType() == Network::Socket::Type::Datagram);
     ASSERT_TRUE(Network::Socket::applyOptions(socket_->options(), *socket_,
