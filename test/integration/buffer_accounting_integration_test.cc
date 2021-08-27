@@ -436,7 +436,7 @@ TEST_P(Http2OverloadManagerIntegrationTest,
   autonomous_allow_incomplete_streams_ = true;
   initializeOverloadManagerInBootstrap(
       TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
-      name: "envoy.overload_actions.reset_streams"
+      name: "envoy.overload_actions.reset_high_memory_stream"
       triggers:
         - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
           scaled:
@@ -459,13 +459,14 @@ TEST_P(Http2OverloadManagerIntegrationTest,
 
   // Set the pressure so the overload action kicks in
   updateResource(0.95);
-  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reset_streams.scale_percent", 62);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 62);
 
   // Wait for the proxy to notice and take action for the overload by only
   // resetting the largest stream.
   if (streamBufferAccounting()) {
     test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 1);
-    test_server_->waitForCounterGe("envoy.overload_actions.reset_streams.count", 1);
+    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 1);
     EXPECT_TRUE(largest_request_response->waitForReset());
     EXPECT_TRUE(largest_request_response->reset());
 
@@ -478,7 +479,7 @@ TEST_P(Http2OverloadManagerIntegrationTest,
   // Wait for the proxy to notice and take action for the overload.
   if (streamBufferAccounting()) {
     test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 2);
-    test_server_->waitForCounterGe("envoy.overload_actions.reset_streams.count", 2);
+    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 2);
     EXPECT_TRUE(medium_request_response->waitForReset());
     EXPECT_TRUE(medium_request_response->reset());
 
@@ -487,7 +488,8 @@ TEST_P(Http2OverloadManagerIntegrationTest,
 
   // Reduce resource pressure
   updateResource(0.80);
-  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reset_streams.scale_percent", 0);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
 
   // Resume writes to upstream, any request streams that survive can go through.
   writev_matcher_->setResumeWrites();
@@ -513,7 +515,7 @@ TEST_P(Http2OverloadManagerIntegrationTest,
        ResetsExpensiveStreamsWhenDownstreamBuffersTakeTooMuchSpaceAndOverloaded) {
   initializeOverloadManagerInBootstrap(
       TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
-      name: "envoy.overload_actions.reset_streams"
+      name: "envoy.overload_actions.reset_high_memory_stream"
       triggers:
         - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
           scaled:
@@ -557,10 +559,11 @@ TEST_P(Http2OverloadManagerIntegrationTest,
 
   // Set the pressure so the overload action kills largest response
   updateResource(0.95);
-  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reset_streams.scale_percent", 62);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 62);
   if (streamBufferAccounting()) {
     test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 1);
-    test_server_->waitForCounterGe("envoy.overload_actions.reset_streams.count", 1);
+    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 1);
     ASSERT_TRUE(upstream_request_for_largest_response->waitForReset());
   }
 
@@ -568,13 +571,14 @@ TEST_P(Http2OverloadManagerIntegrationTest,
   updateResource(0.96);
   if (streamBufferAccounting()) {
     test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 2);
-    test_server_->waitForCounterGe("envoy.overload_actions.reset_streams.count", 2);
+    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 2);
     ASSERT_TRUE(upstream_request_for_medium_response->waitForReset());
   }
 
   // Reduce resource pressure
   updateResource(0.80);
-  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reset_streams.scale_percent", 0);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
 
   // Resume writes to downstream, any responses that survive can go through.
   writev_matcher_->setResumeWrites();

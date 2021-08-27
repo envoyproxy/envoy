@@ -36,7 +36,7 @@ public:
   const std::string ReduceTimeouts = "envoy.overload_actions.reduce_timeouts";
 
   // Overload action to reset streams using excessive memory.
-  const std::string ResetStreams = "envoy.overload_actions.reset_streams";
+  const std::string ResetStreams = "envoy.overload_actions.reset_high_memory_stream";
 };
 
 using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;
@@ -47,7 +47,7 @@ using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;
 class OverloadActionStatsNameValues {
 public:
   // Count of ther number of streams the reset streams action has reset
-  const std::string ResetStreamsCount = "envoy.overload_actions.reset_streams.count";
+  const std::string ResetStreamsCount = "envoy.overload_actions.reset_high_memory_stream.count";
 };
 
 using OverloadActionStatsNames = ConstSingleton<OverloadActionStatsNameValues>;

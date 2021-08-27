@@ -96,7 +96,7 @@ The following overload actions are supported:
     - Envoy will reduce the waiting period for a configured set of timeouts. See
       :ref:`below <config_overload_manager_reducing_timeouts>` for details on configuration.
 
-  * - envoy.overload_actions.reset_streams
+  * - envoy.overload_actions.reset_high_memory_stream
     - Envoy will reset expensive streams to terminate them. See
       :ref:`below <config_overload_manager_reset_streams>` for details on configuration.
 
@@ -176,7 +176,7 @@ Reset Streams
 
    Reset Streams only currently works with HTTP2.
 
-The ``envoy.overload_actions.reset_streams`` overload action will reset
+The ``envoy.overload_actions.reset_high_memory_stream`` overload action will reset
 expensive streams. This requires `minimum_threshold_for_tracking` to be
 configured via :ref:`buffer_factory_config
 <envoy_v3_api_field_config.overload.v3.OverloadManager.buffer_factory_config>`.
@@ -190,7 +190,7 @@ streams:
   buffer_factory_config:
     minimum_account_to_track_power_of_two: 20
   actions:
-    name: "envoy.overload_actions.reset_streams"
+    name: "envoy.overload_actions.reset_high_memory_stream"
     triggers:
       - name: "envoy.resource_monitors.fixed_heap"
         scaled:
