@@ -470,7 +470,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithDynamicMetadata) {
   dynamicMetadataTest(CheckStatus::OK, "200");
 }
 
-// Test the client when a denied response is received with dynamic metadata in tha denied response.
+// Test the client when a denied response is received with dynamic metadata in the denied response.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithDynamicMetadata) {
   dynamicMetadataTest(CheckStatus::Denied, "403");
 }
