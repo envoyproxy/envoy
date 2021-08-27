@@ -18,7 +18,7 @@ namespace PrivateKeyMethodProvider {
 namespace CryptoMb {
 
 namespace {
-void dontFreeBN(const BIGNUM*) { return; }
+void dontFreeBN(const BIGNUM*) {}
 } // namespace
 using BIGNUMConstPtr = CSmartPtr<const BIGNUM, dontFreeBN>;
 
