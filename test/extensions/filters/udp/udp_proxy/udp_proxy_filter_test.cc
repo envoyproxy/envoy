@@ -242,15 +242,25 @@ public:
     EXPECT_EQ(ipv6_expect, session.sock_opts_[ipv6_option.level()][ipv6_option.option()]);
   }
 
+  virtual void setupDefault() {
+    setup(R"EOF(
+stat_prefix: foo
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
+use_original_src_ip: true
+    )EOF");
+  }
+
   void
   ensureIpTransparentSocketOptions(const Network::Address::InstanceConstSharedPtr& upstream_address,
                                    const std::string& local_address, int ipv4_expect,
                                    int ipv6_expect) {
-    setup(R"EOF(
-stat_prefix: foo
-cluster: fake_cluster
-use_original_src_ip: true
-    )EOF");
+    setupDefault();
 
     expectSessionCreate(upstream_address);
     test_sessions_[0].expectSetIpTransparentSocketOption();
@@ -309,6 +319,20 @@ public:
         .WillRepeatedly(Return(upstream_address_v6_));
   }
 
+  void setupDefault() override {
+    setup(R"EOF(
+stat_prefix: foo
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0::0
+    route:
+      cluster: fake_cluster
+use_original_src_ip: true
+    )EOF");
+  }
+
   const Network::Address::InstanceConstSharedPtr upstream_address_v6_;
   inline static const std::string upstream_ipv6_address_ = "[2001:db8:85a3::8a2e:370:7334]:443";
   inline static const std::string peer_ipv6_address_ = "[2001:db8:85a3::9a2e:370:7334]:1000";
@@ -339,6 +363,66 @@ public:
 
 // Basic UDP proxy flow with a single session. Also test disabling GRO.
 TEST_F(UdpProxyFilterTest, BasicFlow) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
+upstream_socket_config:
+  prefer_gro: false
+  )EOF",
+        true, false);
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+  test_sessions_[0].recvDataFromUpstream("world");
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+
+  test_sessions_[0].expectWriteToUpstream("hello2");
+  test_sessions_[0].expectWriteToUpstream("hello3");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
+  checkTransferStats(11 /*rx_bytes*/, 2 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello3");
+  checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+
+  test_sessions_[0].recvDataFromUpstream("world2");
+  checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 11 /*tx_bytes*/, 2 /*tx_datagrams*/);
+  test_sessions_[0].recvDataFromUpstream("world3");
+  checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 17 /*tx_bytes*/, 3 /*tx_datagrams*/);
+}
+
+// No route.
+TEST_F(UdpProxyFilterTest, NoRoute) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 10.0.0.3
+        prefix_len: 32
+    route:
+      cluster: fake_cluster
+  )EOF");
+
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_no_route_.value());
+}
+
+// Single cluster without route config.
+TEST_F(UdpProxyFilterTest, SingleCluster) {
   InSequence s;
 
   setup(R"EOF(
@@ -377,7 +461,13 @@ TEST_F(UdpProxyFilterTest, IdleTimeout) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
   )EOF");
 
   expectSessionCreate(upstream_address_);
@@ -403,7 +493,13 @@ TEST_F(UdpProxyFilterTest, SendReceiveErrorHandling) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
   )EOF");
 
   filter_->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
@@ -448,7 +544,13 @@ TEST_F(UdpProxyFilterTest, NoUpstreamHost) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
   )EOF");
 
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
@@ -463,7 +565,13 @@ TEST_F(UdpProxyFilterTest, NoUpstreamClusterAtCreation) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
   )EOF",
         false);
 
@@ -477,7 +585,13 @@ TEST_F(UdpProxyFilterTest, ClusterDynamicAddAndRemoval) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
   )EOF",
         false);
 
@@ -518,7 +632,13 @@ TEST_F(UdpProxyFilterTest, MaxSessionsCircuitBreaker) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
   )EOF");
 
   // Allow only a single session.
@@ -555,7 +675,13 @@ TEST_F(UdpProxyFilterTest, RemoveHostSessions) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
   )EOF");
 
   expectSessionCreate(upstream_address_);
@@ -583,7 +709,13 @@ TEST_F(UdpProxyFilterTest, HostUnhealthyPickSameHost) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
   )EOF");
 
   expectSessionCreate(upstream_address_);
@@ -605,7 +737,13 @@ TEST_F(UdpProxyFilterTest, HostUnhealthyPickDifferentHost) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
   )EOF");
 
   expectSessionCreate(upstream_address_);
@@ -663,7 +801,14 @@ TEST_F(UdpProxyFilterIpv4Ipv6Test, NoSocketOptionIfUseOriginalSrcIpIsNotSet) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+      - address_prefix: 0::0
+    route:
+      cluster: fake_cluster
 use_original_src_ip: false
   )EOF");
 
@@ -681,7 +826,14 @@ TEST_F(UdpProxyFilterIpv4Ipv6Test, NoSocketOptionIfUseOriginalSrcIpIsNotMentione
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+      - address_prefix: 0::0
+    route:
+      cluster: fake_cluster
   )EOF");
 
   ensureNoIpTransparentSocketOptions();
@@ -696,7 +848,13 @@ TEST_F(UdpProxyFilterTest, ExitIpTransparentNoPlatformSupport) {
 
   auto config = R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
 use_original_src_ip: true
   )EOF";
 
@@ -712,7 +870,13 @@ TEST_F(UdpProxyFilterTest, HashPolicyWithSourceIp) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
 hash_policies:
 - source_ip: true
   )EOF");
@@ -725,7 +889,13 @@ TEST_F(UdpProxyFilterTest, ValidateHashPolicyWithSourceIp) {
   InSequence s;
   auto config = R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
 hash_policies:
 - source_ip: false
   )EOF";
@@ -740,7 +910,13 @@ TEST_F(UdpProxyFilterTest, NoHashPolicy) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
   )EOF");
 
   EXPECT_EQ(nullptr, config_->hashPolicy());
@@ -752,7 +928,13 @@ TEST_F(UdpProxyFilterTest, HashWithSourceIp) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
 hash_policies:
 - source_ip: true
   )EOF");
@@ -779,7 +961,13 @@ TEST_F(UdpProxyFilterTest, NullHashWithoutHashPolicy) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
   )EOF");
 
   auto host = createHost(upstream_address_);
@@ -802,7 +990,13 @@ TEST_F(UdpProxyFilterTest, HashPolicyWithKey) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
 hash_policies:
 - key: "key"
   )EOF");
@@ -815,7 +1009,13 @@ TEST_F(UdpProxyFilterTest, ValidateHashPolicyWithKey) {
   InSequence s;
   auto config = R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
 hash_policies:
 - key: ""
   )EOF";
@@ -830,7 +1030,13 @@ TEST_F(UdpProxyFilterTest, HashWithKey) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+route_config:
+  routes:
+  - match:
+      source_prefix_ranges:
+      - address_prefix: 0.0.0.0
+    route:
+      cluster: fake_cluster
 hash_policies:
 - key: "key"
   )EOF");
@@ -849,67 +1055,6 @@ hash_policies:
   test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   test_sessions_[0].recvDataFromUpstream("world");
-}
-
-// UDP proxy with router based on source_prefix_range. Test with the same conditions as BasicFlow.
-TEST_F(UdpProxyFilterTest, RouteWithSourcePrefixRange) {
-  InSequence s;
-
-  setup(R"EOF(
-stat_prefix: foo
-route_config:
-  routes:
-  - match:
-      source_prefix_ranges:
-      - address_prefix: 10.0.0.0
-        prefix_len: 24
-    route:
-      cluster: fake_cluster
-upstream_socket_config:
-  prefer_gro: false
-  )EOF",
-        true, false);
-
-  expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
-  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
-  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
-  test_sessions_[0].recvDataFromUpstream("world");
-  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
-
-  test_sessions_[0].expectWriteToUpstream("hello2");
-  test_sessions_[0].expectWriteToUpstream("hello3");
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
-  checkTransferStats(11 /*rx_bytes*/, 2 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello3");
-  checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
-
-  test_sessions_[0].recvDataFromUpstream("world2");
-  checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 11 /*tx_bytes*/, 2 /*tx_datagrams*/);
-  test_sessions_[0].recvDataFromUpstream("world3");
-  checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 17 /*tx_bytes*/, 3 /*tx_datagrams*/);
-}
-
-// No route.
-TEST_F(UdpProxyFilterTest, NoRoute) {
-  InSequence s;
-
-  setup(R"EOF(
-stat_prefix: foo
-route_config:
-  routes:
-  - match:
-      source_prefix_ranges:
-      - address_prefix: 10.0.0.3
-        prefix_len: 32
-    route:
-      cluster: fake_cluster
-  )EOF");
-
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
-  EXPECT_EQ(1, config_->stats().downstream_sess_no_route_.value());
 }
 
 } // namespace
