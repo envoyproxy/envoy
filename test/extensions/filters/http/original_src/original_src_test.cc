@@ -49,7 +49,7 @@ public:
   }
 
   void setAddressToReturn(const std::string& address) {
-    callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(
+    callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
         Network::Utility::resolveUrl(address));
   }
 
@@ -95,7 +95,7 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressAddsOption) {
     option->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   }
   EXPECT_EQ(*socket.connectionInfoProvider().localAddress(),
-            *callbacks_.stream_info_.downstream_address_provider_->remoteAddress());
+            *callbacks_.stream_info_.downstream_connection_info_provider_->remoteAddress());
 }
 
 TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressUsesCorrectAddress) {
@@ -200,7 +200,7 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataEndStreamDoNothing) {
   // This will be invoked in decodeHeaders.
   EXPECT_CALL(callbacks, addUpstreamSocketOptions(_));
   EXPECT_CALL(callbacks, streamInfo());
-  callbacks.stream_info_.downstream_address_provider_->setRemoteAddress(
+  callbacks.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       Network::Utility::parseInternetAddress("1.2.3.4"));
   filter->decodeHeaders(headers_, true);
 
@@ -217,7 +217,7 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataNotEndStreamDoNothing) {
   // This will be invoked in decodeHeaders.
   EXPECT_CALL(callbacks, addUpstreamSocketOptions(_));
   EXPECT_CALL(callbacks, streamInfo());
-  callbacks.stream_info_.downstream_address_provider_->setRemoteAddress(
+  callbacks.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       Network::Utility::parseInternetAddress("1.2.3.4"));
   filter->decodeHeaders(headers_, false);
 
