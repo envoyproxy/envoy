@@ -105,7 +105,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     // callback_ target _should_ still be around. In that case, raise the callback_ so the target
     // can be done with this query and initiate a new one.
     if (!cancelled_) {
-      ENVOY_LOG_EVENT(debug, "dns_resolution_destroyed", "dns resolution for {} destroyed",
+      ENVOY_LOG_EVENT(debug, "cares_dns_resolution_destroyed", "dns resolution for {} destroyed",
                       dns_name_);
 
       callback_(ResolutionStatus::Failure, {});
@@ -183,7 +183,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
       // portFromTcpUrl().
       // TODO(chaoqin-li1123): remove try catch pattern here once we figure how to handle unexpected
       // exception in fuzz tests.
-      ENVOY_LOG_EVENT(debug, "dns_resolution_complete",
+      ENVOY_LOG_EVENT(debug, "cares_dns_resolution_complete",
                       "dns resolution for {} completed with status {}", dns_name_,
                       resolution_status);
 
@@ -260,7 +260,7 @@ void DnsResolverImpl::onAresSocketStateChange(os_fd_t fd, int read, int write) {
 
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
                                          DnsLookupFamily dns_lookup_family, ResolveCb callback) {
-  ENVOY_LOG_EVENT(debug, "cares_dns_resolution_started", "dns resolution for {} started", dns_name);
+  ENVOY_LOG_EVENT(debug, "cares_dns_resolution_start", "dns resolution for {} started", dns_name);
 
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
   // failed initial call to getAddrInfo followed by a synchronous IPv4

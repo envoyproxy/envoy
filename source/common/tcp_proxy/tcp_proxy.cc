@@ -58,24 +58,24 @@ Config::RouteImpl::RouteImpl(
 
 bool Config::RouteImpl::matches(Network::Connection& connection) const {
   if (!source_port_ranges_.empty() &&
-      !Network::Utility::portInRangeList(*connection.addressProvider().remoteAddress(),
+      !Network::Utility::portInRangeList(*connection.connectionInfoProvider().remoteAddress(),
                                          source_port_ranges_)) {
     return false;
   }
 
   if (!source_ips_.empty() &&
-      !source_ips_.contains(*connection.addressProvider().remoteAddress())) {
+      !source_ips_.contains(*connection.connectionInfoProvider().remoteAddress())) {
     return false;
   }
 
   if (!destination_port_ranges_.empty() &&
-      !Network::Utility::portInRangeList(*connection.addressProvider().localAddress(),
+      !Network::Utility::portInRangeList(*connection.connectionInfoProvider().localAddress(),
                                          destination_port_ranges_)) {
     return false;
   }
 
   if (!destination_ips_.empty() &&
-      !destination_ips_.contains(*connection.addressProvider().localAddress())) {
+      !destination_ips_.contains(*connection.connectionInfoProvider().localAddress())) {
     return false;
   }
 
@@ -424,9 +424,9 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
                  Network::ProxyProtocolFilterState::key())) {
       read_callbacks_->connection().streamInfo().filterState()->setData(
           Network::ProxyProtocolFilterState::key(),
-          std::make_unique<Network::ProxyProtocolFilterState>(
-              Network::ProxyProtocolData{downstreamConnection()->addressProvider().remoteAddress(),
-                                         downstreamConnection()->addressProvider().localAddress()}),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+              downstreamConnection()->connectionInfoProvider().remoteAddress(),
+              downstreamConnection()->connectionInfoProvider().localAddress()}),
           StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::Connection);
     }

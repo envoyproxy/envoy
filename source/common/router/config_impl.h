@@ -812,7 +812,11 @@ private:
         const std::string& filter_name,
         std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
+<<<<<<< HEAD
     const Http::LowerCaseString& clusterHeaderName() const { return cluster_header_name_; }
+=======
+    const Http::LowerCaseString& clusterHeaderName() { return cluster_header_name_; }
+>>>>>>> ef70185f3ac241d09eabfe15c65b0d631134f74f
 
   private:
     const std::string runtime_key_;
@@ -913,6 +917,7 @@ private:
   envoy::config::core::v3::Metadata metadata_;
   Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory> typed_metadata_;
   const bool match_grpc_;
+  const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;

@@ -254,7 +254,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
   auto cluster_hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
 
   ASSERT_NE(host, nullptr);
-  EXPECT_EQ(*connection.addressProvider().localAddress(), *host->address());
+  EXPECT_EQ(*connection.connectionInfoProvider().localAddress(), *host->address());
 
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -264,7 +264,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
       cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
   EXPECT_EQ(host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-  EXPECT_EQ(*connection.addressProvider().localAddress(),
+  EXPECT_EQ(*connection.connectionInfoProvider().localAddress(),
             *cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address());
 
   // Same host is returned on the 2nd call
@@ -347,14 +347,14 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);
-  EXPECT_EQ(*connection1.addressProvider().localAddress(), *host1->address());
+  EXPECT_EQ(*connection1.connectionInfoProvider().localAddress(), *host1->address());
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
   HostConstSharedPtr host2 = lb.chooseHost(&lb_context2);
   post_cb();
   ASSERT_NE(host2, nullptr);
-  EXPECT_EQ(*connection2.addressProvider().localAddress(), *host2->address());
+  EXPECT_EQ(*connection2.connectionInfoProvider().localAddress(), *host2->address());
 
   EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -364,11 +364,11 @@ TEST_F(OriginalDstClusterTest, Membership2) {
       cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
   EXPECT_EQ(host1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-  EXPECT_EQ(*connection1.addressProvider().localAddress(),
+  EXPECT_EQ(*connection1.connectionInfoProvider().localAddress(),
             *cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address());
 
   EXPECT_EQ(host2, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[1]);
-  EXPECT_EQ(*connection2.addressProvider().localAddress(),
+  EXPECT_EQ(*connection2.connectionInfoProvider().localAddress(),
             *cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->address());
 
   auto cluster_hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -430,10 +430,11 @@ TEST_F(OriginalDstClusterTest, Connection) {
   HostConstSharedPtr host = lb.chooseHost(&lb_context);
   post_cb();
   ASSERT_NE(host, nullptr);
-  EXPECT_EQ(*connection.addressProvider().localAddress(), *host->address());
+  EXPECT_EQ(*connection.connectionInfoProvider().localAddress(), *host->address());
 
-  EXPECT_CALL(dispatcher_, createClientConnection_(
-                               PointeesEq(connection.addressProvider().localAddress()), _, _, _))
+  EXPECT_CALL(dispatcher_,
+              createClientConnection_(
+                  PointeesEq(connection.connectionInfoProvider().localAddress()), _, _, _))
       .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
   host->createConnection(dispatcher_, nullptr, nullptr);
 }
@@ -480,7 +481,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   HostConstSharedPtr host = lb.chooseHost(&lb_context);
   post_cb();
   ASSERT_NE(host, nullptr);
-  EXPECT_EQ(*connection.addressProvider().localAddress(), *host->address());
+  EXPECT_EQ(*connection.connectionInfoProvider().localAddress(), *host->address());
 
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   // Check that 'second' also gets updated
@@ -595,7 +596,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);
-  EXPECT_EQ(*connection1.addressProvider().localAddress(), *host1->address());
+  EXPECT_EQ(*connection1.connectionInfoProvider().localAddress(), *host1->address());
 
   // Downstream connection without original_dst filter, HTTP header override ignored.
   NiceMock<Network::MockConnection> connection2;

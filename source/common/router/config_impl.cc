@@ -59,6 +59,16 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
                                 src.headers_to_remove.end());
 }
 
+const envoy::config::route::v3::WeightedCluster::ClusterWeight& validateWeightedClusterSpecifier(
+    const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster) {
+  if (!cluster.name().empty() && !cluster.cluster_header().empty()) {
+    throw EnvoyException("Only one of name or cluster_header can be specified");
+  } else if (cluster.name().empty() && cluster.cluster_header().empty()) {
+    throw EnvoyException("At least one of name or cluster_header need to be specified");
+  }
+  return cluster;
+}
+
 } // namespace
 
 const std::string& OriginalConnectPort::key() {
@@ -353,8 +363,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           route, per_request_buffer_limit_bytes, vhost.retryShadowBufferLimit())),
       metadata_(route.metadata()), typed_metadata_(route.metadata()),
-      match_grpc_(route.match().has_grpc()), opaque_config_(parseOpaqueConfig(route)),
-      decorator_(parseDecorator(route)), route_tracing_(parseRouteTracing(route)),
+      match_grpc_(route.match().has_grpc()),
+      dynamic_metadata_(route.match().dynamic_metadata().begin(),
+                        route.match().dynamic_metadata().end()),
+      opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
+      route_tracing_(parseRouteTracing(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(
           route, factory_context.api(),
@@ -532,6 +545,14 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
   }
 
   matches &= evaluateTlsContextMatch(stream_info);
+
+  for (const auto& m : dynamic_metadata_) {
+    if (!matches) {
+      // No need to check anymore as all dynamic metadata matchers must match for a match to occur.
+      break;
+    }
+    matches &= m.match(stream_info.dynamicMetadata());
+  }
 
   return matches;
 }
@@ -1064,8 +1085,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     ProtobufMessage::ValidationVisitor& validator,
     const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster,
     const OptionalHttpFilters& optional_http_filters)
-    : DynamicRouteEntry(parent, cluster.name()), runtime_key_(runtime_key),
-      loader_(factory_context.runtime()),
+    : DynamicRouteEntry(parent, validateWeightedClusterSpecifier(cluster).name()),
+      runtime_key_(runtime_key), loader_(factory_context.runtime()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
       request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add(),
                                                       cluster.request_headers_to_remove())),
@@ -1260,7 +1281,6 @@ VirtualHostImpl::VirtualHostImpl(
       include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
       virtual_cluster_catch_all_(*vcluster_scope_,
                                  factory_context.routerContext().virtualClusterStatNames()) {
-
   switch (virtual_host.require_tls()) {
   case envoy::config::route::v3::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::None;
@@ -1517,7 +1537,6 @@ RouteConstSharedPtr RouteMatcher::route(const RouteCallback& cb,
                                         const Http::RequestHeaderMap& headers,
                                         const StreamInfo::StreamInfo& stream_info,
                                         uint64_t random_value) const {
-
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
   if (virtual_host) {
     return virtual_host->getRouteFromEntries(cb, headers, stream_info, random_value);
@@ -1619,7 +1638,6 @@ PerFilterConfigs::PerFilterConfigs(
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
-
   for (const auto& it : typed_configs) {
     // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
     const auto& name =
