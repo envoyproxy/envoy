@@ -350,7 +350,6 @@ intersphinx_mapping = {
     'v1.17.2': ('https://www.envoyproxy.io/docs/envoy/v1.17.2', None),
     'v1.17.3': ('https://www.envoyproxy.io/docs/envoy/v1.17.3', None),
     'v1.17.4': ('https://www.envoyproxy.io/docs/envoy/v1.17.4', None),
-    # Somehow the url for v1.18.{0,1} returns 404.
     'v1.18.0': ('https://www.envoyproxy.io/docs/envoy/v1.18.2', None),
     'v1.18.3': ('https://www.envoyproxy.io/docs/envoy/v1.18.3', None),
     'v1.18.4': ('https://www.envoyproxy.io/docs/envoy/v1.18.4', None),
