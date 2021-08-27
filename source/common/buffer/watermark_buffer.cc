@@ -161,12 +161,14 @@ void WatermarkBufferFactory::updateAccountClass(const BufferMemoryAccountSharedP
                                                 absl::optional<uint32_t> new_class) {
   ASSERT(current_class != new_class, "Expected the current_class and new_class to be different");
 
-  if (!current_class.has_value() && new_class >= 0u) {
+  if (!current_class.has_value()) {
     // Start tracking
+    ASSERT(new_class.has_value());
     ASSERT(!size_class_account_sets_[new_class.value()].contains(account));
     size_class_account_sets_[new_class.value()].insert(account);
-  } else if (current_class >= 0u && !new_class.has_value()) {
+  } else if (!new_class.has_value()) {
     // No longer track
+    ASSERT(current_class.has_value());
     ASSERT(size_class_account_sets_[current_class.value()].contains(account));
     size_class_account_sets_[current_class.value()].erase(account);
   } else {
