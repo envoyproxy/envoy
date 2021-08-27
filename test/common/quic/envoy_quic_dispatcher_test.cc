@@ -117,7 +117,8 @@ public:
             quic::test::ConstructReceivedPacket(*encrypted_packet, clock.Now()));
 
     envoy_quic_dispatcher_.ProcessPacket(
-        envoyIpAddressToQuicSocketAddress(listen_socket_->addressProvider().localAddress()->ip()),
+        envoyIpAddressToQuicSocketAddress(
+            listen_socket_->connectionInfoProvider().localAddress()->ip()),
         peer_addr, *received_packet);
   }
 
@@ -161,10 +162,10 @@ public:
     auto envoy_connection = static_cast<const EnvoyQuicServerSession*>(session);
     EXPECT_EQ("test.example.org", envoy_connection->requestedServerName());
     EXPECT_EQ(peer_addr, envoyIpAddressToQuicSocketAddress(
-                             envoy_connection->addressProvider().remoteAddress()->ip()));
-    ASSERT(envoy_connection->addressProvider().localAddress() != nullptr);
-    EXPECT_EQ(*listen_socket_->addressProvider().localAddress(),
-              *envoy_connection->addressProvider().localAddress());
+                             envoy_connection->connectionInfoProvider().remoteAddress()->ip()));
+    ASSERT(envoy_connection->connectionInfoProvider().localAddress() != nullptr);
+    EXPECT_EQ(*listen_socket_->connectionInfoProvider().localAddress(),
+              *envoy_connection->connectionInfoProvider().localAddress());
     EXPECT_EQ(64 * 1024, envoy_connection->max_inbound_header_list_size());
   }
 

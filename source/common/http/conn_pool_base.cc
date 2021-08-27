@@ -60,7 +60,7 @@ ConnectionPool::Cancellable*
 HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
                                 Http::ConnectionPool::Callbacks& callbacks) {
   HttpAttachContext context({&response_decoder, &callbacks});
-  return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
+  return newStreamImpl(context);
 }
 
 bool HttpConnPoolImplBase::hasActiveConnections() const {

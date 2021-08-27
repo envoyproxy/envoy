@@ -11,7 +11,6 @@
 #include "source/common/common/hash.h"
 #include "source/common/common/stl_helpers.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/singleton/const_singleton.h"
 
@@ -252,16 +251,12 @@ public:
   static std::size_t hash(const Protobuf::Message& message);
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor,
-                           bool do_boosting = true);
+                           ProtobufMessage::ValidationVisitor& validation_visitor);
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor,
-                           bool do_boosting = true);
-  static void loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message);
+                           ProtobufMessage::ValidationVisitor& validation_visitor);
   static void loadFromFile(const std::string& path, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                           bool do_boosting = true);
+                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
@@ -292,15 +287,14 @@ public:
 
     std::string err;
     if (!Validate(message, &err)) {
-      ProtoExceptionUtil::throwProtoValidationException(err, API_RECOVER_ORIGINAL(message));
+      ProtoExceptionUtil::throwProtoValidationException(err, message);
     }
   }
 
   template <class MessageType>
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                                      bool avoid_boosting = false) {
-    loadFromYaml(yaml, message, validation_visitor, !avoid_boosting);
+                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
+    loadFromYaml(yaml, message, validation_visitor);
     validate(message, validation_visitor);
   }
 
@@ -393,14 +387,6 @@ public:
     anyConvertAndValidate<MessageType>(message, typed_message, validation_visitor);
     return typed_message;
   };
-
-  /**
-   * Invoke when a version upgrade (e.g. v2 -> v3) is detected. This may warn or throw
-   * depending on where we are in the major version deprecation cycle.
-   * @param desc description of upgrade to include in warning or exception.
-   * @param reject should a DeprecatedMajorVersionException be thrown on failure?
-   */
-  static void onVersionUpgradeDeprecation(absl::string_view desc, bool reject = true);
 
   /**
    * Obtain a string field from a protobuf message dynamically.
@@ -533,6 +519,17 @@ public:
    * @param message message to redact.
    */
   static void redact(Protobuf::Message& message);
+
+  /**
+   * Reinterpret a Protobuf message as another Protobuf message by converting to wire format and
+   * back. This only works for messages that can be effectively duck typed this way, e.g. with a
+   * subtype relationship modulo field name.
+   *
+   * @param src source message.
+   * @param dst destination message.
+   * @throw EnvoyException if a conversion error occurs.
+   */
+  static void wireCast(const Protobuf::Message& src, Protobuf::Message& dst);
 };
 
 class ValueUtil {

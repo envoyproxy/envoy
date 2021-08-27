@@ -4,13 +4,14 @@
 trigger: none
 pr: none
 
-schedules:
-- cron: "0 * * * *"
-  displayName: Hourly CVE scan
-  branches:
-    include:
-    - main
-  always: true
+# This appears to be broken right now so disabling until it is fixed.
+# schedules:
+# - cron: "0 * * * *"
+#   displayName: Hourly CVE scan
+#   branches:
+#     include:
+#     - main
+#   always: true
 
 pool:
   vmImage: "ubuntu-18.04"

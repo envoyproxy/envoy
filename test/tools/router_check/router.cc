@@ -247,7 +247,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
        validation_config.tests()) {
     active_runtime_ = check_config.input().runtime();
     headers_finalized_ = false;
-    auto address_provider = std::make_shared<Network::SocketAddressSetterImpl>(
+    auto address_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
         nullptr, Network::Utility::getCanonicalIpv4LoopbackAddress());
     Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
                                                   factory_context_->dispatcher().timeSource(),
