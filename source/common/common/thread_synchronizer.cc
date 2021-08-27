@@ -1,4 +1,4 @@
-#include "common/common/thread_synchronizer.h"
+#include "source/common/common/thread_synchronizer.h"
 
 namespace Envoy {
 namespace Thread {

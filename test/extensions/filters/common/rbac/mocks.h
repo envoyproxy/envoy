@@ -2,7 +2,7 @@
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
 
-#include "extensions/filters/common/rbac/engine_impl.h"
+#include "source/extensions/filters/common/rbac/engine_impl.h"
 
 #include "gmock/gmock.h"
 

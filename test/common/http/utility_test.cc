@@ -6,12 +6,12 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/core/v3/protocol.pb.validate.h"
 
-#include "common/common/fmt.h"
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http1/settings.h"
-#include "common/http/utility.h"
-#include "common/network/address_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http1/settings.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/address_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -310,10 +310,9 @@ TEST(HttpUtility, createSslRedirectPath) {
 
 namespace {
 
-envoy::config::core::v3::Http2ProtocolOptions
-parseHttp2OptionsFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
+envoy::config::core::v3::Http2ProtocolOptions parseHttp2OptionsFromV3Yaml(const std::string& yaml) {
   envoy::config::core::v3::Http2ProtocolOptions http2_options;
-  TestUtility::loadFromYamlAndValidate(yaml, http2_options, false, avoid_boosting);
+  TestUtility::loadFromYamlAndValidate(yaml, http2_options);
   return ::Envoy::Http2::Utility::initializeAndValidateOptions(http2_options);
 }
 
@@ -870,11 +869,8 @@ TEST(HttpUtility, ResetReasonToString) {
             Utility::resetReasonToString(Http::StreamResetReason::RemoteRefusedStreamReset));
   EXPECT_EQ("remote error with CONNECT request",
             Utility::resetReasonToString(Http::StreamResetReason::ConnectError));
-}
-
-// Verify that it resolveMostSpecificPerFilterConfigGeneric works with nil routes.
-TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
-  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric("envoy.filter", nullptr));
+  EXPECT_EQ("overload manager reset",
+            Utility::resetReasonToString(Http::StreamResetReason::OverloadManager));
 }
 
 class TestConfig : public Router::RouteSpecificFilterConfig {
@@ -883,112 +879,37 @@ public:
   void merge(const TestConfig& other) { state_ += other.state_; }
 };
 
-// Verify that resolveMostSpecificPerFilterConfig works and we get back the original type.
-TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
-  TestConfig testConfig;
-
-  const std::string filter_name = "envoy.filter";
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
-
-  // make the file callbacks return our test config
-  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
-      .WillByDefault(Return(&testConfig));
-
-  // test the we get the same object back (as this goes through the dynamic_cast)
-  auto resolved_filter_config = Utility::resolveMostSpecificPerFilterConfig<TestConfig>(
-      filter_name, filter_callbacks.route());
-  EXPECT_EQ(&testConfig, resolved_filter_config);
+// Verify that it resolveMostSpecificPerFilterConfig works with nil routes.
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
+  EXPECT_EQ(nullptr,
+            Utility::resolveMostSpecificPerFilterConfig<TestConfig>("envoy.filter", nullptr));
 }
 
-// Verify that resolveMostSpecificPerFilterConfigGeneric indeed returns the most specific per
+// Verify that resolveMostSpecificPerFilterConfig indeed returns the most specific per
 // filter config.
-TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
-  const Router::RouteSpecificFilterConfig one;
-  const Router::RouteSpecificFilterConfig two;
-  const Router::RouteSpecificFilterConfig three;
+  const Router::RouteSpecificFilterConfig config;
 
   // Test when there's nothing on the route
-  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                        filter_callbacks.route()));
+  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                         filter_name, filter_callbacks.route()));
 
   // Testing in reverse order, so that the method always returns the last object.
-  ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
-      .WillByDefault(Return(&one));
-  EXPECT_EQ(&one, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                     filter_callbacks.route()));
-
-  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name)).WillByDefault(Return(&two));
-  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                     filter_callbacks.route()));
-
-  ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
-      .WillByDefault(Return(&three));
-  EXPECT_EQ(&three, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                       filter_callbacks.route()));
+  // Testing per-virtualhost typed filter config
+  ON_CALL(*filter_callbacks.route_, mostSpecificPerFilterConfig(filter_name))
+      .WillByDefault(Return(&config));
+  EXPECT_EQ(&config, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                         filter_name, filter_callbacks.route()));
 
   // Cover the case of no route entry
   ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
-  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                     filter_callbacks.route()));
-}
-
-// Verify that traversePerFilterConfigGeneric traverses in the order of specificity.
-TEST(HttpUtility, TraversePerFilterConfigIteratesInOrder) {
-  const std::string filter_name = "envoy.filter";
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
-
-  // Create configs to test; to ease of testing instead of using real objects
-  // we will use pointers that are actually indexes.
-  const std::vector<Router::RouteSpecificFilterConfig> nullconfigs(5);
-  size_t num_configs = 1;
-  ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
-      .WillByDefault(Return(&nullconfigs[num_configs]));
-  num_configs++;
-  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
-      .WillByDefault(Return(&nullconfigs[num_configs]));
-  num_configs++;
-  ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
-      .WillByDefault(Return(&nullconfigs[num_configs]));
-
-  // a vector to save which configs are visited by the traversePerFilterConfigGeneric
-  std::vector<size_t> visited_configs(num_configs, 0);
-
-  // Iterate; save the retrieved config index in the iteration index in visited_configs.
-  size_t index = 0;
-  Utility::traversePerFilterConfigGeneric(filter_name, filter_callbacks.route(),
-                                          [&](const Router::RouteSpecificFilterConfig& cfg) {
-                                            int cfg_index = &cfg - nullconfigs.data();
-                                            visited_configs[index] = cfg_index - 1;
-                                            index++;
-                                          });
-
-  // Make sure all methods were called, and in order.
-  for (size_t i = 0; i < visited_configs.size(); i++) {
-    EXPECT_EQ(i, visited_configs[i]);
-  }
-}
-
-// Verify that traversePerFilterConfig works and we get back the original type.
-TEST(HttpUtility, TraversePerFilterConfigTyped) {
-  TestConfig testConfig;
-
-  const std::string filter_name = "envoy.filter";
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
-
-  // make the file callbacks return our test config
-  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
-      .WillByDefault(Return(&testConfig));
-
-  // iterate the configs
-  size_t index = 0;
-  Utility::traversePerFilterConfig<TestConfig>(filter_name, filter_callbacks.route(),
-                                               [&](const TestConfig&) { index++; });
-
-  // make sure that the callback was called (which means that the dynamic_cast worked.)
-  EXPECT_EQ(1, index);
+  ON_CALL(*filter_callbacks.route_, mostSpecificPerFilterConfig(filter_name))
+      .WillByDefault(Return(&config));
+  EXPECT_EQ(&config, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                         filter_name, filter_callbacks.route()));
 }
 
 // Verify that merging works as expected and we get back the merged result.
@@ -1001,11 +922,12 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
-  // make the file callbacks return our test config
-  ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
-      .WillByDefault(Return(&baseTestConfig));
-  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
-      .WillByDefault(Return(&routeTestConfig));
+  EXPECT_CALL(*filter_callbacks.route_, traversePerFilterConfig(filter_name, _))
+      .WillOnce(Invoke([&](const std::string&,
+                           std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
+        cb(baseTestConfig);
+        cb(routeTestConfig);
+      }));
 
   // merge the configs
   auto merged_cfg = Utility::getMergedPerFilterConfig<TestConfig>(
@@ -1241,7 +1163,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedHost) {
   EXPECT_EQ(sanitized_headers, request_headers);
 }
 
-TEST(HttpUtility, TestRejectNominatedXForwardedProto) {
+TEST(HttpUtility, TestRejectNominatedForwardedProto) {
   Http::TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"},
       {":path", "/"},
@@ -1321,6 +1243,31 @@ TEST(HttpUtility, TestRejectTeHeaderTooLong) {
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
+}
+
+TEST(HttpUtility, TestRejectUriWithNoPath) {
+  Http::TestRequestHeaderMapImpl request_headers_no_path = {
+      {":method", "GET"}, {":authority", "example.com"}, {":scheme", "http"}};
+  EXPECT_EQ(Utility::buildOriginalUri(request_headers_no_path, {}), "");
+}
+
+TEST(HttpUtility, TestTruncateUri) {
+  Http::TestRequestHeaderMapImpl request_headers_truncated_path = {{":method", "GET"},
+                                                                   {":path", "/hello_world"},
+                                                                   {":authority", "example.com"},
+                                                                   {":scheme", "http"}};
+  EXPECT_EQ(Utility::buildOriginalUri(request_headers_truncated_path, 2), "http://example.com/h");
+}
+
+TEST(HttpUtility, TestUriUsesOriginalPath) {
+  Http::TestRequestHeaderMapImpl request_headers_truncated_path = {
+      {":method", "GET"},
+      {":path", "/hello_world"},
+      {":authority", "example.com"},
+      {":scheme", "http"},
+      {"x-envoy-original-path", "/goodbye_world"}};
+  EXPECT_EQ(Utility::buildOriginalUri(request_headers_truncated_path, {}),
+            "http://example.com/goodbye_world");
 }
 
 TEST(Url, ParsingFails) {
@@ -1475,6 +1422,31 @@ TEST(PercentEncoding, Encoding) {
   EXPECT_EQ(Utility::PercentEncoding::encode("too%large"), "too%25large");
   EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/"), "too%25!large/");
   EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/", "%!/"), "too%25%21large%2F");
+}
+
+TEST(CheckRequiredHeaders, Request) {
+  EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(
+                                  TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}));
+  EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{
+                                  {":method", "CONNECT"}, {":authority", "localhost:1234"}}));
+  EXPECT_EQ(absl::InvalidArgumentError("missing required header: :method"),
+            HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{}));
+  EXPECT_EQ(
+      absl::InvalidArgumentError("missing required header: :path"),
+      HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}));
+  EXPECT_EQ(
+      absl::InvalidArgumentError("missing required header: :authority"),
+      HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{{":method", "CONNECT"}}));
+}
+
+TEST(CheckRequiredHeaders, Response) {
+  EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredResponseHeaders(
+                                  TestResponseHeaderMapImpl{{":status", "200"}}));
+  EXPECT_EQ(absl::InvalidArgumentError("missing required header: :status"),
+            HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{}));
+  EXPECT_EQ(
+      absl::InvalidArgumentError("missing required header: :status"),
+      HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{{":status", "abcd"}}));
 }
 
 } // namespace Http

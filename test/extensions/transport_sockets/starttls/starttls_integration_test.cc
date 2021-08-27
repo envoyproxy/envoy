@@ -3,10 +3,9 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/network/connection_impl.h"
-
-#include "extensions/filters/network/common/factory_base.h"
-#include "extensions/transport_sockets/raw_buffer/config.h"
+#include "source/common/network/connection_impl.h"
+#include "source/extensions/filters/network/common/factory_base.h"
+#include "source/extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/config/utility.h"
 #include "test/extensions/transport_sockets/starttls/starttls_integration_test.pb.h"
@@ -177,7 +176,7 @@ public:
 };
 
 void StartTlsIntegrationTest::initialize() {
-  EXPECT_CALL(*mock_buffer_factory_, create_(_, _, _))
+  EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       // Connection constructor will first create write buffer.
       // Test tracks how many bytes are sent.
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,

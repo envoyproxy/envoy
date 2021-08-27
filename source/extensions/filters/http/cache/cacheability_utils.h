@@ -1,9 +1,8 @@
 #pragma once
 
-#include "common/common/utility.h"
-#include "common/http/headers.h"
-
-#include "extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,7 +24,7 @@ public:
   // https://httpwg.org/specs/rfc7234.html#response.cacheability. Head requests are not
   // cacheable. However, this function is never called for head requests.
   static bool isCacheableResponse(const Http::ResponseHeaderMap& headers,
-                                  const VaryHeader& vary_allow_list);
+                                  const VaryAllowList& vary_allow_list);
 };
 } // namespace Cache
 } // namespace HttpFilters

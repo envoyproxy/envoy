@@ -1,6 +1,6 @@
 #include "test/test_common/file_system_for_test.h"
 
-#include "common/filesystem/filesystem_impl.h"
+#include "source/common/filesystem/filesystem_impl.h"
 
 namespace Envoy {
 

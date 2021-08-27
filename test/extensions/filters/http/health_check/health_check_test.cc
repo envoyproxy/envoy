@@ -3,11 +3,10 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/header_utility.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/filters/http/health_check/health_check.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/filters/http/health_check/health_check.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -51,7 +50,7 @@ public:
     header_data_ = std::make_shared<std::vector<Http::HeaderUtility::HeaderDataPtr>>();
     envoy::config::route::v3::HeaderMatcher matcher;
     matcher.set_name(":path");
-    matcher.set_exact_match("/healthcheck");
+    matcher.mutable_string_match()->set_exact("/healthcheck");
     header_data_->emplace_back(std::make_unique<Http::HeaderUtility::HeaderData>(matcher));
     filter_ = std::make_unique<HealthCheckFilter>(context_, pass_through, cache_manager_,
                                                   header_data_, cluster_min_healthy_percentages);

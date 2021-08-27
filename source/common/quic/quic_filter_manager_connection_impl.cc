@@ -1,4 +1,4 @@
-#include "common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
 
 #include <initializer_list>
 #include <memory>
@@ -14,7 +14,7 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
     : Network::ConnectionImplBase(dispatcher, /*id=*/connection_id.Hash()),
       network_connection_(&connection), filter_manager_(*this, *connection.connectionSocket()),
       stream_info_(dispatcher.timeSource(),
-                   connection.connectionSocket()->addressProviderSharedPtr()),
+                   connection.connectionSocket()->connectionInfoProviderSharedPtr()),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {
@@ -158,7 +158,8 @@ void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
 }
 
 void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
-    const quic::QuicConnectionCloseFrame& frame, quic::ConnectionCloseSource source) {
+    const quic::QuicConnectionCloseFrame& frame, quic::ConnectionCloseSource source,
+    const quic::ParsedQuicVersion& version) {
   transport_failure_reason_ = absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code),
                                            " with details: ", frame.error_details);
   if (network_connection_ != nullptr) {
@@ -168,6 +169,17 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
                              : Network::ConnectionEvent::LocalClose);
     ASSERT(network_connection_ != nullptr);
     network_connection_ = nullptr;
+  }
+
+  if (!codec_stats_.has_value()) {
+    // The connection was closed before it could be used. Stats are not recorded.
+    return;
+  }
+  if (version.transport_version == quic::QUIC_VERSION_IETF_RFC_V1) {
+    codec_stats_->quic_version_rfc_v1_.inc();
+  } else {
+    ENVOY_BUG(false, fmt::format("Unexpected QUIC version {}",
+                                 quic::QuicVersionToString(version.transport_version)));
   }
 }
 

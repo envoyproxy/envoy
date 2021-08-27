@@ -1,7 +1,6 @@
-#include "common/tcp_proxy/tcp_proxy.h"
-
-#include "extensions/filters/network/sni_cluster/config.h"
-#include "extensions/filters/network/sni_cluster/sni_cluster.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
+#include "source/extensions/filters/network/sni_cluster/config.h"
+#include "source/extensions/filters/network/sni_cluster/sni_cluster.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"

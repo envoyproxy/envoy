@@ -10,8 +10,8 @@
 #include "envoy/singleton/manager.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 
-#include "common/protobuf/protobuf.h"
-#include "common/shared_pool/shared_pool.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/shared_pool/shared_pool.h"
 
 #include "absl/container/node_hash_map.h"
 

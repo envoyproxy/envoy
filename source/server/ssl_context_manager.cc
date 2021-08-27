@@ -1,4 +1,4 @@
-#include "server/ssl_context_manager.h"
+#include "source/server/ssl_context_manager.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/registry/registry.h"

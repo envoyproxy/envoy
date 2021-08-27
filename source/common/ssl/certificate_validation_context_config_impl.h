@@ -24,9 +24,6 @@ public:
   const std::string& certificateRevocationListPath() const final {
     return certificate_revocation_list_path_;
   }
-  const std::vector<std::string>& verifySubjectAltNameList() const override {
-    return verify_subject_alt_name_list_;
-  }
   const std::vector<envoy::type::matcher::v3::StringMatcher>&
   subjectAltNameMatchers() const override {
     return subject_alt_name_matchers_;
@@ -56,7 +53,6 @@ private:
   const std::string ca_cert_path_;
   const std::string certificate_revocation_list_;
   const std::string certificate_revocation_list_path_;
-  const std::vector<std::string> verify_subject_alt_name_list_;
   const std::vector<envoy::type::matcher::v3::StringMatcher> subject_alt_name_matchers_;
   const std::vector<std::string> verify_certificate_hash_list_;
   const std::vector<std::string> verify_certificate_spki_list_;

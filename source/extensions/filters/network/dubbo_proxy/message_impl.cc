@@ -1,6 +1,6 @@
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
 
-#include "common/http/header_map_impl.h"
+#include "source/common/http/header_map_impl.h"
 
 namespace Envoy {
 namespace Extensions {

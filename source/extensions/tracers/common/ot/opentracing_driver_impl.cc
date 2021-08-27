@@ -1,15 +1,15 @@
-#include "extensions/tracers/common/ot/opentracing_driver_impl.h"
+#include "source/extensions/tracers/common/ot/opentracing_driver_impl.h"
 
 #include <sstream>
 
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/base64.h"
-#include "common/common/utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/tracing/common_values.h"
-#include "common/tracing/null_span_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/tracing/common_values.h"
+#include "source/common/tracing/null_span_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,28 +21,34 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
     ot_span_context_handle(Http::CustomHeaders::get().OtSpanContext);
 
 namespace {
-class OpenTracingHTTPHeadersWriter : public opentracing::HTTPHeadersWriter {
+
+/**
+ * TODO(wbpcode): Use opentracing::TextMapWriter to replace opentracing::HTTPHeadersWriter.
+ */
+class OpenTracingHeadersWriter : public opentracing::HTTPHeadersWriter {
 public:
-  explicit OpenTracingHTTPHeadersWriter(Http::HeaderMap& request_headers)
-      : request_headers_(request_headers) {}
+  explicit OpenTracingHeadersWriter(Tracing::TraceContext& trace_context)
+      : trace_context_(trace_context) {}
 
   // opentracing::HTTPHeadersWriter
   opentracing::expected<void> Set(opentracing::string_view key,
                                   opentracing::string_view value) const override {
-    Http::LowerCaseString lowercase_key{key};
-    request_headers_.remove(lowercase_key);
-    request_headers_.addCopy(std::move(lowercase_key), {value.data(), value.size()});
+    Http::LowerCaseString lowercase_key{{key.data(), key.size()}};
+    trace_context_.setByKey(lowercase_key, {value.data(), value.size()});
     return {};
   }
 
 private:
-  Http::HeaderMap& request_headers_;
+  Tracing::TraceContext& trace_context_;
 };
 
-class OpenTracingHTTPHeadersReader : public opentracing::HTTPHeadersReader {
+/**
+ * TODO(wbpcode): Use opentracing::TextMapReader to replace opentracing::HTTPHeadersReader.
+ */
+class OpenTracingHeadersReader : public opentracing::HTTPHeadersReader {
 public:
-  explicit OpenTracingHTTPHeadersReader(const Http::RequestHeaderMap& request_headers)
-      : request_headers_(request_headers) {}
+  explicit OpenTracingHeadersReader(const Tracing::TraceContext& trace_context)
+      : trace_context_(trace_context) {}
 
   using OpenTracingCb = std::function<opentracing::expected<void>(opentracing::string_view,
                                                                   opentracing::string_view)>;
@@ -50,38 +56,26 @@ public:
   // opentracing::HTTPHeadersReader
   opentracing::expected<opentracing::string_view>
   LookupKey(opentracing::string_view key) const override {
-    const auto entry = request_headers_.get(Http::LowerCaseString{key});
-    if (!entry.empty()) {
-      // This is an implicitly untrusted header, so only the first value is used.
-      return opentracing::string_view{entry[0]->value().getStringView().data(),
-                                      entry[0]->value().getStringView().length()};
+    Http::LowerCaseString lowercase_key{{key.data(), key.size()}};
+    const auto entry = trace_context_.getByKey(lowercase_key);
+    if (entry.has_value()) {
+      return opentracing::string_view{entry.value().data(), entry.value().length()};
     } else {
       return opentracing::make_unexpected(opentracing::key_not_found_error);
     }
   }
 
   opentracing::expected<void> ForeachKey(OpenTracingCb f) const override {
-    request_headers_.iterate(headerMapCallback(f));
+    trace_context_.forEach([cb = std::move(f)](absl::string_view key, absl::string_view val) {
+      opentracing::string_view opentracing_key{key.data(), key.length()};
+      opentracing::string_view opentracing_val{val.data(), val.length()};
+      return static_cast<bool>(cb(opentracing_key, opentracing_val));
+    });
     return {};
   }
 
 private:
-  const Http::RequestHeaderMap& request_headers_;
-
-  static Http::HeaderMap::ConstIterateCb headerMapCallback(OpenTracingCb callback) {
-    return [callback =
-                std::move(callback)](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-      opentracing::string_view key{header.key().getStringView().data(),
-                                   header.key().getStringView().length()};
-      opentracing::string_view value{header.value().getStringView().data(),
-                                     header.value().getStringView().length()};
-      if (callback(key, value)) {
-        return Http::HeaderMap::Iterate::Continue;
-      } else {
-        return Http::HeaderMap::Iterate::Break;
-      }
-    };
-  }
+  const Tracing::TraceContext& trace_context_;
 };
 } // namespace
 
@@ -113,7 +107,7 @@ std::string OpenTracingSpan::getBaggage(absl::string_view key) {
   return span_->BaggageItem({key.data(), key.length()});
 }
 
-void OpenTracingSpan::injectContext(Http::RequestHeaderMap& request_headers) {
+void OpenTracingSpan::injectContext(Tracing::TraceContext& trace_context) {
   if (driver_.propagationMode() == OpenTracingDriver::PropagationMode::SingleHeader) {
     // Inject the span context using Envoy's single-header format.
     std::ostringstream oss;
@@ -125,12 +119,12 @@ void OpenTracingSpan::injectContext(Http::RequestHeaderMap& request_headers) {
       return;
     }
     const std::string current_span_context = oss.str();
-    request_headers.setInline(
-        ot_span_context_handle.handle(),
+    trace_context.setByReferenceKey(
+        Http::CustomHeaders::get().OtSpanContext,
         Base64::encode(current_span_context.c_str(), current_span_context.length()));
   } else {
-    // Inject the context using the tracer's standard HTTP header format.
-    const OpenTracingHTTPHeadersWriter writer{request_headers};
+    // Inject the context using the tracer's standard header format.
+    const OpenTracingHeadersWriter writer{trace_context};
     const opentracing::expected<void> was_successful =
         span_->tracer().Inject(span_->context(), writer);
     if (!was_successful) {
@@ -157,7 +151,7 @@ OpenTracingDriver::OpenTracingDriver(Stats::Scope& scope)
     : tracer_stats_{OPENTRACING_TRACER_STATS(POOL_COUNTER_PREFIX(scope, "tracing.opentracing."))} {}
 
 Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
-                                              Http::RequestHeaderMap& request_headers,
+                                              Tracing::TraceContext& trace_context,
                                               const std::string& operation_name,
                                               SystemTime start_time,
                                               const Tracing::Decision tracing_decision) {
@@ -165,11 +159,11 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
   const opentracing::Tracer& tracer = this->tracer();
   std::unique_ptr<opentracing::Span> active_span;
   std::unique_ptr<opentracing::SpanContext> parent_span_ctx;
-  if (propagation_mode == PropagationMode::SingleHeader &&
-      request_headers.getInline(ot_span_context_handle.handle())) {
+
+  const auto entry = trace_context.getByKey(Http::CustomHeaders::get().OtSpanContext);
+  if (propagation_mode == PropagationMode::SingleHeader && entry.has_value()) {
     opentracing::expected<std::unique_ptr<opentracing::SpanContext>> parent_span_ctx_maybe;
-    std::string parent_context = Base64::decode(
-        std::string(request_headers.getInlineValue(ot_span_context_handle.handle())));
+    std::string parent_context = Base64::decode(std::string(entry.value()));
 
     if (!parent_context.empty()) {
       InputConstMemoryStream istream{parent_context.data(), parent_context.size()};
@@ -187,7 +181,7 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
       tracerStats().span_context_extraction_error_.inc();
     }
   } else if (propagation_mode == PropagationMode::TracerNative) {
-    const OpenTracingHTTPHeadersReader reader{request_headers};
+    const OpenTracingHeadersReader reader{trace_context};
     opentracing::expected<std::unique_ptr<opentracing::SpanContext>> parent_span_ctx_maybe =
         tracer.Extract(reader);
     if (parent_span_ctx_maybe) {

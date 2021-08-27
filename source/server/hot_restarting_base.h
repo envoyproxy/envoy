@@ -15,7 +15,7 @@
 #include "envoy/server/options.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Server {

@@ -22,11 +22,10 @@ envoy_cc_library(
         "//test/extensions:__subpackages__",
     ],
     deps = [
-        "//include/envoy/grpc:google_grpc_creds_interface",
-        "//include/envoy/registry",
+        "//envoy/grpc:google_grpc_creds_interface",
+        "//envoy/registry",
         "//source/common/common:assert_lib",
         "//source/common/grpc:google_grpc_creds_lib",
-        "//source/extensions/grpc_credentials:well_known_names",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

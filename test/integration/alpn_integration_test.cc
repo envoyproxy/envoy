@@ -9,12 +9,12 @@ namespace {
 class AlpnIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                             public HttpIntegrationTest {
 public:
-  AlpnIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+  AlpnIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
 
   void SetUp() override {
     autonomous_upstream_ = true;
     setUpstreamCount(2);
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+    setDownstreamProtocol(Http::CodecType::HTTP2);
 
     upstream_tls_ = true;
     config_helper_.configureUpstreamTls(true);
@@ -40,7 +40,7 @@ public:
                                                           autonomous_allow_incomplete_streams_));
     }
   }
-  std::vector<FakeHttpConnection::Type> protocols_;
+  std::vector<Http::CodecType> protocols_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AlpnIntegrationTest,
@@ -48,8 +48,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AlpnIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AlpnIntegrationTest, Http2) {
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-  protocols_ = {FakeHttpConnection::Type::HTTP2, FakeHttpConnection::Type::HTTP2};
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  protocols_ = {Http::CodecType::HTTP2, Http::CodecType::HTTP2};
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -60,8 +60,8 @@ TEST_P(AlpnIntegrationTest, Http2) {
 }
 
 TEST_P(AlpnIntegrationTest, Http1) {
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
-  protocols_ = {FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP1};
+  setUpstreamProtocol(Http::CodecType::HTTP1);
+  protocols_ = {Http::CodecType::HTTP1, Http::CodecType::HTTP1};
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -72,7 +72,7 @@ TEST_P(AlpnIntegrationTest, Http1) {
 }
 
 TEST_P(AlpnIntegrationTest, Mixed) {
-  protocols_ = {FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2};
+  protocols_ = {Http::CodecType::HTTP1, Http::CodecType::HTTP2};
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));

@@ -1,6 +1,6 @@
 #include <regex>
 
-#include "server/admin/prometheus_stats.h"
+#include "source/server/admin/prometheus_stats.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"

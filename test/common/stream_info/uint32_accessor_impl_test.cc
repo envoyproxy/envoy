@@ -1,4 +1,4 @@
-#include "common/stream_info/uint32_accessor_impl.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
 
 #include "gtest/gtest.h"
 

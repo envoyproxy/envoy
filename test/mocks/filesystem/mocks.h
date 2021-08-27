@@ -6,7 +6,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/filesystem/watcher.h"
 
-#include "common/common/thread.h"
+#include "source/common/common/thread.h"
 
 #include "gmock/gmock.h"
 

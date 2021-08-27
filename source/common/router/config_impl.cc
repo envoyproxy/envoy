@@ -1,4 +1,4 @@
-#include "common/router/config_impl.h"
+#include "source/common/router/config_impl.h"
 
 #include <algorithm>
 #include <chrono>
@@ -18,28 +18,26 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/common/hash.h"
-#include "common/common/logger.h"
-#include "common/common/regex.h"
-#include "common/common/utility.h"
-#include "common/config/metadata.h"
-#include "common/config/utility.h"
-#include "common/config/well_known_names.h"
-#include "common/http/headers.h"
-#include "common/http/path_utility.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/router/reset_header_parser.h"
-#include "common/router/retry_state_impl.h"
-#include "common/runtime/runtime_features.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/http/common/utility.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/regex.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/path_utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/reset_header_parser.h"
+#include "source/common/router/retry_state_impl.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/filters/http/common/utility.h"
 
 #include "absl/strings/match.h"
 
@@ -220,22 +218,11 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
                                Runtime::Loader& loader)
     : config_(config), loader_(loader), allow_methods_(config.allow_methods()),
       allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
-      max_age_(config.max_age()),
-      legacy_enabled_(config.has_hidden_envoy_deprecated_enabled()
-                          ? config.hidden_envoy_deprecated_enabled().value()
-                          : true) {
-  for (const auto& origin : config.hidden_envoy_deprecated_allow_origin()) {
-    envoy::type::matcher::v3::StringMatcher matcher_config;
-    matcher_config.set_exact(origin);
-    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher_config));
-  }
-  for (const auto& regex : config.hidden_envoy_deprecated_allow_origin_regex()) {
-    envoy::type::matcher::v3::StringMatcher matcher_config;
-    matcher_config.set_hidden_envoy_deprecated_regex(regex);
-    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher_config));
-  }
+      max_age_(config.max_age()) {
   for (const auto& string_match : config.allow_origin_string_match()) {
-    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_match));
+    allow_origins_.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            string_match));
   }
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
@@ -249,9 +236,6 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) {
   if (config.has_runtime_fraction()) {
     runtime_key_ = config.runtime_fraction().runtime_key();
     default_value_ = config.runtime_fraction().default_value();
-  } else {
-    runtime_key_ = config.hidden_envoy_deprecated_runtime_key();
-    default_value_.set_numerator(0);
   }
   trace_sampled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, trace_sampled, true);
 }
@@ -375,9 +359,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       direct_response_body_(ConfigUtility::parseDirectResponseBody(
           route, factory_context.api(),
           vhost_.globalRouteConfig().maxDirectResponseBodySizeBytes())),
-      per_filter_configs_(route.typed_per_filter_config(),
-                          route.hidden_envoy_deprecated_per_filter_config(), optional_http_filters,
-                          factory_context, validator),
+      per_filter_configs_(route.typed_per_filter_config(), optional_http_filters, factory_context,
+                          validator),
       route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
@@ -388,23 +371,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   if (!route.route().request_mirror_policies().empty()) {
-    if (route.route().has_hidden_envoy_deprecated_request_mirror_policy()) {
-      // protobuf does not allow `oneof` to contain a field labeled `repeated`, so we do our own
-      // xor-like check.
-      // https://github.com/protocolbuffers/protobuf/issues/2592
-      // The alternative solution suggested (wrapping the oneof in a repeated message) would still
-      // break wire compatibility.
-      // (see https://github.com/envoyproxy/envoy/issues/439#issuecomment-383622723)
-      throw EnvoyException("Cannot specify both request_mirror_policy and request_mirror_policies");
-    }
     for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
       shadow_policies_.push_back(std::make_unique<ShadowPolicyImpl>(mirror_policy_config));
     }
-  } else if (route.route().has_hidden_envoy_deprecated_request_mirror_policy()) {
-    shadow_policies_.push_back(std::make_unique<ShadowPolicyImpl>(
-        route.route().hidden_envoy_deprecated_request_mirror_policy()));
   }
-
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
   // single cluster, pointing back to the parent. Metadata criteria
@@ -514,14 +484,16 @@ bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& s
   const TlsContextMatchCriteria& criteria = *tlsContextMatchCriteria();
 
   if (criteria.presented().has_value()) {
-    const bool peer_presented = stream_info.downstreamSslConnection() &&
-                                stream_info.downstreamSslConnection()->peerCertificatePresented();
+    const bool peer_presented =
+        stream_info.downstreamAddressProvider().sslConnection() &&
+        stream_info.downstreamAddressProvider().sslConnection()->peerCertificatePresented();
     matches &= criteria.presented().value() == peer_presented;
   }
 
   if (criteria.validated().has_value()) {
-    const bool peer_validated = stream_info.downstreamSslConnection() &&
-                                stream_info.downstreamSslConnection()->peerCertificateValidated();
+    const bool peer_validated =
+        stream_info.downstreamAddressProvider().sslConnection() &&
+        stream_info.downstreamAddressProvider().sslConnection()->peerCertificateValidated();
     matches &= criteria.validated().value() == peer_validated;
   }
 
@@ -541,13 +513,22 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
 
   if (match_grpc_) {
     matches &= Grpc::Common::isGrpcRequestHeaders(headers);
+    if (!matches) {
+      return false;
+    }
   }
 
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
+  if (!matches) {
+    return false;
+  }
   if (!config_query_parameters_.empty()) {
     Http::Utility::QueryParams query_parameters =
         Http::Utility::parseQueryString(headers.getPathValue());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
+    if (!matches) {
+      return false;
+    }
   }
 
   matches &= evaluateTlsContextMatch(stream_info);
@@ -626,24 +607,29 @@ void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& header
 }
 
 Http::HeaderTransforms
-RouteEntryImplBase::responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const {
+RouteEntryImplBase::responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                             bool do_formatting) const {
   Http::HeaderTransforms transforms;
   if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
     // Append user-specified request headers from most to least specific: route-level headers,
     // virtual host level headers and finally global connection manager level headers.
-    mergeTransforms(transforms, response_headers_parser_->getHeaderTransforms(stream_info));
-    mergeTransforms(transforms, vhost_.responseHeaderParser().getHeaderTransforms(stream_info));
-    mergeTransforms(
-        transforms,
-        vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
+    mergeTransforms(transforms,
+                    response_headers_parser_->getHeaderTransforms(stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    vhost_.responseHeaderParser().getHeaderTransforms(stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(
+                        stream_info, do_formatting));
   } else {
     // Most specific mutations (route-level) take precedence by being applied
     // last: if a header is specified at all levels, the last one applied wins.
-    mergeTransforms(
-        transforms,
-        vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
-    mergeTransforms(transforms, vhost_.responseHeaderParser().getHeaderTransforms(stream_info));
-    mergeTransforms(transforms, response_headers_parser_->getHeaderTransforms(stream_info));
+    mergeTransforms(transforms,
+                    vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(
+                        stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    vhost_.responseHeaderParser().getHeaderTransforms(stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    response_headers_parser_->getHeaderTransforms(stream_info, do_formatting));
   }
   return transforms;
 }
@@ -752,11 +738,14 @@ absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHead
       host_end += 1; // advance to :
     }
   } else {
-    host_end = request_host.rfind(":");
+    host_end = request_host.rfind(':');
   }
 
   if (host_end != absl::string_view::npos) {
     absl::string_view request_port = request_host.substr(host_end);
+    // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
+    // connection), do port stripping based on X-Forwarded-Proto so http://foo.com:80 won't
+    // have the port stripped when served over TLS.
     absl::string_view request_protocol = headers.getForwardedProtoValue();
     bool remove_port = !new_port.empty();
 
@@ -788,8 +777,9 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   } else if (https_redirect_) {
     final_scheme = Http::Headers::get().SchemeValues.Https;
   } else {
-    ASSERT(headers.ForwardedProto());
-    final_scheme = headers.getForwardedProtoValue();
+    // Serve the redirect URL based on the scheme of the original URL, not the
+    // security of the underlying connection.
+    final_scheme = Http::Utility::getScheme(headers);
   }
 
   if (!port_redirect_.empty()) {
@@ -840,8 +830,7 @@ std::multimap<std::string, std::string>
 RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& route) {
   std::multimap<std::string, std::string> ret;
   if (route.has_metadata()) {
-    auto filter_metadata = route.metadata().filter_metadata().find(
-        Extensions::HttpFilters::HttpFilterNames::get().Router);
+    auto filter_metadata = route.metadata().filter_metadata().find("envoy.filters.http.router");
     if (filter_metadata == route.metadata().filter_metadata().end()) {
       // TODO(zuercher): simply return `ret` when deprecated filter names are removed.
       filter_metadata = route.metadata().filter_metadata().find(DEPRECATED_ROUTER_NAME);
@@ -850,8 +839,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
       }
 
       Extensions::Common::Utility::ExtensionNameUtil::checkDeprecatedExtensionName(
-          "http filter", DEPRECATED_ROUTER_NAME,
-          Extensions::HttpFilters::HttpFilterNames::get().Router);
+          "http filter", DEPRECATED_ROUTER_NAME, "envoy.filters.http.router");
     }
     for (const auto& it : filter_metadata->second.fields()) {
       if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
@@ -1010,9 +998,18 @@ void RouteEntryImplBase::validateClusters(
   }
 }
 
-const RouteSpecificFilterConfig*
-RouteEntryImplBase::perFilterConfig(const std::string& name) const {
-  return per_filter_configs_.get(name);
+void RouteEntryImplBase::traversePerFilterConfig(
+    const std::string& filter_name,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+  auto maybe_vhost_config = vhost_.perFilterConfig(filter_name);
+  if (maybe_vhost_config != nullptr) {
+    cb(*maybe_vhost_config);
+  }
+
+  auto maybe_route_config = per_filter_configs_.get(filter_name);
+  if (maybe_route_config != nullptr) {
+    cb(*maybe_route_config);
+  }
 }
 
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
@@ -1028,9 +1025,9 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
                                                       cluster.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
                                                        cluster.response_headers_to_remove())),
-      per_filter_configs_(cluster.typed_per_filter_config(),
-                          cluster.hidden_envoy_deprecated_per_filter_config(),
-                          optional_http_filters, factory_context, validator) {
+      per_filter_configs_(cluster.typed_per_filter_config(), optional_http_filters, factory_context,
+                          validator),
+      host_rewrite_(cluster.host_rewrite_literal()) {
   if (cluster.has_metadata_match()) {
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -1047,16 +1044,22 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
 }
 
 Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderTransforms(
-    const StreamInfo::StreamInfo& stream_info) const {
-  auto transforms = response_headers_parser_->getHeaderTransforms(stream_info);
-  mergeTransforms(transforms, DynamicRouteEntry::responseHeaderTransforms(stream_info));
+    const StreamInfo::StreamInfo& stream_info, bool do_formatting) const {
+  auto transforms = response_headers_parser_->getHeaderTransforms(stream_info, do_formatting);
+  mergeTransforms(transforms,
+                  DynamicRouteEntry::responseHeaderTransforms(stream_info, do_formatting));
   return transforms;
 }
 
-const RouteSpecificFilterConfig*
-RouteEntryImplBase::WeightedClusterEntry::perFilterConfig(const std::string& name) const {
-  const auto cfg = per_filter_configs_.get(name);
-  return cfg != nullptr ? cfg : DynamicRouteEntry::perFilterConfig(name);
+void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
+    const std::string& filter_name,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+  DynamicRouteEntry::traversePerFilterConfig(filter_name, cb);
+
+  const auto* cfg = per_filter_configs_.get(filter_name);
+  if (cfg) {
+    cb(*cfg);
+  }
 }
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(
@@ -1123,19 +1126,11 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator) {
-  // TODO(yangminzhu): Use PathMatcher once hidden_envoy_deprecated_regex is removed.
-  if (route.match().path_specifier_case() ==
-      envoy::config::route::v3::RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex) {
-    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
-        route.match().hidden_envoy_deprecated_regex());
-    regex_str_ = route.match().hidden_envoy_deprecated_regex();
-  } else {
-    ASSERT(route.match().path_specifier_case() ==
-           envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
-    regex_ = Regex::Utility::parseRegex(route.match().safe_regex());
-    regex_str_ = route.match().safe_regex().regex();
-  }
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
+      regex_str_(route.match().safe_regex().regex()),
+      path_matcher_(Matchers::PathMatcher::createSafeRegex(route.match().safe_regex())) {
+  ASSERT(route.match().path_specifier_case() ==
+         envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
 }
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1143,7 +1138,7 @@ void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
   const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
   // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
   // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
-  ASSERT(regex_->match(path));
+  ASSERT(path_matcher_->match(path));
   finalizePathHeader(headers, path, insert_envoy_original_path);
 }
 
@@ -1158,7 +1153,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-    if (regex_->match(path)) {
+    if (path_matcher_->match(path)) {
       return clusterEntry(headers, random_value);
     }
   }
@@ -1210,9 +1205,8 @@ VirtualHostImpl::VirtualHostImpl(
                                                       virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
-      per_filter_configs_(virtual_host.typed_per_filter_config(),
-                          virtual_host.hidden_envoy_deprecated_per_filter_config(),
-                          optional_http_filters, factory_context, validator),
+      per_filter_configs_(virtual_host.typed_per_filter_config(), optional_http_filters,
+                          factory_context, validator),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
@@ -1298,30 +1292,12 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     : StatNameProvider(virtual_cluster.name(), scope.symbolTable()),
       VirtualClusterBase(stat_name_storage_.statName(),
                          scope.scopeFromStatName(stat_name_storage_.statName()), stat_names) {
-  if (virtual_cluster.hidden_envoy_deprecated_pattern().empty() ==
-      virtual_cluster.headers().empty()) {
-    throw EnvoyException("virtual clusters must define either 'pattern' or 'headers'");
+  if (virtual_cluster.headers().empty()) {
+    throw EnvoyException("virtual clusters must define 'headers'");
   }
 
-  if (!virtual_cluster.hidden_envoy_deprecated_pattern().empty()) {
-    envoy::config::route::v3::HeaderMatcher matcher_config;
-    matcher_config.set_name(Http::Headers::get().Path.get());
-    matcher_config.set_hidden_envoy_deprecated_regex_match(
-        virtual_cluster.hidden_envoy_deprecated_pattern());
-    headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(matcher_config));
-  } else {
-    ASSERT(!virtual_cluster.headers().empty());
-    headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers());
-  }
-
-  if (virtual_cluster.hidden_envoy_deprecated_method() !=
-      envoy::config::core::v3::METHOD_UNSPECIFIED) {
-    envoy::config::route::v3::HeaderMatcher matcher_config;
-    matcher_config.set_name(Http::Headers::get().Method.get());
-    matcher_config.set_exact_match(envoy::config::core::v3::RequestMethod_Name(
-        virtual_cluster.hidden_envoy_deprecated_method()));
-    headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(matcher_config));
-  }
+  ASSERT(!virtual_cluster.headers().empty());
+  headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers());
 }
 
 const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }
@@ -1400,18 +1376,21 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
                                                          const Http::RequestHeaderMap& headers,
                                                          const StreamInfo::StreamInfo& stream_info,
                                                          uint64_t random_value) const {
-  // No x-forwarded-proto header. This normally only happens when ActiveStream::decodeHeaders
-  // bails early (as it rejects a request), so there is no routing is going to happen anyway.
-  const auto* forwarded_proto_header = headers.ForwardedProto();
-  if (forwarded_proto_header == nullptr) {
+  // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
+  // connection), force a redirect based on underlying protocol, rather than URL
+  // scheme, so don't force a redirect for a http:// url served over a TLS
+  // connection.
+  const absl::string_view scheme = headers.getForwardedProtoValue();
+  if (scheme.empty()) {
+    // No scheme header. This normally only happens when ActiveStream::decodeHeaders
+    // bails early (as it rejects a request), or a buggy filter removes the :scheme header.
     return nullptr;
   }
 
   // First check for ssl redirect.
-  if (ssl_requirements_ == SslRequirements::All && forwarded_proto_header->value() != "https") {
+  if (ssl_requirements_ == SslRequirements::All && scheme != "https") {
     return SSL_REDIRECT_ROUTE;
-  } else if (ssl_requirements_ == SslRequirements::ExternalOnly &&
-             forwarded_proto_header->value() != "https" &&
+  } else if (ssl_requirements_ == SslRequirements::ExternalOnly && scheme != "https" &&
              !Http::HeaderUtility::isEnvoyInternalRequest(headers)) {
     return SSL_REDIRECT_ROUTE;
   }
@@ -1501,6 +1480,10 @@ RouteConstSharedPtr RouteMatcher::route(const RouteCallback& cb,
 }
 
 const SslRedirector SslRedirectRoute::SSL_REDIRECTOR;
+const envoy::config::core::v3::Metadata SslRedirectRoute::metadata_;
+const Envoy::Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
+    SslRedirectRoute::typed_metadata_({});
+
 const std::shared_ptr<const SslRedirectRoute> VirtualHostImpl::SSL_REDIRECT_ROUTE{
     new SslRedirectRoute()};
 
@@ -1586,13 +1569,9 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
 
 PerFilterConfigs::PerFilterConfigs(
     const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
-    const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
-  if (!typed_configs.empty() && !configs.empty()) {
-    throw EnvoyException("Only one of typed_configs or configs can be specified");
-  }
 
   for (const auto& it : typed_configs) {
     // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
@@ -1601,19 +1580,6 @@ PerFilterConfigs::PerFilterConfigs(
 
     auto object =
         createRouteSpecificFilterConfig(name, it.second, ProtobufWkt::Struct::default_instance(),
-                                        optional_http_filters, factory_context, validator);
-    if (object != nullptr) {
-      configs_[name] = std::move(object);
-    }
-  }
-
-  for (const auto& it : configs) {
-    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
-    const auto& name =
-        Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
-
-    auto object =
-        createRouteSpecificFilterConfig(name, ProtobufWkt::Any::default_instance(), it.second,
                                         optional_http_filters, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);

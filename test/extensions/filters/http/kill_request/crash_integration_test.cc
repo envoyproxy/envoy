@@ -65,7 +65,7 @@ TEST_P(CrashIntegrationTestAllProtocols, UnwindsTrackedObjectStack) {
   //  - ActiveStream
   //  - Http(1|2)::ConnectionImpl
   //  - Network::ConnectionImpl
-  const std::string death_string = GetParam().downstream_protocol == Http::CodecClient::Type::HTTP2
+  const std::string death_string = GetParam().downstream_protocol == Http::CodecType::HTTP2
                                        ? "ActiveStream.*Http2::ConnectionImpl.*ConnectionImpl"
                                        : "ActiveStream.*Http1::ConnectionImpl.*ConnectionImpl";
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),

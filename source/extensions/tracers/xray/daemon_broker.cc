@@ -1,12 +1,11 @@
-#include "extensions/tracers/xray/daemon_broker.h"
+#include "source/extensions/tracers/xray/daemon_broker.h"
 
 #include "envoy/network/address.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/socket_interface.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/tracers/xray/daemon.pb.h"
 
 namespace Envoy {
@@ -43,7 +42,7 @@ void DaemonBrokerImpl::send(const std::string& data) const {
   const auto rc = Network::Utility::writeToSocket(*io_handle_, &buf, 1 /*num_slices*/,
                                                   nullptr /*local_ip*/, *address_);
 
-  if (rc.rc_ != payload.length()) {
+  if (rc.return_value_ != payload.length()) {
     // TODO(marcomagdy): report this in stats
     ENVOY_LOG_TO_LOGGER(logger, debug, "Failed to send trace payload to the X-Ray daemon.");
   }

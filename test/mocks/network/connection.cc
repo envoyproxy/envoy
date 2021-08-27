@@ -54,9 +54,9 @@ void MockConnectionBase::runLowWatermarkCallbacks() {
 }
 
 template <class T> static void initializeMockConnection(T& connection) {
-  ON_CALL(connection, addressProvider())
+  ON_CALL(connection, connectionInfoProvider())
       .WillByDefault(ReturnPointee(connection.stream_info_.downstream_address_provider_));
-  ON_CALL(connection, addressProviderSharedPtr())
+  ON_CALL(connection, connectionInfoProviderSharedPtr())
       .WillByDefault(ReturnPointee(&connection.stream_info_.downstream_address_provider_));
   ON_CALL(connection, dispatcher()).WillByDefault(ReturnRef(connection.dispatcher_));
   ON_CALL(connection, readEnabled()).WillByDefault(ReturnPointee(&connection.read_enabled_));
@@ -81,6 +81,7 @@ template <class T> static void initializeMockConnection(T& connection) {
     connection.raiseEvent(Network::ConnectionEvent::LocalClose);
   }));
   ON_CALL(connection, id()).WillByDefault(Return(connection.next_id_));
+  connection.stream_info_.downstream_address_provider_->setConnectionID(connection.id_);
   ON_CALL(connection, state()).WillByDefault(ReturnPointee(&connection.state_));
 
   // The real implementation will move the buffer data into the socket.

@@ -3,8 +3,7 @@
 #include "envoy/extensions/common/matching/v3/extension_matcher.pb.validate.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Common {

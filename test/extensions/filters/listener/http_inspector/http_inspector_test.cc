@@ -1,8 +1,7 @@
-#include "common/common/hex.h"
-#include "common/http/utility.h"
-#include "common/network/io_socket_handle_impl.h"
-
-#include "extensions/filters/listener/http_inspector/http_inspector.h"
+#include "source/common/common/hex.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/extensions/filters/listener/http_inspector/http_inspector.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"

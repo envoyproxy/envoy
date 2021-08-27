@@ -16,7 +16,7 @@ envoy_cc_library(
         "rapidjson",
     ],
     deps = [
-        "//include/envoy/json:json_object_interface",
+        "//envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
@@ -32,7 +32,7 @@ envoy_cc_library(
         "json",
     ],
     deps = [
-        "//include/envoy/json:json_object_interface",
+        "//envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
@@ -47,7 +47,7 @@ envoy_cc_library(
     deps = [
         ":json_internal_legacy_lib",
         ":json_internal_lib",
-        "//include/envoy/json:json_object_interface",
+        "//envoy/json:json_object_interface",
         "//source/common/runtime:runtime_features_lib",
     ],
 )

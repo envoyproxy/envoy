@@ -1,6 +1,6 @@
 #include <algorithm>
 
-#include "common/stats/stat_merger.h"
+#include "source/common/stats/stat_merger.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -39,7 +39,7 @@ void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
     // TODO(#10008): We should remove the "1 +" below, so we can get empty
     // segments, which trigger some inconsistent handling as described in that
     // bug.
-    uint32_t num_bytes = (1 + data[index]) & 0x7;
+    uint32_t num_bytes = 1 + (data[index] & 0x7);
 
     // Carve out the segment and use the 4th bit from the control-byte to
     // determine whether to treat this segment symbolic or not.

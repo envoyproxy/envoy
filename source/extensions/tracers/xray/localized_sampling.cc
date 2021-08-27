@@ -1,9 +1,8 @@
-#include "extensions/tracers/xray/localized_sampling.h"
+#include "source/extensions/tracers/xray/localized_sampling.h"
 
-#include "common/http/exception.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/tracers/xray/util.h"
+#include "source/common/http/exception.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/tracers/xray/util.h"
 
 namespace Envoy {
 namespace Extensions {

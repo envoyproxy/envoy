@@ -20,7 +20,6 @@ A sample filter configuration could be:
 
   listener_filters:
     - name: "envoy.filters.listener.http_inspector"
-      typed_config: {}
 
 Statistics
 ----------

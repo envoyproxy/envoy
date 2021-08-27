@@ -8,7 +8,8 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
-#include "server/active_listener_base.h"
+#include "source/common/network/utility.h"
+#include "source/server/active_listener_base.h"
 
 namespace Envoy {
 namespace Server {
@@ -60,7 +61,8 @@ protected:
  */
 class ActiveRawUdpListener : public ActiveUdpListenerBase,
                              public Network::UdpListenerFilterManager,
-                             public Network::UdpReadFilterCallbacks {
+                             public Network::UdpReadFilterCallbacks,
+                             Logger::Loggable<Logger::Id::conn_handler> {
 public:
   ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                        Network::UdpConnectionHandler& parent, Event::Dispatcher& dispatcher,
@@ -82,6 +84,10 @@ public:
   void onWriteReady(const Network::Socket& socket) override;
   void onReceiveError(Api::IoError::IoErrorCode error_code) override;
   Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
+  size_t numPacketsExpectedPerEventLoop() const final {
+    // TODO(mattklein123) change this to a reasonable number if needed.
+    return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
+  }
 
   // Network::UdpWorker
   void onDataWorker(Network::UdpRecvData&& data) override;

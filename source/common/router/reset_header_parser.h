@@ -9,7 +9,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/router/router.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 

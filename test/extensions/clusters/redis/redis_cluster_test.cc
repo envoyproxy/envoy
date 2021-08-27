@@ -11,10 +11,9 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/stats/scope.h"
 
-#include "common/network/utility.h"
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/logical_dns_cluster.h"
-
+#include "source/common/network/utility.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/logical_dns_cluster.h"
 #include "source/extensions/clusters/redis/redis_cluster.h"
 
 #include "test/common/upstream/utility.h"
@@ -96,11 +95,10 @@ protected:
     return addresses;
   }
 
-  void setupFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
+  void setupFromV3Yaml(const std::string& yaml) {
     expectRedisSessionCreated();
     NiceMock<Upstream::MockClusterManager> cm;
-    envoy::config::cluster::v3::Cluster cluster_config =
-        Upstream::parseClusterFromV3Yaml(yaml, avoid_boosting);
+    envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
@@ -545,10 +543,9 @@ protected:
                              Network::DnsResolver::ResolveCb) -> Network::ActiveDnsQuery* {
           return &active_dns_query_;
         }));
-    ;
     resolver_target.startResolveDns();
 
-    EXPECT_CALL(active_dns_query_, cancel());
+    EXPECT_CALL(active_dns_query_, cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
   }
 
   Stats::TestUtil::TestStore stats_store_;

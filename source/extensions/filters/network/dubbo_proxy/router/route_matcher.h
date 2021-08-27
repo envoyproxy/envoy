@@ -8,15 +8,14 @@
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
-#include "common/common/logger.h"
-#include "common/common/matchers.h"
-#include "common/http/header_utility.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
-#include "extensions/filters/network/dubbo_proxy/metadata.h"
-#include "extensions/filters/network/dubbo_proxy/router/route.h"
-#include "extensions/filters/network/dubbo_proxy/router/router.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/metadata.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/route.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/router.h"
 
 #include "absl/types/optional.h"
 
@@ -124,7 +123,7 @@ public:
                               uint64_t random_value) const override;
 
 private:
-  const Matchers::StringMatcherImpl method_name_;
+  const Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> method_name_;
   std::shared_ptr<ParameterRouteEntryImpl> parameter_route_;
 };
 

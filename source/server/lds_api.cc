@@ -1,4 +1,4 @@
-#include "server/lds_api.h"
+#include "source/server/lds_api.h"
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -7,11 +7,11 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/cleanup.h"
-#include "common/config/api_version.h"
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"
@@ -24,8 +24,8 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
                        Upstream::ClusterManager& cm, Init::Manager& init_manager,
                        Stats::Scope& scope, ListenerManager& lm,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
-    : Envoy::Config::SubscriptionBase<envoy::config::listener::v3::Listener>(
-          lds_config.resource_api_version(), validation_visitor, "name"),
+    : Envoy::Config::SubscriptionBase<envoy::config::listener::v3::Listener>(validation_visitor,
+                                                                             "name"),
       listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
       init_target_("LDS", [this]() { subscription_->start({}); }) {
   const auto resource_name = getResourceName();
@@ -44,9 +44,8 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
                                 const std::string& system_version_info) {
   Config::ScopedResume maybe_resume_rds;
   if (cm_.adsMux()) {
-    const auto type_urls =
-        Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
-    maybe_resume_rds = cm_.adsMux()->pause(type_urls);
+    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>();
+    maybe_resume_rds = cm_.adsMux()->pause(type_url);
   }
 
   bool any_applied = false;

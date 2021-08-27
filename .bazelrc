@@ -10,8 +10,11 @@
 # Startup options cannot be selected via config.
 startup --host_jvm_args=-Xmx2g
 
+run --color=yes
+
+build --color=yes
 build --workspace_status_command="bash bazel/get_workspace_status"
-build --experimental_strict_action_env=true
+build --incompatible_strict_action_env
 build --host_force_python=PY3
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
@@ -46,6 +49,10 @@ build:sanitizer --test_tag_filters=-no_san
 build:clang --action_env=BAZEL_COMPILER=clang
 build:clang --linkopt=-fuse-ld=lld
 
+# Flags for Clang + PCH
+build:clang-pch --spawn_strategy=local
+build:clang-pch --define=ENVOY_CLANG_PCH=1
+
 # Basic ASAN/UBSAN that works for gcc
 build:asan --action_env=ENVOY_ASAN=1
 build:asan --config=sanitizer
@@ -69,9 +76,13 @@ build:asan --copt -fno-optimize-sibling-calls
 # Clang ASAN/UBSAN
 build:clang-asan --config=asan
 build:clang-asan --linkopt -fuse-ld=lld
+build:clang-asan --linkopt --rtlib=compiler-rt
+build:clang-asan --linkopt --unwindlib=libgcc
 
 # macOS ASAN/UBSAN
 build:macos --cxxopt=-std=c++17
+build:macos --action_env=PATH=/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin:/opt/local/bin
+build:macos --host_action_env=PATH=/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin:/opt/local/bin
 
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
@@ -105,9 +116,12 @@ build:clang-msan --config=sanitizer
 build:clang-msan --define ENVOY_CONFIG_MSAN=1
 build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
+build:clang-msan --linkopt -fuse-ld=lld
 build:clang-msan --copt -fsanitize-memory-track-origins=2
+build:clang-msan --test_env=MSAN_SYMBOLIZER_PATH
 # MSAN needs -O1 to get reasonable performance.
 build:clang-msan --copt -O1
+build:clang-msan --copt -fno-optimize-sibling-calls
 
 # Clang with libc++
 build:libc++ --config=clang
@@ -208,7 +222,7 @@ build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --remote_timeout=7200
-build:remote --auth_enabled=true
+build:remote --google_default_credentials=true
 build:remote --remote_download_toplevel
 
 # Windows bazel does not allow sandboxed as a spawn strategy
@@ -217,7 +231,7 @@ build:remote-windows --strategy=Javac=remote,local
 build:remote-windows --strategy=Closure=remote,local
 build:remote-windows --strategy=Genrule=remote,local
 build:remote-windows --remote_timeout=7200
-build:remote-windows --auth_enabled=true
+build:remote-windows --google_default_credentials=true
 build:remote-windows --remote_download_toplevel
 
 build:remote-clang --config=remote

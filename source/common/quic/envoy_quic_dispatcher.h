@@ -17,43 +17,39 @@
 #include <string>
 
 #include "envoy/network/listener.h"
-#include "server/connection_handler_impl.h"
-#include "server/active_listener_base.h"
+#include "source/server/connection_handler_impl.h"
+#include "source/server/active_listener_base.h"
+#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
+#include "source/common/quic/quic_stat_names.h"
 
 namespace Envoy {
 namespace Quic {
 
-// Envoy specific provider of server connection id and decision maker of
-// accepting new connection or not.
+// Dummy implementation only used by Google Quic.
 class EnvoyQuicCryptoServerStreamHelper : public quic::QuicCryptoServerStreamBase::Helper {
 public:
-  ~EnvoyQuicCryptoServerStreamHelper() override = default;
-
   // quic::QuicCryptoServerStream::Helper
   bool CanAcceptClientHello(const quic::CryptoHandshakeMessage& /*message*/,
                             const quic::QuicSocketAddress& /*client_address*/,
                             const quic::QuicSocketAddress& /*peer_address*/,
                             const quic::QuicSocketAddress& /*self_address*/,
                             std::string* /*error_details*/) const override {
-    // TODO(danzh): decide to accept or not based on information from given handshake message, i.e.
-    // user agent and SNI.
-    return true;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 };
 
 class EnvoyQuicDispatcher : public quic::QuicDispatcher {
 public:
-  EnvoyQuicDispatcher(const quic::QuicCryptoServerConfig* crypto_config,
-                      const quic::QuicConfig& quic_config,
-                      quic::QuicVersionManager* version_manager,
-                      std::unique_ptr<quic::QuicConnectionHelperInterface> helper,
-                      std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
-                      uint8_t expected_server_connection_id_length,
-                      Network::ConnectionHandler& connection_handler,
-                      Network::ListenerConfig& listener_config,
-                      Server::ListenerStats& listener_stats,
-                      Server::PerHandlerListenerStats& per_worker_stats,
-                      Event::Dispatcher& dispatcher, Network::Socket& listen_socket);
+  EnvoyQuicDispatcher(
+      const quic::QuicCryptoServerConfig* crypto_config, const quic::QuicConfig& quic_config,
+      quic::QuicVersionManager* version_manager,
+      std::unique_ptr<quic::QuicConnectionHelperInterface> helper,
+      std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
+      uint8_t expected_server_connection_id_length, Network::ConnectionHandler& connection_handler,
+      Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
+      Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
+      Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
+      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
 
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
                           const std::string& error_details,
@@ -81,6 +77,8 @@ private:
   Server::PerHandlerListenerStats& per_worker_stats_;
   Event::Dispatcher& dispatcher_;
   Network::Socket& listen_socket_;
+  QuicStatNames& quic_stat_names_;
+  EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
 };
 
 } // namespace Quic

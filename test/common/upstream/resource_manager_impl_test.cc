@@ -1,7 +1,7 @@
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/upstream/resource_manager_impl.h"
+#include "source/common/upstream/resource_manager_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"

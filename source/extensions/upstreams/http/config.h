@@ -15,8 +15,8 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 
-#include "common/common/logger.h"
-#include "common/protobuf/message_validator_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/message_validator_impl.h"
 
 namespace Envoy {
 namespace Extensions {

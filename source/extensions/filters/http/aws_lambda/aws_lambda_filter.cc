@@ -1,4 +1,4 @@
-#include "extensions/filters/http/aws_lambda/aws_lambda_filter.h"
+#include "source/extensions/filters/http/aws_lambda/aws_lambda_filter.h"
 
 #include <string>
 #include <vector>
@@ -8,20 +8,17 @@
 #include "envoy/http/header_map.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/base64.h"
-#include "common/common/fmt.h"
-#include "common/common/hex.h"
-#include "common/crypto/utility.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/singleton/const_singleton.h"
-
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/singleton/const_singleton.h"
 #include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
-
-#include "extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
@@ -120,12 +117,8 @@ Filter::Filter(const FilterSettings& settings, const FilterStats& stats,
     : settings_(settings), stats_(stats), sigv4_signer_(sigv4_signer) {}
 
 absl::optional<FilterSettings> Filter::getRouteSpecificSettings() const {
-  if (!decoder_callbacks_->route() || !decoder_callbacks_->route()->routeEntry()) {
-    return absl::nullopt;
-  }
-  const auto* route_entry = decoder_callbacks_->route()->routeEntry();
-  const auto* settings = route_entry->mostSpecificPerFilterConfigTyped<FilterSettings>(
-      HttpFilterNames::get().AwsLambda);
+  const auto* settings = Http::Utility::resolveMostSpecificPerFilterConfig<FilterSettings>(
+      "envoy.filters.http.aws_lambda", decoder_callbacks_->route());
   if (!settings) {
     return absl::nullopt;
   }
@@ -333,6 +326,10 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
     return;
   }
 
+  // Use JSON as the default content-type. If the response headers have a different content-type
+  // set, that will be used instead.
+  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+
   for (auto&& kv : json_resp.headers()) {
     // ignore H2 pseudo-headers (if any)
     if (kv.first[0] == ':') {
@@ -348,7 +345,6 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
   if (json_resp.status_code() != 0) {
     headers.setStatus(json_resp.status_code());
   }
-  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   if (!json_resp.body().empty()) {
     if (json_resp.is_base64_encoded()) {
       body.add(Base64::decode(json_resp.body()));

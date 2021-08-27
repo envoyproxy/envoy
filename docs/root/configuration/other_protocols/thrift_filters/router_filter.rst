@@ -23,6 +23,7 @@ The filter outputs generic routing error statistics in the *thrift.<stat_prefix>
   unknown_cluster, Counter, Total requests with a route that has an unknown cluster.
   upstream_rq_maintenance_mode, Counter, Total requests with a destination cluster in maintenance mode.
   no_healthy_upstream, Counter, Total requests with no healthy upstream endpoints available.
+  shadow_request_submit_failure, Counter, Total shadow requests that failed to be submitted.
 
 
 The filter is also responsible for cluster-level statistics derived from routed upstream clusters.
@@ -41,3 +42,10 @@ Since these stats utilize the underlying cluster scope, we prefix with the ``thr
   thrift.upstream_resp_exception, Counter, Total responses with the "Exception" message type.
   thrift.upstream_resp_invalid_type, Counter, Total responses with an unsupported message type.
   thrift.upstream_rq_time, Histogram, total rq time from rq complete to resp complete; includes oneway messages.
+  thrift.upstream_rq_size, Histogram, Request message size in bytes per upstream
+  thrift.upstream_resp_size, Histogram, Response message size in bytes per upstream
+
+.. note::
+
+  The request and response size histograms include what's sent and received during protocol upgrade.
+  However, invalid responses are not included in the response size histogram.

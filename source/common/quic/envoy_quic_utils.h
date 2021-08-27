@@ -4,11 +4,11 @@
 #include "envoy/config/listener/v3/quic_config.pb.h"
 #include "envoy/http/codec.h"
 
-#include "common/common/assert.h"
-#include "common/http/header_map_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/quic/quic_io_handle_wrapper.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/quic/quic_io_handle_wrapper.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -27,7 +27,7 @@
 #include "quiche/quic/core/quic_error_codes.h"
 #include "quiche/quic/platform/api/quic_ip_address.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
-#include "common/http/header_utility.h"
+#include "source/common/http/header_utility.h"
 
 #include "openssl/ssl.h"
 
@@ -66,7 +66,7 @@ class HeaderValidator {
 public:
   virtual ~HeaderValidator() = default;
   virtual Http::HeaderUtility::HeaderValidationResult
-  validateHeader(const std::string& header_name, absl::string_view header_value) = 0;
+  validateHeader(absl::string_view name, absl::string_view header_value) = 0;
 };
 
 // The returned header map has all keys in lower case.
@@ -105,15 +105,36 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
 }
 
 template <class T>
-std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block) {
+std::unique_ptr<T> spdyHeaderBlockToEnvoyTrailers(const spdy::SpdyHeaderBlock& header_block,
+                                                  uint32_t max_headers_allowed,
+                                                  HeaderValidator& validator,
+                                                  absl::string_view& details) {
   auto headers = T::create();
+  if (header_block.size() > max_headers_allowed) {
+    details = Http3ResponseCodeDetailValues::too_many_trailers;
+    return nullptr;
+  }
   for (auto entry : header_block) {
     // TODO(danzh): Avoid temporary strings and addCopy() with string_view.
     std::string key(entry.first);
     // QUICHE coalesces multiple trailer values with the same key with '\0'.
     std::vector<absl::string_view> values = absl::StrSplit(entry.second, '\0');
     for (const absl::string_view& value : values) {
-      headers->addCopy(Http::LowerCaseString(key), value);
+      if (max_headers_allowed == 0) {
+        details = Http3ResponseCodeDetailValues::too_many_trailers;
+        return nullptr;
+      }
+      max_headers_allowed--;
+      Http::HeaderUtility::HeaderValidationResult result =
+          validator.validateHeader(entry.first, value);
+      switch (result) {
+      case Http::HeaderUtility::HeaderValidationResult::REJECT:
+        return nullptr;
+      case Http::HeaderUtility::HeaderValidationResult::DROP:
+        continue;
+      case Http::HeaderUtility::HeaderValidationResult::ACCEPT:
+        headers->addCopy(Http::LowerCaseString(key), value);
+      }
     }
   }
   return headers;
@@ -135,10 +156,6 @@ Http::StreamResetReason quicErrorCodeToEnvoyLocalResetReason(quic::QuicErrorCode
 
 // Called when underlying QUIC connection is closed by peer.
 Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCode error);
-
-// Called when a GOAWAY frame is received.
-ABSL_MUST_USE_RESULT
-Http::GoAwayErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept;
 
 // Create a connection socket instance and apply given socket options to the
 // socket. IP_PKTINFO and SO_RXQ_OVFL is always set if supported.
@@ -167,6 +184,11 @@ createServerConnectionSocket(Network::IoHandle& io_handle,
 // Set initial flow control windows in quic_config according to the given Envoy config.
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
                                         quic::QuicConfig& quic_config);
+
+// Modify new_connection_id according to given old_connection_id to make sure packets with the new
+// one can be routed to the same listener.
+void adjustNewConnectionIdForRoutine(quic::QuicConnectionId& new_connection_id,
+                                     const quic::QuicConnectionId& old_connection_id);
 
 } // namespace Quic
 } // namespace Envoy

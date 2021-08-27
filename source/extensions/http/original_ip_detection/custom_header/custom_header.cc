@@ -1,6 +1,6 @@
-#include "extensions/http/original_ip_detection/custom_header/custom_header.h"
+#include "source/extensions/http/original_ip_detection/custom_header/custom_header.h"
 
-#include "common/network/utility.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Extensions {

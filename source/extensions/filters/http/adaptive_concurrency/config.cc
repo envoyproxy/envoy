@@ -1,11 +1,11 @@
-#include "extensions/filters/http/adaptive_concurrency/config.h"
+#include "source/extensions/filters/http/adaptive_concurrency/config.h"
 
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
-#include "extensions/filters/http/adaptive_concurrency/controller/gradient_controller.h"
+#include "source/extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
+#include "source/extensions/filters/http/adaptive_concurrency/controller/gradient_controller.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,0 +1,36 @@
+{#
+  Main template for 'responses.h' file.
+  Gets filled in (by 'contents') with Kafka response structures, deserializers, and parsers.
+
+  For each response we have the following:
+  - 1 top-level structure corresponding to the response (e.g. `struct FetchResponse`),
+  - N deserializers for top-level structure, one for each response version,
+  - N parsers binding each deserializer with parser,
+  - 0+ child structures (e.g. `struct FetchableTopicResponse`) that are used by the response's
+    top-level structure,
+  - deserializers for each child structure.
+
+  So for example, for FetchResponse we have:
+  - struct FetchResponse,
+  - FetchResponseV0Deserializer, FetchResponseV1Deserializer, FetchResponseV2Deserializer, etc.,
+  - FetchResponseV0Parser, FetchResponseV1Parser, FetchResponseV2Parser, etc.,
+  - struct FetchableTopicResponse,
+  - FetchableTopicResponseV0Deserializer, FetchableTopicResponseV1Deserializer, etc.
+    (because topic data is present in every FetchResponse version),
+  - struct FetchablePartitionResponse,
+  - FetchablePartitionResponseV0Deserializer, FetchablePartitionResponseV1Deserializer, etc.
+    (because partition data is present in every FetchableTopicResponse version).
+  - AbortedTransaction & its Deserializers (starting with version 4).
+#}
+#pragma once
+#include "contrib/kafka/filters/network/source/kafka_response.h"
+#include "contrib/kafka/filters/network/source/kafka_response_parser.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+
+{{ contents }}
+
+}}}}

@@ -26,7 +26,7 @@ HTTP/3 is marked as broken it will be for the initial 5 minutes.
 
 #### Alternate Protocols Cache
 The `AlternateProtocolsCache` is responsible for tracking servers which advertise HTTP/3.
-These advertisements may arrive via HTTP Altnernate Service (alt-svc) or soon via the HTTPS
+These advertisements may arrive via HTTP Alternative Service (alt-svc) or soon via the HTTPS
 DNS RR. Currently only advertisements which specify the same hostname and port are stored.
 
 #### Connectivity Grid
@@ -42,6 +42,12 @@ sent to the mixed pool, and whichever succeeds first will be passed back up to t
 
 Specific Envoy configuration is required in order to enable the previously described components.
 
+#### Alternate Protocols Cache Filter
+
+The Alternate Protocols Cache Filter must be enabled in order for alt-svc headers to be parsed
+and stored in the cache, and the `alternate_protocols_cache_options` field must be specified
+in the filter config.
+
 #### Auto Cluster Pool
 
 The "Auto" must be enabled via the Upstream `HttpProtocolOptions` message. The
@@ -50,4 +56,5 @@ all three protocols: HTTP/1, HTTP/2 and HTTP/3.
 
 #### Alternate Protocols Cache Options
 
-In addition, the `alternate_protocols_cache_options` field must be specified.
+In addition, the `alternate_protocols_cache_options` field must be specified in
+`upstream_protocol_options` and the value must match that in the filter config.

@@ -1,12 +1,11 @@
-#include "extensions/filters/network/thrift_proxy/decoder.h"
+#include "source/extensions/filters/network/thrift_proxy/decoder.h"
 
 #include "envoy/common/exception.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/macros.h"
-
-#include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
+#include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 
 namespace Envoy {
 namespace Extensions {

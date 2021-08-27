@@ -1,10 +1,10 @@
-#include "extensions/request_id/uuid/config.h"
+#include "source/extensions/request_id/uuid/config.h"
 
 #include "envoy/http/header_map.h"
 #include "envoy/tracing/http_tracer.h"
 
-#include "common/common/random_generator.h"
-#include "common/common/utility.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/common/utility.h"
 
 namespace Envoy {
 namespace Extensions {

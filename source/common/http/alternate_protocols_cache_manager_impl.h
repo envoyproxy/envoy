@@ -14,7 +14,7 @@ namespace Http {
 class AlternateProtocolsCacheManagerImpl : public AlternateProtocolsCacheManager,
                                            public Singleton::Instance {
 public:
-  AlternateProtocolsCacheManagerImpl(TimeSource& time_source, ThreadLocal::Instance& tls);
+  AlternateProtocolsCacheManagerImpl(TimeSource& time_source, ThreadLocal::SlotAllocator& tls);
 
   // AlternateProtocolsCacheManager
   AlternateProtocolsCacheSharedPtr
@@ -27,7 +27,7 @@ private:
                      AlternateProtocolsCacheSharedPtr cache)
         : options_(options), cache_(cache) {}
 
-    const envoy::config::core::v3::AlternateProtocolsCacheOptions& options_;
+    const envoy::config::core::v3::AlternateProtocolsCacheOptions options_;
     AlternateProtocolsCacheSharedPtr cache_;
   };
 
@@ -46,7 +46,8 @@ private:
 class AlternateProtocolsCacheManagerFactoryImpl : public AlternateProtocolsCacheManagerFactory {
 public:
   AlternateProtocolsCacheManagerFactoryImpl(Singleton::Manager& singleton_manager,
-                                            TimeSource& time_source, ThreadLocal::Instance& tls)
+                                            TimeSource& time_source,
+                                            ThreadLocal::SlotAllocator& tls)
       : singleton_manager_(singleton_manager), time_source_(time_source), tls_(tls) {}
 
   AlternateProtocolsCacheManagerSharedPtr get() override;
@@ -54,7 +55,7 @@ public:
 private:
   Singleton::Manager& singleton_manager_;
   TimeSource& time_source_;
-  ThreadLocal::Instance& tls_;
+  ThreadLocal::SlotAllocator& tls_;
 };
 
 } // namespace Http

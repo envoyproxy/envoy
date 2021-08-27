@@ -4,8 +4,7 @@
 #include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.validate.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +16,7 @@ class Config
           envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfig,
           envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfigPerRoute> {
 public:
-  Config() : FactoryBase(HttpFilterNames::get().GrpcHttp1ReverseBridge) {}
+  Config() : FactoryBase("envoy.filters.http.grpc_http1_reverse_bridge") {}
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfig& config,

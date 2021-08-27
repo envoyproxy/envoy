@@ -29,18 +29,18 @@ static_resources:
             - name: local_service
               domains: ["*"]
               routes:
-              - match: { prefix: "/" }
-                route: { host_rewrite_literal: www.google.com, cluster: service_google }
+              - match: {prefix: "/"}
+                route: {host_rewrite_literal: www.google.com, cluster: service_google}
   clusters:
   - name: service_google
     connect_timeout: 0.25s
     type: LOGICAL_DNS
     # Comment out the following line to test on v6 networks
-    dns_lookup_family: {{ dns_lookup_family }}
+    dns_lookup_family: "{{ dns_lookup_family }}"
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: service_google
       endpoints:
       - lb_endpoints:
         - endpoint:
-            address: { socket_address: { address: google.com, port_value: 443 }}
+            address: {socket_address: {address: google.com, port_value: 443}}

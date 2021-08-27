@@ -6,13 +6,12 @@
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/stats/stats.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/json/json_loader.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/network/ext_authz/ext_authz.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/ext_authz/ext_authz.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -40,7 +39,7 @@ public:
   void initialize(std::string yaml) {
     envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
-    config_ = std::make_shared<Config>(proto_config, stats_store_);
+    config_ = std::make_shared<Config>(proto_config, stats_store_, bootstrap_);
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -124,6 +123,7 @@ public:
 
   Stats::TestUtil::TestStore stats_store_;
   ConfigSharedPtr config_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Filters::Common::ExtAuthz::MockClient* client_;
   std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;

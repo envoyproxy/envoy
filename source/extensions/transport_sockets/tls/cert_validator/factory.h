@@ -3,10 +3,9 @@
 #include "envoy/common/pure.h"
 #include "envoy/ssl/context_config.h"
 
-#include "common/common/utility.h"
-
-#include "extensions/transport_sockets/tls/cert_validator/cert_validator.h"
-#include "extensions/transport_sockets/tls/stats.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
+#include "source/extensions/transport_sockets/tls/stats.h"
 
 #include "absl/strings/string_view.h"
 

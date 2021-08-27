@@ -7,9 +7,9 @@
 #include "envoy/service/runtime/v3/rtds.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/config/runtime_utility.h"
-#include "common/runtime/runtime_features.h"
-#include "common/runtime/runtime_impl.h"
+#include "source/common/config/runtime_utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/runtime/runtime_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
@@ -29,7 +29,7 @@
 #include "gtest/gtest.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_utils.h"
 #endif
 
 using testing::_;

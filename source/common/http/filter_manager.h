@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -14,18 +15,18 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/grpc/common.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/matching/data_impl.h"
-#include "common/local_reply/local_reply.h"
-#include "common/matcher/matcher.h"
-#include "common/protobuf/utility.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/matching/data_impl.h"
+#include "source/common/local_reply/local_reply.h"
+#include "source/common/matcher/matcher.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -67,11 +68,12 @@ private:
 
 using FilterMatchStateSharedPtr = std::shared_ptr<FilterMatchState>;
 
-class SkipActionFactory : public Matcher::ActionFactory {
+class SkipActionFactory : public Matcher::ActionFactory<Matching::HttpFilterActionContext> {
 public:
   std::string name() const override { return "skip"; }
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&, const std::string&,
-                                                 Server::Configuration::FactoryContext&) override {
+  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&,
+                                                 Matching::HttpFilterActionContext&,
+                                                 ProtobufMessage::ValidationVisitor&) override {
     return []() { return std::make_unique<SkipAction>(); };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -143,6 +145,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   Tracing::Config& tracingConfig() override;
   const ScopeTrackedObject& scope() override;
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
+  void resetIdleTimer() override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -277,6 +280,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
 
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override;
+  Buffer::BufferMemoryAccountSharedPtr account() const override;
 
   // Each decoder filter instance checks if the request passed to the filter is gRPC
   // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -580,12 +584,12 @@ public:
 
 /**
  * This class allows the remote address to be overridden for HTTP stream info. This is used for
- * XFF handling. This is required to avoid providing stream info with a non-const address provider.
- * Private inheritance from SocketAddressProvider is used to make sure users get the address
- * provider via the normal getter.
+ * XFF handling. This is required to avoid providing stream info with a non-const connection info
+ * provider. Private inheritance from ConnectionInfoProvider is used to make sure users get the
+ * address provider via the normal getter.
  */
-class OverridableRemoteSocketAddressSetterStreamInfo : public StreamInfo::StreamInfoImpl,
-                                                       private Network::SocketAddressProvider {
+class OverridableRemoteConnectionInfoSetterStreamInfo : public StreamInfo::StreamInfoImpl,
+                                                        private Network::ConnectionInfoProvider {
 public:
   using StreamInfoImpl::StreamInfoImpl;
 
@@ -599,9 +603,11 @@ public:
   }
 
   // StreamInfo::StreamInfo
-  const Network::SocketAddressProvider& downstreamAddressProvider() const override { return *this; }
+  const Network::ConnectionInfoProvider& downstreamAddressProvider() const override {
+    return *this;
+  }
 
-  // Network::SocketAddressProvider
+  // Network::ConnectionInfoProvider
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return StreamInfoImpl::downstreamAddressProvider().localAddress();
   }
@@ -616,12 +622,23 @@ public:
   const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
     return StreamInfoImpl::downstreamAddressProvider().directRemoteAddress();
   }
-
+  absl::string_view requestedServerName() const override {
+    return StreamInfoImpl::downstreamAddressProvider().requestedServerName();
+  }
+  absl::optional<uint64_t> connectionID() const override {
+    return StreamInfoImpl::downstreamAddressProvider().connectionID();
+  }
+  Ssl::ConnectionInfoConstSharedPtr sslConnection() const override {
+    return StreamInfoImpl::downstreamAddressProvider().sslConnection();
+  }
+  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
+    return StreamInfoImpl::upstreamSslConnection();
+  }
   void dumpState(std::ostream& os, int indent_level) const override {
     StreamInfoImpl::dumpState(os, indent_level);
 
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "OverridableRemoteSocketAddressSetterStreamInfo " << this
+    os << spaces << "OverridableRemoteConnectionInfoSetterStreamInfo " << this
        << DUMP_MEMBER_AS(remoteAddress(), remoteAddress()->asStringView())
        << DUMP_MEMBER_AS(directRemoteAddress(), directRemoteAddress()->asStringView())
        << DUMP_MEMBER_AS(localAddress(), localAddress()->asStringView()) << "\n";
@@ -640,16 +657,17 @@ class FilterManager : public ScopeTrackedObject,
                       Logger::Loggable<Logger::Id::http> {
 public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
-                const Network::Connection& connection, uint64_t stream_id, bool proxy_100_continue,
+                const Network::Connection& connection, uint64_t stream_id,
+                Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
                 uint32_t buffer_limit, FilterChainFactory& filter_chain_factory,
                 const LocalReply::LocalReply& local_reply, Http::Protocol protocol,
                 TimeSource& time_source, StreamInfo::FilterStateSharedPtr parent_filter_state,
                 StreamInfo::FilterState::LifeSpan filter_state_life_span)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
-        connection_(connection), stream_id_(stream_id), proxy_100_continue_(proxy_100_continue),
-        buffer_limit_(buffer_limit), filter_chain_factory_(filter_chain_factory),
-        local_reply_(local_reply),
-        stream_info_(protocol, time_source, connection.addressProviderSharedPtr(),
+        connection_(connection), stream_id_(stream_id), account_(std::move(account)),
+        proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit),
+        filter_chain_factory_(filter_chain_factory), local_reply_(local_reply),
+        stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
                      parent_filter_state, filter_state_life_span) {}
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
@@ -913,6 +931,7 @@ public:
   const Network::Connection* connection() const { return &connection_; }
 
   uint64_t streamId() const { return stream_id_; }
+  Buffer::BufferMemoryAccountSharedPtr account() const { return account_; }
 
   Buffer::InstancePtr& bufferedRequestData() { return buffered_request_data_; }
 
@@ -986,6 +1005,7 @@ private:
   Event::Dispatcher& dispatcher_;
   const Network::Connection& connection_;
   const uint64_t stream_id_;
+  Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
 
   std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
@@ -1007,7 +1027,7 @@ private:
 
   FilterChainFactory& filter_chain_factory_;
   const LocalReply::LocalReply& local_reply_;
-  OverridableRemoteSocketAddressSetterStreamInfo stream_info_;
+  OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.
   friend ActiveStreamFilterBase;
@@ -1040,7 +1060,8 @@ private:
     State()
         : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
           created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
-          non_100_response_headers_encoded_(false), under_on_local_reply_(false) {}
+          non_100_response_headers_encoded_(false), under_on_local_reply_(false),
+          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false) {}
 
     uint32_t filter_call_state_{0};
 
@@ -1060,6 +1081,9 @@ private:
     bool non_100_response_headers_encoded_ : 1;
     // True under the stack of onLocalReply, false otherwise.
     bool under_on_local_reply_ : 1;
+    // True when the filter chain iteration was aborted with local reply.
+    bool decoder_filter_chain_aborted_ : 1;
+    bool encoder_filter_chain_aborted_ : 1;
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield

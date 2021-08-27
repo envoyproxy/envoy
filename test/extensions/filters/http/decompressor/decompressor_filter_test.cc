@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/http/decompressor/v3/decompressor.pb.h"
 
-#include "common/http/headers.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/decompressor/decompressor_filter.h"
+#include "source/common/http/headers.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/decompressor/decompressor_filter.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/compression/decompressor/mocks.h"

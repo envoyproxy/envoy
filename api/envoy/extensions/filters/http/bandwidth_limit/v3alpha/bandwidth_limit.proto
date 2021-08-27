@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.bandwidth_limit.v3alpha;
+
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.bandwidth_limit.v3alpha";
+option java_outer_classname = "BandwidthLimitProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Bandwidth limit]
+// Bandwidth limit :ref:`configuration overview <config_http_filters_bandwidth_limit>`.
+// [#extension: envoy.filters.http.bandwidth_limit]
+
+// [#next-free-field: 6]
+message BandwidthLimit {
+  // Defines the mode for the bandwidth limit filter.
+  // Values represent bitmask.
+  enum EnableMode {
+    // Filter is disabled.
+    DISABLED = 0;
+
+    // Filter enabled only for incoming traffic.
+    REQUEST = 1;
+
+    // Filter enabled only for outgoing traffic.
+    RESPONSE = 2;
+
+    // Filter enabled for both incoming and outgoing traffic.
+    REQUEST_AND_RESPONSE = 3;
+  }
+
+  // The human readable prefix to use when emitting stats.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The enable mode for the bandwidth limit filter.
+  // Default is Disabled.
+  EnableMode enable_mode = 2 [(validate.rules).enum = {defined_only: true}];
+
+  // The limit supplied in KiB/s.
+  //
+  // .. note::
+  //   It's fine for the limit to be unset for the global configuration since the bandwidth limit
+  //   can be applied at a the virtual host or route level. Thus, the limit must be set for the
+  //   per route configuration otherwise the config will be rejected.
+  //
+  // .. note::
+  //   When using per route configuration, the limit becomes unique to that route.
+  //
+  google.protobuf.UInt64Value limit_kbps = 3 [(validate.rules).uint64 = {gte: 1}];
+
+  // Optional Fill interval in milliseconds for the token refills. Defaults to 50ms.
+  // It must be at least 20ms to avoid too aggressive refills.
+  google.protobuf.Duration fill_interval = 4 [(validate.rules).duration = {
+    lte {seconds: 1}
+    gte {nanos: 20000000}
+  }];
+
+  // Runtime flag that controls whether the filter is enabled or not. If not specified, defaults
+  // to enabled.
+  config.core.v3.RuntimeFeatureFlag runtime_enabled = 5;
+}

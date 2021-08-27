@@ -1,7 +1,7 @@
 #include <functional>
 
-#include "common/common/thread.h"
-#include "common/common/thread_synchronizer.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/thread_synchronizer.h"
 
 #include "test/test_common/thread_factory_for_test.h"
 

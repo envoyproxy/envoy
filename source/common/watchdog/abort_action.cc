@@ -1,12 +1,12 @@
-#include "common/watchdog/abort_action.h"
+#include "source/common/watchdog/abort_action.h"
 
 #include "envoy/thread/thread.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/logger.h"
-#include "common/protobuf/utility.h"
-#include "common/thread/terminate_thread.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/thread/terminate_thread.h"
 
 namespace Envoy {
 namespace Watchdog {

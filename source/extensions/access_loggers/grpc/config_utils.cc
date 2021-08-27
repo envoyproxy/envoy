@@ -1,4 +1,4 @@
-#include "extensions/access_loggers/grpc/config_utils.h"
+#include "source/extensions/access_loggers/grpc/config_utils.h"
 
 #include "envoy/singleton/manager.h"
 

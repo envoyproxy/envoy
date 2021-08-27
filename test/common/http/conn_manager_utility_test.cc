@@ -4,17 +4,17 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/random_generator.h"
-#include "common/http/conn_manager_utility.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/runtime/runtime_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/http/conn_manager_utility.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/extensions/request_id/uuid/config.h"
 
-#include "extensions/request_id/uuid/config.h"
-
-#include "test/common/http/ip_detection_extensions.h"
+#include "test/common/http/custom_header_extension.h"
+#include "test/common/http/xff_extension.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -63,6 +63,7 @@ public:
             [this](Http::RequestHeaderMap& request_headers, Tracing::Reason trace_status) {
               real_->setTraceReason(request_headers, trace_status);
             });
+    ON_CALL(*this, useRequestIdForTraceSampling()).WillByDefault(Return(true));
   }
 
   MOCK_METHOD(void, set, (Http::RequestHeaderMap&, bool));
@@ -70,6 +71,7 @@ public:
   MOCK_METHOD(absl::optional<uint64_t>, toInteger, (const Http::RequestHeaderMap&), (const));
   MOCK_METHOD(Tracing::Reason, getTraceReason, (const Http::RequestHeaderMap&));
   MOCK_METHOD(void, setTraceReason, (Http::RequestHeaderMap&, Tracing::Reason));
+  MOCK_METHOD(bool, useRequestIdForTraceSampling, (), (const));
 
 private:
   RequestIDExtensionSharedPtr real_;
@@ -235,6 +237,50 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddre
             headers.get_(Headers::get().ForwardedFor));
 }
 
+TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUrlInvalid) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
+
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"referer", "foo"}};
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.get(Http::CustomHeaders::get().Referer).empty());
+}
+
+TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMultipleEntriesAreFound) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
+
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"referer", "https://example.com/"},
+                                   {"referer", "https://google.com/"}};
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.get(Http::CustomHeaders::get().Referer).empty());
+}
+
+TEST_F(ConnectionManagerUtilityTest, ValidRefererPassesSanitization) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.sanitize_http_header_referer", "true"}});
+
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"referer", "https://example.com/"}};
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("https://example.com/",
+            headers.get(Http::CustomHeaders::get().Referer)[0]->value().getStringView());
+}
+
 // Verify that we don't append XFF when skipXffAppend(), even if using remote
 // address and where the address is external.
 TEST_F(ConnectionManagerUtilityTest, SkipXffAppendUseRemoteAddress) {
@@ -332,6 +378,23 @@ TEST_F(ConnectionManagerUtilityTest, SchemeIsRespected) {
   EXPECT_EQ("https", headers.getSchemeValue());
 }
 
+TEST_F(ConnectionManagerUtilityTest, SchemeOverwrite) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
+  TestRequestHeaderMapImpl headers{};
+  Network::Address::Ipv4Instance local_address("10.3.2.1");
+  ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
+
+  // Scheme was present. Do not overwrite anything
+  // Scheme and X-Forwarded-Proto will be overwritten.
+  config_.scheme_ = "https";
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("https", headers.getSchemeValue());
+  EXPECT_EQ("https", headers.getForwardedProtoValue());
+}
+
 // Verify internal request and XFF is set when we are using remote address and the address is
 // internal according to user configuration.
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenUserConfiguredRemoteAddress) {
@@ -393,6 +456,23 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
   EXPECT_EQ((MutateRequestRet{"198.51.100.2:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
+}
+
+// Verify we preserve hop by hop headers if configured to do so.
+TEST_F(ConnectionManagerUtilityTest, PreserveHopByHop) {
+  TestRequestHeaderMapImpl request_headers;
+  TestResponseHeaderMapImpl response_headers{{"connection", "foo"},
+                                             {"transfer-encoding", "foo"},
+                                             {"upgrade", "eep"},
+                                             {"keep-alive", "ads"},
+                                             {"proxy-connection", "dsa"}};
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, via_,
+                                                  false);
+  EXPECT_TRUE(response_headers.has(Headers::get().Connection));
+  EXPECT_TRUE(response_headers.has(Headers::get().TransferEncoding));
+  EXPECT_TRUE(response_headers.has(Headers::get().Upgrade));
+  EXPECT_TRUE(response_headers.has(Headers::get().KeepAlive));
+  EXPECT_TRUE(response_headers.has(Headers::get().ProxyConnection));
 }
 
 // Verify that we don't set the via header on requests/responses when empty.
@@ -1229,6 +1309,14 @@ TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
   EXPECT_EQ(Tracing::Reason::Sampling, request_id_extension_->getTraceReason(request_headers));
 }
 
+TEST_F(ConnectionManagerUtilityTest, CheckSamplingDecisionWithBypassSamplingWithRequestId) {
+  EXPECT_CALL(*request_id_extension_, useRequestIdForTraceSampling()).WillOnce(Return(false));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  const auto ret = callMutateRequestHeaders(request_headers, Protocol::Http2);
+  EXPECT_EQ(Tracing::Reason::Sampling, ret.trace_reason_);
+}
+
 TEST_F(ConnectionManagerUtilityTest, SamplingWithRouteOverride) {
   EXPECT_CALL(
       runtime_.snapshot_,
@@ -1500,6 +1588,51 @@ TEST_F(ConnectionManagerUtilityTest, RemovePort) {
   TestRequestHeaderMapImpl header_map_none(original_headers_none);
   ConnectionManagerUtility::maybeNormalizeHost(header_map_none, config_, 0);
   EXPECT_EQ(header_map_none.getHostValue(), "host:9999");
+}
+
+// maybeNormalizeHost() removes trailing dot of host from host header.
+TEST_F(ConnectionManagerUtilityTest, RemoveTrailingDot) {
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setHost("host.");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map, config_, 0);
+  EXPECT_EQ(header_map.getHostValue(), "host");
+
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::None));
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers_with_port;
+  original_headers_with_port.setHost("host.:443");
+
+  TestRequestHeaderMapImpl header_map_with_port(original_headers_with_port);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_with_port, config_, 443);
+  EXPECT_EQ(header_map_with_port.getHostValue(), "host:443");
+
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::MatchingHost));
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers_strip_port;
+  original_headers_strip_port.setHost("host.:443");
+
+  TestRequestHeaderMapImpl header_map_strip_port(original_headers_strip_port);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_strip_port, config_, 443);
+  EXPECT_EQ(header_map_strip_port.getHostValue(), "host");
+
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers_no_dot;
+  original_headers_no_dot.setHost("host");
+
+  TestRequestHeaderMapImpl header_map_no_dot(original_headers_no_dot);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_no_dot, config_, 0);
+  EXPECT_EQ(header_map_no_dot.getHostValue(), "host");
+
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(false));
+  TestRequestHeaderMapImpl original_headers_none;
+  original_headers_none.setHost("host.");
+
+  TestRequestHeaderMapImpl header_map_none(original_headers_none);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_none, config_, 0);
+  EXPECT_EQ(header_map_none.getHostValue(), "host.");
 }
 
 // maybeNormalizePath() does not touch escaped slashes when configured to KEEP_UNCHANGED.
@@ -1801,6 +1934,96 @@ TEST_F(ConnectionManagerUtilityTest, OriginalIPDetectionExtension) {
     EXPECT_EQ(ret.downstream_address_, "10.0.0.3:50000");
     EXPECT_EQ(ret.reject_request_, absl::nullopt);
   }
+}
+
+TEST_F(ConnectionManagerUtilityTest, RejectPathWithFragmentByDefault) {
+  TestRequestHeaderMapImpl header_map{{":path", "/foo/bar#boom"}};
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Reject,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+
+  TestRequestHeaderMapImpl header_map_just_fragment{{":path", "#boom"}};
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Reject,
+            ConnectionManagerUtility::maybeNormalizePath(header_map_just_fragment, config_));
+
+  // Percent encoded # should not cause rejection
+  TestRequestHeaderMapImpl header_map_with_percent_23{{":path", "/foo/bar/../%23boom"}};
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map_with_percent_23, config_));
+  EXPECT_EQ(header_map_with_percent_23.getPathValue(), "/foo/bar/../%23boom");
+
+  // With normalization enabled the %23 should not be decoded
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map_with_percent_23, config_));
+  // Path normalization should collapse /../
+  EXPECT_EQ(header_map_with_percent_23.getPathValue(), "/foo/%23boom");
+}
+
+TEST_F(ConnectionManagerUtilityTest, DropFragmentFromPathWithOverride) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
+
+  TestRequestHeaderMapImpl header_map{{":path", "/foo/bar#boom"}};
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+  EXPECT_EQ(header_map.getPathValue(), "/foo/bar");
+
+  TestRequestHeaderMapImpl header_map_just_fragment{{":path", "#"}};
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map_just_fragment, config_));
+  EXPECT_EQ(header_map_just_fragment.getPathValue(), "");
+
+  TestRequestHeaderMapImpl header_map_just_fragment2{{":path", "/#"}};
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map_just_fragment2, config_));
+  EXPECT_EQ(header_map_just_fragment2.getPathValue(), "/");
+
+  TestRequestHeaderMapImpl header_map_with_empty_fragment{{":path", "/foo/baz/#"}};
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map_with_empty_fragment, config_));
+  EXPECT_EQ(header_map_with_empty_fragment.getPathValue(), "/foo/baz/");
+
+  // Check that normalization does not "see" stripped path
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl header_map_with_fragment2{{":path", "/foo/../baz/#fragment"}};
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map_with_fragment2, config_));
+  EXPECT_EQ(header_map_with_fragment2.getPathValue(), "/baz/");
+}
+
+TEST_F(ConnectionManagerUtilityTest, KeepFragmentFromPathWithBothOverrides) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled", "false"}});
+
+  TestRequestHeaderMapImpl header_map{{":path", "/foo/bar#boom"}};
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+  EXPECT_EQ(header_map.getPathValue(), "/foo/bar#boom");
+
+  TestRequestHeaderMapImpl header_map_just_fragment{{":path", "#"}};
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map_just_fragment, config_));
+  EXPECT_EQ(header_map_just_fragment.getPathValue(), "#");
+
+  TestRequestHeaderMapImpl header_map_just_fragment2{{":path", "/#"}};
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map_just_fragment2, config_));
+  EXPECT_EQ(header_map_just_fragment2.getPathValue(), "/#");
+
+  TestRequestHeaderMapImpl header_map_with_empty_fragment{{":path", "/foo/baz/#"}};
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map_with_empty_fragment, config_));
+  EXPECT_EQ(header_map_with_empty_fragment.getPathValue(), "/foo/baz/#");
+
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl header_map_with_fragment2{{":path", "/foo/../baz/#fragment"}};
+  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+            ConnectionManagerUtility::maybeNormalizePath(header_map_with_fragment2, config_));
+  EXPECT_EQ(header_map_with_fragment2.getPathValue(), "/baz/%23fragment");
 }
 
 } // namespace Http

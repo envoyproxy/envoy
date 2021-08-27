@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "server/hot_restarting_child.h"
-#include "server/hot_restarting_parent.h"
+#include "source/server/hot_restarting_child.h"
+#include "source/server/hot_restarting_parent.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"

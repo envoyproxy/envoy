@@ -1,11 +1,11 @@
-#include "extensions/filters/network/client_ssl_auth/config.h"
+#include "source/extensions/filters/network/client_ssl_auth/config.h"
 
 #include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 #include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
+#include "source/extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
 
 namespace Envoy {
 namespace Extensions {

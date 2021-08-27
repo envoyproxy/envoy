@@ -3,7 +3,7 @@
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
-#include "extensions/filters/network/redis_proxy/proxy_filter.h"
+#include "source/extensions/filters/network/redis_proxy/proxy_filter.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"

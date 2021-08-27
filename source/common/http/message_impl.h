@@ -5,9 +5,9 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/non_copyable.h"
-#include "common/http/header_map_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/http/header_map_impl.h"
 
 namespace Envoy {
 namespace Http {

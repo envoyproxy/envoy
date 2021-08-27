@@ -1,9 +1,9 @@
-#include "common/network/io_socket_error_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
 
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
 
 namespace Envoy {
 namespace Network {

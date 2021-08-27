@@ -2,7 +2,7 @@
 #include "envoy/config/route/v3/route.pb.validate.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/router/config_impl.h"
+#include "source/common/router/config_impl.h"
 
 #include "test/common/router/route_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"

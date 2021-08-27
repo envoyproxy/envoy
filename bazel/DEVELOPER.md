@@ -22,12 +22,12 @@ be sorted alphabetically by their `name` attribute.
 
 All modules that make up the Envoy binary are statically linked at compile time.
 Many of the modules within Envoy have a pure virtual interface living in
-[`include/envoy`](../include/envoy), implementation sources in
+[`envoy`](../envoy), implementation sources in
 [`source`](../source), mocks in [`test/mocks`](../test/mocks) and
 unit/integration tests in [`test`](../test). The relevant `BUILD` files will
 require updating or to be added in these locations as you extend Envoy.
 
-As an example, consider adding the following interface in `include/envoy/foo/bar.h`:
+As an example, consider adding the following interface in `envoy/foo/bar.h`:
 
 ```c++
 #pragma once
@@ -43,7 +43,7 @@ public:
   ...
 ```
 
-This would require the addition to `include/envoy/foo/BUILD` of the following target:
+This would require the addition to `envoy/foo/BUILD` of the following target:
 
 ```python
 envoy_cc_library(
@@ -51,7 +51,7 @@ envoy_cc_library(
     hdrs = ["bar.h"],
     deps = [
         ":baz_interface",
-        "//include/envoy/buffer:buffer_interface",
+        "//envoy/buffer:buffer_interface",
     ],
 )
 ```
@@ -59,7 +59,7 @@ envoy_cc_library(
 This declares a new target `bar_interface`, where the convention is that pure
 virtual interfaces have their targets suffixed with `_interface`. The header
 `bar.h` is exported to other targets that depend on
-`//include/envoy/foo:bar_interface`. The interface target itself depends on
+`//envoy/foo:bar_interface`. The interface target itself depends on
 `baz_interface` (in the same directory, hence the relative Bazel label) and
 `buffer_interface`.
 
@@ -82,11 +82,11 @@ class BarImpl : public Bar {
 and `source/common/foo/bar_impl.cc`:
 
 ```c++
-#include "common/foo/bar_impl.h"
+#include "source/common/foo/bar_impl.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/foo/bar_internal.h"
-#include "common/foo/baz_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/foo/bar_internal.h"
+#include "source/common/foo/baz_impl.h"
 ...
 ```
 
@@ -102,7 +102,7 @@ envoy_cc_library(
     hdrs = ["bar_impl.h"],
     deps = [
         ":baz_lib",
-        "//include/envoy/foo:bar_interface",
+        "//envoy/foo:bar_interface",
         "//source/common/buffer:buffer_lib",
     ],
 )
@@ -120,7 +120,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/foo:bar_interface",
+        "//envoy/foo:bar_interface",
         ...
     ],
 )
@@ -165,10 +165,10 @@ envoy_cc_binary(
 ## Filter linking
 
 Filters are registered via static initializers at early runtime by modules in
-[`source/server/config`](../source/server/config). These require the `alwayslink
+[`source/extensions/filters`](../source/extensions/filters). These require the `alwayslink
 = 1` attribute to be set in the corresponding `envoy_cc_library` target to
 ensure they are correctly linked. See
-[`source/server/config/http/BUILD`](../source/server/config/http/BUILD) for
+[`source/extensions/filters/http/BUILD`](../source/extensions/filters/http/BUILD) for
 examples.
 
 ## Tests with environment dependencies

@@ -2,7 +2,7 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/test_common/printers.h"

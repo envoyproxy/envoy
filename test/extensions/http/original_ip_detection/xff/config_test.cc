@@ -1,7 +1,7 @@
 #include "envoy/extensions/http/original_ip_detection/xff/v3/xff.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/http/original_ip_detection/xff/config.h"
+#include "source/extensions/http/original_ip_detection/xff/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"

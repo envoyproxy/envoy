@@ -23,9 +23,6 @@ powershell Invoke-WebRequest https://github.com/bazelbuild/bazelisk/releases/lat
 set PATH=%PATH%;%USERPROFILE%\bazel
 ```
 
-If you're building from an revision of Envoy prior to August 2019, which doesn't contains a `.bazelversion` file, run `ci/run_envoy_docker.sh "bazel version"`
-to find the right version of Bazel and set the version to `USE_BAZEL_VERSION` environment variable to build.
-
 ## Production environments
 
 To build Envoy with Bazel in a production environment, where the [Envoy
@@ -116,17 +113,6 @@ for how to update or override dependencies.
     Envoy compiles and passes tests with the version of clang installed by Xcode 11.1:
     Apple clang version 11.0.0 (clang-1100.0.33.8).
 
-    In order for bazel to be aware of the tools installed by brew, the PATH
-    variable must be set for bazel builds. This can be accomplished by setting
-    this in your `user.bazelrc` file:
-
-    ```
-    build --action_env=PATH="/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
-    ```
-
-    Alternatively, you can pass `--action_env` on the command line when running
-    `bazel build`/`bazel test`.
-
     Having the binutils keg installed in Brew is known to cause issues due to putting an incompatible
     version of `ar` on the PATH, so if you run into issues building third party code like luajit
     consider uninstalling binutils.
@@ -167,9 +153,9 @@ for how to update or override dependencies.
     and Bazel rules which follow POSIX python conventions. Add `pip.exe` to the PATH and install the `wheel`
     package.
     ```cmd
-    mklink %USERPROFILE%\Python38\python3.exe %USERPROFILE%\Python38\python.exe
-    set PATH=%PATH%;%USERPROFILE%\Python38
-    set PATH=%PATH%;%USERPROFILE%\Python38\Scripts
+    mklink %USERPROFILE%\Python39\python3.exe %USERPROFILE%\Python39\python.exe
+    set PATH=%PATH%;%USERPROFILE%\Python39
+    set PATH=%PATH%;%USERPROFILE%\Python39\Scripts
     pip install wheel
     ```
 
@@ -682,7 +668,10 @@ The following optional features can be enabled on the Bazel build command-line:
 
 Envoy uses a modular build which allows extensions to be removed if they are not needed or desired.
 Extensions that can be removed are contained in
-[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
+[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl). Contrib build
+extensions are contained in [contrib_build_config.bzl](../contrib/contrib_build_config.bzl). Note
+that contrib extensions are only included by default when building the contrib executable and in
+the default contrib images pushed to Docker Hub.
 
 The extensions disabled by default can be enabled by adding the following parameter to Bazel, for example to enable
 `envoy.filters.http.kill_request` extension, add `--//source/extensions/filters/http/kill_request:enabled`.
@@ -694,6 +683,13 @@ If you're building from a custom build repository, the parameters need to prefix
 `--@envoy//source/extensions/filters/http/kill_request:enabled`.
 
 You may persist those options in `user.bazelrc` in Envoy repo or your `.bazelrc`.
+
+Contrib extensions can be enabled and disabled similarly to above when building the contrib
+executable. For example:
+
+`bazel build //contrib/exe:envoy-static --//contrib/squash/filters/http/source:enabled=false`
+
+Will disable the squash extension when building the contrib executable.
 
 ## Customize extension build config
 
@@ -732,6 +728,11 @@ local_repository(
 
 ...
 ```
+
+When performing custom builds, it is acceptable to include contrib extensions as well. This can
+be done by including the desired Bazel paths from [contrib_build_config.bzl](../contrib/contrib_build_config.bzl)
+into the overriden `extensions_build_config.bzl`. (There is no need to specifically perform
+a contrib build to include a contrib extension.)
 
 ## Extra extensions
 
@@ -866,7 +867,7 @@ TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 ```
 
 
-# Running clang-format without docker
+# Running format linting without docker
 
 The easiest way to run the clang-format check/fix commands is to run them via
 docker, which helps ensure the right toolchain is set up. However you may prefer
@@ -879,6 +880,8 @@ To run the tools directly, you must install the correct version of clang. This
 may change over time, check the version of clang in the docker image. You must
 also have 'buildifier' installed from the bazel distribution.
 
+Note that if you run the `check_spelling.py` script you will need to have `aspell` installed.
+
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
@@ -890,9 +893,9 @@ Once this is set up, you can run clang-format without docker:
 
 ```shell
 ./tools/code_format/check_format.py check
-./tools/spelling/check_spelling.sh check
+./tools/spelling/check_spelling_pedantic.py check
 ./tools/code_format/check_format.py fix
-./tools/spelling/check_spelling.sh fix
+./tools/spelling/check_spelling_pedantic.py fix
 ```
 
 # Advanced caching setup

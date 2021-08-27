@@ -1,15 +1,15 @@
-#include "common/router/route_config_update_receiver_impl.h"
+#include "source/common/router/route_config_update_receiver_impl.h"
 
 #include <string>
 
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/thread.h"
-#include "common/protobuf/utility.h"
-#include "common/router/config_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/config_impl.h"
 
 namespace Envoy {
 namespace Router {

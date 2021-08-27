@@ -5,9 +5,9 @@
 
 #include "envoy/api/api.h"
 
-#include "common/common/lock_guard.h"
-#include "common/common/mutex_tracer_impl.h"
-#include "common/common/thread.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/mutex_tracer_impl.h"
+#include "source/common/common/thread.h"
 
 #include "test/test_common/test_time.h"
 

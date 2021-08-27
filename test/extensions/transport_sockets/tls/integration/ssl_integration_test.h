@@ -17,7 +17,7 @@ namespace Ssl {
 class SslIntegrationTestBase : public HttpIntegrationTest {
 public:
   SslIntegrationTestBase(Network::Address::IpVersion ip_version)
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ip_version) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, ip_version) {}
 
   void initialize() override;
 

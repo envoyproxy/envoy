@@ -19,16 +19,16 @@
 #include "envoy/stats/tag_producer.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/backoff_strategy.h"
-#include "common/common/hash.h"
-#include "common/common/hex.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/backoff_strategy.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/singleton/const_singleton.h"
 
 #include "udpa/type/v1/typed_struct.pb.h"
 
@@ -185,15 +185,11 @@ public:
       const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
-   * Access transport_api_version field in ApiConfigSource, while validating version
-   * compatibility.
+   * Validate transport_api_version field in ApiConfigSource.
    * @param api_config_source the config source to extract transport API version from.
-   * @return envoy::config::core::v3::ApiVersion transport API version
    * @throws DeprecatedMajorVersionException when the transport version is disabled.
    */
-  template <class Proto>
-  static envoy::config::core::v3::ApiVersion
-  getAndCheckTransportVersion(const Proto& api_config_source) {
+  template <class Proto> static void checkTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
     ASSERT(Thread::MainThread::isMainThread());
     if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO ||
@@ -206,12 +202,8 @@ public:
           "following the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition.",
           api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
-      if (!Runtime::runtimeFeatureEnabled(
-              "envoy.test_only.broken_in_production.enable_deprecated_v2_api")) {
-        throw DeprecatedMajorVersionException(warning);
-      }
+      throw DeprecatedMajorVersionException(warning);
     }
-    return transport_api_version;
   }
 
   /**
@@ -431,7 +423,8 @@ public:
    * Create StatsMatcher instance.
    */
   static Stats::StatsMatcherPtr
-  createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                     Stats::SymbolTable& symbol_table);
 
   /**
    * Create HistogramSettings instance.
@@ -450,14 +443,6 @@ public:
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
                                 Stats::Scope& scope, bool skip_cluster_check);
-
-  /**
-   * Translate a set of cluster's hosts into a load assignment configuration.
-   * @param hosts cluster's list of hosts.
-   * @return envoy::config::endpoint::v3::ClusterLoadAssignment a load assignment configuration.
-   */
-  static envoy::config::endpoint::v3::ClusterLoadAssignment
-  translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::config::core::v3::Address>& hosts);
 
   /**
    * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto

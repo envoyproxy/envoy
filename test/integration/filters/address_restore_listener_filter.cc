@@ -4,8 +4,8 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 
@@ -16,11 +16,11 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
     FANCY_LOG(debug, "in FakeOriginalDstListenerFilter::onAccept");
     Network::ConnectionSocket& socket = cb.socket();
-    socket.addressProvider().restoreLocalAddress(
+    socket.connectionInfoProvider().restoreLocalAddress(
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2", 80));
     FANCY_LOG(debug, "current local socket address is {} restored = {}",
-              socket.addressProvider().localAddress()->asString(),
-              socket.addressProvider().localAddressRestored());
+              socket.connectionInfoProvider().localAddress()->asString(),
+              socket.connectionInfoProvider().localAddressRestored());
     return Network::FilterStatus::Continue;
   }
 };

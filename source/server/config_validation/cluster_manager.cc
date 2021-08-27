@@ -1,9 +1,9 @@
-#include "server/config_validation/cluster_manager.h"
+#include "source/server/config_validation/cluster_manager.h"
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 namespace Envoy {
 namespace Upstream {

@@ -5,16 +5,15 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/common/random_generator.h"
-#include "common/common/thread.h"
-#include "common/local_info/local_info_impl.h"
-#include "common/network/utility.h"
-#include "common/stats/thread_local_store.h"
-#include "common/thread_local/thread_local_impl.h"
-
-#include "server/hot_restart_nop_impl.h"
-#include "server/options_impl.h"
-#include "server/process_context_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/common/thread.h"
+#include "source/common/local_info/local_info_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
+#include "source/server/hot_restart_nop_impl.h"
+#include "source/server/options_impl.h"
+#include "source/server/process_context_impl.h"
 
 #include "test/common/runtime/utility.h"
 #include "test/integration/utility.h"
@@ -32,7 +31,7 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
                                   Network::Address::IpVersion ip_version,
                                   FieldValidationConfig validation_config, uint32_t concurrency,
                                   std::chrono::seconds drain_time,
-                                  Server::DrainStrategy drain_strategy, bool v2_bootstrap) {
+                                  Server::DrainStrategy drain_strategy) {
   OptionsImpl test_options("cluster_name", "node_name", "zone_name", spdlog::level::info);
 
   test_options.setConfigPath(config_path);
@@ -42,14 +41,11 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
   test_options.setDrainTime(drain_time);
   test_options.setParentShutdownTime(std::chrono::seconds(2));
   test_options.setDrainStrategy(drain_strategy);
-  test_options.setAllowUnkownFields(validation_config.allow_unknown_static_fields);
+  test_options.setAllowUnknownFields(validation_config.allow_unknown_static_fields);
   test_options.setRejectUnknownFieldsDynamic(validation_config.reject_unknown_dynamic_fields);
   test_options.setIgnoreUnknownFieldsDynamic(validation_config.ignore_unknown_dynamic_fields);
   test_options.setConcurrency(concurrency);
   test_options.setHotRestartDisabled(true);
-  if (v2_bootstrap) {
-    test_options.setBootstrapVersion(2);
-  }
 
   return test_options;
 }
@@ -63,7 +59,7 @@ IntegrationTestServerPtr IntegrationTestServer::create(
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-    Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_real_stats, bool v2_bootstrap) {
+    Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_real_stats) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path, use_real_stats)};
   if (server_ready_function != nullptr) {
@@ -71,7 +67,7 @@ IntegrationTestServerPtr IntegrationTestServer::create(
   }
   server->start(version, on_server_init_function, deterministic, defer_listener_finalization,
                 process_object, validation_config, concurrency, drain_time, drain_strategy,
-                watermark_factory, v2_bootstrap);
+                watermark_factory);
   return server;
 }
 
@@ -99,20 +95,22 @@ void IntegrationTestServer::unsetDynamicContextParam(absl::string_view resource_
   });
 }
 
-void IntegrationTestServer::start(
-    const Network::Address::IpVersion version, std::function<void()> on_server_init_function,
-    bool deterministic, bool defer_listener_finalization, ProcessObjectOptRef process_object,
-    Server::FieldValidationConfig validator_config, uint32_t concurrency,
-    std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-    Buffer::WatermarkFactorySharedPtr watermark_factory, bool v2_bootstrap) {
+void IntegrationTestServer::start(const Network::Address::IpVersion version,
+                                  std::function<void()> on_server_init_function, bool deterministic,
+                                  bool defer_listener_finalization,
+                                  ProcessObjectOptRef process_object,
+                                  Server::FieldValidationConfig validator_config,
+                                  uint32_t concurrency, std::chrono::seconds drain_time,
+                                  Server::DrainStrategy drain_strategy,
+                                  Buffer::WatermarkFactorySharedPtr watermark_factory) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_ = api_.threadFactory().createThread(
-      [version, deterministic, process_object, validator_config, concurrency, drain_time,
-       drain_strategy, watermark_factory, v2_bootstrap, this]() -> void {
-        threadRoutine(version, deterministic, process_object, validator_config, concurrency,
-                      drain_time, drain_strategy, watermark_factory, v2_bootstrap);
-      });
+  thread_ = api_.threadFactory().createThread([version, deterministic, process_object,
+                                               validator_config, concurrency, drain_time,
+                                               drain_strategy, watermark_factory, this]() -> void {
+    threadRoutine(version, deterministic, process_object, validator_config, concurrency, drain_time,
+                  drain_strategy, watermark_factory);
+  });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
   // Note that there is no synchronization guaranteeing this happens either
@@ -189,11 +187,9 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
                                           Server::FieldValidationConfig validation_config,
                                           uint32_t concurrency, std::chrono::seconds drain_time,
                                           Server::DrainStrategy drain_strategy,
-                                          Buffer::WatermarkFactorySharedPtr watermark_factory,
-                                          bool v2_bootstrap) {
+                                          Buffer::WatermarkFactorySharedPtr watermark_factory) {
   OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version, validation_config,
-                                                    concurrency, drain_time, drain_strategy,
-                                                    v2_bootstrap));
+                                                    concurrency, drain_time, drain_strategy));
   Thread::MutexBasicLockable lock;
 
   Random::RandomGeneratorPtr random_generator;
@@ -239,7 +235,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     // This is technically thread unsafe (assigning to a shared_ptr accessed
     // across threads), but because we synchronize below through serverReady(), the only
     // consumer on the main test thread in ~IntegrationTestServerImpl will not race.
-    admin_address_ = server.admin().socket().addressProvider().localAddress();
+    admin_address_ = server.admin().socket().connectionInfoProvider().localAddress();
     server_ = &server;
     stat_store_ = &stat_store;
     serverReady();
@@ -255,7 +251,7 @@ IntegrationTestServerImpl::~IntegrationTestServerImpl() {
     Network::Address::InstanceConstSharedPtr admin_address(admin_address_);
     if (admin_address != nullptr) {
       BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-          admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
+          admin_address, "POST", "/quitquitquit", "", Http::CodecType::HTTP1);
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("200", response->headers().getStatusValue());
       server_gone_.WaitForNotification();

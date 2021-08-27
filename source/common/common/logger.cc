@@ -1,4 +1,4 @@
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include <cassert> // use direct system-assert to avoid cyclic dependency.
 #include <cstdint>
@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "common/common/json_escape_string.h"
-#include "common/common/lock_guard.h"
+#include "source/common/common/json_escape_string.h"
+#include "source/common/common/lock_guard.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
@@ -22,6 +22,8 @@ StandardLogger::StandardLogger(const std::string& name)
     : Logger(std::make_shared<spdlog::logger>(name, Registry::getSink())) {}
 
 SinkDelegate::SinkDelegate(DelegatingLogSinkSharedPtr log_sink) : log_sink_(log_sink) {}
+void SinkDelegate::logWithStableName(absl::string_view, absl::string_view, absl::string_view,
+                                     absl::string_view) {}
 
 SinkDelegate::~SinkDelegate() {
   // The previous delegate should have never been set or should have been reset by now via

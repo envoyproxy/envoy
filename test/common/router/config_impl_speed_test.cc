@@ -1,8 +1,8 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route.pb.validate.h"
 
-#include "common/common/assert.h"
-#include "common/router/config_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/router/config_impl.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/mocks/stream_info/mocks.h"

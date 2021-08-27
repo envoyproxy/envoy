@@ -3,7 +3,7 @@
 #include "envoy/singleton/manager.h"
 #include "envoy/thread/thread.h"
 
-#include "common/common/non_copyable.h"
+#include "source/common/common/non_copyable.h"
 
 #include "absl/container/node_hash_map.h"
 

@@ -11,10 +11,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/common/redis/codec.h"
-#include "extensions/filters/network/redis_proxy/command_splitter.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/common/redis/codec.h"
+#include "source/extensions/filters/network/redis_proxy/command_splitter.h"
 
 namespace Envoy {
 namespace Extensions {

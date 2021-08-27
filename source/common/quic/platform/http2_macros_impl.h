@@ -8,7 +8,7 @@
 
 #include <utility>
 
-#include "common/quic/platform/quic_logging_impl.h"
+#include "source/common/quic/platform/quic_logging_impl.h"
 
 #include "absl/base/macros.h"
 

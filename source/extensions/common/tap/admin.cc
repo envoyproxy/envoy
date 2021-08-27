@@ -1,13 +1,13 @@
-#include "extensions/common/tap/admin.h"
+#include "source/extensions/common/tap/admin.h"
 
 #include "envoy/admin/v3/tap.pb.h"
 #include "envoy/admin/v3/tap.pb.validate.h"
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {

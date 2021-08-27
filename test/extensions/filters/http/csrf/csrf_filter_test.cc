@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/http/csrf/v3/csrf.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/http/header_map_impl.h"
-
-#include "extensions/filters/http/csrf/csrf_filter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/http/csrf/csrf_filter.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -42,7 +41,7 @@ public:
     add_exact_origin->set_exact("additionalhost");
 
     const auto& add_regex_origin = policy.mutable_additional_origins()->Add();
-    add_regex_origin->set_hidden_envoy_deprecated_regex(R"(www\-[0-9]\.allow\.com)");
+    add_regex_origin->MergeFrom(TestUtility::createRegexMatcher(R"(www\-[0-9]\.allow\.com)"));
 
     return std::make_shared<CsrfFilterConfig>(policy, "test", stats_, runtime_);
   }
@@ -60,12 +59,12 @@ public:
   }
 
   void setRoutePolicy(const CsrfPolicy* policy) {
-    ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(filter_name_))
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(filter_name_))
         .WillByDefault(Return(policy));
   }
 
   void setVirtualHostPolicy(const CsrfPolicy* policy) {
-    ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(filter_name_))
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(filter_name_))
         .WillByDefault(Return(policy));
   }
 

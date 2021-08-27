@@ -7,11 +7,9 @@
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
-#include "common/matcher/matcher.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/matcher/matcher.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,7 +22,7 @@ namespace Composite {
 class CompositeFilterFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::composite::v3::Composite> {
 public:
-  CompositeFilterFactory() : FactoryBase(HttpFilterNames::get().Composite) {}
+  CompositeFilterFactory() : FactoryBase("envoy.filters.http.composite") {}
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::composite::v3::Composite& proto_config,

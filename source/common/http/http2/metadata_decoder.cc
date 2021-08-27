@@ -1,6 +1,6 @@
-#include "common/http/http2/metadata_decoder.h"
+#include "source/common/http/http2/metadata_decoder.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/container/fixed_array.h"
 
