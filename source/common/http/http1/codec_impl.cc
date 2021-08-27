@@ -575,15 +575,17 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
   return true;
 }
 
-Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
-  if (pending_response_.has_value()) {
-    StreamInfo::BytesMetererSharedPtr& bytes_meterer =
-        pending_response_.value().encoder_.getStream().bytesMeterer();
+void ConnectionImpl::onDispatch(Buffer::Instance const& data) {
+  StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
+  if (bytes_meterer) {
     bytes_meterer->addWireBytesReceived(data.length());
   } else {
     // Bytes dispatched before we create pending response.
-    dispatched_bytes_ += data.length();
+    dispatched_bytes_before_stream_ += data.length();
   }
+}
+
+Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
   Http::Status status = ConnectionImpl::dispatch(data);
   if (status.ok() && data.length() > 0) {
     // The HTTP/1.1 codec pauses dispatch after a single response is complete. Extraneous data
@@ -605,6 +607,7 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
   ASSERT(buffered_body_.length() == 0);
 
   dispatching_ = true;
+  onDispatch(data);
   if (maybeDirectDispatch(data)) {
     return Http::okStatus();
   }
@@ -1151,6 +1154,7 @@ Status ServerConnectionImpl::onMessageBeginBase() {
     ASSERT(!active_request_.has_value());
     active_request_.emplace(*this);
     auto& active_request = active_request_.value();
+    getBytesMeterer()->addWireBytesReceived(dispatched_bytes_before_stream_);
     if (resetStreamCalled()) {
       return codecClientError("cannot create new streams after calling reset");
     }
@@ -1178,6 +1182,8 @@ void ServerConnectionImpl::onBody(Buffer::Instance& data) {
   ASSERT(!deferred_end_stream_headers_);
   if (active_request_.has_value()) {
     ENVOY_CONN_LOG(trace, "body size={}", connection_, data.length());
+    ASSERT(getBytesMeterer());
+    getBytesMeterer()->addBodyBytesReceived(data.length());
     active_request_.value().request_decoder_->decodeData(data, false);
   }
 }
@@ -1309,9 +1315,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
   ASSERT(pending_response_done_);
   pending_response_.emplace(*this, &response_decoder);
   pending_response_done_ = false;
-  StreamInfo::BytesMetererSharedPtr& bytes_meterer =
-      pending_response_.value().encoder_.getStream().bytesMeterer();
-  bytes_meterer->addWireBytesReceived(dispatched_bytes_);
+  getBytesMeterer()->addWireBytesReceived(dispatched_bytes_before_stream_);
   return pending_response_.value().encoder_;
 }
 
@@ -1393,9 +1397,7 @@ void ClientConnectionImpl::onBody(Buffer::Instance& data) {
   ASSERT(!deferred_end_stream_headers_);
   if (pending_response_.has_value()) {
     ASSERT(!pending_response_done_);
-    StreamInfo::BytesMetererSharedPtr& bytes_meterer =
-        pending_response_.value().encoder_.getStream().bytesMeterer();
-
+    StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
     bytes_meterer->addBodyBytesReceived(data.length());
 
     pending_response_.value().decoder_->decodeData(data, false);

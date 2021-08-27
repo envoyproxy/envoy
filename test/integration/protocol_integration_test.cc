@@ -3067,7 +3067,7 @@ TEST_P(ProtocolIntegrationTest, HeaderOnlyBytesCountDownstream) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_BODY_BYTES_SENT% %DOWNSTREAM_BODY_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(0, 0, false);
-  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 124, 0, 0, 0, 68, 0, 0, 0);
+  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 124, 111, 0, 0, 68, 0, 0, 0);
 }
 
 TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountUpstream) {
@@ -3090,7 +3090,7 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountDownstream) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_BODY_BYTES_SENT% %DOWNSTREAM_BODY_BYTES_RECEIVED%\n");
   testRouterRequestAndResponseWithBody(100, 100, false);
-  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 244, 0, 106, 10, 177, 109, 100,
+  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 244, 231, 106, 110, 177, 109, 100,
                                            100);
 }
 
@@ -3121,7 +3121,7 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountDownstream) {
 
   testTrailers(10, 20, true, true);
 
-  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 206, 0, 26, 9, 136, 58, 29, 19);
+  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 206, 132, 26, 19, 136, 58, 29, 19);
 }
 
 TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireBytesCountUpstream) {

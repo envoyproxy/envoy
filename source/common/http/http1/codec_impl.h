@@ -318,6 +318,7 @@ protected:
   bool dispatching_ : 1;
   bool dispatching_slice_already_drained_ : 1;
   const bool no_chunked_encoding_header_for_304_ : 1;
+  uint64_t dispatched_bytes_before_stream_{};
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -362,6 +363,8 @@ private:
    * @len supplies the length of the span.
    */
   Envoy::StatusOr<size_t> dispatchSlice(const char* slice, size_t len);
+
+  void onDispatch(Buffer::Instance const& data);
 
   // ParserCallbacks.
   Status onHeaderField(const char* data, size_t length) override;
@@ -537,6 +540,7 @@ private:
 
   void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
   void maybeAddSentinelBufferFragment(Buffer::Instance& output_buffer) override;
+
   Status doFloodProtectionChecks() const;
   Status checkHeaderNameForUnderscores() override;
 
@@ -644,8 +648,6 @@ private:
 
   // The default limit of 80 KiB is the vanilla http_parser behaviour.
   static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
-
-  uint64_t dispatched_bytes_{};
 };
 
 } // namespace Http1
