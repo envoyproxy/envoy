@@ -782,6 +782,9 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   if (new_cluster->outlierDetector() != nullptr) {
     new_cluster->outlierDetector()->addChangedStateCb([this](HostSharedPtr host) {
       if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+        ENVOY_LOG_EVENT(debug, "outlier_detection_ejection",
+                        "host {} in cluster {} was ejected by the outlier detector",
+                        host->address(), host->cluster().name());
         postThreadLocalHealthFailure(host);
       }
     });
@@ -946,6 +949,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
 }
 
 void ClusterManagerImpl::drainConnections(const std::string& cluster) {
+  ENVOY_LOG_EVENT(debug, "drain_connections_call", "drainConnections called for cluster {}",
+                  cluster);
+
   tls_.runOnAllThreads([cluster](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     auto cluster_entry = cluster_manager->thread_local_clusters_.find(cluster);
     if (cluster_entry != cluster_manager->thread_local_clusters_.end()) {
@@ -955,6 +961,9 @@ void ClusterManagerImpl::drainConnections(const std::string& cluster) {
 }
 
 void ClusterManagerImpl::drainConnections() {
+  ENVOY_LOG_EVENT(debug, "drain_connections_call_for_all_clusters",
+                  "drainConnections called for all clusters");
+
   tls_.runOnAllThreads([](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     for (const auto& cluster_entry : cluster_manager->thread_local_clusters_) {
       cluster_entry.second->drainConnPools();
