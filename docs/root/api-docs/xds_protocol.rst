@@ -445,12 +445,14 @@ that point, clearing the list of subscribed resources is interpretted as an unsu
 to "*".
 
 For example, in SotW:
+
 - Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` unset. Server interprets this as a subscription to "*".
 - Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` set to "*" and "A". Server interprets this as continuing the existing subscription to "*" and adding a new subscription to "A".
 - Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` set to "A". Server interprets this as unsubscribing to "*" and continuing the existing subscription to "A".
 - Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` unset. Server interprets this as unsubscribing to "A" (i.e., the client has now unsubscribed to all resources). Although this request is identical to the first one, it is not interpreted as a wildcard subscription, because there has previously been a request on this stream for this resource type that set the :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` field.
 
 And in incremental:
+
 - Client sends a request with :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>` unset. Server interprets this as a subscription to "*".
 - Client sends a request with :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>` set to "A". Server interprets this as continuing the existing subscription to "*" and adding a new subscription to "A".
 - Client sends a request with :ref:`resource_names_unsubscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_unsubscribe>` set to "*". Server interprets this as unsubscribing to "*" and continuing the existing subscription to "A".

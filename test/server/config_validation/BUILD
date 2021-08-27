@@ -48,6 +48,7 @@ envoy_cc_test(
         "//configs:example_configs",
         "//test/config_test:example_configs_test_setup.sh",
     ],
+    env = {"EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar"},
     deps = [
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/listener/original_dst:config",

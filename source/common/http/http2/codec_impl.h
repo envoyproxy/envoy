@@ -225,7 +225,7 @@ protected:
     void readDisable(bool disable) override;
     uint32_t bufferLimit() override { return pending_recv_data_->highWatermark(); }
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
-      return parent_.connection_.addressProvider().localAddress();
+      return parent_.connection_.connectionInfoProvider().localAddress();
     }
     absl::string_view responseDetails() override { return details_; }
     void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
@@ -326,10 +326,9 @@ protected:
           headers_or_trailers_(ResponseHeaderMapImpl::create()) {}
 
     // Http::MultiplexedStreamImplBase
-    void setFlushTimeout(std::chrono::milliseconds /*timeout*/) override {
-      // Client streams do not need a flush timer because we currently assume that any failure
-      // to flush would be covered by a request/stream/etc. timeout.
-    }
+    // Client streams do not need a flush timer because we currently assume that any failure
+    // to flush would be covered by a request/stream/etc. timeout.
+    void setFlushTimeout(std::chrono::milliseconds /*timeout*/) override {}
     // StreamImpl
     void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) override;
     // Do not use deferred reset on upstream connections.

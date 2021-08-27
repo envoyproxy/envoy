@@ -968,8 +968,8 @@ TEST_F(HappyEyeballsConnectionImplTest, AddressProvider) {
 
   const ConnectionInfoSetterImpl provider(std::make_shared<Address::Ipv4Instance>(80),
                                           std::make_shared<Address::Ipv4Instance>(80));
-  EXPECT_CALL(*created_connections_[0], addressProvider()).WillOnce(ReturnRef(provider));
-  impl_->addressProvider();
+  EXPECT_CALL(*created_connections_[0], connectionInfoProvider()).WillOnce(ReturnRef(provider));
+  impl_->connectionInfoProvider();
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, AddressProviderSharedPtr) {
@@ -978,8 +978,9 @@ TEST_F(HappyEyeballsConnectionImplTest, AddressProviderSharedPtr) {
   ConnectionInfoProviderSharedPtr provider = std::make_shared<ConnectionInfoSetterImpl>(
       std::make_shared<Address::Ipv4Instance>("127.0.0.2"),
       std::make_shared<Address::Ipv4Instance>("127.0.0.1"));
-  EXPECT_CALL(*created_connections_[0], addressProviderSharedPtr()).WillOnce(Return(provider));
-  EXPECT_EQ(provider, impl_->addressProviderSharedPtr());
+  EXPECT_CALL(*created_connections_[0], connectionInfoProviderSharedPtr())
+      .WillOnce(Return(provider));
+  EXPECT_EQ(provider, impl_->connectionInfoProviderSharedPtr());
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, UnixSocketPeerCredentials) {

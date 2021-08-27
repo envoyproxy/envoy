@@ -132,13 +132,14 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     // are but they didn't populate XFF properly, the trusted client address is the
     // source address of the immediate downstream's connection to us.
     if (final_remote_address == nullptr) {
-      final_remote_address = connection.addressProvider().remoteAddress();
+      final_remote_address = connection.connectionInfoProvider().remoteAddress();
     }
     if (!config.skipXffAppend()) {
-      if (Network::Utility::isLoopbackAddress(*connection.addressProvider().remoteAddress())) {
+      if (Network::Utility::isLoopbackAddress(
+              *connection.connectionInfoProvider().remoteAddress())) {
         Utility::appendXff(request_headers, config.localAddress());
       } else {
-        Utility::appendXff(request_headers, *connection.addressProvider().remoteAddress());
+        Utility::appendXff(request_headers, *connection.connectionInfoProvider().remoteAddress());
       }
     }
     // If the prior hop is not a trusted proxy, overwrite any x-forwarded-proto value it set as
@@ -155,7 +156,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     // If we find one, it will be used as the downstream address for logging. It may or may not be
     // used for determining internal/external status (see below).
     OriginalIPDetectionParams params = {request_headers,
-                                        connection.addressProvider().remoteAddress()};
+                                        connection.connectionInfoProvider().remoteAddress()};
     for (const auto& detection_extension : config.originalIpDetectionExtensions()) {
       const auto result = detection_extension->detect(params);
 
@@ -208,7 +209,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // After determining internal request status, if there is no final remote address, due to no XFF,
   // busted XFF, etc., use the direct connection remote address for logging.
   if (final_remote_address == nullptr) {
-    final_remote_address = connection.addressProvider().remoteAddress();
+    final_remote_address = connection.connectionInfoProvider().remoteAddress();
   }
 
   // Edge request is the request from external clients to front Envoy.

@@ -28,7 +28,9 @@ TEST(ExampleConfigsTest, All) {
 
   EXPECT_EQ(config_file_count, ConfigTest::run(directory));
 
-  ConfigTest::testMerge();
+  if (std::getenv("DISABLE_TEST_MERGE") == nullptr) {
+    ConfigTest::testMerge();
+  }
 
   // Return to the original working directory, otherwise "bazel.coverage" breaks (...but why?).
   RELEASE_ASSERT(::chdir(cwd) == 0, "");
