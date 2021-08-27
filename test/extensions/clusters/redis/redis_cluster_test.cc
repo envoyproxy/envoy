@@ -108,7 +108,6 @@ protected:
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
     cluster_ = std::make_shared<RedisCluster>(
@@ -138,7 +137,6 @@ protected:
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(),
                                            validation_visitor_, config);
 
     NiceMock<AccessLog::MockAccessLogManager> log_manager;
