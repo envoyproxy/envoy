@@ -36,6 +36,9 @@ message ClusterConfig {
   // If true allow HTTP/2 and HTTP/3 connections to be reused for requests to different
   // origins than the connection was initially created for. This will only happen when the
   // resolved address for the new connection matches the peer address of the connection and
-  // the TLS certificate is also valid for the new hostname.
+  // the TLS certificate is also valid for the new hostname. For example, if a connection
+  // has previously been established to foo.example.com at IP 1.2.3.4 with a certificate
+  // that is valid for *.example.com, then this connection could be used for requests to
+  // bar.example.com if that also resolved to 1.2.3.4.
   bool allow_coalesced_connections = 3;
 }

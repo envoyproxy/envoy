@@ -780,7 +780,7 @@ private:
       return nullptr;
     }
     absl::optional<Upstream::SelectedPoolAndConnection> selectPool(Upstream::LoadBalancerContext*,
-                                                                   Upstream::HostConstSharedPtr,
+                                                                   const Upstream::Host&,
                                                                    std::vector<uint8_t>&) override {
       return absl::nullopt;
     }

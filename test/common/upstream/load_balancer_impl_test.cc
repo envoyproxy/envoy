@@ -77,7 +77,7 @@ public:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   absl::optional<Upstream::SelectedPoolAndConnection>
-  selectPool(Upstream::LoadBalancerContext* /*context*/, Upstream::HostConstSharedPtr /*host*/,
+  selectPool(Upstream::LoadBalancerContext* /*context*/, const Upstream::Host& /*host*/,
              std::vector<uint8_t>& /*hash_key*/) override {
     return absl::nullopt;
   }

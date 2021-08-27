@@ -125,17 +125,18 @@ public:
    * Returns connnection lifetime callbacks that may be used to inform the load balancer of
    * connection events. Load balancers which do not intend to track connection lifetime events
    * will return nullopt.
-   * @return optional lifetime callsbacks for this load balancer
+   * @return optional lifetime callbacks for this load balancer.
    */
   virtual OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() PURE;
 
   /**
-   * Returns a specific pool and connection to be used for the specified host.
+   * Returns a specific pool and existing connection to be used for the specified host.
    *
-   * @return selected pool and connection to be used, or nullopt if no selection is made.
+   * @return selected pool and connection to be used, or nullopt if no selection is made,
+   *         for example if no matching connection is found.
    */
   virtual absl::optional<SelectedPoolAndConnection> selectPool(LoadBalancerContext* context,
-                                                               HostConstSharedPtr host,
+                                                               const Host& host,
                                                                std::vector<uint8_t>& hash_key) PURE;
 };
 

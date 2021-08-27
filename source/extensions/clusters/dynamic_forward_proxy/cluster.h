@@ -66,7 +66,7 @@ private:
       return nullptr;
     }
     absl::optional<Upstream::SelectedPoolAndConnection>
-    selectPool(Upstream::LoadBalancerContext* context, Upstream::HostConstSharedPtr host,
+    selectPool(Upstream::LoadBalancerContext* context, const Upstream::Host& host,
                std::vector<uint8_t>& hash_key) override;
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
 
@@ -144,7 +144,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
 
   // True if H2 and H3 connections may be reused across different origins.
-  bool allow_coalesced_connections_;
+  const bool allow_coalesced_connections_;
 
   mutable absl::Mutex host_map_lock_;
   HostInfoMap host_map_ ABSL_GUARDED_BY(host_map_lock_);

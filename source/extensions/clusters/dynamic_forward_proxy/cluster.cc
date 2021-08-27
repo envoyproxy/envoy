@@ -175,19 +175,15 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 }
 
 absl::optional<Upstream::SelectedPoolAndConnection>
-Cluster::LoadBalancer::selectPool(Upstream::LoadBalancerContext* context,
-                                  Upstream::HostConstSharedPtr host,
+Cluster::LoadBalancer::selectPool(Upstream::LoadBalancerContext* /*context*/,
+                                  const Upstream::Host& host,
                                   std::vector<uint8_t>& hash_key) {
-  if (!context || !host) {
-    return absl::nullopt;
-  }
-
-  const std::string& hostname = host->hostname();
+  const std::string& hostname = host.hostname();
   if (hostname.empty()) {
     return absl::nullopt;
   }
 
-  LookupKey key = {hash_key, *host->address()};
+  LookupKey key = {hash_key, *host.address()};
   auto it = connection_info_map_.find(key);
   if (it == connection_info_map_.end()) {
     return absl::nullopt;
@@ -213,20 +209,19 @@ Cluster::LoadBalancer::lifetimeCallbacks() {
   if (!cluster_.allowCoalescedConnections()) {
     return {};
   }
-  return makeOptRef(
-      *(static_cast<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks*>(this)));
+  return makeOptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>(*this);
 }
 
 void Cluster::LoadBalancer::onConnectionOpen(Envoy::Http::ConnectionPool::Instance& pool,
                                              std::vector<uint8_t>& hash_key,
                                              const Network::Connection& connection) {
-  std::string alpn = connection.nextProtocol();
+  const std::string alpn = connection.nextProtocol();
   if (alpn != Http::Utility::AlpnNames::get().Http2 &&
       alpn != Http::Utility::AlpnNames::get().Http3) {
     // Only enable coalesced connections for HTTP/2 and HTTP/3.
     return;
   }
-  LookupKey key = {hash_key, *connection.addressProvider().remoteAddress()};
+  const LookupKey key = {hash_key, *connection.addressProvider().remoteAddress()};
   ConnectionInfo info = {&pool, &connection};
   connection_info_map_[key].push_back(info);
 }
@@ -234,7 +229,7 @@ void Cluster::LoadBalancer::onConnectionOpen(Envoy::Http::ConnectionPool::Instan
 void Cluster::LoadBalancer::onConnectionDraining(Envoy::Http::ConnectionPool::Instance& pool,
                                                  std::vector<uint8_t>& hash_key,
                                                  const Network::Connection& connection) {
-  LookupKey key = {hash_key, *connection.addressProvider().remoteAddress()};
+  const LookupKey key = {hash_key, *connection.addressProvider().remoteAddress()};
   connection_info_map_[key].erase(
       std::remove_if(connection_info_map_[key].begin(), connection_info_map_[key].end(),
                      [&pool, &connection](const ConnectionInfo& info) {

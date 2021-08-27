@@ -249,7 +249,6 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnection) {
 
   const std::string hostname = "mail.example.org";
   auto host = std::make_shared<Upstream::MockHost>();
-  ;
   EXPECT_CALL(*host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
@@ -283,7 +282,6 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnectionHttp3) {
 
   const std::string hostname = "mail.example.org";
   auto host = std::make_shared<Upstream::MockHost>();
-  ;
   EXPECT_CALL(*host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
@@ -344,7 +342,6 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolSanMismatch) {
 
   const std::string hostname = "mail.example.org";
   auto host = std::make_shared<Upstream::MockHost>();
-  ;
   EXPECT_CALL(*host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
@@ -375,7 +372,6 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolHashMismatch) {
 
   const std::string hostname = "mail.example.org";
   auto host = std::make_shared<Upstream::MockHost>();
-  ;
   EXPECT_CALL(*host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
@@ -403,7 +399,6 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolIpMismatch) {
 
   const std::string hostname = "mail.example.org";
   auto host = std::make_shared<Upstream::MockHost>();
-  ;
   EXPECT_CALL(*host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
