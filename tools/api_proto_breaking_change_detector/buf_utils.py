@@ -28,6 +28,7 @@ def _cd_into_config_parent(config_file_loc):
     config_parent = Path(config_file_loc).parent if config_file_loc else Path.cwd()
     return cd_and_return(config_parent)
 
+
 def pull_buf_deps(
         buf_path: Union[str, Path],
         target_path: Union[str, Path],
@@ -59,7 +60,8 @@ def pull_buf_deps(
             )
         if not Path.cwd().joinpath("buf.lock").exists():
             raise ChangeDetectorInitializeError(
-                "buf mod update did not generate a buf.lock file (silent error... incorrect config?)")
+                "buf mod update did not generate a buf.lock file (silent error... incorrect config?)"
+            )
 
         run_command(' '.join([f'{buf_path} build', *buf_args]))
 
