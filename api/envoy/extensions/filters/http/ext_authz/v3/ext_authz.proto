@@ -243,6 +243,7 @@ message AuthorizationRequest {
   repeated config.core.v3.HeaderValue headers_to_add = 2;
 }
 
+// [#next-free-field: 6]
 message AuthorizationResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.AuthorizationResponse";
