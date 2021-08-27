@@ -23,7 +23,7 @@ from colorama import Fore, Style
 from packaging import version
 
 # Tag issues created with these labels.
-LABELS = ['deprecation', 'tech debt', 'no stalebot']
+LABELS = ['dependencies', 'area/build', 'deps', 'no stalebot']
 
 
 # Thrown on errors related to release date or version.
@@ -59,7 +59,10 @@ def verify_and_print_latest_release(dep, repo, metadata_version, release_date):
         print(
             f'{Fore.YELLOW}*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>: '
             f'{latest_release.tag_name}@<{latest_release.created_at}>{Style.RESET_ALL}')
-        create_issues(dep, repo, metadata_version, release_date, latest_release)
+        # check for --cron flag, To run this only on github action schedule
+        # and it does not bloat CI on every push
+        if str(sys.argv[2]).split("")[1] == "--cron" :
+            create_issues(dep, repo, metadata_version, release_date, latest_release)
 
 
 # create issue for stale dependency
@@ -84,19 +87,21 @@ def create_issues(dep, repo, metadata_version, release_date, latest_release):
             labels.append(label)
     if len(labels) != len(LABELS):
         raise DeprecateVersionError('Unknown labels (expected %s, got %s)' % (LABELS, labels))
-
-    print('Creating issues...')
     body = f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>:{latest_release.tag_name}@<{latest_release.created_at}>'
     title = f'{dep} has a newer release {latest_release.tag_name}'
+    exists = repo.legacy_search_issues('open', title) or repo.legacy_search_issues('close', title)
+    # TODO(htuch): Figure out how to do this without legacy and faster.
+    if exists :
+        print("Issue with %s already exists" % title)
+        print(exists)
+        print('  >> Issue already exists, not posting!')
+        return
+    print('Creating issues...')
     try:
         repo.create_issue(title, body=body, labels=labels)
     except github.GithubException as e:
-        try:
-            repo.create_issue(title, body=body, labels=labels)
-            print('unable to assign issue . Add them to the Envoy proxy org')
-        except github.GithubException as e:
-            print('GithubException while creating issue.')
-            raise
+        print('unable to create issue, Getting Error: {e.data}. Add them to the Envoy proxy org')
+        raise
 
 
 # Print GitHub release date, throw ReleaseDateVersionError on mismatch with metadata release date.
@@ -178,7 +183,7 @@ def verify_and_print_release_dates(repository_locations, github_instance):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
+    if len(sys.argv) != 2 :
         print('Usage: %s <path to repository_locations.bzl>' % sys.argv[0])
         sys.exit(1)
     access_token = os.getenv('GITHUB_TOKEN')
