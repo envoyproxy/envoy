@@ -38,7 +38,7 @@ enum class CacheEntryStatus {
   FoundNotModified,
 };
 
-std::string CacheEntryStatusString(CacheEntryStatus s);
+absl::string_view cacheEntryStatusString(CacheEntryStatus s);
 
 } // namespace Cache
 } // namespace HttpFilters

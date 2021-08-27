@@ -7,7 +7,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-std::string CacheEntryStatusString(CacheEntryStatus s) {
+absl::string_view cacheEntryStatusString(CacheEntryStatus s) {
   switch (s) {
   case CacheEntryStatus::Ok:
     return "Ok";
@@ -22,17 +22,7 @@ std::string CacheEntryStatusString(CacheEntryStatus s) {
 }
 
 inline std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
-  switch (status) {
-  case CacheEntryStatus::Ok:
-    return os << "Ok";
-  case CacheEntryStatus::Unusable:
-    return os << "Unusable";
-  case CacheEntryStatus::RequiresValidation:
-    return os << "RequiresValidation";
-  case CacheEntryStatus::FoundNotModified:
-    return os << "FoundNotModified";
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return os << cacheEntryStatusString(status);
 }
 
 } // namespace Cache

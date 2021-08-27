@@ -263,7 +263,7 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
     return;
   default:
     ENVOY_LOG(error, "Unhandled CacheEntryStatus in CacheFilter::onHeaders: {}",
-              CacheEntryStatusString(lookup_result_->cache_entry_status_));
+              cacheEntryStatusString(lookup_result_->cache_entry_status_));
     // Treat unhandled status as a cache miss.
     decoder_callbacks_->continueDecoding();
     return;
