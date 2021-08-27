@@ -660,8 +660,7 @@ void ConnectionImpl::sendKeepalive() {
   SystemTime now = connection_.dispatcher().timeSource().systemTime();
   uint64_t ms_since_epoch =
       std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-  ENVOY_CONN_LOG_EVENT(debug, "h2_ping_send", "Sending keepalive PING {}", connection_,
-                       ms_since_epoch);
+  ENVOY_CONN_LOG(trace, "Sending keepalive PING {}", connection_, ms_since_epoch);
 
   // The last parameter is an opaque 8-byte buffer, so this cast is safe.
   int rc = nghttp2_submit_ping(session_, 0 /*flags*/, reinterpret_cast<uint8_t*>(&ms_since_epoch));
@@ -675,7 +674,6 @@ void ConnectionImpl::sendKeepalive() {
 }
 
 void ConnectionImpl::onKeepaliveResponse() {
-  ENVOY_CONN_LOG_EVENT(debug, "h2_ping_ack", "Received keepalive PING ack", connection_);
   // Check the timers for nullptr in case the peer sent an unsolicited PING ACK.
   if (keepalive_timeout_timer_ != nullptr) {
     keepalive_timeout_timer_->disableTimer();
@@ -1654,7 +1652,6 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
   if (idle_session_requires_ping_interval_.count() != 0 &&
       (connection_.dispatcher().timeSource().monotonicTime() - lastReceivedDataTime() >
        idle_session_requires_ping_interval_)) {
-    ENVOY_CONN_LOG_EVENT(debug, "h2_ping_preflight", "Sending ping preflight", connection_);
     sendKeepalive();
   }
 
