@@ -102,7 +102,7 @@ public:
     return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
   }
 
-  void dynamicMetadataTest(CheckStatus status, const std::string &httpStatus) {
+  void dynamicMetadataTest(CheckStatus status, const std::string& httpStatus) {
     const std::string yaml = R"EOF(
     http_service:
       server_uri:
