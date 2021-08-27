@@ -175,7 +175,7 @@ MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*
 HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
 TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
 EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
-CONTRIB_CODEOWNERS_REGEX = re.compile(r'(/contrib/\w+/\s+)(@.*)')
+CONTRIB_CODEOWNERS_REGEX = re.compile(r'(/contrib/[^@]*\s+)(@.*)')
 COMMENT_REGEX = re.compile(r"//|\*")
 DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
@@ -1223,7 +1223,22 @@ if __name__ == "__main__":
 
                     m = CONTRIB_CODEOWNERS_REGEX.search(line)
                     if m is not None and not line.startswith('#'):
-                        owned.append(m.group(1).strip())
+                        stripped_path = m.group(1).strip()
+                        if not stripped_path.endswith('/'):
+                            error_messages.append(
+                                "Contrib CODEOWNERS entry '{}' must end in '/'".format(
+                                    stripped_path))
+                            continue
+
+                        if not (stripped_path.count('/') == 3 or
+                                (stripped_path.count('/') == 4
+                                 and stripped_path.startswith('/contrib/common/'))):
+                            error_messages.append(
+                                "Contrib CODEOWNERS entry '{}' must be 2 directories deep unless in /contrib/common/ and then it can be 3 directories deep"
+                                .format(stripped_path))
+                            continue
+
+                        owned.append(stripped_path)
                         owners = re.findall('@\S+', m.group(2).strip())
                         if len(owners) < 2:
                             error_messages.append(

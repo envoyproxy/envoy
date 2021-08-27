@@ -10,6 +10,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Invoke;
 
 namespace Envoy {
 namespace Logger {
@@ -177,6 +178,11 @@ TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
   EXPECT_CALL(sink, log(_));
   EXPECT_CALL(sink, logWithStableName("test_event", "debug", "assert", "test log 1"));
   ENVOY_LOG_EVENT(debug, "test_event", "test {} {}", "log", 1);
+
+  // Verify that ENVOY_LOG_EVENT_TO_LOGGER does the right thing.
+  EXPECT_CALL(sink, log(_)).WillOnce(Invoke([](auto log) { EXPECT_TRUE(log.find("[misc]")); }));
+  EXPECT_CALL(sink, logWithStableName("misc_event", "debug", "misc", "log"));
+  ENVOY_LOG_EVENT_TO_LOGGER(Registry::getLog(Id::misc), debug, "misc_event", "log");
 }
 
 } // namespace Logger

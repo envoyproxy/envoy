@@ -584,9 +584,9 @@ public:
 
 /**
  * This class allows the remote address to be overridden for HTTP stream info. This is used for
- * XFF handling. This is required to avoid providing stream info with a non-const address provider.
- * Private inheritance from ConnectionInfoProvider is used to make sure users get the address
- * provider via the normal getter.
+ * XFF handling. This is required to avoid providing stream info with a non-const connection info
+ * provider. Private inheritance from ConnectionInfoProvider is used to make sure users get the
+ * address provider via the normal getter.
  */
 class OverridableRemoteConnectionInfoSetterStreamInfo : public StreamInfo::StreamInfoImpl,
                                                         private Network::ConnectionInfoProvider {
@@ -667,7 +667,7 @@ public:
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
         proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit),
         filter_chain_factory_(filter_chain_factory), local_reply_(local_reply),
-        stream_info_(protocol, time_source, connection.addressProviderSharedPtr(),
+        stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
                      parent_filter_state, filter_state_life_span) {}
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
@@ -1060,7 +1060,8 @@ private:
     State()
         : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
           created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
-          non_100_response_headers_encoded_(false), under_on_local_reply_(false) {}
+          non_100_response_headers_encoded_(false), under_on_local_reply_(false),
+          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false) {}
 
     uint32_t filter_call_state_{0};
 
@@ -1080,6 +1081,9 @@ private:
     bool non_100_response_headers_encoded_ : 1;
     // True under the stack of onLocalReply, false otherwise.
     bool under_on_local_reply_ : 1;
+    // True when the filter chain iteration was aborted with local reply.
+    bool decoder_filter_chain_aborted_ : 1;
+    bool encoder_filter_chain_aborted_ : 1;
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield

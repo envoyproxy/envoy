@@ -115,8 +115,8 @@ public:
       router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
                                          context_.runtime(), shadow_writer_);
     } else {
-      shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(context_.clusterManager(), "test",
-                                                               context_.scope(), dispatcher_);
+      shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(
+          context_.clusterManager(), "test", context_.scope(), dispatcher_, context_.threadLocal());
       router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
                                          context_.runtime(), *shadow_writer_impl_);
     }

@@ -364,6 +364,8 @@ void ConnPoolImplBase::drainConnectionsImpl() {
   // so all remaining entries in ready_clients_ are serving streams. Move them and all entries
   // in busy_clients_ to draining.
   while (!ready_clients_.empty()) {
+    ENVOY_LOG_EVENT(debug, "draining_ready_client", "draining active client {} for cluster {}",
+                    ready_clients_.front()->id(), host_->cluster().name());
     transitionActiveClientState(*ready_clients_.front(), ActiveClient::State::DRAINING);
   }
 
@@ -371,6 +373,8 @@ void ConnPoolImplBase::drainConnectionsImpl() {
   // so use a for-loop since the list is not mutated.
   ASSERT(&owningList(ActiveClient::State::DRAINING) == &busy_clients_);
   for (auto& busy_client : busy_clients_) {
+    ENVOY_LOG_EVENT(debug, "draining_busy_client", "draining busy client {} for cluster {}",
+                    busy_client->id(), host_->cluster().name());
     transitionActiveClientState(*busy_client, ActiveClient::State::DRAINING);
   }
 }

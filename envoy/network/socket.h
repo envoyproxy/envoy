@@ -161,11 +161,11 @@ public:
   enum class Type { Stream, Datagram };
 
   /**
-   * @return the address provider backing this socket.
+   * @return the connection info provider backing this socket.
    */
-  virtual ConnectionInfoSetter& addressProvider() PURE;
-  virtual const ConnectionInfoProvider& addressProvider() const PURE;
-  virtual ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const PURE;
+  virtual ConnectionInfoSetter& connectionInfoProvider() PURE;
+  virtual const ConnectionInfoProvider& connectionInfoProvider() const PURE;
+  virtual ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const PURE;
 
   /**
    * @return IoHandle for the underlying connection
