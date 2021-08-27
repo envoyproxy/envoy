@@ -220,7 +220,7 @@ TEST(ParseRangeHeaderTest, OverRangeLimit) {
 class ParseInvalidRangeHeaderTest : public testing::Test,
                                     public testing::WithParamInterface<absl::string_view> {
 protected:
-  absl::string_view header_value() { return GetParam(); }
+  absl::string_view headerValue() { return GetParam(); }
 };
 
 // clang-format off
@@ -267,7 +267,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(ParseInvalidRangeHeaderTest, InvalidRangeReturnsEmpty) {
   absl::optional<std::vector<RawByteRange>> result =
-      RangeUtils::parseRangeHeader(header_value(), 5);
+      RangeUtils::parseRangeHeader(headerValue(), 5);
   ASSERT_FALSE(result.has_value());
 }
 
