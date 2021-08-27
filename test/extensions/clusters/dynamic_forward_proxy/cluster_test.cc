@@ -235,7 +235,7 @@ TEST_F(ClusterTest, LoadBalancer_LifetimeCallbacksWithCoalescing) {
 TEST_F(ClusterTest, LoadBalancer_SelectPoolNoConnections) {
   initialize(coalesce_connection_config_, false);
 
-  Upstream::HostConstSharedPtr host;
+  Upstream::MockHost host;
   std::vector<uint8_t> hash_key;
 
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
@@ -248,11 +248,11 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnection) {
   initialize(coalesce_connection_config_, false);
 
   const std::string hostname = "mail.example.org";
-  auto host = std::make_shared<Upstream::MockHost>();
-  EXPECT_CALL(*host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
+  Upstream::MockHost host;
+  EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
-  EXPECT_CALL(*host, address()).WillRepeatedly(testing::Return(address));
+  EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
   Envoy::Http::ConnectionPool::MockInstance pool;
@@ -281,11 +281,11 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnectionHttp3) {
   initialize(coalesce_connection_config_, false);
 
   const std::string hostname = "mail.example.org";
-  auto host = std::make_shared<Upstream::MockHost>();
-  EXPECT_CALL(*host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
+  Upstream::MockHost host;
+  EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
-  EXPECT_CALL(*host, address()).WillRepeatedly(testing::Return(address));
+  EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
   Envoy::Http::ConnectionPool::MockInstance pool;
@@ -314,11 +314,11 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolInvalidAlpn) {
   initialize(coalesce_connection_config_, false);
 
   const std::string hostname = "mail.example.org";
-  auto host = std::make_shared<Upstream::MockHost>();
-  EXPECT_CALL(*host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
+  Upstream::MockHost host;
+  EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
-  EXPECT_CALL(*host, address()).WillRepeatedly(testing::Return(address));
+  EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
   Envoy::Http::ConnectionPool::MockInstance pool;
@@ -341,11 +341,11 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolSanMismatch) {
   initialize(coalesce_connection_config_, false);
 
   const std::string hostname = "mail.example.org";
-  auto host = std::make_shared<Upstream::MockHost>();
-  EXPECT_CALL(*host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
+  Upstream::MockHost host;
+  EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
-  EXPECT_CALL(*host, address()).WillRepeatedly(testing::Return(address));
+  EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
   Envoy::Http::ConnectionPool::MockInstance pool;
@@ -371,11 +371,11 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolHashMismatch) {
   initialize(coalesce_connection_config_, false);
 
   const std::string hostname = "mail.example.org";
-  auto host = std::make_shared<Upstream::MockHost>();
-  EXPECT_CALL(*host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
+  Upstream::MockHost host;
+  EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
-  EXPECT_CALL(*host, address()).WillRepeatedly(testing::Return(address));
+  EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
   Envoy::Http::ConnectionPool::MockInstance pool;
@@ -398,11 +398,11 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolIpMismatch) {
   initialize(coalesce_connection_config_, false);
 
   const std::string hostname = "mail.example.org";
-  auto host = std::make_shared<Upstream::MockHost>();
-  EXPECT_CALL(*host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
+  Upstream::MockHost host;
+  EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
-  EXPECT_CALL(*host, address()).WillRepeatedly(testing::Return(address));
+  EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
   Envoy::Http::ConnectionPool::MockInstance pool;
