@@ -39,6 +39,13 @@ envoy_mobile_swift_test(
 )
 
 envoy_mobile_swift_test(
+    name = "engine_api_test",
+    srcs = [
+        "EngineApiTest.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
     name = "direct_response_exact_path_match_integration_test",
     srcs = [
         "DirectResponseExactPathMatchIntegrationTest.swift",

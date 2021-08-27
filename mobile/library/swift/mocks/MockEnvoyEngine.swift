@@ -90,6 +90,10 @@ extension MockEnvoyEngine: EnvoyEngine {
     MockEnvoyEngine.onFlushStats?()
   }
 
+  func dumpStats() -> String {
+    return ""
+  }
+
   func terminate() {}
 
   func drainConnections() {}

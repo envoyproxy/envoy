@@ -212,6 +212,23 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_flushStats(JNIEnv* env,
   flush_stats(engine);
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_dumpStats(JNIEnv* env,
+                                                           jclass, // class
+                                                           jlong engine) {
+  jni_log("[Envoy]", "dumpStats");
+  envoy_data data;
+  jint result = dump_stats(engine, &data);
+  if (result != ENVOY_SUCCESS) {
+    return env->NewStringUTF("");
+  }
+
+  jstring str = native_data_to_string(env, data);
+  release_envoy_data(data);
+
+  return str;
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordHistogramValue(JNIEnv* env,
                                                                       jclass, // class
