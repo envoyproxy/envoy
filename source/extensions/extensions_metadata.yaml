@@ -707,10 +707,10 @@ envoy.key_value.file_based:
 envoy.network.dns_resolver.cares:
   categories:
   - envoy.network.dns_resolver
-  security_posture: unknown
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
 envoy.network.dns_resolver.apple:
   categories:
   - envoy.network.dns_resolver
-  security_posture: unknown
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable

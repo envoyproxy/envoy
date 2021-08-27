@@ -221,10 +221,7 @@ public:
   /**
    * Creates an async DNS resolver. The resolver should only be used on the thread that runs this
    * dispatcher.
-   * @param typed_dns_resolver_config contains the resolvers (supplies the addresses of DNS
-   * resolvers that this resolver should use) or dns_resolver_options (supplies the aggregated area
-   * options flags needed for dns resolver init) information, or left empty. If empty, it will not
-   * use any specific resolvers, but use defaults (/etc/resolv.conf).
+   * @param typed_dns_resolver_config contains the resolvers data and dns_resolver_options.
    * @return Network::DnsResolverSharedPtr that is owned by the caller.
    */
   virtual Network::DnsResolverSharedPtr createDnsResolver(

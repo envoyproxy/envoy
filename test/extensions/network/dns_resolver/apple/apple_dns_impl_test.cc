@@ -133,6 +133,26 @@ TEST_F(AppleDnsImplTest, DefaultAppleDnsResolverConstruction) {
       "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
 }
 
+// If typed apple DNS resolver config exits, use it.
+TEST_F(AppleDnsImplTest, TypedAppleDnsResolverConfigExist) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::config::cluster::v3::Cluster config;
+
+  typed_dns_resolver_config.mutable_typed_config()->set_type_url(
+      "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
+  typed_dns_resolver_config.set_name(std::string(Network::AppleDnsResolver));
+  config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
+  EXPECT_TRUE(config.has_typed_dns_resolver_config());
+  EXPECT_TRUE(checkUseAppleApiForDnsLookups(typed_dns_resolver_config));
+  typed_dns_resolver_config.Clear();
+
+  Envoy::Network::makeDnsResolverConfig(config, typed_dns_resolver_config);
+  EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::AppleDnsResolver));
+  EXPECT_EQ(
+      typed_dns_resolver_config.typed_config().type_url(),
+      "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
+}
+
 // Validate that when AppleDnsResolverImpl is destructed with outstanding requests,
 // that we don't invoke any callbacks if the query was cancelled. This is a regression test from
 // development, where segfaults were encountered due to callback invocations on

@@ -43,6 +43,11 @@ void makeEmptyCaresDnsResolverConfig(
 void makeEmptyAppleDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
+// If it is MacOS and the run time flag: envoy.restart_features.use_apple_api_for_dns_lookups
+// is enabled, synthetic an AppleDnsResolverConfig typed config.
+bool checkUseAppleApiForDnsLookups(
+    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
+
 // If the config has typed_dns_resolver_config, and the corresponding DNS resolver factory is
 // registered, copy it into typed_dns_resolver_config and return true. Otherwise, return false.
 template <class ConfigType>
@@ -118,12 +123,8 @@ void makeDnsResolverConfig(
     return;
   }
 
-  // If it is MacOS and the run time flag: envoy.restart_features.use_apple_api_for_dns_lookups
-  // is enabled, synthetic an AppleDnsResolverConfig typed config.
-  if ((Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(
-           std::string(AppleDnsResolver), true) != nullptr) &&
-      Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups")) {
-    makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);
+  // If use apple API for DNS lookups, synthetic an AppleDnsResolverConfig typed config.
+  if (checkUseAppleApiForDnsLookups(typed_dns_resolver_config)) {
     return;
   }
 
@@ -132,8 +133,8 @@ void makeDnsResolverConfig(
     return;
   }
 
-  // Handle legacy DNS resolver fields for backward compatibility. Different config type has
-  // different fields to copy.
+  // Handle legacy DNS resolver fields for backward compatibility.
+  // Different config type has different fields to copy.
   handleLegacyDnsResolverData(config, typed_dns_resolver_config);
 }
 

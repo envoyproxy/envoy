@@ -19,6 +19,19 @@ void makeEmptyAppleDnsResolverConfig(
   typed_dns_resolver_config.set_name(std::string(AppleDnsResolver));
 }
 
+// If it is MacOS and the run time flag: envoy.restart_features.use_apple_api_for_dns_lookups
+// is enabled, synthetic an AppleDnsResolverConfig typed config.
+bool checkUseAppleApiForDnsLookups(
+    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+  if ((Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(
+           std::string(AppleDnsResolver), true) != nullptr) &&
+      Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups")) {
+    makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);
+    return true;
+  }
+  return false;
+}
+
 // Overloading the template function for DnsFilterConfig type, which doesn't need to copy anything.
 void handleLegacyDnsResolverData(
     const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig::
