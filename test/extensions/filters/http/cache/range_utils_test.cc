@@ -266,8 +266,7 @@ INSTANTIATE_TEST_SUITE_P(
 // clang-format on
 
 TEST_P(ParseInvalidRangeHeaderTest, InvalidRangeReturnsEmpty) {
-  absl::optional<std::vector<RawByteRange>> result =
-      RangeUtils::parseRangeHeader(headerValue(), 5);
+  absl::optional<std::vector<RawByteRange>> result = RangeUtils::parseRangeHeader(headerValue(), 5);
   ASSERT_FALSE(result.has_value());
 }
 
