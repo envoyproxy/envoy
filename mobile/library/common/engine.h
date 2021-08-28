@@ -124,6 +124,7 @@ public:
 
 private:
   envoy_status_t main(std::string config, std::string log_level);
+  void logInterfaces();
 
   Event::Dispatcher* event_dispatcher_{};
   Stats::ScopePtr client_scope_;
