@@ -50,4 +50,4 @@ Either configuring HTTP/3 explicitly on, or using the auto_http option to use HT
 See :ref:`here <arch_overview_http3_upstream>` for more information about HTTP/3 connection pooling, including
 detailed information of where QUIC will be used, and how it fails over to TCP when QUIC use is configured to be optional.
 
-An example upstream HTTP/3 configuration file can be found :repo:`here </configs/google_com_http3_upstream_proxy.yaml`>.
+An example upstream HTTP/3 configuration file can be found :repo:`here </configs/google_com_http3_upstream_proxy.yaml>`.
