@@ -2121,6 +2121,87 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, DynamicMetadataMatchedRouting) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: test
+    domains: ["www.example.com"]
+    routes:
+      - match:
+          prefix: "/"
+          dynamic_metadata:
+          - filter: example
+            path:
+            - key: k1
+            value:
+              string_match:
+                exact: foo
+        route:
+          cluster: foo
+      - match:
+          prefix: "/"
+          dynamic_metadata:
+          - filter: example
+            path:
+            - key: k2
+            value:
+              string_match:
+                exact: bar
+          - filter: example
+            path:
+            - key: k3
+            value:
+              string_match:
+                exact: bar
+        route:
+          cluster: bar
+      - match:
+          prefix: "/"
+        route:
+          cluster: default
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"foo", "bar", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.example.com", "/", "GET");
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  {
+    envoy::config::core::v3::Metadata metadata;
+    (*metadata.mutable_filter_metadata())["example"] = MessageUtil::keyValueStruct("k1", "foo");
+    EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    EXPECT_EQ("foo", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    envoy::config::core::v3::Metadata metadata;
+    (*metadata.mutable_filter_metadata())["example"] =
+        MessageUtil::keyValueStruct({{"k2", "bar"}, {"k3", "bar"}});
+    EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    EXPECT_EQ("bar", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    envoy::config::core::v3::Metadata metadata;
+    (*metadata.mutable_filter_metadata())["example"] = MessageUtil::keyValueStruct("k2", "bar");
+    EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    EXPECT_EQ("default", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    envoy::config::core::v3::Metadata metadata;
+    (*metadata.mutable_filter_metadata())["example"] = MessageUtil::keyValueStruct("k3", "bar");
+    EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    EXPECT_EQ("default", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    envoy::config::core::v3::Metadata metadata;
+    EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    EXPECT_EQ("default", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+}
+
 class RouterMatcherHashPolicyTest : public testing::Test, public ConfigImplTestBase {
 protected:
   RouterMatcherHashPolicyTest()
@@ -5194,6 +5275,71 @@ virtual_hosts:
     EXPECT_EQ("cluster2", resp_headers.get_("x-resp-cluster"));
     EXPECT_FALSE(resp_headers.has("x-remove-cluster2"));
   }
+}
+
+TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithBothNameAndClusterHeader) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  total_weight: 100
+                  clusters:
+                    - cluster_header: some_header
+                      name: some_name
+                      weight: 30
+                    - name: cluster1
+                      weight: 30
+                    - name: cluster2
+                      weight: 40
+      )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Only one of name or cluster_header can be specified");
+}
+
+TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithNoClusterSpecifier) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  total_weight: 30
+                  clusters:
+                   - weight:
+                      30
+      )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "At least one of name or cluster_header need to be specified");
+}
+
+TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithInvalidHttpHeader) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  total_weight: 30
+                  clusters:
+                    - cluster_header: "test\r"
+                      weight: 30
+      )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "Proto constraint validation failed.*");
 }
 
 TEST(NullConfigImplTest, All) {
