@@ -362,8 +362,10 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
   initialize(default_yaml_string_);
   InSequence s;
 
-  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
-  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr_);
   ProtobufWkt::Struct dynamic_metadata;
   (*dynamic_metadata.mutable_fields())["baz"] = ValueUtil::stringValue("hello-ok");
   (*dynamic_metadata.mutable_fields())["x"] = ValueUtil::numberValue(12);
