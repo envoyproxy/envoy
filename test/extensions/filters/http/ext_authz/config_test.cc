@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
@@ -12,6 +14,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/blocking_counter.h"
 #include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,96 +22,122 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
+class TestAsyncClientManagerImpl : public Grpc::AsyncClientManagerImpl {
+public:
+  TestAsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
+                             TimeSource& time_source, Api::Api& api,
+                             const Grpc::StatNames& stat_names)
+      : Grpc::AsyncClientManagerImpl(cm, tls, time_source, api, stat_names) {}
+  Grpc::AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService&,
+                                                    Stats::Scope&, bool) override {
+    return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+  }
+};
+
 class MultiThreadTest {
 public:
   MultiThreadTest(size_t num_threads) : num_threads_(num_threads), api_(Api::createApiForTest()) {}
   virtual ~MultiThreadTest() { tls_.shutdownGlobalThreading(); }
-  virtual void workerFunc() {}
-  void run() { spawnAllWorkers(); }
 
-private:
-  void spawnAllWorkers() {
-    // Create dispatcher and register.
-    for (size_t i = 0; i < num_threads_; i++) {
-      dispatchers_.emplace_back(api_->allocateDispatcher(std::to_string(i)));
-      tls_.registerThread(*dispatchers_[i], false);
-    }
-    // Create running threads.
-    for (size_t i = 0; i < num_threads_; i++) {
-      // i must be explicitly captured by value.
-      workers_.emplace_back(api_->threadFactory().createThread(
-          [&, i]() { dispatchers_[i]->run(Event::Dispatcher::RunType::RunUntilExit); }));
-    }
-    // Post callback to fire all threads at the same time.
-    for (Event::DispatcherPtr& dispatcher : dispatchers_) {
-      dispatcher->post([&]() {
-        waitForAllWorkersToFire();
-        workerFunc();
+  void postWorkToAllWorkers(std::function<void()> work) {
+    absl::BlockingCounter start_counter(num_threads_);
+    absl::BlockingCounter end_counter(num_threads_);
+    absl::Notification workers_should_fire;
+
+    for (Event::DispaztcherPtr& dispatcher : worker_dispatchers_) {
+      dispatcher->post([&, work]() {
+        workers_should_fire.WaitForNotificationWithTimeout(absl::Milliseconds(1000));
+        work();
+        end_counter.DecrementCount();
       });
     }
+
+    // Wait until all the workers start to execute the callback.
+    start_counter.Wait();
+    // Notify all the worker to continue.
+    workers_should_fire.Notify();
+    // Wait for all workers to finish the job.
+    end_counter.Wait();
+  }
+
+protected:
+  void startThreading() {
+    spawnMainThread();
+    spawnWorkerThreads();
+  }
+
+  void cleanUpThreading() {
     // Post exit signals and wait for thread to end.
-    for (Event::DispatcherPtr& dispatcher : dispatchers_) {
+    for (Event::DispatcherPtr& dispatcher : worker_dispatchers_) {
       dispatcher->post([&dispatcher]() { dispatcher->exit(); });
     }
-    for (Thread::ThreadPtr& worker : workers_) {
+    for (Thread::ThreadPtr& worker : worker_threads_) {
       worker->join();
     }
+    main_dispatcher_->post([this]() { main_dispatcher_->exit(); });
+    main_thread_->join();
   }
 
-  void waitForAllWorkersToFire() {
-    if (shouldFire()) {
-      // The last thread spawned should notify all to start.
-      workers_should_fire_.Notify();
-    } else {
-      // Wait for notification if the current thread is not the last one spawned.
-      workers_should_fire_.WaitForNotification();
+  ThreadLocal::InstanceImpl& tls() { return tls_; }
+
+  Api::Api& api() { return *api_; }
+
+private:
+  void spawnMainThread() {
+    main_dispatcher_ = api_->allocateDispatcher("main_thread");
+    tls_.registerThread(*main_dispatcher_, true);
+    main_thread_ = api_->threadFactory().createThread(
+        [this]() { main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); });
+  }
+
+  void spawnWorkerThreads() {
+    // Create worker dispatchers and register tls.
+    for (size_t i = 0; i < num_threads_; i++) {
+      worker_dispatchers_.emplace_back(api_->allocateDispatcher(std::to_string(i)));
+      tls_.registerThread(*worker_dispatchers_[i], false);
+      // i must be explicitly captured by value.
+      worker_threads_.emplace_back(api_->threadFactory().createThread(
+          [this, i]() { worker_dispatchers_[i]->run(Event::Dispatcher::RunType::RunUntilExit); }));
     }
   }
 
-  bool shouldFire() {
-    Thread::LockGuard lock(mutex_);
-    active_threads_cnt_++;
-    return active_threads_cnt_ == num_threads_;
-  }
+  const size_t num_threads_;
 
-  size_t num_threads_;
-  absl::Notification workers_should_fire_;
-  Thread::MutexBasicLockable mutex_;
-  size_t active_threads_cnt_{};
   ThreadLocal::InstanceImpl tls_;
   Api::ApiPtr api_;
 
-  std::vector<Event::DispatcherPtr> dispatchers_;
-  std::vector<Thread::ThreadPtr> workers_;
+  Event::DispatcherPtr main_dispatcher_;
+  Thread::ThreadPtr main_thread_;
+  std::vector<Event::DispatcherPtr> worker_dispatchers_;
+  std::vector<Thread::ThreadPtr> worker_threads_;
 };
 
 class ExtAuthzFilterTest : public MultiThreadTest, public testing::Test {
 public:
-  ExtAuthzFilterTest() : MultiThreadTest(10), stat_names_(symbol_table_) {}
+  ExtAuthzFilterTest() : MultiThreadTest(3), stat_names_(symbol_table_) {}
 
-  void initialize(const std::string& ext_authz_config_yaml) {
-    initFilterFactory(ext_authz_config_yaml);
-    initAddress();
-  }
-
-  void initFilterFactory(const std::string& ext_authz_config_yaml) {
+  Http::FilterFactoryCb createFilterFactory(const std::string& ext_authz_config_yaml) {
+    async_client_manager_ = std::make_unique<TestAsyncClientManagerImpl>(
+        context_.cluster_manager_, tls(), api().timeSource(), api(), stat_names_);
     EXPECT_CALL(context_, getServerFactoryContext())
         .WillRepeatedly(testing::ReturnRef(server_context_));
     ON_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
-        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
-                                  Grpc::CacheOption) {
-          return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService& grpc_service,
+                                  Stats::Scope& scope, bool skip, Grpc::CacheOption cache_option) {
+          return async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope, skip,
+                                                                  cache_option);
         }));
     ExtAuthzFilterConfig factory;
     ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
     TestUtility::loadFromYaml(ext_authz_config_yaml, *proto_config);
-    filter_factory_ = factory.createFilterFactoryFromProto(*proto_config, "stats", context_);
+    return factory.createFilterFactoryFromProto(*proto_config, "stats", context_);
   }
 
   void initAddress() {
@@ -117,12 +146,17 @@ public:
     connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   }
 
-  void testFilter() {
-    Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  Http::StreamFilterSharedPtr createFilterFromFilterFactory(Http::FilterFactoryCb filter_factory) {
+    StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
 
     Http::StreamFilterSharedPtr filter;
     EXPECT_CALL(filter_callbacks, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
-    filter_factory_(filter_callbacks);
+    filter_factory(filter_callbacks);
+    return filter;
+  }
+
+  void testExtAuthzFilter(Http::StreamFilterSharedPtr filter) {
+    EXPECT_NE(filter, nullptr);
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     ON_CALL(decoder_callbacks, connection()).WillByDefault(Return(&connection_));
     filter->setDecoderFilterCallbacks(decoder_callbacks);
@@ -132,137 +166,23 @@ public:
     decoder_filter->onDestroy();
   }
 
-  void workerFunc() override { testFilter(); }
-
 private:
-  NiceMock<Upstream::MockClusterManager> cm_;
-  Stats::SymbolTableImpl symbol_table_;
-  Grpc::StatNames stat_names_;
-
-  std::unique_ptr<Grpc::AsyncClientManagerImpl> async_client_manager_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  Http::FilterFactoryCb filter_factory_;
+  Stats::SymbolTableImpl symbol_table_;
+  Grpc::StatNames stat_names_;
 
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   Http::TestRequestHeaderMapImpl request_headers_;
-};
 
-TEST_F(ExtAuthzFilterTest, ExtAuthzFilterThreadingTestEnvoyGrpc) {
+protected:
+  std::unique_ptr<TestAsyncClientManagerImpl> async_client_manager_;
+
+}; // namespace ExtAuthz
+
+TEST_F(ExtAuthzFilterTest, ExtAuthzFilterFactoryTestHttp) {
   std::string ext_authz_config_yaml = R"EOF(
-   transport_api_version: V3
-   grpc_service:
-     envoy_grpc:
-       cluster_name: test_cluster
-   failure_mode_allow: false
-   )EOF";
-  initialize(ext_authz_config_yaml);
-  run();
-}
-
-TEST_F(ExtAuthzFilterTest, ExtAuthzFilterThreadingTestGoogleGrpc) {
-  std::string ext_authz_config_yaml = R"EOF(
-  transport_api_version: V3
-  grpc_service:
-    google_grpc:
-      target_uri: ext_authz_server
-      stat_prefix: google
-  failure_mode_allow: false
-  )EOF";
-  initialize(ext_authz_config_yaml);
-  run();
-}
-
-namespace {
-
-void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version,
-                            std::string const& grpc_service_yaml) {
-  std::unique_ptr<TestDeprecatedV2Api> _deprecated_v2_api;
-  if (api_version != envoy::config::core::v3::ApiVersion::V3) {
-    _deprecated_v2_api = std::make_unique<TestDeprecatedV2Api>();
-  }
-
-  ExtAuthzFilterConfig factory;
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  TestUtility::loadFromYaml(
-      fmt::format(grpc_service_yaml, TestUtility::getVersionStringFromApiVersion(api_version)),
-      *proto_config);
-
-  testing::StrictMock<Server::Configuration::MockFactoryContext> context;
-  testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
-  EXPECT_CALL(context, getServerFactoryContext())
-      .WillRepeatedly(testing::ReturnRef(server_context));
-  EXPECT_CALL(context, messageValidationVisitor());
-  EXPECT_CALL(context, clusterManager()).Times(2);
-  EXPECT_CALL(context, runtime());
-  EXPECT_CALL(context, scope()).Times(3);
-
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
-  // Expect the raw async client to be created inside the callback.
-  // The creation of the filter callback is in main thread while the execution of callback is in
-  // worker thread. Because of the thread local cache of async client, it must be created in worker
-  // thread inside the callback.
-  EXPECT_CALL(context.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
-      .WillOnce(Invoke(
-          [](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool, Grpc::CacheOption) {
-            return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
-          }));
-  cb(filter_callback);
-
-  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([&context, cb]() {
-    Http::MockFilterChainFactoryCallbacks filter_callback;
-    EXPECT_CALL(filter_callback, addStreamFilter(_));
-    // Execute the filter factory callback in another thread.
-    EXPECT_CALL(context.cluster_manager_.async_client_manager_,
-                getOrCreateRawAsyncClient(_, _, _, _))
-        .WillOnce(Invoke(
-            [](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
-               Grpc::CacheOption) { return std::make_unique<NiceMock<Grpc::MockAsyncClient>>(); }));
-    cb(filter_callback);
-  });
-  thread->join();
-}
-
-} // namespace
-
-TEST(HttpExtAuthzConfigTest, CorrectProtoGoogleGrpc) {
-  std::string google_grpc_service_yaml = R"EOF(
-  transport_api_version: V3
-  grpc_service:
-    google_grpc:
-      target_uri: ext_authz_server
-      stat_prefix: google
-  failure_mode_allow: false
-  transport_api_version: {}
-  )EOF";
-#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
-  // TODO(chaoqin-li1123): clean this up when we move AUTO to V3 by default.
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::AUTO, google_grpc_service_yaml);
-#endif
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V3, google_grpc_service_yaml);
-}
-
-TEST(HttpExtAuthzConfigTest, CorrectProtoEnvoyGrpc) {
-  std::string envoy_grpc_service_yaml = R"EOF(
-  transport_api_version: V3
-  grpc_service:
-    envoy_grpc:
-      cluster_name: ext_authz_server
-  failure_mode_allow: false
-  transport_api_version: {}
-  )EOF";
-#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
-  // TODO(chaoqin-li1123): clean this up when we move AUTO to V3 by default.
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::AUTO, envoy_grpc_service_yaml);
-#endif
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V3, envoy_grpc_service_yaml);
-}
-
-TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
-  std::string yaml = R"EOF(
   stat_prefix: "wall"
   transport_api_version: V3
   http_service:
@@ -304,21 +224,50 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
     pack_as_bytes: true
   )EOF";
 
-  ExtAuthzFilterConfig factory;
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  TestUtility::loadFromYaml(yaml, *proto_config);
-  testing::StrictMock<Server::Configuration::MockFactoryContext> context;
-  testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
-  EXPECT_CALL(context, getServerFactoryContext())
-      .WillRepeatedly(testing::ReturnRef(server_context));
-  EXPECT_CALL(context, messageValidationVisitor());
-  EXPECT_CALL(context, clusterManager());
-  EXPECT_CALL(context, runtime());
-  EXPECT_CALL(context, scope());
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  testing::StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
-  cb(filter_callback);
+  startThreading();
+  Http::FilterFactoryCb filter_factory = createFilterFactory(ext_authz_config_yaml);
+  postWorkToAllWorkers([&, filter_factory]() {
+    Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
+    EXPECT_NE(filter, nullptr);
+  });
+  cleanUpThreading();
+}
+
+TEST_F(ExtAuthzFilterTest, ExtAuthzFilterFactoryTestEnvoyGrpc) {
+  std::string ext_authz_config_yaml = R"EOF(
+   transport_api_version: V3
+   grpc_service:
+     envoy_grpc:
+       cluster_name: test_cluster
+   failure_mode_allow: false
+   )EOF";
+  initAddress();
+  startThreading();
+  Http::FilterFactoryCb filter_factory = createFilterFactory(ext_authz_config_yaml);
+  postWorkToAllWorkers([&, filter_factory]() {
+    Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
+    testExtAuthzFilter(filter);
+  });
+  cleanUpThreading();
+}
+
+TEST_F(ExtAuthzFilterTest, ExtAuthzFilterFactoryTestGoogleGrpc) {
+  std::string ext_authz_config_yaml = R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    google_grpc:
+      target_uri: ext_authz_server
+      stat_prefix: google
+  failure_mode_allow: false
+  )EOF";
+  initAddress();
+  startThreading();
+  Http::FilterFactoryCb filter_factory = createFilterFactory(ext_authz_config_yaml);
+  postWorkToAllWorkers([&, filter_factory]() {
+    Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
+    testExtAuthzFilter(filter);
+  });
+  cleanUpThreading();
 }
 
 // Test that the deprecated extension name still functions.
