@@ -92,6 +92,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "pprof_handler_test",
+    srcs = ["pprof_handler_test.cc"],
+    deps = [
+        ":admin_instance_lib",
+        "//test/test_common:logging_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "profiling_handler_test",
     srcs = ["profiling_handler_test.cc"],
     deps = [
