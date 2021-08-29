@@ -102,7 +102,7 @@ public:
     return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
   }
 
-  void dynamicMetadataTest(CheckStatus status, const std::string& httpStatus) {
+  void dynamicMetadataTest(CheckStatus status, const std::string& http_status) {
     const std::string yaml = R"EOF(
     http_service:
       server_uri:
@@ -137,7 +137,7 @@ public:
                                         AuthzResponseNoAttributes(authz_response))));
 
     const HeaderValueOptionVector http_response_headers = TestCommon::makeHeaderValueOption({
-        {":status", httpStatus, false},
+        {":status", http_status, false},
         {"bar", "nope", false},
         {"x-metadata-header-0", "zero", false},
         {"x-metadata-header-1", "2", false},
