@@ -47,17 +47,21 @@ public:
   virtual ~MultiThreadTest() { tls_.shutdownGlobalThreading(); }
 
   void postWorkToAllWorkers(std::function<void()> work) {
+    absl::BlockingCounter start_counter(num_threads_);
     absl::BlockingCounter end_counter(num_threads_);
     absl::Notification workers_should_fire;
 
     for (Event::DispatcherPtr& dispatcher : worker_dispatchers_) {
       dispatcher->post([&, work]() {
+        start_counter.DecrementCount();
         workers_should_fire.WaitForNotificationWithTimeout(absl::Milliseconds(1000));
         work();
         end_counter.DecrementCount();
       });
     }
 
+    // Wait until all the workers start to execute the callback.
+    start_counter.Wait();
     // Notify all the worker to continue.
     workers_should_fire.Notify();
     // Wait for all workers to finish the job.
@@ -121,15 +125,16 @@ public:
   ExtAuthzFilterTest() : MultiThreadTest(3), stat_names_(symbol_table_) {}
 
   Http::FilterFactoryCb createFilterFactory(const std::string& ext_authz_config_yaml) {
+    /*
     async_client_manager_ = std::make_unique<TestAsyncClientManagerImpl>(
         context_.cluster_manager_, tls(), api().timeSource(), api(), stat_names_);
+        */
     EXPECT_CALL(context_, getServerFactoryContext())
         .WillRepeatedly(testing::ReturnRef(server_context_));
     ON_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
-        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService& grpc_service,
-                                  Stats::Scope& scope, bool skip, Grpc::CacheOption cache_option) {
-          return async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope, skip,
-                                                                  cache_option);
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                  Grpc::CacheOption) {
+          return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
         }));
     ExtAuthzFilterConfig factory;
     ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
