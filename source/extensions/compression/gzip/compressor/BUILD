@@ -14,14 +14,14 @@ envoy_cc_library(
     srcs = ["zlib_compressor_impl.cc"],
     hdrs = ["zlib_compressor_impl.h"],
     external_deps = ["zlib"],
+    visibility = [
+        "//source/server/admin:__pkg__",
+    ],
     deps = [
         "//envoy/compression/compressor:compressor_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/extensions/compression/gzip/common:zlib_base_lib",
-    ],
-    visibility = [
-        "//source/server/admin:__pkg__",
     ],
 )
 

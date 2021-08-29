@@ -7,6 +7,7 @@
 #include "absl/debugging/symbolize.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
+
 #if defined(TCMALLOC)
 #include "tcmalloc/malloc_extension.h"
 #endif
@@ -114,7 +115,9 @@ Http::Code PprofHandler::handlerHeapProfile(absl::string_view,
 #endif
 
   ZlibCompressorImpl compressor;
-  compressor.init(ZlibCompressorImpl::CompressionLevel::Standard, ZlibCompressorImpl::CompressionStrategy::Standard, kDefaultMemLevel, kDefaultWindowBits);
+  compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
+                  ZlibCompressorImpl::CompressionStrategy::Standard, kDefaultMemLevel,
+                  kDefaultWindowBits);
   response.add(profile.SerializeAsString());
   compressor.compress(response, Compression::Compressor::State::Finish);
   response_headers.setContentType("application/octet-stream");
