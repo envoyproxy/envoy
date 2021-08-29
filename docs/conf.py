@@ -227,7 +227,7 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = '_static/img/envoy-logo.png'
+html_logo = 'img/envoy-logo.png'
 
 # The name of an image file (relative to this directory) to use as a favicon of
 # the docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
@@ -338,10 +338,21 @@ intersphinx_mapping = {
     'v1.14.7': ('https://www.envoyproxy.io/docs/envoy/v1.14.7', None),
     'v1.15.0': ('https://www.envoyproxy.io/docs/envoy/v1.15.0', None),
     'v1.15.4': ('https://www.envoyproxy.io/docs/envoy/v1.15.4', None),
+    'v1.15.5': ('https://www.envoyproxy.io/docs/envoy/v1.15.5', None),
     'v1.16.0': ('https://www.envoyproxy.io/docs/envoy/v1.16.0', None),
+    'v1.16.1': ('https://www.envoyproxy.io/docs/envoy/v1.16.1', None),
+    'v1.16.2': ('https://www.envoyproxy.io/docs/envoy/v1.16.2', None),
     'v1.16.3': ('https://www.envoyproxy.io/docs/envoy/v1.16.3', None),
+    'v1.16.4': ('https://www.envoyproxy.io/docs/envoy/v1.16.4', None),
+    'v1.16.5': ('https://www.envoyproxy.io/docs/envoy/v1.16.5', None),
     'v1.17.0': ('https://www.envoyproxy.io/docs/envoy/v1.17.0', None),
     'v1.17.1': ('https://www.envoyproxy.io/docs/envoy/v1.17.1', None),
     'v1.17.2': ('https://www.envoyproxy.io/docs/envoy/v1.17.2', None),
-    'v1.18.0': ('https://www.envoyproxy.io/docs/envoy/v1.18.2', None)
+    'v1.17.3': ('https://www.envoyproxy.io/docs/envoy/v1.17.3', None),
+    'v1.17.4': ('https://www.envoyproxy.io/docs/envoy/v1.17.4', None),
+    'v1.18.0': ('https://www.envoyproxy.io/docs/envoy/v1.18.2', None),
+    'v1.18.3': ('https://www.envoyproxy.io/docs/envoy/v1.18.3', None),
+    'v1.18.4': ('https://www.envoyproxy.io/docs/envoy/v1.18.4', None),
+    'v1.19.0': ('https://www.envoyproxy.io/docs/envoy/v1.19.0', None),
+    'v1.19.1': ('https://www.envoyproxy.io/docs/envoy/v1.19.1', None),
 }

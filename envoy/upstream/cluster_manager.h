@@ -310,6 +310,17 @@ public:
   virtual const ClusterRequestResponseSizeStatNames&
   clusterRequestResponseSizeStatNames() const PURE;
   virtual const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const PURE;
+
+  /**
+   * Drain all connection pool connections owned by this cluster.
+   * @param cluster, the cluster to drain.
+   */
+  virtual void drainConnections(const std::string& cluster) PURE;
+
+  /**
+   * Drain all connection pool connections owned by all clusters in the cluster manager.
+   */
+  virtual void drainConnections() PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -363,7 +374,7 @@ public:
                    const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                        alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    TimeSource& time_source, ClusterConnectivityState& state) PURE;
 
   /**
@@ -374,7 +385,7 @@ public:
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                      Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                       ClusterConnectivityState& state) PURE;
 
   /**

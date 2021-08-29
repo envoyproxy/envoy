@@ -55,9 +55,9 @@ public:
 
   Matcher::DataInputFactoryCb<HttpMatchingData>
   createDataInputFactoryCb(const Protobuf::Message& config,
-                           Server::Configuration::FactoryContext& factory_context) override {
-    const auto& typed_config = MessageUtil::downcastAndValidate<const ProtoType&>(
-        config, factory_context.messageValidationVisitor());
+                           ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    const auto& typed_config =
+        MessageUtil::downcastAndValidate<const ProtoType&>(config, validation_visitor);
 
     return [header_name = typed_config.header_name()] {
       return std::make_unique<DataInputType>(header_name);

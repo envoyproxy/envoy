@@ -147,14 +147,6 @@ public:
   bool used_;
   uint64_t value_;
   uint64_t latch_;
-
-  // RefcountInterface
-  void incRefCount() override { refcount_helper_.incRefCount(); }
-  bool decRefCount() override { return refcount_helper_.decRefCount(); }
-  uint32_t use_count() const override { return refcount_helper_.use_count(); }
-
-private:
-  RefcountHelper refcount_helper_;
 };
 
 class MockGauge : public MockStatWithRefcount<Gauge> {
@@ -177,14 +169,6 @@ public:
   bool used_;
   uint64_t value_;
   ImportMode import_mode_;
-
-  // RefcountInterface
-  void incRefCount() override { refcount_helper_.incRefCount(); }
-  bool decRefCount() override { return refcount_helper_.decRefCount(); }
-  uint32_t use_count() const override { return refcount_helper_.use_count(); }
-
-private:
-  RefcountHelper refcount_helper_;
 };
 
 class MockHistogram : public MockMetric<Histogram> {
@@ -348,7 +332,9 @@ class MockStatsMatcher : public StatsMatcher {
 public:
   MockStatsMatcher();
   ~MockStatsMatcher() override;
-  MOCK_METHOD(bool, rejects, (const std::string& name), (const));
+  MOCK_METHOD(bool, rejects, (StatName name), (const));
+  MOCK_METHOD(StatsMatcher::FastResult, fastRejects, (StatName name), (const));
+  MOCK_METHOD(bool, slowRejects, (FastResult, StatName name), (const));
   bool acceptsAll() const override { return accepts_all_; }
   bool rejectsAll() const override { return rejects_all_; }
 

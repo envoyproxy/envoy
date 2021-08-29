@@ -35,6 +35,7 @@ namespace Http {
   COUNTER(downstream_cx_http3_total)                                                               \
   COUNTER(downstream_cx_idle_timeout)                                                              \
   COUNTER(downstream_cx_max_duration_reached)                                                      \
+  COUNTER(downstream_cx_max_requests_reached)                                                      \
   COUNTER(downstream_cx_overload_disable_keepalive)                                                \
   COUNTER(downstream_cx_protocol_error)                                                            \
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
@@ -349,6 +350,11 @@ public:
   serverHeaderTransformation() const PURE;
 
   /**
+   * @return const absl::optional<std::string> the scheme name to write into requests.
+   */
+  virtual const absl::optional<std::string>& schemeToSet() const PURE;
+
+  /**
    * @return ConnectionManagerStats& the stats to write to.
    */
   virtual ConnectionManagerStats& stats() PURE;
@@ -490,6 +496,10 @@ public:
    * header.
    */
   virtual bool shouldStripTrailingHostDot() const PURE;
+  /**
+   * @return maximum requests for downstream.
+   */
+  virtual uint64_t maxRequestsPerConnection() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

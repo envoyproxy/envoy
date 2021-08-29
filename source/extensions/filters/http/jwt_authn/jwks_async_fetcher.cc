@@ -54,8 +54,8 @@ void JwksAsyncFetcher::fetch() {
   }
 
   ENVOY_LOG(debug, "{}: started", debug_name_);
-  fetcher_ = create_fetcher_fn_(context_.clusterManager());
-  fetcher_->fetch(remote_jwks_.http_uri(), Tracing::NullSpan::instance(), *this);
+  fetcher_ = create_fetcher_fn_(context_.clusterManager(), remote_jwks_);
+  fetcher_->fetch(Tracing::NullSpan::instance(), *this);
 }
 
 void JwksAsyncFetcher::handleFetchDone() {
@@ -68,10 +68,9 @@ void JwksAsyncFetcher::handleFetchDone() {
 }
 
 void JwksAsyncFetcher::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
-  stats_.jwks_fetch_success_.inc();
-
   done_fn_(std::move(jwks));
   handleFetchDone();
+  stats_.jwks_fetch_success_.inc();
 
   // Note: not to free fetcher_ within onJwksSuccess or onJwksError function.
   // They are passed to fetcher_->fetch() and are called by fetcher_ after fetch is done.
@@ -84,10 +83,9 @@ void JwksAsyncFetcher::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
 }
 
 void JwksAsyncFetcher::onJwksError(Failure) {
-  stats_.jwks_fetch_failed_.inc();
-
   ENVOY_LOG(warn, "{}: failed", debug_name_);
   handleFetchDone();
+  stats_.jwks_fetch_failed_.inc();
 
   // Note: not to free fetcher_ in this function. Please see comment at onJwksSuccess.
 }

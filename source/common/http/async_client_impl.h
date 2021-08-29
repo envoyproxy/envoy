@@ -35,6 +35,8 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/router/config_impl.h"
 #include "source/common/router/router.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -83,11 +85,6 @@ class AsyncStreamImpl : public AsyncClient::Stream,
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const AsyncClient::StreamOptions& options);
-
-  // Http::StreamDecoderFilterCallbacks
-  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
 
   // Http::AsyncClient::Stream
   void sendHeaders(RequestHeaderMap& headers, bool end_stream) override;
@@ -195,9 +192,6 @@ private:
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     const Router::Config& routeConfig() const override { return route_configuration_; }
-    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
-      return nullptr;
-    }
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
     uint32_t retryShadowBufferLimit() const override {
@@ -216,10 +210,18 @@ private:
     RouteEntryImpl(
         const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout,
         const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
-            hash_policy)
+            hash_policy,
+        const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy)
         : cluster_name_(cluster_name), timeout_(timeout) {
       if (!hash_policy.empty()) {
         hash_policy_ = std::make_unique<HashPolicyImpl>(hash_policy);
+      }
+      if (retry_policy.has_value()) {
+        // ProtobufMessage::getStrictValidationVisitor() ?  how often do we do this?
+        retry_policy_ = std::make_unique<Router::RetryPolicyImpl>(
+            retry_policy.value(), ProtobufMessage::getNullValidationVisitor());
+      } else {
+        retry_policy_ = std::make_unique<NullRetryPolicy>();
       }
     }
 
@@ -248,7 +250,7 @@ private:
       return Upstream::ResourcePriority::Default;
     }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
-    const Router::RetryPolicy& retryPolicy() const override { return retry_policy_; }
+    const Router::RetryPolicy& retryPolicy() const override { return *retry_policy_; }
     const Router::InternalRedirectPolicy& internalRedirectPolicy() const override {
       return internal_redirect_policy_;
     }
@@ -294,15 +296,10 @@ private:
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
-    const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
-    const Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
     const Router::PathMatchCriterion& pathMatchCriterion() const override {
       return path_match_criterion_;
     }
 
-    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
-      return nullptr;
-    }
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return connect_config_nullopt_;
     }
@@ -312,16 +309,14 @@ private:
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
     const std::string& routeName() const override { return route_name_; }
     std::unique_ptr<const HashPolicyImpl> hash_policy_;
+    std::unique_ptr<Router::RetryPolicy> retry_policy_;
+
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
-    static const NullRetryPolicy retry_policy_;
     static const Router::InternalRedirectPolicyImpl internal_redirect_policy_;
     static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
-    static const envoy::config::core::v3::Metadata metadata_;
-    // Async client doesn't require metadata.
-    static const Config::TypedMetadataImpl<Config::TypedMetadataFactory> typed_metadata_;
     static const NullPathMatchCriterion path_match_criterion_;
 
     Router::RouteEntry::UpgradeMap upgrade_map_;
@@ -335,19 +330,28 @@ private:
     RouteImpl(const std::string& cluster_name,
               const absl::optional<std::chrono::milliseconds>& timeout,
               const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
-                  hash_policy)
-        : route_entry_(cluster_name, timeout, hash_policy) {}
+                  hash_policy,
+              const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy)
+        : route_entry_(cluster_name, timeout, hash_policy, retry_policy), typed_metadata_({}) {}
 
     // Router::Route
     const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }
     const Router::RouteEntry* routeEntry() const override { return &route_entry_; }
     const Router::Decorator* decorator() const override { return nullptr; }
     const Router::RouteTracing* tracingConfig() const override { return nullptr; }
-    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
+    const Router::RouteSpecificFilterConfig*
+    mostSpecificPerFilterConfig(const std::string&) const override {
       return nullptr;
     }
+    void traversePerFilterConfig(
+        const std::string&,
+        std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
+    const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
+    const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
 
     RouteEntryImpl route_entry_;
+    const envoy::config::core::v3::Metadata metadata_;
+    const Envoy::Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory> typed_metadata_;
   };
 
   void cleanup();
@@ -436,6 +440,10 @@ private:
   }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
+  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  void resetIdleTimer() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override {

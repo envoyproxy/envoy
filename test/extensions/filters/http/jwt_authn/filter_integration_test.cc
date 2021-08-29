@@ -21,7 +21,6 @@ namespace JwtAuthn {
 namespace {
 
 const char HeaderToFilterStateFilterName[] = "envoy.filters.http.header_to_filter_state_for_test";
-
 // This filter extracts a string header from "header" and
 // save it into FilterState as name "state" as read-only Router::StringAccessor.
 class HeaderToFilterStateFilter : public Http::PassThroughDecoderFilter {
@@ -152,6 +151,10 @@ TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
+  EXPECT_EQ(1, response->headers().get(Http::Headers::get().WWWAuthenticate).size());
+  EXPECT_EQ(
+      "Bearer realm=\"http://host/\", error=\"invalid_token\"",
+      response->headers().get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
 }
 
 TEST_P(LocalJwksIntegrationTest, MissingToken) {
@@ -170,6 +173,9 @@ TEST_P(LocalJwksIntegrationTest, MissingToken) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
+  EXPECT_EQ(
+      "Bearer realm=\"http://host/\"",
+      response->headers().get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
 }
 
 TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
@@ -189,6 +195,10 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
+  EXPECT_EQ(
+      "Bearer realm=\"http://host/\", error=\"invalid_token\"",
+      response->headers().get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
+
   EXPECT_NE("0", response->headers().getContentLengthValue());
   EXPECT_THAT(response->body(), ::testing::IsEmpty());
 }
@@ -448,6 +458,9 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedJwks) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
+  EXPECT_EQ(
+      "Bearer realm=\"http://host/\", error=\"invalid_token\"",
+      response->headers().get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
 
   cleanup();
 }
@@ -468,7 +481,9 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedMissingCluster) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("401", response->headers().getStatusValue());
-
+  EXPECT_EQ(
+      "Bearer realm=\"http://host/\", error=\"invalid_token\"",
+      response->headers().get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
   cleanup();
 }
 
@@ -507,6 +522,15 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetch) {
 TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetchFast) {
   on_server_init_function_ = [this]() { waitForJwksResponse("200", PublicKey); };
   initializeAsyncFetchFilter(true);
+
+  // This test is only expecting one jwks fetch, but there is a race condition in the test:
+  // In fast fetch mode, the listener is activated without waiting for jwks fetch to be
+  // completed. When the first request comes at the worker thread, jwks fetch could be at
+  // any state at the main thread. If its result is not saved into jwks thread local slot,
+  // the first request will trigger a second jwks fetch, this is not expected, test will fail.
+  // To avoid such race condition, before making the first request, wait for the first
+  // fetch stats to be updated.
+  test_server_->waitForCounterGe("http.config_test.jwt_authn.jwks_fetch_success", 1);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

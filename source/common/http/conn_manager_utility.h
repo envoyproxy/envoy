@@ -61,9 +61,6 @@ public:
    * complexity for ease of testing. See the method itself for detailed comments on what
    * mutations are performed.
    *
-   * Note this function may be called twice on the response path if there are
-   * 100-Continue headers.
-   *
    * @return MutateRequestHeadersResult containing the final trusted remote address if detected.
    *         This depends on various settings and the existence of the x-forwarded-for header.
    *         Note that an extension might also be used. If detection fails, the result may contain
@@ -74,10 +71,25 @@ public:
                                                          ConnectionManagerConfig& config,
                                                          const Router::Config& route_config,
                                                          const LocalInfo::LocalInfo& local_info);
-
+  /**
+   * Mutates response headers in various ways. This functionality is broken out because of its
+   * complexity for ease of testing. See the method itself for detailed comments on what
+   * mutations are performed.
+   *
+   * Note this function may be called twice on the response path if there are
+   * 100-Continue headers.
+   *
+   * @param response_headers the headers to mutate.
+   * @param request_headers the request headers.
+   * @param the configuration for the HCM, which affects request ID headers.
+   * @param via the via header to append, if any.
+   * @param clear_hop_by_hop_headers true if hop by hop headers should be
+   *        cleared. This should only ever be false for envoy-mobile.
+   */
   static void mutateResponseHeaders(ResponseHeaderMap& response_headers,
                                     const RequestHeaderMap* request_headers,
-                                    ConnectionManagerConfig& config, const std::string& via);
+                                    ConnectionManagerConfig& config, const std::string& via,
+                                    bool clear_hop_by_hop_headers = true);
 
   enum class NormalizePathAction {
     Continue = 0,

@@ -536,7 +536,9 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
     EXPECT_CALL(*decoder_filter, onLocalReply(_));
     EXPECT_CALL(*stream_filter, onLocalReply(_));
     EXPECT_CALL(*encoder_filter, onLocalReply(_));
-    EXPECT_CALL(dispatcher_, trackedObjectStackIsEmpty());
+    // trackedObjectStackIsEmpty() is never called since sendLocalReply will abort encoder filter
+    // iteration.
+    EXPECT_CALL(dispatcher_, trackedObjectStackIsEmpty()).Times(0);
 
     decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
                                                absl::nullopt, "details");
@@ -546,6 +548,23 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
   ASSERT_TRUE(filter_manager_->streamInfo().responseCodeDetails().has_value());
   EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details2");
   EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, ResetIdleTimer) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(decoder_filter);
+      }));
+  filter_manager_->createFilterChain();
+
+  EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
+  decoder_filter->callbacks_->resetIdleTimer();
 
   filter_manager_->destroyFilters();
 }

@@ -23,6 +23,7 @@ The filter outputs generic routing error statistics in the *thrift.<stat_prefix>
   unknown_cluster, Counter, Total requests with a route that has an unknown cluster.
   upstream_rq_maintenance_mode, Counter, Total requests with a destination cluster in maintenance mode.
   no_healthy_upstream, Counter, Total requests with no healthy upstream endpoints available.
+  shadow_request_submit_failure, Counter, Total shadow requests that failed to be submitted.
 
 
 The filter is also responsible for cluster-level statistics derived from routed upstream clusters.

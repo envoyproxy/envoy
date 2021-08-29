@@ -21,7 +21,7 @@ public:
       : plugin_(plugin), singleton_(singleton) {}
 
   void flush(Stats::MetricSnapshot& snapshot) override {
-    singleton_->wasm()->onStatsUpdate(plugin_, snapshot);
+    singleton_->wasmHandle()->wasm()->onStatsUpdate(plugin_, snapshot);
   }
 
   void setSingleton(PluginHandleSharedPtr singleton) {

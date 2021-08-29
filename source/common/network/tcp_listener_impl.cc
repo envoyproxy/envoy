@@ -83,43 +83,30 @@ void TcpListenerImpl::onSocketEvent(short flags) {
     // Pass the 'v6only' parameter as true if the local_address is an IPv6 address. This has no
     // effect if the socket is a v4 socket, but for v6 sockets this will create an IPv4 remote
     // address if an IPv4 local_address was created from an IPv6 mapped IPv4 address.
-    const Address::InstanceConstSharedPtr& remote_address =
+
+    const Address::InstanceConstSharedPtr remote_address =
         (remote_addr.ss_family == AF_UNIX)
             ? io_handle->peerAddress()
-            : Address::addressFromSockAddr(remote_addr, remote_addr_len,
-                                           local_address->ip()->version() ==
-                                               Address::IpVersion::v6);
+            : Address::addressFromSockAddrOrThrow(remote_addr, remote_addr_len,
+                                                  local_address->ip()->version() ==
+                                                      Address::IpVersion::v6);
 
     cb_.onAccept(
         std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address));
   }
 }
 
-void TcpListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
-  ASSERT(bind_to_port_);
-
-  socket.ioHandle().listen(backlog_size_);
-
-  // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
-  // loss of the trigger due to transient accept errors.
-  socket.ioHandle().initializeFileEvent(
-      dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
-      Event::FileTriggerType::Level, Event::FileReadyType::Read);
-
-  if (!Network::Socket::applyOptions(socket.options(), socket,
-                                     envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
-    throw CreateListenerException(fmt::format("cannot set post-listen socket option on socket: {}",
-                                              socket.addressProvider().localAddress()->asString()));
-  }
-}
-
 TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
                                  SocketSharedPtr socket, TcpListenerCallbacks& cb,
-                                 bool bind_to_port, uint32_t backlog_size)
-    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), backlog_size_(backlog_size),
-      random_(random), bind_to_port_(bind_to_port), reject_fraction_(0.0) {
+                                 bool bind_to_port)
+    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), random_(random),
+      bind_to_port_(bind_to_port), reject_fraction_(0.0) {
   if (bind_to_port) {
-    setupServerSocket(dispatcher, *socket_);
+    // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
+    // loss of the trigger due to transient accept errors.
+    socket_->ioHandle().initializeFileEvent(
+        dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
+        Event::FileTriggerType::Level, Event::FileReadyType::Read);
   }
 }
 

@@ -39,7 +39,7 @@ class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 class MockConnectionSocket : public Network::ConnectionSocket {
 public:
   MockConnectionSocket()
-      : address_provider_(std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr)) {}
+      : address_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)) {}
 
   static std::unique_ptr<MockConnectionSocket>
   createMockConnectionSocket(uint16_t destination_port, const std::string& destination_address,
@@ -61,6 +61,8 @@ public:
     } else {
       res->address_provider_->setRemoteAddress(
           Network::Utility::parseInternetAddress(source_address, source_port));
+      res->address_provider_->setDirectRemoteAddressForTest(
+          Network::Utility::parseInternetAddress(source_address, source_port));
     }
     res->server_name_ = server_name;
     res->transport_protocol_ = transport_protocol;
@@ -73,11 +75,11 @@ public:
   const std::vector<std::string>& requestedApplicationProtocols() const override {
     return application_protocols_;
   }
-  Network::SocketAddressSetter& addressProvider() override { return *address_provider_; }
-  const Network::SocketAddressSetter& addressProvider() const override {
+  Network::ConnectionInfoSetter& connectionInfoProvider() override { return *address_provider_; }
+  const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
     return *address_provider_;
   }
-  Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+  Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
     return address_provider_;
   }
 
@@ -124,7 +126,7 @@ public:
 private:
   Network::IoHandlePtr io_handle_;
   OptionsSharedPtr options_;
-  Network::SocketAddressSetterSharedPtr address_provider_;
+  std::shared_ptr<Network::ConnectionInfoSetterImpl> address_provider_;
   std::string server_name_;
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
@@ -134,7 +136,6 @@ const char YamlHeader[] = R"EOF(
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         # empty

@@ -867,27 +867,6 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   expectEndpointToMatchRoute();
 }
 
-// Test subset load balancing for a deprecated_v1 route when endpoint selector is defined at the top
-// level.
-TEST_P(TcpProxyMetadataMatchIntegrationTest,
-       DEPRECATED_FEATURE_TEST(EndpointShouldMatchRouteWithTopLevelMetadataMatch)) {
-  tcp_proxy_.set_stat_prefix("tcp_stats");
-  tcp_proxy_.set_cluster("fallback");
-  tcp_proxy_.mutable_hidden_envoy_deprecated_deprecated_v1()->add_routes()->set_cluster(
-      "cluster_0");
-  tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
-
-  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
-
-  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.extensions.filters.network."
-                                    "tcp_proxy.v3.TcpProxy.hidden_envoy_deprecated_deprecated_v1",
-                                    "true");
-  initialize();
-
-  expectEndpointToMatchRoute();
-}
-
 // Test subset load balancing for a weighted cluster when endpoint selector is defined on a weighted
 // cluster.
 TEST_P(TcpProxyMetadataMatchIntegrationTest, EndpointShouldMatchWeightedClusterWithMetadataMatch) {
@@ -953,27 +932,6 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
 
   endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
 
-  initialize();
-
-  expectEndpointNotToMatchRoute();
-}
-
-// Test subset load balancing for a deprecated_v1 route when endpoint selector is defined at the top
-// level.
-TEST_P(TcpProxyMetadataMatchIntegrationTest,
-       DEPRECATED_FEATURE_TEST(EndpointShouldNotMatchRouteWithTopLevelMetadataMatch)) {
-  tcp_proxy_.set_stat_prefix("tcp_stats");
-  tcp_proxy_.set_cluster("fallback");
-  tcp_proxy_.mutable_hidden_envoy_deprecated_deprecated_v1()->add_routes()->set_cluster(
-      "cluster_0");
-  tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
-
-  endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
-
-  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.extensions.filters.network."
-                                    "tcp_proxy.v3.TcpProxy.hidden_envoy_deprecated_deprecated_v1",
-                                    "true");
   initialize();
 
   expectEndpointNotToMatchRoute();
@@ -1180,7 +1138,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
   // Set up the mock buffer factory so the newly created SSL client will have a mock write
   // buffer. This allows us to track the bytes actually written to the socket.
 
-  EXPECT_CALL(*mock_buffer_factory_, create_(_, _, _))
+  EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       .Times(AtLeast(1))
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                            std::function<void()> above_overflow) -> Buffer::Instance* {

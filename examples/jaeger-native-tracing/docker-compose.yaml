@@ -44,7 +44,7 @@ services:
   jaeger:
     image: jaegertracing/all-in-one
     environment:
-    - COLLECTOR_ZIPKIN_HTTP_PORT=9411
+    - COLLECTOR_ZIPKIN_HOST_PORT=9411
     networks:
     - envoymesh
     ports:

@@ -41,8 +41,6 @@ public:
   QuicFilterManagerConnectionImpl(QuicNetworkConnection& connection,
                                   const quic::QuicConnectionId& connection_id,
                                   Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
-  ~QuicFilterManagerConnectionImpl() override = default;
-
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
@@ -70,11 +68,11 @@ public:
   void readDisable(bool /*disable*/) override { ASSERT(false); }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
   bool readEnabled() const override { return true; }
-  const Network::SocketAddressSetter& addressProvider() const override {
-    return network_connection_->connectionSocket()->addressProvider();
+  const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
+    return network_connection_->connectionSocket()->connectionInfoProvider();
   }
-  Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
-    return network_connection_->connectionSocket()->addressProviderSharedPtr();
+  Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return network_connection_->connectionSocket()->connectionInfoProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
@@ -137,13 +135,10 @@ public:
   uint32_t bytesToSend() { return bytes_to_send_; }
 
   void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
-    http3_options_ =
-        std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>(http3_options);
+    http3_options_ = http3_options;
   }
 
-  void setCodecStats(Http::Http3::CodecStats& stats) {
-    codec_stats_ = std::reference_wrapper<Http::Http3::CodecStats>(stats);
-  }
+  void setCodecStats(Http::Http3::CodecStats& stats) { codec_stats_ = stats; }
 
   uint32_t maxIncomingHeadersCount() { return max_headers_count_; }
 
@@ -154,7 +149,8 @@ public:
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
-                              quic::ConnectionCloseSource source);
+                              quic::ConnectionCloseSource source,
+                              const quic::ParsedQuicVersion& version);
 
   void closeConnectionImmediately() override;
 
@@ -166,9 +162,8 @@ protected:
 
   QuicNetworkConnection* network_connection_{nullptr};
 
-  absl::optional<std::reference_wrapper<Http::Http3::CodecStats>> codec_stats_;
-  absl::optional<std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>>
-      http3_options_;
+  OptRef<Http::Http3::CodecStats> codec_stats_;
+  OptRef<const envoy::config::core::v3::Http3ProtocolOptions> http3_options_;
   bool initialized_{false};
 
 private:

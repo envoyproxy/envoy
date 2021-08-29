@@ -5,6 +5,7 @@
 
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/tracing/http_tracer_manager.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "gmock/gmock.h"
 
@@ -35,7 +36,7 @@ public:
   MOCK_METHOD(void, setTag, (absl::string_view name, absl::string_view value));
   MOCK_METHOD(void, log, (SystemTime timestamp, const std::string& event));
   MOCK_METHOD(void, finishSpan, ());
-  MOCK_METHOD(void, injectContext, (Http::RequestHeaderMap & request_headers));
+  MOCK_METHOD(void, injectContext, (Tracing::TraceContext & request_headers));
   MOCK_METHOD(void, setSampled, (const bool sampled));
   MOCK_METHOD(void, setBaggage, (absl::string_view key, absl::string_view value));
   MOCK_METHOD(std::string, getBaggage, (absl::string_view key));
@@ -62,7 +63,7 @@ public:
   }
 
   MOCK_METHOD(Span*, startSpan_,
-              (const Config& config, Http::HeaderMap& request_headers,
+              (const Config& config, Http::RequestHeaderMap& request_headers,
                const StreamInfo::StreamInfo& stream_info,
                const Tracing::Decision tracing_decision));
 };
@@ -72,17 +73,15 @@ public:
   MockDriver();
   ~MockDriver() override;
 
-  SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
+  SpanPtr startSpan(const Config& config, TraceContext& trace_context,
                     const std::string& operation_name, SystemTime start_time,
                     const Tracing::Decision tracing_decision) override {
-    return SpanPtr{
-        startSpan_(config, request_headers, operation_name, start_time, tracing_decision)};
+    return SpanPtr{startSpan_(config, trace_context, operation_name, start_time, tracing_decision)};
   }
 
   MOCK_METHOD(Span*, startSpan_,
-              (const Config& config, Http::HeaderMap& request_headers,
-               const std::string& operation_name, SystemTime start_time,
-               const Tracing::Decision tracing_decision));
+              (const Config& config, TraceContext& trace_context, const std::string& operation_name,
+               SystemTime start_time, const Tracing::Decision tracing_decision));
 };
 
 class MockHttpTracerManager : public HttpTracerManager {

@@ -6,7 +6,6 @@ import "envoy/extensions/filters/http/compressor/v3/compressor.proto";
 
 import "google/protobuf/wrappers.proto";
 
-import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -41,6 +40,11 @@ message Gzip {
     }
   }
 
+  reserved 2, 6, 7, 8;
+
+  reserved "content_length", "content_type", "disable_on_etag_header",
+      "remove_accept_encoding_header";
+
   // Value from 1 to 9 that controls the amount of internal memory used by zlib. Higher values
   // use more memory, but are faster and produce better compression results. The default value is 5.
   google.protobuf.UInt32Value memory_level = 1 [(validate.rules).uint32 = {lte: 9 gte: 1}];
@@ -74,16 +78,4 @@ message Gzip {
   // See https://www.zlib.net/manual.html for more details. Also see
   // https://github.com/envoyproxy/envoy/issues/8448 for context on this filter's performance.
   google.protobuf.UInt32Value chunk_size = 11 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];
-
-  google.protobuf.UInt32Value hidden_envoy_deprecated_content_length = 2
-      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
-
-  repeated string hidden_envoy_deprecated_content_type = 6
-      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
-
-  bool hidden_envoy_deprecated_disable_on_etag_header = 7
-      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
-
-  bool hidden_envoy_deprecated_remove_accept_encoding_header = 8
-      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }

@@ -35,7 +35,7 @@
 #include <arpa/nameser.h>
 #include <arpa/nameser_compat.h>
 #else
-#include "nameser.h"
+#include "ares_nameser.h"
 #endif
 
 using testing::_;
@@ -437,15 +437,17 @@ public:
   void SetUp() override {
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
     server_ = std::make_unique<TestDnsServer>(*dispatcher_);
-    socket_ = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ = dispatcher_->createListener(socket_, *server_, true, ENVOY_TCP_BACKLOG_SIZE);
+    socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()));
+    listener_ = dispatcher_->createListener(socket_, *server_, true);
     updateDnsResolverOptions();
+    // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
+    envoy::config::core::v3::DnsResolverOptions dns_resolver_options = dns_resolver_options_;
     if (setResolverInConstructor()) {
-      resolver_ = dispatcher_->createDnsResolver({socket_->addressProvider().localAddress()},
-                                                 dns_resolver_options_);
+      resolver_ = dispatcher_->createDnsResolver({socket_->connectionInfoProvider().localAddress()},
+                                                 dns_resolver_options);
     } else {
-      resolver_ = dispatcher_->createDnsResolver({}, dns_resolver_options_);
+      resolver_ = dispatcher_->createDnsResolver({}, dns_resolver_options);
     }
 
     // Point c-ares at the listener with no search domains and TCP-only.
@@ -453,8 +455,8 @@ public:
     if (tcpOnly()) {
       peer_->resetChannelTcpOnly(zeroTimeout());
     }
-    ares_set_servers_ports_csv(peer_->channel(),
-                               socket_->addressProvider().localAddress()->asString().c_str());
+    ares_set_servers_ports_csv(
+        peer_->channel(), socket_->connectionInfoProvider().localAddress()->asString().c_str());
   }
 
   void TearDown() override {
@@ -572,7 +574,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplTest,
 TEST_P(DnsImplTest, DestructPending) {
   ActiveDnsQuery* query = resolveWithUnreferencedParameters("", DnsLookupFamily::V4Only, false);
   ASSERT_NE(nullptr, query);
-  query->cancel();
+  query->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
   // Also validate that pending events are around to exercise the resource
   // reclamation path.
   EXPECT_GT(peer_->events().size(), 0U);
@@ -589,7 +591,7 @@ TEST_P(DnsImplTest, DestructCallback) {
   // a subsequent result to call ares_destroy.
   peer_->resetChannelTcpOnly(zeroTimeout());
   ares_set_servers_ports_csv(peer_->channel(),
-                             socket_->addressProvider().localAddress()->asString().c_str());
+                             socket_->connectionInfoProvider().localAddress()->asString().c_str());
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -717,7 +719,7 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
     peer_->resetChannelTcpOnly(zeroTimeout());
   }
   ares_set_servers_ports_csv(peer_->channel(),
-                             socket_->addressProvider().localAddress()->asString().c_str());
+                             socket_->connectionInfoProvider().localAddress()->asString().c_str());
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success,
@@ -806,7 +808,7 @@ TEST_P(DnsImplTest, Cancel) {
                                              {"201.134.56.7"}, {}, absl::nullopt));
 
   ASSERT_NE(nullptr, query);
-  query->cancel();
+  query->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }

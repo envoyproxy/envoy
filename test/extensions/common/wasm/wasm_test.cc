@@ -52,8 +52,6 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
-REGISTER_WASM_EXTENSION(EnvoyWasm);
-
 std::string sha256(absl::string_view data) {
   std::vector<uint8_t> digest(SHA256_DIGEST_LENGTH);
   EVP_MD_CTX* ctx(EVP_MD_CTX_new());
@@ -91,9 +89,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonTest, Envoy::Extensions::Common::Wasm::runtime_values);
 
-TEST_P(WasmCommonTest, EnvoyWasm) {
-  auto envoy_wasm = std::make_unique<EnvoyWasm>();
-  envoy_wasm->initialize();
+TEST_P(WasmCommonTest, WasmFailState) {
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
   Upstream::MockClusterManager cluster_manager;
@@ -108,43 +104,42 @@ TEST_P(WasmCommonTest, EnvoyWasm) {
   auto wasm = std::make_shared<WasmHandle>(
       std::make_unique<Wasm>(plugin->wasmConfig(), "", scope, cluster_manager, *dispatcher));
   auto wasm_base = std::dynamic_pointer_cast<proxy_wasm::WasmHandleBase>(wasm);
-  wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::UnableToCreateVM);
-  EXPECT_EQ(toWasmEvent(wasm_base), EnvoyWasm::WasmEvent::UnableToCreateVM);
-  wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::UnableToCloneVM);
-  EXPECT_EQ(toWasmEvent(wasm_base), EnvoyWasm::WasmEvent::UnableToCloneVM);
+  wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::UnableToCreateVm);
+  EXPECT_EQ(toWasmEvent(wasm_base), WasmEvent::UnableToCreateVm);
+  wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::UnableToCloneVm);
+  EXPECT_EQ(toWasmEvent(wasm_base), WasmEvent::UnableToCloneVm);
   wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::MissingFunction);
-  EXPECT_EQ(toWasmEvent(wasm_base), EnvoyWasm::WasmEvent::MissingFunction);
+  EXPECT_EQ(toWasmEvent(wasm_base), WasmEvent::MissingFunction);
   wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::UnableToInitializeCode);
-  EXPECT_EQ(toWasmEvent(wasm_base), EnvoyWasm::WasmEvent::UnableToInitializeCode);
+  EXPECT_EQ(toWasmEvent(wasm_base), WasmEvent::UnableToInitializeCode);
   wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::StartFailed);
-  EXPECT_EQ(toWasmEvent(wasm_base), EnvoyWasm::WasmEvent::StartFailed);
+  EXPECT_EQ(toWasmEvent(wasm_base), WasmEvent::StartFailed);
   wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::ConfigureFailed);
-  EXPECT_EQ(toWasmEvent(wasm_base), EnvoyWasm::WasmEvent::ConfigureFailed);
+  EXPECT_EQ(toWasmEvent(wasm_base), WasmEvent::ConfigureFailed);
   wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::RuntimeError);
-  EXPECT_EQ(toWasmEvent(wasm_base), EnvoyWasm::WasmEvent::RuntimeError);
+  EXPECT_EQ(toWasmEvent(wasm_base), WasmEvent::RuntimeError);
+
+  uint32_t grpc_call_token1 = wasm->wasm()->nextGrpcCallId();
+  EXPECT_TRUE(wasm->wasm()->isGrpcCallId(grpc_call_token1));
+  uint32_t grpc_call_token2 = wasm->wasm()->nextGrpcCallId();
+  EXPECT_TRUE(wasm->wasm()->isGrpcCallId(grpc_call_token2));
+  EXPECT_NE(grpc_call_token1, grpc_call_token2);
+
+  uint32_t grpc_stream_token1 = wasm->wasm()->nextGrpcStreamId();
+  EXPECT_TRUE(wasm->wasm()->isGrpcStreamId(grpc_stream_token1));
+  uint32_t grpc_stream_token2 = wasm->wasm()->nextGrpcStreamId();
+  EXPECT_TRUE(wasm->wasm()->isGrpcStreamId(grpc_stream_token2));
+  EXPECT_NE(grpc_stream_token1, grpc_stream_token2);
+
+  uint32_t http_call_token1 = wasm->wasm()->nextHttpCallId();
+  EXPECT_TRUE(wasm->wasm()->isHttpCallId(http_call_token1));
+  uint32_t http_call_token2 = wasm->wasm()->nextHttpCallId();
+  EXPECT_TRUE(wasm->wasm()->isHttpCallId(http_call_token2));
+  EXPECT_NE(http_call_token1, http_call_token2);
 
   auto root_context = static_cast<Context*>(wasm->wasm()->createRootContext(plugin));
-  uint32_t grpc_call_token1 = root_context->nextGrpcCallToken();
-  uint32_t grpc_call_token2 = root_context->nextGrpcCallToken();
-  EXPECT_NE(grpc_call_token1, grpc_call_token2);
-  root_context->setNextGrpcTokenForTesting(0); // Rollover.
-  EXPECT_EQ(root_context->nextGrpcCallToken(), 1);
-
-  uint32_t grpc_stream_token1 = root_context->nextGrpcStreamToken();
-  uint32_t grpc_stream_token2 = root_context->nextGrpcStreamToken();
-  EXPECT_NE(grpc_stream_token1, grpc_stream_token2);
-  root_context->setNextGrpcTokenForTesting(0xFFFFFFFF); // Rollover.
-  EXPECT_EQ(root_context->nextGrpcStreamToken(), 2);
-
-  uint32_t http_call_token1 = root_context->nextHttpCallToken();
-  uint32_t http_call_token2 = root_context->nextHttpCallToken();
-  EXPECT_NE(http_call_token1, http_call_token2);
-  root_context->setNextHttpCallTokenForTesting(0); // Rollover.
-  EXPECT_EQ(root_context->nextHttpCallToken(), 1);
-
   EXPECT_EQ(root_context->getBuffer(WasmBufferType::HttpCallResponseBody), nullptr);
   EXPECT_EQ(root_context->getBuffer(WasmBufferType::PluginConfiguration), nullptr);
-
   delete root_context;
 
   Filters::Common::Expr::CelStatePrototype wasm_state_prototype(
@@ -477,7 +472,6 @@ TEST_P(WasmCommonTest, Utilities) {
               buffer.copyTo(wasm.get(), 0, 1, 1 << 30 /* bad pointer location */, 0));
     EXPECT_EQ(WasmResult::InvalidMemoryAccess,
               buffer.copyTo(wasm.get(), 0, 1, 0, 1 << 30 /* bad size location */));
-    EXPECT_EQ(WasmResult::BadArgument, buffer.copyFrom(0, 1, data));
     EXPECT_EQ(WasmResult::BadArgument, buffer.copyFrom(1, 1, data));
     EXPECT_EQ(WasmResult::BadArgument, const_buffer.copyFrom(1, 1, data));
     EXPECT_EQ(WasmResult::BadArgument, string_buffer.copyFrom(1, 1, data));
@@ -1418,7 +1412,8 @@ public:
   }
 
   void setupContext() {
-    context_ = std::make_unique<TestContext>(wasm_->wasm().get(), root_context_->id(), plugin_);
+    context_ =
+        std::make_unique<TestContext>(wasm_->wasm().get(), root_context_->id(), plugin_handle_);
     context_->onCreate();
   }
 

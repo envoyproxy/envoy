@@ -92,7 +92,7 @@ envoy_cmake_external(
         "//conditions:default": [],
     }),
     postfix_script = select({
-        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/nameser.h $INSTALLDIR/include/nameser.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
+        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_nameser.h $INSTALLDIR/include/ares_nameser.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
         "//conditions:default": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
     }),
     static_libraries = select({
@@ -315,9 +315,9 @@ envoy_cmake_external(
     name = "wamr",
     cache_entries = {
         "LLVM_DIR": "$EXT_BUILD_DEPS/copy_llvm/llvm/lib/cmake/llvm",
-        "WAMR_BUILD_INTERP": "1",
-        "WAMR_BUILD_JIT": "0",
-        "WAMR_BUILD_AOT": "0",
+        "WAMR_BUILD_INTERP": "0",
+        "WAMR_BUILD_JIT": "1",
+        "WAMR_BUILD_AOT": "1",
         "WAMR_BUILD_SIMD": "0",
         "WAMR_BUILD_MULTI_MODULE": "1",
         "WAMR_BUILD_LIBC_WASI": "0",

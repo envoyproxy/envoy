@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/filter.h"
+#include "envoy/server/factory_context.h"
 
 namespace Envoy {
 namespace Http {
@@ -55,6 +56,10 @@ private:
 
 using HttpMatchingDataImplSharedPtr = std::shared_ptr<HttpMatchingDataImpl>;
 
+struct HttpFilterActionContext {
+  const std::string& stat_prefix_;
+  Server::Configuration::FactoryContext& factory_context_;
+};
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy

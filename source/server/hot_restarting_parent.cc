@@ -95,6 +95,8 @@ HotRestartMessage HotRestartingParent::Internal::shutdownAdmin() {
   HotRestartMessage wrapped_reply;
   wrapped_reply.mutable_reply()->mutable_shutdown_admin()->set_original_start_time_unix_seconds(
       server_->startTimeFirstEpoch());
+  wrapped_reply.mutable_reply()->mutable_shutdown_admin()->set_enable_reuse_port_default(
+      server_->enableReusePortDefault());
   return wrapped_reply;
 }
 
@@ -107,10 +109,13 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
   for (const auto& listener : server_->listenerManager().listeners()) {
     Network::ListenSocketFactory& socket_factory = listener.get().listenSocketFactory();
     if (*socket_factory.localAddress() == *addr && listener.get().bindToPort()) {
-      if (socket_factory.sharedSocket().has_value()) {
-        // Pass the socket to the new process if it is already shared across workers.
+      // worker_index() will default to 0 if not set which is the behavior before this field
+      // was added. Thus, this should be safe for both roll forward and roll back.
+      if (request.pass_listen_socket().worker_index() < server_->options().concurrency()) {
         wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
-            socket_factory.sharedSocket()->get().ioHandle().fdDoNotUse());
+            socket_factory.getListenSocket(request.pass_listen_socket().worker_index())
+                ->ioHandle()
+                .fdDoNotUse());
       }
       break;
     }

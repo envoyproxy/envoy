@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 
+#include "envoy/common/matchers.h"
 #include "envoy/common/pure.h"
 
 #include "source/common/common/non_copyable.h"
@@ -21,7 +22,9 @@ namespace Server {
  */
 class ConfigTracker {
 public:
-  using Cb = std::function<ProtobufTypes::MessagePtr()>;
+  // The passed StringMatcher will be matched against the `name` field of whatever
+  // proto is returned.
+  using Cb = std::function<ProtobufTypes::MessagePtr(const Matchers::StringMatcher&)>;
   using CbsMap = std::map<std::string, Cb>;
 
   /**

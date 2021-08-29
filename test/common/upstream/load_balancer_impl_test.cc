@@ -574,7 +574,7 @@ public:
   std::shared_ptr<LoadBalancer> lb_;
   HostsPerLocalityConstSharedPtr empty_locality_;
   HostVector empty_host_vector_;
-}; // namespace
+};
 
 // For the tests which mutate primary and failover host sets explicitly, only
 // run once.

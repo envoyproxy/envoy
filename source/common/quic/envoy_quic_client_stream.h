@@ -27,9 +27,6 @@ public:
   EnvoyQuicClientStream(quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session,
                         quic::StreamType type, Http::Http3::CodecStats& stats,
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
-  EnvoyQuicClientStream(quic::PendingStream* pending, quic::QuicSpdyClientSession* client_session,
-                        quic::StreamType type, Http::Http3::CodecStats& stats,
-                        const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
 
   void setResponseDecoder(Http::ResponseDecoder& decoder) { response_decoder_ = &decoder; }
 
@@ -49,9 +46,6 @@ public:
   void resetStream(Http::StreamResetReason reason) override;
   void setFlushTimeout(std::chrono::milliseconds) override {}
 
-  void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
-    // TODO(kbaichoo): implement account tracking for QUIC.
-  }
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
@@ -75,6 +69,9 @@ protected:
                                 const quic::QuicHeaderList& header_list) override;
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                  const quic::QuicHeaderList& header_list) override;
+
+  // Http::MultiplexedStreamImplBase
+  bool hasPendingData() override;
 
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();

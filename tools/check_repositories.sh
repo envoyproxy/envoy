@@ -12,8 +12,8 @@ fi
 
 # Check whether number of defined `url =` or `urls =` and `sha256 =` kwargs in
 # repository definitions is equal.
-urls_count=$(git grep -E "\<url(s)? =" -- '*.bzl' | wc -l)
-sha256sums_count=$(git grep -E "\<sha256 =" -- '*.bzl' | wc -l)
+urls_count=$(git grep -E "\<url(s)? =" -- '*.bzl' -- ':!bazel/external/cargo/crates.bzl' | wc -l)
+sha256sums_count=$(git grep -E "\<sha256 =" -- '*.bzl' -- ':!bazel/external/cargo/crates.bzl' | wc -l)
 
 if [[ $urls_count != "$sha256sums_count" ]]; then
   echo "Found more defined repository URLs than SHA256 sums, which means that there are some repositories without sums."

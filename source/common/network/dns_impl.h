@@ -24,7 +24,7 @@ class DnsResolverImplPeer;
  * Implementation of DnsResolver that uses c-ares. All calls and callbacks are assumed to
  * happen on the thread that owns the creating dispatcher.
  */
-class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::upstream> {
+class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
   DnsResolverImpl(Event::Dispatcher& dispatcher,
                   const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
@@ -44,9 +44,10 @@ private:
         : parent_(parent), callback_(callback), dispatcher_(dispatcher), channel_(channel),
           dns_name_(dns_name) {}
 
-    void cancel() override {
+    void cancel(CancelReason) override {
       // c-ares only supports channel-wide cancellation, so we just allow the
       // network events to continue but don't invoke the callback on completion.
+      // TODO(mattklein123): Potentially use timeout to destroy and recreate the channel.
       cancelled_ = true;
     }
 
@@ -106,7 +107,7 @@ private:
   Event::TimerPtr timer_;
   ares_channel channel_;
   bool dirty_channel_{};
-  const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options_;
+  envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 
   absl::node_hash_map<int, Event::FileEventPtr> events_;
   const absl::optional<std::string> resolvers_csv_;

@@ -31,7 +31,7 @@ DEFINE_PROTO_FUZZER(
   auto filter = std::make_unique<Filter>(std::move(cfg));
 
   ListenerFilterFuzzer fuzzer;
-  fuzzer.fuzz(*filter, input.fuzzed());
+  fuzzer.fuzz(std::move(filter), input.fuzzed());
 }
 
 } // namespace TlsInspector

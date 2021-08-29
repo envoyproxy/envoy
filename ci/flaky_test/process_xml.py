@@ -4,6 +4,7 @@ import subprocess
 import os
 import xml.etree.ElementTree as ET
 import slack
+from slack.errors import SlackApiError
 import sys
 import ssl
 
@@ -273,8 +274,12 @@ if __name__ == "__main__":
             ssl_context.verify_mode = ssl.CERT_NONE
             # Due to a weird interaction between `websocket-client` and Slack client
             # we need to set the ssl context. See `slackapi/python-slack-sdk/issues/334`
-            client = slack.WebClient(token=SLACKTOKEN, ssl=ssl_context)
-            client.chat_postMessage(channel='test-flaky', text=output_msg, as_user="true")
+            try:
+                client = slack.WebClient(token=SLACKTOKEN, ssl=ssl_context)
+                client.chat_postMessage(channel='test-flaky', text=output_msg, as_user="true")
+            except SlackApiError as e:
+                print("Call to SlackApi failed:", e.response["error"])
+                print(output_msg)
         else:
             print(output_msg)
     else:

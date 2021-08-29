@@ -22,7 +22,7 @@ Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstShar
   address_provider_->setLocalAddress(address);
 
   const Api::SysCallIntResult result = SocketImpl::bind(address_provider_->localAddress());
-  if (SOCKET_FAILURE(result.rc_)) {
+  if (SOCKET_FAILURE(result.return_value_)) {
     close();
     throw SocketBindException(fmt::format("cannot bind '{}': {}",
                                           address_provider_->localAddress()->asString(),
@@ -35,27 +35,13 @@ Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstShar
 void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
   if (!Network::Socket::applyOptions(options, *this,
                                      envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
-    throw CreateListenerException("ListenSocket: Setting socket options failed");
+    throw SocketOptionException("ListenSocket: Setting socket options failed");
   }
 }
 
-void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& options,
-                                   bool bind_to_port) {
+void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& options) {
   setListenSocketOptions(options);
-
-  if (bind_to_port) {
-    bind(address_provider_->localAddress());
-  }
-}
-
-// UDP listen socket desires io handle regardless bind_to_port is true or false.
-template <>
-NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::NetworkListenSocket(
-    const Address::InstanceConstSharedPtr& address,
-    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
-    : ListenSocketImpl(Network::ioHandleForAddr(Socket::Type::Datagram, address), address) {
-  setPrebindSocketOptions();
-  setupSocket(options, bind_to_port);
+  bind(address_provider_->localAddress());
 }
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)

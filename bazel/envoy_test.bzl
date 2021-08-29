@@ -60,11 +60,7 @@ def _envoy_cc_test_infrastructure_library(
 # Compute the test linkopts based on various options.
 def _envoy_test_linkopts():
     return select({
-        "@envoy//bazel:apple": [
-            # See note here: https://luajit.org/install.html
-            "-pagezero_size 10000",
-            "-image_base 100000000",
-        ],
+        "@envoy//bazel:apple": [],
         "@envoy//bazel:windows_x86_64": [
             "-DEFAULTLIB:ws2_32.lib",
             "-DEFAULTLIB:iphlpapi.lib",
@@ -160,7 +156,8 @@ def envoy_cc_test(
         coverage = True,
         local = False,
         size = "medium",
-        flaky = False):
+        flaky = False,
+        env = {}):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
 
     cc_test(
@@ -184,6 +181,7 @@ def envoy_cc_test(
         shard_count = shard_count,
         size = size,
         flaky = flaky,
+        env = env,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified

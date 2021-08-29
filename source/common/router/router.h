@@ -388,7 +388,7 @@ public:
                                           : callbacks_->getUpstreamSocketOptions();
   }
 
-  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+  Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
     return transport_socket_options_;
   }
 
@@ -408,8 +408,8 @@ public:
     std::string value;
     const Network::Connection* conn = downstreamConnection();
     // Need to check for null conn if this is ever used by Http::AsyncClient in the future.
-    value = conn->addressProvider().remoteAddress()->asString() +
-            conn->addressProvider().localAddress()->asString();
+    value = conn->connectionInfoProvider().remoteAddress()->asString() +
+            conn->connectionInfoProvider().localAddress()->asString();
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
     downstream_set_cookies_.emplace_back(
@@ -527,6 +527,7 @@ private:
   // response forwarded downstream
   UpstreamRequest* final_upstream_request_;
   bool grpc_request_{};
+  bool exclude_http_code_stats_ = false;
   Http::RequestHeaderMap* downstream_headers_{};
   Http::RequestTrailerMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;
@@ -549,7 +550,7 @@ private:
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
 
-  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::Socket::OptionsSharedPtr upstream_options_;
 };
 

@@ -16,7 +16,8 @@ ExternalProcessorClientImpl::ExternalProcessorClientImpl(
 
 ExternalProcessorStreamPtr
 ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks) {
-  Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(factory_->create());
+  Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(
+      factory_->createUncachedRawAsyncClient());
   return std::make_unique<ExternalProcessorStreamImpl>(std::move(grpcClient), callbacks);
 }
 

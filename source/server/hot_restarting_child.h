@@ -14,10 +14,10 @@ public:
   HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
                      mode_t socket_mode);
 
-  int duplicateParentListenSocket(const std::string& address);
+  int duplicateParentListenSocket(const std::string& address, uint32_t worker_index);
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
-  void sendParentAdminShutdownRequest(time_t& original_start_time);
+  absl::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();
   void sendParentTerminateRequest();
   void mergeParentStats(Stats::Store& stats_store,
                         const envoy::HotRestartMessage::Reply::Stats& stats_proto);

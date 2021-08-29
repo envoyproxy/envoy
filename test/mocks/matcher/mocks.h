@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/common/matchers.h"
 #include "source/common/matcher/matcher.h"
 
 #include "gmock/gmock.h"
@@ -18,4 +19,11 @@ public:
 };
 
 } // namespace Matcher
+
+namespace Matchers {
+class MockStringMatcher : public StringMatcher {
+public:
+  MOCK_METHOD(bool, match, (absl::string_view), (const, override));
+};
+} // namespace Matchers
 } // namespace Envoy

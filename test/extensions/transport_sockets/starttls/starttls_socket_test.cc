@@ -25,7 +25,7 @@ public:
 };
 
 TEST(StartTlsTest, BasicSwitch) {
-  Network::TransportSocketOptionsSharedPtr options =
+  Network::TransportSocketOptionsConstSharedPtr options =
       std::make_shared<Network::TransportSocketOptionsImpl>();
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
   NiceMock<StartTlsTransportSocketMock>* raw_socket = new NiceMock<StartTlsTransportSocketMock>;

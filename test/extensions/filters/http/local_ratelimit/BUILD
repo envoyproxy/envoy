@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
-    extension_name = "envoy.filters.http.local_ratelimit",
+    extension_names = ["envoy.filters.http.local_ratelimit"],
     deps = [
         "//source/extensions/filters/http/local_ratelimit:local_ratelimit_lib",
         "//test/common/stream_info:test_util",
@@ -27,7 +27,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.http.local_ratelimit",
+    extension_names = ["envoy.filters.http.local_ratelimit"],
     deps = [
         "//source/extensions/filters/http/local_ratelimit:config",
         "//test/mocks/server:server_mocks",
@@ -37,7 +37,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "local_ratelimit_integration_test",
     srcs = ["local_ratelimit_integration_test.cc"],
-    extension_name = "envoy.filters.http.local_ratelimit",
+    extension_names = ["envoy.filters.http.local_ratelimit"],
     deps = [
         "//source/extensions/filters/http/local_ratelimit:config",
         "//test/integration:http_protocol_integration_lib",

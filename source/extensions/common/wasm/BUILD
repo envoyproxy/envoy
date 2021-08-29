@@ -24,8 +24,8 @@ envoy_cc_library(
     hdrs = [
         "context.h",
         "plugin.h",
+        "stats_handler.h",
         "wasm.h",
-        "wasm_extension.h",
         "wasm_vm.h",
     ],
     visibility = ["//visibility:public"],
@@ -43,6 +43,7 @@ envoy_cc_library(
         "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "@com_google_cel_cpp//eval/public:activation",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
         "@proxy_wasm_cpp_host//:headers",
         "@proxy_wasm_cpp_sdk//:common_lib",
@@ -55,8 +56,8 @@ envoy_cc_library(
         "context.cc",
         "foreign.cc",
         "plugin.cc",
+        "stats_handler.cc",
         "wasm.cc",
-        "wasm_extension.cc",
         "wasm_vm.cc",
     ],
     copts = select({

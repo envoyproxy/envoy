@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef ENVOY_ENABLE_QUIC
+
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/thread.h"
@@ -45,6 +47,19 @@ private:
                          Thread::AtomicPtrAllocMode::DoNotDelete>
       reset_stream_error_stat_names_;
 };
+
+#else
+
+#include "source/common/stats/symbol_table_impl.h"
+namespace Envoy {
+namespace Quic {
+
+class QuicStatNames {
+public:
+  explicit QuicStatNames(Stats::SymbolTable& symbol_table);
+};
+
+#endif
 
 } // namespace Quic
 } // namespace Envoy

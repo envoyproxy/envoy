@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/api/v2/scoped_route.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -15,7 +14,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/resource_name.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/watcher_impl.h"
@@ -109,7 +107,6 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
       Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration>(
-          scoped_rds.scoped_rds_config_source().resource_api_version(),
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       factory_context_(factory_context), name_(name),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
@@ -346,13 +343,12 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   // server.
   std::unique_ptr<Cleanup> srds_initialization_continuation;
   ASSERT(localInitManager().state() > Init::Manager::State::Uninitialized);
-  const auto type_urls =
-      Envoy::Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
+  const auto type_url = Envoy::Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>();
   // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
   // In the case that localInitManager is uninitialized, RDS is already paused
   // either by Server init or LDS init.
   if (factory_context_.clusterManager().adsMux()) {
-    resume_rds = factory_context_.clusterManager().adsMux()->pause(type_urls);
+    resume_rds = factory_context_.clusterManager().adsMux()->pause(type_url);
   }
   // if local init manager is initialized, the parent init manager may have gone away.
   if (localInitManager().state() == Init::Manager::State::Initialized) {
@@ -393,6 +389,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   }
   stats_.all_scopes_.set(scoped_route_map_.size());
   stats_.config_reload_.inc();
+  stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
 }
 
 void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_name,
@@ -520,7 +517,8 @@ ScopedRdsConfigProvider::ScopedRdsConfigProvider(
     ScopedRdsConfigSubscriptionSharedPtr&& subscription)
     : MutableConfigProviderCommonBase(std::move(subscription), ConfigProvider::ApiType::Delta) {}
 
-ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const {
+ProtobufTypes::MessagePtr
+ScopedRoutesConfigProviderManager::dumpConfigs(const Matchers::StringMatcher& name_matcher) const {
   auto config_dump = std::make_unique<envoy::admin::v3::ScopedRoutesConfigDump>();
   for (const auto& element : configSubscriptions()) {
     auto subscription = element.second.lock();
@@ -534,8 +532,10 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const
       dynamic_config->set_name(typed_subscription->name());
       const ScopedRouteMap& scoped_route_map = typed_subscription->scopedRouteMap();
       for (const auto& it : scoped_route_map) {
-        dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(
-            API_RECOVER_ORIGINAL(it.second->configProto()));
+        if (!name_matcher.match(it.second->configProto().name())) {
+          continue;
+        }
+        dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(it.second->configProto());
       }
       TimestampUtil::systemClockToTimestamp(subscription->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
@@ -549,8 +549,10 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const
     auto* inline_config = config_dump->mutable_inline_scoped_route_configs()->Add();
     inline_config->set_name(static_cast<InlineScopedRoutesConfigProvider*>(provider)->name());
     for (const auto& config_proto : protos_info.value().config_protos_) {
-      inline_config->mutable_scoped_route_configs()->Add()->PackFrom(
-          API_RECOVER_ORIGINAL(*config_proto));
+      if (!name_matcher.match(config_proto->name())) {
+        continue;
+      }
+      inline_config->mutable_scoped_route_configs()->Add()->PackFrom(*config_proto);
     }
     TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                           *inline_config->mutable_last_updated());

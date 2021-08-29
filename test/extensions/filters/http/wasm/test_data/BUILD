@@ -30,6 +30,35 @@ wasm_rust_binary(
 )
 
 wasm_rust_binary(
+    name = "close_stream_rust.wasm",
+    srcs = ["close_stream_rust.rs"],
+    deps = [
+        "@proxy_wasm_rust_sdk//:proxy_wasm",
+        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+    ],
+)
+
+wasm_rust_binary(
+    name = "grpc_call_rust.wasm",
+    srcs = ["grpc_call_rust.rs"],
+    deps = [
+        "@proxy_wasm_rust_sdk//:proxy_wasm",
+        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "//bazel/external/cargo:protobuf",
+    ],
+)
+
+wasm_rust_binary(
+    name = "grpc_stream_rust.wasm",
+    srcs = ["grpc_stream_rust.rs"],
+    deps = [
+        "@proxy_wasm_rust_sdk//:proxy_wasm",
+        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "//bazel/external/cargo:protobuf",
+    ],
+)
+
+wasm_rust_binary(
     name = "headers_rust.wasm",
     srcs = ["headers_rust.rs"],
     wasi = True,

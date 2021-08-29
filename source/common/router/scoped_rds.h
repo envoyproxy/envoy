@@ -86,6 +86,7 @@ private:
   COUNTER(config_reload)                                                                           \
   COUNTER(update_empty)                                                                            \
   GAUGE(all_scopes, Accumulate)                                                                    \
+  GAUGE(config_reload_time_ms, NeverImport)                                                        \
   GAUGE(on_demand_scopes, Accumulate)                                                              \
   GAUGE(active_scopes, Accumulate)
 
@@ -274,7 +275,7 @@ public:
   ~ScopedRoutesConfigProviderManager() override = default;
 
   // Envoy::Config::ConfigProviderManagerImplBase
-  ProtobufTypes::MessagePtr dumpConfigs() const override;
+  ProtobufTypes::MessagePtr dumpConfigs(const Matchers::StringMatcher& name_matcher) const override;
 
   // Envoy::Config::ConfigProviderManager
   Envoy::Config::ConfigProviderPtr
