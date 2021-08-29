@@ -60,13 +60,10 @@ public:
       });
     }
 
-    main_dispatcher_->post([&, work]() {
-      // Wait until all the workers start to execute the callback.
-      start_counter.Wait();
-      // Notify all the worker to continue.
-      workers_should_fire.Notify();
-    });
-
+    // Wait until all the workers start to execute the callback.
+    start_counter.Wait();
+    // Notify all the worker to continue.
+    workers_should_fire.Notify();
     // Wait for all workers to finish the job.
     end_counter.Wait();
   }
