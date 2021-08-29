@@ -60,10 +60,13 @@ public:
       });
     }
 
-    // Wait until all the workers start to execute the callback.
-    start_counter.Wait();
-    // Notify all the worker to continue.
-    workers_should_fire.Notify();
+    main_dispatcher_->post([&, work]() {
+      // Wait until all the workers start to execute the callback.
+      start_counter.Wait();
+      // Notify all the worker to continue.
+      workers_should_fire.Notify();
+    });
+
     // Wait for all workers to finish the job.
     end_counter.Wait();
   }
@@ -120,21 +123,23 @@ private:
   std::vector<Thread::ThreadPtr> worker_threads_;
 };
 
-class ExtAuthzFilterTest : public MultiThreadTest, public testing::Test {
+class ExtAuthzFilterTest : public Event::TestUsingSimulatedTime,
+                           public MultiThreadTest,
+                           public testing::Test {
 public:
-  ExtAuthzFilterTest() : MultiThreadTest(3), stat_names_(symbol_table_) {}
+  ExtAuthzFilterTest() : MultiThreadTest(10), stat_names_(symbol_table_) {}
 
   Http::FilterFactoryCb createFilterFactory(const std::string& ext_authz_config_yaml) {
-    /*
     async_client_manager_ = std::make_unique<TestAsyncClientManagerImpl>(
-        context_.cluster_manager_, tls(), api().timeSource(), api(), stat_names_);
-        */
+        context_.cluster_manager_, tls(), simTime(), api(), stat_names_);
     EXPECT_CALL(context_, getServerFactoryContext())
         .WillRepeatedly(testing::ReturnRef(server_context_));
     ON_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
-        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
-                                  Grpc::CacheOption) {
-          return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService& config,
+                                  Stats::Scope& scope, bool skip_cluster_check,
+                                  Grpc::CacheOption cache_option) {
+          return async_client_manager_->getOrCreateRawAsyncClient(config, scope, skip_cluster_check,
+                                                                  cache_option);
         }));
     ExtAuthzFilterConfig factory;
     ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
