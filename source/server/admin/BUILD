@@ -177,7 +177,7 @@ envoy_cc_library(
     name = "pprof_handler_lib",
     srcs = ["pprof_handler.cc"],
     hdrs = ["pprof_handler.h"],
-    external_deps = ["zlib", "pprof_proto_cc"],
+    external_deps = ["pprof_proto_cc"],
     tcmalloc_dep = 1,
     deps = [
         ":handler_ctx_lib",
@@ -187,6 +187,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/compression/gzip/compressor:compressor_lib",
         "@com_google_absl//absl/debugging:symbolize",
         "@com_google_absl//absl/status:statusor",
     ],

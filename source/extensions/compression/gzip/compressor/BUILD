@@ -20,6 +20,9 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/extensions/compression/gzip/common:zlib_base_lib",
     ],
+    visibility = [
+        "//source/server/admin:__pkg__",
+    ],
 )
 
 envoy_cc_extension(

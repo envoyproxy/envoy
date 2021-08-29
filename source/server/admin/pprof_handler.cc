@@ -10,11 +10,14 @@
 #if defined(TCMALLOC)
 #include "tcmalloc/malloc_extension.h"
 #endif
+#include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 #include "proto/profile.pb.h"
 #include "zlib.h"
 
 namespace Envoy {
 namespace Server {
+
+using Extensions::Compression::Gzip::Compressor::ZlibCompressorImpl;
 
 namespace {
 
@@ -24,87 +27,8 @@ constexpr bool kHasTcMalloc = true;
 constexpr bool kHasTcMalloc = false;
 #endif
 
-constexpr size_t kChunkSize = 16 * 1024;
-constexpr int kGzipEncoding = 16;
-constexpr int kDefaultMemLevel = 8;
-
-class ZStream {
-public:
-  explicit ZStream(std::function<void(z_stream*)> destructor) : destructor_(std::move(destructor)) {
-    ResetOutput();
-  }
-  ~ZStream() { destructor_(&stream_); }
-
-  z_stream* Get() { return &stream_; }
-  z_stream* operator->() { return Get(); }
-
-  absl::StatusOr<std::string> process(const std::string& data,
-                                      std::function<int(z_stream*)> process,
-                                      absl::string_view process_name) {
-    stream_.avail_in = data.size();
-    stream_.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.c_str()));
-
-    for (;;) {
-      int ret = process(&stream_);
-      // Z_STREAM_ERROR indicates that z_stream is corrupted. Should never happen.
-      RELEASE_ASSERT(ret != Z_STREAM_ERROR, "zstream is corrupted");
-
-      UpdateOutput();
-      if (ret == Z_STREAM_END) {
-        // Double check that all input was indeed consumed.
-        RELEASE_ASSERT(stream_.avail_in == 0, "some input was not consumed");
-        break;
-      }
-
-      // Z_OK means that some progress was made, otherwise it is an error as all available input has
-      // been already provided to zlib.
-      if (ret != Z_OK) {
-        return invalidArgumentError(absl::StrFormat("%s() failed", process_name));
-      }
-    }
-
-    return std::move(output_);
-  }
-
-  absl::Status invalidArgumentError(absl::string_view prefix) {
-    return absl::InvalidArgumentError(
-        absl::StrFormat("%s: %s", prefix, stream_.msg ? stream_.msg : "unknown"));
-  }
-
-private:
-  void UpdateOutput() {
-    const size_t out_size = sizeof(buffer_) - stream_.avail_out;
-    output_.append(reinterpret_cast<char*>(&buffer_), reinterpret_cast<char*>(buffer_ + out_size));
-    ResetOutput();
-  }
-
-  void ResetOutput() {
-    stream_.next_out = buffer_;
-    stream_.avail_out = sizeof(buffer_);
-  }
-
-  Bytef buffer_[kChunkSize];
-  z_stream stream_{};
-  std::function<void(z_stream*)> destructor_;
-  std::string output_;
-};
-
-absl::StatusOr<std::string> compress(const std::string& data) {
-  ZStream stream([](z_stream* stream) {
-    int ret = deflateEnd(stream);
-    // deflateEnd fails iff stream is invalid, which is impossible.
-    RELEASE_ASSERT(ret == Z_OK, "deflateEnd() failed");
-  });
-  int ret = deflateInit2(stream.Get(), Z_DEFAULT_COMPRESSION, Z_DEFLATED, MAX_WBITS | kGzipEncoding,
-                         kDefaultMemLevel, Z_DEFAULT_STRATEGY);
-  // deflateInit2 fails iff input arguments are invalid or process is out of memory.
-  // In either case we can not fix it (arguments are constants and handling out of memory is too
-  // hard problem to solve).
-  RELEASE_ASSERT(ret == Z_OK, "deflateInit2() failed");
-
-  return stream.process(
-      data, [](z_stream* stream) { return deflate(stream, Z_FINISH); }, "deflate");
-}
+constexpr int kDefaultMemLevel = 5;
+constexpr int kDefaultWindowBits = 12;
 
 } // namespace
 
@@ -189,14 +113,11 @@ Http::Code PprofHandler::handlerHeapProfile(absl::string_view,
   });
 #endif
 
-  auto compressed = compress(profile.SerializeAsString());
-  if (!compressed.ok()) {
-    response.add(compressed.status().ToString());
-    return Envoy::Http::Code::InternalServerError;
-  }
-
+  ZlibCompressorImpl compressor;
+  compressor.init(ZlibCompressorImpl::CompressionLevel::Standard, ZlibCompressorImpl::CompressionStrategy::Standard, kDefaultMemLevel, kDefaultWindowBits);
+  response.add(profile.SerializeAsString());
+  compressor.compress(response, Compression::Compressor::State::Finish);
   response_headers.setContentType("application/octet-stream");
-  response.add(*compressed);
   return Envoy::Http::Code::OK;
 }
 
