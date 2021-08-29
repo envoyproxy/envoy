@@ -220,6 +220,8 @@ To use the generic matching tree, specify a ref:`matcher <fds>` on a virtual hos
               name: route
               typed_config:
                 "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /
                 route:
                   cluster: cluster_foo
                 request_headers_to_add:
@@ -231,6 +233,8 @@ To use the generic matching tree, specify a ref:`matcher <fds>` on a virtual hos
               name: route
               typed_config:
                 "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /
                 route:
                   cluster: cluster_bar
                 request_headers_to_add:
@@ -241,11 +245,10 @@ To use the generic matching tree, specify a ref:`matcher <fds>` on a virtual hos
 This allows resolving the same Route proto message used for the `routes`-based routing using the additional
 matching flexibility provided by the generic matching framework.
 
+Note that the resulting Route also specifies a match criteria. This must be satisfied in addition to resolving
+the route in order to achieve a route match. When path rewrites are used, the matched path will only depend on
+the match criteria of the resolved Route. Path matching done during the match tree traversal does not contribute
+to path rewrites.
+
 The only inputs supported are request headers (via `envoy.type.matcher.v3.HttpRequestHeaderMatchInput`). See
 the docs for the :ref:`matching API <arch_overview_matching_api>` for more information about the API as a whole.
-
-Known limiations:
-
-* The matching tree doesn't work with path rewrites. This is because this relies on rewriting the matched path
-  against the rewrite rule, but the matching engine allows matching on :path in many different ways, making it
-  ambiguous which path match should be used when rewriting.

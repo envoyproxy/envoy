@@ -91,6 +91,7 @@ message VirtualHost {
   // Only one of this and `matcher` can be specified.
   repeated Route routes = 3;
 
+  // [#next-major-version: This should be included in a oneof with routes wrapped in a message.]
   // The match tree to use when resolving route actions for incoming requests. Only one of this and `routes`
   // can be specified.
   xds.type.matcher.v3.Matcher matcher = 21;
@@ -221,7 +222,7 @@ message Route {
   string name = 14;
 
   // Route matching parameters.
-  RouteMatch match = 1;
+  RouteMatch match = 1 [(validate.rules).message = {required: true}];
 
   oneof action {
     option (validate.required) = true;

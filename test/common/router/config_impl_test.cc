@@ -1233,7 +1233,6 @@ virtual_hosts:
   domains:
   - lyft.com
   matcher:
-    "@type": type.googleapis.com/envoy.config.common.matcher.v3.Matcher
     matcher_tree:
       input:
         name: request-headers
@@ -1247,6 +1246,8 @@ virtual_hosts:
               name: route
               typed_config:
                 "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /
                 route:
                   cluster: root_ww2
                 request_headers_to_add:
@@ -1258,6 +1259,8 @@ virtual_hosts:
               name: route
               typed_config:
                 "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /
                 route:
                   cluster: root_ww2
                 request_headers_to_add:

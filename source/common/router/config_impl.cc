@@ -63,29 +63,6 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
                                 src.headers_to_remove.end());
 }
 
-// A RouteEntry produced via a generic matching tree.
-class MatchTreeRouteEntryImpl : public RouteEntryImplBase {
-public:
-  using RouteEntryImplBase::RouteEntryImplBase;
-
-  RouteConstSharedPtr matches(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
-                              uint64_t) const override {
-    // This is used during match resolution for the old linear matcher, should never be called when
-    // we have a match tree defined.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-
-  // We can't support path rewrites since it requires us to have a single path that we match on,
-  // but the matcher tree affords too much flexibility here making that ambiguous.
-  // TODO(snowp): Can we use tree validation to prevent these fields from being set?
-  absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
-    return absl::nullopt;
-  }
-  PathMatchType matchType() const override { return PathMatchType::None; }
-  const std::string& matcher() const override { NOT_REACHED_GCOVR_EXCL_LINE; }
-};
-
 RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
     const envoy::config::route::v3::Route& route_config, const VirtualHostImpl& vhost,
     const OptionalHttpFilters& optional_http_filters,
@@ -1723,9 +1700,8 @@ Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
   const auto& route_config =
       MessageUtil::downcastAndValidate<const envoy::config::route::v3::Route&>(config,
                                                                                validation_visitor);
-  auto route = std::make_shared<MatchTreeRouteEntryImpl>(
-      context.vhost, route_config, context.optional_http_filters, context.factory_context,
-      validation_visitor);
+  auto route = createAndValidateRoute(route_config, context.vhost, context.optional_http_filters,
+                                      context.factory_context, validation_visitor, absl::nullopt);
 
   return [route]() { return std::make_unique<RouteMatchAction>(route); };
 }
