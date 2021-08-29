@@ -93,7 +93,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
   sockets_.push_back(createListenSocketAndApplyOptions(factory, socket_type, 0));
 
   if (sockets_[0] != nullptr && local_address_->ip() && local_address_->ip()->port() == 0) {
-    local_address_ = sockets_[0]->addressProvider().localAddress();
+    local_address_ = sockets_[0]->connectionInfoProvider().localAddress();
   }
   ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name,
             local_address_->asString());
@@ -185,7 +185,7 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
                                        envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
       throw Network::SocketOptionException(
           fmt::format("cannot set post-listen socket option on socket: {}",
-                      socket->addressProvider().localAddress()->asString()));
+                      socket->connectionInfoProvider().localAddress()->asString()));
     }
   };
   // On all platforms we should listen on the first socket.
@@ -444,6 +444,10 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(config_.udp_listener_config());
   if (config_.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC
+    if (config_.has_connection_balance_config()) {
+      throw EnvoyException("connection_balance_config is configured for QUIC listener which "
+                           "doesn't work with connection balancer.");
+    }
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_);
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT

@@ -47,11 +47,10 @@ public:
   virtual ~MultiThreadTest() { tls_.shutdownGlobalThreading(); }
 
   void postWorkToAllWorkers(std::function<void()> work) {
-    absl::BlockingCounter start_counter(num_threads_);
     absl::BlockingCounter end_counter(num_threads_);
     absl::Notification workers_should_fire;
 
-    for (Event::DispaztcherPtr& dispatcher : worker_dispatchers_) {
+    for (Event::DispatcherPtr& dispatcher : worker_dispatchers_) {
       dispatcher->post([&, work]() {
         workers_should_fire.WaitForNotificationWithTimeout(absl::Milliseconds(1000));
         work();
@@ -59,8 +58,6 @@ public:
       });
     }
 
-    // Wait until all the workers start to execute the callback.
-    start_counter.Wait();
     // Notify all the worker to continue.
     workers_should_fire.Notify();
     // Wait for all workers to finish the job.

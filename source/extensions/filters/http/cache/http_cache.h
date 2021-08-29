@@ -186,7 +186,7 @@ class LookupRequest {
 public:
   // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
   LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
-                const VaryHeader& vary_allow_list);
+                const VaryAllowList& vary_allow_list);
 
   const RequestCacheControl& requestCacheControl() const { return request_cache_control_; }
 
@@ -207,7 +207,7 @@ public:
                                 ResponseMetadata&& metadata, uint64_t content_length) const;
 
   const Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
-  const VaryHeader& varyAllowList() const { return vary_allow_list_; }
+  const VaryAllowList& varyAllowList() const { return vary_allow_list_; }
 
 private:
   void initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers);
@@ -217,7 +217,7 @@ private:
   Key key_;
   std::vector<RawByteRange> request_range_spec_;
   Http::RequestHeaderMapPtr request_headers_;
-  const VaryHeader& vary_allow_list_;
+  const VaryAllowList& vary_allow_list_;
   // Time when this LookupRequest was created (in response to an HTTP request).
   SystemTime timestamp_;
   RequestCacheControl request_cache_control_;

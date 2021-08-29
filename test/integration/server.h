@@ -45,8 +45,7 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
                       FieldValidationConfig validation_config = FieldValidationConfig(),
                       uint32_t concurrency = 1,
                       std::chrono::seconds drain_time = std::chrono::seconds(1),
-                      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
-                      bool v2_bootstrap = false);
+                      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual);
 
 class TestComponentFactory : public ComponentFactory {
 public:
@@ -398,18 +397,16 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
                               public IntegrationTestServerStats,
                               public Server::ComponentFactory {
 public:
-  static IntegrationTestServerPtr
-  create(const std::string& config_path, const Network::Address::IpVersion version,
-         std::function<void(IntegrationTestServer&)> on_server_ready_function,
-         std::function<void()> on_server_init_function, bool deterministic,
-         Event::TestTimeSystem& time_system, Api::Api& api,
-         bool defer_listener_finalization = false,
-         ProcessObjectOptRef process_object = absl::nullopt,
-         Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
-         uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
-         Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
-         Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false,
-         bool v2_bootstrap = false);
+  static IntegrationTestServerPtr create(
+      const std::string& config_path, const Network::Address::IpVersion version,
+      std::function<void(IntegrationTestServer&)> on_server_ready_function,
+      std::function<void()> on_server_init_function, bool deterministic,
+      Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization = false,
+      ProcessObjectOptRef process_object = absl::nullopt,
+      Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
+      uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
+      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
+      Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -437,7 +434,7 @@ public:
              bool defer_listener_finalization, ProcessObjectOptRef process_object,
              Server::FieldValidationConfig validation_config, uint32_t concurrency,
              std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-             Buffer::WatermarkFactorySharedPtr watermark_factory, bool v2_bootstrap);
+             Buffer::WatermarkFactorySharedPtr watermark_factory);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
@@ -545,7 +542,7 @@ private:
                      ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-                     Buffer::WatermarkFactorySharedPtr watermark_factory, bool v2_bootstrap);
+                     Buffer::WatermarkFactorySharedPtr watermark_factory);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;

@@ -86,7 +86,7 @@ public:
 private:
   void commit() {
     committed_ = true;
-    if (VaryHeader::hasVary(*response_headers_)) {
+    if (VaryHeaderUtils::hasVary(*response_headers_)) {
       cache_.varyInsert(key_, std::move(response_headers_), std::move(metadata_), body_.toString(),
                         request_headers_, vary_allow_list_);
     } else {
@@ -96,7 +96,7 @@ private:
 
   Key key_;
   const Http::RequestHeaderMap& request_headers_;
-  const VaryHeader& vary_allow_list_;
+  const VaryAllowList& vary_allow_list_;
   Http::ResponseHeaderMapPtr response_headers_;
   ResponseMetadata metadata_;
   SimpleHttpCache& cache_;
@@ -109,11 +109,38 @@ LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
   return std::make_unique<SimpleLookupContext>(*this, std::move(request));
 }
 
-void SimpleHttpCache::updateHeaders(const LookupContext&, const Http::ResponseHeaderMap&,
-                                    const ResponseMetadata&) {
-  // TODO(toddmgreer): Support updating headers.
-  // Not implemented yet, however this is called during tests
-  // NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
+                                    const Http::ResponseHeaderMap& response_headers,
+                                    const ResponseMetadata& metadata) {
+  const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
+  const Key& key = simple_lookup_context.request().key();
+  absl::WriterMutexLock lock(&mutex_);
+
+  auto iter = map_.find(key);
+  if (iter == map_.end() || !iter->second.response_headers_) {
+    return;
+  }
+  auto& entry = iter->second;
+
+  // TODO(tangsaidi) handle Vary header updates properly
+  if (VaryHeaderUtils::hasVary(*(entry.response_headers_))) {
+    return;
+  }
+
+  // https://www.rfc-editor.org/rfc/pdfrfc/rfc7234.txt.pdf
+  // 4.3.4 Freshening Stored Responses upon Validation
+  // use other header fields provided in the 304 (Not Modified)
+  // response to replace all instances of the corresponding header
+  // fields in the stored response.
+  //
+  // Assumptions:
+  // 1. The internet is fast, i.e. we get the result as soon as the server sends it.
+  // Race conditions would not be possible because we are always processing up-to-date data.
+  // 2. No key collision for etag. Therefore, if etag matches it's the same resource.
+  // 3. Backend is correct. etag is being used as a unique identifier to the resource
+  // TODO(tangsaidi) merge the header map instead of replacing it according to rfc7234
+  entry.response_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
+  entry.metadata_ = metadata;
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
@@ -124,7 +151,7 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
   }
   ASSERT(iter->second.response_headers_);
 
-  if (VaryHeader::hasVary(*iter->second.response_headers_)) {
+  if (VaryHeaderUtils::hasVary(*iter->second.response_headers_)) {
     return varyLookup(request, iter->second.response_headers_);
   } else {
     return SimpleHttpCache::Entry{
@@ -147,12 +174,12 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
   mutex_.AssertReaderHeld();
 
   absl::btree_set<absl::string_view> vary_header_values =
-      VaryHeader::getVaryValues(*response_headers);
+      VaryHeaderUtils::getVaryValues(*response_headers);
   ASSERT(!vary_header_values.empty());
 
   Key varied_request_key = request.key();
-  const absl::optional<std::string> vary_identifier =
-      request.varyAllowList().createVaryIdentifier(vary_header_values, request.requestHeaders());
+  const absl::optional<std::string> vary_identifier = VaryHeaderUtils::createVaryIdentifier(
+      request.varyAllowList(), vary_header_values, request.requestHeaders());
   if (!vary_identifier.has_value()) {
     // The vary allow list has changed and has made the vary header of this
     // cached value not cacheable.
@@ -175,17 +202,17 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
                                  Http::ResponseHeaderMapPtr&& response_headers,
                                  ResponseMetadata&& metadata, std::string&& body,
                                  const Http::RequestHeaderMap& request_headers,
-                                 const VaryHeader& vary_allow_list) {
+                                 const VaryAllowList& vary_allow_list) {
   absl::WriterMutexLock lock(&mutex_);
 
   absl::btree_set<absl::string_view> vary_header_values =
-      VaryHeader::getVaryValues(*response_headers);
+      VaryHeaderUtils::getVaryValues(*response_headers);
   ASSERT(!vary_header_values.empty());
 
   // Insert the varied response.
   Key varied_request_key = request_key;
   const absl::optional<std::string> vary_identifier =
-      vary_allow_list.createVaryIdentifier(vary_header_values, request_headers);
+      VaryHeaderUtils::createVaryIdentifier(vary_allow_list, vary_header_values, request_headers);
   if (!vary_identifier.has_value()) {
     // Skip the insert if we are unable to create a vary key.
     return;

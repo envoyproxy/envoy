@@ -28,10 +28,9 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-envoy::config::route::v3::RateLimit parseRateLimitFromV3Yaml(const std::string& yaml_string,
-                                                             bool avoid_boosting = true) {
+envoy::config::route::v3::RateLimit parseRateLimitFromV3Yaml(const std::string& yaml_string) {
   envoy::config::route::v3::RateLimit rate_limit;
-  TestUtility::loadFromYaml(yaml_string, rate_limit, false, avoid_boosting);
+  TestUtility::loadFromYaml(yaml_string, rate_limit);
   TestUtility::validate(rate_limit);
   return rate_limit;
 }

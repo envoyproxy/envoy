@@ -353,13 +353,24 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
 
   filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
   filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+  ProtobufWkt::Struct dynamic_metadata;
+  (*dynamic_metadata.mutable_fields())["baz"] = ValueUtil::stringValue("hello-ok");
+  (*dynamic_metadata.mutable_fields())["x"] = ValueUtil::numberValue(12);
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
+            Filters::Common::ExtAuthz::Response response{};
+            response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+            response.dynamic_metadata = dynamic_metadata;
+            callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
           })));
-  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
+                                           const ProtobufWkt::Struct& returned_dynamic_metadata) {
+        EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
+        EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, dynamic_metadata));
+      }));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
@@ -385,12 +396,24 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
 
   filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
   filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+  ProtobufWkt::Struct dynamic_metadata;
+  (*dynamic_metadata.mutable_fields())["baz"] = ValueUtil::stringValue("hello-nok");
+  (*dynamic_metadata.mutable_fields())["x"] = ValueUtil::numberValue(15);
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
+            Filters::Common::ExtAuthz::Response response{};
+            response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+            response.dynamic_metadata = dynamic_metadata;
+            callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
           })));
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
+                                           const ProtobufWkt::Struct& returned_dynamic_metadata) {
+        EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
+        EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, dynamic_metadata));
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
