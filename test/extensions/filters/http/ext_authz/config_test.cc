@@ -43,94 +43,105 @@ public:
 
 class MultiThreadTest {
 public:
-  MultiThreadTest(size_t num_threads) : num_threads_(num_threads), api_(Api::createApiForTest()) {}
-  virtual ~MultiThreadTest() { tls_.shutdownGlobalThreading(); }
+  MultiThreadTest(size_t num_threads)
+      : num_threads_(num_threads), api_(Api::createApiForTest()), end_counter_(num_threads_) {}
+  virtual ~MultiThreadTest() {}
 
   void postWorkToAllWorkers(std::function<void()> work) {
-    absl::BlockingCounter start_counter(num_threads_);
-    absl::BlockingCounter end_counter(num_threads_);
-    absl::Notification workers_should_fire;
+
+    // absl::BlockingCounter start_counter(num_threads_);
 
     for (Event::DispatcherPtr& dispatcher : worker_dispatchers_) {
       dispatcher->post([&, work]() {
-        start_counter.DecrementCount();
-        workers_should_fire.WaitForNotificationWithTimeout(absl::Milliseconds(1000));
+        workers_should_fire_.WaitForNotification();
         work();
-        end_counter.DecrementCount();
       });
     }
 
-    // Wait until all the workers start to execute the callback.
-    start_counter.Wait();
-    // Notify all the worker to continue.
-    workers_should_fire.Notify();
-    // Wait for all workers to finish the job.
-    end_counter.Wait();
+    main_dispatcher_->post([&]() {
+      // Wait until all the workers start to execute the callback.
+      // start_counter.Wait();
+      // Notify all the worker to continue.
+      workers_should_fire_.Notify();
+      std::cerr << "notify them\n" << std::endl;
+    });
+  }
+
+  void postWorkToMain(std::function<void()> work) {
+    main_dispatcher_->post([work]() { work(); });
   }
 
 protected:
-  void startThreading() {
-    spawnMainThread();
-    spawnWorkerThreads();
-  }
+  void startThreading() { spawnMainThread(); }
 
   void cleanUpThreading() {
-    // Post exit signals and wait for thread to end.
-    for (Event::DispatcherPtr& dispatcher : worker_dispatchers_) {
-      dispatcher->post([&dispatcher]() { dispatcher->exit(); });
-    }
-    for (Thread::ThreadPtr& worker : worker_threads_) {
-      worker->join();
-    }
-    main_dispatcher_->post([this]() { main_dispatcher_->exit(); });
+    main_dispatcher_->post([&]() {
+      // Post exit signals and wait for thread to end.
+      for (Event::DispatcherPtr& dispatcher : worker_dispatchers_) {
+        dispatcher->post([&dispatcher]() { dispatcher->exit(); });
+      }
+      for (Thread::ThreadPtr& worker : worker_threads_) {
+        worker->join();
+      }
+      tls().shutdownGlobalThreading();
+      main_dispatcher_->exit();
+      tls_.reset();
+    });
     main_thread_->join();
   }
 
-  ThreadLocal::InstanceImpl& tls() { return tls_; }
+  ThreadLocal::InstanceImpl& tls() { return *tls_; }
 
   Api::Api& api() { return *api_; }
 
 private:
   void spawnMainThread() {
     main_dispatcher_ = api_->allocateDispatcher("main_thread");
-    tls_.registerThread(*main_dispatcher_, true);
-    main_thread_ = api_->threadFactory().createThread(
-        [this]() { main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); });
+
+    main_thread_ = api_->threadFactory().createThread([this]() {
+      tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
+      tls().registerThread(*main_dispatcher_, true);
+      spawnWorkerThreads();
+      main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+    });
   }
 
   void spawnWorkerThreads() {
     // Create worker dispatchers and register tls.
     for (size_t i = 0; i < num_threads_; i++) {
       worker_dispatchers_.emplace_back(api_->allocateDispatcher(std::to_string(i)));
-      tls_.registerThread(*worker_dispatchers_[i], false);
+      tls().registerThread(*worker_dispatchers_[i], false);
       // i must be explicitly captured by value.
-      worker_threads_.emplace_back(api_->threadFactory().createThread(
-          [this, i]() { worker_dispatchers_[i]->run(Event::Dispatcher::RunType::RunUntilExit); }));
+      worker_threads_.emplace_back(api_->threadFactory().createThread([this, i]() {
+        absl::BlockingCounter end_counter(num_threads_);
+        worker_dispatchers_[i]->run(Event::Dispatcher::RunType::RunUntilExit);
+      }));
     }
   }
 
   const size_t num_threads_;
 
-  ThreadLocal::InstanceImpl tls_;
+  std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   Api::ApiPtr api_;
 
   Event::DispatcherPtr main_dispatcher_;
   Thread::ThreadPtr main_thread_;
   std::vector<Event::DispatcherPtr> worker_dispatchers_;
   std::vector<Thread::ThreadPtr> worker_threads_;
+  absl::BlockingCounter end_counter_;
+  absl::Notification workers_should_fire_;
 };
 
 class ExtAuthzFilterTest : public Event::TestUsingSimulatedTime,
                            public MultiThreadTest,
                            public testing::Test {
 public:
-  ExtAuthzFilterTest() : MultiThreadTest(10), stat_names_(symbol_table_) {}
+  ExtAuthzFilterTest() : MultiThreadTest(5), stat_names_(symbol_table_) {}
 
   Http::FilterFactoryCb createFilterFactory(const std::string& ext_authz_config_yaml) {
     async_client_manager_ = std::make_unique<TestAsyncClientManagerImpl>(
-        context_.cluster_manager_, tls(), simTime(), api(), stat_names_);
-    EXPECT_CALL(context_, getServerFactoryContext())
-        .WillRepeatedly(testing::ReturnRef(server_context_));
+        context_.cluster_manager_, tls(), api().timeSource(), api(), stat_names_);
+    ON_CALL(context_, getServerFactoryContext()).WillByDefault(testing::ReturnRef(server_context_));
     ON_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService& config,
                                   Stats::Scope& scope, bool skip_cluster_check,
@@ -229,7 +240,10 @@ TEST_F(ExtAuthzFilterTest, ExtAuthzFilterFactoryTestHttp) {
   )EOF";
 
   startThreading();
-  Http::FilterFactoryCb filter_factory = createFilterFactory(ext_authz_config_yaml);
+
+  Http::FilterFactoryCb filter_factory;
+  postWorkToMain([&]() { filter_factory = createFilterFactory(ext_authz_config_yaml); });
+
   postWorkToAllWorkers([&, filter_factory]() {
     Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
     EXPECT_NE(filter, nullptr);
@@ -247,7 +261,9 @@ TEST_F(ExtAuthzFilterTest, ExtAuthzFilterFactoryTestEnvoyGrpc) {
    )EOF";
   initAddress();
   startThreading();
-  Http::FilterFactoryCb filter_factory = createFilterFactory(ext_authz_config_yaml);
+  Http::FilterFactoryCb filter_factory;
+  postWorkToMain([&]() { filter_factory = createFilterFactory(ext_authz_config_yaml); });
+
   postWorkToAllWorkers([&, filter_factory]() {
     Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
     testExtAuthzFilter(filter);
@@ -266,7 +282,9 @@ TEST_F(ExtAuthzFilterTest, ExtAuthzFilterFactoryTestGoogleGrpc) {
   )EOF";
   initAddress();
   startThreading();
-  Http::FilterFactoryCb filter_factory = createFilterFactory(ext_authz_config_yaml);
+  Http::FilterFactoryCb filter_factory;
+  postWorkToMain([&]() { filter_factory = createFilterFactory(ext_authz_config_yaml); });
+
   postWorkToAllWorkers([&, filter_factory]() {
     Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
     testExtAuthzFilter(filter);
