@@ -3,7 +3,6 @@
 #include <string>
 
 #include "source/common/common/assert.h"
-#include "source/server/admin/profile.pb.h"
 
 #include "absl/debugging/symbolize.h"
 #include "absl/status/statusor.h"
@@ -11,6 +10,7 @@
 #if defined(TCMALLOC)
 #include "tcmalloc/malloc_extension.h"
 #endif
+#include "proto/profile.pb.h"
 #include "zlib.h"
 
 namespace Envoy {

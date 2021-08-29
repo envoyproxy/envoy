@@ -135,6 +135,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
     _com_github_google_tcmalloc()
+    _com_github_google_pprof()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
     _com_github_jbeder_yaml_cpp()
@@ -921,6 +922,17 @@ def _com_github_google_tcmalloc():
     native.bind(
         name = "tcmalloc",
         actual = "@com_github_google_tcmalloc//tcmalloc",
+    )
+
+def _com_github_google_pprof():
+    external_http_archive(
+        name = "com_github_google_pprof",
+        build_file = "@envoy//bazel/external:pprof.BUILD",
+    )
+
+    native.bind(
+        name = "pprof_proto_cc",
+        actual = "@com_github_google_pprof//:profile_proto_cc",
     )
 
 def _com_github_gperftools_gperftools():

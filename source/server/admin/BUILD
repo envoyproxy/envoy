@@ -2,7 +2,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -174,20 +173,14 @@ envoy_cc_library(
     ],
 )
 
-envoy_proto_library(
-    name = "profile",
-    srcs = ["profile.proto"],
-)
-
 envoy_cc_library(
     name = "pprof_handler_lib",
     srcs = ["pprof_handler.cc"],
     hdrs = ["pprof_handler.h"],
-    external_deps = ["zlib"],
+    external_deps = ["zlib", "pprof_proto_cc"],
     tcmalloc_dep = 1,
     deps = [
         ":handler_ctx_lib",
-        ":profile_cc_proto",
         "//envoy/http:codes_interface",
         "//envoy/server:admin_interface",
         "//envoy/server:instance_interface",

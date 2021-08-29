@@ -235,6 +235,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_core", "controlplane"],
         cpe = "cpe:2.3:a:gperftools_project:gperftools:*",
     ),
+    com_github_google_pprof = dict(
+        project_name = "com_github_google_pprof",
+        project_desc = "pprof is a tool for visualization and analysis of profiling data",
+        project_url = "https://github.com/google/pprof",
+        version = "02619b876842e0d0afb5e5580d3a374dad740edb",
+        sha256 = "ea2f67b23a37b0f342483254991c69c0f9d54f5889e460acb1ddd2908c8a5ace",
+        strip_prefix = "pprof-{version}",
+        urls = ["https://github.com/google/pprof/archive/{version}.tar.gz"],
+        release_date = "2021-08-27",
+        use_category = ["dataplane_core"],
+        cpe = "N/A",
+    ),
     com_github_grpc_grpc = dict(
         project_name = "gRPC",
         project_desc = "gRPC C core library",
