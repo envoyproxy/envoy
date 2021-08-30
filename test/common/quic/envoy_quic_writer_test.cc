@@ -3,18 +3,19 @@
 #include <memory>
 #include <string>
 
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_error_impl.h"
-#include "common/network/udp_packet_writer_handler_impl.h"
-#include "common/quic/envoy_quic_packet_writer.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
 
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/network/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Return;
 
 namespace Envoy {
@@ -23,7 +24,7 @@ namespace Quic {
 class EnvoyQuicWriterTest : public ::testing::Test {
 public:
   EnvoyQuicWriterTest()
-      : envoy_quic_writer_(std::make_unique<Network::UdpDefaultWriter>(socket_.ioHandle())) {
+      : envoy_quic_writer_(std::make_unique<Network::UdpDefaultWriter>(io_handle_)) {
     self_address_.FromString("::");
     quic::QuicIpAddress peer_ip;
     peer_ip.FromString("::1");
@@ -33,10 +34,11 @@ public:
   }
 
   void verifySendData(const std::string& content, const msghdr* message) {
-    EXPECT_EQ(peer_address_.ToString(), Network::Address::addressFromSockAddr(
-                                            *reinterpret_cast<sockaddr_storage*>(message->msg_name),
-                                            message->msg_namelen, /*v6only=*/false)
-                                            ->asString());
+    EXPECT_EQ(peer_address_.ToString(),
+              (*Network::Address::addressFromSockAddr(
+                   *reinterpret_cast<sockaddr_storage*>(message->msg_name), message->msg_namelen,
+                   /*v6only=*/false))
+                  ->asString());
     cmsghdr* const cmsg = CMSG_FIRSTHDR(message);
     auto pktinfo = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
     EXPECT_EQ(0, memcmp(self_address_.GetIPv6().s6_addr, pktinfo->ipi6_addr.s6_addr,
@@ -49,7 +51,7 @@ public:
 protected:
   testing::NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
-  testing::NiceMock<Network::MockListenSocket> socket_;
+  Network::IoSocketHandleImpl io_handle_;
   quic::QuicIpAddress self_address_;
   quic::QuicSocketAddress peer_address_;
   EnvoyQuicPacketWriter envoy_quic_writer_;

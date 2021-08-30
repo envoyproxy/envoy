@@ -5,10 +5,9 @@
 #include "envoy/config/trace/v3/skywalking.pb.h"
 #include "envoy/grpc/async_client_manager.h"
 
-#include "common/common/backoff_strategy.h"
-#include "common/grpc/async_client_impl.h"
-
-#include "extensions/tracers/skywalking/skywalking_stats.h"
+#include "source/common/common/backoff_strategy.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/extensions/tracers/skywalking/skywalking_stats.h"
 
 #include "cpp2sky/tracing_context.h"
 

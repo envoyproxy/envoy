@@ -2,21 +2,20 @@
 
 #include <memory>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/logger.h"
-#include "common/config/api_version.h"
-#include "common/config/delta_subscription_state.h"
-#include "common/config/grpc_stream.h"
-#include "common/config/pausable_ack_queue.h"
-#include "common/config/watch_map.h"
-#include "common/grpc/common.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/delta_subscription_state.h"
+#include "source/common/config/grpc_stream.h"
+#include "source/common/config/pausable_ack_queue.h"
+#include "source/common/config/watch_map.h"
+#include "source/common/grpc/common.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
@@ -32,11 +31,20 @@ class NewGrpcMuxImpl
       Logger::Loggable<Logger::Id::config> {
 public:
   NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-                 const Protobuf::MethodDescriptor& service_method,
-                 envoy::config::core::v3::ApiVersion transport_api_version,
-                 Random::RandomGenerator& random, Stats::Scope& scope,
-                 const RateLimitSettings& rate_limit_settings,
+                 const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
+                 Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
+
+  ~NewGrpcMuxImpl() override;
+
+  // Causes all NewGrpcMuxImpl objects to stop sending any messages on `grpc_stream_` to fix a crash
+  // on Envoy shutdown due to dangling pointers. This may not be the ideal fix; it is probably
+  // preferable for the `ServerImpl` to cause all configuration subscriptions to be shutdown, which
+  // would then cause all `NewGrpcMuxImpl` to be destructed.
+  // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
+  static void shutdownAll();
+
+  void shutdown() { shutdown_ = true; }
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
                            const absl::flat_hash_set<std::string>& resources,
@@ -80,6 +88,7 @@ public:
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
+    std::string control_plane_identifier_{};
 
     SubscriptionStuff(const SubscriptionStuff&) = delete;
     SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;
@@ -167,8 +176,11 @@ private:
 
   const LocalInfo::LocalInfo& local_info_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
-  const envoy::config::core::v3::ApiVersion transport_api_version_;
   Event::Dispatcher& dispatcher_;
+
+  // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
+  // true because it may contain dangling pointers.
+  std::atomic<bool> shutdown_{false};
 };
 
 using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;

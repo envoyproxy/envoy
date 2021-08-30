@@ -1,8 +1,8 @@
-#include "extensions/filters/http/grpc_http1_bridge/config.h"
+#include "source/extensions/filters/http/grpc_http1_bridge/config.h"
 
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/grpc_http1_bridge/http1_bridge_filter.h"
+#include "source/extensions/filters/http/grpc_http1_bridge/http1_bridge_filter.h"
 
 namespace Envoy {
 namespace Extensions {

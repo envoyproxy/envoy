@@ -2,8 +2,8 @@
 #include "envoy/http/protocol.h"
 #include "envoy/json/json_object.h"
 
-#include "common/json/json_loader.h"
-#include "common/router/reset_header_parser.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/router/reset_header_parser.h"
 
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"

@@ -15,8 +15,8 @@
 #include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/logger.h"
-#include "common/event/scaled_range_timer_manager_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/event/scaled_range_timer_manager_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"

@@ -8,5 +8,5 @@ resources:
     - endpoint:
         address:
           socket_address:
-            address: {{ ntop_ip_loopback_address }}
-            port_value: {{ upstream_0 }}
+            address: "{{ ntop_ip_loopback_address }}"
+            port_value: "{{ upstream_0 }}"

@@ -4,13 +4,11 @@
 
 #include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/empty_string.h"
-#include "common/http/headers.h"
-
-#include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
-#include "extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
-#include "extensions/filters/network/thrift_proxy/filters/well_known_names.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
 
 #include "test/extensions/filters/common/ratelimit/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
@@ -55,7 +53,7 @@ public:
   void setupTest(const std::string& yaml) {
     envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit
         proto_config{};
-    TestUtility::loadFromYaml(yaml, proto_config, false, true);
+    TestUtility::loadFromYaml(yaml, proto_config);
 
     config_ = std::make_shared<Config>(proto_config, local_info_, stats_store_, runtime_, cm_);
 
@@ -339,7 +337,7 @@ TEST_F(ThriftRateLimitFilterTest, ErrorResponseWithDynamicMetadata) {
   EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
                                            const ProtobufWkt::Struct& returned_dynamic_metadata) {
-        EXPECT_EQ(ns, ThriftProxy::ThriftFilters::ThriftFilterNames::get().RATE_LIMIT);
+        EXPECT_EQ(ns, "envoy.filters.thrift.rate_limit");
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, *dynamic_metadata));
       }));
 

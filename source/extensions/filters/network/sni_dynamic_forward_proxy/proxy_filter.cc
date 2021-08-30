@@ -1,11 +1,11 @@
-#include "extensions/filters/network/sni_dynamic_forward_proxy/proxy_filter.h"
+#include "source/extensions/filters/network/sni_dynamic_forward_proxy/proxy_filter.h"
 
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "common/common/assert.h"
-#include "common/tcp_proxy/tcp_proxy.h"
+#include "source/common/common/assert.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,4 +1,4 @@
-#include "extensions/filters/http/grpc_http1_bridge/http1_bridge_filter.h"
+#include "source/extensions/filters/http/grpc_http1_bridge/http1_bridge_filter.h"
 
 #include <cstdint>
 #include <string>
@@ -6,12 +6,12 @@
 
 #include "envoy/http/codes.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/grpc/context_impl.h"
-#include "common/http/headers.h"
-#include "common/http/http1/codec_impl.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/context_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/http1/codec_impl.h"
 
 namespace Envoy {
 namespace Extensions {

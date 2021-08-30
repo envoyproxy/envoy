@@ -4,9 +4,8 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 
-#include "common/http/headers.h"
-
-#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/test_common/utility.h"

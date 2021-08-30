@@ -1,6 +1,5 @@
-#include "common/network/io_socket_error_impl.h"
-
-#include "extensions/transport_sockets/tls/io_handle_bio.h"
+#include "source/common/network/io_socket_error_impl.h"
+#include "source/extensions/transport_sockets/tls/io_handle_bio.h"
 
 #include "test/mocks/network/io_handle.h"
 
@@ -8,6 +7,7 @@
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
 
@@ -24,6 +24,17 @@ public:
   BIO* bio_;
   NiceMock<Network::MockIoHandle> io_handle_;
 };
+
+TEST_F(IoHandleBioTest, WriteError) {
+  EXPECT_CALL(io_handle_, writev(_, 1))
+      .WillOnce(Return(testing::ByMove(
+          Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(100),
+                                                     Network::IoSocketError::deleteIoError)))));
+  EXPECT_EQ(-1, bio_->method->bwrite(bio_, nullptr, 10));
+  const int err = ERR_get_error();
+  EXPECT_EQ(ERR_GET_LIB(err), ERR_LIB_SYS);
+  EXPECT_EQ(ERR_GET_REASON(err), 100);
+}
 
 TEST_F(IoHandleBioTest, TestMiscApis) {
   EXPECT_EQ(bio_->method->destroy(nullptr), 0);

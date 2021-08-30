@@ -17,10 +17,10 @@ envoy_cc_library(
     hdrs = ["http_inspector.h"],
     external_deps = ["http_parser"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:listen_socket_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:headers_lib",
@@ -31,13 +31,10 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
-    category = "envoy.filters.listener",
-    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":http_inspector_lib",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/listener:well_known_names",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "@envoy_api//envoy/extensions/filters/listener/http_inspector/v3:pkg_cc_proto",
     ],
 )

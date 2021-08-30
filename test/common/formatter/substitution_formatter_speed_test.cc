@@ -1,5 +1,5 @@
-#include "common/formatter/substitution_formatter.h"
-#include "common/network/address_impl.h"
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/network/address_impl.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/http/mocks.h"
@@ -48,7 +48,7 @@ std::unique_ptr<Envoy::Formatter::StructFormatter> makeStructFormatter(bool type
 
 std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo() {
   auto stream_info = std::make_unique<Envoy::TestStreamInfo>();
-  stream_info->downstream_address_provider_->setRemoteAddress(
+  stream_info->downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Envoy::Network::Address::Ipv4Instance>("203.0.113.1"));
   return stream_info;
 }

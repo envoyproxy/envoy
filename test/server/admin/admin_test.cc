@@ -8,14 +8,13 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/http/message_impl.h"
-#include "common/json/json_loader.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/access_loggers/common/file_access_log_impl.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -27,11 +26,6 @@
 #include "gtest/gtest.h"
 
 using testing::HasSubstr;
-using testing::Invoke;
-using testing::NiceMock;
-using testing::Return;
-using testing::ReturnPointee;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Server {
@@ -57,13 +51,14 @@ TEST_P(AdminInstanceTest, Getters) {
   EXPECT_EQ(false, admin_.preserveExternalRequestId());
   EXPECT_EQ(nullptr, admin_.tracer());
   EXPECT_EQ(false, admin_.streamErrorOnInvalidHttpMessaging());
+  EXPECT_EQ(false, admin_.schemeToSet().has_value());
 }
 
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
   std::ifstream address_file(address_out_path_);
   std::string address_from_file;
   std::getline(address_file, address_from_file);
-  EXPECT_EQ(admin_.socket().addressProvider().localAddress()->asString(), address_from_file);
+  EXPECT_EQ(admin_.socket().connectionInfoProvider().localAddress()->asString(), address_from_file);
 }
 
 TEST_P(AdminInstanceTest, AdminAddress) {

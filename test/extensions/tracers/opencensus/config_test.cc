@@ -3,7 +3,7 @@
 #include "envoy/config/trace/v3/opencensus.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/tracers/opencensus/config.h"
+#include "source/extensions/tracers/opencensus/config.h"
 
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
@@ -374,6 +374,27 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerStackdriverGrpc) {
                             "Opencensus tracer: cannot handle stackdriver google grpc service, "
                             "google grpc is not built in.");
 #endif
+}
+
+TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerStackdriverAddress) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  const std::string yaml_string = R"EOF(
+  http:
+    name: opencensus
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v3.OpenCensusConfig
+      stackdriver_exporter_enabled: true
+      stackdriver_address: 127.0.0.1:55678
+  )EOF";
+
+  envoy::config::trace::v3::Tracing configuration;
+  TestUtility::loadFromYaml(yaml_string, configuration);
+
+  OpenCensusTracerFactory factory;
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  auto tracer = factory.createTracerDriver(*message, context);
+  EXPECT_NE(nullptr, tracer);
 }
 
 } // namespace OpenCensus

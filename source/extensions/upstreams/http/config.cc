@@ -1,4 +1,4 @@
-#include "extensions/upstreams/http/config.h"
+#include "source/extensions/upstreams/http/config.h"
 
 #include <chrono>
 #include <memory>
@@ -9,10 +9,10 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/utility.h"
-#include "common/http/http1/settings.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/http1/settings.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -111,6 +111,9 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     use_http2_ = true;
     use_alpn_ = true;
     use_http3_ = options.auto_config().has_http3_protocol_options();
+    if (options.auto_config().has_alternate_protocols_cache_options()) {
+      alternate_protocol_cache_options_ = options.auto_config().alternate_protocols_cache_options();
+    }
   }
 }
 

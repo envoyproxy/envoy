@@ -2,12 +2,11 @@
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 
-#include "common/router/context_impl.h"
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/cluster_manager_impl.h"
-
-#include "extensions/clusters/aggregate/cluster.h"
+#include "source/common/router/context_impl.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/cluster_manager_impl.h"
+#include "source/extensions/clusters/aggregate/cluster.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/common/upstream/utility.h"

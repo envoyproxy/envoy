@@ -30,21 +30,20 @@
 #include "envoy/upstream/locality.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/callback_impl.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/logger.h"
-#include "common/config/metadata.h"
-#include "common/config/utility.h"
-#include "common/config/well_known_names.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/isolated_store_impl.h"
-#include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/outlier_detection_impl.h"
-#include "common/upstream/resource_manager_impl.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/clusters/well_known_names.h"
+#include "source/common/common/callback_impl.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/outlier_detection_impl.h"
+#include "source/common/upstream/resource_manager_impl.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -177,9 +176,9 @@ private:
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
-    Config::Utility::translateOpaqueConfig(
-        cluster.cluster_type().typed_config(), ProtobufWkt::Struct::default_instance(),
-        socket_factory_context.messageValidationVisitor(), *config);
+    Config::Utility::translateOpaqueConfig(cluster.cluster_type().typed_config(),
+                                           socket_factory_context.messageValidationVisitor(),
+                                           *config);
     return createClusterWithConfig(cluster,
                                    MessageUtil::downcastAndValidate<const ConfigProto&>(
                                        *config, context.messageValidationVisitor()),

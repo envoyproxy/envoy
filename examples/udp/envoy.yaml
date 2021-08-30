@@ -1,7 +1,6 @@
 static_resources:
   listeners:
   - name: listener_0
-    reuse_port: true
     address:
       socket_address:
         protocol: UDP
@@ -16,7 +15,6 @@ static_resources:
 
   clusters:
   - name: service_udp
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -30,7 +28,6 @@ static_resources:
                 port_value: 5005
 
 admin:
-  access_log_path: "/dev/null"
   address:
     socket_address:
       address: 0.0.0.0

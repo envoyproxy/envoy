@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "jwt_verify_lib/jwks.h"
@@ -57,19 +58,25 @@ public:
    * i.e. from the invocation of `fetch()` until either
    * a callback or `cancel()` is invoked, no
    * additional `fetch()` may be issued.
-   * @param uri the uri to retrieve the jwks from.
+   * the URI to to fetch is to be obtained at construction time
+   * for example from RemoteJwks configuration
+   *
    * @param parent_span the active span to create children under
    * @param receiver the receiver of the fetched JWKS or error.
+   *
+   *
    */
-  virtual void fetch(const envoy::config::core::v3::HttpUri& uri, Tracing::Span& parent_span,
-                     JwksReceiver& receiver) PURE;
+  virtual void fetch(Tracing::Span& parent_span, JwksReceiver& receiver) PURE;
 
   /*
    * Factory method for creating a JwksFetcher.
    * @param cm the cluster manager to use during Jwks retrieval
+   * @param remote_jwks the definition of the remote Jwks source
    * @return a JwksFetcher instance
    */
-  static JwksFetcherPtr create(Upstream::ClusterManager& cm);
+  static JwksFetcherPtr
+  create(Upstream::ClusterManager& cm,
+         const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks);
 };
 } // namespace Common
 } // namespace HttpFilters

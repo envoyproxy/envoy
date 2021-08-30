@@ -1,7 +1,7 @@
 #include <string>
 #include <vector>
 
-#include "extensions/filters/http/ratelimit/ratelimit_headers.h"
+#include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
 #include "test/extensions/filters/common/ratelimit/utils.h"
 #include "test/mocks/http/mocks.h"

@@ -2,7 +2,7 @@
 
 #include "envoy/matcher/matcher.h"
 
-#include "common/common/hash.h"
+#include "source/common/common/hash.h"
 
 namespace Envoy {
 namespace Extensions {

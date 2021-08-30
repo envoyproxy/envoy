@@ -1,12 +1,12 @@
-#include "common/upstream/cds_api_helper.h"
+#include "source/common/upstream/cds_api_helper.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/grpc_mux.h"
 
-#include "common/common/fmt.h"
-#include "common/config/resource_name.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/resource_name.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -19,9 +19,8 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
                              const std::string& system_version_info) {
   Config::ScopedResume maybe_resume_eds;
   if (cm_.adsMux()) {
-    const auto type_urls =
-        Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-    maybe_resume_eds = cm_.adsMux()->pause(type_urls);
+    const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+    maybe_resume_eds = cm_.adsMux()->pause(type_url);
   }
 
   ENVOY_LOG(info, "{}: add {} cluster(s), remove {} cluster(s)", name_, added_resources.size(),

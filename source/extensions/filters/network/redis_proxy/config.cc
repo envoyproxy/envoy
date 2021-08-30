@@ -1,14 +1,14 @@
-#include "extensions/filters/network/redis_proxy/config.h"
+#include "source/extensions/filters/network/redis_proxy/config.h"
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
-#include "extensions/common/redis/cluster_refresh_manager_impl.h"
-#include "extensions/filters/network/common/redis/client_impl.h"
-#include "extensions/filters/network/common/redis/fault_impl.h"
-#include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
-#include "extensions/filters/network/redis_proxy/proxy_filter.h"
-#include "extensions/filters/network/redis_proxy/router_impl.h"
+#include "source/extensions/common/redis/cluster_refresh_manager_impl.h"
+#include "source/extensions/filters/network/common/redis/client_impl.h"
+#include "source/extensions/filters/network/common/redis/fault_impl.h"
+#include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
+#include "source/extensions/filters/network/redis_proxy/proxy_filter.h"
+#include "source/extensions/filters/network/redis_proxy/router_impl.h"
 
 #include "absl/container/flat_hash_set.h"
 

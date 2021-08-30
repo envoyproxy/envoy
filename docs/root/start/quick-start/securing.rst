@@ -59,8 +59,8 @@ to the :ref:`transport_socket <extension_envoy.transport_sockets.tls>` of a
    :language: yaml
    :linenos:
    :lineno-start: 39
-   :lines: 39-57
-   :emphasize-lines: 16-19
+   :lines: 39-56
+   :emphasize-lines: 15-18
    :caption: :download:`envoy-demo-tls.yaml <_include/envoy-demo-tls.yaml>`
 
 .. _start_quick_start_securing_validation:
@@ -79,8 +79,8 @@ Firstly, you can ensure that the certificates are from a mutually trusted certif
 .. literalinclude:: _include/envoy-demo-tls-validation.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 43
-   :lines: 43-53
+   :lineno-start: 42
+   :lines: 42-52
    :emphasize-lines: 6-9
    :caption: :download:`envoy-demo-tls-validation.yaml <_include/envoy-demo-tls-validation.yaml>`
 
@@ -92,8 +92,8 @@ certificate is valid for.
 .. literalinclude:: _include/envoy-demo-tls-validation.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 43
-   :lines: 43-53
+   :lineno-start: 42
+   :lines: 42-52
    :emphasize-lines: 6-7, 10-11
    :caption: :download:`envoy-demo-tls-validation.yaml <_include/envoy-demo-tls-validation.yaml>`
 
@@ -154,9 +154,9 @@ When connecting to an upstream with client certificates you can set them as foll
 .. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 45
-   :lines: 45-69
-   :emphasize-lines: 21-25
+   :lineno-start: 44
+   :lines: 44-68
+   :emphasize-lines: 20-25
    :caption: :download:`envoy-demo-tls-client-auth.yaml <_include/envoy-demo-tls-client-auth.yaml>`
 
 .. _start_quick_start_securing_sni:
@@ -195,8 +195,8 @@ This will usually be the DNS name of the service you are connecting to.
 .. literalinclude:: _include/envoy-demo-tls-sni.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 56
-   :lines: 56-61
+   :lineno-start: 55
+   :lines: 55-60
    :emphasize-lines: 6
    :caption: :download:`envoy-demo-tls-sni.yaml <_include/envoy-demo-tls-sni.yaml>`
 

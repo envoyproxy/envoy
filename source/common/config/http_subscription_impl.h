@@ -1,13 +1,12 @@
 #pragma once
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/http/rest_api_fetcher.h"
+#include "source/common/config/api_version.h"
+#include "source/common/http/rest_api_fetcher.h"
 
 namespace Envoy {
 namespace Config {
@@ -28,7 +27,6 @@ public:
                        Random::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
                        std::chrono::milliseconds request_timeout,
                        const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
-                       envoy::config::core::v3::ApiVersion transport_api_version,
                        SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
                        SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout,
                        ProtobufMessage::ValidationVisitor& validation_visitor);
@@ -61,7 +59,6 @@ private:
   std::chrono::milliseconds init_fetch_timeout_;
   Event::TimerPtr init_fetch_timeout_timer_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
 } // namespace Config

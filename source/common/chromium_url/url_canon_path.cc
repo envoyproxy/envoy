@@ -7,9 +7,9 @@
 
 #include <limits.h>
 
-#include "common/chromium_url/url_canon.h"
-#include "common/chromium_url/url_canon_internal.h"
-#include "common/chromium_url/url_parse_internal.h"
+#include "source/common/chromium_url/url_canon.h"
+#include "source/common/chromium_url/url_canon_internal.h"
+#include "source/common/chromium_url/url_parse_internal.h"
 
 namespace chromium_url {
 

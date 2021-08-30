@@ -13,10 +13,10 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/http/rest_api_fetcher.h"
-#include "common/network/cidr_range.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/http/rest_api_fetcher.h"
+#include "source/common/network/cidr_range.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/node_hash_set.h"
 

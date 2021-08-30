@@ -5,7 +5,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 
-#include "common/singleton/threadsafe_singleton.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 #include "absl/container/flat_hash_map.h"
 

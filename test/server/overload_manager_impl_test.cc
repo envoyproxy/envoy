@@ -8,11 +8,9 @@
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
 
-#include "common/stats/isolated_store_impl.h"
-
-#include "server/overload_manager_impl.h"
-
-#include "extensions/resource_monitors/common/factory_base.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/resource_monitors/common/factory_base.h"
+#include "source/server/overload_manager_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"

@@ -98,6 +98,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "happy_eyeballs_connection_impl_test",
+    srcs = ["happy_eyeballs_connection_impl_test.cc"],
+    deps = [
+        "//source/common/network:happy_eyeballs_connection_impl_lib",
+        "//source/common/network:socket_option_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "apple_dns_impl_test",
     srcs = select({
         "//bazel:apple": ["apple_dns_impl_test.cc"],
@@ -105,10 +116,10 @@ envoy_cc_test(
     }),
     external_deps = ["abseil_synchronization"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:dns_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/network:dns_interface",
         "//source/common/event:dispatcher_includes",
-        "//include/envoy/event:file_event_interface",
+        "//envoy/event:file_event_interface",
         "//source/common/stats:isolated_store_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
@@ -139,9 +150,9 @@ envoy_cc_test(
     # https://gist.github.com/wrowe/24fe5b93b58bb444bce7ecc134905395
     tags = ["fails_on_clang_cl"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:address_interface",
-        "//include/envoy/network:dns_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/network:address_interface",
+        "//envoy/network:dns_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
@@ -311,7 +322,7 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
-        "@com_googlesource_quiche//:quic_test_tools_mock_syscall_wrapper_lib",
+        "@com_github_google_quiche//:quic_test_tools_mock_syscall_wrapper_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

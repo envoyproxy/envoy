@@ -4,12 +4,11 @@
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/filter_manager_impl.h"
-#include "common/tcp_proxy/tcp_proxy.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/filters/network/ratelimit/ratelimit.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/filter_manager_impl.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/filters/network/ratelimit/ratelimit.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/filters/common/ratelimit/mocks.h"
@@ -416,7 +415,7 @@ stat_prefix: name
   EXPECT_EQ(manager.initializeReadFilters(), true);
 
   EXPECT_CALL(factory_context.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Return(&conn_pool));
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool)));
 
   request_callbacks->complete(Extensions::Filters::Common::RateLimit::LimitStatus::OK, nullptr,
                               nullptr, nullptr, "", nullptr);

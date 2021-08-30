@@ -3,18 +3,18 @@
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "common/protobuf/utility.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/filters/http/jwt_authn/jwks_cache.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/filters/http/jwt_authn/jwks_cache.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
-#include "test/mocks/thread_local/mocks.h"
-#include "test/test_common/simulated_time_system.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
 using ::google::jwt_verify::Status;
+using ::testing::MockFunction;
 
 namespace Envoy {
 namespace Extensions {
@@ -22,25 +22,32 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
+JwtAuthnFilterStats generateMockStats(Stats::Scope& scope) {
+  return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, ""))};
+}
+
 class JwksCacheTest : public testing::Test {
 protected:
-  JwksCacheTest() : api_(Api::createApiForTest()) {}
+  JwksCacheTest() : stats_(generateMockStats(context_.scope())) {}
+
   void SetUp() override {
+    // fetcher is only called at async_fetch. In this test, it is never called.
+    EXPECT_CALL(mock_fetcher_, Call(_, _)).Times(0);
     setupCache(ExampleConfig);
     jwks_ = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
   }
 
   void setupCache(const std::string& config_str) {
     TestUtility::loadFromYaml(config_str, config_);
-    cache_ = JwksCache::create(config_, time_system_, *api_, tls_);
+    cache_ = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
   }
 
-  Event::SimulatedTimeSystem time_system_;
   JwtAuthentication config_;
   JwksCachePtr cache_;
   google::jwt_verify::JwksPtr jwks_;
-  Api::ApiPtr api_;
-  ::testing::NiceMock<ThreadLocal::MockInstance> tls_;
+  MockFunction<Common::JwksFetcherPtr(Upstream::ClusterManager&, const RemoteJwks&)> mock_fetcher_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  JwtAuthnFilterStats stats_;
 };
 
 // Test findByProvider
@@ -84,7 +91,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwks) {
   auto& provider0 = (*config_.mutable_providers())[std::string(ProviderName)];
   // Set cache_duration to 1 second to test expiration
   provider0.mutable_remote_jwks()->mutable_cache_duration()->set_seconds(1);
-  cache_ = JwksCache::create(config_, time_system_, *api_, tls_);
+  cache_ = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
@@ -94,7 +101,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwks) {
   EXPECT_FALSE(jwks->isExpired());
 
   // cache duration is 1 second, sleep two seconds to expire it
-  time_system_.advanceTimeWait(std::chrono::seconds(2));
+  context_.time_system_.advanceTimeWait(std::chrono::seconds(2));
   EXPECT_TRUE(jwks->isExpired());
 }
 
@@ -103,7 +110,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwksWithDefaultCacheDuration) {
   auto& provider0 = (*config_.mutable_providers())[std::string(ProviderName)];
   // Clear cache_duration to use default one.
   provider0.mutable_remote_jwks()->clear_cache_duration();
-  cache_ = JwksCache::create(config_, time_system_, *api_, tls_);
+  cache_ = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
@@ -120,7 +127,7 @@ TEST_F(JwksCacheTest, TestGoodInlineJwks) {
   auto local_jwks = provider0.mutable_local_jwks();
   local_jwks->set_inline_string(PublicKey);
 
-  cache_ = JwksCache::create(config_, time_system_, *api_, tls_);
+  cache_ = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_FALSE(jwks->getJwksObj() == nullptr);
@@ -134,7 +141,7 @@ TEST_F(JwksCacheTest, TestBadInlineJwks) {
   auto local_jwks = provider0.mutable_local_jwks();
   local_jwks->set_inline_string("BAD-JWKS");
 
-  cache_ = JwksCache::create(config_, time_system_, *api_, tls_);
+  cache_ = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);

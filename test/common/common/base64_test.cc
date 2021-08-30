@@ -1,7 +1,7 @@
 #include <string>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/base64.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/base64.h"
 
 #include "test/test_common/printers.h"
 

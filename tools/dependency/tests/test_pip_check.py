@@ -1,4 +1,4 @@
-from unittest.mock import patch, PropertyMock
+from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
@@ -31,58 +31,67 @@ def test_pip_checker_config_requirements():
             == [('updates',), {}])
 
 
-def test_pip_checker_dependabot_config(patches):
+@pytest.mark.parametrize("isdict", [True, False])
+def test_pip_checker_dependabot_config(patches, isdict):
     checker = pip_check.PipChecker("path1", "path2", "path3")
     patched = patches(
-        "open",
-        "yaml.safe_load",
+        "utils",
         ("PipChecker.path", dict(new_callable=PropertyMock)),
-        "os.path.join",
         prefix="tools.dependency.pip_check")
 
-    with patched as (m_open, m_yaml, m_path, m_join):
-        assert checker.dependabot_config == m_yaml.return_value
+    with patched as (m_utils, m_path):
+        if isdict:
+            m_utils.from_yaml.return_value = {}
+
+        if isdict:
+            assert checker.dependabot_config == m_utils.from_yaml.return_value
+        else:
+            with pytest.raises(pip_check.PipConfigurationError) as e:
+                checker.dependabot_config
+
+            assert (
+                e.value.args[0]
+                == f'Unable to parse dependabot config: {checker.dependabot_config_path}')
 
     assert (
-        list(m_join.call_args)
-        == [(m_path.return_value, checker._dependabot_config), {}])
+        list(m_path.return_value.joinpath.call_args)
+        == [(checker._dependabot_config, ), {}])
     assert (
-        list(m_yaml.call_args)
-        == [(m_open.return_value.__enter__.return_value.read.return_value,), {}])
-    assert (
-        list(m_open.return_value.__enter__.return_value.read.call_args,)
-        == [(), {}])
-    assert (
-        list(m_open.call_args)
-        == [(m_join.return_value,), {}])
+        list(m_utils.from_yaml.call_args)
+        == [(m_path.return_value.joinpath.return_value,), {}])
 
 
 def test_pip_checker_requirements_dirs(patches):
     checker = pip_check.PipChecker("path1", "path2", "path3")
-
-    dummy_walker = [
-        ["ROOT1", ["DIR1", "DIR2"], ["FILE1", "FILE2", "FILE3"]],
-        ["ROOT2", ["DIR1", "DIR2"], ["FILE1", "FILE2", "REQUIREMENTS_FILE", "FILE3"]],
-        ["ROOT3", ["DIR1", "DIR2"], ["FILE1", "FILE2", "REQUIREMENTS_FILE", "FILE3"]],
-        ["ROOT4", ["DIR1", "DIR2"], ["FILE1", "FILE2", "FILE3"]]]
-
+    dummy_glob = [
+        "FILE1", "FILE2", "FILE3",
+        "REQUIREMENTS_FILE", "FILE4",
+        "REQUIREMENTS_FILE", "FILE5"]
     patched = patches(
         ("PipChecker.requirements_filename", dict(new_callable=PropertyMock)),
         ("PipChecker.path", dict(new_callable=PropertyMock)),
-        "os.walk",
         prefix="tools.dependency.pip_check")
+    expected = []
 
-    with patched as (m_reqs, m_path, m_walk):
+    with patched as (m_reqs, m_path):
         m_reqs.return_value = "REQUIREMENTS_FILE"
-        m_path.return_value = "ROO"
-        m_walk.return_value = dummy_walker
-        assert checker.requirements_dirs == {'T3', 'T2'}
+        _glob = []
 
-    assert m_reqs.called
-    assert m_path.called
-    assert (
-        list(m_walk.call_args)
-        == [('ROO',), {}])
+        for fname in dummy_glob:
+            _mock = MagicMock()
+            _mock.name = fname
+            if fname == "REQUIREMENTS_FILE":
+                expected.append(_mock)
+            _glob.append(_mock)
+
+        m_path.return_value.glob.return_value = _glob
+        assert checker.requirements_dirs == {f"/{f.parent.relative_to.return_value}" for f in expected}
+
+    for exp in expected:
+        assert (
+            list(exp.parent.relative_to.call_args)
+            == [(m_path.return_value,), {}])
+    assert "requirements_dirs" in checker.__dict__
 
 
 TEST_REQS = (
@@ -148,10 +157,7 @@ def test_pip_checker_dependabot_success(patches):
     assert (
         list(m_succeed.call_args)
         == [('dependabot',
-             [f'Correct dependabot config for {m_fname.return_value} in dir: A',
-              f'Correct dependabot config for {m_fname.return_value} in dir: B',
-              f'Correct dependabot config for {m_fname.return_value} in dir: C',
-              f'Correct dependabot config for {m_fname.return_value} in dir: D']), {}])
+             [f"{m_fname.return_value}: {x}" for x in sorted(success)]),  {}])
 
 
 def test_pip_checker_dependabot_errors(patches):
@@ -169,12 +175,8 @@ def test_pip_checker_dependabot_errors(patches):
         checker.dependabot_errors(errors, MSG)
 
     assert (
-        list(m_error.call_args)
-        == [('dependabot',
-             [f"[ERROR:{m_name.return_value}] (dependabot) {MSG}: A",
-              f"[ERROR:{m_name.return_value}] (dependabot) {MSG}: B",
-              f"[ERROR:{m_name.return_value}] (dependabot) {MSG}: C",
-              f"[ERROR:{m_name.return_value}] (dependabot) {MSG}: D"]), {}])
+        list(list(c) for c in list(m_error.call_args_list))
+        == [[('dependabot', [f'ERROR MESSAGE: {x}']), {}] for x in sorted(errors)])
 
 
 def test_pip_checker_main():

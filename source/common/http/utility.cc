@@ -1,4 +1,4 @@
-#include "common/http/utility.h"
+#include "source/common/http/utility.h"
 
 #include <http_parser.h>
 
@@ -10,20 +10,20 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/grpc/status.h"
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/status.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
@@ -254,44 +254,79 @@ bool maybeAdjustForIpv6(absl::string_view absolute_url, uint64_t& offset, uint64
   return true;
 }
 
-std::string parseCookie(const HeaderMap& headers, const std::string& key,
-                        const std::string& cookie) {
+void forEachCookie(
+    const HeaderMap& headers, const LowerCaseString& cookie_header,
+    const std::function<bool(absl::string_view, absl::string_view)>& cookie_consumer) {
+  const Http::HeaderMap::GetResult cookie_headers = headers.get(cookie_header);
 
-  std::string ret;
+  for (size_t index = 0; index < cookie_headers.size(); index++) {
+    auto cookie_header_value = cookie_headers[index]->value().getStringView();
 
-  headers.iterateReverse([&key, &ret, &cookie](const HeaderEntry& header) -> HeaderMap::Iterate {
-    // Find the cookie headers in the request (typically, there's only one).
-    if (header.key() == cookie) {
+    // Split the cookie header into individual cookies.
+    for (const auto& s : StringUtil::splitToken(cookie_header_value, ";")) {
+      // Find the key part of the cookie (i.e. the name of the cookie).
+      size_t first_non_space = s.find_first_not_of(' ');
+      size_t equals_index = s.find('=');
+      if (equals_index == absl::string_view::npos) {
+        // The cookie is malformed if it does not have an `=`. Continue
+        // checking other cookies in this header.
+        continue;
+      }
+      absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
+      absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
 
-      // Split the cookie header into individual cookies.
-      for (const auto& s : StringUtil::splitToken(header.value().getStringView(), ";")) {
-        // Find the key part of the cookie (i.e. the name of the cookie).
-        size_t first_non_space = s.find_first_not_of(' ');
-        size_t equals_index = s.find('=');
-        if (equals_index == absl::string_view::npos) {
-          // The cookie is malformed if it does not have an `=`. Continue
-          // checking other cookies in this header.
-          continue;
-        }
-        const absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
-        // If the key matches, parse the value from the rest of the cookie string.
-        if (k == key) {
-          absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
+      // Cookie values may be wrapped in double quotes.
+      // https://tools.ietf.org/html/rfc6265#section-4.1.1
+      if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
+        v = v.substr(1, v.size() - 2);
+      }
 
-          // Cookie values may be wrapped in double quotes.
-          // https://tools.ietf.org/html/rfc6265#section-4.1.1
-          if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
-            v = v.substr(1, v.size() - 2);
-          }
-          ret = std::string{v};
-          return HeaderMap::Iterate::Break;
-        }
+      if (!cookie_consumer(k, v)) {
+        return;
       }
     }
-    return HeaderMap::Iterate::Continue;
+  }
+}
+
+std::string parseCookie(const HeaderMap& headers, const std::string& key,
+                        const LowerCaseString& cookie) {
+  std::string value;
+
+  // Iterate over each cookie & return if its value is not empty.
+  forEachCookie(headers, cookie, [&key, &value](absl::string_view k, absl::string_view v) -> bool {
+    if (key == k) {
+      value = std::string{v};
+      return false;
+    }
+
+    // continue iterating until a cookie that matches `key` is found.
+    return true;
   });
 
-  return ret;
+  return value;
+}
+
+absl::flat_hash_map<std::string, std::string>
+Utility::parseCookies(const RequestHeaderMap& headers) {
+  return Utility::parseCookies(headers, [](absl::string_view) -> bool { return true; });
+}
+
+absl::flat_hash_map<std::string, std::string>
+Utility::parseCookies(const RequestHeaderMap& headers,
+                      const std::function<bool(absl::string_view)>& key_filter) {
+  absl::flat_hash_map<std::string, std::string> cookies;
+
+  forEachCookie(headers, Http::Headers::get().Cookie,
+                [&cookies, &key_filter](absl::string_view k, absl::string_view v) -> bool {
+                  if (key_filter(k)) {
+                    cookies.emplace(k, v);
+                  }
+
+                  // continue iterating until all cookies are processed.
+                  return true;
+                });
+
+  return cookies;
 }
 
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
@@ -421,12 +456,20 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
   return path_str;
 }
 
+std::string Utility::stripQueryString(const HeaderString& path) {
+  absl::string_view path_str = path.getStringView();
+  size_t query_offset = path_str.find('?');
+  return std::string(path_str.data(),
+                     query_offset != path_str.npos ? query_offset : path_str.size());
+}
+
 std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
-  return parseCookie(headers, key, Http::Headers::get().Cookie.get());
+  // TODO(wbpcode): Modify the headers parameter type to 'RequestHeaderMap'.
+  return parseCookie(headers, key, Http::Headers::get().Cookie);
 }
 
 std::string Utility::parseSetCookieValue(const Http::HeaderMap& headers, const std::string& key) {
-  return parseCookie(headers, key, Http::Headers::get().SetCookie.get());
+  return parseCookie(headers, key, Http::Headers::get().SetCookie);
 }
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
@@ -542,7 +585,8 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
       // status.
       // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
       // https://github.com/envoyproxy/envoy/blob/main/source/common/formatter/substitution_formatter.cc#L129
-      if (body_text[body_text.length() - 1] == '\n') {
+      if (content_type == Headers::get().ContentTypeValues.Json &&
+          body_text[body_text.length() - 1] == '\n') {
         body_text = body_text.substr(0, body_text.length() - 1);
       }
       response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
@@ -761,6 +805,30 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+absl::string_view Utility::getScheme(const RequestHeaderMap& headers) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.correct_scheme_and_xfp")) {
+    return headers.getSchemeValue();
+  }
+  return headers.getForwardedProtoValue();
+}
+
+std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_headers,
+                                      const absl::optional<uint32_t> max_path_length) {
+  if (!request_headers.Path()) {
+    return "";
+  }
+  absl::string_view path(request_headers.EnvoyOriginalPath()
+                             ? request_headers.getEnvoyOriginalPathValue()
+                             : request_headers.getPathValue());
+
+  if (max_path_length.has_value() && path.length() > max_path_length) {
+    path = path.substr(0, max_path_length.value());
+  }
+
+  return absl::StrCat(Http::Utility::getScheme(request_headers), "://",
+                      request_headers.getHostValue(), path);
+}
+
 void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
                                      absl::string_view& path) {
   /**
@@ -778,7 +846,7 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
   // Start position of the host
   const auto host_pos = (pos == std::string::npos) ? 0 : pos + 3;
   // Start position of the path
-  const auto path_pos = uri.find("/", host_pos);
+  const auto path_pos = uri.find('/', host_pos);
   if (path_pos == std::string::npos) {
     // If uri doesn't have "/", the whole string is treated as host.
     host = uri.substr(host_pos);
@@ -840,6 +908,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "remote error with CONNECT request";
   case Http::StreamResetReason::ProtocolError:
     return "protocol error";
+  case Http::StreamResetReason::OverloadManager:
+    return "overload manager reset";
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -885,47 +955,6 @@ void Utility::transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers,
     headers.setUpgrade(upgrade);
     headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
     headers.setStatus(101);
-  }
-}
-
-const Router::RouteSpecificFilterConfig*
-Utility::resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
-                                                   const Router::RouteConstSharedPtr& route) {
-
-  const Router::RouteSpecificFilterConfig* maybe_filter_config{};
-  traversePerFilterConfigGeneric(
-      filter_name, route, [&maybe_filter_config](const Router::RouteSpecificFilterConfig& cfg) {
-        maybe_filter_config = &cfg;
-      });
-  return maybe_filter_config;
-}
-
-void Utility::traversePerFilterConfigGeneric(
-    const std::string& filter_name, const Router::RouteConstSharedPtr& route,
-    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-  if (!route) {
-    return;
-  }
-
-  const Router::RouteEntry* routeEntry = route->routeEntry();
-
-  if (routeEntry != nullptr) {
-    auto maybe_vhost_config = routeEntry->virtualHost().perFilterConfig(filter_name);
-    if (maybe_vhost_config != nullptr) {
-      cb(*maybe_vhost_config);
-    }
-  }
-
-  auto maybe_route_config = route->perFilterConfig(filter_name);
-  if (maybe_route_config != nullptr) {
-    cb(*maybe_route_config);
-  }
-
-  if (routeEntry != nullptr) {
-    auto maybe_weighted_cluster_config = routeEntry->perFilterConfig(filter_name);
-    if (maybe_weighted_cluster_config != nullptr) {
-      cb(*maybe_weighted_cluster_config);
-    }
   }
 }
 

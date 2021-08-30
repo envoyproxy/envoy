@@ -34,9 +34,9 @@ envoy_cc_library(
     hdrs = ["heap_shrinker.h"],
     deps = [
         ":utils_lib",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/server/overload:overload_manager_interface",
-        "//include/envoy/stats:stats_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/server/overload:overload_manager_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/stats:symbol_table_lib",
     ],
 )

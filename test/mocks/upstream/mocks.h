@@ -12,10 +12,10 @@
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/callback_impl.h"
-#include "common/upstream/health_discovery_service.h"
-#include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/callback_impl.h"
+#include "source/common/upstream/health_discovery_service.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/grpc/mocks.h"

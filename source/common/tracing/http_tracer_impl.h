@@ -13,11 +13,11 @@
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/config/metadata.h"
-#include "common/http/header_map_impl.h"
-#include "common/json/json_loader.h"
-#include "common/tracing/common_values.h"
-#include "common/tracing/null_span_impl.h"
+#include "source/common/config/metadata.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/tracing/common_values.h"
+#include "source/common/tracing/null_span_impl.h"
 
 namespace Envoy {
 namespace Tracing {

@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
 

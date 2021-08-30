@@ -1,11 +1,11 @@
-#include "extensions/clusters/aggregate/cluster.h"
+#include "source/extensions/clusters/aggregate/cluster.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Extensions {

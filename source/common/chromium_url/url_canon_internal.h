@@ -16,8 +16,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "common/chromium_url/envoy_shim.h"
-#include "common/chromium_url/url_canon.h"
+#include "source/common/chromium_url/envoy_shim.h"
+#include "source/common/chromium_url/url_canon.h"
 
 namespace chromium_url {
 

@@ -24,10 +24,8 @@ static_resources:
                   cluster: local_service
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
   clusters:
   - name: local_service
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:

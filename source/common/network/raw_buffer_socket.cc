@@ -1,9 +1,9 @@
-#include "common/network/raw_buffer_socket.h"
+#include "source/common/network/raw_buffer_socket.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/http/headers.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/headers.h"
 
 namespace Envoy {
 namespace Network {
@@ -21,13 +21,13 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
     Api::IoCallUint64Result result = callbacks_->ioHandle().read(buffer, absl::nullopt);
 
     if (result.ok()) {
-      ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.rc_);
-      if (result.rc_ == 0) {
+      ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.return_value_);
+      if (result.return_value_ == 0) {
         // Remote close.
         end_stream = true;
         break;
       }
-      bytes_read += result.rc_;
+      bytes_read += result.return_value_;
       if (callbacks_->shouldDrainReadBuffer()) {
         callbacks_->setTransportSocketIsReadable();
         break;
@@ -64,8 +64,8 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
     Api::IoCallUint64Result result = callbacks_->ioHandle().write(buffer);
 
     if (result.ok()) {
-      ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.rc_);
-      bytes_written += result.rc_;
+      ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.return_value_);
+      bytes_written += result.return_value_;
     } else {
       ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(),
                      result.err_->getErrorDetails());
@@ -87,7 +87,7 @@ absl::string_view RawBufferSocket::failureReason() const { return EMPTY_STRING; 
 void RawBufferSocket::onConnected() { callbacks_->raiseEvent(ConnectionEvent::Connected); }
 
 TransportSocketPtr
-RawBufferSocketFactory::createTransportSocket(TransportSocketOptionsSharedPtr) const {
+RawBufferSocketFactory::createTransportSocket(TransportSocketOptionsConstSharedPtr) const {
   return std::make_unique<RawBufferSocket>();
 }
 

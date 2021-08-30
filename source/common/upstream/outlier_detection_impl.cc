@@ -1,4 +1,4 @@
-#include "common/upstream/outlier_detection_impl.h"
+#include "source/common/upstream/outlier_detection_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -12,12 +12,12 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/http/codes.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/codes.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Upstream {

@@ -1,7 +1,7 @@
-#include "extensions/filters/network/dubbo_proxy/heartbeat_response.h"
-#include "extensions/filters/network/dubbo_proxy/hessian_utils.h"
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
-#include "extensions/filters/network/dubbo_proxy/metadata.h"
+#include "source/extensions/filters/network/dubbo_proxy/heartbeat_response.h"
+#include "source/extensions/filters/network/dubbo_proxy/hessian_utils.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/metadata.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 

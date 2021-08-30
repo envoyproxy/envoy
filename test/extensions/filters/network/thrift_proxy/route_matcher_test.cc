@@ -3,10 +3,9 @@
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.validate.h"
 
-#include "common/config/metadata.h"
-
-#include "extensions/filters/network/thrift_proxy/router/config.h"
-#include "extensions/filters/network/thrift_proxy/router/router_impl.h"
+#include "source/common/config/metadata.h"
+#include "source/extensions/filters/network/thrift_proxy/router/config.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/utility.h"
@@ -21,9 +20,9 @@ namespace Router {
 namespace {
 
 envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration
-parseRouteConfigurationFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
+parseRouteConfigurationFromV3Yaml(const std::string& yaml) {
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration route_config;
-  TestUtility::loadFromYaml(yaml, route_config, false, avoid_boosting);
+  TestUtility::loadFromYaml(yaml, route_config);
   TestUtility::validate(route_config);
   return route_config;
 }
@@ -310,7 +309,8 @@ routes:
       method_name: "method1"
       headers:
       - name: "x-header-1"
-        exact_match: "x-value-1"
+        string_match:
+          exact: "x-value-1"
     route:
       cluster: "cluster1"
 )EOF";
@@ -341,9 +341,10 @@ routes:
       method_name: "method1"
       headers:
       - name: "x-version"
-        safe_regex_match:
-          google_re2: {}
-          regex: "0.[5-9]"
+        string_match:
+          safe_regex:
+            google_re2: {}
+            regex: "0.[5-9]"
     route:
       cluster: "cluster1"
 )EOF";
@@ -454,7 +455,8 @@ routes:
       method_name: "method1"
       headers:
       - name: "x-header-1"
-        prefix_match: "user_id:"
+        string_match:
+          prefix: "user_id:"
     route:
       cluster: "cluster1"
 )EOF";
@@ -490,7 +492,8 @@ routes:
       method_name: "method1"
       headers:
       - name: "x-header-1"
-        suffix_match: "asdf"
+        string_match:
+          suffix: "asdf"
     route:
       cluster: "cluster1"
 )EOF";

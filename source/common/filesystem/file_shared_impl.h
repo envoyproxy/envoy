@@ -4,7 +4,7 @@
 
 #include "envoy/filesystem/filesystem.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -17,6 +17,7 @@ public:
 
   Api::IoError::IoErrorCode getErrorCode() const override;
   std::string getErrorDetails() const override;
+  int getSystemErrorCode() const override { return errno_; }
 
 private:
   const int errno_;

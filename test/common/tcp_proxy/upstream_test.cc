@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "common/tcp_proxy/upstream.h"
+#include "source/common/tcp_proxy/upstream.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -46,7 +46,7 @@ public:
 
 using testing::Types;
 
-typedef Types<Http1Upstream, Http2Upstream> Implementations;
+using Implementations = Types<Http1Upstream, Http2Upstream>;
 
 TYPED_TEST_SUITE(HttpUpstreamTest, Implementations);
 

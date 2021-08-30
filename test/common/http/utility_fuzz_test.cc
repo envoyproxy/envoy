@@ -1,4 +1,4 @@
-#include "common/http/utility.h"
+#include "source/common/http/utility.h"
 
 #include "test/common/http/utility_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"

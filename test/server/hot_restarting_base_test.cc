@@ -1,4 +1,4 @@
-#include "server/hot_restarting_base.h"
+#include "source/server/hot_restarting_base.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"

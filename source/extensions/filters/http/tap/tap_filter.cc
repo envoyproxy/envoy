@@ -1,4 +1,4 @@
-#include "extensions/filters/http/tap/tap_filter.h"
+#include "source/extensions/filters/http/tap/tap_filter.h"
 
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 

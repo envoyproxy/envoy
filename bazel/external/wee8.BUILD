@@ -19,7 +19,6 @@ cc_library(
         "-Wno-range-loop-analysis",
     ],
     defines = [
-        "ENVOY_WASM_V8",
         "V8_ENABLE_WEBASSEMBLY",
     ],
     includes = [

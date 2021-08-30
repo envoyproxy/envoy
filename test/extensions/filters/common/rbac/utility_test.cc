@@ -1,4 +1,4 @@
-#include "extensions/filters/common/rbac/utility.h"
+#include "source/extensions/filters/common/rbac/utility.h"
 
 #include "gtest/gtest.h"
 

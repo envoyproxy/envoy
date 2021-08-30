@@ -5,9 +5,9 @@
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
 
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/common/stream_info/test_int_accessor.h"
 #include "test/mocks/router/mocks.h"
@@ -166,10 +166,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.healthCheck(true);
     EXPECT_TRUE(stream_info.healthCheck());
 
-    EXPECT_EQ(nullptr, stream_info.routeEntry());
-    NiceMock<Router::MockRouteEntry> route_entry;
-    stream_info.route_entry_ = &route_entry;
-    EXPECT_EQ(&route_entry, stream_info.routeEntry());
+    EXPECT_EQ(nullptr, stream_info.route());
+    std::shared_ptr<NiceMock<Router::MockRoute>> route =
+        std::make_shared<NiceMock<Router::MockRoute>>();
+    stream_info.route_ = route;
+    EXPECT_EQ(route, stream_info.route());
 
     stream_info.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
                                        FilterState::StateType::ReadOnly,
@@ -179,11 +180,6 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.setUpstreamFilterState(stream_info.filterState());
     EXPECT_EQ(1,
               stream_info.upstreamFilterState()->getDataReadOnly<TestIntAccessor>("test").access());
-
-    EXPECT_EQ("", stream_info.requestedServerName());
-    absl::string_view sni_name = "stubserver.org";
-    stream_info.setRequestedServerName(sni_name);
-    EXPECT_EQ(std::string(sni_name), stream_info.requestedServerName());
 
     EXPECT_EQ(absl::nullopt, stream_info.upstreamClusterInfo());
     Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
@@ -197,6 +193,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(testing::ReturnRef(session_id));
     stream_info.setUpstreamSslConnection(ssl_info);
     EXPECT_EQ(session_id, stream_info.upstreamSslConnection()->sessionId());
+
+    EXPECT_FALSE(stream_info.upstreamConnectionId().has_value());
+    stream_info.setUpstreamConnectionId(12345);
+    ASSERT_TRUE(stream_info.upstreamConnectionId().has_value());
+    EXPECT_EQ(12345, stream_info.upstreamConnectionId().value());
   }
 }
 
@@ -255,14 +256,6 @@ TEST_F(StreamInfoImplTest, RequestHeadersTest) {
 TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
   StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
   EXPECT_EQ(nullptr, stream_info.getRequestIDProvider());
-}
-
-TEST_F(StreamInfoImplTest, ConnectionID) {
-  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
-  EXPECT_FALSE(stream_info.connectionID().has_value());
-  uint64_t id = 123;
-  stream_info.setConnectionID(id);
-  EXPECT_EQ(id, stream_info.connectionID());
 }
 
 TEST_F(StreamInfoImplTest, Details) {

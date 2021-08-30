@@ -1,14 +1,14 @@
-#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
-#include "common/common/assert.h"
-#include "common/grpc/async_client_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/assert.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,14 +16,11 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientSharedPtr async_client,
-                               const absl::optional<std::chrono::milliseconds>& timeout,
-                               envoy::config::core::v3::ApiVersion transport_api_version)
+GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
+                               const absl::optional<std::chrono::milliseconds>& timeout)
     : async_client_(async_client), timeout_(timeout),
-      service_method_(Grpc::VersionedMethods("envoy.service.auth.v3.Authorization.Check",
-                                             "envoy.service.auth.v2.Authorization.Check")
-                          .getMethodDescriptorForVersion(transport_api_version)),
-      transport_api_version_(transport_api_version) {}
+      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.auth.v3.Authorization.Check")) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
@@ -43,8 +40,7 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
   options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
 
   ENVOY_LOG(trace, "Sending CheckRequest: {}", request.DebugString());
-  request_ = async_client_->send(service_method_, request, *this, parent_span, options,
-                                 transport_api_version_);
+  request_ = async_client_->send(service_method_, request, *this, parent_span, options);
 }
 
 void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckResponse>&& response,

@@ -3,7 +3,7 @@
 #include "envoy/config/trace/v3/zipkin.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/tracers/zipkin/config.h"
+#include "source/extensions/tracers/zipkin/config.h"
 
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"

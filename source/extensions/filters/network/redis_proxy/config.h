@@ -8,11 +8,10 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/empty_string.h"
-#include "common/config/datasource.h"
-
-#include "extensions/filters/network/common/factory_base.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/config/datasource.h"
+#include "source/extensions/filters/network/common/factory_base.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

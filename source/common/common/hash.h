@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "common/common/macros.h"
-#include "common/common/safe_memcpy.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/safe_memcpy.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"

@@ -7,8 +7,8 @@
 #include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"

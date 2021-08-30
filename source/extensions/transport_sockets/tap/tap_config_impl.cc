@@ -1,9 +1,9 @@
-#include "extensions/transport_sockets/tap/tap_config_impl.h"
+#include "source/extensions/transport_sockets/tap/tap_config_impl.h"
 
 #include "envoy/data/tap/v3/transport.pb.h"
 
-#include "common/common/assert.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,12 +29,12 @@ PerSocketTapperImpl::PerSocketTapperImpl(SocketTapConfigSharedPtr config,
 }
 
 void PerSocketTapperImpl::fillConnectionInfo(envoy::data::tap::v3::Connection& connection) {
-  if (connection_.addressProvider().localAddress() != nullptr) {
+  if (connection_.connectionInfoProvider().localAddress() != nullptr) {
     // Local address might not be populated before a client connection is connected.
-    Network::Utility::addressToProtobufAddress(*connection_.addressProvider().localAddress(),
+    Network::Utility::addressToProtobufAddress(*connection_.connectionInfoProvider().localAddress(),
                                                *connection.mutable_local_address());
   }
-  Network::Utility::addressToProtobufAddress(*connection_.addressProvider().remoteAddress(),
+  Network::Utility::addressToProtobufAddress(*connection_.connectionInfoProvider().remoteAddress(),
                                              *connection.mutable_remote_address());
 }
 

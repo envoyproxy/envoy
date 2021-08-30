@@ -7,11 +7,11 @@
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/metadata.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/health_checker_impl.h"
-#include "common/upstream/health_discovery_service.h"
+#include "source/common/config/metadata.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/upstream/health_checker_impl.h"
+#include "source/common/upstream/health_discovery_service.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/config/utility.h"
@@ -27,28 +27,23 @@ namespace Envoy {
 namespace {
 
 // TODO(jmarantz): switch this to simulated-time after debugging flakes.
-class HdsIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
-                           public HttpIntegrationTest {
+class HdsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest, public HttpIntegrationTest {
 public:
-  HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  HdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
     hds_upstream_ = fake_upstreams_.back().get();
     HttpIntegrationTest::createUpstreams();
   }
   void initialize() override {
-    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
-      config_helper_.enableDeprecatedV2Api();
-    }
     setUpstreamCount(upstream_endpoints_);
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Setup hds and corresponding gRPC cluster.
       auto* hds_config = bootstrap.mutable_hds_config();
       hds_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
       hds_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       hds_config->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("hds_cluster");
-      hds_config->set_transport_api_version(apiVersion());
       auto* hds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       hds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       hds_cluster->mutable_circuit_breakers()->Clear();
@@ -62,10 +57,10 @@ public:
 
     // Endpoint connections
     if (tls_hosts_) {
-      host_upstream_ =
-          &addFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
-      host2_upstream_ =
-          &addFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
+      host_upstream_ = &addFakeUpstream(
+          HttpIntegrationTest::createUpstreamTlsContext(upstreamConfig()), http_conn_type_);
+      host2_upstream_ = &addFakeUpstream(
+          HttpIntegrationTest::createUpstreamTlsContext(upstreamConfig()), http_conn_type_);
     } else {
       host_upstream_ = &addFakeUpstream(http_conn_type_);
       host2_upstream_ = &addFakeUpstream(http_conn_type_);
@@ -211,9 +206,6 @@ transport_socket_matches:
     health_check.mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check.mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
     health_check.mutable_health_checks(0)->mutable_grpc_health_check();
-    health_check.mutable_health_checks(0)
-        ->mutable_http_health_check()
-        ->set_hidden_envoy_deprecated_use_http2(false);
     health_check.mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
 
     return health_check;
@@ -278,9 +270,7 @@ transport_socket_matches:
                                         healthy, host_upstream_->localAddress())) {
       ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
       EXPECT_EQ("POST", hds_stream_->headers().getMethodValue());
-      EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.{1}.{0}.HealthDiscoveryService",
-                                                    "StreamHealthCheck", apiVersion(),
-                                                    /*use_alpha=*/false, serviceNamespace()),
+      EXPECT_EQ("/envoy.service.health.v3.HealthDiscoveryService/StreamHealthCheck",
                 hds_stream_->headers().getPathValue());
       EXPECT_EQ("application/grpc", hds_stream_->headers().getContentTypeValue());
     }
@@ -333,27 +323,12 @@ transport_socket_matches:
       }
 
       EXPECT_EQ("POST", hds_stream_->headers().getMethodValue());
-      EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.{1}.{0}.HealthDiscoveryService",
-                                                    "StreamHealthCheck", apiVersion(),
-                                                    /*use_alpha=*/false, serviceNamespace()),
+      EXPECT_EQ("/envoy.service.health.v3.HealthDiscoveryService/StreamHealthCheck",
                 hds_stream_->headers().getPathValue());
       EXPECT_EQ("application/grpc", hds_stream_->headers().getContentTypeValue());
     }
 
     return true;
-  }
-
-  const std::string serviceNamespace() const {
-    switch (apiVersion()) {
-    case envoy::config::core::v3::ApiVersion::AUTO:
-      FALLTHRU;
-    case envoy::config::core::v3::ApiVersion::V2:
-      return "discovery";
-    case envoy::config::core::v3::ApiVersion::V3:
-      return "health";
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
   }
 
   static constexpr uint32_t upstream_endpoints_ = 0;
@@ -370,7 +345,7 @@ transport_socket_matches:
   FakeHttpConnectionPtr host_fake_connection_;
   FakeHttpConnectionPtr host2_fake_connection_;
   FakeRawConnectionPtr host_fake_raw_connection_;
-  FakeHttpConnection::Type http_conn_type_{FakeHttpConnection::Type::HTTP1};
+  Http::CodecType http_conn_type_{Http::CodecType::HTTP1};
   bool tls_hosts_{false};
 
   static constexpr int MaxTimeout = 100;
@@ -379,14 +354,12 @@ transport_socket_matches:
   envoy::service::health::v3::HealthCheckSpecifier server_health_check_specifier_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, HdsIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, HdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Tests Envoy HTTP health checking a single healthy endpoint and reporting that it is
 // indeed healthy to the server.
 TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttp) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   // Server <--> Envoy
@@ -422,7 +395,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttp) {
 // Tests Envoy HTTP health checking a single endpoint that times out and reporting
 // that it is unhealthy to the server.
 TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
   server_health_check_specifier_ =
       makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
@@ -464,7 +436,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
 // Tests Envoy HTTP health checking a single unhealthy endpoint and reporting that it is
 // indeed unhealthy to the server.
 TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyHttp) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
   server_health_check_specifier_ =
       makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
@@ -498,7 +469,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyHttp) {
 // Tests Envoy TCP health checking an endpoint that doesn't respond and reporting that it is
 // unhealthy to the server.
 TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   // Server <--> Envoy
@@ -539,7 +509,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
 // Tests Envoy TCP health checking a single healthy endpoint and reporting that it is
 // indeed healthy to the server.
 TEST_P(HdsIntegrationTest, SingleEndpointHealthyTcp) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   // Server <--> Envoy
@@ -570,7 +539,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTcp) {
 // Tests Envoy TCP health checking a single unhealthy endpoint and reporting that it is
 // indeed unhealthy to the server.
 TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTcp) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   // Server <--> Envoy
@@ -605,7 +573,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTcp) {
 // Tests that Envoy can HTTP health check two hosts that are in the same cluster, and
 // the same locality and report back the correct health statuses.
 TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   server_health_check_specifier_ =
@@ -665,7 +632,6 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
 // Tests that Envoy can HTTP health check two hosts that are in the same cluster, and
 // different localities and report back the correct health statuses.
 TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
   server_health_check_specifier_ =
       makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
@@ -734,7 +700,6 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
 // Tests that Envoy can HTTP health check two hosts that are in different clusters, and
 // report back the correct health statuses.
 TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
   server_health_check_specifier_ =
       makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
@@ -803,7 +768,6 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
 // Tests Envoy HTTP health checking a single endpoint, receiving an update
 // message from the management server and health checking a new endpoint
 TEST_P(HdsIntegrationTest, TestUpdateMessage) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   // Server <--> Envoy
@@ -851,9 +815,6 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
   health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
   health_check->mutable_health_checks(0)->mutable_grpc_health_check();
-  health_check->mutable_health_checks(0)
-      ->mutable_http_health_check()
-      ->set_hidden_envoy_deprecated_use_http2(false);
   health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
 
   // Server asks for health checking with the new message
@@ -885,7 +846,6 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
 // Tests Envoy HTTP health checking a single endpoint, receiving an update
 // message from the management server and reporting in a new interval
 TEST_P(HdsIntegrationTest, TestUpdateChangesTimer) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   // Server <--> Envoy
@@ -926,7 +886,6 @@ TEST_P(HdsIntegrationTest, TestUpdateChangesTimer) {
 
 // Tests Envoy HTTP health checking a single endpoint when interval hasn't been defined
 TEST_P(HdsIntegrationTest, TestDefaultTimer) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   // Server <--> Envoy
@@ -954,12 +913,11 @@ TEST_P(HdsIntegrationTest, TestDefaultTimer) {
 
 // Health checks a single endpoint over TLS with HTTP/2
 TEST_P(HdsIntegrationTest, SingleEndpointHealthyTlsHttp2) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   // Change member variable to specify host streams to have tls transport socket.
   tls_hosts_ = true;
 
   // Change hosts to operate over HTTP/2 instead of default HTTP.
-  http_conn_type_ = FakeHttpConnection::Type::HTTP2;
+  http_conn_type_ = Http::CodecType::HTTP2;
 
   initialize();
 
@@ -995,7 +953,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTlsHttp2) {
 
 // Health checks a single endpoint over TLS with HTTP/1
 TEST_P(HdsIntegrationTest, SingleEndpointHealthyTlsHttp1) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   // Change member variable to specify host streams to have tls transport socket.
   tls_hosts_ = true;
 
@@ -1033,7 +990,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTlsHttp1) {
 
 // Attempts to health check a TLS endpoint over plaintext, which should fail.
 TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTlsMissingSocketMatch) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   // Make the endpoints expect communication over TLS.
   tls_hosts_ = true;
 
@@ -1074,7 +1030,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTlsMissingSocketMatch) {
 }
 
 TEST_P(HdsIntegrationTest, UpdateEndpoints) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
   server_health_check_specifier_ =
       makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
@@ -1195,7 +1150,6 @@ TEST_P(HdsIntegrationTest, UpdateEndpoints) {
 
 // Tests Envoy HTTP health checking a custom healthy endpoint and reporting it is healthy
 TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttpCustomPort) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   // Server <--> Envoy
@@ -1239,7 +1193,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttpCustomPort) {
 // Tests Envoy HTTP health checking a single unhealthy endpoint and reporting that it is
 // indeed unhealthy to the server.
 TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyHttpCustomPort) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   server_health_check_specifier_ =
@@ -1273,6 +1226,60 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyHttpCustomPort) {
 
   // Receive updates until the one we expect arrives
   waitForEndpointHealthResponse(envoy::config::core::v3::UNHEALTHY);
+
+  // Clean up connections
+  cleanupHostConnections();
+  cleanupHdsConnection();
+}
+
+// Tests Envoy keeps sending EndpointHealthResponses after the HDS server reconnection
+TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttpHdsReconnect) {
+  initialize();
+
+  // Server <--> Envoy
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+  EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(0),
+            envoy::service::health::v3::Capability::HTTP);
+
+  // Server asks for health checking
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  // Envoy sends a health check message to an endpoint
+  healthcheckEndpoints();
+
+  // Endpoint responds to the health check
+  host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  host_stream_->encodeData(1024, true);
+
+  // Receive updates until the one we expect arrives
+  waitForEndpointHealthResponse(envoy::config::core::v3::HEALTHY);
+
+  checkCounters(1, 2, 1, 0);
+
+  // Simulate disconnection of HDS server
+  ASSERT_TRUE(hds_fake_connection_->close());
+  ASSERT_TRUE(hds_fake_connection_->waitForDisconnect());
+
+  // Server <--> Envoy, connect once again
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+  EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(0),
+            envoy::service::health::v3::Capability::HTTP);
+
+  // Server asks for health checking
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  // Receive updates until the one we expect arrives
+  waitForEndpointHealthResponse(envoy::config::core::v3::HEALTHY);
 
   // Clean up connections
   cleanupHostConnections();

@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "client_ssl_auth_test",
     srcs = ["client_ssl_auth_test.cc"],
     data = glob(["test_data/**"]),
-    extension_name = "envoy.filters.network.client_ssl_auth",
+    extension_names = ["envoy.filters.network.client_ssl_auth"],
     deps = [
         "//source/extensions/filters/network/client_ssl_auth",
         "//test/mocks/network:network_mocks",
@@ -32,7 +32,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.network.client_ssl_auth",
+    extension_names = ["envoy.filters.network.client_ssl_auth"],
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/client_ssl_auth:config",

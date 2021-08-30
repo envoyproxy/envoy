@@ -26,3 +26,6 @@ Http::FilterHeadersStatus MyFilter::decodeHeaders(
       "local_reply");
 }
 ```
+
+If you want to retrieve the original values rather than the formatted ones, pass
+`/*do_formatting=*/false` as the second argument to `responseHeaderTransforms`.

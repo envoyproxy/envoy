@@ -23,6 +23,7 @@ message RBAC {
 
   // Specify the RBAC rules to be applied globally.
   // If absent, no enforcing RBAC policy will be applied.
+  // If present and empty, DENY.
   config.rbac.v3.RBAC rules = 1;
 
   // Shadow rules are not enforced by the filter (i.e., returning a 403)

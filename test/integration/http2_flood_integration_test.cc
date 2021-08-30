@@ -5,14 +5,14 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/random_generator.h"
-#include "common/http/header_map_impl.h"
-#include "common/network/socket_option_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/network/socket_option_impl.h"
 
 #include "test/integration/autonomous_upstream.h"
-#include "test/integration/filters/test_socket_interface.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/socket_interface_swap.h"
 #include "test/integration/tracked_watermark_buffer.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
@@ -30,70 +30,6 @@ namespace {
 const uint32_t ControlFrameFloodLimit = 100;
 const uint32_t AllFrameFloodLimit = 1000;
 } // namespace
-
-class SocketInterfaceSwap {
-public:
-  // Object of this class hold the state determining the IoHandle which
-  // should return EAGAIN from the `writev` call.
-  struct IoHandleMatcher {
-    bool shouldReturnEgain(uint32_t src_port, uint32_t dst_port) const {
-      absl::ReaderMutexLock lock(&mutex_);
-      return writev_returns_egain_ && (src_port == src_port_ || dst_port == dst_port_);
-    }
-
-    // Source port to match. The port specified should be associated with a listener.
-    void setSourcePort(uint32_t port) {
-      absl::WriterMutexLock lock(&mutex_);
-      src_port_ = port;
-    }
-
-    // Destination port to match. The port specified should be associated with a listener.
-    void setDestinationPort(uint32_t port) {
-      absl::WriterMutexLock lock(&mutex_);
-      dst_port_ = port;
-    }
-
-    void setWritevReturnsEgain() {
-      absl::WriterMutexLock lock(&mutex_);
-      ASSERT(src_port_ != 0 || dst_port_ != 0);
-      writev_returns_egain_ = true;
-    }
-
-  private:
-    mutable absl::Mutex mutex_;
-    uint32_t src_port_ ABSL_GUARDED_BY(mutex_) = 0;
-    uint32_t dst_port_ ABSL_GUARDED_BY(mutex_) = 0;
-    bool writev_returns_egain_ ABSL_GUARDED_BY(mutex_) = false;
-  };
-
-  SocketInterfaceSwap() {
-    Envoy::Network::SocketInterfaceSingleton::clear();
-    test_socket_interface_loader_ = std::make_unique<Envoy::Network::SocketInterfaceLoader>(
-        std::make_unique<Envoy::Network::TestSocketInterface>(
-            [writev_matcher = writev_matcher_](
-                Envoy::Network::TestIoSocketHandle* io_handle, const Buffer::RawSlice*,
-                uint64_t) -> absl::optional<Api::IoCallUint64Result> {
-              if (writev_matcher->shouldReturnEgain(io_handle->localAddress()->ip()->port(),
-                                                    io_handle->peerAddress()->ip()->port())) {
-                return Api::IoCallUint64Result(
-                    0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                                       Network::IoSocketError::deleteIoError));
-              }
-              return absl::nullopt;
-            }));
-  }
-
-  ~SocketInterfaceSwap() {
-    test_socket_interface_loader_.reset();
-    Envoy::Network::SocketInterfaceSingleton::initialize(previous_socket_interface_);
-  }
-
-protected:
-  Envoy::Network::SocketInterface* const previous_socket_interface_{
-      Envoy::Network::SocketInterfaceSingleton::getExisting()};
-  std::shared_ptr<IoHandleMatcher> writev_matcher_{std::make_shared<IoHandleMatcher>()};
-  std::unique_ptr<Envoy::Network::SocketInterfaceLoader> test_socket_interface_loader_;
-};
 
 // It is important that the new socket interface is installed before any I/O activity starts and
 // the previous one is restored after all I/O activity stops. Since the HttpIntegrationTest
@@ -131,8 +67,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
                          TestUtility::ipTestParamsToString);
 
 bool Http2FloodMitigationTest::initializeUpstreamFloodTest() {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   // set lower upstream outbound frame limits to make tests run faster
   config_helper_.setUpstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
   initialize();
@@ -158,8 +94,8 @@ void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
 }
 
 void Http2FloodMitigationTest::beginSession() {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   // set lower outbound frame limits to make tests run faster
   config_helper_.setDownstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
   initialize();
@@ -396,7 +332,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
 
   // The factory will be used to create 4 buffers: the input and output buffers for request and
   // response pipelines.
-  EXPECT_EQ(4, buffer_factory->numBuffersCreated());
+  EXPECT_EQ(8, buffer_factory->numBuffersCreated());
 
   // Expect at least 1000 1 byte data frames in the output buffer. Each data frame comes with a
   // 9-byte frame header; 10 bytes per data frame, 10000 bytes total. The output buffer should also
@@ -411,7 +347,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
   EXPECT_GE(22000, buffer_factory->sumMaxBufferSizes());
   // Verify that all buffers have watermarks set.
   EXPECT_THAT(buffer_factory->highWatermarkRange(),
-              testing::Pair(1024 * 1024 * 1024, 1024 * 1024 * 1024));
+              testing::Pair(256 * 1024 * 1024, 1024 * 1024 * 1024));
 }
 
 // Verify that the server can detect flood triggered by a DATA frame from a decoder filter call
@@ -1554,13 +1490,73 @@ TEST_P(Http2FloodMitigationTest, RequestMetadata) {
 
 // Validate that the default configuration has flood protection enabled.
 TEST_P(Http2FloodMitigationTest, UpstreamFloodDetectionIsOnByDefault) {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   initialize();
 
   floodClient(Http2Frame::makePingFrame(),
               Http2::Utility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1,
               "cluster.cluster_0.http2.outbound_control_flood");
+}
+
+class Http2ManyStreamsTest
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public Http2RawFrameIntegrationTest {
+protected:
+  Http2ManyStreamsTest() : Http2RawFrameIntegrationTest(std::get<0>(GetParam())) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.improved_stream_limit_handling",
+                                      useImprovedStreamLimitHandling() ? "true" : "false");
+  }
+
+  bool useImprovedStreamLimitHandling() const { return std::get<1>(GetParam()); }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsAndRuntimeFeature, Http2ManyStreamsTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()));
+
+TEST_P(Http2ManyStreamsTest, UpstreamRstStreamStormOnDownstreamCloseRegressionTest) {
+  const uint32_t num_requests = 80;
+
+  envoy::config::core::v3::Http2ProtocolOptions config;
+  config.mutable_max_concurrent_streams()->set_value(num_requests / 2);
+  mergeOptions(config);
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  config_helper_.setUpstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
+  beginSession();
+
+  // Send a normal request and wait for the response as a way to prime the upstream connection and
+  // ensure that SETTINGS are exchanged. Skipping this step may result in the upstream seeing too
+  // many active streams at the same  time and terminating the connection to the proxy since stream
+  // limits were not obeyed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Open a large number of streams and wait until they are active at the proxy.
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(i), "host", "/",
+                                           {Http2Frame::Header("no_end_stream", "1")});
+    sendFrame(request);
+  }
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", num_requests,
+                               TestUtility::DefaultTimeout);
+
+  // Disconnect downstream connection. Envoy should send RST_STREAM to cancel active upstream
+  // requests.
+  tcp_client_->close();
+
+  // Wait until the disconnect is detected and all upstream connections have been closed.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0,
+                               TestUtility::DefaultTimeout);
+
+  // The disconnect shouldn't trigger an outbound control frame flood.
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.http2.outbound_control_flood")->value());
+  // Verify that the upstream connections are still active.
+  EXPECT_EQ(useImprovedStreamLimitHandling() ? 2 : 1,
+            test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
 }
 
 } // namespace Envoy

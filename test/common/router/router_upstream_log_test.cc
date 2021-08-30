@@ -6,9 +6,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 
-#include "common/network/utility.h"
-#include "common/router/router.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/router/router.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/access_log/mocks.h"
@@ -83,6 +83,12 @@ class RouterUpstreamLogTest : public testing::Test {
 public:
   void init(absl::optional<envoy::config::accesslog::v3::AccessLog> upstream_log) {
     envoy::extensions::filters::http::router::v3::Router router_proto;
+    static const std::string cluster_name = "cluster_0";
+
+    cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+    ON_CALL(*cluster_info_, name()).WillByDefault(ReturnRef(cluster_name));
+    ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef(cluster_name));
+    ON_CALL(callbacks_.stream_info_, upstreamClusterInfo()).WillByDefault(Return(cluster_info_));
 
     if (upstream_log) {
       ON_CALL(*context_.access_log_manager_.file_, write(_))
@@ -108,10 +114,10 @@ public:
         .WillByDefault(Return(host_address_));
     ON_CALL(*context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_, locality())
         .WillByDefault(ReturnRef(upstream_locality_));
-    router_->downstream_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
-        host_address_);
-    router_->downstream_connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
-        Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+    router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+        ->setLocalAddress(host_address_);
+    router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
   }
 
   void expectResponseTimerCreate() {
@@ -160,6 +166,7 @@ public:
 
     EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
                 putHttpResponseCode(response_code));
+    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decodeHeaders(std::move(response_headers), false);
 
     Http::ResponseTrailerMapPtr response_trailers(
@@ -245,6 +252,7 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<TestFilter> router_;
+  std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
@@ -363,6 +371,28 @@ typed_config:
   // Response trailers:
   // response-trailer-name: response-trailer-val
   EXPECT_EQ(output_.front(), "110 49 41");
+}
+
+// Test UPSTREAM_CLUSTER log formatter.
+TEST_F(RouterUpstreamLogTest, UpstreamCluster) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  log_format:
+    text_format_source:
+      inline_string: "%UPSTREAM_CLUSTER%"
+  path: "/dev/null"
+  )EOF";
+
+  envoy::config::accesslog::v3::AccessLog upstream_log;
+  TestUtility::loadFromYaml(yaml, upstream_log);
+
+  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
+  run();
+
+  EXPECT_EQ(output_.size(), 1U);
+  EXPECT_EQ(output_.front(), "cluster_0");
 }
 
 } // namespace Router

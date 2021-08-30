@@ -21,6 +21,7 @@ AWS
 BACKTRACE
 BSON
 BPF
+btree
 CAS
 CB
 CDN
@@ -32,13 +33,16 @@ ENOTCONN
 EPIPE
 HEXDIG
 HEXDIGIT
+LRU
 OWS
 Preconnecting
+RCVBUF
 RTCP
 RTP
 STATNAME
 SkyWalking
 TIDs
+WRSQ
 WASI
 ceil
 CCM
@@ -181,6 +185,7 @@ Kille
 LBs
 LC
 LDS
+LEDS
 LEV
 LF
 LHS
@@ -443,6 +448,8 @@ benchmarked
 bidi
 bignum
 bitfield
+bitmask
+bitmasks
 bitset
 bitwise
 blackhole
@@ -593,6 +600,7 @@ dubbo
 dup
 durations
 dynamodb
+eg
 emplace
 emplaced
 emscripten
@@ -679,6 +687,7 @@ hackery
 hacky
 handshaker
 hardcoded
+hardcodes
 hardcoding
 hasher
 hashtagging
@@ -757,6 +766,7 @@ lexically
 libc
 libevent
 libprotobuf
+librdkafka
 libtool
 libstdc
 lifecycle
@@ -794,6 +804,7 @@ megamiss
 mem
 memcmp
 memcpy
+memoize
 mergeable
 messagename
 metadata
@@ -934,6 +945,8 @@ preorder
 prepend
 prepended
 prepends
+preresolve
+preresolved
 prev
 probabilistically
 proc
@@ -1241,6 +1254,7 @@ virtualize
 vptr
 wakeup
 wakeups
+wamr
 wasmtime
 websocket
 wepoll
@@ -1251,6 +1265,7 @@ wildcards
 winsock
 workspace
 writev
+wrsq
 xDS
 xDSes
 xdstp

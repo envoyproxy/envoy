@@ -1,8 +1,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/socket_option_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/socket_option_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -33,13 +33,13 @@ protected:
   testing::NiceMock<MockListenSocket> socket_mock_;
   Api::MockOsSysCalls os_sys_calls_mock_;
 
-  void SetUp() override { socket_mock_.address_provider_->setLocalAddress(nullptr); }
+  void SetUp() override { socket_mock_.connection_info_provider_->setLocalAddress(nullptr); }
   void makeSocketV4() {
-    socket_mock_.address_provider_->setLocalAddress(
+    socket_mock_.connection_info_provider_->setLocalAddress(
         std::make_unique<Address::Ipv4Instance>("1.2.3.4", 5678));
   }
   void makeSocketV6() {
-    socket_mock_.address_provider_->setLocalAddress(
+    socket_mock_.connection_info_provider_->setLocalAddress(
         std::make_unique<Address::Ipv6Instance>("::1:2:3:4", 5678));
   }
 };

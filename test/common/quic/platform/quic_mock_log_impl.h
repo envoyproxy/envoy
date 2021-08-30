@@ -8,7 +8,7 @@
 
 #include <string>
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "gmock/gmock.h"
 #include "quiche/quic/platform/api/quic_logging.h"

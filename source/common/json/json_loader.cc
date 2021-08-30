@@ -1,8 +1,8 @@
-#include "common/json/json_loader.h"
+#include "source/common/json/json_loader.h"
 
-#include "common/json/json_internal.h"
-#include "common/json/json_internal_legacy.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/json/json_internal.h"
+#include "source/common/json/json_internal_legacy.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Json {

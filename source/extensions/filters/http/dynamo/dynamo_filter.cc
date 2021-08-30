@@ -1,20 +1,19 @@
-#include "extensions/filters/http/dynamo/dynamo_filter.h"
+#include "source/extensions/filters/http/dynamo/dynamo_filter.h"
 
 #include <chrono>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/http/codes.h"
-#include "common/http/exception.h"
-#include "common/http/utility.h"
-#include "common/json/json_loader.h"
-
-#include "extensions/filters/http/dynamo/dynamo_request_parser.h"
-#include "extensions/filters/http/dynamo/dynamo_stats.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/extensions/filters/http/dynamo/dynamo_request_parser.h"
+#include "source/extensions/filters/http/dynamo/dynamo_stats.h"
 
 #include "absl/container/fixed_array.h"
 

@@ -6,11 +6,12 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/config/metadata.h"
-#include "common/http/exception.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/metadata.h"
+#include "source/common/http/exception.h"
+#include "source/common/protobuf/protobuf.h"
 
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
@@ -176,8 +177,7 @@ class HeaderIntegrationTest
     : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public HttpIntegrationTest {
 public:
-  HeaderIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())) {}
+  HeaderIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
 
   bool routerSuppressEnvoyHeaders() const { return std::get<1>(GetParam()); }
 
@@ -366,7 +366,7 @@ public:
     HttpIntegrationTest::createUpstreams();
 
     if (use_eds_) {
-      addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+      addFakeUpstream(Http::CodecType::HTTP2);
     }
   }
 

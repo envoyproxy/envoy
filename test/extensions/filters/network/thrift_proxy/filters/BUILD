@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "pass_through_filter_test",
     srcs = ["pass_through_filter_test.cc"],
-    extension_name = "envoy.filters.network.thrift_proxy",
+    extension_names = ["envoy.filters.network.thrift_proxy"],
     deps = [
         "//source/extensions/filters/network/thrift_proxy/filters:pass_through_filter_lib",
         "//test/extensions/filters/network/thrift_proxy:mocks",
