@@ -47,21 +47,31 @@ public:
 
 } // namespace
 
+int SslSocket::ssl_ex_data_index_ = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                     Ssl::HandshakerFactoryCb handshaker_factory_cb)
+                     Ssl::HandshakerFactoryCb handshaker_factory_cb, bool enable_tls_keylog = false,
+                     const std::string tls_keylog_path = "")
     : transport_socket_options_(transport_socket_options),
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
       info_(std::dynamic_pointer_cast<SslHandshakerImpl>(
           handshaker_factory_cb(ctx_->newSsl(transport_socket_options_.get()),
-                                ctx_->sslExtendedSocketInfoIndex(), this))) {
+                                ctx_->sslExtendedSocketInfoIndex(), this))),
+      enable_tls_keylog_(enable_tls_keylog), tls_keylog_path_(tls_keylog_path) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
   } else {
     ASSERT(state == InitialState::Server);
     SSL_set_accept_state(rawSsl());
   }
-}
+
+  bio_keylog_ = nullptr;
+  if (enable_tls_keylog_) {
+    ENVOY_LOG(debug, "Enable tls key log, log path: {}, index: {}", tls_keylog_path_.c_str(),
+              ssl_ex_data_index_);
+    enableTlsKeyLog();
+  }
+} // namespace Tls
 
 void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   ASSERT(!callbacks_);
@@ -294,6 +304,44 @@ void SslSocket::onConnected() { ASSERT(info_->state() == Ssl::SocketState::PreHa
 
 Ssl::ConnectionInfoConstSharedPtr SslSocket::ssl() const { return info_; }
 
+void SslSocket::keylogCallback(const SSL* ssl, const char* line) {
+  ASSERT(ssl != nullptr);
+  BIO* bio_keylog = static_cast<BIO*>(SSL_get_ex_data(ssl, ssl_ex_data_index_));
+  BIO_printf(bio_keylog, "%s\n", line);
+  (void)BIO_flush(bio_keylog);
+}
+
+void SslSocket::disableTlsKeyLog(void) {
+  if (bio_keylog_ != nullptr) {
+    BIO_free_all(bio_keylog_);
+    bio_keylog_ = nullptr;
+  }
+  SSL_CTX* ctx = SSL_get_SSL_CTX(rawSsl());
+  ASSERT(ctx != nullptr);
+  SSL_CTX_set_keylog_callback(ctx, nullptr);
+  enable_tls_keylog_ = false;
+}
+
+void SslSocket::enableTlsKeyLog(void) {
+  SSL_CTX* ctx = SSL_get_SSL_CTX(rawSsl());
+  ASSERT(ctx != nullptr);
+  /*
+   * Append rather than write in order to allow concurrent modification.
+   * Furthermore, this preserves existing key log files which is useful when
+   * the tool is run multiple times.
+   */
+  bio_keylog_ = BIO_new_file(tls_keylog_path_.c_str(), "a");
+  if (bio_keylog_ == nullptr) {
+    ENVOY_LOG(warn, "Creating BIO file fails, log path: {}", tls_keylog_path_.c_str());
+    return;
+  }
+
+  SSL* ssl = rawSsl();
+  SSL_set_ex_data(ssl, SslSocket::ssl_ex_data_index_, bio_keylog_);
+  SSL_CTX_set_keylog_callback(ctx, keylogCallback);
+  enable_tls_keylog_ = true;
+}
+
 void SslSocket::shutdownSsl() {
   ASSERT(info_->state() != Ssl::SocketState::PreHandshake);
   if (info_->state() != Ssl::SocketState::ShutdownSent &&
@@ -326,6 +374,10 @@ void SslSocket::shutdownBasic() {
 }
 
 void SslSocket::closeSocket(Network::ConnectionEvent) {
+  if (enable_tls_keylog_) {
+    ENVOY_LOG(debug, "Disable tls key log");
+    disableTlsKeyLog();
+  }
   // Unregister the SSL connection object from private key method providers.
   for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
     provider->unregisterPrivateKeyMethod(rawSsl());
@@ -377,6 +429,7 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
+    ENVOY_LOG(debug, "Create ClientSslSocket");
     return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Client,
                                        transport_socket_options, config_->createHandshaker());
   } else {
@@ -416,8 +469,58 @@ Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
   return ssl_ctx_;
 }
 
-Network::TransportSocketPtr
-ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr) const {
+bool ServerSslSocketFactory::tlsKeyLogMatch(
+    const Network::Address::InstanceConstSharedPtr local,
+    const Network::Address::InstanceConstSharedPtr remote) const {
+  auto src_ip = config_->getTlsKeyLogSrc();
+  auto dst_ip = config_->getTlsKeyLogDst();
+  bool match = false;
+  bool match_src = false;
+  bool enable_src = false;
+  bool match_dst = false;
+  bool enable_dst = false;
+  uint32_t ip_addr_dst = 0, ip_addr_src = 0;
+  uint32_t ip_addr_src_config = 0, ip_addr_dst_config = 0;
+
+  if (local != nullptr && local->ip() != nullptr && local->ip()->ipv4() != nullptr) {
+    ip_addr_dst = local->ip()->ipv4()->address();
+  }
+  if (remote != nullptr && remote->ip() != nullptr && remote->ip()->ipv4() != nullptr) {
+    ip_addr_src = remote->ip()->ipv4()->address();
+  }
+  if (src_ip != nullptr && src_ip->ip() != nullptr && src_ip->ip()->ipv4() != nullptr) {
+    enable_src = true;
+    ip_addr_src_config = src_ip->ip()->ipv4()->address();
+    match_src = (ip_addr_src_config == ip_addr_src) &&
+                (src_ip->ip()->port() == 0 || src_ip->ip()->port() == remote->ip()->port());
+  }
+  if (dst_ip != nullptr && dst_ip->ip() != nullptr && dst_ip->ip()->ipv4() != nullptr) {
+    enable_dst = true;
+    ip_addr_dst_config = dst_ip->ip()->ipv4()->address();
+    match_dst = (ip_addr_dst_config == ip_addr_dst) &&
+                (dst_ip->ip()->port() == 0 || dst_ip->ip()->port() == local->ip()->port());
+  }
+  ENVOY_LOG(trace, "Packet src ip: {}, dst ip: {}, configured src ip: {}, dst ip: {}", ip_addr_src,
+            ip_addr_dst, ip_addr_src_config, ip_addr_dst_config);
+  if (enable_src) {
+    if (enable_dst) {
+      match = match_src && match_dst;
+    } else {
+      match = match_src;
+    }
+  } else {
+    if (enable_dst) {
+      match = match_dst;
+    } else {
+      match = false;
+    }
+  }
+  ENVOY_LOG(debug, "tls key log match: {}", match);
+  return match;
+} // namespace Tls
+
+Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket(
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
@@ -426,9 +529,16 @@ ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsCon
     absl::ReaderMutexLock l(&ssl_ctx_mu_);
     ssl_ctx = ssl_ctx_;
   }
+  bool match = false;
+  if (transport_socket_options != nullptr) {
+    match =
+        tlsKeyLogMatch(transport_socket_options->getLocal(), transport_socket_options->getRemote());
+  }
   if (ssl_ctx) {
-    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server, nullptr,
-                                       config_->createHandshaker());
+    ENVOY_LOG(debug, "Create ServerSslSocket");
+    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server,
+                                       transport_socket_options, config_->createHandshaker(), match,
+                                       match ? (config_->getTlsKeyLogPath()) : "");
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();

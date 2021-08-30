@@ -7,7 +7,9 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
+#include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
@@ -182,7 +184,16 @@ ContextConfigImpl::ContextConfigImpl(
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 default_max_protocol_version)),
-      factory_context_(factory_context) {
+      factory_context_(factory_context), tls_keylog_path_(config.tls_keylog().tls_keylog_path()),
+      tls_keylog_src_(nullptr), tls_keylog_dst_(nullptr) {
+  if (config.tls_keylog().has_tls_keylog_src()) {
+    tls_keylog_src_ =
+        Network::Utility::protobufAddressToAddress(config.tls_keylog().tls_keylog_src());
+  }
+  if (config.tls_keylog().has_tls_keylog_dst()) {
+    tls_keylog_dst_ =
+        Network::Utility::protobufAddressToAddress(config.tls_keylog().tls_keylog_dst());
+  }
   if (certificate_validation_context_provider_ != nullptr) {
     if (default_cvc_) {
       // We need to validate combined certificate validation context.
@@ -393,7 +404,6 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
       disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)) {
-
   if (session_ticket_keys_provider_ != nullptr) {
     // Validate tls session ticket keys early to reject bad sds updates.
     stk_validation_callback_handle_ = session_ticket_keys_provider_->addValidationCallback(

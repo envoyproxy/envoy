@@ -14,6 +14,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 
@@ -1259,6 +1260,14 @@ void ConfigHelper::initializeTls(
     *validation_context->mutable_match_typed_subject_alt_names() = {options.san_matchers_.begin(),
                                                                     options.san_matchers_.end()};
   }
+  auto tls_keylog_path = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_path();
+  auto tls_keylog_src = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_src();
+  auto tls_keylog_dst = common_tls_context.mutable_tls_keylog()->mutable_tls_keylog_dst();
+  *tls_keylog_path = std::string("/dev/null");
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("127.0.0.1"),
+                                             *tls_keylog_src);
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("127.0.0.1"),
+                                             *tls_keylog_dst);
 }
 
 void ConfigHelper::renameListener(const std::string& name) {

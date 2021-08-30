@@ -11,8 +11,11 @@ namespace Network {
 class AlpnDecoratingTransportSocketOptions : public TransportSocketOptions {
 public:
   AlpnDecoratingTransportSocketOptions(std::vector<std::string>&& alpn,
-                                       TransportSocketOptionsConstSharedPtr inner_options)
-      : alpn_fallback_(std::move(alpn)), inner_options_(std::move(inner_options)) {}
+                                       TransportSocketOptionsConstSharedPtr inner_options,
+                                       const Address::InstanceConstSharedPtr local = nullptr,
+                                       const Address::InstanceConstSharedPtr remote = nullptr)
+      : alpn_fallback_(std::move(alpn)), inner_options_(std::move(inner_options)), local_(local),
+        remote_(remote) {}
   // Network::TransportSocketOptions
   const absl::optional<std::string>& serverNameOverride() const override {
     return inner_options_->serverNameOverride();
@@ -32,10 +35,14 @@ public:
   const StreamInfo::FilterStateSharedPtr& filterState() const override {
     return inner_options_->filterState();
   }
+  void hashKey(std::vector<uint8_t>& key,
+               const Network::TransportSocketFactory& factory) const override;
 
 private:
   const std::vector<std::string> alpn_fallback_;
   const TransportSocketOptionsConstSharedPtr inner_options_;
+  const Address::InstanceConstSharedPtr local_;
+  const Address::InstanceConstSharedPtr remote_;
 };
 
 class TransportSocketOptionsImpl : public TransportSocketOptions {
@@ -70,6 +77,8 @@ public:
     return proxy_protocol_options_;
   }
   const StreamInfo::FilterStateSharedPtr& filterState() const override { return filter_state_; }
+  void hashKey(std::vector<uint8_t>& key,
+               const Network::TransportSocketFactory& factory) const override;
 
 private:
   const absl::optional<std::string> override_server_name_;

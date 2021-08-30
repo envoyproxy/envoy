@@ -1339,3 +1339,5 @@ vhosts
 infos
 ElastiCache
 pinterest
+NSS
+SSLKEYLOGFILE

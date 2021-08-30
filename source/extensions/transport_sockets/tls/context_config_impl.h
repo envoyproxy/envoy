@@ -20,7 +20,8 @@ namespace Tls {
 
 static const std::string INLINE_STRING = "<inline>";
 
-class ContextConfigImpl : public virtual Ssl::ContextConfig {
+class ContextConfigImpl : public virtual Ssl::ContextConfig,
+                          public Logger::Loggable<Logger::Id::config> {
 public:
   // Ssl::ContextConfig
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
@@ -41,6 +42,13 @@ public:
   }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
+  const std::string& getTlsKeyLogPath() const override { return tls_keylog_path_; };
+  Network::Address::InstanceConstSharedPtr getTlsKeyLogSrc() const override {
+    return tls_keylog_src_;
+  };
+  Network::Address::InstanceConstSharedPtr getTlsKeyLogDst() const override {
+    return tls_keylog_dst_;
+  };
 
   bool isReady() const override {
     const bool tls_is_ready =
@@ -101,6 +109,9 @@ private:
   Ssl::HandshakerCapabilities capabilities_;
   Ssl::SslCtxCb sslctx_cb_;
   Server::Configuration::TransportSocketFactoryContext& factory_context_;
+  const std::string tls_keylog_path_;
+  Network::Address::InstanceConstSharedPtr tls_keylog_src_;
+  Network::Address::InstanceConstSharedPtr tls_keylog_dst_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {

@@ -256,6 +256,7 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:linked_object",
         "//source/common/network:connection_lib",
+        "//source/common/network:transport_socket_options_lib",
     ],
 )
 

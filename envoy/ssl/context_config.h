@@ -89,6 +89,12 @@ public:
    * @return a callback for configuring an SSL_CTX before use.
    */
   virtual SslCtxCb sslctxCb() const PURE;
+
+  virtual const std::string& getTlsKeyLogPath() const PURE;
+
+  virtual Network::Address::InstanceConstSharedPtr getTlsKeyLogSrc() const PURE;
+
+  virtual Network::Address::InstanceConstSharedPtr getTlsKeyLogDst() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {
