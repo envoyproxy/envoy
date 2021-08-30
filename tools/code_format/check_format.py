@@ -81,7 +81,8 @@ SERIALIZE_AS_STRING_ALLOWLIST = (
 # Files in these paths can use Protobuf::util::JsonStringToMessage
 JSON_STRING_TO_MESSAGE_ALLOWLIST = (
     "./source/common/protobuf/utility.cc",
-    "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc")
+    "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc",
+    "./source/common/common/envoy_defaults.cc")
 
 # Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
 # ones were grandfathered as part of PR #8484 for backwards compatibility.

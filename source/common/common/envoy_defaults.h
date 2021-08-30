@@ -58,14 +58,14 @@ struct DefaultsProfile {
   };
 
   /**
-   * DefaultsProfile intended to be constructed as a DefaultsProfileSingleton, so that default 
+   * DefaultsProfile intended to be constructed as a DefaultsProfileSingleton, so that default
    * values can be accessed globally.
    * @param profile enum value specifying which profile to load
    */
   DefaultsProfile(Profile profile = Performant);
   /**
-   * Returns a reference to DefaultsProfile inside singleton if it exists, otherwise returns 
-   * blank DefaultsProfile. 
+   * Returns a reference to DefaultsProfile inside singleton if it exists, otherwise returns
+   * blank DefaultsProfile.
    */
   static const DefaultsProfile& get();
 
@@ -85,7 +85,7 @@ struct DefaultsProfile {
 
 private:
   /**
-   * Searches the defaults profile for `field`, which may exist in a map of multiple 
+   * Searches the defaults profile for `field`, which may exist in a map of multiple
    * fields keyed by `config_name`, or as a single key that is `config_name` concatenated
    * with '.' + `field`. If `field` is found, the Proto value associated with `field`
    * is returned. Otherwise, absl::nullopt returns.

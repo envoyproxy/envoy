@@ -356,6 +356,7 @@ initial_connection_window_size: 65535
   }
 }
 
+// Verify that values are pulled from the defaults profile.
 TEST(HttpUtility, TestDefaultsProfile) {
   {
     std::unique_ptr<ScopedDefaultsProfileSingleton> dp =

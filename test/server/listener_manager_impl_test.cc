@@ -191,25 +191,6 @@ filter_chains:
             manager_->listeners().front().get().listenerFiltersTimeout());
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, TestDefaultsProfile) {
-  std::unique_ptr<ScopedDefaultsProfileSingleton> dp =
-      std::make_unique<ScopedDefaultsProfileSingleton>(
-          std::make_unique<DefaultsProfile>(DefaultsProfile::Safe));
-
-  const std::string yaml = R"EOF(
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1234
-filter_chains:
-- filters: []
-  )EOF";
-
-  // EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
-  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
-}
-
 TEST_F(ListenerManagerImplWithRealFiltersTest, DefaultListenerPerConnectionBufferLimit) {
   const std::string yaml = R"EOF(
 address:

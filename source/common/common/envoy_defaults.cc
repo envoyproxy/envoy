@@ -28,7 +28,6 @@ double DefaultsProfile::getNumber(const ConfigContext& config, const std::string
   absl::optional<ProtobufWkt::Value> value = getProtoValue(std::string(config.getContext()), field);
 
   if (value && value->has_number_value()) {
-    printf("NUMBER VALUE: %f\n\n", value->number_value());
     return value->number_value();
   }
 
@@ -45,7 +44,6 @@ std::chrono::milliseconds DefaultsProfile::getMs(const ConfigContext& config,
   if (value && value->has_string_value()) {
     ProtobufWkt::Duration duration;
     auto result = ProtobufUtil::JsonStringToMessage("\"" + value->string_value() + "\"", &duration);
-    // should I use TestUtility::loadFromJson("\"" + value->string_value() + "\"", &duration) ?
     return std::chrono::milliseconds(result.ok() ? DurationUtil::durationToMilliseconds(duration)
                                                  : default_value);
   }
@@ -60,7 +58,6 @@ bool DefaultsProfile::getBool(const ConfigContext& config, const std::string& fi
   absl::optional<ProtobufWkt::Value> value = getProtoValue(std::string(config.getContext()), field);
 
   if (value && value->has_bool_value()) {
-    // printf("BOOL VALUE: %s\n\n", value->bool_value() ? "true" : "false");
     return value->bool_value();
   }
 
