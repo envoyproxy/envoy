@@ -208,7 +208,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
   {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
-    connection.stream_info_.downstream_address_provider_->restoreLocalAddress(
+    connection.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
         std::make_shared<Network::Address::PipeInstance>("unix://foo"));
 
     OriginalDstCluster::LoadBalancer lb(cluster_);
@@ -243,7 +243,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
-  connection.stream_info_.downstream_address_provider_->restoreLocalAddress(
+  connection.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
 
   Event::PostCb post_cb;
@@ -332,12 +332,12 @@ TEST_F(OriginalDstClusterTest, Membership2) {
 
   NiceMock<Network::MockConnection> connection1;
   TestLoadBalancerContext lb_context1(&connection1);
-  connection1.stream_info_.downstream_address_provider_->restoreLocalAddress(
+  connection1.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
 
   NiceMock<Network::MockConnection> connection2;
   TestLoadBalancerContext lb_context2(&connection2);
-  connection2.stream_info_.downstream_address_provider_->restoreLocalAddress(
+  connection2.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.10.11.12"));
 
   OriginalDstCluster::LoadBalancer lb(cluster_);
@@ -421,7 +421,7 @@ TEST_F(OriginalDstClusterTest, Connection) {
   // Connection to the host is made to the downstream connection's local address.
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
-  connection.stream_info_.downstream_address_provider_->restoreLocalAddress(
+  connection.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
       std::make_shared<Network::Address::Ipv6Instance>("FD00::1"));
 
   OriginalDstCluster::LoadBalancer lb(cluster_);
@@ -472,7 +472,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   // Connection to the host is made to the downstream connection's local address.
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
-  connection.stream_info_.downstream_address_provider_->restoreLocalAddress(
+  connection.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
       std::make_shared<Network::Address::Ipv6Instance>("FD00::1"));
 
   OriginalDstCluster::LoadBalancer lb(cluster_);
@@ -586,7 +586,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
 
   // Downstream connection with original_dst filter, HTTP header override ignored.
   NiceMock<Network::MockConnection> connection1;
-  connection1.stream_info_.downstream_address_provider_->restoreLocalAddress(
+  connection1.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
   TestLoadBalancerContext lb_context1(&connection1, Http::Headers::get().EnvoyOriginalDstHost.get(),
                                       "127.0.0.1:5555");
@@ -600,7 +600,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
 
   // Downstream connection without original_dst filter, HTTP header override ignored.
   NiceMock<Network::MockConnection> connection2;
-  connection2.stream_info_.downstream_address_provider_->setLocalAddress(
+  connection2.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
   TestLoadBalancerContext lb_context2(&connection2, Http::Headers::get().EnvoyOriginalDstHost.get(),
                                       "127.0.0.1:5555");
@@ -612,7 +612,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
 
   // Downstream connection over Unix Domain Socket, HTTP header override ignored.
   NiceMock<Network::MockConnection> connection3;
-  connection3.stream_info_.downstream_address_provider_->setLocalAddress(
+  connection3.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::PipeInstance>("unix://foo"));
   TestLoadBalancerContext lb_context3(&connection3, Http::Headers::get().EnvoyOriginalDstHost.get(),
                                       "127.0.0.1:5555");
