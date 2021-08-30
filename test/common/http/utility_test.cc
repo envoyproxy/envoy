@@ -358,23 +358,37 @@ initial_connection_window_size: 65535
 }
 
 TEST(HttpUtility, TestDefaultsProfile) {
-  std::unique_ptr<ScopedDefaultsProfileSingleton> dp =
-      std::make_unique<ScopedDefaultsProfileSingleton>(std::make_unique<DefaultsProfile>());
-  DefaultsProfile::ConfigContext context =
-      DefaultsProfile::ConfigContext("envoy.extensions.filters.network.http_connection_manager.v3."
-                                     "HttpConnectionManager.http2_protocol_options");
+  {
+    std::unique_ptr<ScopedDefaultsProfileSingleton> dp =
+        std::make_unique<ScopedDefaultsProfileSingleton>(
+            std::make_unique<DefaultsProfile>(DefaultsProfile::Safe));
+    DefaultsProfile::ConfigContext context = DefaultsProfile::ConfigContext(
+        "envoy.extensions.filters.network.http_connection_manager.v3."
+        "HttpConnectionManager.http2_protocol_options");
 
-  envoy::config::core::v3::Http2ProtocolOptions http2_options;
-  http2_options = ::Envoy::Http2::Utility::initializeAndValidateOptions(context, http2_options);
+    envoy::config::core::v3::Http2ProtocolOptions http2_options;
+    http2_options = ::Envoy::Http2::Utility::initializeAndValidateOptions(context, http2_options);
 
-  // TODO(saeedali): hardcode correct values instead of pulling them from profile
-  EXPECT_EQ(DefaultsProfileSingleton::get().getNumber(context, "max_concurrent_streams", -1),
-            http2_options.max_concurrent_streams().value());
-  EXPECT_EQ(DefaultsProfileSingleton::get().getNumber(context, "initial_stream_window_size", -1),
-            http2_options.initial_stream_window_size().value());
-  EXPECT_EQ(
-      DefaultsProfileSingleton::get().getNumber(context, "initial_connection_window_size", -1),
-      http2_options.initial_connection_window_size().value());
+    EXPECT_EQ(100, http2_options.max_concurrent_streams().value());
+    EXPECT_EQ(268435456, http2_options.initial_stream_window_size().value());
+    EXPECT_EQ(1048576, http2_options.initial_connection_window_size().value());
+  }
+
+  {
+    // invoke DefaultsProfile constructor with no args, creating a blank profile
+    std::unique_ptr<ScopedDefaultsProfileSingleton> dp =
+        std::make_unique<ScopedDefaultsProfileSingleton>(std::make_unique<DefaultsProfile>());
+    DefaultsProfile::ConfigContext context = DefaultsProfile::ConfigContext(
+        "envoy.extensions.filters.network.http_connection_manager.v3."
+        "HttpConnectionManager.http2_protocol_options");
+
+    envoy::config::core::v3::Http2ProtocolOptions http2_options;
+    http2_options = ::Envoy::Http2::Utility::initializeAndValidateOptions(context, http2_options);
+
+    EXPECT_EQ((1U << 31) - 1, http2_options.max_concurrent_streams().value());
+    EXPECT_EQ(256 * 1024 * 1024, http2_options.initial_stream_window_size().value());
+    EXPECT_EQ(256 * 1024 * 1024, http2_options.initial_connection_window_size().value());
+  }
 }
 
 TEST(HttpUtility, ValidateStreamErrors) {

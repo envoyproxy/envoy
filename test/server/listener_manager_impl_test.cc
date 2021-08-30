@@ -193,7 +193,8 @@ filter_chains:
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TestDefaultsProfile) {
   std::unique_ptr<ScopedDefaultsProfileSingleton> dp =
-      std::make_unique<ScopedDefaultsProfileSingleton>(std::make_unique<DefaultsProfile>());
+      std::make_unique<ScopedDefaultsProfileSingleton>(
+          std::make_unique<DefaultsProfile>(DefaultsProfile::Safe));
 
   const std::string yaml = R"EOF(
 address:

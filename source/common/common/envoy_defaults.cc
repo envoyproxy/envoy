@@ -5,15 +5,15 @@
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
-// add argument: safe -> load YAML | not safe -> don't load
-DefaultsProfile::DefaultsProfile() {
-  MessageUtil::loadFromYaml(manifest_yaml, defaults_manifest_,
-                            ProtobufMessage::getNullValidationVisitor());
+DefaultsProfile::DefaultsProfile(Profile profile) {
+  if (profile == Safe) {
+    MessageUtil::loadFromYaml(manifest_yaml, defaults_manifest_,
+                              ProtobufMessage::getNullValidationVisitor());
+  }
 }
 
 const DefaultsProfile& DefaultsProfile::get() {
   if (DefaultsProfileSingleton::getExisting()) {
-    printf("yup\n");
     return DefaultsProfileSingleton::get();
   }
 
@@ -28,7 +28,7 @@ double DefaultsProfile::getNumber(const ConfigContext& config, const std::string
   absl::optional<ProtobufWkt::Value> value = getProtoValue(std::string(config.getContext()), field);
 
   if (value && value->has_number_value()) {
-    // printf("NUMBER VALUE: %f\n\n", value->number_value());
+    printf("NUMBER VALUE: %f\n\n", value->number_value());
     return value->number_value();
   }
 
@@ -46,7 +46,6 @@ std::chrono::milliseconds DefaultsProfile::getMs(const ConfigContext& config,
     ProtobufWkt::Duration duration;
     auto result = ProtobufUtil::JsonStringToMessage("\"" + value->string_value() + "\"", &duration);
     // should I use TestUtility::loadFromJson("\"" + value->string_value() + "\"", &duration) ?
-    // printf("DURATION VALUE: %lds\n\n", duration.seconds());
     return std::chrono::milliseconds(result.ok() ? DurationUtil::durationToMilliseconds(duration)
                                                  : default_value);
   }
@@ -71,7 +70,6 @@ bool DefaultsProfile::getBool(const ConfigContext& config, const std::string& fi
 // Search defaults profile for `field`, return value if found
 absl::optional<ProtobufWkt::Value> DefaultsProfile::getProtoValue(const std::string config_name,
                                                                   const std::string& field) const {
-  // printf("\nFINDING %s.%s\n", config_name.c_str(), field.c_str());
   auto fields_map = defaults_manifest_.fields();
   auto config_it = fields_map.find(config_name);
 
@@ -87,6 +85,7 @@ absl::optional<ProtobufWkt::Value> DefaultsProfile::getProtoValue(const std::str
                                       : absl::nullopt;
   }
 
+  // otherwise, `field` may exist in a single key-value pairing
   std::string full_field_name = config_name + "." + field;
   return fields_map.count(full_field_name)
              ? absl::make_optional(fields_map.at(full_field_name).edge_config().example())
