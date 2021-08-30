@@ -58,6 +58,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//contrib/envoy/extensions/filters/http/squash/v3:pkg",
+        "//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/kafka_broker/v3:pkg",
         "//contrib/envoy/extensions/filters/network/mysql_proxy/v3:pkg",
         "//contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg",
@@ -149,7 +150,6 @@ proto_library(
         "//envoy/extensions/filters/http/rbac/v3:pkg",
         "//envoy/extensions/filters/http/router/v3:pkg",
         "//envoy/extensions/filters/http/set_metadata/v3:pkg",
-        "//envoy/extensions/filters/http/sxg/v3alpha:pkg",
         "//envoy/extensions/filters/http/tap/v3:pkg",
         "//envoy/extensions/filters/http/wasm/v3:pkg",
         "//envoy/extensions/filters/listener/http_inspector/v3:pkg",

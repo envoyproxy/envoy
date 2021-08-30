@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/sxg/encoder.h"
+#include "contrib/sxg/filters/http/source/encoder.h"
 
 #include <openssl/bio.h>
 #include <openssl/evp.h>
@@ -9,7 +9,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/headers.h"
-#include "source/extensions/filters/http/sxg/filter_config.h"
+#include "contrib/sxg/filters/http/source/filter_config.h"
 
 #include "absl/strings/escaping.h"
 

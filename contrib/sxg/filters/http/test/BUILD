@@ -1,46 +1,41 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_package",
-)
-load(
-    "//test/extensions:extensions_build_system.bzl",
-    "envoy_extension_cc_test",
+    "envoy_cc_test",
+    "envoy_contrib_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_contrib_package()
 
-envoy_extension_cc_test(
+envoy_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
-    extension_names = ["envoy.filters.http.sxg"],
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/secret:secret_manager_impl_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//source/extensions/filters/http/sxg:config",
-        "//source/extensions/filters/http/sxg:sxg_lib",
+        "//contrib/sxg/filters/http/source:config",
+        "//contrib/sxg/filters/http/source:sxg_lib",
         "//test/integration:http_integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/extensions/filters/http/sxg/v3alpha:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg_cc_proto",
     ],
 )
 
-envoy_extension_cc_test(
+envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_names = ["envoy.filters.http.sxg"],
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/secret:secret_manager_impl_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//source/extensions/filters/http/sxg:config",
-        "//source/extensions/filters/http/sxg:sxg_lib",
+        "//contrib/sxg/filters/http/source:config",
+        "//contrib/sxg/filters/http/source:sxg_lib",
         "//test/integration:http_integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/extensions/filters/http/sxg/v3alpha:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg_cc_proto",
     ],
 )

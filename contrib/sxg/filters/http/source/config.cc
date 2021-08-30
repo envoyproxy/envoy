@@ -1,17 +1,18 @@
-#include "source/extensions/filters/http/sxg/config.h"
+#include "contrib/sxg/filters/http/source/config.h"
 
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
-#include "envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret_provider.h"
 
+#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
+#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.validate.h"
+#include "contrib/sxg/filters/http/source/encoder.h"
+#include "contrib/sxg/filters/http/source/filter.h"
+
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/http/sxg/encoder.h"
-#include "source/extensions/filters/http/sxg/filter.h"
 
 namespace Envoy {
 namespace Extensions {

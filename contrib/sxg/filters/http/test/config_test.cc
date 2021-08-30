@@ -1,12 +1,12 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
-
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/secret_provider_impl.h"
-#include "source/extensions/filters/http/sxg/config.h"
+
+#include "contrib/sxg/filters/http/source/config.h"
+#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
 
 #include "test/mocks/server/factory_context.h"
 

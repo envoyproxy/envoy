@@ -1,11 +1,12 @@
 #include <memory>
 
-#include "envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
-#include "envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.validate.h"
 #include "envoy/stats/stats.h"
 
 #include "source/common/secret/secret_manager_impl.h"
-#include "source/extensions/filters/http/sxg/filter.h"
+
+#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
+#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.validate.h"
+#include "contrib/sxg/filters/http/source/filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"

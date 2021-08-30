@@ -1,14 +1,14 @@
 #pragma once
 
-#include "envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
+#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.validate.h"
+
 #include "source/common/config/datasource.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-
-// #include "source/extensions/filters/http/sxg/encoder.h"
 
 namespace Envoy {
 namespace Extensions {

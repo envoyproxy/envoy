@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/sxg/filter_config.h"
+#include "contrib/sxg/filters/http/source/filter_config.h"
 
 #include <string>
 
