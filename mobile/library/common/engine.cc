@@ -67,10 +67,6 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
             });
       }
 
-      main_common = std::make_unique<EngineCommon>(envoy_argv.size() - 1, envoy_argv.data());
-      server_ = main_common->server();
-      event_dispatcher_ = &server_->dispatcher();
-
       if (logger_.log) {
         log_delegate_ptr_ =
             std::make_unique<Logger::LambdaDelegate>(logger_, Logger::Registry::getSink());
@@ -78,6 +74,10 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
         log_delegate_ptr_ =
             std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
       }
+
+      main_common = std::make_unique<EngineCommon>(envoy_argv.size() - 1, envoy_argv.data());
+      server_ = main_common->server();
+      event_dispatcher_ = &server_->dispatcher();
 
       cv_.notifyAll();
     } catch (const Envoy::NoServingException& e) {
