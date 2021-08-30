@@ -461,6 +461,14 @@ TEST(ZipkinSpanBufferTest, TestSerializeTimestampInTheFuture) {
               Not(HasSubstr(R"("duration":"2584324295476870")")));
 }
 
+TEST(ZipkinSpanBufferTest, TestDeprecatationOfHttpJsonV1) {
+  EXPECT_THROW_WITH_MESSAGE(
+      SpanBuffer buffer1(
+          envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1, false),
+      Envoy::EnvoyException,
+      "hidden_envoy_deprecated_HTTP_JSON_V1 has been deprecated. Please use other ZipkinConfig.");
+}
+
 } // namespace
 } // namespace Zipkin
 } // namespace Tracers
