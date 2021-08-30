@@ -110,7 +110,7 @@ build:remote-ci-common --verbose_failures
 # sends a keepalive if we don't receive any messages (server updates every 60s).
 build:remote-ci-common --grpc_keepalive_time=61s
 #############################################################################
-# remote-ci-linux: These options are linux-only
+# remote-ci-linux: These options are linux-only using GCC by default
 # TODO(lfpino): Add --remote_default_exec_properties=Pool=linux once the pool is defined
 #############################################################################
 # Common engflow flags
@@ -133,6 +133,20 @@ build:remote-ci-linux --java_toolchain=@bazel_tools//tools/jdk:toolchain_java11
 build:remote-ci-linux --javabase=@engflow_remote_config//java:jdk
 build:remote-ci-linux --platforms=@engflow_remote_config//config:platform
 build:remote-ci-linux --config=remote-ci-common
+#############################################################################
+# remote-ci-linux-clang: These options are linux-only using Clang by default
+#############################################################################
+build:remote-ci-linux-clang --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:remote-ci-linux-clang --action_env=CC=/opt/llvm/bin/clang
+build:remote-ci-linux-clang --action_env=CXX=/opt/llvm/bin/clang++
+build:remote-ci-linux-clang --crosstool_top=@engflow_remote_config_clang//cc:toolchain
+build:remote-ci-linux-clang --extra_execution_platforms=@engflow_remote_config_clang//config:platform
+build:remote-ci-linux-clang --extra_toolchains=@engflow_remote_config_clang//config:cc-toolchain
+build:remote-ci-linux-clang --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_java11
+build:remote-ci-linux-clang --host_platform=@engflow_remote_config_clang//config:platform
+build:remote-ci-linux-clang --java_toolchain=@bazel_tools//tools/jdk:toolchain_java11
+build:remote-ci-linux-clang --platforms=@engflow_remote_config_clang//config:platform
+build:remote-ci-linux-clang --config=remote-ci-common
 #############################################################################
 # remote-ci-macos: These options are macOS-only
 # TODO(lfpino): Add --remote_default_exec_properties=Pool=macos once the pool is defined
