@@ -240,10 +240,7 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
   lookup_result_ = std::make_unique<LookupResult>(std::move(result));
   switch (lookup_result_->cache_entry_status_) {
   case CacheEntryStatus::FoundNotModified:
-    // TODO(b/194204291): Implement proper handling of FoundNotModified. Until
-    // then, return as if the cache returned a cache hit.
-    handleCacheHit();
-    return;
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // We don't yet return or support these codes.
   case CacheEntryStatus::RequiresValidation:
     // If a cache entry requires validation, inject validation headers in the
     // request and let it pass through as if no cache entry was found. If the
