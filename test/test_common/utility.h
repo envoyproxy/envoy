@@ -1171,20 +1171,6 @@ MATCHER_P(ProtoEq, expected, "") {
   return equal;
 }
 
-MATCHER(ProtoEqSingleArg, "") {
-  const bool equal =
-      TestUtility::protoEqual(get<1>(arg), get<0>(arg), /*ignore_repeated_field_ordering=*/false);
-  if (!equal) {
-    *result_listener << "\n"
-                     << "==========================Expected proto:===========================\n"
-                     << get<0>(arg).DebugString()
-                     << "------------------is not equal to actual proto:---------------------\n"
-                     << get<1>(arg).DebugString()
-                     << "====================================================================\n";
-  }
-  return equal;
-}
-
 MATCHER_P(ProtoEqIgnoreRepeatedFieldOrdering, expected, "") {
   const bool equal =
       TestUtility::protoEqual(arg, expected, /*ignore_repeated_field_ordering=*/true);

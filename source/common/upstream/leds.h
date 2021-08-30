@@ -39,18 +39,18 @@ class LedsSubscription
       private Logger::Loggable<Logger::Id::upstream> {
 public:
   using UpdateCb = std::function<void()>;
-  using LbEndpointList = std::list<envoy::config::endpoint::v3::LbEndpoint>;
+  using LbEndpointsMap = absl::flat_hash_map<std::string, envoy::config::endpoint::v3::LbEndpoint>;
 
   LedsSubscription(const envoy::config::endpoint::v3::LedsClusterLocalityConfig& leds_config,
                    const std::string& cluster_name,
                    Server::Configuration::TransportSocketFactoryContext& factory_context,
                    Stats::Scope& stats_scope, const UpdateCb& callback);
 
-  // Fetch all the endpoints in the locality subscription.
-  const LbEndpointList& getEndpoints() const { return endpoints_; }
+  // Returns the map between registered LEDS resource names and their endpoints data.
+  const LbEndpointsMap& getEndpointsMap() const { return endpoints_map_; }
 
   // Returns true iff the endpoints were updated.
-  bool isActive() const { return active_; }
+  bool isUpdated() const { return initial_update_attempt_complete_; }
 
 private:
   // Config::SubscriptionCallbacks
@@ -64,22 +64,18 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
 
-  bool validateUpdateSize(int num_resources);
-
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
   // LEDS stats scope must outlive the subscription.
   Stats::ScopePtr stats_scope_;
   LedsStats stats_;
-  // Holds the current list of LbEndpoints.
-  LbEndpointList endpoints_;
-  // A map between a LEDS LbEndpoint resource name to its location in the endpoints_ list.
-  absl::flat_hash_map<std::string, LbEndpointList::iterator> endpoint_entry_map_;
+  // A map between a LEDS resource name to the LbEndpoint data.
+  LbEndpointsMap endpoints_map_;
   // A callback function activated after an update is received (either successful or
   // unsuccessful).
   const UpdateCb callback_;
   // Once the endpoints of the locality are updated, it is considered active.
-  bool active_{false};
+  bool initial_update_attempt_complete_{false};
   Config::SubscriptionPtr subscription_;
 };
 

@@ -34,15 +34,14 @@ void LedsSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   // At least one resource must be added or removed.
-  if (!validateUpdateSize(added_resources.size()) &&
-      !validateUpdateSize(removed_resources.size())) {
+  if ((added_resources.size() == 0) && (removed_resources.size() == 0)) {
     ENVOY_LOG(debug, "No added or removed LbEndpoint entries for cluster {} in onConfigUpdate()",
               cluster_name_);
     stats_.update_empty_.inc();
     // If it's the first update, and it has no resources, set the locality as active,
     // and update whoever is waiting for it, to allow the system to initialize.
-    if (!active_) {
-      active_ = true;
+    if (!initial_update_attempt_complete_) {
+      initial_update_attempt_complete_ = true;
       callback_();
     }
     return;
@@ -53,52 +52,23 @@ void LedsSubscription::onConfigUpdate(
 
   // Update the internal host list with the removed hosts.
   for (const auto& removed_resource_name : removed_resources) {
-    if (!Config::XdsResourceIdentifier::hasXdsTpScheme(removed_resource_name)) {
-      ENVOY_LOG(warn,
-                "Received non-glob collection resource name for an unsubscribed resource {} in "
-                "LEDS update for cluster: {}. Skipping entry.",
-                removed_resource_name, cluster_name_);
-      continue;
-    }
-
     // Remove the entry from the endpoints list.
     ENVOY_LOG(debug, "Removing endpoint {} using LEDS update.", removed_resource_name);
-    auto map_it = endpoint_entry_map_.find(removed_resource_name);
-    endpoints_.erase(map_it->second);
-    endpoint_entry_map_.erase(map_it);
+    endpoints_map_.erase(removed_resource_name);
   }
 
   // Update the internal host list with the added hosts.
   for (const auto& added_resource : added_resources) {
     const auto& added_resource_name = added_resource.get().name();
-    if (!Config::XdsResourceIdentifier::hasXdsTpScheme(added_resource_name)) {
-      ENVOY_LOG(warn,
-                "Received non-glob collection resource name for a subscribed resource {} in "
-                "LEDS update for cluster: {}. Skipping entry.",
-                added_resource_name, cluster_name_);
-      continue;
-    }
-
-    auto resource_it = endpoint_entry_map_.find(added_resource_name);
-    if (resource_it == endpoint_entry_map_.end()) {
-      ENVOY_LOG(trace, "Adding new endpoint {} using LEDS update.", added_resource_name);
-      envoy::config::endpoint::v3::LbEndpoint lb_endpoint =
-          dynamic_cast<const envoy::config::endpoint::v3::LbEndpoint&>(
-              added_resource.get().resource());
-      auto new_element_it = endpoints_.emplace(endpoints_.end(), lb_endpoint);
-      endpoint_entry_map_.emplace(added_resource_name, new_element_it);
-    } else {
-      // Updating the resource contents.
-      ENVOY_LOG(trace, "Updating endpoint {} using LEDS update.", added_resource_name);
-      envoy::config::endpoint::v3::LbEndpoint lb_endpoint =
-          dynamic_cast<const envoy::config::endpoint::v3::LbEndpoint&>(
-              added_resource.get().resource());
-      *resource_it->second = lb_endpoint;
-    }
+    ENVOY_LOG(trace, "Adding/Updating endpoint {} using LEDS update.", added_resource_name);
+    envoy::config::endpoint::v3::LbEndpoint lb_endpoint =
+        dynamic_cast<const envoy::config::endpoint::v3::LbEndpoint&>(
+            added_resource.get().resource());
+    endpoints_map_[added_resource_name] = std::move(lb_endpoint);
   }
 
   // Notify the callbacks that the host list has been modified.
-  active_ = true;
+  initial_update_attempt_complete_ = true;
   callback_();
 }
 
@@ -109,11 +79,9 @@ void LedsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureRe
 
   // Similar to EDS, we need to let the system initialize. Set the locality as
   // active, and update whoever is waiting for it.
-  active_ = true;
+  initial_update_attempt_complete_ = true;
   callback_();
 }
-
-bool LedsSubscription::validateUpdateSize(int num_resources) { return num_resources > 0; }
 
 } // namespace Upstream
 } // namespace Envoy

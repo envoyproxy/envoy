@@ -128,6 +128,18 @@ public:
                                                             [&]() { callbacks_called_counter_++; });
   }
 
+  static void compareEndpointsMapContents(
+      const LedsSubscription::LbEndpointsMap& actual_map,
+      const std::vector<std::pair<std::string, envoy::config::endpoint::v3::LbEndpoint>>&
+          expected_contents) {
+    EXPECT_EQ(actual_map.size(), expected_contents.size());
+    for (const auto& [resource_name, proto_value] : expected_contents) {
+      const auto map_it = actual_map.find(resource_name);
+      EXPECT_TRUE(map_it != actual_map.end());
+      EXPECT_THAT(proto_value, ProtoEq(map_it->second));
+    }
+  }
+
   static constexpr absl::string_view DEFAULT_LEDS_CONFIG_YAML{R"EOF(
     leds_config:
       api_config_source:
@@ -172,22 +184,22 @@ TEST_F(LedsTest, OnConfigUpdateSuccess) {
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   leds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "");
   EXPECT_EQ(1UL, callbacks_called_counter_);
-  EXPECT_TRUE(leds_subscription_->isActive());
-  const auto& all_endpoints = leds_subscription_->getEndpoints();
-  EXPECT_EQ(1UL, all_endpoints.size());
-  EXPECT_TRUE(TestUtility::protoEqual(lb_endpoint, *all_endpoints.begin()));
+  EXPECT_TRUE(leds_subscription_->isUpdated());
+  const auto& all_endpoints_map = leds_subscription_->getEndpointsMap();
+  EXPECT_EQ(1UL, all_endpoints_map.size());
+  EXPECT_TRUE(TestUtility::protoEqual(lb_endpoint, all_endpoints_map.begin()->second));
 }
 
 // Verify that onConfigUpdate() with empty LbEndpoints vector size ignores config.
 TEST_F(LedsTest, OnConfigUpdateEmpty) {
   initialize();
-  EXPECT_FALSE(leds_subscription_->isActive());
+  EXPECT_FALSE(leds_subscription_->isUpdated());
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   leds_callbacks_->onConfigUpdate({}, removed_resources, "");
   EXPECT_EQ(1UL, stats_.counter("cluster.xds_cluster.leds.update_empty").value());
   // Verify that the callback was called even after an empty update.
   EXPECT_EQ(1UL, callbacks_called_counter_);
-  EXPECT_TRUE(leds_subscription_->isActive());
+  EXPECT_TRUE(leds_subscription_->isUpdated());
 
   // Verify that the second time an empty update arrives, the callback isn't called.
   leds_callbacks_->onConfigUpdate({}, removed_resources, "");
@@ -198,14 +210,14 @@ TEST_F(LedsTest, OnConfigUpdateEmpty) {
 // Verify that onConfigUpdateFailed() calls the callback.
 TEST_F(LedsTest, OnConfigUpdateFailed) {
   initialize();
-  EXPECT_FALSE(leds_subscription_->isActive());
+  EXPECT_FALSE(leds_subscription_->isUpdated());
   const std::unique_ptr<EnvoyException> ex = std::make_unique<EnvoyException>("Update Failed");
   leds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
                                         ex.get());
   // Verify that the callback was called even after an failed update.
   EXPECT_EQ(1UL, callbacks_called_counter_);
-  EXPECT_TRUE(leds_subscription_->isActive());
-  EXPECT_EQ(0UL, leds_subscription_->getEndpoints().size());
+  EXPECT_TRUE(leds_subscription_->isUpdated());
+  EXPECT_EQ(0UL, leds_subscription_->getEndpointsMap().size());
 }
 
 // Verify that onConfigUpdateFailed() doesn't change the endpoints.
@@ -222,9 +234,9 @@ TEST_F(LedsTest, OnConfigUpdateFailedEndpoints) {
   EXPECT_EQ(1UL, callbacks_called_counter_);
 
   // Verify there's an endpoint.
-  const auto& all_endpoints = leds_subscription_->getEndpoints();
-  EXPECT_EQ(1UL, all_endpoints.size());
-  EXPECT_TRUE(TestUtility::protoEqual(lb_endpoint, *all_endpoints.begin()));
+  const auto& all_endpoints_map = leds_subscription_->getEndpointsMap();
+  EXPECT_EQ(1UL, all_endpoints_map.size());
+  EXPECT_TRUE(TestUtility::protoEqual(lb_endpoint, all_endpoints_map.begin()->second));
 
   // Fail the config.
   const std::unique_ptr<EnvoyException> ex = std::make_unique<EnvoyException>("Update Failed");
@@ -233,78 +245,79 @@ TEST_F(LedsTest, OnConfigUpdateFailedEndpoints) {
   EXPECT_EQ(2UL, callbacks_called_counter_);
 
   // Verify that the same endpoint exists.
-  const auto& all_endpoints2 = leds_subscription_->getEndpoints();
-  EXPECT_EQ(1UL, all_endpoints2.size());
-  EXPECT_TRUE(TestUtility::protoEqual(lb_endpoint, *all_endpoints2.begin()));
+  const auto& all_endpoints_map2 = leds_subscription_->getEndpointsMap();
+  EXPECT_EQ(1UL, all_endpoints_map2.size());
+  EXPECT_TRUE(TestUtility::protoEqual(lb_endpoint, all_endpoints_map2.begin()->second));
 }
 
 // Verify the update of an endpoint.
 TEST_F(LedsTest, UpdateEndpoint) {
   initialize();
   // Add 2 endpoints.
+  const std::string lb_endpoint1_name{
+      "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/endpoint0"};
+  const std::string lb_endpoint2_name{
+      "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/endpoint1"};
   const auto lb_endpoint1 = buildLbEndpoint("127.0.0.1", 12345);
   const auto lb_endpoint2 = buildLbEndpoint("127.0.0.1", 54321);
-  const auto& added_resources = buildAddedResources(
-      {lb_endpoint1, lb_endpoint2},
-      {"xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/endpoint0",
-       "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/endpoint1"});
+  const auto& added_resources =
+      buildAddedResources({lb_endpoint1, lb_endpoint2}, {lb_endpoint1_name, lb_endpoint2_name});
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::LbEndpoint>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   leds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "");
   EXPECT_EQ(1UL, callbacks_called_counter_);
-  EXPECT_TRUE(leds_subscription_->isActive());
-  const auto& all_endpoints = leds_subscription_->getEndpoints();
-  EXPECT_EQ(2UL, all_endpoints.size());
-  EXPECT_THAT(all_endpoints, UnorderedPointwise(ProtoEqSingleArg(), {lb_endpoint1, lb_endpoint2}));
+  EXPECT_TRUE(leds_subscription_->isUpdated());
+  const auto& all_endpoints_map = leds_subscription_->getEndpointsMap();
+  EXPECT_EQ(2UL, all_endpoints_map.size());
+  compareEndpointsMapContents(
+      all_endpoints_map, {{lb_endpoint1_name, lb_endpoint1}, {lb_endpoint2_name, lb_endpoint2}});
 
   // Update the first endpoint.
   const auto lb_endpoint1_update = buildLbEndpoint("127.0.0.1", 12346);
-  const auto& updated_resources = buildAddedResources(
-      {lb_endpoint1_update},
-      {"xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/endpoint0"});
+  const auto& updated_resources = buildAddedResources({lb_endpoint1_update}, {lb_endpoint1_name});
   const auto decoded_resources_update =
       TestUtility::decodeResources<envoy::config::endpoint::v3::LbEndpoint>(updated_resources);
   leds_callbacks_->onConfigUpdate(decoded_resources_update.refvec_, removed_resources, "");
   EXPECT_EQ(2UL, callbacks_called_counter_);
-  EXPECT_TRUE(leds_subscription_->isActive());
-  const auto& all_endpoints_update = leds_subscription_->getEndpoints();
+  EXPECT_TRUE(leds_subscription_->isUpdated());
+  const auto& all_endpoints_update = leds_subscription_->getEndpointsMap();
   EXPECT_EQ(2UL, all_endpoints_update.size());
-  EXPECT_THAT(all_endpoints_update,
-              UnorderedPointwise(ProtoEqSingleArg(), {lb_endpoint1_update, lb_endpoint2}));
+  compareEndpointsMapContents(all_endpoints_map, {{lb_endpoint1_name, lb_endpoint1_update},
+                                                  {lb_endpoint2_name, lb_endpoint2}});
 }
 
 // Verify adding 2 endpoints then removing one.
 TEST_F(LedsTest, RemoveEndpoint) {
   initialize();
   // Add 2 endpoints.
+  const auto lb_endpoint1_name{
+      "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/endpoint0"};
+  const auto lb_endpoint2_name{
+      "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/endpoint1"};
   const auto lb_endpoint1 = buildLbEndpoint("127.0.0.1", 12345);
   const auto lb_endpoint2 = buildLbEndpoint("127.0.0.1", 54321);
-  const auto& added_resources = buildAddedResources(
-      {lb_endpoint1, lb_endpoint2},
-      {"xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/endpoint0",
-       "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/endpoint1"});
+  const auto& added_resources =
+      buildAddedResources({lb_endpoint1, lb_endpoint2}, {lb_endpoint1_name, lb_endpoint2_name});
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::LbEndpoint>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   leds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "");
   EXPECT_EQ(1UL, callbacks_called_counter_);
-  EXPECT_TRUE(leds_subscription_->isActive());
-  const auto& all_endpoints = leds_subscription_->getEndpoints();
-  EXPECT_EQ(2UL, all_endpoints.size());
-  EXPECT_THAT(all_endpoints, UnorderedPointwise(ProtoEqSingleArg(), {lb_endpoint1, lb_endpoint2}));
+  EXPECT_TRUE(leds_subscription_->isUpdated());
+  const auto& all_endpoints_map = leds_subscription_->getEndpointsMap();
+  EXPECT_EQ(2UL, all_endpoints_map.size());
+  compareEndpointsMapContents(
+      all_endpoints_map, {{lb_endpoint1_name, lb_endpoint1}, {lb_endpoint2_name, lb_endpoint2}});
 
   // Remove the first endpoint.
-  const auto& removed_resources_update = buildRemovedResources(
-      {"xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/endpoint0"});
-  // const auto decoded_resources_update =
-  //    TestUtility::decodeResources<envoy::config::endpoint::v3::LbEndpoint>();
+  const auto& removed_resources_update = buildRemovedResources({lb_endpoint1_name});
   leds_callbacks_->onConfigUpdate({}, removed_resources_update, "");
   EXPECT_EQ(2UL, callbacks_called_counter_);
-  EXPECT_TRUE(leds_subscription_->isActive());
-  const auto& all_endpoints_update = leds_subscription_->getEndpoints();
+  EXPECT_TRUE(leds_subscription_->isUpdated());
+  const auto& all_endpoints_update = leds_subscription_->getEndpointsMap();
   EXPECT_EQ(1UL, all_endpoints_update.size());
-  EXPECT_THAT(all_endpoints_update, UnorderedPointwise(ProtoEqSingleArg(), {lb_endpoint2}));
+  compareEndpointsMapContents(all_endpoints_map, {{lb_endpoint2_name, lb_endpoint2}});
 }
 
 } // namespace
