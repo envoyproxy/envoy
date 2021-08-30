@@ -55,10 +55,11 @@ static_resources:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 """
     let expectation = self.expectation(description: "Run called with expected http status")
-    let client = EngineBuilder(yaml: config)
+    let engine = EngineBuilder(yaml: config)
       .addLogLevel(.debug)
       .build()
-      .streamClient()
+
+    let client = engine.streamClient()
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
                                                authority: "example.com", path: "/test")
@@ -84,5 +85,7 @@ static_resources:
       .close(trailers: requestTrailers)
 
     XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 1), .completed)
+
+    engine.terminate()
   }
 }

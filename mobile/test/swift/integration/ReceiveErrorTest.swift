@@ -84,7 +84,7 @@ static_resources:
     filterNotCancelled.isInverted = true
     let expectations = [filterReceivedError, filterNotCancelled, callbackReceivedError]
 
-    let client = EngineBuilder(yaml: config)
+    let engine = EngineBuilder(yaml: config)
       .addLogLevel(.trace)
       .addPlatformFilter(
         name: filterName,
@@ -94,7 +94,8 @@ static_resources:
         }
       )
       .build()
-      .streamClient()
+
+    let client = engine.streamClient()
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
                                                authority: "example.com", path: "/test")
@@ -122,5 +123,7 @@ static_resources:
       .sendHeaders(requestHeaders, endStream: true)
 
     XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 1), .completed)
+
+    engine.terminate()
   }
 }

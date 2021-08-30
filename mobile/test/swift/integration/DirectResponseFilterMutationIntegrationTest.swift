@@ -81,5 +81,7 @@ final class DirectResponseFilterMutationIntegrationTest: XCTestCase {
 
     let expectations = [headersExpectation, dataExpectation]
     XCTAssertEqual(.completed, XCTWaiter().wait(for: expectations, timeout: 10, enforceOrder: true))
+
+    engine.terminate()
   }
 }

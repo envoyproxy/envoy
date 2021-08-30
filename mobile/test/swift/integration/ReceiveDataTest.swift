@@ -51,10 +51,11 @@ static_resources:
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 """
-    let client = EngineBuilder(yaml: config)
+    let engine = EngineBuilder(yaml: config)
       .addLogLevel(.debug)
       .build()
-      .streamClient()
+
+    let client = engine.streamClient()
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
                                                authority: "example.com", path: "/test")
@@ -84,5 +85,7 @@ static_resources:
     XCTAssertEqual(XCTWaiter.wait(for: [headersExpectation, dataExpectation], timeout: 1,
                                   enforceOrder: true),
                    .completed)
+
+    engine.terminate()
   }
 }
