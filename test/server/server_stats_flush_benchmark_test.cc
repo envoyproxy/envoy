@@ -7,40 +7,42 @@
 #include "source/common/stats/thread_local_store.h"
 #include "source/server/server.h"
 
+#include "test/benchmark/main.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "absl/strings/str_cat.h"
 #include "benchmark/benchmark.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 class StatsSinkFlushSpeedTest {
 
 public:
-  StatsSinkFlushSpeedTest(uint64_t n_counters, uint64_t n_gauges, uint64_t n_text_readouts)
+  StatsSinkFlushSpeedTest(size_t const num_stats)
       : pool_(symbol_table_), stats_allocator_(symbol_table_), stats_store_(stats_allocator_) {
 
     sinks_.emplace_back(new testing::NiceMock<Stats::MockSink>());
     // Create counters
-    for (uint64_t idx = 0; idx < n_counters; ++idx) {
+    for (uint64_t idx = 0; idx < num_stats; ++idx) {
       auto stat_name = pool_.add(absl::StrCat("counter.", idx));
       stats_store_.counterFromStatName(stat_name).inc();
     }
     // Create gauges
-    for (uint64_t idx = 0; idx < n_gauges; ++idx) {
+    for (uint64_t idx = 0; idx < num_stats; ++idx) {
       auto stat_name = pool_.add(absl::StrCat("gauge.", idx));
       stats_store_.gaugeFromStatName(stat_name, Stats::Gauge::ImportMode::NeverImport).set(idx);
     }
 
     // Create text readouts
-    for (uint64_t idx = 0; idx < n_text_readouts; ++idx) {
+    for (uint64_t idx = 0; idx < num_stats; ++idx) {
       auto stat_name = pool_.add(absl::StrCat("text_readout.", idx));
       stats_store_.textReadoutFromStatName(stat_name).set(absl::StrCat("text_readout.", idx));
     }
   }
 
-  void test(benchmark::State& state) {
+  void test(::benchmark::State& state) {
     for (auto _ : state) {
       UNREFERENCED_PARAMETER(state);
       Server::InstanceUtil::flushMetricsToSinks(sinks_, stats_store_, time_system_);
@@ -56,18 +58,16 @@ private:
   Event::SimulatedTimeSystem time_system_;
 };
 
-static void bmLarge(benchmark::State& state) {
-  uint64_t n_counters = 1000000, n_gauges = 1000000, n_text_readouts = 1000000;
-  StatsSinkFlushSpeedTest speed_test(n_counters, n_gauges, n_text_readouts);
-  speed_test.test(state);
-}
-BENCHMARK(bmLarge)->Unit(::benchmark::kMillisecond);
+static void bmFlushToSinks(::benchmark::State& state) {
+  // Skip expensive benchmarks for unit tests.
+  if (benchmark::skipExpensiveBenchmarks() && state.range(0) > 100) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
 
-static void bmSmall(benchmark::State& state) {
-  uint64_t n_counters = 10000, n_gauges = 10000, n_text_readouts = 10000;
-  StatsSinkFlushSpeedTest speed_test(n_counters, n_gauges, n_text_readouts);
+  StatsSinkFlushSpeedTest speed_test(state.range(0));
   speed_test.test(state);
 }
-BENCHMARK(bmSmall)->Unit(::benchmark::kMillisecond);
+BENCHMARK(bmFlushToSinks)->Unit(::benchmark::kMillisecond)->RangeMultiplier(10)->Range(10, 1000000);
 
 } // namespace Envoy
