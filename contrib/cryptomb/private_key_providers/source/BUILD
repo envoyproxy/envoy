@@ -11,11 +11,13 @@ envoy_contrib_package()
 
 envoy_cc_library(
     name = "ipp_crypto_wrapper_lib",
-    hdrs = [
-        "ipp_crypto.h",
-        "ipp_crypto_disabled_impl.h",
-        "ipp_crypto_impl.h",
-    ],
+    hdrs = ["ipp_crypto.h"] + select({
+        "//bazel:linux_x86_64": [
+            "ipp_crypto_impl.h",
+        ],
+        "//conditions:default": [
+        ],
+    }),
     defines = select({
         "//bazel:linux_x86_64": [],
         "//conditions:default": [
@@ -27,7 +29,6 @@ envoy_cc_library(
     deps = select({
         "//bazel:linux_x86_64": [
             "//bazel/foreign_cc:ipp-crypto",
-            "//source/common/common:macros",
         ],
         "//conditions:default": [],
     }),
@@ -64,8 +65,13 @@ envoy_cc_contrib_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    defines = select({
+        "//bazel:linux_x86_64": [],
+        "//conditions:default": [
+            "IPP_CRYPTO_DISABLED=1",
+        ],
+    }),
     deps = [
-        ":cryptomb_private_key_provider_lib",
         "//envoy/registry",
         "//envoy/ssl/private_key:private_key_config_interface",
         "//envoy/ssl/private_key:private_key_interface",
@@ -74,5 +80,12 @@ envoy_cc_contrib_extension(
         "//source/common/protobuf:utility_lib",
         "@envoy_api//contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:linux_x86_64": [
+            ":cryptomb_private_key_provider_lib",
+            ":ipp_crypto_wrapper_lib",
+        ],
+        "//conditions:default": [
+        ],
+    }),
 )

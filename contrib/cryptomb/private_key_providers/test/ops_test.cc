@@ -7,6 +7,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "contrib/cryptomb/private_key_providers/source/cryptomb_private_key_provider.h"
 #include "fake_factory.h"
 #include "gtest/gtest.h"
 

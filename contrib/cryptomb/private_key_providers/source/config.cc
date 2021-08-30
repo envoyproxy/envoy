@@ -5,11 +5,16 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 
-#include "contrib/cryptomb/private_key_providers/source/ipp_crypto.h"
+#ifndef IPP_CRYPTO_DISABLED
+#include "contrib/cryptomb/private_key_providers/source/ipp_crypto_impl.h"
+#include "contrib/cryptomb/private_key_providers/source/cryptomb_private_key_provider.h"
+#endif
+
 #include "contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha/cryptomb.pb.h"
 #include "contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha/cryptomb.pb.validate.h"
 
@@ -34,6 +39,10 @@ CryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
                                                cryptomb::v3alpha::CryptoMbPrivateKeyMethodConfig&>(
               *message, private_key_provider_context.messageValidationVisitor());
 
+#ifdef IPP_CRYPTO_DISABLED
+  ENVOY_LOG(debug, "X86_64 architecture is required for cryptomb provider");
+  Ssl::PrivateKeyMethodProviderSharedPtr provider = nullptr;
+#else
   IppCryptoSharedPtr ipp = std::make_shared<IppCryptoImpl>();
 
   Ssl::PrivateKeyMethodProviderSharedPtr provider =
@@ -41,7 +50,7 @@ CryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
   if (provider == nullptr) {
     ENVOY_LOG(debug, "Failed to create cryptomb provider");
   }
-
+#endif
   return provider;
 }
 

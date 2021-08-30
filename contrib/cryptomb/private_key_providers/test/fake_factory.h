@@ -4,7 +4,6 @@
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/private_key/private_key_config.h"
 
-#include "contrib/cryptomb/private_key_providers/source/cryptomb_private_key_provider.h"
 #include "contrib/cryptomb/private_key_providers/source/ipp_crypto.h"
 
 namespace Envoy {

@@ -19,7 +19,8 @@ envoy_cc_test_library(
     ],
     external_deps = ["ssl"],
     deps = [
-        "//contrib/cryptomb/private_key_providers/source:config",
+        "//contrib/cryptomb/private_key_providers/source:cryptomb_private_key_provider_lib",
+        "//contrib/cryptomb/private_key_providers/source:ipp_crypto_wrapper_lib",
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/server:transport_socket_config_interface",
@@ -43,7 +44,6 @@ envoy_cc_test(
     ],
     deps = [
         ":test_fake_factory",
-        "//contrib/cryptomb/private_key_providers/source:config",
         "//source/common/common:random_generator_lib",
         "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
         "//test/mocks/runtime:runtime_mocks",
@@ -68,7 +68,6 @@ envoy_cc_test(
     ],
     deps = [
         ":test_fake_factory",
-        "//contrib/cryptomb/private_key_providers/source:config",
         "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
