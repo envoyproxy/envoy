@@ -175,6 +175,31 @@ TEST_F(FilterUnitTest, ShouldDoNothingOnBufferWatermarkEvents) {
   testee_.onAboveWriteBufferHighWatermark();
 }
 
+class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
+public:
+  MOCK_METHOD(void, onData, (Buffer::Instance&));
+  MOCK_METHOD(void, reset, ());
+  MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic,
+              (const std::string& topic), (const));
+  MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
+};
+
+class MockUpstreamKafkaFacade : public UpstreamKafkaFacade {
+public:
+  MOCK_METHOD(KafkaProducer&, getProducerForTopic, (const std::string&));
+};
+
+TEST(Filter, ShouldBeConstructable) {
+  // given
+  MockUpstreamKafkaConfiguration configuration;
+  MockUpstreamKafkaFacade upstream_kafka_facade;
+
+  // when
+  KafkaMeshFilter filter = KafkaMeshFilter(configuration, upstream_kafka_facade);
+
+  // then - no exceptions.
+}
+
 } // namespace
 } // namespace Mesh
 } // namespace Kafka

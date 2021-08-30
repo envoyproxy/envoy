@@ -1,5 +1,6 @@
 #pragma once
 
+#include "contrib/kafka/filters/network/source/external/requests.h"
 #include "contrib/kafka/filters/network/source/mesh/abstract_command.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/produce_outbound_record.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/produce_record_extractor.h"

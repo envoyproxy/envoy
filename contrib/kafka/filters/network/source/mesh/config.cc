@@ -26,7 +26,7 @@ Network::FilterFactoryCb KafkaMeshConfigFactory::createFilterFactoryFromProtoTyp
     const KafkaMeshProtoConfig& config, Server::Configuration::FactoryContext& context) {
 
 #ifdef WIN32
-  throw EnvoyException("Kafka mesh filter is not ready for Windows");
+  throw EnvoyException("Kafka mesh filter is not supported on Windows");
 #else
   const UpstreamKafkaConfigurationSharedPtr configuration =
       std::make_shared<UpstreamKafkaConfigurationImpl>(config);

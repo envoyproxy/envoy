@@ -25,9 +25,12 @@ UpstreamKafkaConfigurationImpl::UpstreamKafkaConfigurationImpl(const KafkaMeshPr
     throw EnvoyException("kafka-mesh filter needs to have at least one upstream Kafka cluster");
   }
 
+  // Processing cluster configuration.
   std::map<std::string, ClusterConfig> cluster_name_to_cluster_config;
   for (const auto& upstream_cluster_definition : upstream_clusters) {
     const std::string& cluster_name = upstream_cluster_definition.cluster_name();
+
+    // No duplicates are allowed.
     if (cluster_name_to_cluster_config.find(cluster_name) != cluster_name_to_cluster_config.end()) {
       throw EnvoyException(
           absl::StrCat("kafka-mesh filter has multiple Kafka clusters referenced by the same name",
@@ -55,6 +58,7 @@ UpstreamKafkaConfigurationImpl::UpstreamKafkaConfigurationImpl(const KafkaMeshPr
     const std::string& target_cluster = rule.target_cluster();
     ASSERT(rule.trigger_case() == ForwardingRule::TriggerCase::kTopicPrefix);
     ENVOY_LOG(trace, "Setting up forwarding rule: {} -> {}", rule.topic_prefix(), target_cluster);
+    // Each forwarding rule needs to reference a cluster.
     if (cluster_name_to_cluster_config.find(target_cluster) ==
         cluster_name_to_cluster_config.end()) {
       throw EnvoyException(absl::StrCat(
@@ -68,6 +72,7 @@ UpstreamKafkaConfigurationImpl::UpstreamKafkaConfigurationImpl(const KafkaMeshPr
 
 absl::optional<ClusterConfig>
 UpstreamKafkaConfigurationImpl::computeClusterConfigForTopic(const std::string& topic) const {
+  // We find the first matching prefix (this is why ordering is important).
   for (const auto& it : topic_prefix_to_cluster_config_) {
     if (topic.rfind(it.first, 0) == 0) {
       const ClusterConfig cluster_config = it.second;

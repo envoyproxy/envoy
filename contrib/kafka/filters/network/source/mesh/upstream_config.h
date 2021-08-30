@@ -1,7 +1,15 @@
 #pragma once
 
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "envoy/common/pure.h"
+
 #include "source/common/common/logger.h"
 
+#include "absl/types/optional.h"
 #include "contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.pb.h"
 #include "contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.pb.validate.h"
 
@@ -39,25 +47,36 @@ struct ClusterConfig {
 
 /**
  * Keeps the configuration related to upstream Kafka clusters.
- * Impl note: current matching from topic to cluster is based on prefix matching but more complex
- * rules could be added.
  */
 class UpstreamKafkaConfiguration {
 public:
   virtual ~UpstreamKafkaConfiguration() = default;
+
+  // Return this the host-port pair that's provided to Kafka clients.
+  // This value needs to follow same rules as 'advertised.address' property of Kafka broker.
+  virtual std::pair<std::string, int32_t> getAdvertisedAddress() const PURE;
+
+  // Provides cluster for given Kafka topic, according to the rules contained within this
+  // configuration object.
   virtual absl::optional<ClusterConfig>
   computeClusterConfigForTopic(const std::string& topic) const PURE;
-  virtual std::pair<std::string, int32_t> getAdvertisedAddress() const PURE;
 };
 
 using UpstreamKafkaConfigurationSharedPtr = std::shared_ptr<const UpstreamKafkaConfiguration>;
 
+/**
+ * Implementation that uses only topic-prefix to figure out which Kafka cluster to use.
+ */
 class UpstreamKafkaConfigurationImpl : public UpstreamKafkaConfiguration,
                                        private Logger::Loggable<Logger::Id::kafka> {
 public:
   UpstreamKafkaConfigurationImpl(const KafkaMeshProtoConfig& config);
+
+  // UpstreamKafkaConfiguration
   absl::optional<ClusterConfig>
   computeClusterConfigForTopic(const std::string& topic) const override;
+
+  // UpstreamKafkaConfiguration
   std::pair<std::string, int32_t> getAdvertisedAddress() const override;
 
 private:

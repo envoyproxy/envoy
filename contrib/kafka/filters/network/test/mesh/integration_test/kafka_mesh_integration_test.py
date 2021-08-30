@@ -161,8 +161,6 @@ class IntegrationTest(unittest.TestCase):
     def __verify_target_kafka_cluster(
             self, bootstrap_servers, partition, offset_to_payload_map, other_partition):
         # Check if records were properly forwarded to the cluster.
-        print("verify")
-        print(len(offset_to_payload_map))
         consumer = KafkaConsumer(bootstrap_servers=bootstrap_servers, auto_offset_reset='earliest')
         consumer.assign([partition])
         received_messages = []
