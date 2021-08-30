@@ -55,7 +55,7 @@ AppleDnsResolverStats AppleDnsResolverImpl::generateAppleDnsResolverStats(Stats:
 AppleDnsResolverImpl::StartResolutionResult
 AppleDnsResolverImpl::startResolution(const std::string& dns_name,
                                       DnsLookupFamily dns_lookup_family, ResolveCb callback) {
-  ENVOY_LOG(debug, "DNS resolver resolve={}", dns_name);
+  ENVOY_LOG_EVENT(debug, "apple_dns_start", "DNS resolution for {} started", dns_name);
 
   // When an IP address is submitted to c-ares in DnsResolverImpl, c-ares synchronously returns
   // the IP without submitting a DNS query. Because Envoy has come to rely on this behavior, this
@@ -64,8 +64,9 @@ AppleDnsResolverImpl::startResolution(const std::string& dns_name,
   auto address = Utility::parseInternetAddressNoThrow(dns_name);
 
   if (address != nullptr) {
-    ENVOY_LOG(debug, "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
-              dns_name, address->asString());
+    ENVOY_LOG_EVENT(debug, "apple_dns_immediate_resolution",
+                    "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
+                    dns_name, address->asString());
     callback(DnsResolver::ResolutionStatus::Success,
              {DnsResponse(address, std::chrono::seconds(60))});
     return {nullptr, true};
@@ -106,6 +107,8 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
 
   // If we synchronously failed the resolution, trigger a failure callback.
   if (!pending_resolution_and_success.second) {
+    ENVOY_LOG_EVENT(debug, "apple_dns_immediate_failure", "DNS resolution for {} failed", dns_name);
+
     callback(DnsResolver::ResolutionStatus::Failure, {});
     return nullptr;
   }
@@ -183,6 +186,8 @@ void AppleDnsResolverImpl::PendingResolution::onEventCallback(uint32_t events) {
 }
 
 void AppleDnsResolverImpl::PendingResolution::finishResolve() {
+  ENVOY_LOG_EVENT(debug, "apple_dns_resolution_complete",
+                  "dns resolution for {} completed with status {}", dns_name_, pending_cb_.status_);
   callback_(pending_cb_.status_, std::move(pending_cb_.responses_));
 
   if (owned_) {

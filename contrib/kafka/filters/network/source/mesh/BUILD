@@ -3,6 +3,7 @@ load(
     "envoy_cc_library",
     "envoy_contrib_package",
 )
+load("//bazel:envoy_internal.bzl", "envoy_external_dep_path")
 
 licenses(["notice"])  # Apache 2
 
@@ -21,6 +22,7 @@ envoy_cc_library(
         ":abstract_command_lib",
         ":request_processor_lib",
         ":upstream_config_lib",
+        ":upstream_kafka_facade_lib",
         "//contrib/kafka/filters/network/source:kafka_request_codec_lib",
         "//contrib/kafka/filters/network/source:kafka_response_codec_lib",
         "//envoy/buffer:buffer_interface",
@@ -43,10 +45,12 @@ envoy_cc_library(
     deps = [
         ":abstract_command_lib",
         ":upstream_config_lib",
+        ":upstream_kafka_facade_lib",
         "//contrib/kafka/filters/network/source:kafka_request_codec_lib",
         "//contrib/kafka/filters/network/source:kafka_request_parser_lib",
         "//contrib/kafka/filters/network/source/mesh/command_handlers:api_versions_lib",
         "//contrib/kafka/filters/network/source/mesh/command_handlers:metadata_lib",
+        "//contrib/kafka/filters/network/source/mesh/command_handlers:produce_lib",
         "//source/common/common:minimal_logger_lib",
     ],
 )
@@ -110,6 +114,7 @@ envoy_cc_library(
         ":upstream_kafka_client_lib",
         "//envoy/event:dispatcher_interface",
         "//source/common/common:minimal_logger_lib",
+        envoy_external_dep_path("librdkafka"),
     ],
 )
 

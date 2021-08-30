@@ -20,10 +20,9 @@ namespace RocketmqProxy {
 
 using RocketmqProxyProto = envoy::extensions::filters::network::rocketmq_proxy::v3::RocketmqProxy;
 
-RocketmqProxyProto parseRocketmqProxyFromV3Yaml(const std::string& yaml,
-                                                bool avoid_boosting = true) {
+RocketmqProxyProto parseRocketmqProxyFromV3Yaml(const std::string& yaml) {
   RocketmqProxyProto rocketmq_proxy;
-  TestUtility::loadFromYaml(yaml, rocketmq_proxy, false, avoid_boosting);
+  TestUtility::loadFromYaml(yaml, rocketmq_proxy);
   return rocketmq_proxy;
 }
 

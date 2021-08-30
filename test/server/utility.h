@@ -13,10 +13,9 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-inline envoy::config::listener::v3::Listener parseListenerFromV3Yaml(const std::string& yaml,
-                                                                     bool avoid_boosting = true) {
+inline envoy::config::listener::v3::Listener parseListenerFromV3Yaml(const std::string& yaml) {
   envoy::config::listener::v3::Listener listener;
-  TestUtility::loadFromYamlAndValidate(yaml, listener, true, avoid_boosting);
+  TestUtility::loadFromYamlAndValidate(yaml, listener);
   return listener;
 }
 

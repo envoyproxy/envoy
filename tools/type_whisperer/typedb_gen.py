@@ -181,8 +181,9 @@ if __name__ == '__main__':
                 type_map[type_desc.next_version_type_name].proto_path,
                 type_map[type_desc.next_version_type_name].qualified_package)
     for proto_path, (next_proto_path, next_package) in sorted(next_proto_info.items()):
-        type_db.next_version_protos[proto_path].proto_path = next_proto_path
-        type_db.next_version_protos[proto_path].qualified_package = next_package
+        if not next_package.endswith('.v4alpha'):
+            type_db.next_version_protos[proto_path].proto_path = next_proto_path
+            type_db.next_version_protos[proto_path].qualified_package = next_package
 
     # Write out proto text.
     with open(out_path, 'w') as f:

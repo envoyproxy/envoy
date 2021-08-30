@@ -466,7 +466,6 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:envoy_defaults_lib",
         "//source/common/config:utility_lib",
-        "//source/common/config:version_converter_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/init:manager_lib",
         "//source/common/init:target_lib",
