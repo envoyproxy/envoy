@@ -64,12 +64,6 @@ public:
 
   virtual void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
                                         std::function<void(Stats::TextReadout&)> f_stat) PURE;
-  /**
-   * @param filter should return true if the passed in stat needs to be sinked.
-   */
-  virtual void setCounterSinkFilter(std::function<bool(const Stats::Counter&)> filter) PURE;
-  virtual void setGaugeSinkFilter(std::function<bool(const Stats::Gauge&)> filter) PURE;
-  virtual void setTextReadoutSinkFilter(std::function<bool(const Stats::TextReadout&)> filter) PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;

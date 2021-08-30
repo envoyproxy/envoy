@@ -46,9 +46,6 @@ public:
 
     RefcountPtr<Base> new_stat = counter_alloc_(name);
     stats_.emplace(new_stat->statName(), new_stat);
-    if (sink_filter_ && sink_filter_(*new_stat)) {
-      sinked_stats_.insert(new_stat.get());
-    }
     return *new_stat;
   }
 
@@ -60,9 +57,6 @@ public:
 
     RefcountPtr<Base> new_stat = gauge_alloc_(name, import_mode);
     stats_.emplace(new_stat->statName(), new_stat);
-    if (sink_filter_ && sink_filter_(*new_stat)) {
-      sinked_stats_.insert(new_stat.get());
-    }
     return *new_stat;
   }
 
@@ -85,9 +79,6 @@ public:
 
     RefcountPtr<Base> new_stat = text_readout_alloc_(name, type);
     stats_.emplace(new_stat->statName(), new_stat);
-    if (sink_filter_ && sink_filter_(*new_stat)) {
-      sinked_stats_.insert(new_stat.get());
-    }
     return *new_stat;
   }
 
@@ -112,20 +103,11 @@ public:
 
   void forEachSinkedStat(std::function<void(std::size_t)> f_size,
                          std::function<void(Base&)> f_stat) {
-    if (sink_filter_ != nullptr) {
-      f_size(sinked_stats_.size());
-      for (auto& stat : sinked_stats_) {
-        f_stat(*stat);
-      }
-    } else {
-      f_size(stats_.size());
-      for (auto const& stat : stats_) {
-        f_stat(*stat.second);
-      }
+    f_size(stats_.size());
+    for (auto const& stat : stats_) {
+      f_stat(*stat.second);
     }
   }
-
-  void setSinkFilter(std::function<bool(const Base&)> filter) { sink_filter_ = filter; }
 
 private:
   friend class IsolatedStoreImpl;
@@ -139,12 +121,10 @@ private:
   }
 
   StatNameHashMap<RefcountPtr<Base>> stats_;
-  absl::flat_hash_set<Base*, absl::Hash<Base*>> sinked_stats_;
   CounterAllocator counter_alloc_;
   GaugeAllocator gauge_alloc_;
   HistogramAllocator histogram_alloc_;
   TextReadoutAllocator text_readout_alloc_;
-  std::function<bool(const Base&)> sink_filter_;
 };
 
 class IsolatedStoreImpl : public StoreImpl {
@@ -247,18 +227,6 @@ public:
   void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
                                 std::function<void(Stats::TextReadout&)> f_stat) override {
     text_readouts_.forEachSinkedStat(f_size, f_stat);
-  }
-
-  void setCounterSinkFilter(std::function<bool(const Stats::Counter&)> filter) override {
-    counters_.setSinkFilter(filter);
-  }
-
-  void setGaugeSinkFilter(std::function<bool(const Stats::Gauge&)> filter) override {
-    gauges_.setSinkFilter(filter);
-  }
-
-  void setTextReadoutSinkFilter(std::function<bool(const Stats::TextReadout&)> filter) override {
-    text_readouts_.setSinkFilter(filter);
   }
 
 private:

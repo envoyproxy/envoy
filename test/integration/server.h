@@ -299,18 +299,6 @@ public:
     store_.forEachSinkedTextReadout(f_size, f_stat);
   }
 
-  void setCounterSinkFilter(std::function<bool(const Stats::Counter&)> filter) override {
-    store_.setCounterSinkFilter(filter);
-  }
-
-  void setGaugeSinkFilter(std::function<bool(const Stats::Gauge&)> filter) override {
-    store_.setGaugeSinkFilter(filter);
-  }
-
-  void setTextReadoutSinkFilter(std::function<bool(const Stats::TextReadout&)> filter) override {
-    store_.setTextReadoutSinkFilter(filter);
-  }
-
   Counter& counterFromString(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.counterFromString(name);

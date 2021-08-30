@@ -253,12 +253,6 @@ public:
   void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
                                 std::function<void(Stats::TextReadout&)> f_stat) override;
 
-  void setCounterSinkFilter(std::function<bool(const Stats::Counter&)>) override;
-
-  void setGaugeSinkFilter(std::function<bool(const Stats::Gauge&)>) override;
-
-  void setTextReadoutSinkFilter(std::function<bool(const Stats::TextReadout&)>) override;
-
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
   void setTagProducer(TagProducerPtr&& tag_producer) override {

@@ -992,18 +992,5 @@ void ThreadLocalStoreImpl::forEachSinkedTextReadout(
   alloc_.forEachSinkedTextReadout(f_size, f_stat);
 }
 
-void ThreadLocalStoreImpl::setCounterSinkFilter(std::function<bool(const Stats::Counter&)> filter) {
-  alloc_.setCounterSinkFilter(filter);
-}
-
-void ThreadLocalStoreImpl::setGaugeSinkFilter(std::function<bool(const Stats::Gauge&)> filter) {
-  alloc_.setGaugeSinkFilter(filter);
-}
-
-void ThreadLocalStoreImpl::setTextReadoutSinkFilter(
-    std::function<bool(const Stats::TextReadout&)> filter) {
-  alloc_.setTextReadoutSinkFilter(filter);
-}
-
 } // namespace Stats
 } // namespace Envoy

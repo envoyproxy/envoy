@@ -292,9 +292,6 @@ public:
               (std::function<void(std::size_t)>, std::function<void(Stats::Gauge&)>));
   MOCK_METHOD(void, forEachSinkedTextReadout,
               (std::function<void(std::size_t)>, std::function<void(Stats::TextReadout&)>));
-  MOCK_METHOD(void, setCounterSinkFilter, (std::function<bool(const Stats::Counter&)>));
-  MOCK_METHOD(void, setGaugeSinkFilter, (std::function<bool(const Stats::Gauge&)>));
-  MOCK_METHOD(void, setTextReadoutSinkFilter, (std::function<bool(const Stats::TextReadout&)>));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
