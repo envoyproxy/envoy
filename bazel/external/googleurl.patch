@@ -56,10 +56,10 @@ index 3faca72..a3adb1b 100644
 # https://github.com/envoyproxy/envoy/issues/14743.
 
 diff --git a/url/BUILD b/url/BUILD
-index 6ed3fc5..64b7a2b 100644
+index 6ed3fc5..e9d9ac3 100644
 --- a/url/BUILD
 +++ b/url/BUILD
-@@ -54,3 +54,29 @@ cc_library(
+@@ -54,3 +54,30 @@ cc_library(
          "//polyfills",
      ] + build_config.icuuc_deps,
  )
@@ -79,9 +79,10 @@ index 6ed3fc5..64b7a2b 100644
 +       "url_canon_stdstring.h",
 +       "url_parse_internal.h",
 +    ],
-+    copts = build_config.default_copts + [
-+        "-Wno-c++11-narrowing",
-+    ],
++    copts = build_config.default_copts + select({
++        "@envoy//bazel:windows_x86_64": [],
++        "//conditions:default": ["-Wno-c++11-narrowing"],
++    }),
 +    visibility = ["//visibility:public"],
 +    deps = [
 +       "//base",
