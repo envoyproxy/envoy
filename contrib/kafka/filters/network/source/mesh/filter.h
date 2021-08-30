@@ -80,10 +80,8 @@ public:
 
 private:
   // Helper method invoked when connection gets dropped.
-  // Request references are stored in 2 places: this filter (request's origin) and in
-  // UpstreamKafkaClient instances (to match pure-Kafka confirmations to the requests). Because
-  // filter can be destroyed before confirmations from Kafka are received, we are just going to mark
-  // related requests as abandoned, so they do not attempt to reference this filter anymore.
+  // Because filter can be destroyed before confirmations from Kafka are received, we are just going
+  // to mark related requests as abandoned, so they do not attempt to reference this filter anymore.
   // Impl note: this is similar to what Redis filter does.
   void abandonAllInFlightRequests();
 

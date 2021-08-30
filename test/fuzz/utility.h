@@ -165,14 +165,14 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
           ? Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address())
           : Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
   test_stream_info->upstream_local_address_ = upstream_local_address;
-  test_stream_info->downstream_address_provider_ =
+  test_stream_info->downstream_connection_info_provider_ =
       std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
-  test_stream_info->downstream_address_provider_->setRequestedServerName(
+  test_stream_info->downstream_connection_info_provider_->setRequestedServerName(
       stream_info.requested_server_name());
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*connection_info, subjectPeerCertificate())
       .WillByDefault(testing::ReturnRef(TestSubjectPeer));
-  test_stream_info->downstream_address_provider_->setSslConnection(connection_info);
+  test_stream_info->downstream_connection_info_provider_->setSslConnection(connection_info);
   return test_stream_info;
 }
 

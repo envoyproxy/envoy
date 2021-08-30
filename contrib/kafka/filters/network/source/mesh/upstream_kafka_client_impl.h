@@ -19,6 +19,7 @@ namespace Mesh {
 class LibRdKafkaUtils {
 public:
   virtual ~LibRdKafkaUtils() = default;
+
   virtual RdKafka::Conf::ConfResult setConfProperty(RdKafka::Conf& conf, const std::string& name,
                                                     const std::string& value,
                                                     std::string& errstr) const PURE;
@@ -34,7 +35,7 @@ public:
 using RawKafkaProducerConfig = std::map<std::string, std::string>;
 
 /**
- * Combines the librdkafka producer and its monitoring thread.
+ * Combines the librdkafka producer and its dedicated monitoring thread.
  * Producer is used to schedule messages to be sent to Kafka.
  * Independently running monitoring thread picks up delivery confirmations from producer and uses
  * Dispatcher to notify itself about delivery in worker thread.
@@ -43,7 +44,7 @@ class RichKafkaProducer : public KafkaProducer,
                           public RdKafka::DeliveryReportCb,
                           private Logger::Loggable<Logger::Id::kafka> {
 public:
-  // Usual constructor.
+  // Main constructor.
   RichKafkaProducer(Event::Dispatcher& dispatcher, Thread::ThreadFactory& thread_factory,
                     const RawKafkaProducerConfig& configuration);
 
@@ -51,47 +52,33 @@ public:
   RichKafkaProducer(Event::Dispatcher& dispatcher, Thread::ThreadFactory& thread_factory,
                     const RawKafkaProducerConfig& configuration, const LibRdKafkaUtils& utils);
 
-  /**
-   * More complex than usual.
-   * Marks that monitoring thread should finish and waits for it to join.
-   */
+  // More complex than usual.
+  // Marks that monitoring thread should finish and waits for it to join.
   ~RichKafkaProducer() override;
 
-  /**
-   * Submits given payload to be sent to given topic:partition.
-   * If successful, after successful delivery callback method will be invoked sometime in future by
-   * monitoring thread. If there's a produce failure, we are going to notify the callback
-   * immediately with failure data.
-   *
-   * @param origin origin of payload to be notified when delivery finishes.
-   * @param topic Kafka topic.
-   * @param partition Kafka partition (as clients do partitioning, we just reuse what downstream
-   * gave us).
-   * @param key Kafka message key.
-   * @param value Kafka message value.
-   */
+  // KafkaProducer
+  void markFinished() override;
+
+  // KafkaProducer
   void send(const ProduceFinishCbSharedPtr origin, const std::string& topic,
             const int32_t partition, const absl::string_view key,
             const absl::string_view value) override;
 
-  void processDelivery(const DeliveryMemento& memento);
-
-  // Method executed by monitoring thread.
+  // This method gets executed by monitoring thread.
+  // Does not finish until this object gets 'markFinished' invoked or gets destroyed.
+  // Executed in dedicated monitoring thread.
   void checkDeliveryReports();
 
   // RdKafka::DeliveryReportCb
   void dr_cb(RdKafka::Message& message) override;
 
-  // Notifies this instance that it is going to be destroyed soon.
-  // Impl note: it allows us to prepare all rich producers for shutdown instead of waiting for each
-  // one by one.
-  void markFinished() override;
+  // Processes the delivery confirmation.
+  // Executed in Envoy worker thread.
+  void processDelivery(const DeliveryMemento& memento);
 
   std::list<ProduceFinishCbSharedPtr>& getUnfinishedRequestsForTest();
 
 private:
-  ProduceFinishCbSharedPtr getMatching(const RdKafka::Message& message);
-
   Event::Dispatcher& dispatcher_;
 
   std::list<ProduceFinishCbSharedPtr> unfinished_produce_requests_;
