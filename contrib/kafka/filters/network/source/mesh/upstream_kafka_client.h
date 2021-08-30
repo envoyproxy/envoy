@@ -17,6 +17,13 @@ namespace Mesh {
 // in case of success this means offset (if acks > 0), or error code.
 struct DeliveryMemento {
 
+  // Pointer to byte array that was passed to Kafka producer.
+  // We use this to tell apart messages.
+  // Important: we do not free this memory, it's still part of the 'ProduceRequestHandler' object.
+  // Future work: adopt Kafka's opaque-pointer functionality so we use less memory instead of
+  // keeping whole payload until we receive a confirmation.
+  const void* data_;
+
   // Kafka producer error code.
   const int32_t error_code_;
 

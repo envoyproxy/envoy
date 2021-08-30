@@ -167,10 +167,10 @@ public:
 
   void setRequestedServerName(absl::string_view server_name) override {
     // Always keep the server_name_ as lower case.
-    addressProvider().setRequestedServerName(absl::AsciiStrToLower(server_name));
+    connectionInfoProvider().setRequestedServerName(absl::AsciiStrToLower(server_name));
   }
   absl::string_view requestedServerName() const override {
-    return addressProvider().requestedServerName();
+    return connectionInfoProvider().requestedServerName();
   }
 
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {

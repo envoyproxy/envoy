@@ -189,7 +189,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
       }));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
-        cb.socket().addressProvider().restoreLocalAddress(alt_address);
+        cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
         return Network::FilterStatus::Continue;
       }));
   // Verify that listener1 hands off the connection by not creating network filter chain.

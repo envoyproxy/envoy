@@ -258,44 +258,6 @@ filter_chains:
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest,
-       DEPRECATED_FEATURE_TEST(TlsTransportSocketLegacyConfig)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1234
-filter_chains:
-- filters: []
-  transport_socket:
-    name: tls
-    typed_config:
-      "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
-      common_tls_context:
-        tls_certificates:
-        - certificate_chain:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
-          private_key:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
-        validation_context:
-          trusted_ca:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-          verify_subject_alt_name:
-            - localhost
-            - 127.0.0.1
-  )EOF",
-                                                       Network::Address::IpVersion::v4);
-
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
-  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
-  EXPECT_EQ(1U, manager_->listeners().size());
-
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
-  ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
-}
-
 TEST_F(ListenerManagerImplWithRealFiltersTest, TransportSocketConnectTimeout) {
   const std::string yaml = R"EOF(
 address:
@@ -4064,8 +4026,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-  EXPECT_TRUE(socket.addressProvider().localAddressRestored());
-  EXPECT_EQ("127.0.0.2:2345", socket.addressProvider().localAddress()->asString());
+  EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
+  EXPECT_EQ("127.0.0.2:2345", socket.connectionInfoProvider().localAddress()->asString());
 #endif
 }
 
@@ -4161,8 +4123,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-  EXPECT_TRUE(socket.addressProvider().localAddressRestored());
-  EXPECT_EQ("127.0.0.2:2345", socket.addressProvider().localAddress()->asString());
+  EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
+  EXPECT_EQ("127.0.0.2:2345", socket.connectionInfoProvider().localAddress()->asString());
 #endif
 }
 
@@ -4242,8 +4204,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-  EXPECT_TRUE(socket.addressProvider().localAddressRestored());
-  EXPECT_EQ("[1::2]:2345", socket.addressProvider().localAddress()->asString());
+  EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
+  EXPECT_EQ("[1::2]:2345", socket.connectionInfoProvider().localAddress()->asString());
 }
 
 // Validate that when neither transparent nor freebind is not set in the

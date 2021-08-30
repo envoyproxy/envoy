@@ -30,7 +30,6 @@
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
@@ -279,19 +278,6 @@ ProcessContextOptRef InstanceImpl::processContext() {
 }
 
 namespace {
-// Loads a bootstrap object, potentially at a specific version (upgrading if necessary).
-void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
-                   envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                   std::function<void(Protobuf::Message&, bool)> load_function) {
-
-  if (!bootstrap_version.has_value()) {
-    load_function(bootstrap, true);
-  } else if (*bootstrap_version == 3) {
-    load_function(bootstrap, false);
-  } else {
-    throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
-  }
-}
 
 bool canBeRegisteredAsInlineHeader(const Http::LowerCaseString& header_name) {
   // 'set-cookie' cannot currently be registered as an inline header.
@@ -349,19 +335,11 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
 
   if (!config_path.empty()) {
-    loadBootstrap(
-        options.bootstrapVersion(), bootstrap,
-        [&config_path, &validation_visitor, &api](Protobuf::Message& message, bool do_boosting) {
-          MessageUtil::loadFromFile(config_path, message, validation_visitor, api, do_boosting);
-        });
+    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
-    loadBootstrap(
-        options.bootstrapVersion(), bootstrap_override,
-        [&config_yaml, &validation_visitor](Protobuf::Message& message, bool do_boosting) {
-          MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
-        });
+    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
@@ -460,15 +438,6 @@ void InstanceImpl::initialize(const Options& options,
     bootstrap_.mutable_node()->set_user_agent_name("envoy");
   }
 
-  // If user has set user_agent_version in the bootstrap config, use it.
-  // Default to the internal server version.
-  if (!bootstrap_.node().user_agent_version().empty()) {
-    std::string user_agent_version = bootstrap_.node().user_agent_version();
-    bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(user_agent_version);
-  } else {
-    bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
-  }
-
   // If user has set user_agent_build_version in the bootstrap config, use it.
   // Default to the internal server version.
   if (!bootstrap_.node().user_agent_build_version().has_version()) {
@@ -492,7 +461,7 @@ void InstanceImpl::initialize(const Options& options,
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_, options);
+  Configuration::InitialImpl initial_config(bootstrap_);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
@@ -708,14 +677,14 @@ void InstanceImpl::onRuntimeReady() {
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
     TRY_ASSERT_MAIN_THREAD {
+      Config::Utility::checkTransportVersion(hds_config);
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           stats_store_,
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
                                                          stats_store_, false)
               ->createUncachedRawAsyncClient(),
-          Config::Utility::getAndCheckTransportVersion(hds_config), *dispatcher_,
-          Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_, info_factory_,
-          access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
+          *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
+          info_factory_, access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
           *singleton_manager_, thread_local_, messageValidationContext().dynamicValidationVisitor(),
           *api_, options_);
     }
@@ -825,14 +794,13 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       return;
     }
 
-    const auto type_urls =
-        Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
+    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>();
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
     Config::ScopedResume maybe_resume_rds;
     if (cm.adsMux()) {
-      maybe_resume_rds = cm.adsMux()->pause(type_urls);
+      maybe_resume_rds = cm.adsMux()->pause(type_url);
     }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");

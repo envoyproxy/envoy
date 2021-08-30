@@ -29,7 +29,7 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
   }
   // Update local address if QUICHE has updated the self address.
   ASSERT(self_address().IsInitialized());
-  connectionSocket()->addressProvider().setLocalAddress(
+  connectionSocket()->connectionInfoProvider().setLocalAddress(
       quicAddressToEnvoyAddressInstance(self_address()));
 
   return true;

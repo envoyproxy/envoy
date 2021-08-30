@@ -38,10 +38,9 @@ using ::testing::Return;
 using ::testing::ReturnPointee;
 using ::testing::ReturnRef;
 
-static envoy::config::route::v3::Route parseRouteFromV3Yaml(const std::string& yaml,
-                                                            bool avoid_boosting = true) {
+static envoy::config::route::v3::Route parseRouteFromV3Yaml(const std::string& yaml) {
   envoy::config::route::v3::Route route;
-  TestUtility::loadFromYaml(yaml, route, false, avoid_boosting);
+  TestUtility::loadFromYaml(yaml, route);
   return route;
 }
 
