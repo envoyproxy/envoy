@@ -8,10 +8,13 @@ final class IdleTimeoutTests: XCTestCase {
     let idleTimeout = "0.5s"
     // swiftlint:disable:next line_length
     let hcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
-    let lefType = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
     // swiftlint:disable:next line_length
-    let pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
-    let filterName = "idle_timeout_validation_filter"
+    let emhcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
+    let pbfType =
+      "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
+    let localErrorFilterType =
+      "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
+    let filterName = "reset_idle_test_filter"
     let config =
 """
 static_resources:
@@ -42,28 +45,29 @@ static_resources:
       socket_address: { protocol: TCP, address: 0.0.0.0, port_value: 10000 }
     api_listener:
       api_listener:
-        "@type": \(hcmType)
-        stat_prefix: api_hcm
-        stream_idle_timeout: \(idleTimeout)
-        route_config:
-          name: api_router
-          virtual_hosts:
-          - name: api
-            domains: ["*"]
-            routes:
-            - match: { prefix: "/" }
-              route: { cluster: fake_remote }
-        http_filters:
-        - name: envoy.filters.http.local_error
-          typed_config:
-            "@type": \(lefType)
-        - name: envoy.filters.http.platform_bridge
-          typed_config:
-            "@type": \(pbfType)
-            platform_filter_name: \(filterName)
-        - name: envoy.router
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+        "@type": \(emhcmType)
+        config:
+          stat_prefix: api_hcm
+          stream_idle_timeout: \(idleTimeout)
+          route_config:
+            name: api_router
+            virtual_hosts:
+            - name: api
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: fake_remote }
+          http_filters:
+          - name: envoy.filters.http.platform_bridge
+            typed_config:
+              "@type": \(pbfType)
+              platform_filter_name: \(filterName)
+          - name: envoy.filters.http.local_error
+            typed_config:
+              "@type": \(localErrorFilterType)
+          - name: envoy.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
   - name: fake_remote
     connect_timeout: 0.25s
@@ -78,7 +82,7 @@ static_resources:
               socket_address: { address: 127.0.0.1, port_value: 10101 }
 """
 
-    class IdleTimeoutValidationFilter: AsyncResponseFilter {
+    class IdleTimeoutValidationFilter: AsyncResponseFilter, ResponseFilter {
       let timeoutExpectation: XCTestExpectation
       var callbacks: ResponseFilterCallbacks!
 
