@@ -134,6 +134,12 @@ protected:
   const std::string age = std::to_string(delay_.count());
 };
 
+TEST_F(CacheFilterTest, FilterIsBeingDestroyed) {
+  CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+  filter->onDestroy();
+  filter->decodeHeaders(request_headers_, true); // Should do nothing... at least make sure it doesn't crash.
+}
+
 TEST_F(CacheFilterTest, UncacheableRequest) {
   request_headers_.setHost("UncacheableRequest");
 

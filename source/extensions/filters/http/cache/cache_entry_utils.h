@@ -39,6 +39,7 @@ enum class CacheEntryStatus {
 };
 
 absl::string_view cacheEntryStatusString(CacheEntryStatus s);
+std::ostream& operator<<(std::ostream& os, CacheEntryStatus status);
 
 } // namespace Cache
 } // namespace HttpFilters

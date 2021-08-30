@@ -21,7 +21,7 @@ absl::string_view cacheEntryStatusString(CacheEntryStatus s) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-inline std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
+std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
   return os << cacheEntryStatusString(status);
 }
 
