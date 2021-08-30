@@ -152,7 +152,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1540")
   public void testSimpleGet() throws Exception {
     String url = NativeTestServer.getEchoMethodURL();
     TestUrlRequestCallback callback = startAndWaitForComplete(url);
@@ -200,7 +199,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1540")
   public void testRedirectAsync() throws Exception {
     // Start the request and wait to see the redirect.
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
@@ -797,7 +795,6 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1540")
   public void testSimpleGetBufferUpdates() throws Exception {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     callback.setAutoAdvance(false);
