@@ -51,8 +51,7 @@ message ZipkinConfig {
   string collector_cluster = 1 [(validate.rules).string = {min_len: 1}];
 
   // The API endpoint of the Zipkin service where the spans will be sent. When
-  // using a standard Zipkin installation, the API endpoint is typically
-  // /api/v1/spans, which is the default value.
+  // using a standard Zipkin installation.
   string collector_endpoint = 2 [(validate.rules).string = {min_len: 1}];
 
   // Determines whether a 128bit trace id will be used when creating a new
