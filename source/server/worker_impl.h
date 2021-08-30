@@ -76,7 +76,7 @@ private:
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
   Api::Api& api_;
-  WorkerStatNames& stat_names_;
+  Stats::Counter& reset_streams_counter_;
   Thread::ThreadPtr thread_;
   WatchDogSharedPtr watch_dog_;
 };

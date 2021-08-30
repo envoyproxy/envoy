@@ -28,7 +28,8 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
                        OverloadManager& overload_manager, Api::Api& api,
                        WorkerStatNames& stat_names)
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
-      api_(api), stat_names_(stat_names) {
+      api_(api), reset_streams_counter_(
+                     api_.rootScope().counterFromStatName(stat_names.reset_high_memory_stream_)) {
   tls_.registerThread(*dispatcher_, false);
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
@@ -155,9 +156,7 @@ void WorkerImpl::rejectIncomingConnectionsCb(OverloadActionState state) {
 void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState state) {
   uint64_t streams_reset_count =
       dispatcher_->getWatermarkFactory().resetAccountsGivenPressure(state.value().value());
-  api_.rootScope()
-      .counterFromStatName(stat_names_.reset_high_memory_stream_)
-      .add(streams_reset_count);
+  reset_streams_counter_.add(streams_reset_count);
 }
 
 } // namespace Server
