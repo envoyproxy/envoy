@@ -80,7 +80,7 @@ index 6ed3fc5..e9d9ac3 100644
 +       "url_parse_internal.h",
 +    ],
 +    copts = build_config.default_copts + select({
-+        "@envoy//bazel:windows_x86_64": [],
++        "@envoy//bazel:windows_x86_64": ["-wd2397"],
 +        "//conditions:default": ["-Wno-c++11-narrowing"],
 +    }),
 +    visibility = ["//visibility:public"],
