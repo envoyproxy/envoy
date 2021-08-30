@@ -89,7 +89,7 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
 
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override { return *this; }
-  bool passthroughEnabled() const override { return false; }
+  bool passthroughEnabled() const override { return true; }
 
   DecoderPtr decoder_;
   Buffer::OwnedImpl response_buffer_;
