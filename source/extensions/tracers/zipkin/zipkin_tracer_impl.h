@@ -158,9 +158,8 @@ private:
  * Information about the Zipkin collector.
  */
 struct CollectorInfo {
-  // The Zipkin collector endpoint/path to receive the collected trace data. e.g. default is
-  // /api/v2/spans.
-  std::string endpoint_{DEFAULT_COLLECTOR_ENDPOINT};
+  // The Zipkin collector endpoint/path to receive the collected trace data.
+  std::string endpoint_;
 
   // The version of the collector. This is related to endpoint's supported payload specification and
   // transport. Currently it defaults to envoy::config::trace::v3::ZipkinConfig::HTTP_JSON. In
