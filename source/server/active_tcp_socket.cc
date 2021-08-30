@@ -15,7 +15,7 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
       hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
       iter_(accept_filters_.end()),
       stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
-          listener_.dispatcher().timeSource(), socket_->addressProviderSharedPtr(),
+          listener_.dispatcher().timeSource(), socket_->connectionInfoProviderSharedPtr(),
           StreamInfo::FilterState::LifeSpan::Connection)) {
   listener_.stats_.downstream_pre_cx_active_.inc();
 }
@@ -121,10 +121,10 @@ void ActiveTcpSocket::newConnection() {
   Network::BalancedConnectionHandlerOptRef new_listener;
 
   if (hand_off_restored_destination_connections_ &&
-      socket_->addressProvider().localAddressRestored()) {
+      socket_->connectionInfoProvider().localAddressRestored()) {
     // Find a listener associated with the original destination address.
     new_listener =
-        listener_.getBalancedHandlerByAddress(*socket_->addressProvider().localAddress());
+        listener_.getBalancedHandlerByAddress(*socket_->connectionInfoProvider().localAddress());
   }
   if (new_listener.has_value()) {
     // Hands off connections redirected by iptables to the listener associated with the
