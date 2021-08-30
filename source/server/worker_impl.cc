@@ -13,14 +13,6 @@
 
 namespace Envoy {
 namespace Server {
-namespace {
-// TODO(kbaichoo): refactor into a utility.
-Stats::Counter& getCounter(Stats::Scope& scope, absl::string_view name_of_stat) {
-  Envoy::Stats::StatNameManagedStorage stat_name(name_of_stat, scope.symbolTable());
-  return scope.counterFromStatName(stat_name.statName());
-}
-
-} // namespace
 
 WorkerPtr ProdWorkerFactory::createWorker(uint32_t index, OverloadManager& overload_manager,
                                           const std::string& worker_name) {
@@ -28,15 +20,15 @@ WorkerPtr ProdWorkerFactory::createWorker(uint32_t index, OverloadManager& overl
       api_.allocateDispatcher(worker_name, overload_manager.scaledTimerFactory()));
   auto conn_handler = std::make_unique<ConnectionHandlerImpl>(*dispatcher, index);
   return std::make_unique<WorkerImpl>(tls_, hooks_, std::move(dispatcher), std::move(conn_handler),
-                                      overload_manager, api_);
+                                      overload_manager, api_, stat_names_);
 }
 
 WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
                        Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler,
-                       OverloadManager& overload_manager, Api::Api& api)
+                       OverloadManager& overload_manager, Api::Api& api,
+                       WorkerStatNames& stat_names)
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
-      api_(api), reset_streams_counter_(getCounter(
-                     api.rootScope(), OverloadActionStatsNames::get().ResetStreamsCount)) {
+      api_(api), stat_names_(stat_names) {
   tls_.registerThread(*dispatcher_, false);
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
@@ -163,7 +155,9 @@ void WorkerImpl::rejectIncomingConnectionsCb(OverloadActionState state) {
 void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState state) {
   uint64_t streams_reset_count =
       dispatcher_->getWatermarkFactory().resetAccountsGivenPressure(state.value().value());
-  reset_streams_counter_.add(streams_reset_count);
+  api_.rootScope()
+      .counterFromStatName(stat_names_.reset_high_memory_stream_)
+      .add(streams_reset_count);
 }
 
 } // namespace Server
