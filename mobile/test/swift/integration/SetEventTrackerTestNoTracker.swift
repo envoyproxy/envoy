@@ -8,14 +8,15 @@ final class SetEventTrackerTestNoTracker: XCTestCase {
   func skipped_testSetEventTracker() throws {
     let expectation = self.expectation(description: "Response headers received")
 
-    let client = EngineBuilder()
+    let engine = EngineBuilder()
       .addLogLevel(.trace)
       .addNativeFilter(
         name: "envoy.filters.http.test_event_tracker",
         // swiftlint:disable:next line_length
         typedConfig: "{\"@type\":\"type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker\",\"attributes\":{\"foo\":\"bar\"}}")
       .build()
-      .streamClient()
+
+    let client = engine.streamClient()
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
                                                authority: "example.com", path: "/test")
@@ -30,5 +31,7 @@ final class SetEventTrackerTestNoTracker: XCTestCase {
       .sendHeaders(requestHeaders, endStream: true)
 
     XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 10), .completed)
+
+    engine.terminate()
   }
 }

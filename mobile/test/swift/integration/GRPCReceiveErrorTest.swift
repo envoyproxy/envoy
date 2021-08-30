@@ -84,7 +84,7 @@ static_resources:
     filterNotCancelled.isInverted = true
     let expectations = [filterReceivedError, filterNotCancelled, callbackReceivedError]
 
-    let httpStreamClient = EngineBuilder(yaml: config)
+    let engine = EngineBuilder(yaml: config)
       .addLogLevel(.trace)
       .addPlatformFilter(
         name: filterName,
@@ -94,9 +94,8 @@ static_resources:
         }
       )
       .build()
-      .streamClient()
 
-    let client = Envoy.GRPCClient(streamClient: httpStreamClient)
+    let client = Envoy.GRPCClient(streamClient: engine.streamClient())
 
     let requestHeaders = GRPCRequestHeadersBuilder(scheme: "https", authority: "example.com",
                                                    path: "/pb.api.v1.Foo/GetBar").build()
@@ -124,5 +123,7 @@ static_resources:
       .sendMessage(message)
 
     XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 1), .completed)
+
+    engine.terminate()
   }
 }

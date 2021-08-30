@@ -52,8 +52,7 @@ static_resources:
       .addLogLevel(.debug)
       .build()
 
-    let client = engine
-      .streamClient()
+    let client = engine.streamClient()
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
                                                authority: "example.com", path: "/test")
@@ -97,5 +96,7 @@ static_resources:
       .sendHeaders(requestHeaders, endStream: true)
 
     XCTAssertEqual(XCTWaiter.wait(for: [expectation2], timeout: 1), .completed)
+
+    engine.terminate()
   }
 }
