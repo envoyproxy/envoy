@@ -216,6 +216,8 @@ public:
    */
   virtual void hashKey(std::vector<uint8_t>& key,
                        const Network::TransportSocketFactory& factory) const PURE;
+
+  virtual bool enableSSLKeyLog(void) const PURE;
 };
 
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;

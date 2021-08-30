@@ -59,6 +59,14 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
     ASSERT(state == InitialState::Server);
     SSL_set_accept_state(rawSsl());
   }
+
+  if (transport_socket_options != nullptr && transport_socket_options.get()->enableSSLKeyLog()) {
+    ENVOY_LOG(info, "enable tls key log");
+    setSSLKeyLog(true);
+  } else {
+    enable_sslkey_log_ = false;
+    bio_keylog_ = nullptr;
+  }
 }
 
 void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
@@ -285,6 +293,58 @@ void SslSocket::onConnected() { ASSERT(info_->state() == Ssl::SocketState::PreHa
 
 Ssl::ConnectionInfoConstSharedPtr SslSocket::ssl() const { return info_; }
 
+static void keylogCallback(const SSL* ssl, const char* line) {
+  if (ssl == nullptr) {
+    return;
+  }
+  /*
+   * There might be concurrent writers to the key log file, so we must ensure
+   * that the given line is written at once.
+   */
+  BIO* bio_keylog = static_cast<BIO*> SSL_get_app_data(ssl);
+  BIO_printf(bio_keylog, "%s\n", line);
+  (void)BIO_flush(bio_keylog);
+}
+
+int SslSocket::setSSLKeyLog(bool enable) {
+  const char* keylog_file = "/tmp/tls.log";
+  /* Close any open files */
+  if (bio_keylog_ != nullptr) {
+    BIO_free_all(bio_keylog_);
+    bio_keylog_ = nullptr;
+  }
+
+  SSL_CTX* ctx = SSL_get_SSL_CTX(rawSslForTest());
+  if (ctx == nullptr || keylog_file == nullptr) {
+    ENVOY_LOG(debug, "ctx or keylog file is null");
+    /* key log is disabled, OK. */
+    return -1;
+  }
+  if (!enable) {
+    ENVOY_LOG(debug, "Disable ssl key log");
+    SSL_CTX_set_keylog_callback(ctx, nullptr);
+    enable_sslkey_log_ = false;
+    return 0;
+  }
+  /*
+   * Append rather than write in order to allow concurrent modification.
+   * Furthermore, this preserves existing key log files which is useful when
+   * the tool is run multiple times.
+   */
+  bio_keylog_ = BIO_new_file(keylog_file, "a");
+  if (bio_keylog_ == nullptr) {
+    ENVOY_LOG(debug, "NO key log file, {}", Envoy::errorDetails(errno));
+    return -1;
+  }
+
+  ENVOY_LOG(debug, "Enable ssl key log");
+  SSL* ssl = rawSsl();
+  SSL_set_app_data(ssl, bio_keylog_);
+  SSL_CTX_set_keylog_callback(ctx, keylogCallback);
+  enable_sslkey_log_ = true;
+  return 0;
+}
+
 void SslSocket::shutdownSsl() {
   ASSERT(info_->state() != Ssl::SocketState::PreHandshake);
   if (info_->state() != Ssl::SocketState::ShutdownSent &&
@@ -318,6 +378,9 @@ void SslSocket::shutdownBasic() {
 
 void SslSocket::closeSocket(Network::ConnectionEvent) {
   // Unregister the SSL connection object from private key method providers.
+  if (enable_sslkey_log_) {
+    setSSLKeyLog(false);
+  }
   for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
     provider->unregisterPrivateKeyMethod(rawSsl());
   }
@@ -406,8 +469,8 @@ Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
   return ssl_ctx_;
 }
 
-Network::TransportSocketPtr
-ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr) const {
+Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket(
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
@@ -417,8 +480,8 @@ ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsCon
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server, nullptr,
-                                       config_->createHandshaker());
+    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server,
+                                       transport_socket_options, config_->createHandshaker());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();

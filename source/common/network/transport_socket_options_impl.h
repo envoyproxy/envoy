@@ -31,6 +31,7 @@ public:
   }
   void hashKey(std::vector<uint8_t>& key,
                const Network::TransportSocketFactory& factory) const override;
+  bool enableSSLKeyLog(void) const override { return false; };
 
 private:
   const std::vector<std::string> alpn_fallback_;
@@ -43,13 +44,14 @@ public:
       absl::string_view override_server_name = "",
       std::vector<std::string>&& override_verify_san_list = {},
       std::vector<std::string>&& override_alpn = {}, std::vector<std::string>&& fallback_alpn = {},
-      absl::optional<Network::ProxyProtocolData> proxy_proto_options = absl::nullopt)
+      absl::optional<Network::ProxyProtocolData> proxy_proto_options = absl::nullopt,
+      bool enable_tlskey_log = false)
       : override_server_name_(override_server_name.empty()
                                   ? absl::nullopt
                                   : absl::optional<std::string>(override_server_name)),
         override_verify_san_list_{std::move(override_verify_san_list)},
         override_alpn_list_{std::move(override_alpn)}, alpn_fallback_{std::move(fallback_alpn)},
-        proxy_protocol_options_(proxy_proto_options) {}
+        proxy_protocol_options_(proxy_proto_options), enable_tlskey_log_(enable_tlskey_log) {}
 
   // Network::TransportSocketOptions
   const absl::optional<std::string>& serverNameOverride() const override {
@@ -69,6 +71,7 @@ public:
   }
   void hashKey(std::vector<uint8_t>& key,
                const Network::TransportSocketFactory& factory) const override;
+  bool enableSSLKeyLog(void) const override { return enable_tlskey_log_; };
 
 private:
   const absl::optional<std::string> override_server_name_;
@@ -76,6 +79,7 @@ private:
   const std::vector<std::string> override_alpn_list_;
   const std::vector<std::string> alpn_fallback_;
   const absl::optional<Network::ProxyProtocolData> proxy_protocol_options_;
+  bool enable_tlskey_log_;
 };
 
 class TransportSocketOptionsUtility {

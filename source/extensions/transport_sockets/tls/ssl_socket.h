@@ -71,6 +71,7 @@ public:
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
 
   SSL* rawSslForTest() const { return rawSsl(); }
+  int setSSLKeyLog(bool enable);
 
 protected:
   SSL* rawSsl() const { return info_->ssl_.get(); }
@@ -97,6 +98,8 @@ private:
   std::string failure_reason_;
 
   SslHandshakerImplSharedPtr info_;
+  bool enable_sslkey_log_;
+  BIO* bio_keylog_;
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory,

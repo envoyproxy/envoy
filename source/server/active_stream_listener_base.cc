@@ -1,7 +1,10 @@
 #include "source/server/active_stream_listener_base.h"
 
 #include "envoy/network/filter.h"
+#include "envoy/network/transport_socket.h"
+#include "envoy/runtime/runtime.h"
 
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/stats/timespan_impl.h"
 
 namespace Envoy {
@@ -40,7 +43,65 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
     return;
   }
   stream_info->setFilterChainName(filter_chain->name());
-  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  bool match = false;
+  Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting();
+  if (runtime != nullptr) {
+    bool match_src = false;
+    bool enable_src = false;
+    bool match_dst = false;
+    bool enable_dst = false;
+    std::string ip_addr_dst, ip_addr_src;
+    if (socket->connectionInfoProvider().localAddress() != nullptr &&
+        socket->connectionInfoProvider().localAddress()->ip() != nullptr) {
+      ip_addr_dst = socket->connectionInfoProvider().localAddress()->ip()->addressAsString();
+    }
+    if (socket->connectionInfoProvider().remoteAddress() != nullptr &&
+        socket->connectionInfoProvider().remoteAddress()->ip() != nullptr) {
+      ip_addr_src = socket->connectionInfoProvider().remoteAddress()->ip()->addressAsString();
+    }
+    ENVOY_LOG(info, "dst ip:{}, src ip:{}", ip_addr_dst, ip_addr_src);
+
+    auto enable_tlskey_log_src = runtime->threadsafeSnapshot()->get("enable_tlskey_log_src");
+    if (enable_tlskey_log_src.has_value()) {
+      enable_src = true;
+      match_src = enable_tlskey_log_src.value().get().compare(ip_addr_src) == 0 ||
+                          enable_tlskey_log_src.value().get().compare("any") == 0
+                      ? true
+                      : false;
+    }
+    ENVOY_LOG(info, "tls key log: enable src: {}, match src: {}", enable_src, match_src);
+
+    auto enable_tlskey_log_dst = runtime->threadsafeSnapshot()->get("enable_tlskey_log_dst");
+    if (enable_tlskey_log_dst.has_value()) {
+      enable_dst = true;
+      match_dst = enable_tlskey_log_dst.value().get().compare(ip_addr_dst) == 0 ||
+                          enable_tlskey_log_dst.value().get().compare("any") == 0
+                      ? true
+                      : false;
+    }
+    ENVOY_LOG(info, "tls key log: enable dst: {}, match dst: {}", enable_dst, match_dst);
+
+    if (enable_src) {
+      if (enable_dst) {
+        match = match_src && match_dst;
+      } else {
+        match = match_src;
+      }
+    } else {
+      if (enable_dst) {
+        match = match_dst;
+      } else {
+        match = false;
+      }
+    }
+    ENVOY_LOG(info, "tls key log: {}", match);
+  }
+
+  auto socket_opt = std::make_shared<const Network::TransportSocketOptionsImpl>(
+      "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+      absl::nullopt, match);
+
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(socket_opt);
   auto server_conn_ptr = dispatcher().createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
   if (const auto timeout = filter_chain->transportSocketConnectTimeout();
