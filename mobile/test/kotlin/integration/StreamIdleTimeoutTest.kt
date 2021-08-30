@@ -23,8 +23,8 @@ import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
 private const val idleTimeout = "0.5s"
-private const val hcmType =
-  "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+private const val ehcmType =
+  "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
 private const val lefType =
   "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
 private const val pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
@@ -41,7 +41,7 @@ static_resources:
     - filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
-          "@type": $hcmType
+          "@type": $ehcmType
           stat_prefix: remote_hcm
           route_config:
             name: remote_route
