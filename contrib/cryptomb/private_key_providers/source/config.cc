@@ -38,18 +38,13 @@ CryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
           MessageUtil::downcastAndValidate<const envoy::extensions::private_key_providers::
                                                cryptomb::v3alpha::CryptoMbPrivateKeyMethodConfig&>(
               *message, private_key_provider_context.messageValidationVisitor());
-
-#ifdef IPP_CRYPTO_DISABLED
-  ENVOY_LOG(debug, "X86_64 architecture is required for cryptomb provider");
   Ssl::PrivateKeyMethodProviderSharedPtr provider = nullptr;
+#ifdef IPP_CRYPTO_DISABLED
+  throw EnvoyException("X86_64 architecture is required for cryptomb provider.");
 #else
   IppCryptoSharedPtr ipp = std::make_shared<IppCryptoImpl>();
-
-  Ssl::PrivateKeyMethodProviderSharedPtr provider =
+  provider =
       std::make_shared<CryptoMbPrivateKeyMethodProvider>(conf, private_key_provider_context, ipp);
-  if (provider == nullptr) {
-    ENVOY_LOG(debug, "Failed to create cryptomb provider");
-  }
 #endif
   return provider;
 }
