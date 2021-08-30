@@ -37,6 +37,32 @@ cc_library(
     ],
 )
 
+# Kafka client dependency used by Kafka-mesh filter.
+# librdkafka build generates extra headers that need to be copied into source to get it to compile.
+configure_make(
+    name = "librdkafka_build",
+    configure_in_place = True,
+    configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd && cp Makefile.config src/.. && cp config.h src/.."],
+    lib_source = "@edenhill_librdkafka//:all",
+    make_commands = [
+        "make ARFLAGS='' libs install-subdirs",
+    ],
+    static_libraries = [
+        "librdkafka.a",
+        "librdkafka++.a",
+    ],
+    tags = ["skip_on_windows"],
+    alwayslink = True,
+)
+
+cc_library(
+    name = "librdkafka",
+    tags = ["skip_on_windows"],
+    deps = [
+        "librdkafka_build",
+    ],
+)
+
 configure_make(
     name = "luajit",
     configure_command = "build.py",
@@ -110,7 +136,7 @@ envoy_cmake_external(
         "//conditions:default": [],
     }),
     postfix_script = select({
-        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/nameser.h $INSTALLDIR/include/nameser.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
+        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_nameser.h $INSTALLDIR/include/ares_nameser.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
         "//conditions:default": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
     }),
     static_libraries = select({

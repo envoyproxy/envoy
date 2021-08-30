@@ -13,7 +13,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/api_type_oracle.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/utility.h"
 
@@ -356,25 +355,16 @@ private:
         continue;
       }
 
-      // Register config types in the mapping and traverse the deprecated message type chain.
-      while (true) {
-        auto it = mapping->find(config_type);
-        if (it != mapping->end() && it->second != factory) {
-          // Mark double-registered types with a nullptr.
-          // See issue https://github.com/envoyproxy/envoy/issues/9643.
-          ENVOY_LOG(warn, "Double registration for type: '{}' by '{}' and '{}'", config_type,
-                    factory->name(), it->second ? it->second->name() : "");
-          it->second = nullptr;
-        } else {
-          mapping->emplace(std::make_pair(config_type, factory));
-        }
-
-        const Protobuf::Descriptor* previous =
-            Config::ApiTypeOracle::getEarlierVersionDescriptor(config_type);
-        if (previous == nullptr) {
-          break;
-        }
-        config_type = previous->full_name();
+      // Register config types in the mapping.
+      auto it = mapping->find(config_type);
+      if (it != mapping->end() && it->second != factory) {
+        // Mark double-registered types with a nullptr.
+        // See issue https://github.com/envoyproxy/envoy/issues/9643.
+        ENVOY_LOG(warn, "Double registration for type: '{}' by '{}' and '{}'", config_type,
+                  factory->name(), it->second ? it->second->name() : "");
+        it->second = nullptr;
+      } else {
+        mapping->emplace(std::make_pair(config_type, factory));
       }
     }
 

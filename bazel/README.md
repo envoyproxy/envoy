@@ -668,7 +668,10 @@ The following optional features can be enabled on the Bazel build command-line:
 
 Envoy uses a modular build which allows extensions to be removed if they are not needed or desired.
 Extensions that can be removed are contained in
-[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
+[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl). Contrib build
+extensions are contained in [contrib_build_config.bzl](../contrib/contrib_build_config.bzl). Note
+that contrib extensions are only included by default when building the contrib executable and in
+the default contrib images pushed to Docker Hub.
 
 The extensions disabled by default can be enabled by adding the following parameter to Bazel, for example to enable
 `envoy.filters.http.kill_request` extension, add `--//source/extensions/filters/http/kill_request:enabled`.
@@ -680,6 +683,13 @@ If you're building from a custom build repository, the parameters need to prefix
 `--@envoy//source/extensions/filters/http/kill_request:enabled`.
 
 You may persist those options in `user.bazelrc` in Envoy repo or your `.bazelrc`.
+
+Contrib extensions can be enabled and disabled similarly to above when building the contrib
+executable. For example:
+
+`bazel build //contrib/exe:envoy-static --//contrib/squash/filters/http/source:enabled=false`
+
+Will disable the squash extension when building the contrib executable.
 
 ## Customize extension build config
 
@@ -718,6 +728,11 @@ local_repository(
 
 ...
 ```
+
+When performing custom builds, it is acceptable to include contrib extensions as well. This can
+be done by including the desired Bazel paths from [contrib_build_config.bzl](../contrib/contrib_build_config.bzl)
+into the overriden `extensions_build_config.bzl`. (There is no need to specifically perform
+a contrib build to include a contrib extension.)
 
 ## Extra extensions
 

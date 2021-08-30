@@ -38,7 +38,8 @@ struct MockNullResponseDecoder : public NullResponseDecoder {
 class ShadowWriterTest : public testing::Test {
 public:
   ShadowWriterTest() {
-    shadow_writer_ = std::make_shared<ShadowWriterImpl>(cm_, "test", context_.scope(), dispatcher_);
+    shadow_writer_ = std::make_shared<ShadowWriterImpl>(cm_, "test", context_.scope(), dispatcher_,
+                                                        context_.threadLocal());
     metadata_ = std::make_shared<MessageMetadata>();
     metadata_->setMethodName("ping");
     metadata_->setMessageType(MessageType::Call);
@@ -254,6 +255,7 @@ TEST_F(ShadowWriterTest, SubmitClusterNotFound) {
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
   EXPECT_EQ(absl::nullopt, router_handle);
+  EXPECT_EQ(1U, context_.scope().counterFromString("test.shadow_request_submit_failure").value());
 }
 
 TEST_F(ShadowWriterTest, SubmitClusterInMaintenance) {
@@ -264,6 +266,7 @@ TEST_F(ShadowWriterTest, SubmitClusterInMaintenance) {
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
   EXPECT_EQ(absl::nullopt, router_handle);
+  EXPECT_EQ(1U, context_.scope().counterFromString("test.shadow_request_submit_failure").value());
 }
 
 TEST_F(ShadowWriterTest, SubmitNoHealthyUpstream) {
@@ -277,6 +280,7 @@ TEST_F(ShadowWriterTest, SubmitNoHealthyUpstream) {
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
   EXPECT_EQ(absl::nullopt, router_handle);
+  EXPECT_EQ(1U, context_.scope().counterFromString("test.shadow_request_submit_failure").value());
 
   // We still count the request, even if it didn't go through.
   EXPECT_EQ(
@@ -405,7 +409,7 @@ TEST_F(ShadowWriterTest, TestNullResponseDecoder) {
   auto decoder_ptr = std::make_unique<NullResponseDecoder>(*transport_ptr, *protocol_ptr);
 
   decoder_ptr->newDecoderEventHandler();
-  EXPECT_FALSE(decoder_ptr->passthroughEnabled());
+  EXPECT_TRUE(decoder_ptr->passthroughEnabled());
 
   metadata_->setMessageType(MessageType::Reply);
   EXPECT_EQ(FilterStatus::Continue, decoder_ptr->messageBegin(metadata_));

@@ -35,7 +35,7 @@
 #include <arpa/nameser.h>
 #include <arpa/nameser_compat.h>
 #else
-#include "nameser.h"
+#include "ares_nameser.h"
 #endif
 
 using testing::_;
@@ -441,11 +441,13 @@ public:
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     listener_ = dispatcher_->createListener(socket_, *server_, true);
     updateDnsResolverOptions();
+    // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
+    envoy::config::core::v3::DnsResolverOptions dns_resolver_options = dns_resolver_options_;
     if (setResolverInConstructor()) {
-      resolver_ = dispatcher_->createDnsResolver({socket_->addressProvider().localAddress()},
-                                                 dns_resolver_options_);
+      resolver_ = dispatcher_->createDnsResolver({socket_->connectionInfoProvider().localAddress()},
+                                                 dns_resolver_options);
     } else {
-      resolver_ = dispatcher_->createDnsResolver({}, dns_resolver_options_);
+      resolver_ = dispatcher_->createDnsResolver({}, dns_resolver_options);
     }
 
     // Point c-ares at the listener with no search domains and TCP-only.
@@ -453,8 +455,8 @@ public:
     if (tcpOnly()) {
       peer_->resetChannelTcpOnly(zeroTimeout());
     }
-    ares_set_servers_ports_csv(peer_->channel(),
-                               socket_->addressProvider().localAddress()->asString().c_str());
+    ares_set_servers_ports_csv(
+        peer_->channel(), socket_->connectionInfoProvider().localAddress()->asString().c_str());
   }
 
   void TearDown() override {
@@ -589,7 +591,7 @@ TEST_P(DnsImplTest, DestructCallback) {
   // a subsequent result to call ares_destroy.
   peer_->resetChannelTcpOnly(zeroTimeout());
   ares_set_servers_ports_csv(peer_->channel(),
-                             socket_->addressProvider().localAddress()->asString().c_str());
+                             socket_->connectionInfoProvider().localAddress()->asString().c_str());
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -717,7 +719,7 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
     peer_->resetChannelTcpOnly(zeroTimeout());
   }
   ares_set_servers_ports_csv(peer_->channel(),
-                             socket_->addressProvider().localAddress()->asString().c_str());
+                             socket_->connectionInfoProvider().localAddress()->asString().c_str());
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success,

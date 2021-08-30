@@ -13,7 +13,7 @@ set -e
 #   tree structure.)
 
 # Determine base directory of unmodified QUICHE source files. In practice, this
-# ends up being "external/com_googlesource_quiche".
+# ends up being "external/com_github_google_quiche".
 src_base_dir=$$(dirname $$(dirname $$(dirname $(rootpath quic/core/quic_constants.h))))
 
 # sed commands to apply to each source file.
@@ -73,7 +73,7 @@ EOF
 
 for src_file in $(SRCS); do
   # Extract relative path (e.g. "quic/core/quic_utils.cc") from full path in
-  # src_path (e.g. "external/com_googlesource_quiche/quic/core/quic_utils.cc").
+  # src_path (e.g. "external/com_github_google_quiche/quic/core/quic_utils.cc").
   src_path="$${src_file#$$src_base_dir/}"
 
   # Map to output file with quiche/ base directory inserted in path.
