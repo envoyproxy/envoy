@@ -584,9 +584,9 @@ public:
 
 /**
  * This class allows the remote address to be overridden for HTTP stream info. This is used for
- * XFF handling. This is required to avoid providing stream info with a non-const address provider.
- * Private inheritance from ConnectionInfoProvider is used to make sure users get the address
- * provider via the normal getter.
+ * XFF handling. This is required to avoid providing stream info with a non-const connection info
+ * provider. Private inheritance from ConnectionInfoProvider is used to make sure users get the
+ * address provider via the normal getter.
  */
 class OverridableRemoteConnectionInfoSetterStreamInfo : public StreamInfo::StreamInfoImpl,
                                                         private Network::ConnectionInfoProvider {
@@ -667,7 +667,7 @@ public:
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
         proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit),
         filter_chain_factory_(filter_chain_factory), local_reply_(local_reply),
-        stream_info_(protocol, time_source, connection.addressProviderSharedPtr(),
+        stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
                      parent_filter_state, filter_state_life_span) {}
   ~FilterManager() override {
     ASSERT(state_.destroyed_);

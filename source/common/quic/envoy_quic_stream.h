@@ -77,7 +77,7 @@ public:
   }
   uint32_t bufferLimit() override { return send_buffer_simulation_.highWatermark(); }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
-    return connection()->addressProvider().localAddress();
+    return connection()->connectionInfoProvider().localAddress();
   }
 
   void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {
