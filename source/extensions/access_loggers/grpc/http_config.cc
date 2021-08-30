@@ -27,6 +27,8 @@ AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
       const envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
+  GrpcCommon::checkGrpcCluster(proto_config.common_config().grpc_service(),
+                               context.clusterManager().clusters());
   return std::make_shared<HttpGrpcAccessLog>(std::move(filter), proto_config, context.threadLocal(),
                                              GrpcCommon::getGrpcAccessLoggerCacheSingleton(context),
                                              context.scope());

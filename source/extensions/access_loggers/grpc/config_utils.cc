@@ -19,6 +19,22 @@ getGrpcAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& c
             context.threadLocal(), context.localInfo());
       });
 }
+
+void checkGrpcCluster(const envoy::config::core::v3::GrpcService& config,
+                      Envoy::Upstream::ClusterManager::ClusterInfoMaps all_clusters) {
+  if (config.has_google_grpc()) {
+    return;
+  }
+  const std::string& cluster_name = config.envoy_grpc().cluster_name();
+  const auto& it = all_clusters.active_clusters_.find(cluster_name);
+  if (it == all_clusters.active_clusters_.end()) {
+    throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster_name));
+  }
+  if (it->second.get().info()->addedViaApi()) {
+    throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster_name));
+  }
+}
+
 } // namespace GrpcCommon
 } // namespace AccessLoggers
 } // namespace Extensions

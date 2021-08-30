@@ -270,7 +270,7 @@ public:
     }
     const auto logger = createLogger(
         config,
-        async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, false)
+        async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true)
             ->createUncachedRawAsyncClient(),
         std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384), cache.dispatcher_,
