@@ -744,6 +744,11 @@ public:
   virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return optional maximum connection duration timeout for manager connections.
+   */
+  virtual const absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
+
+  /**
    * @return how many streams should be anticipated per each current stream.
    */
   virtual float perUpstreamPreconnectRatio() const PURE;
