@@ -3217,14 +3217,14 @@ TEST_P(DownstreamProtocolIntegrationTest, BadRequest) {
                "%DOWNSTREAM_BODY_BYTES_SENT% %DOWNSTREAM_BODY_BYTES_RECEIVED%\n");
   initialize();
   std::string response;
-  std::string full_request("\r\n", 100);
+  std::string full_request('r', 100);
   full_request += "GET / HTTP/1.1\r\n path: /test/long/url\r\n"
                   "Host: host\r\ncontent-length: 0\r\n"
                   "transfer-encoding: chunked\r\n\r\n";
 
   sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
 
-  // expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 156, 100, 11, 0, 113, 13, 0, 0);
+  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 156, 214, 11, 0, 113, 13, 0, 0);
 }
 
 TEST_P(ProtocolIntegrationTest, DownstreamResetWireBytesCountUpstream) {
