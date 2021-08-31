@@ -290,6 +290,7 @@ public:
   waitForGaugeDestroyed(Stats::Store& store, const std::string& name,
                         Event::TestTimeSystem& time_system,
                         std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+
   /**
    * Wait for a histogram to have samples.
    * @param store supplies the stats store.

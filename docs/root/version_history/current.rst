@@ -55,6 +55,7 @@ Minor Behavior Changes
   to false. As part of this change, the use of reuse_port for TCP listeners on both macOS and
   Windows has been disabled due to suboptimal behavior. See the field documentation for more
   information.
+* listener: destroy per network filter chain stats when a network filter chain is removed during the listener in place update.
 
 Bug Fixes
 ---------
