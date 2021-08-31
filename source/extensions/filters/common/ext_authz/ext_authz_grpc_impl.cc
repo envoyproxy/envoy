@@ -57,6 +57,18 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
           authz_response->headers_to_remove.push_back(Http::LowerCaseString(header));
         }
       }
+      if (response->ok_response().query_parameters_to_add_size() > 0) {
+        for (const auto& query_parameter : response->ok_response().query_parameters_to_add()) {
+          // TODO(esmet): It might make more sense to store query_parameters_to_set as a vector
+          // instead of a map since we likely only need to lineaerly iterate them.
+          if (query_parameter.remove()) {
+            authz_response->query_parameters_to_set[query_parameter.key()] =
+                query_parameter.value();
+          } else {
+            authz_response->query_parameters_to_remove.push_back(query_parameter.key());
+          }
+        }
+      }
       if (response->ok_response().response_headers_to_add_size() > 0) {
         for (const auto& header : response->ok_response().response_headers_to_add()) {
           authz_response->response_headers_to_add.emplace_back(

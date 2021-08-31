@@ -213,12 +213,13 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
   switch (response->status) {
   case CheckStatus::OK: {
-    // Any changes to request headers can affect how the request is going to be
+    // Any changes to request headers or query parameters can affect how the request is going to be
     // routed. If we are changing the headers we also need to clear the route
     // cache.
     if (config_->clearRouteCache() &&
         (!response->headers_to_set.empty() || !response->headers_to_append.empty() ||
-         !response->headers_to_remove.empty())) {
+         !response->headers_to_remove.empty() || !response->query_parameters_to_set.empty() ||
+         !response->query_parameters_to_remove.empty())) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *decoder_callbacks_);
       decoder_callbacks_->clearRouteCache();
     }
@@ -269,6 +270,50 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to add to the response:",
                        *decoder_callbacks_, response->response_headers_to_add.size());
       response_headers_to_add_ = std::move(response->response_headers_to_add);
+    }
+
+    absl::optional<Http::Utility::QueryParams> modified_query_parameters;
+    if (!response->query_parameters_to_set.empty()) {
+      modified_query_parameters =
+          Http::Utility::parseQueryString(request_headers_->Path()->value().getStringView());
+      ENVOY_STREAM_LOG(
+          trace, "ext_authz filter set query parameter(s) on the request:", *decoder_callbacks_);
+      for (const auto& [key, value] : response->query_parameters_to_set) {
+        ENVOY_STREAM_LOG(trace, "'{}={}'", *decoder_callbacks_, key, value);
+        // TODO(esmet): Sanitize key/value and/or declare the security posture that we trust the
+        // authorization server.
+        (*modified_query_parameters)[key] = value;
+      }
+    }
+
+    if (!response->query_parameters_to_set.empty()) {
+      if (!modified_query_parameters) {
+        modified_query_parameters =
+            Http::Utility::parseQueryString(request_headers_->Path()->value().getStringView());
+      }
+      ENVOY_STREAM_LOG(trace, "ext_authz filter removed query parameter(s) from the request:",
+                       *decoder_callbacks_);
+      for (const auto& key : response->query_parameters_to_remove) {
+        ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, key);
+        (*modified_query_parameters).erase(key);
+      }
+    }
+
+    // We modified the query parameters in some way, so regenerate the `path` header and set it
+    // here.
+    if (modified_query_parameters) {
+      std::string new_path;
+      const auto path_without_query =
+          Http::Utility::stripQueryString(request_headers_->Path()->value());
+      // TODO: These two lines should probably be abstracted as
+      // Http::Utility::formatPathAndQueryParams
+      const auto new_query_string =
+          Http::Utility::queryParamsToString(modified_query_parameters.value());
+      absl::StrAppend(&new_path, path_without_query, "?", new_query_string);
+      ENVOY_STREAM_LOG(trace,
+                       "ext_authz filter modified query parameter, using new path for request: {}",
+                       *decoder_callbacks_, new_path);
+      request_headers_->setPath(new_path);
     }
 
     if (cluster_) {
