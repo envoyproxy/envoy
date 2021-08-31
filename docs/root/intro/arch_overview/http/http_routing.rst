@@ -196,17 +196,17 @@ Envoy will include the specified headers in the direct HTTP response.
 Routing Via Generic Matching
 ----------------------------
 
-Envoy recently added support for utilzing a :ref:`generic match tree <envoy_v3_api_msg_config>` to
+Envoy recently added support for utilzing a :ref:`generic match tree <arch_overview_matching_api>` to
 specify the route table. This is a more expressive matching engine than the original one, allowing
 for sublinear matching on arbitrary headers (unlike the original matching engine which could only
 do this for :authority in some cases).
 
-To use the generic matching tree, specify a ref:`matcher <fds>` on a virtual host with a RouteAction action:
+To use the generic matching tree, specify a matcher on a virtual host with a RouteAction action:
 
 .. code-block:: yaml
 
   matcher:
-    "@type": type.googleapis.com/envoy.config.common.matcher.v3.Matcher
+    "@type": type.googleapis.com/xds.type.matcher.v3.Matcher
     matcher_tree:
       input:
         name: request-headers
