@@ -16,6 +16,11 @@ kt_jvm_library(
     ],
 )
 
+config_setting(
+    name = "include_ifaddrs",
+    values = {"define": "include_ifaddrs=true"},
+)
+
 exports_files([
     "pom_template.xml",
     "test_manifest.xml",
