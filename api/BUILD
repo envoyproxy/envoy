@@ -256,3 +256,11 @@ proto_library(
         ":v3_protos",
     ],
 )
+
+filegroup(
+    name = "proto_breaking_change_detector_buf_config",
+    srcs = [
+        "buf.yaml",
+    ],
+    visibility = ["//visibility:public"],
+)

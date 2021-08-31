@@ -484,7 +484,7 @@ public:
   virtual void healthCheck(bool is_health_check) PURE;
 
   /**
-   * @return the downstream address provider.
+   * @return the downstream connection info provider.
    */
   virtual const Network::ConnectionInfoProvider& downstreamAddressProvider() const PURE;
 

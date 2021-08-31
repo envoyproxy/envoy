@@ -689,7 +689,8 @@ void ConnectionImpl::onKeepaliveResponse() {
 }
 
 void ConnectionImpl::onKeepaliveResponseTimeout() {
-  ENVOY_CONN_LOG(debug, "Closing connection due to keepalive timeout", connection_);
+  ENVOY_CONN_LOG_EVENT(debug, "h2_ping_timeout", "Closing connection due to keepalive timeout",
+                       connection_);
   stats_.keepalive_timeout_.inc();
   connection_.close(Network::ConnectionCloseType::NoFlush);
 }

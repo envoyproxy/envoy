@@ -644,6 +644,28 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("InvalidHeaderFilter_ready\n"));
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyBytesCount) {
+  useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+               "%DOWNSTREAM_BODY_BYTES_SENT% %DOWNSTREAM_BODY_BYTES_RECEIVED%\n");
+  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Missing method
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"remove-method", "yes"},
+                                     {"send-reply", "yes"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 90, 80, 0, 0, 0, 0, 0, 0);
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
@@ -664,6 +686,29 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("InvalidHeaderFilter_ready\n"));
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBodyBytesCount) {
+  useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+               "%DOWNSTREAM_BODY_BYTES_SENT% %DOWNSTREAM_BODY_BYTES_RECEIVED%\n");
+  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Missing method
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":scheme", "http"},
+                                                                        {":authority", "host"},
+                                                                        {"remove-method", "yes"},
+                                                                        {"send-reply", "yes"}},
+                                         1024);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 109, 1144, 0, 0, 0, 0, 0, 0);
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10270
@@ -3161,6 +3206,25 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireByte
   testRouterUpstreamDisconnectBeforeResponseComplete();
 
   expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 159, 47, 0, 0, 113, 13, 0, 0);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, BadRequest) {
+  // we only care about upstream protocol.
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+               "%DOWNSTREAM_BODY_BYTES_SENT% %DOWNSTREAM_BODY_BYTES_RECEIVED%\n");
+  initialize();
+  std::string response;
+  std::string full_request("\r\n", 100);
+  full_request += "GET / HTTP/1.1\r\n path: /test/long/url\r\n"
+                  "Host: host\r\ncontent-length: 0\r\n"
+                  "transfer-encoding: chunked\r\n\r\n";
+
+  sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
+
+  // expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 156, 100, 11, 0, 113, 13, 0, 0);
 }
 
 TEST_P(ProtocolIntegrationTest, DownstreamResetWireBytesCountUpstream) {

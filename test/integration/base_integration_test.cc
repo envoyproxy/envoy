@@ -315,7 +315,8 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
       registerPort(*port_it, listen_addr->ip()->port());
     }
   }
-  const auto admin_addr = test_server_->server().admin().socket().addressProvider().localAddress();
+  const auto admin_addr =
+      test_server_->server().admin().socket().connectionInfoProvider().localAddress();
   if (admin_addr->type() == Network::Address::Type::Ip) {
     registerPort("admin", admin_addr->ip()->port());
   }

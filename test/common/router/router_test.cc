@@ -2250,7 +2250,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            upstream_stream_info_.downstream_address_provider_->setConnectionID(111);
+            upstream_stream_info_.downstream_connection_info_provider_->setConnectionID(111);
             callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
@@ -2289,7 +2289,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            upstream_stream_info_.downstream_address_provider_->setConnectionID(222);
+            upstream_stream_info_.downstream_connection_info_provider_->setConnectionID(222);
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
@@ -2314,7 +2314,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder3 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            upstream_stream_info_.downstream_address_provider_->setConnectionID(333);
+            upstream_stream_info_.downstream_connection_info_provider_->setConnectionID(333);
             callbacks.onPoolReady(encoder3, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
@@ -4900,7 +4900,7 @@ TEST_F(RouterTest, UpstreamSSLConnection) {
   std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(session_id));
-  upstream_stream_info_.downstream_address_provider_->setSslConnection(connection_info);
+  upstream_stream_info_.downstream_connection_info_provider_->setSslConnection(connection_info);
 
   expectResponseTimerCreate();
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))

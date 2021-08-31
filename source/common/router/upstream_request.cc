@@ -195,7 +195,7 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
 void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "UpstreamRequest " << this << "\n";
-  const auto addressProvider = connection().addressProviderSharedPtr();
+  const auto addressProvider = connection().connectionInfoProviderSharedPtr();
   const Http::RequestHeaderMap* request_headers = parent_.downstreamHeaders();
   DUMP_DETAILS(addressProvider);
   DUMP_DETAILS(request_headers);

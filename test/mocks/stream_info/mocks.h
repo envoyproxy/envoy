@@ -131,7 +131,7 @@ public:
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  std::shared_ptr<Network::ConnectionInfoSetterImpl> downstream_address_provider_;
+  std::shared_ptr<Network::ConnectionInfoSetterImpl> downstream_connection_info_provider_;
   BytesMetererSharedPtr upstream_bytes_meterer_;
   BytesMetererSharedPtr downstream_bytes_meterer_;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;

@@ -11,6 +11,7 @@ py_library(
     name = "abstract",
     srcs = ["abstract.py"],
     deps = [
+        "//tools/base:abstract",
         "//tools/base:functional",
         "//tools/base:utils",
         requirement("aiohttp"),
@@ -35,5 +36,17 @@ envoy_py_library(
         requirement("aiohttp"),
         requirement("gidgethub"),
         requirement("packaging"),
+    ],
+)
+
+envoy_py_library(
+    "tools.github.release.release",
+    deps = [
+        ":abstract",
+        ":exceptions",
+        "//tools/base:aio",
+        "//tools/base:functional",
+        "//tools/base:utils",
+        requirement("gidgethub"),
     ],
 )
