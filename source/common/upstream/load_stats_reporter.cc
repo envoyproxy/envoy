@@ -3,7 +3,6 @@
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "source/common/config/version_converter.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -12,15 +11,12 @@ namespace Upstream {
 LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::RawAsyncClientPtr async_client,
-                                     envoy::config::core::v3::ApiVersion transport_api_version,
                                      Event::Dispatcher& dispatcher)
     : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
-      async_client_(std::move(async_client)), transport_api_version_(transport_api_version),
-      service_method_(
-          Grpc::VersionedMethods("envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats",
-                                 "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")
-              .getMethodDescriptorForVersion(transport_api_version)),
+      async_client_(std::move(async_client)),
+      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats")),
       time_source_(dispatcher.timeSource()) {
   request_.mutable_node()->MergeFrom(local_info.node());
   request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
@@ -111,7 +107,6 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     clusters_[cluster_name] = now;
   }
 
-  Config::VersionConverter::prepareMessageForGrpcWire(request_, transport_api_version_);
   ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
   stream_->sendMessage(request_, false);
   stats_.responses_.inc();

@@ -699,10 +699,9 @@ public:
     loadConfig(server_context_config);
   }
 
-  void loadConfigYaml(const std::string& yaml, bool avoid_boosting = true) {
+  void loadConfigYaml(const std::string& yaml) {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context, false,
-                              avoid_boosting);
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
     ServerContextConfigImpl cfg(tls_context, factory_context_);
     loadConfig(cfg);
   }
@@ -1679,7 +1678,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProvider) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   EXPECT_THROW_WITH_REGEX(
       ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
-      "Failed to load incomplete certificate from ");
+      "Failed to load private key provider: mock_provider");
 }
 
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
@@ -1750,11 +1749,6 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureBothKeyAndMethod)
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
   auto private_key_method_provider_ptr =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
-  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
-  EXPECT_CALL(context_manager, privateKeyMethodManager())
-      .WillOnce(ReturnRef(private_key_method_manager));
-  EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _))
-      .WillOnce(Return(private_key_method_provider_ptr));
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
     tls_certificates:

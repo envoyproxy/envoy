@@ -124,7 +124,6 @@ parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
 
 ProtocolOptionsConfigConstSharedPtr
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
-                            const ProtobufWkt::Struct& config,
                             Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
@@ -152,7 +151,7 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
   }
 
   Envoy::Config::Utility::translateOpaqueConfig(
-      typed_config, config, factory_context.messageValidationVisitor(), *proto_config);
+      typed_config, factory_context.messageValidationVisitor(), *proto_config);
   return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
@@ -167,8 +166,7 @@ absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExten
     // protocol options.
     auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
-    auto object = createProtocolOptionsConfig(
-        name, it.second, ProtobufWkt::Struct::default_instance(), factory_context);
+    auto object = createProtocolOptionsConfig(name, it.second, factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
@@ -551,12 +549,17 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
 void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                                   LocalityWeightsConstSharedPtr locality_weights,
                                   const HostVector& hosts_added, const HostVector& hosts_removed,
-                                  absl::optional<uint32_t> overprovisioning_factor) {
+                                  absl::optional<uint32_t> overprovisioning_factor,
+                                  HostMapConstSharedPtr cross_priority_host_map) {
   // Ensure that we have a HostSet for the given priority.
   getOrCreateHostSet(priority, overprovisioning_factor);
   static_cast<HostSetImpl*>(host_sets_[priority].get())
       ->updateHosts(std::move(update_hosts_params), std::move(locality_weights), hosts_added,
                     hosts_removed, overprovisioning_factor);
+
+  if (cross_priority_host_map != nullptr) {
+    const_cross_priority_host_map_ = std::move(cross_priority_host_map);
+  }
 
   if (!batch_update_) {
     runUpdateCallbacks(hosts_added, hosts_removed);
@@ -594,6 +597,52 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
 
   parent_.updateHosts(priority, std::move(update_hosts_params), locality_weights, hosts_added,
                       hosts_removed, overprovisioning_factor);
+}
+
+void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
+                                      LocalityWeightsConstSharedPtr locality_weights,
+                                      const HostVector& hosts_added,
+                                      const HostVector& hosts_removed,
+                                      absl::optional<uint32_t> overprovisioning_factor,
+                                      HostMapConstSharedPtr cross_priority_host_map) {
+  ASSERT(cross_priority_host_map == nullptr,
+         "External cross-priority host map is meaningless to MainPrioritySetImpl");
+  updateCrossPriorityHostMap(hosts_added, hosts_removed);
+
+  PrioritySetImpl::updateHosts(priority, std::move(update_hosts_params), locality_weights,
+                               hosts_added, hosts_removed, overprovisioning_factor);
+}
+
+HostMapConstSharedPtr MainPrioritySetImpl::crossPriorityHostMap() const {
+  // Check if the host set in the main thread PrioritySet has been updated.
+  if (mutable_cross_priority_host_map_ != nullptr) {
+    const_cross_priority_host_map_ = std::move(mutable_cross_priority_host_map_);
+    ASSERT(mutable_cross_priority_host_map_ == nullptr);
+  }
+  return const_cross_priority_host_map_;
+}
+
+void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_added,
+                                                     const HostVector& hosts_removed) {
+  if (hosts_added.empty() && hosts_removed.empty()) {
+    // No new hosts have been added and no old hosts have been removed.
+    return;
+  }
+
+  // Since read_only_all_host_map_ may be shared by multiple threads, when the host set changes, we
+  // cannot directly modify read_only_all_host_map_.
+  if (mutable_cross_priority_host_map_ == nullptr) {
+    // Copy old read only host map to mutable host map.
+    mutable_cross_priority_host_map_ = std::make_shared<HostMap>(*const_cross_priority_host_map_);
+  }
+
+  for (const auto& host : hosts_removed) {
+    mutable_cross_priority_host_map_->erase(host->address()->asString());
+  }
+
+  for (const auto& host : hosts_added) {
+    mutable_cross_priority_host_map_->insert({host->address()->asString(), host});
+  }
 }
 
 ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
@@ -888,7 +937,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     auto& factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(proto_config);
     auto message = factory.createEmptyConfigProto();
-    Config::Utility::translateOpaqueConfig(proto_config.typed_config(), ProtobufWkt::Struct(),
+    Config::Utility::translateOpaqueConfig(proto_config.typed_config(),
                                            factory_context.messageValidationVisitor(), *message);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);
@@ -1162,6 +1211,11 @@ void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outli
   outlier_detector_ = outlier_detector;
   outlier_detector_->addChangedStateCb(
       [this](const HostSharedPtr& host) -> void { reloadHealthyHosts(host); });
+}
+
+void ClusterImplBase::setTransportFactoryContext(
+    Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context) {
+  transport_factory_context_ = std::move(transport_factory_context);
 }
 
 void ClusterImplBase::reloadHealthyHosts(const HostSharedPtr& host) {
@@ -1481,8 +1535,7 @@ void PriorityStateManager::updateClusterPrioritySet(
 bool BaseDynamicClusterImpl::updateDynamicHostList(
     const HostVector& new_hosts, HostVector& current_priority_hosts,
     HostVector& hosts_added_to_current_priority, HostVector& hosts_removed_from_current_priority,
-    HostMap& updated_hosts, const HostMap& all_hosts,
-    const absl::flat_hash_set<std::string>& all_new_hosts) {
+    const HostMap& all_hosts, const absl::flat_hash_set<std::string>& all_new_hosts) {
   uint64_t max_host_weight = 1;
 
   // Did hosts change?
@@ -1511,10 +1564,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   absl::flat_hash_set<std::string> new_hosts_for_current_priority(new_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
-    if (updated_hosts.count(host->address()->asString())) {
-      continue;
-    }
-
     // To match a new host with an existing host means comparing their addresses.
     auto existing_host = all_hosts.find(host->address()->asString());
     const bool existing_host_found = existing_host != all_hosts.end();
@@ -1590,7 +1639,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       }
 
       final_hosts.push_back(existing_host->second);
-      updated_hosts[existing_host->second->address()->asString()] = existing_host->second;
     } else {
       new_hosts_for_current_priority.emplace(host->address()->asString());
       if (host->weight() > max_host_weight) {
@@ -1608,7 +1656,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
         }
       }
 
-      updated_hosts[host->address()->asString()] = host;
       final_hosts.push_back(host);
       hosts_added_to_current_priority.push_back(host);
     }
@@ -1649,8 +1696,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
     erase_from =
         std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
-                       [&all_new_hosts, &new_hosts_for_current_priority, &updated_hosts,
-                        &final_hosts, &max_host_weight](const HostSharedPtr& p) {
+                       [&all_new_hosts, &new_hosts_for_current_priority, &final_hosts,
+                        &max_host_weight](const HostSharedPtr& p) {
                          if (all_new_hosts.contains(p->address()->asString()) &&
                              !new_hosts_for_current_priority.contains(p->address()->asString())) {
                            // If the address is being completely deleted from this priority, but is
@@ -1668,7 +1715,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
                            }
 
                            final_hosts.push_back(p);
-                           updated_hosts[p->address()->asString()] = p;
                            p->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
                            return true;
                          }

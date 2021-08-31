@@ -70,7 +70,6 @@ envoy_cc_library(
     hdrs = ["subscription.h"],
     deps = [
         "//envoy/stats:stats_macros",
-        "//source/common/config:api_type_oracle_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],

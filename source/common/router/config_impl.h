@@ -77,7 +77,6 @@ using OptionalHttpFilters = absl::flat_hash_set<std::string>;
 class PerFilterConfigs : public Logger::Loggable<Logger::Id::http> {
 public:
   PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
-                   const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
                    const OptionalHttpFilters& optional_http_filters,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    ProtobufMessage::ValidationVisitor& validator);
@@ -87,7 +86,6 @@ public:
 private:
   RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
-                                  const ProtobufWkt::Struct& config,
                                   const OptionalHttpFilters& optional_http_filters,
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator);
@@ -165,7 +163,7 @@ public:
       return loader_.snapshot().featureEnabled(filter_enabled.runtime_key(),
                                                filter_enabled.default_value());
     }
-    return legacy_enabled_;
+    return true;
   };
   bool shadowEnabled() const override {
     if (config_.has_shadow_enabled()) {
@@ -185,7 +183,6 @@ private:
   const std::string expose_headers_;
   const std::string max_age_;
   absl::optional<bool> allow_credentials_{};
-  const bool legacy_enabled_;
 };
 
 class ConfigImpl;
@@ -814,6 +811,8 @@ private:
         const std::string& filter_name,
         std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
+    const Http::LowerCaseString& clusterHeaderName() { return cluster_header_name_; }
+
   private:
     const std::string runtime_key_;
     Runtime::Loader& loader_;
@@ -823,6 +822,7 @@ private:
     HeaderParserPtr response_headers_parser_;
     PerFilterConfigs per_filter_configs_;
     const std::string host_rewrite_;
+    const Http::LowerCaseString cluster_header_name_;
   };
 
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
@@ -906,6 +906,7 @@ private:
   envoy::config::core::v3::Metadata metadata_;
   Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory> typed_metadata_;
   const bool match_grpc_;
+  const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;
