@@ -72,9 +72,9 @@ MetadataConstSharedPtr HealthCheckerImplBase::initTransportSocketMatchMetadata(
 }
 
 HealthCheckerImplBase::~HealthCheckerImplBase() {
-  // First clear callbacks that otherwise will be run from onDeferredDeleteBase() in
-  // the session. This prevents invoking a callback on a deleted parent object (e.g.
-  // Cluster).
+  // First clear callbacks that otherwise will be run from
+  // ActiveHealthCheckSession::onDeferredDeleteBase(). This prevents invoking a callback on a
+  // deleted parent object (e.g. Cluster).
   callbacks_.clear();
   // ASSERTs inside the session destructor check to make sure we have been previously deferred
   // deleted. Unify that logic here before actual destruction happens.
