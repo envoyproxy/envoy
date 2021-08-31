@@ -92,7 +92,9 @@ private:
       }
     };
     struct LookupKeyHash {
-      size_t operator()(const LookupKey& /*hash*/) const { return 42; }
+      size_t operator()(const LookupKey& lookup_key) const {
+        return std::hash<std::string>{}(lookup_key.peer_address_.asString());
+      }
     };
 
     absl::flat_hash_map<LookupKey, std::vector<ConnectionInfo>, LookupKeyHash> connection_info_map_;
