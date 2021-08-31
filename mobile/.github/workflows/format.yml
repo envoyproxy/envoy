@@ -60,8 +60,11 @@ jobs:
       - run: ./ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - name: 'Run Kotlin Lint (Detekt)'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           bazel build \
+            --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //library/kotlin/io/envoyproxy/envoymobile:envoy_lib_lint \
             //examples/kotlin/hello_world:hello_envoy_kt_lint
       - name: 'Run Kotlin Formatter (ktlint)'
