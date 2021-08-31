@@ -131,9 +131,6 @@ LoadBalancerBase::LoadBalancerBase(
                                     total_healthy_hosts_);
         recalculatePerPriorityPanic();
         stashed_random_.clear();
-
-        // Update cross priority host map.
-        setCrossPriorityHostMap(priority_set_.crossPriorityHostMap());
       });
 }
 
@@ -369,6 +366,9 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
   resizePerPriorityState();
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
+        // Update cross priority host map for fast host searching.
+        cross_priority_host_map_ = priority_set_.crossPriorityHostMap();
+
         // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
         resizePerPriorityState();
         // If P=0 changes, regenerate locality routing structures. Locality based routing is
@@ -515,32 +515,8 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
-LoadBalancerContext::ExpectedHostStatus LoadBalancerContextBase::createExpectedHostStatus(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus>& statuses) {
-  ExpectedHostStatus expected_host_statuses = 0;
-  for (auto status : statuses) {
-    switch (status) {
-    case envoy::config::core::v3::HealthStatus::UNKNOWN:
-    case envoy::config::core::v3::HealthStatus::HEALTHY:
-      expected_host_statuses |= HealthyStatus;
-      break;
-    case envoy::config::core::v3::HealthStatus::UNHEALTHY:
-    case envoy::config::core::v3::HealthStatus::DRAINING:
-    case envoy::config::core::v3::HealthStatus::TIMEOUT:
-      expected_host_statuses |= UnhealthyStatus;
-      break;
-    case envoy::config::core::v3::HealthStatus::DEGRADED:
-      expected_host_statuses |= DegradedStatus;
-      break;
-    default:
-      break;
-    }
-  }
-  return expected_host_statuses;
-}
-
-bool LoadBalancerContextBase::validateExpectedHostStatus(Host::Health health,
-                                                         ExpectedHostStatus status) {
+bool LoadBalancerContextBase::validateOverrideHostStatus(Host::Health health,
+                                                         OverrideHostStatus status) {
   switch (health) {
   case Host::Health::Unhealthy:
     return status & UnhealthyStatus;
@@ -552,14 +528,14 @@ bool LoadBalancerContextBase::validateExpectedHostStatus(Host::Health health,
   return false;
 }
 
-HostConstSharedPtr LoadBalancerBase::selectOverrideHost(const HostMap* host_map,
-                                                        LoadBalancerContext* context) {
+HostConstSharedPtr LoadBalancerContextBase::selectOverrideHost(const HostMap* host_map,
+                                                               LoadBalancerContext* context) {
   if (context == nullptr) {
     return nullptr;
   }
 
-  auto expected_host = context->overrideHostToSelect();
-  if (!expected_host.has_value()) {
+  auto override_host = context->overrideHostToSelect();
+  if (!override_host.has_value()) {
     return nullptr;
   }
 
@@ -567,21 +543,21 @@ HostConstSharedPtr LoadBalancerBase::selectOverrideHost(const HostMap* host_map,
     return nullptr;
   }
 
-  auto host_iter = host_map->find(expected_host.value().first);
+  auto host_iter = host_map->find(override_host.value().first);
   HostConstSharedPtr host = host_iter != host_map->end() ? host_iter->second : nullptr;
 
-  if (host != nullptr && LoadBalancerContextBase::validateExpectedHostStatus(
-                             host->health(), expected_host.value().second)) {
+  if (host != nullptr && LoadBalancerContextBase::validateOverrideHostStatus(
+                             host->health(), override_host.value().second)) {
     return host;
   }
   return nullptr;
 }
 
-HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
+HostConstSharedPtr ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
   HostConstSharedPtr host;
 
-  host = selectOverrideHost(cross_priority_host_map_.get(), context);
-  if (host != nullptr && !context->shouldSelectAnotherHost(*host)) {
+  if (host = LoadBalancerContextBase::selectOverrideHost(cross_priority_host_map_.get(), context);
+      host != nullptr) {
     return host;
   }
 

@@ -1,6 +1,5 @@
 #include "source/common/upstream/thread_aware_lb_impl.h"
 
-#include <atomic>
 #include <memory>
 #include <random>
 
@@ -96,7 +95,10 @@ void ThreadAwareLoadBalancerBase::initialize() {
   // complicated initialization as the load balancer would need its own initialized callback. I
   // think the synchronous/asynchronous split is probably the best option.
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t, const HostVector&, const HostVector&) -> void { refresh(); });
+      [this](uint32_t, const HostVector&, const HostVector&) -> void {
+        refresh();
+        threadSafeSetCrossPriorityHostMap(priority_set_.crossPriorityHostMap());
+      });
 
   refresh();
 }
@@ -143,8 +145,8 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   }
 
   HostConstSharedPtr host;
-  host = LoadBalancerBase::selectOverrideHost(cross_priority_host_map_.get(), context);
-  if (host != nullptr && !context->shouldSelectAnotherHost(*host)) {
+  if (host = LoadBalancerContextBase::selectOverrideHost(cross_priority_host_map_.get(), context);
+      host != nullptr) {
     return host;
   }
 

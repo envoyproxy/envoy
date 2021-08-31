@@ -162,7 +162,7 @@ private:
       return wrapped_->upstreamTransportSocketOptions();
     }
 
-    absl::optional<ExpectedHost> overrideHostToSelect() const override {
+    absl::optional<OverrideHost> overrideHostToSelect() const override {
       return wrapped_->overrideHostToSelect();
     }
 
