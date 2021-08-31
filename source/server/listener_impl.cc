@@ -523,6 +523,19 @@ void ListenerImpl::buildFilterChains() {
 void ListenerImpl::buildSocketOptions() {
   // TCP specific setup.
   if (connection_balancer_ == nullptr) {
+#ifdef WIN32
+    // On Windows we use the exact connection balancer to dispatch connections
+    // from worker 1 to all workers. This is a perf hit but it is the only way
+    // to make all the workers do work.
+    // TODO(davinci26): We can be faster here if we create a balancer implementation
+    // that dispatches the connection to a random thread.
+    ENVOY_LOG(warn,
+              "ExactBalance was forced enabled for TCP listener '{}' because "
+              "Envoy is running on Windows."
+              "ExactBalance is used to load balance connections between workers on Windows.",
+              config_.name());
+    connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
+#else
     // Not in place listener update.
     if (config_.has_connection_balance_config()) {
       // Currently exact balance is the only supported type and there are no options.
@@ -531,6 +544,7 @@ void ListenerImpl::buildSocketOptions() {
     } else {
       connection_balancer_ = std::make_shared<Network::NopConnectionBalancerImpl>();
     }
+#endif
   }
 
   if (config_.has_tcp_fast_open_queue_length()) {
