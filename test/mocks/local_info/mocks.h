@@ -6,6 +6,7 @@
 #include "envoy/local_info/local_info.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/mocks/config/mocks.h"
 
 #include "gmock/gmock.h"
 
@@ -23,6 +24,7 @@ public:
   MOCK_METHOD(const std::string&, nodeName, (), (const));
   MOCK_METHOD(const Stats::StatName&, zoneStatName, (), (const));
   MOCK_METHOD(envoy::config::core::v3::Node&, node, (), (const));
+  MOCK_METHOD(Config::ContextProvider&, contextProvider, ());
   MOCK_METHOD(const Config::ContextProvider&, contextProvider, (), (const));
 
   const Stats::StatName& makeZoneStatName() const;
@@ -34,6 +36,7 @@ public:
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> zone_stat_name_storage_;
   mutable Stats::StatName zone_stat_name_;
+  testing::NiceMock<Config::MockContextProvider> context_provider_;
 };
 
 } // namespace LocalInfo

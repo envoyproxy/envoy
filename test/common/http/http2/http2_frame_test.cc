@@ -2,7 +2,7 @@
 
 #include "envoy/http/metadata_interface.h"
 
-#include "common/http/http2/metadata_encoder.h"
+#include "source/common/http/http2/metadata_encoder.h"
 
 #include "test/common/http/http2/http2_frame.h"
 

@@ -79,13 +79,13 @@ A corresponding upstream cluster configuration could be:
       lb_policy: ROUND_ROBIN
       lb_subset_config:
         fallback_policy: ANY_ENDPOINT
-	subset_selectors:
-	  - keys:
-	      - default
+        subset_selectors:
           - keys:
-	      - version
+              - default
+          - keys:
+              - version
 
-This would then allow requests with the `x-version` header set to be matched against
+This would then allow requests with the ``x-version`` header set to be matched against
 endpoints with the corresponding version. Whereas requests with that header missing
 would be matched with the default endpoints.
 

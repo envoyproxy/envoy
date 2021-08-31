@@ -1,19 +1,19 @@
-#include "common/stats/allocator_impl.h"
+#include "source/common/stats/allocator_impl.h"
 
 #include <cstdint>
 
 #include "envoy/stats/stats.h"
 #include "envoy/stats/symbol_table.h"
 
-#include "common/common/hash.h"
-#include "common/common/lock_guard.h"
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/common/thread_annotations.h"
-#include "common/common/utility.h"
-#include "common/stats/metric_impl.h"
-#include "common/stats/stat_merger.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/thread_annotations.h"
+#include "source/common/common/utility.h"
+#include "source/common/stats/metric_impl.h"
+#include "source/common/stats/stat_merger.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "absl/container/flat_hash_set.h"
 

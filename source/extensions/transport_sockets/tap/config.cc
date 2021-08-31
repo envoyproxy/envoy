@@ -1,15 +1,14 @@
-#include "extensions/transport_sockets/tap/config.h"
+#include "source/extensions/transport_sockets/tap/config.h"
 
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/transport_sockets/tap/tap.h"
-#include "extensions/transport_sockets/tap/tap_config_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/transport_sockets/tap/tap.h"
+#include "source/extensions/transport_sockets/tap/tap_config_impl.h"
 
 namespace Envoy {
 namespace Extensions {

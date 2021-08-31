@@ -1,8 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "extensions/filters/http/well_known_names.h"
-
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
@@ -16,14 +15,14 @@ namespace {
 class LuaIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
-  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
     // Create the xDS upstream.
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {
@@ -47,7 +46,7 @@ public:
           new_route->mutable_match()->set_prefix("/alt/route");
           new_route->mutable_route()->set_cluster("alt_cluster");
 
-          const std::string key = Extensions::HttpFilters::HttpFilterNames::get().Lua;
+          const std::string key = "envoy.filters.http.lua";
           const std::string yaml =
               R"EOF(
             foo.bar:
@@ -79,9 +78,7 @@ public:
     config_helper_.addConfigModifier(
         [route_config](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) {
-          TestUtility::loadFromYaml(route_config, *hcm.mutable_route_config(), true);
-        });
+                hcm) { TestUtility::loadFromYaml(route_config, *hcm.mutable_route_config()); });
     initialize();
   }
 
@@ -175,7 +172,7 @@ public:
       upstream_request_->encodeData(response_data2, true);
     }
 
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
 
     if (enable_wrap_body) {
       EXPECT_EQ("2", response->headers()
@@ -287,10 +284,12 @@ typed_config:
       end
       request_handle:headers():add("request_protocol", request_handle:streamInfo():protocol())
       request_handle:headers():add("request_dynamic_metadata_value", dynamic_metadata_value)
-      request_handle:headers():add("request_downstream_local_address_value", 
+      request_handle:headers():add("request_downstream_local_address_value",
         request_handle:streamInfo():downstreamLocalAddress())
-      request_handle:headers():add("request_downstream_directremote_address_value", 
+      request_handle:headers():add("request_downstream_directremote_address_value",
         request_handle:streamInfo():downstreamDirectRemoteAddress())
+      request_handle:headers():add("request_requested_server_name",
+        request_handle:streamInfo():requestedServerName())
     end
 
     function envoy_on_response(response_handle)
@@ -364,6 +363,11 @@ typed_config:
           .getStringView(),
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
 
+  EXPECT_EQ("", upstream_request_->headers()
+                    .get(Http::LowerCaseString("request_requested_server_name"))[0]
+                    ->value()
+                    .getStringView());
+
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   upstream_request_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl response_data1("good");
@@ -371,7 +375,7 @@ typed_config:
   Buffer::OwnedImpl response_data2("bye");
   upstream_request_->encodeData(response_data2, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ("7", response->headers()
                      .get(Http::LowerCaseString("response_body_size"))[0]
@@ -447,7 +451,7 @@ typed_config:
                      .getStringView());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   cleanup();
 }
@@ -494,7 +498,7 @@ typed_config:
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   cleanup();
 
   EXPECT_TRUE(response->complete());
@@ -544,7 +548,7 @@ typed_config:
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   cleanup();
 
@@ -578,7 +582,7 @@ typed_config:
 
   waitForNextUpstreamRequest(2);
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   cleanup();
 
   EXPECT_TRUE(response->complete());
@@ -613,7 +617,7 @@ typed_config:
 
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(default_response_headers_, true);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
 
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
@@ -713,7 +717,7 @@ typed_config:
                         .getStringView());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -853,7 +857,7 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
     }
 
     upstream_request_->encodeHeaders(default_response_headers_, true);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
 
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
@@ -909,6 +913,62 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
   cleanup();
 }
 
+TEST_P(LuaIntegrationTest, DirectResponseLuaMetadata) {
+  const std::string filter_config =
+      R"EOF(
+  name: lua
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+    inline_code: |
+      function envoy_on_response(response_handle)
+        response_handle:headers():add('foo', response_handle:metadata():get('foo') or 'nil')
+      end
+)EOF";
+
+  std::string route_config =
+      R"EOF(
+name: basic_lua_routes
+virtual_hosts:
+- name: rds_vhost_1
+  domains: ["lua.per.route"]
+  routes:
+  - match:
+      prefix: "/lua/direct_response"
+    direct_response:
+      status: 200
+      body:
+        inline_string: "hello"
+    metadata:
+      filter_metadata:
+        envoy.filters.http.lua:
+          foo: bar
+)EOF";
+
+  initializeWithYaml(filter_config, route_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Lua code defined in 'inline_code' will be executed by default.
+  Http::TestRequestHeaderMapImpl default_headers{{":method", "GET"},
+                                                 {":path", "/lua/direct_response"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "lua.per.route"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  auto encoder_decoder = codec_client_->startRequest(default_headers);
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  EXPECT_EQ("bar",
+            response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("hello", response->body());
+
+  cleanup();
+}
+
 // Test whether Rds can correctly deliver LuaPerRoute configuration.
 TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
 // When the route configuration is updated dynamically via RDS and the configuration contains an
@@ -939,7 +999,7 @@ TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
     }
 
     upstream_request_->encodeHeaders(default_response_headers_, true);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
 
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());

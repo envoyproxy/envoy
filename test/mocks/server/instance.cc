@@ -1,6 +1,6 @@
 #include "instance.h"
 
-#include "common/singleton/manager_impl.h"
+#include "source/common/singleton/manager_impl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -16,7 +16,7 @@ MockInstance::MockInstance()
       cluster_manager_(timeSource()), ssl_context_manager_(timeSource()),
       singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
-      router_context_(stats_store_.symbolTable()),
+      router_context_(stats_store_.symbolTable()), quic_stat_names_(stats_store_.symbolTable()),
       stats_config_(std::make_shared<NiceMock<Configuration::MockStatsConfig>>()),
       server_factory_context_(
           std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()),
@@ -50,6 +50,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(*server_factory_context_));
   ON_CALL(*this, transportSocketFactoryContext())
       .WillByDefault(ReturnRef(*transport_socket_factory_context_));
+  ON_CALL(*this, enableReusePortDefault()).WillByDefault(Return(true));
 }
 
 MockInstance::~MockInstance() = default;
@@ -76,6 +77,9 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, statsConfig()).WillByDefault(ReturnRef(stats_config_));
+  ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
+  ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
+  ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 

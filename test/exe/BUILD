@@ -67,7 +67,8 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/api:api_lib",
-        "//source/exe:main_common_lib",
+        "//source/exe:envoy_main_common_with_core_extensions_lib",
+        "//source/exe:platform_impl_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
@@ -78,10 +79,13 @@ envoy_cc_test(
     name = "extra_extensions_test",
     srcs = ["extra_extensions_test.cc"],
     deps = [
-        # This dependency MUST be main_common_lib to meet the purpose of this test
-        "//source/exe:main_common_lib",
         "//test/test_common:environment_lib",
-    ],
+    ] + select({
+        # gcc RBE build has trouble compiling target with all extensions
+        "//bazel:gcc_build": ["//source/exe:envoy_main_common_with_core_extensions_lib"],
+        # This dependency MUST be main_common_lib to meet the purpose of this test
+        "//conditions:default": ["//source/exe:main_common_lib"],
+    }),
 )
 
 envoy_cc_test(
@@ -91,6 +95,22 @@ envoy_cc_test(
     deps = [
         "//source/exe:terminate_handler_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "win32_scm_test",
+    srcs = ["win32_scm_test.cc"],
+    data = [
+        "//source/exe:envoy-static",
+        "//test/config/integration:google_com_proxy_port_0",
+    ],
+    deps = [
+        "//source/common/api:api_lib",
+        "//source/exe:envoy_main_common_with_core_extensions_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:contention_lib",
+        "//test/test_common:environment_lib",
     ],
 )
 
@@ -113,5 +133,14 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "platform_impl_test",
+    srcs = ["platform_impl_test.cc"],
+    deps = [
+        "//source/exe:platform_impl_lib",
+        "//test/mocks/runtime:runtime_mocks",
     ],
 )

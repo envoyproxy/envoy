@@ -61,12 +61,13 @@ message StringMatcher {
     string hidden_envoy_deprecated_regex = 4 [
       deprecated = true,
       (validate.rules).string = {max_bytes: 1024},
+      (envoy.annotations.deprecated_at_minor_version) = "3.0",
       (envoy.annotations.disallowed_by_default) = true
     ];
   }
 
-  // If true, indicates the exact/prefix/suffix matching should be case insensitive. This has no
-  // effect for the safe_regex match.
+  // If true, indicates the exact/prefix/suffix/contains matching should be case insensitive. This
+  // has no effect for the safe_regex match.
   // For example, the matcher *data* will match both input string *Data* and *data* if set to true.
   bool ignore_case = 6;
 }

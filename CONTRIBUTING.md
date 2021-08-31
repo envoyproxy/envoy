@@ -29,7 +29,7 @@ following guidelines for all code, APIs, and documentation:
 * The following words and phrases are not allowed:
   * *Whitelist*: use allowlist instead.
   * *Blacklist*: use denylist or blocklist instead.
-  * *Master*: use primary instead.
+  * *Master*: use primary or main instead.
   * *Slave*: use secondary or replica instead.
 * Documentation should be written in an inclusive style. The [Google developer
   documentation](https://developers.google.com/style/inclusive-documentation) contains an excellent
@@ -102,7 +102,7 @@ versioning guidelines:
 
   Please see [support/README.md](support/README.md) for more information on these hooks.
 
-* Create your PR. If your PR adds new code, it should include tests [covering](source/docs/coverage.md) the new code.
+* Create your PR. If your PR adds new code, it should include tests [covering](source/docs/coverage.md) the new code. Please note that draft PRs may not be reviewed and will likely not be triaged, so do not create your PR as a draft if you want prompt reviews!
 * Tests will automatically run for you.
 * We will **not** merge any PR that is not passing tests.
 * PRs are expected to have 100% test coverage for added code. This can be verified with a coverage
@@ -238,9 +238,9 @@ and false.
 
 # API changes
 
-If you change anything in the [api tree](https://github.com/envoyproxy/envoy/tree/master/api),
+If you change anything in the [api tree](https://github.com/envoyproxy/envoy/tree/main/api),
 please read the [API Review
-Checklist](https://github.com/envoyproxy/envoy/tree/master/api/review_checklist.md)
+Checklist](https://github.com/envoyproxy/envoy/tree/main/api/review_checklist.md)
 and make sure that your changes have addressed all of the considerations listed there.
 
 # Adding new extensions
@@ -259,9 +259,20 @@ API can be found [here](api/STYLE.md#adding-an-extension-configuration-to-the-ap
 Other changes will likely include
 
   * Editing [source/extensions/extensions_build_config.bzl](source/extensions/extensions_build_config.bzl) to include the new extensions
+  * Editing [source/extensions/extensions_metadata.yaml](source/extensions/extensions_metadata.yaml) to include metadata for the new extensions
   * Editing [docs/root/api-v3/config/config.rst](docs/root/api-v3/config/config.rst) to add area/area
   * Adding `docs/root/api-v3/config/area/area.rst` to add a table of contents for the API docs
-  * Adding `source/extensions/area/well_known_names.h` for registered plugins
+
+# Adding contrib extensions
+
+See [EXTENSION_POLICY.md](EXTENSION_POLICY.md) for more information on contrib. Adding a contrib
+extension mostly mirrors adding a normal extension above. Some differences are noted here:
+
+* API files should be added in `api/contrib/envoy/`, but the protos' namespaces should still be as
+  in normal extensions (which will make file movement easier later if the extension gets promoted
+  to core).
+* Build config and metadata should be included in [contrib/contrib_build_config.bzl](contrib/contrib_build_config.bzl)
+  and [contrib/extensions_metadata.yaml](contrib/extensions_metadata.yaml).
 
 # DCO: Sign your work
 

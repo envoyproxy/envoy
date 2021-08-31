@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <string>
 
-#include "common/api/os_sys_calls_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
 
 #define DWORD_MAX UINT32_MAX
 
@@ -104,8 +104,12 @@ SysCallIntResult OsSysCallsImpl::chmod(const std::string& path, mode_t mode) {
   return {rc, rc != -1 ? 0 : errno};
 }
 
-SysCallIntResult OsSysCallsImpl::ioctl(os_fd_t sockfd, unsigned long int request, void* argp) {
-  const int rc = ::ioctlsocket(sockfd, request, static_cast<u_long*>(argp));
+SysCallIntResult OsSysCallsImpl::ioctl(os_fd_t sockfd, unsigned long control_code, void* in_buffer,
+                                       unsigned long in_buffer_len, void* out_buffer,
+                                       unsigned long out_buffer_len,
+                                       unsigned long* bytes_returned) {
+  const int rc = ::WSAIoctl(sockfd, control_code, in_buffer, in_buffer_len, out_buffer,
+                            out_buffer_len, bytes_returned, nullptr, nullptr);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
@@ -275,11 +279,11 @@ SysCallIntResult OsSysCallsImpl::socketpair(int domain, int type, int protocol, 
   sv[0] = sv[1] = INVALID_SOCKET;
 
   SysCallSocketResult socket_result = socket(domain, type, protocol);
-  if (SOCKET_INVALID(socket_result.rc_)) {
+  if (SOCKET_INVALID(socket_result.return_value_)) {
     return {SOCKET_ERROR, socket_result.errno_};
   }
 
-  os_fd_t listener = socket_result.rc_;
+  os_fd_t listener = socket_result.return_value_;
 
   typedef union {
     struct sockaddr_storage sa;
@@ -309,44 +313,44 @@ SysCallIntResult OsSysCallsImpl::socketpair(int domain, int type, int protocol, 
   };
 
   SysCallIntResult int_result = bind(listener, reinterpret_cast<sockaddr*>(&a), sa_size);
-  if (int_result.rc_ == SOCKET_ERROR) {
+  if (int_result.return_value_ == SOCKET_ERROR) {
     onErr();
     return int_result;
   }
 
   int_result = listen(listener, 1);
-  if (int_result.rc_ == SOCKET_ERROR) {
+  if (int_result.return_value_ == SOCKET_ERROR) {
     onErr();
     return int_result;
   }
 
   socket_result = socket(domain, type, protocol);
-  if (SOCKET_INVALID(socket_result.rc_)) {
+  if (SOCKET_INVALID(socket_result.return_value_)) {
     onErr();
     return {SOCKET_ERROR, socket_result.errno_};
   }
-  sv[0] = socket_result.rc_;
+  sv[0] = socket_result.return_value_;
 
   a = {};
   int_result = getsockname(listener, reinterpret_cast<sockaddr*>(&a), &sa_size);
-  if (int_result.rc_ == SOCKET_ERROR) {
+  if (int_result.return_value_ == SOCKET_ERROR) {
     onErr();
     return int_result;
   }
 
   int_result = connect(sv[0], reinterpret_cast<sockaddr*>(&a), sa_size);
-  if (int_result.rc_ == SOCKET_ERROR) {
+  if (int_result.return_value_ == SOCKET_ERROR) {
     onErr();
     return int_result;
   }
 
-  socket_result.rc_ = ::accept(listener, nullptr, nullptr);
-  if (SOCKET_INVALID(socket_result.rc_)) {
+  socket_result.return_value_ = ::accept(listener, nullptr, nullptr);
+  if (SOCKET_INVALID(socket_result.return_value_)) {
     socket_result.errno_ = ::WSAGetLastError();
     onErr();
     return {SOCKET_ERROR, socket_result.errno_};
   }
-  sv[1] = socket_result.rc_;
+  sv[1] = socket_result.return_value_;
 
   ::closesocket(listener);
   return {0, 0};

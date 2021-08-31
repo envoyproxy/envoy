@@ -2,8 +2,8 @@
 
 #include "envoy/http/codec.h"
 
-#include "common/http/http2/codec_impl.h"
-#include "common/http/utility.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/utility.h"
 
 #include "test/mocks/common.h"
 
@@ -77,10 +77,13 @@ public:
 
   nghttp2_session* session() { return session_; }
   using ServerConnectionImpl::getStream;
+  using ServerConnectionImpl::sendPendingFrames;
 
 protected:
-  // Overrides ServerConnectionImpl::onSettingsForTest().
-  void onSettingsForTest(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
+  // Overrides ServerConnectionImpl::onSettings().
+  void onSettings(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
+
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 class TestClientConnectionImpl : public TestCodecStatsProvider,
@@ -111,8 +114,8 @@ public:
   using ConnectionImpl::sendPendingFrames;
 
 protected:
-  // Overrides ClientConnectionImpl::onSettingsForTest().
-  void onSettingsForTest(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
+  // Overrides ClientConnectionImpl::onSettings().
+  void onSettings(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
 };
 
 } // namespace Http2

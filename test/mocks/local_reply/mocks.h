@@ -1,4 +1,6 @@
-#include "common/local_reply/local_reply.h"
+#pragma once
+
+#include "source/common/local_reply/local_reply.h"
 
 #include "gmock/gmock.h"
 

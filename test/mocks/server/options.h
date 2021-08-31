@@ -22,7 +22,6 @@ public:
   MOCK_METHOD(const std::string&, configPath, (), (const));
   MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, configProto, (), (const));
   MOCK_METHOD(const std::string&, configYaml, (), (const));
-  MOCK_METHOD(const absl::optional<uint32_t>&, bootstrapVersion, (), (const));
   MOCK_METHOD(bool, allowUnknownStaticFields, (), (const));
   MOCK_METHOD(bool, rejectUnknownDynamicFields, (), (const));
   MOCK_METHOD(bool, ignoreUnknownDynamicFields, (), (const));
@@ -47,6 +46,7 @@ public:
   MOCK_METHOD(bool, hotRestartDisabled, (), (const));
   MOCK_METHOD(bool, signalHandlingEnabled, (), (const));
   MOCK_METHOD(bool, mutexTracingEnabled, (), (const));
+  MOCK_METHOD(bool, coreDumpEnabled, (), (const));
   MOCK_METHOD(bool, cpusetThreadsEnabled, (), (const));
   MOCK_METHOD(const std::vector<std::string>&, disabledExtensions, (), (const));
   MOCK_METHOD(Server::CommandLineOptionsPtr, toCommandLineOptions, (), (const));
@@ -71,6 +71,7 @@ public:
   bool hot_restart_disabled_{};
   bool signal_handling_enabled_{true};
   bool mutex_tracing_enabled_{};
+  bool core_dump_enabled_{};
   bool cpuset_threads_enabled_{};
   std::vector<std::string> disabled_extensions_;
   std::string socket_path_;

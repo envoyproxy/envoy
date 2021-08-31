@@ -12,9 +12,9 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/logger.h"
-#include "common/config/subscription_base.h"
-#include "common/init/target_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/subscription_base.h"
+#include "source/common/init/target_impl.h"
 
 namespace Envoy {
 namespace Server {

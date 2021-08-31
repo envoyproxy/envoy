@@ -1,6 +1,6 @@
-#include "common/network/utility.h"
-#include "common/upstream/host_utility.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/host_utility.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"

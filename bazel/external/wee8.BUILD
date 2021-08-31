@@ -18,12 +18,15 @@ cc_library(
     copts = [
         "-Wno-range-loop-analysis",
     ],
-    defines = ["ENVOY_WASM_V8"],
+    defines = [
+        "V8_ENABLE_WEBASSEMBLY",
+    ],
     includes = [
         "wee8",
         "wee8/include",
         "wee8/third_party",
     ],
+    tags = ["skip_on_windows"],
     visibility = ["//visibility:public"],
 )
 
@@ -38,4 +41,5 @@ genrule(
     ],
     cmd = genrule_cmd("@envoy//bazel/external:wee8.genrule_cmd"),
     exec_properties = LARGE_MACHINE,
+    tags = ["skip_on_windows"],
 )

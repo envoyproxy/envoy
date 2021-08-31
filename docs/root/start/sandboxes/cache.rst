@@ -9,7 +9,7 @@ Cache filter
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
+        Used to make ``HTTP`` requests.
 
 In this example, we demonstrate how HTTP caching can be utilized in Envoy by using the Cache Filter.
 The setup of this sandbox is based on the setup of the :ref:`Front Proxy sandbox <install_sandboxes_front_proxy>`.
@@ -50,8 +50,8 @@ Change to the ``examples/cache`` directory.
            Name                      Command            State           Ports
     ----------------------------------------------------------------------------------------------
     cache_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
-    cache_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
-    cache_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
+    cache_service1_1      python3 /code/service.py       Up
+    cache_service2_1      python3 /code/service.py       Up
 
 Step 2: Test Envoy's HTTP caching capabilities
 **********************************************

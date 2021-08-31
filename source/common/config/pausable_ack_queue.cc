@@ -1,8 +1,8 @@
-#include "common/config/pausable_ack_queue.h"
+#include "source/common/config/pausable_ack_queue.h"
 
 #include <list>
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Config {
@@ -19,6 +19,9 @@ bool PausableAckQueue::empty() {
   }
   return true;
 }
+
+// In the event of a reconnection, clear all the cached nonces.
+void PausableAckQueue::clear() { storage_.clear(); }
 
 const UpdateAck& PausableAckQueue::front() {
   for (const auto& entry : storage_) {

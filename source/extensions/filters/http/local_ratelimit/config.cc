@@ -1,12 +1,11 @@
-#include "extensions/filters/http/local_ratelimit/config.h"
+#include "source/extensions/filters/http/local_ratelimit/config.h"
 
 #include <string>
 
 #include "envoy/registry/registry.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/local_ratelimit/local_ratelimit.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
 namespace Envoy {
 namespace Extensions {

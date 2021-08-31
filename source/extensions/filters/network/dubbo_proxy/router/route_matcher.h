@@ -8,14 +8,14 @@
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
-#include "common/common/logger.h"
-#include "common/common/matchers.h"
-#include "common/http/header_utility.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/network/dubbo_proxy/metadata.h"
-#include "extensions/filters/network/dubbo_proxy/router/route.h"
-#include "extensions/filters/network/dubbo_proxy/router/router.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/metadata.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/route.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/router.h"
 
 #include "absl/types/optional.h"
 
@@ -47,7 +47,7 @@ public:
 
 protected:
   RouteConstSharedPtr clusterEntry(uint64_t random_value) const;
-  bool headersMatch(const Http::HeaderMap& headers) const;
+  bool headersMatch(const RpcInvocationImpl& invocation) const;
 
 private:
   class WeightedClusterEntry : public RouteEntry, public Route {
@@ -123,20 +123,33 @@ public:
                               uint64_t random_value) const override;
 
 private:
-  const Matchers::StringMatcherImpl method_name_;
+  const Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> method_name_;
   std::shared_ptr<ParameterRouteEntryImpl> parameter_route_;
 };
 
 class SingleRouteMatcherImpl : public RouteMatcher, public Logger::Loggable<Logger::Id::dubbo> {
 public:
+  class InterfaceMatcher {
+  public:
+    InterfaceMatcher(const std::string& interface_name);
+    bool match(const absl::string_view interface) const { return impl_(interface); }
+
+  private:
+    std::function<bool(const absl::string_view)> impl_;
+  };
+
   using RouteConfig = envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration;
   SingleRouteMatcherImpl(const RouteConfig& config, Server::Configuration::FactoryContext& context);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const override;
 
 private:
+  bool matchServiceName(const RpcInvocationImpl& invocation) const;
+  bool matchServiceVersion(const RpcInvocationImpl& invocation) const;
+  bool matchServiceGroup(const RpcInvocationImpl& invocation) const;
+
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
-  const std::string service_name_;
+  const InterfaceMatcher interface_matcher_;
   const absl::optional<std::string> group_;
   const absl::optional<std::string> version_;
 };

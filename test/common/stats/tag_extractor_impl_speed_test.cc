@@ -42,9 +42,9 @@
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 
-#include "common/common/assert.h"
-#include "common/config/well_known_names.h"
-#include "common/stats/tag_producer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/stats/tag_producer_impl.h"
 
 #include "benchmark/benchmark.h"
 
@@ -100,7 +100,8 @@ void BM_ExtractTags(benchmark::State& state) {
     UNREFERENCED_PARAMETER(_);
     TagVector tags;
     tag_extractors.produceTags(str, tags);
-    RELEASE_ASSERT(tags.size() == tags_size, "");
+    RELEASE_ASSERT(tags.size() == tags_size,
+                   absl::StrCat("tags.size()=", tags.size(), " tags_size==", tags_size));
   }
 }
 BENCHMARK(BM_ExtractTags)->DenseRange(0, 26, 1);

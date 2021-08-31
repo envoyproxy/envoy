@@ -3,7 +3,7 @@
 #include "envoy/config/endpoint/v3/load_report.pb.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 
-#include "common/upstream/load_stats_reporter.h"
+#include "source/common/upstream/load_stats_reporter.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -45,8 +45,7 @@ public:
       return response_timer_;
     }));
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info_, cm_, stats_store_, Grpc::RawAsyncClientPtr(async_client_),
-        envoy::config::core::v3::ApiVersion::AUTO, dispatcher_);
+        local_info_, cm_, stats_store_, Grpc::RawAsyncClientPtr(async_client_), dispatcher_);
   }
 
   void expectSendMessage(

@@ -7,6 +7,7 @@ using testing::ReturnRef;
 using testing::_;
 using testing::Invoke;
 using testing::ReturnRef;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Tcp {
@@ -27,6 +28,7 @@ MockInstance::MockInstance() {
     return newConnectionImpl(cb);
   }));
   ON_CALL(*this, host()).WillByDefault(Return(host_));
+  ON_CALL(*this, addIdleCallback(_)).WillByDefault(SaveArg<0>(&idle_cb_));
 }
 MockInstance::~MockInstance() = default;
 
@@ -41,9 +43,9 @@ void MockInstance::poolFailure(PoolFailureReason reason, bool host_null) {
   callbacks_.pop_front();
   handles_.pop_front();
   if (host_null) {
-    cb->onPoolFailure(reason, nullptr);
+    cb->onPoolFailure(reason, "", nullptr);
   } else {
-    cb->onPoolFailure(reason, host_);
+    cb->onPoolFailure(reason, "", host_);
   }
 }
 
@@ -57,6 +59,8 @@ void MockInstance::poolReady(Network::MockClientConnection& conn) {
   connection_data_->release_callback_ = [&]() -> void { released(conn); };
 
   cb->onPoolReady(std::move(connection_data_), host_);
+
+  connection_data_ = std::make_unique<NiceMock<MockConnectionData>>();
 }
 
 } // namespace ConnectionPool

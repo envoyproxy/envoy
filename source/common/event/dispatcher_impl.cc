@@ -1,4 +1,4 @@
-#include "common/event/dispatcher_impl.h"
+#include "source/common/event/dispatcher_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -8,33 +8,34 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/scope_tracker.h"
+#include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
-#include "common/event/file_event_impl.h"
-#include "common/event/libevent_scheduler.h"
-#include "common/event/scaled_range_timer_manager_impl.h"
-#include "common/event/signal_impl.h"
-#include "common/event/timer_impl.h"
-#include "common/filesystem/watcher_impl.h"
-#include "common/network/connection_impl.h"
-#include "common/network/dns_impl.h"
-#include "common/network/tcp_listener_impl.h"
-#include "common/network/udp_listener_impl.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/file_event_impl.h"
+#include "source/common/event/libevent_scheduler.h"
+#include "source/common/event/scaled_range_timer_manager_impl.h"
+#include "source/common/event/signal_impl.h"
+#include "source/common/event/timer_impl.h"
+#include "source/common/filesystem/watcher_impl.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/dns_impl.h"
+#include "source/common/network/tcp_listener_impl.h"
+#include "source/common/network/udp_listener_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "event2/event.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "common/signal/signal_action.h"
+#include "source/common/signal/signal_action.h"
 #endif
 
 #ifdef __APPLE__
-#include "common/network/apple_dns_impl.h"
+#include "source/common/network/apple_dns_impl.h"
 #endif
 
 namespace Envoy {
@@ -61,8 +62,11 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
     : name_(name), api_(api),
       buffer_factory_(watermark_factory != nullptr
                           ? watermark_factory
-                          : std::make_shared<Buffer::WatermarkBufferFactory>()),
+                          : std::make_shared<Buffer::WatermarkBufferFactory>(
+                                api.bootstrap().overload_manager().buffer_factory_config())),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
+      thread_local_delete_cb_(
+          base_scheduler_.createSchedulableCallback([this]() -> void { runThreadLocalDelete(); })),
       deferred_delete_cb_(base_scheduler_.createSchedulableCallback(
           [this]() -> void { clearDeferredDeleteList(); })),
       post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
@@ -74,7 +78,12 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
       std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
-DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*this); }
+DispatcherImpl::~DispatcherImpl() {
+  ENVOY_LOG(debug, "destroying dispatcher {}", name_);
+  FatalErrorHandler::removeFatalErrorHandler(*this);
+  // TODO(lambdai): Resolve https://github.com/envoyproxy/envoy/issues/15072 and enable
+  // ASSERT(deletable_in_dispatcher_thread_.empty())
+}
 
 void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                                       std::chrono::milliseconds min_touch_interval) {
@@ -150,7 +159,7 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-    const bool use_tcp_for_dns_lookups) {
+    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) {
   ASSERT(isThreadSafe());
 #ifdef __APPLE__
   static bool use_apple_api_for_dns_lookups =
@@ -162,15 +171,14 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
         "Apple's API only allows overriding DNS resolvers via system settings. Delete resolvers "
         "config or disable the envoy.restart_features.use_apple_api_for_dns_lookups runtime "
         "feature.");
-    RELEASE_ASSERT(!use_tcp_for_dns_lookups,
+    RELEASE_ASSERT(!dns_resolver_options.use_tcp_for_dns_lookups(),
                    "using TCP for DNS lookups is not possible when using Apple APIs for DNS "
                    "resolution. Apple' API only uses UDP for DNS resolution. Use UDP or disable "
                    "the envoy.restart_features.use_apple_api_for_dns_lookups runtime feature.");
-    return std::make_shared<Network::AppleDnsResolverImpl>(*this, api_.randomGenerator(),
-                                                           api_.rootScope());
+    return std::make_shared<Network::AppleDnsResolverImpl>(*this, api_.rootScope());
   }
 #endif
-  return std::make_shared<Network::DnsResolverImpl>(*this, resolvers, use_tcp_for_dns_lookups);
+  return std::make_shared<Network::DnsResolverImpl>(*this, resolvers, dns_resolver_options);
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
@@ -192,16 +200,19 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
 
 Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
                                                     Network::TcpListenerCallbacks& cb,
-                                                    bool bind_to_port, uint32_t backlog_size) {
+                                                    bool bind_to_port) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::TcpListenerImpl>(
-      *this, api_.randomGenerator(), std::move(socket), cb, bind_to_port, backlog_size);
+  return std::make_unique<Network::TcpListenerImpl>(*this, api_.randomGenerator(),
+                                                    std::move(socket), cb, bind_to_port);
 }
 
-Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,
-                                                          Network::UdpListenerCallbacks& cb) {
+Network::UdpListenerPtr
+DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,
+                                  Network::UdpListenerCallbacks& cb,
+                                  const envoy::config::core::v3::UdpSocketConfig& config) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource());
+  return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource(),
+                                                    config);
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
@@ -238,10 +249,13 @@ TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   ASSERT(isThreadSafe());
-  current_to_delete_->emplace_back(std::move(to_delete));
-  ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
-  if (current_to_delete_->size() == 1) {
-    deferred_delete_cb_->scheduleCallbackCurrentIteration();
+  if (to_delete != nullptr) {
+    to_delete->deleteIsPending();
+    current_to_delete_->emplace_back(std::move(to_delete));
+    ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
+    if (current_to_delete_->size() == 1) {
+      deferred_delete_cb_->scheduleCallbackCurrentIteration();
+    }
   }
 }
 
@@ -265,9 +279,23 @@ void DispatcherImpl::post(std::function<void()> callback) {
   }
 }
 
+void DispatcherImpl::deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) {
+  bool need_schedule;
+  {
+    Thread::LockGuard lock(thread_local_deletable_lock_);
+    need_schedule = deletables_in_dispatcher_thread_.empty();
+    deletables_in_dispatcher_thread_.emplace_back(std::move(deletable));
+    // TODO(lambdai): Enable below after https://github.com/envoyproxy/envoy/issues/15072
+    // ASSERT(!shutdown_called_, "inserted after shutdown");
+  }
+
+  if (need_schedule) {
+    thread_local_delete_cb_->scheduleCallbackCurrentIteration();
+  }
+}
+
 void DispatcherImpl::run(RunType type) {
   run_tid_ = api_.threadFactory().currentThreadId();
-
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
   // not guarantee that events are run in any particular order. So even if we post() and call
@@ -280,12 +308,56 @@ MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
   return approximate_monotonic_time_;
 }
 
+void DispatcherImpl::shutdown() {
+  // TODO(lambdai): Resolve https://github.com/envoyproxy/envoy/issues/15072 and loop delete below
+  // below 3 lists until all lists are empty. The 3 lists are list of deferred delete objects, post
+  // callbacks and dispatcher thread deletable objects.
+  ASSERT(isThreadSafe());
+  auto deferred_deletables_size = current_to_delete_->size();
+  std::list<std::function<void()>>::size_type post_callbacks_size;
+  {
+    Thread::LockGuard lock(post_lock_);
+    post_callbacks_size = post_callbacks_.size();
+  }
+
+  std::list<DispatcherThreadDeletableConstPtr> local_deletables;
+  {
+    Thread::LockGuard lock(thread_local_deletable_lock_);
+    local_deletables = std::move(deletables_in_dispatcher_thread_);
+  }
+  auto thread_local_deletables_size = local_deletables.size();
+  while (!local_deletables.empty()) {
+    local_deletables.pop_front();
+  }
+  ASSERT(!shutdown_called_);
+  shutdown_called_ = true;
+  ENVOY_LOG(
+      trace,
+      "{} destroyed {} thread local objects. Peek {} deferred deletables, {} post callbacks. ",
+      __FUNCTION__, deferred_deletables_size, post_callbacks_size, thread_local_deletables_size);
+}
+
 void DispatcherImpl::updateApproximateMonotonicTime() { updateApproximateMonotonicTimeInternal(); }
 
 void DispatcherImpl::updateApproximateMonotonicTimeInternal() {
   approximate_monotonic_time_ = api_.timeSource().monotonicTime();
 }
 
+void DispatcherImpl::runThreadLocalDelete() {
+  std::list<DispatcherThreadDeletableConstPtr> to_be_delete;
+  {
+    Thread::LockGuard lock(thread_local_deletable_lock_);
+    to_be_delete = std::move(deletables_in_dispatcher_thread_);
+    ASSERT(deletables_in_dispatcher_thread_.empty());
+  }
+  while (!to_be_delete.empty()) {
+    // Touch the watchdog before deleting the objects to avoid spurious watchdog miss events when
+    // executing complicated destruction.
+    touchWatchdog();
+    // Delete in FIFO order.
+    to_be_delete.pop_front();
+  }
+}
 void DispatcherImpl::runPostCallbacks() {
   // Clear the deferred delete list before running post callbacks to reduce non-determinism in
   // callback processing, and more easily detect if a scheduled post callback refers to one of the

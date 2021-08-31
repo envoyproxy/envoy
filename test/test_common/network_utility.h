@@ -8,6 +8,11 @@
 #include "envoy/network/io_handle.h"
 #include "envoy/network/transport_socket.h"
 
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/utility.h"
+
+#include "gtest/gtest.h"
+
 namespace Envoy {
 namespace Network {
 namespace Test {
@@ -152,6 +157,8 @@ public:
     return empty_network_filter_factory_;
   }
 
+  absl::string_view name() const override { return "EmptyFilterChain"; }
+
 private:
   const TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<FilterFactoryCb> empty_network_filter_factory_{};
@@ -176,15 +183,17 @@ const FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
  * UdpRecvData without worrying about the packet processor interface. The function will
  * instantiate the buffer returned in data.
  */
-Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
-                                       UdpRecvData& data);
+Api::IoCallUint64Result
+readFromSocket(IoHandle& handle, const Address::Instance& local_address, UdpRecvData& data,
+               uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
 
 /**
  * A synchronous UDP peer that can be used for testing.
  */
 class UdpSyncPeer {
 public:
-  UdpSyncPeer(Network::Address::IpVersion version);
+  UdpSyncPeer(Network::Address::IpVersion version,
+              uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
 
   // Writer a datagram to a remote peer.
   void write(const std::string& buffer, const Network::Address::Instance& peer);
@@ -194,12 +203,25 @@ public:
 
   // Return the local peer's socket address.
   const Network::Address::InstanceConstSharedPtr& localAddress() {
-    return socket_->addressProvider().localAddress();
+    return socket_->connectionInfoProvider().localAddress();
   }
 
 private:
   const Network::SocketPtr socket_;
+  const uint64_t max_rx_datagram_size_;
   std::list<Network::UdpRecvData> received_datagrams_;
+};
+
+/**
+ * A test version of TcpListenSocket that immediately listens which is a common pattern in tests.
+ */
+class TcpListenSocketImmediateListen : public Network::TcpListenSocket {
+public:
+  TcpListenSocketImmediateListen(const Address::InstanceConstSharedPtr& address,
+                                 const Network::Socket::OptionsSharedPtr& options = nullptr)
+      : TcpListenSocket(address, options, true) {
+    EXPECT_EQ(0, io_handle_->listen(ENVOY_TCP_BACKLOG_SIZE).return_value_);
+  }
 };
 
 } // namespace Test

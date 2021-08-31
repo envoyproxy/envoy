@@ -4,7 +4,7 @@
 #include "envoy/extensions/retry/host/omit_host_metadata/v3/omit_host_metadata_config.pb.validate.h"
 #include "envoy/upstream/retry.h"
 
-#include "extensions/retry/host/omit_host_metadata/omit_host_metadata.h"
+#include "source/extensions/retry/host/omit_host_metadata/omit_host_metadata.h"
 
 namespace Envoy {
 namespace Extensions {

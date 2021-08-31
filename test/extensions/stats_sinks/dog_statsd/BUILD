@@ -14,9 +14,9 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.stat_sinks.dog_statsd",
+    extension_names = ["envoy.stat_sinks.dog_statsd"],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/stat_sinks/dog_statsd:config",
         "//test/mocks/server:instance_mocks",

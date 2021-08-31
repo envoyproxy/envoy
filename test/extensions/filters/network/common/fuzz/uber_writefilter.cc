@@ -1,7 +1,6 @@
 #include "test/extensions/filters/network/common/fuzz/uber_writefilter.h"
 
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
+#include "source/common/config/utility.h"
 
 using testing::_;
 using testing::Return;

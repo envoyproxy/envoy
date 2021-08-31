@@ -1,6 +1,6 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "extensions/filters/http/jwt_authn/verifier.h"
+#include "source/extensions/filters/http/jwt_authn/verifier.h"
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
@@ -582,8 +582,8 @@ TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowMissingButFailed) {
   callbacks_["other_provider"](Status::JwtExpired);
 }
 
-// Test RequiresAny with two providers and allow_missing, but OK
-TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowMissingButOk) {
+// Test RequiresAny with two providers and allow_missing, but one returns JwtUnknownIssuer
+TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowMissingButUnknownIssuer) {
   TestUtility::loadFromYaml(RequiresAnyConfig, proto_config_);
   proto_config_.mutable_rules(0)
       ->mutable_requires()
@@ -592,7 +592,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowMissingButOk) {
       ->mutable_allow_missing();
 
   createAsyncMockAuthsAndVerifier(std::vector<std::string>{"example_provider", "other_provider"});
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer));
 
   auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);

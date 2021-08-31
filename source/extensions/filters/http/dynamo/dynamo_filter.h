@@ -7,10 +7,9 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 
-#include "common/json/json_loader.h"
-
-#include "extensions/filters/http/dynamo/dynamo_request_parser.h"
-#include "extensions/filters/http/dynamo/dynamo_stats.h"
+#include "source/common/json/json_loader.h"
+#include "source/extensions/filters/http/dynamo/dynamo_request_parser.h"
+#include "source/extensions/filters/http/dynamo/dynamo_stats.h"
 
 namespace Envoy {
 namespace Extensions {

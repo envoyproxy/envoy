@@ -1,0 +1,29 @@
+[package]
+description = "Proxy-Wasm tests for Envoy"
+name = "proxy-wasm-envoy-tests"
+version = "0.0.1"
+authors = ["Piotr Sikora <piotrsikora@google.com>"]
+edition = "2018"
+
+[dependencies]
+protobuf = "2"
+
+[profile.release]
+lto = true
+opt-level = 3
+panic = "abort"
+
+[package.metadata.raze]
+package_aliases_dir = "."
+workspace_path = "//bazel/external/cargo"
+genmode = "Remote"
+
+[[example]]
+name = "grpc_call_rust"
+path = "../../../test/extensions/filters/http/wasm/test_data/grpc_call_rust.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "grpc_stream_rust"
+path = "../../../test/extensions/filters/http/wasm/test_data/grpc_stream_rust.rs"
+crate-type = ["cdylib"]

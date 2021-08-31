@@ -7,10 +7,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/common/rbac/engine_impl.h"
-#include "extensions/filters/common/rbac/utility.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/common/rbac/engine_impl.h"
+#include "source/extensions/filters/common/rbac/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,6 +42,14 @@ public:
       const std::string& stats_prefix, Stats::Scope& scope);
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
+  std::string shadowEffectivePolicyIdField() const {
+    return shadow_rules_stat_prefix_ +
+           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEffectivePolicyIdField;
+  }
+  std::string shadowEngineResultField() const {
+    return shadow_rules_stat_prefix_ +
+           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField;
+  }
 
   const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
   engine(const Router::RouteConstSharedPtr route,
@@ -56,6 +63,7 @@ private:
   }
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
+  const std::string shadow_rules_stat_prefix_;
 
   std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
   std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;

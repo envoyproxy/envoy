@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "fixed_heap_monitor_test",
     srcs = ["fixed_heap_monitor_test.cc"],
-    extension_name = "envoy.resource_monitors.fixed_heap",
+    extension_names = ["envoy.resource_monitors.fixed_heap"],
     external_deps = ["abseil_optional"],
     deps = [
         "//source/extensions/resource_monitors/fixed_heap:fixed_heap_monitor",
@@ -25,13 +25,14 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.resource_monitors.fixed_heap",
+    extension_names = ["envoy.resource_monitors.fixed_heap"],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/resource_monitors/fixed_heap:config",
         "//source/server:resource_monitor_config_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/server:options_mocks",
         "@envoy_api//envoy/extensions/resource_monitors/fixed_heap/v3:pkg_cc_proto",
     ],
 )

@@ -89,4 +89,4 @@ proxies over ``TLS`` to https://www.envoyproxy.io.
 .. literalinclude:: _include/envoy-dynamic-cds-demo.yaml
     :language: yaml
     :linenos:
-    :emphasize-lines: 8, 14-15, 19-20
+    :emphasize-lines: 11, 17-18, 22-23

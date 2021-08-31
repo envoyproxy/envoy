@@ -8,16 +8,15 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/stats/timespan_impl.h"
-
-#include "extensions/filters/network/common/redis/client_impl.h"
-#include "extensions/filters/network/common/redis/fault_impl.h"
-#include "extensions/filters/network/common/redis/utility.h"
-#include "extensions/filters/network/redis_proxy/command_splitter.h"
-#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
-#include "extensions/filters/network/redis_proxy/router.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/extensions/filters/network/common/redis/client_impl.h"
+#include "source/extensions/filters/network/common/redis/fault_impl.h"
+#include "source/extensions/filters/network/common/redis/utility.h"
+#include "source/extensions/filters/network/redis_proxy/command_splitter.h"
+#include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
+#include "source/extensions/filters/network/redis_proxy/router.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -70,7 +69,7 @@ protected:
   Router& router_;
 };
 
-class SplitRequestBase : public SplitRequest {
+class SplitRequestBase : public SplitRequest, public Logger::Loggable<Logger::Id::redis> {
 protected:
   static void onWrongNumberOfArguments(SplitCallbacks& callbacks,
                                        const Common::Redis::RespValue& request);
@@ -244,7 +243,7 @@ protected:
  * MGETRequest takes each key from the command and sends a GET for each to the appropriate Redis
  * server. The response contains the result from each command.
  */
-class MGETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
+class MGETRequest : public FragmentedRequest {
 public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
@@ -265,7 +264,7 @@ private:
  * integer) is summed and returned to the user. If there is any error or failure in processing the
  * fragmented commands, an error will be returned.
  */
-class SplitKeysSumResultRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
+class SplitKeysSumResultRequest : public FragmentedRequest {
 public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
@@ -287,7 +286,7 @@ private:
  * appropriate Redis server. The response is an OK if all commands succeeded or an ERR if any
  * failed.
  */
-class MSETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
+class MSETRequest : public FragmentedRequest {
 public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,

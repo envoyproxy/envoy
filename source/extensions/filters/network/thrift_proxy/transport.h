@@ -7,11 +7,10 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/assert.h"
-#include "common/config/utility.h"
-#include "common/singleton/const_singleton.h"
-
-#include "extensions/filters/network/thrift_proxy/metadata.h"
+#include "source/common/common/assert.h"
+#include "source/common/config/utility.h"
+#include "source/common/singleton/const_singleton.h"
+#include "source/extensions/filters/network/thrift_proxy/metadata.h"
 
 namespace Envoy {
 namespace Extensions {

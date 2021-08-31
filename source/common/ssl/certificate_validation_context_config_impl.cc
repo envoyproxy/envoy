@@ -1,11 +1,11 @@
-#include "common/ssl/certificate_validation_context_config_impl.h"
+#include "source/common/ssl/certificate_validation_context_config_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/config/datasource.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/datasource.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -22,9 +22,6 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       certificate_revocation_list_path_(
           Config::DataSource::getPath(config.crl())
               .value_or(certificate_revocation_list_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      verify_subject_alt_name_list_(
-          config.hidden_envoy_deprecated_verify_subject_alt_name().begin(),
-          config.hidden_envoy_deprecated_verify_subject_alt_name().end()),
       subject_alt_name_matchers_(config.match_subject_alt_names().begin(),
                                  config.match_subject_alt_names().end()),
       verify_certificate_hash_list_(config.verify_certificate_hash().begin(),
@@ -32,13 +29,19 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       verify_certificate_spki_list_(config.verify_certificate_spki().begin(),
                                     config.verify_certificate_spki().end()),
       allow_expired_certificate_(config.allow_expired_certificate()),
-      trust_chain_verification_(config.trust_chain_verification()) {
-  if (ca_cert_.empty()) {
+      trust_chain_verification_(config.trust_chain_verification()),
+      custom_validator_config_(
+          config.has_custom_validator_config()
+              ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
+                    config.custom_validator_config())
+              : absl::nullopt),
+      api_(api) {
+  if (ca_cert_.empty() && custom_validator_config_ == absl::nullopt) {
     if (!certificate_revocation_list_.empty()) {
       throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",
                                        certificateRevocationListPath()));
     }
-    if (!subject_alt_name_matchers_.empty() || !verify_subject_alt_name_list_.empty()) {
+    if (!subject_alt_name_matchers_.empty()) {
       throw EnvoyException("SAN-based verification of peer certificates without "
                            "trusted CA is insecure and not allowed");
     }

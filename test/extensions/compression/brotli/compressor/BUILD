@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "compressor_test",
     srcs = ["brotli_compressor_impl_test.cc"],
-    extension_name = "envoy.compression.brotli.compressor",
+    extension_names = ["envoy.compression.brotli.compressor"],
     deps = [
         "//source/extensions/compression/brotli/compressor:config",
         "//source/extensions/compression/brotli/decompressor:decompressor_lib",

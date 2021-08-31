@@ -1,24 +1,25 @@
-#include "common/grpc/common.h"
+#include "source/common/grpc/common.h"
 
 #include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <string>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/common/assert.h"
-#include "common/common/base64.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
@@ -136,7 +137,7 @@ Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& messag
   uint8_t* current = reinterpret_cast<uint8_t*>(reservation.slice().mem_);
   *current++ = 0; // flags
   const uint32_t nsize = htonl(size);
-  std::memcpy(current, reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
+  safeMemcpyUnsafeDst(current, &nsize);
   current += sizeof(uint32_t);
   Protobuf::io::ArrayOutputStream stream(current, size, -1);
   Protobuf::io::CodedOutputStream codec_stream(&stream);
@@ -163,12 +164,18 @@ Common::getGrpcTimeout(const Http::RequestHeaderMap& request_headers) {
   const Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
   std::chrono::milliseconds timeout;
   if (header_grpc_timeout_entry) {
-    uint64_t grpc_timeout;
-    // TODO(dnoe): Migrate to pure string_view (#6580)
-    std::string grpc_timeout_string(header_grpc_timeout_entry->value().getStringView());
-    const char* unit = StringUtil::strtoull(grpc_timeout_string.c_str(), grpc_timeout);
-    if (unit != nullptr && *unit != '\0') {
-      switch (*unit) {
+    int64_t grpc_timeout;
+    absl::string_view timeout_entry = header_grpc_timeout_entry->value().getStringView();
+    if (timeout_entry.empty()) {
+      // Must be of the form TimeoutValue TimeoutUnit. See
+      // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests.
+      return absl::nullopt;
+    }
+    // TimeoutValue must be a positive integer of at most 8 digits.
+    if (absl::SimpleAtoi(timeout_entry.substr(0, timeout_entry.size() - 1), &grpc_timeout) &&
+        grpc_timeout >= 0 && static_cast<uint64_t>(grpc_timeout) <= MAX_GRPC_TIMEOUT_VALUE) {
+      const char unit = timeout_entry[timeout_entry.size() - 1];
+      switch (unit) {
       case 'H':
         return std::chrono::hours(grpc_timeout);
       case 'M':
@@ -203,7 +210,6 @@ void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout,
   uint64_t time = timeout.count();
   static const char units[] = "mSMH";
   const char* unit = units; // start with milliseconds
-  static constexpr size_t MAX_GRPC_TIMEOUT_VALUE = 99999999;
   if (time > MAX_GRPC_TIMEOUT_VALUE) {
     time /= 1000; // Convert from milliseconds to seconds
     unit++;
@@ -288,7 +294,7 @@ void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
   std::array<char, 5> header;
   header[0] = 0; // flags
   const uint32_t nsize = htonl(buffer.length());
-  std::memcpy(&header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
+  safeMemcpyUnsafeDst(&header[1], &nsize);
   buffer.prepend(absl::string_view(&header[0], 5));
 }
 

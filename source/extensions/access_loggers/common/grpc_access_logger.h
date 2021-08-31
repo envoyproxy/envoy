@@ -9,9 +9,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/assert.h"
-#include "common/grpc/typed_async_client.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/grpc/typed_async_client.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
@@ -75,14 +75,9 @@ public:
 
 template <typename LogRequest, typename LogResponse> class GrpcAccessLogClient {
 public:
-  GrpcAccessLogClient(Grpc::RawAsyncClientPtr&& client,
+  GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
                       const Protobuf::MethodDescriptor& service_method)
-      : GrpcAccessLogClient(std::move(client), service_method, absl::nullopt) {}
-  GrpcAccessLogClient(Grpc::RawAsyncClientPtr&& client,
-                      const Protobuf::MethodDescriptor& service_method,
-                      envoy::config::core::v3::ApiVersion transport_api_version)
-      : client_(std::move(client)), service_method_(service_method),
-        transport_api_version_(transport_api_version) {}
+      : client_(client), service_method_(service_method) {}
 
 public:
   struct LocalStream : public Grpc::AsyncStreamCallbacks<LogResponse> {
@@ -122,11 +117,7 @@ public:
       if (stream_->stream_->isAboveWriteBufferHighWatermark()) {
         return false;
       }
-      if (transport_api_version_.has_value()) {
-        stream_->stream_->sendMessage(request, transport_api_version_.value(), false);
-      } else {
-        stream_->stream_->sendMessage(request, false);
-      }
+      stream_->stream_->sendMessage(request, false);
     } else {
       // Clear out the stream data due to stream creation failure.
       stream_.reset();
@@ -137,7 +128,6 @@ public:
   Grpc::AsyncClient<LogRequest, LogResponse> client_;
   std::unique_ptr<LocalStream> stream_;
   const Protobuf::MethodDescriptor& service_method_;
-  const absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version_;
 };
 
 } // namespace Detail
@@ -167,21 +157,12 @@ class GrpcAccessLogger : public Detail::GrpcAccessLogger<HttpLogProto, TcpLogPro
 public:
   using Interface = Detail::GrpcAccessLogger<HttpLogProto, TcpLogProto>;
 
-  GrpcAccessLogger(Grpc::RawAsyncClientPtr&& client,
+  GrpcAccessLogger(const Grpc::RawAsyncClientSharedPtr& client,
                    std::chrono::milliseconds buffer_flush_interval_msec,
                    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                    Stats::Scope& scope, std::string access_log_prefix,
                    const Protobuf::MethodDescriptor& service_method)
-      : GrpcAccessLogger(std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes,
-                         dispatcher, scope, access_log_prefix, service_method, absl::nullopt) {}
-  GrpcAccessLogger(Grpc::RawAsyncClientPtr&& client,
-                   std::chrono::milliseconds buffer_flush_interval_msec,
-                   uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
-                   Stats::Scope& scope, std::string access_log_prefix,
-                   const Protobuf::MethodDescriptor& service_method,
-                   envoy::config::core::v3::ApiVersion transport_api_version)
-      : client_(std::move(client), service_method, transport_api_version),
-        buffer_flush_interval_msec_(buffer_flush_interval_msec),
+      : client_(client, service_method), buffer_flush_interval_msec_(buffer_flush_interval_msec),
         flush_timer_(dispatcher.createTimer([this]() {
           flush();
           flush_timer_->enableTimer(buffer_flush_interval_msec_);
@@ -287,10 +268,10 @@ public:
     if (it != cache.access_loggers_.end()) {
       return it->second;
     }
-    const Grpc::AsyncClientFactoryPtr factory =
-        async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, false);
     const auto logger = createLogger(
-        config, factory->create(),
+        config,
+        async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, false)
+            ->createUncachedRawAsyncClient(),
         std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384), cache.dispatcher_,
         scope);
@@ -314,7 +295,7 @@ private:
 
   // Create the specific logger type for this cache.
   virtual typename GrpcAccessLogger::SharedPtr
-  createLogger(const ConfigProto& config, Grpc::RawAsyncClientPtr&& client,
+  createLogger(const ConfigProto& config, const Grpc::RawAsyncClientSharedPtr& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) PURE;
 

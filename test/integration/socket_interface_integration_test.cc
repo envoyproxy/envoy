@@ -1,6 +1,6 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/socket_interface.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_interface.h"
 
 #include "test/integration/integration.h"
 #include "test/test_common/environment.h"

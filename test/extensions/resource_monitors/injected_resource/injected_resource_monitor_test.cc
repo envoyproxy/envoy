@@ -1,12 +1,11 @@
 #include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.h"
 
-#include "common/event/dispatcher_impl.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/resource_monitors/injected_resource/injected_resource_monitor.h"
+#include "source/server/resource_monitor_config_impl.h"
 
-#include "server/resource_monitor_config_impl.h"
-
-#include "extensions/resource_monitors/injected_resource/injected_resource_monitor.h"
-
+#include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -64,12 +63,13 @@ protected:
     envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig config;
     config.set_filename(resource_filename_);
     Server::Configuration::ResourceMonitorFactoryContextImpl context(
-        *dispatcher_, *api_, ProtobufMessage::getStrictValidationVisitor());
+        *dispatcher_, options_, *api_, ProtobufMessage::getStrictValidationVisitor());
     return std::make_unique<TestableInjectedResourceMonitor>(config, context);
   }
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  Server::MockOptions options_;
   const std::string resource_filename_;
   AtomicFileUpdater file_updater_;
   MockedCallbacks cb_;

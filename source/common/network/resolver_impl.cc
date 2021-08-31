@@ -1,4 +1,4 @@
-#include "common/network/resolver_impl.h"
+#include "source/common/network/resolver_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -6,9 +6,9 @@
 #include "envoy/network/resolver.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/well_known_names.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Network {

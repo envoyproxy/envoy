@@ -1,6 +1,6 @@
-#include "extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
+#include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {

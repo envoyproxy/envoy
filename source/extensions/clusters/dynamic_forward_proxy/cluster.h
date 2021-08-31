@@ -5,11 +5,9 @@
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/logical_host.h"
-
-#include "extensions/clusters/well_known_names.h"
-#include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/logical_host.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -53,7 +51,8 @@ private:
 
   using HostInfoMap = absl::flat_hash_map<std::string, HostInfo>;
 
-  struct LoadBalancer : public Upstream::LoadBalancer {
+  class LoadBalancer : public Upstream::LoadBalancer {
+  public:
     LoadBalancer(const Cluster& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancer
@@ -63,19 +62,23 @@ private:
       return nullptr;
     }
 
+  private:
     const Cluster& cluster_;
   };
 
-  struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
+  class LoadBalancerFactory : public Upstream::LoadBalancerFactory {
+  public:
     LoadBalancerFactory(Cluster& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancerFactory
     Upstream::LoadBalancerPtr create() override { return std::make_unique<LoadBalancer>(cluster_); }
 
+  private:
     Cluster& cluster_;
   };
 
-  struct ThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
+  class ThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
+  public:
     ThreadAwareLoadBalancer(Cluster& cluster) : cluster_(cluster) {}
 
     // Upstream::ThreadAwareLoadBalancer
@@ -84,6 +87,7 @@ private:
     }
     void initialize() override {}
 
+  private:
     Cluster& cluster_;
   };
 
@@ -115,9 +119,7 @@ private:
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
                            envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig> {
 public:
-  ClusterFactory()
-      : ConfigurableClusterFactoryBase(
-            Extensions::Clusters::ClusterTypes::get().DynamicForwardProxy) {}
+  ClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.dynamic_forward_proxy") {}
 
 private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>

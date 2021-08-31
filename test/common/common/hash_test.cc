@@ -1,4 +1,4 @@
-#include "common/common/hash.h"
+#include "source/common/common/hash.h"
 
 #include "gtest/gtest.h"
 
@@ -9,6 +9,11 @@ TEST(Hash, xxHash) {
   EXPECT_EQ(8917841378505826757U, HashUtil::xxHash64("foo\nbar"));
   EXPECT_EQ(4400747396090729504U, HashUtil::xxHash64("lyft"));
   EXPECT_EQ(17241709254077376921U, HashUtil::xxHash64(""));
+}
+
+TEST(Hash, xxHashWithVector) {
+  absl::InlinedVector<absl::string_view, 2> v{"foo", "bar"};
+  EXPECT_EQ(17745830980996999794U, HashUtil::xxHash64(absl::MakeSpan(v)));
 }
 
 TEST(Hash, djb2CaseInsensitiveHash) {

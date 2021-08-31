@@ -11,8 +11,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common/chromium_url/envoy_shim.h"
-#include "common/chromium_url/url_parse.h"
+#include "source/common/chromium_url/envoy_shim.h"
+#include "source/common/chromium_url/url_parse.h"
+#include "source/common/common/mem_block_builder.h"
 
 namespace chromium_url {
 
@@ -145,11 +146,11 @@ public:
   }
 
   void Resize(int sz) override {
-    T* new_buf = new T[sz];
-    memcpy(new_buf, this->buffer_, sizeof(T) * (this->cur_len_ < sz ? this->cur_len_ : sz));
+    Envoy::MemBlockBuilder<T> new_buf(sz);
+    new_buf.appendData(absl::Span<T>(this->buffer, std::min(this->cur_len_, sz)));
     if (this->buffer_ != fixed_buffer_)
       delete[] this->buffer_;
-    this->buffer_ = new_buf;
+    this->buffer_ = new_buf.releasePointer();
     this->buffer_len_ = sz;
   }
 

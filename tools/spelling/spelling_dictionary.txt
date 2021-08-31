@@ -21,6 +21,7 @@ AWS
 BACKTRACE
 BSON
 BPF
+btree
 CAS
 CB
 CDN
@@ -32,11 +33,17 @@ ENOTCONN
 EPIPE
 HEXDIG
 HEXDIGIT
+LRU
 OWS
 Preconnecting
+RCVBUF
+RTCP
+RTP
 STATNAME
 SkyWalking
 TIDs
+Timedout
+WRSQ
 WASI
 ceil
 CCM
@@ -46,6 +53,7 @@ CHMOD
 CHLOS
 CHLOs
 CIDR
+CITT
 CLA
 CLI
 CMSG
@@ -69,6 +77,7 @@ CVE
 CX
 Cxx
 CYGWIN
+DCP
 DER
 DESC
 DFATAL
@@ -116,6 +125,7 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+guarddog
 GC
 GCC
 GCE
@@ -176,6 +186,7 @@ Kille
 LBs
 LC
 LDS
+LEDS
 LEV
 LF
 LHS
@@ -188,6 +199,7 @@ MD
 MERCHANTABILITY
 MGET
 MQ
+MSDN
 MSET
 MSVC
 MTLS
@@ -237,6 +249,7 @@ PGV
 PID
 PKTINFO
 PNG
+Pointwise
 PostCBs
 PREBIND
 PRNG
@@ -269,6 +282,7 @@ RPC
 RSA
 RST
 RTDS
+RTOS
 RTTI
 RUNDIR
 RW
@@ -311,6 +325,7 @@ STL
 STRLEN
 STS
 SVG
+SVID
 Symbolizer
 TBD
 TCLAP
@@ -435,6 +450,8 @@ benchmarked
 bidi
 bignum
 bitfield
+bitmask
+bitmasks
 bitset
 bitwise
 blackhole
@@ -484,7 +501,7 @@ ci
 ciphersuite
 ciphersuites
 circllhist
-CITT
+clientcert
 cloneable
 cloneability
 cmd
@@ -517,6 +534,7 @@ coverity
 cplusplus
 cpuset
 creds
+cRLSign
 crypto
 cryptographic
 cryptographically
@@ -584,6 +602,7 @@ dubbo
 dup
 durations
 dynamodb
+eg
 emplace
 emplaced
 emscripten
@@ -670,6 +689,7 @@ hackery
 hacky
 handshaker
 hardcoded
+hardcodes
 hardcoding
 hasher
 hashtagging
@@ -748,6 +768,7 @@ lexically
 libc
 libevent
 libprotobuf
+librdkafka
 libtool
 libstdc
 lifecycle
@@ -785,6 +806,7 @@ megamiss
 mem
 memcmp
 memcpy
+memoize
 mergeable
 messagename
 metadata
@@ -925,6 +947,8 @@ preorder
 prepend
 prepended
 prepends
+preresolve
+preresolved
 prev
 probabilistically
 proc
@@ -965,6 +989,7 @@ readonly
 readv
 realloc
 rebalanced
+rebalancer
 rebalancing
 rebuffer
 rebuilder
@@ -984,6 +1009,7 @@ refcount
 referencee
 referer
 refetch
+refvec
 regex
 regexes
 reified
@@ -1124,6 +1150,7 @@ subtypes
 subzone
 superclass
 superset
+svc
 symlink
 symlinked
 symlinks
@@ -1159,6 +1186,7 @@ timeval
 tmp
 tmpfile
 tokenize
+tokenized
 tokenizes
 tokenizing
 toolchain
@@ -1229,6 +1257,7 @@ virtualize
 vptr
 wakeup
 wakeups
+wamr
 wasmtime
 websocket
 wepoll
@@ -1239,6 +1268,7 @@ wildcards
 winsock
 workspace
 writev
+wrsq
 xDS
 xDSes
 xdstp

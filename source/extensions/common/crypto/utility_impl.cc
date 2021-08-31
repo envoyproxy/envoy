@@ -1,8 +1,7 @@
-#include "extensions/common/crypto/utility_impl.h"
+#include "source/extensions/common/crypto/utility_impl.h"
 
-#include "common/common/assert.h"
-
-#include "extensions/common/crypto/crypto_impl.h"
+#include "source/common/common/assert.h"
+#include "source/extensions/common/crypto/crypto_impl.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/ascii.h"

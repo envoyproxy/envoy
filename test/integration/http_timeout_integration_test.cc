@@ -211,7 +211,7 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeoutAfterHeadersBeforeBodyResetsUpst
 
   ASSERT_TRUE(upstream_request_->waitForReset(std::chrono::seconds(15)));
 
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
 
   codec_client_->close();
 
@@ -485,7 +485,7 @@ void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTim
     }
   }
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   codec_client_->close();
 
@@ -504,7 +504,7 @@ void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTim
 // Starts a request with a header timeout specified, sleeps for longer than the
 // timeout, and ensures that a timeout is received.
 TEST_P(HttpTimeoutIntegrationTest, RequestHeaderTimeout) {
-  if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
     // This test requires that the downstream be using HTTP1.
     return;
   }

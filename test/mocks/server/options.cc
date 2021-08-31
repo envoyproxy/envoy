@@ -18,7 +18,6 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
   ON_CALL(*this, configProto()).WillByDefault(ReturnRef(config_proto_));
   ON_CALL(*this, configYaml()).WillByDefault(ReturnRef(config_yaml_));
-  ON_CALL(*this, bootstrapVersion()).WillByDefault(ReturnRef(bootstrap_version_));
   ON_CALL(*this, allowUnknownStaticFields()).WillByDefault(Invoke([this] {
     return allow_unknown_static_fields_;
   }));
@@ -38,6 +37,7 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, hotRestartDisabled()).WillByDefault(ReturnPointee(&hot_restart_disabled_));
   ON_CALL(*this, signalHandlingEnabled()).WillByDefault(ReturnPointee(&signal_handling_enabled_));
   ON_CALL(*this, mutexTracingEnabled()).WillByDefault(ReturnPointee(&mutex_tracing_enabled_));
+  ON_CALL(*this, coreDumpEnabled()).WillByDefault(ReturnPointee(&core_dump_enabled_));
   ON_CALL(*this, cpusetThreadsEnabled()).WillByDefault(ReturnPointee(&cpuset_threads_enabled_));
   ON_CALL(*this, disabledExtensions()).WillByDefault(ReturnRef(disabled_extensions_));
   ON_CALL(*this, toCommandLineOptions()).WillByDefault(Invoke([] {

@@ -9,7 +9,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: {{ ntop_ip_loopback_address }}
+                address: "{{ ntop_ip_loopback_address }}"
                 port_value: 0
   - name: ads_cluster
     connect_timeout: 1s
@@ -33,9 +33,9 @@ dynamic_resources:
     set_node_on_first_message_only: true
 layered_runtime:
   layers:
-    - name: foobar
-      rtds_layer:
-        name: foobar
-        rtds_config:
-          resource_api_version: V3
-          ads: {}
+  - name: foobar
+    rtds_layer:
+      name: foobar
+      rtds_config:
+        resource_api_version: V3
+        ads: {}

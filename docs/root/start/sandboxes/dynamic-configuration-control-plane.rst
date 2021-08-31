@@ -8,10 +8,10 @@ Dynamic configuration (control plane)
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
+        Used to make ``HTTP`` requests.
 
    :ref:`jq <start_sandboxes_setup_jq>`
-	Parse ``json`` output from the upstream echo servers.
+        Parse ``json`` output from the upstream echo servers.
 
 This example walks through configuring Envoy using the `Go Control Plane <https://github.com/envoyproxy/go-control-plane>`_
 reference implementation.

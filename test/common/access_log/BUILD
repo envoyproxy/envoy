@@ -13,9 +13,11 @@ envoy_cc_test(
     srcs = ["access_log_impl_test.cc"],
     deps = [
         "//source/common/access_log:access_log_lib",
+        "//source/common/stream_info:utility_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/access_loggers/grpc:http_config",
         "//source/extensions/access_loggers/grpc:tcp_config",
+        "//source/extensions/access_loggers/stream:config",
         "//test/common/stream_info:test_util",
         "//test/common/upstream:utility_lib",
         "//test/mocks/access_log:access_log_mocks",

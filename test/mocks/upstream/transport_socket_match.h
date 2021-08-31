@@ -20,7 +20,6 @@ public:
   MOCK_METHOD(TransportSocketMatcher::MatchData, resolve,
               (const envoy::config::core::v3::Metadata*), (const));
 
-private:
   Network::TransportSocketFactoryPtr socket_factory_;
   Stats::TestUtil::TestStore stats_store_;
   TransportSocketMatchStats stats_;

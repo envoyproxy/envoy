@@ -15,7 +15,8 @@ class HttpSubsetLbIntegrationTest
     : public testing::TestWithParam<envoy::config::cluster::v3::Cluster::LbPolicy>,
       public HttpIntegrationTest {
 public:
-  // Returns all load balancer types except ORIGINAL_DST_LB and CLUSTER_PROVIDED.
+  // Returns all load balancer types except ORIGINAL_DST_LB, CLUSTER_PROVIDED
+  // and LOAD_BALANCING_POLICY_CONFIG.
   static std::vector<envoy::config::cluster::v3::Cluster::LbPolicy> getSubsetLbTestParams() {
     int first = static_cast<int>(envoy::config::cluster::v3::Cluster::LbPolicy_MIN);
     int last = static_cast<int>(envoy::config::cluster::v3::Cluster::LbPolicy_MAX);
@@ -49,8 +50,7 @@ public:
   }
 
   HttpSubsetLbIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
-                            TestEnvironment::getIpVersionsForTest().front(),
+      : HttpIntegrationTest(Http::CodecType::HTTP1, TestEnvironment::getIpVersionsForTest().front(),
                             ConfigHelper::httpProxyConfig()),
         is_hash_lb_(GetParam() == envoy::config::cluster::v3::Cluster::RING_HASH ||
                     GetParam() == envoy::config::cluster::v3::Cluster::MAGLEV) {
@@ -121,7 +121,7 @@ public:
     // Match the x-type header against the given host_type (a/b).
     auto* match_header = match->add_headers();
     match_header->set_name(type_header_);
-    match_header->set_exact_match(host_type);
+    match_header->mutable_string_match()->set_exact(host_type);
 
     // Route to cluster_0, selecting metadata type=a or type=b.
     auto* action = route->mutable_route();
@@ -137,8 +137,8 @@ public:
   };
 
   void SetUp() override {
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    setDownstreamProtocol(Http::CodecType::HTTP1);
+    setUpstreamProtocol(Http::CodecType::HTTP1);
   }
 
   // Runs a subset lb test with the given request headers, expecting the x-host-type header to
@@ -155,7 +155,7 @@ public:
 
       // Send header only request.
       IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
-      response->waitForEndStream();
+      ASSERT_TRUE(response->waitForEndStream());
 
       // Expect a response from a host in the correct subset.
       EXPECT_EQ(response->headers()
@@ -214,6 +214,41 @@ TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancer) {
 
   runTest(type_a_request_headers_, "a");
   runTest(type_b_request_headers_, "b");
+}
+
+// Tests subset-compatible load balancer policy without metadata does not crash on initialization
+// with single_host_per_subset set to be true.
+TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancerSingleHostPerSubsetNoMetadata) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+
+    // Set single_host_per_subset to be true. This will avoid function
+    // SubsetLoadBalancer::rebuildSingle() bailout early. Thus exercise the no metadata logic.
+    auto* subset_selector = cluster->mutable_lb_subset_config()->mutable_subset_selectors(0);
+    subset_selector->set_single_host_per_subset(true);
+
+    // Clear the metadata for each host
+    auto* load_assignment = cluster->mutable_load_assignment();
+    auto* endpoints = load_assignment->mutable_endpoints(0);
+    for (uint32_t i = 0; i < num_hosts_; i++) {
+      auto* lb_endpoint = endpoints->mutable_lb_endpoints(i);
+      lb_endpoint->clear_metadata();
+    }
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                          {":path", "/test"},
+                                                                          {":scheme", "http"},
+                                                                          {":authority", "host"},
+                                                                          {"x-type", "a"},
+                                                                          {"x-hash", "hash-a"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("503"));
 }
 
 } // namespace Envoy

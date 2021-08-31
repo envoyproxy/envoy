@@ -1,11 +1,11 @@
-#include "extensions/filters/http/cache/cacheability_utils.h"
+#include "source/extensions/filters/http/cache/cacheability_utils.h"
 
 #include "envoy/http/header_map.h"
 
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-
-#include "extensions/filters/http/cache/inline_headers_handles.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/filters/http/cache/cache_custom_headers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -32,9 +32,9 @@ const std::vector<const Http::LowerCaseString*>& conditionalHeaders() {
 }
 } // namespace
 
-bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers) {
+bool CacheabilityUtils::canServeRequestFromCache(const Http::RequestHeaderMap& headers) {
   const absl::string_view method = headers.getMethodValue();
-  const absl::string_view forwarded_proto = headers.getForwardedProtoValue();
+  const absl::string_view scheme = Http::Utility::getScheme(headers);
   const Http::HeaderValues& header_values = Http::Headers::get();
 
   // Check if the request contains any conditional headers.
@@ -50,15 +50,16 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
 
   // TODO(toddmgreer): Also serve HEAD requests from cache.
   // Cache-related headers are checked in HttpCache::LookupRequest.
-  return headers.Path() && headers.Host() && !headers.getInline(authorization_handle.handle()) &&
-         (method == header_values.MethodValues.Get) &&
-         (forwarded_proto == header_values.SchemeValues.Http ||
-          forwarded_proto == header_values.SchemeValues.Https);
+  return headers.Path() && headers.Host() &&
+         !headers.getInline(CacheCustomHeaders::authorization()) &&
+         (method == header_values.MethodValues.Get || method == header_values.MethodValues.Head) &&
+         (scheme == header_values.SchemeValues.Http || scheme == header_values.SchemeValues.Https);
 }
 
 bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers,
-                                            const VaryHeader& vary_allow_list) {
-  absl::string_view cache_control = headers.getInlineValue(response_cache_control_handle.handle());
+                                            const VaryAllowList& vary_allow_list) {
+  absl::string_view cache_control =
+      headers.getInlineValue(CacheCustomHeaders::responseCacheControl());
   ResponseCacheControl response_cache_control(cache_control);
 
   // Only cache responses with enough data to calculate freshness lifetime as per:
@@ -67,13 +68,13 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
   //    "no-cache" cache-control directive (requires revalidation anyway).
   //    "max-age" or "s-maxage" cache-control directives.
   //    Both "Expires" and "Date" headers.
-  const bool has_validation_data = response_cache_control.must_validate_ ||
-                                   response_cache_control.max_age_.has_value() ||
-                                   (headers.Date() && headers.getInline(expires_handle.handle()));
+  const bool has_validation_data =
+      response_cache_control.must_validate_ || response_cache_control.max_age_.has_value() ||
+      (headers.Date() && headers.getInline(CacheCustomHeaders::expires()));
 
   return !response_cache_control.no_store_ &&
          cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data &&
-         vary_allow_list.isAllowed(headers);
+         vary_allow_list.allowsHeaders(headers);
 }
 
 } // namespace Cache

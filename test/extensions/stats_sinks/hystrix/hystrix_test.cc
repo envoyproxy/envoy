@@ -2,9 +2,8 @@
 #include <memory>
 #include <sstream>
 
-#include "common/json/json_loader.h"
-
-#include "extensions/stat_sinks/hystrix/hystrix.h"
+#include "source/common/json/json_loader.h"
+#include "source/extensions/stat_sinks/hystrix/hystrix.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/admin.h"
@@ -522,7 +521,8 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   ON_CALL(admin_stream_mock, http1StreamEncoderOptions())
       .WillByDefault(Return(Http::Http1StreamEncoderOptionsOptRef(stream_encoder_options)));
   ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_mock));
-  connection_mock.stream_info_.downstream_address_provider_->setRemoteAddress(addr_instance_);
+  connection_mock.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr_instance_);
 
   EXPECT_CALL(stream_encoder_options, disableChunkEncoding());
   ASSERT_EQ(sink_->handlerHystrixEventStream(path_and_query, response_headers,

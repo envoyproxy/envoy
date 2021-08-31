@@ -1,8 +1,8 @@
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
 
-#include "extensions/filters/network/dubbo_proxy/config.h"
-#include "extensions/filters/network/dubbo_proxy/filters/filter_config.h"
+#include "source/extensions/filters/network/dubbo_proxy/config.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/filter_config.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -22,9 +22,9 @@ using DubboProxyProto = envoy::extensions::filters::network::dubbo_proxy::v3::Du
 
 namespace {
 
-DubboProxyProto parseDubboProxyFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
+DubboProxyProto parseDubboProxyFromV3Yaml(const std::string& yaml) {
   DubboProxyProto dubbo_proxy;
-  TestUtility::loadFromYaml(yaml, dubbo_proxy, false, avoid_boosting);
+  TestUtility::loadFromYaml(yaml, dubbo_proxy);
   return dubbo_proxy;
 }
 
@@ -62,7 +62,7 @@ TEST_F(DubboFilterConfigTest, ValidProtoConfiguration) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DubboProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
-  EXPECT_TRUE(factory.isTerminalFilter());
+  EXPECT_TRUE(factory.isTerminalFilterByProto(config, context));
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -161,7 +161,8 @@ TEST_F(DubboFilterConfigTest, CreateFilterChain) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DubboFilters::MockFilterChainFactoryCallbacks callbacks;
   ConfigImpl config(dubbo_config, context);
-  EXPECT_CALL(callbacks, addDecoderFilter(_)).Times(2);
+  EXPECT_CALL(callbacks, addDecoderFilter(_));
+  EXPECT_CALL(callbacks, addFilter(_));
   config.createFilterChain(callbacks);
 }
 

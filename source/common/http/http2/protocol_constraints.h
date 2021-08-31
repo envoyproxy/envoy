@@ -6,8 +6,8 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/network/connection.h"
 
-#include "common/http/http2/codec_stats.h"
-#include "common/http/status.h"
+#include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/status.h"
 
 #include "nghttp2/nghttp2.h"
 
@@ -22,7 +22,7 @@ namespace Http2 {
 //  2. detection of outbound DATA or HEADER frame floods.
 //  4. zero length, PRIORITY and WINDOW_UPDATE floods.
 
-class ProtocolConstraints {
+class ProtocolConstraints : public ScopeTrackedObject {
 public:
   using ReleasorProc = std::function<void()>;
 
@@ -53,6 +53,9 @@ public:
   void incrementOpenedStreamCount() { ++opened_streams_; }
 
   Status checkOutboundFrameLimits();
+
+  // ScopeTrackedObject
+  void dumpState(std::ostream& os, int indent_level) const override;
 
 private:
   void releaseOutboundFrame();

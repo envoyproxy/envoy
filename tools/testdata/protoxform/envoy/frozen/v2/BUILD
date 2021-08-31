@@ -4,7 +4,13 @@ licenses(["notice"])  # Apache 2
 
 proto_library(
     name = "freeze_protos",
-    srcs = ["frozen.proto"],
+    srcs = [
+        "frozen.proto",
+        "frozen_versioned_deprecation.proto",
+    ],
     visibility = ["//visibility:public"],
-    deps = ["@com_github_cncf_udpa//udpa/annotations:pkg"],
+    deps = [
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@envoy_api//envoy/annotations:pkg",
+    ],
 )

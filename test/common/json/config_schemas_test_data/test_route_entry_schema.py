@@ -10,17 +10,17 @@ ROUTE_ENTRY_CONFIGURATION_BLOB = {
 
 def test(writer):
 
-  writer.write_test_file(
-      'Valid',
-      schema='ROUTE_ENTRY_CONFIGURATION_SCHEMA',
-      data=get_blob(ROUTE_ENTRY_CONFIGURATION_BLOB),
-      throws=False,
-  )
+    writer.write_test_file(
+        'Valid',
+        schema='ROUTE_ENTRY_CONFIGURATION_SCHEMA',
+        data=get_blob(ROUTE_ENTRY_CONFIGURATION_BLOB),
+        throws=False,
+    )
 
-  blob = {"prefix": "/foo", "cluster": "local_service_grpc", "priority": "foo"}
-  writer.write_test_file(
-      'InvalidPriority',
-      schema='ROUTE_ENTRY_CONFIGURATION_SCHEMA',
-      data=blob,
-      throws=True,
-  )
+    blob = {"prefix": "/foo", "cluster": "local_service_grpc", "priority": "foo"}
+    writer.write_test_file(
+        'InvalidPriority',
+        schema='ROUTE_ENTRY_CONFIGURATION_SCHEMA',
+        data=blob,
+        throws=True,
+    )

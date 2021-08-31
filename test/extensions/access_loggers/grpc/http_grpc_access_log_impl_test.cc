@@ -3,11 +3,11 @@
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/network/address_impl.h"
-#include "common/router/string_accessor_impl.h"
-
-#include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
+#include "source/extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -54,7 +54,10 @@ public:
     ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
     config_.mutable_common_config()->add_filter_state_objects_to_log("string_accessor");
+    config_.mutable_common_config()->add_filter_state_objects_to_log("uint32_accessor");
     config_.mutable_common_config()->add_filter_state_objects_to_log("serialized");
+    config_.mutable_common_config()->set_transport_api_version(
+        envoy::config::core::v3::ApiVersion::V3);
     EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _, _))
         .WillOnce(
             [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
@@ -146,11 +149,15 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     stream_info.start_time_ = SystemTime(1h);
     stream_info.start_time_monotonic_ = MonotonicTime(1h);
     stream_info.last_downstream_tx_byte_sent_ = 2ms;
-    stream_info.downstream_address_provider_->setLocalAddress(
+    stream_info.downstream_connection_info_provider_->setLocalAddress(
         std::make_shared<Network::Address::PipeInstance>("/foo"));
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
     stream_info.filter_state_->setData("string_accessor",
                                        std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("uint32_accessor",
+                                       std::make_unique<StreamInfo::UInt32AccessorImpl>(42),
                                        StreamInfo::FilterState::StateType::ReadOnly,
                                        StreamInfo::FilterState::LifeSpan::FilterChain);
     stream_info.filter_state_->setData("serialized", std::make_unique<TestSerializedFilterState>(),
@@ -180,6 +187,9 @@ common_properties:
     string_accessor:
       "@type": type.googleapis.com/google.protobuf.StringValue
       value: test_value
+    uint32_accessor:
+      "@type": type.googleapis.com/google.protobuf.UInt32Value
+      value: 42
     serialized:
       "@type": type.googleapis.com/google.protobuf.Duration
       value: 10s
@@ -376,8 +386,8 @@ response: {}
     const std::string tlsVersion = "TLSv1.3";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2CC0));
-    stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -436,8 +446,8 @@ response: {}
     const std::string tlsVersion = "TLSv1.2";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -486,8 +496,8 @@ response: {}
     const std::string tlsVersion = "TLSv1.1";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -536,8 +546,8 @@ response: {}
     const std::string tlsVersion = "TLSv1";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -586,8 +596,8 @@ response: {}
     const std::string tlsVersion = "TLSv1.4";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},

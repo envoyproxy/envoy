@@ -114,6 +114,26 @@ private:
 };
 
 /**
+ * A FieldMatcher that returns the invert of a FieldMatcher.
+ */
+template <class DataType> class NotFieldMatcher : public FieldMatcher<DataType> {
+public:
+  explicit NotFieldMatcher(FieldMatcherPtr<DataType> matcher) : matcher_(std::move(matcher)) {}
+
+  FieldMatchResult match(const DataType& data) override {
+    const auto result = matcher_->match(data);
+    if (result.match_state_ == MatchState::UnableToMatch) {
+      return result;
+    }
+
+    return {MatchState::MatchComplete, !result.result()};
+  }
+
+private:
+  const FieldMatcherPtr<DataType> matcher_;
+};
+
+/**
  * Implementation of a FieldMatcher that extracts an input value from the provided data and attempts
  * to match using an InputMatcher. absl::nullopt is returned whenever the data is not available or
  * if we failed to match and there is more data available.
@@ -129,7 +149,7 @@ public:
   FieldMatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
 
-    ENVOY_LOG(debug, "Attempting to match {}", input);
+    ENVOY_LOG(trace, "Attempting to match {}", input);
     if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
       return {MatchState::UnableToMatch, absl::nullopt};
     }
@@ -137,11 +157,11 @@ public:
     const auto current_match = input_matcher_->match(input.data_);
     if (!current_match && input.data_availability_ ==
                               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
-      ENVOY_LOG(debug, "No match yet; delaying result as more data might be available.");
+      ENVOY_LOG(trace, "No match yet; delaying result as more data might be available.");
       return {MatchState::UnableToMatch, absl::nullopt};
     }
 
-    ENVOY_LOG(debug, "Match result: {}", current_match);
+    ENVOY_LOG(trace, "Match result: {}", current_match);
 
     return {MatchState::MatchComplete, current_match};
   }

@@ -2,8 +2,8 @@
 
 set -e
 
-LLVM_VERSION="10.0.0"
-CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \(.*\)\ /\1/')
+LLVM_VERSION="11.0.1"
+CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \(.*\)\ */\1/')
 LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
 LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
 
@@ -62,6 +62,9 @@ else
       "--config=test-coverage"
       "--test_tag_filters=-nocoverage,-fuzz_target")
 fi
+
+# Don't block coverage on flakes.
+BAZEL_BUILD_OPTIONS+=("--flaky_test_attempts=2")
 
 bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
 

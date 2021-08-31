@@ -13,8 +13,8 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "common/runtime/runtime_impl.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -55,7 +55,7 @@ class TestDeprecatedV2Api : public TestScopedRuntime {
 public:
   TestDeprecatedV2Api() {
     Runtime::LoaderSingleton::getExisting()->mergeValues({
-        {"envoy.reloadable_features.enable_deprecated_v2_api", "true"},
+        {"envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true"},
         {"envoy.features.enable_all_deprecated_features", "true"},
     });
   }

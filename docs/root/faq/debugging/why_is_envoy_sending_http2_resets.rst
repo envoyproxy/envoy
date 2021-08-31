@@ -5,7 +5,7 @@ Why is Envoy sending HTTP/2 resets?
 
 The HTTP/2 reset path is mostly governed by the codec Envoy uses to frame HTTP/2, nghttp2. nghttp2 has
 extremely good adherence to the HTTP/2 spec, but as many clients are not exactly as compliant, this
-mismatch can cause unexpected resets. Unfortunately, unlike the debugging the 
+mismatch can cause unexpected resets. Unfortunately, unlike the debugging the
 :ref:`internal response path <why_is_envoy_sending_internal_responses>`, Envoy has limited visibility into
 the specific reason nghttp2 reset a given stream.
 
@@ -17,8 +17,6 @@ from the file "source/common/http/http2/codec_impl.cc" of the form
 for example:
 `invalid http2: Invalid HTTP header field was received: frame type: 1, stream: 1, name: [content-length], value: [3]`
 
-You can also check :ref:`HTTP/2 stats`<config_http_conn_man_stats_per_codec>`: in many cases where
+You can also check :ref:`HTTP/2 stats <config_http_conn_man_stats_per_codec>`: in many cases where
 Envoy resets streams, for example if there are more headers than allowed by configuration or flood
 detection kicks in, http2 counters will be incremented as the streams are reset.
-
-

@@ -1,6 +1,6 @@
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 
-#include "extensions/access_loggers/grpc/grpc_access_log_utils.h"
+#include "source/extensions/access_loggers/grpc/grpc_access_log_utils.h"
 
 #include "test/mocks/stream_info/mocks.h"
 
@@ -45,6 +45,9 @@ TEST(UtilityResponseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->set_response_from_cache_filter(true);
   common_access_log_expected.mutable_response_flags()->set_no_filter_config_found(true);
   common_access_log_expected.mutable_response_flags()->set_duration_timeout(true);
+  common_access_log_expected.mutable_response_flags()->set_upstream_protocol_error(true);
+  common_access_log_expected.mutable_response_flags()->set_no_cluster_found(true);
+  common_access_log_expected.mutable_response_flags()->set_overload_manager(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }

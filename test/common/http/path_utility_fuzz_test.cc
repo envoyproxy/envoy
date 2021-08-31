@@ -1,4 +1,4 @@
-#include "common/http/path_utility.h"
+#include "source/common/http/path_utility.h"
 
 #include "test/common/http/path_utility_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -33,7 +33,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::PathUtilityTestCase& input) {
   case test::common::http::PathUtilityTestCase::kRemoveQueryAndFragment: {
     auto path = input.remove_query_and_fragment().path();
     auto sanitized_path = Http::PathUtil::removeQueryAndFragment(path);
-    ASSERT(path.find(sanitized_path) != std::string::npos);
+    ASSERT(path.find(std::string(sanitized_path)) != std::string::npos);
     break;
   }
   default:

@@ -1,8 +1,8 @@
 #include <memory>
 
-#include "common/stats/isolated_store_impl.h"
-#include "common/stats/stat_merger.h"
-#include "common/stats/thread_local_store.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/stat_merger.h"
+#include "source/common/stats/thread_local_store.h"
 
 #include "test/test_common/utility.h"
 

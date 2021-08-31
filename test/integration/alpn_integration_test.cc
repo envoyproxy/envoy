@@ -9,12 +9,12 @@ namespace {
 class AlpnIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                             public HttpIntegrationTest {
 public:
-  AlpnIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+  AlpnIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
 
   void SetUp() override {
     autonomous_upstream_ = true;
     setUpstreamCount(2);
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+    setDownstreamProtocol(Http::CodecType::HTTP2);
 
     upstream_tls_ = true;
     config_helper_.configureUpstreamTls(true);
@@ -32,16 +32,15 @@ public:
   }
   void createUpstreams() override {
     for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
-      setUpstreamProtocol(protocols_[i]);
-      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext();
-      auto endpoint = upstream_address_fn_(i);
       auto config = upstreamConfig();
       config.upstream_protocol_ = protocols_[i];
+      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
+      auto endpoint = upstream_address_fn_(i);
       fake_upstreams_.emplace_back(new AutonomousUpstream(std::move(factory), endpoint, config,
                                                           autonomous_allow_incomplete_streams_));
     }
   }
-  std::vector<FakeHttpConnection::Type> protocols_;
+  std::vector<Http::CodecType> protocols_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AlpnIntegrationTest,
@@ -49,31 +48,31 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AlpnIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AlpnIntegrationTest, Http2) {
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-  protocols_ = {FakeHttpConnection::Type::HTTP2, FakeHttpConnection::Type::HTTP2};
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  protocols_ = {Http::CodecType::HTTP2, Http::CodecType::HTTP2};
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(AlpnIntegrationTest, Http1) {
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
-  protocols_ = {FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP1};
+  setUpstreamProtocol(Http::CodecType::HTTP1);
+  protocols_ = {Http::CodecType::HTTP1, Http::CodecType::HTTP1};
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(AlpnIntegrationTest, Mixed) {
-  protocols_ = {FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2};
+  protocols_ = {Http::CodecType::HTTP1, Http::CodecType::HTTP2};
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -93,8 +92,8 @@ TEST_P(AlpnIntegrationTest, Mixed) {
   encoder1.encodeData(data, true);
   encoder2.encodeData(data, true);
 
-  response1->waitForEndStream();
-  response2->waitForEndStream();
+  ASSERT_TRUE(response1->waitForEndStream());
+  ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_EQ("200", response1->headers().Status()->value().getStringView());
   EXPECT_EQ("200", response2->headers().Status()->value().getStringView());
 }

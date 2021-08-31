@@ -1,10 +1,10 @@
-#include "extensions/filters/http/kill_request/kill_request_config.h"
+#include "source/extensions/filters/http/kill_request/kill_request_config.h"
 
 #include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.h"
 #include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/kill_request/kill_request_filter.h"
+#include "source/extensions/filters/http/kill_request/kill_request_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,6 +18,13 @@ Http::FilterFactoryCb KillRequestFilterFactory::createFilterFactoryFromProtoType
     callbacks.addStreamFilter(
         std::make_shared<KillRequestFilter>(proto_config, context.api().randomGenerator()));
   };
+}
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+KillRequestFilterFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::kill_request::v3::KillRequest& proto_config,
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<const KillSettings>(proto_config);
 }
 
 /**

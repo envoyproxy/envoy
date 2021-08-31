@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "common/tcp_proxy/upstream.h"
+#include "source/common/tcp_proxy/upstream.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -12,6 +12,7 @@
 
 using testing::_;
 using testing::AnyNumber;
+using testing::EndsWith;
 using testing::Return;
 
 namespace Envoy {
@@ -45,7 +46,7 @@ public:
 
 using testing::Types;
 
-typedef Types<Http1Upstream, Http2Upstream> Implementations;
+using Implementations = Types<Http1Upstream, Http2Upstream>;
 
 TYPED_TEST_SUITE(HttpUpstreamTest, Implementations);
 
@@ -154,6 +155,16 @@ TYPED_TEST(HttpUpstreamTest, OnFailureCalledOnInvalidResponse) {
   EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "404"}}};
   this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+}
+
+TYPED_TEST(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
+  std::array<char, 256> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  Stats::TestUtil::MemoryTest memory_test;
+
+  this->upstream_->responseDecoder().dumpState(ostream, 1);
+  EXPECT_EQ(memory_test.consumedBytes(), 0);
+  EXPECT_THAT(ostream.contents(), EndsWith("has not implemented dumpState\n"));
 }
 
 template <typename T> class HttpUpstreamRequestEncoderTest : public testing::Test {

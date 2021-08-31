@@ -1,24 +1,26 @@
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/formatter/substitution_formatter.h"
-#include "common/grpc/common.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/stream_info/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stream_info/utility.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -35,23 +37,6 @@ static absl::string_view valueOrDefault(const Http::HeaderEntry* header,
   return header ? header->value().getStringView() : default_value;
 }
 
-static std::string buildUrl(const Http::RequestHeaderMap& request_headers,
-                            const uint32_t max_path_length) {
-  if (!request_headers.Path()) {
-    return "";
-  }
-  absl::string_view path(request_headers.EnvoyOriginalPath()
-                             ? request_headers.getEnvoyOriginalPathValue()
-                             : request_headers.getPathValue());
-
-  if (path.length() > max_path_length) {
-    path = path.substr(0, max_path_length);
-  }
-
-  return absl::StrCat(request_headers.getForwardedProtoValue(), "://",
-                      request_headers.getHostValue(), path);
-}
-
 const std::string HttpTracerUtility::IngressOperation = "ingress";
 const std::string HttpTracerUtility::EgressOperation = "egress";
 
@@ -66,25 +51,20 @@ const std::string& HttpTracerUtility::toString(OperationName operation_name) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
-                                      const Http::RequestHeaderMap& request_headers) {
+Decision HttpTracerUtility::shouldTraceRequest(const StreamInfo::StreamInfo& stream_info) {
   // Exclude health check requests immediately.
   if (stream_info.healthCheck()) {
     return {Reason::HealthCheck, false};
   }
 
-  Http::TraceStatus trace_status =
-      stream_info.getRequestIDExtension()->getTraceStatus(request_headers);
-
-  switch (trace_status) {
-  case Http::TraceStatus::Client:
-    return {Reason::ClientForced, true};
-  case Http::TraceStatus::Forced:
-    return {Reason::ServiceForced, true};
-  case Http::TraceStatus::Sampled:
-    return {Reason::Sampling, true};
-  case Http::TraceStatus::NoTrace:
-    return {Reason::NotTraceableRequestId, false};
+  const Tracing::Reason trace_reason = stream_info.traceReason();
+  switch (trace_reason) {
+  case Reason::ClientForced:
+  case Reason::ServiceForced:
+  case Reason::Sampling:
+    return {trace_reason, true};
+  default:
+    return {trace_reason, false};
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -163,8 +143,9 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
     if (request_headers->RequestId()) {
       span.setTag(Tracing::Tags::get().GuidXRequestId, request_headers->getRequestIdValue());
     }
-    span.setTag(Tracing::Tags::get().HttpUrl,
-                buildUrl(*request_headers, tracing_config.maxPathTagLength()));
+    span.setTag(
+        Tracing::Tags::get().HttpUrl,
+        Http::Utility::buildOriginalUri(*request_headers, tracing_config.maxPathTagLength()));
     span.setTag(Tracing::Tags::get().HttpMethod, request_headers->getMethodValue());
     span.setTag(Tracing::Tags::get().DownstreamCluster,
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
@@ -235,6 +216,8 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap*
 
   if (nullptr != stream_info.upstreamHost()) {
     span.setTag(Tracing::Tags::get().UpstreamCluster, stream_info.upstreamHost()->cluster().name());
+    span.setTag(Tracing::Tags::get().UpstreamClusterName,
+                stream_info.upstreamHost()->cluster().observabilityName());
   }
 
   // Post response data.
@@ -274,7 +257,7 @@ HttpTracerUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& ta
   }
 }
 
-HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info)
+HttpTracerImpl::HttpTracerImpl(DriverSharedPtr driver, const LocalInfo::LocalInfo& local_info)
     : driver_(std::move(driver)), local_info_(local_info) {}
 
 SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
@@ -319,12 +302,12 @@ RequestHeaderCustomTag::RequestHeaderCustomTag(
       default_value_(request_header.default_value()) {}
 
 absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) const {
-  if (!ctx.request_headers) {
+  if (ctx.trace_context == nullptr) {
     return default_value_;
   }
   // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
-  const auto entry = ctx.request_headers->get(name_);
-  return !entry.empty() ? entry[0]->value().getStringView() : default_value_;
+  const auto entry = ctx.trace_context->getByKey(name_);
+  return entry.value_or(default_value_);
 }
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,
@@ -372,8 +355,8 @@ MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRequest:
     return &info.dynamicMetadata();
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRoute: {
-    const Router::RouteEntry* route_entry = info.routeEntry();
-    return route_entry ? &route_entry->metadata() : nullptr;
+    Router::RouteConstSharedPtr route = info.route();
+    return route ? &route->metadata() : nullptr;
   }
   case envoy::type::metadata::v3::MetadataKind::KindCase::kCluster: {
     const auto& hostPtr = info.upstreamHost();

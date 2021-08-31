@@ -1,0 +1,6 @@
+FROM envoyproxy/envoy-windows-dev:latest
+
+COPY ./front-envoy.yaml './front-envoy.yaml'
+COPY ./start_envoy.ps1 ./start_envoy.ps1
+ENTRYPOINT ["powershell.exe", "./start_envoy.ps1"]
+

@@ -1,17 +1,17 @@
-#include "server/lds_api.h"
+#include "source/server/lds_api.h"
 
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/api/v2/listener.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/cleanup.h"
-#include "common/config/api_version.h"
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"
@@ -24,14 +24,14 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
                        Upstream::ClusterManager& cm, Init::Manager& init_manager,
                        Stats::Scope& scope, ListenerManager& lm,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
-    : Envoy::Config::SubscriptionBase<envoy::config::listener::v3::Listener>(
-          lds_config.resource_api_version(), validation_visitor, "name"),
+    : Envoy::Config::SubscriptionBase<envoy::config::listener::v3::Listener>(validation_visitor,
+                                                                             "name"),
       listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
       init_target_("LDS", [this]() { subscription_->start({}); }) {
   const auto resource_name = getResourceName();
   if (lds_resources_locator == nullptr) {
     subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
-        lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, false);
+        lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
   } else {
     subscription_ = cm.subscriptionFactory().collectionSubscriptionFromUrl(
         *lds_resources_locator, lds_config, resource_name, *scope_, *this, resource_decoder_);
@@ -44,9 +44,8 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
                                 const std::string& system_version_info) {
   Config::ScopedResume maybe_resume_rds;
   if (cm_.adsMux()) {
-    const auto type_urls =
-        Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
-    maybe_resume_rds = cm_.adsMux()->pause(type_urls);
+    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>();
+    maybe_resume_rds = cm_.adsMux()->pause(type_url);
   }
 
   bool any_applied = false;
@@ -66,7 +65,7 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
   std::string message;
   for (const auto& resource : added_resources) {
     envoy::config::listener::v3::Listener listener;
-    try {
+    TRY_ASSERT_MAIN_THREAD {
       listener =
           dynamic_cast<const envoy::config::listener::v3::Listener&>(resource.get().resource());
       if (!listener_names.insert(listener.name()).second) {
@@ -80,7 +79,9 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
       } else {
         ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener.name());
       }
-    } catch (const EnvoyException& e) {
+    }
+    END_TRY
+    catch (const EnvoyException& e) {
       failure_state.push_back(std::make_unique<envoy::admin::v3::UpdateFailureState>());
       auto& state = failure_state.back();
       state->set_details(e.what());

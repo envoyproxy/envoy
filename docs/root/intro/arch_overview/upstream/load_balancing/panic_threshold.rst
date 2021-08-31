@@ -83,9 +83,9 @@ Load distribution is calculated as described above as long as there are priority
 When all priority levels enter the panic mode, load calculation algorithm changes.
 In this case each priority level receives traffic relative to the number of hosts in that priority level
 in relation to the number of hosts in all priority levels.
-For example, if there are 2 priorities P=0 and P=1 and each of them consists of 5 hosts, each level will 
+For example, if there are 2 priorities P=0 and P=1 and each of them consists of 5 hosts, each level will
 receive 50% of the traffic.
-If there are 2 hosts in priority P=0 and 8 hosts in priority P=1, priority P=0 will receive 20% of the 
+If there are 2 hosts in priority P=0 and 8 hosts in priority P=1, priority P=0 will receive 20% of the
 traffic and priority P=1 will receive 80% of the traffic.
 
 However, if the panic threshold is 0% for any priority, that priority will never enter panic mode.

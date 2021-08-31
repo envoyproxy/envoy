@@ -37,3 +37,6 @@ cmake-build-debug
 /linux
 bazel.output.txt
 *~
+.coverage
+**/.DS_Store
+**/*.iml

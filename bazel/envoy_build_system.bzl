@@ -6,20 +6,26 @@ load(":envoy_internal.bzl", "envoy_external_dep_path")
 load(
     ":envoy_library.bzl",
     _envoy_basic_cc_library = "envoy_basic_cc_library",
+    _envoy_cc_contrib_extension = "envoy_cc_contrib_extension",
     _envoy_cc_extension = "envoy_cc_extension",
     _envoy_cc_library = "envoy_cc_library",
+    _envoy_cc_linux_library = "envoy_cc_linux_library",
     _envoy_cc_posix_library = "envoy_cc_posix_library",
+    _envoy_cc_posix_without_linux_library = "envoy_cc_posix_without_linux_library",
     _envoy_cc_win32_library = "envoy_cc_win32_library",
-    _envoy_include_prefix = "envoy_include_prefix",
     _envoy_proto_library = "envoy_proto_library",
 )
+load(":envoy_pch.bzl", _envoy_pch_library = "envoy_pch_library")
 load(
     ":envoy_select.bzl",
     _envoy_select_boringssl = "envoy_select_boringssl",
+    _envoy_select_enable_http3 = "envoy_select_enable_http3",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
-    _envoy_select_wasm = "envoy_select_wasm",
+    _envoy_select_wasm_cpp_tests = "envoy_select_wasm_cpp_tests",
+    _envoy_select_wasm_rust_tests = "envoy_select_wasm_rust_tests",
     _envoy_select_wasm_v8 = "envoy_select_wasm_v8",
+    _envoy_select_wasm_wamr = "envoy_select_wasm_wamr",
     _envoy_select_wasm_wasmtime = "envoy_select_wasm_wasmtime",
     _envoy_select_wasm_wavm = "envoy_select_wasm_wavm",
 )
@@ -32,6 +38,7 @@ load(
     _envoy_cc_test = "envoy_cc_test",
     _envoy_cc_test_binary = "envoy_cc_test_binary",
     _envoy_cc_test_library = "envoy_cc_test_library",
+    _envoy_py_test = "envoy_py_test",
     _envoy_py_test_binary = "envoy_py_test_binary",
     _envoy_sh_test = "envoy_sh_test",
 )
@@ -44,8 +51,8 @@ load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
 
-def envoy_extension_package(enabled_default = True):
-    native.package(default_visibility = EXTENSION_PACKAGE_VISIBILITY)
+def envoy_extension_package(enabled_default = True, default_visibility = EXTENSION_PACKAGE_VISIBILITY):
+    native.package(default_visibility = default_visibility)
 
     bool_flag(
         name = "enabled",
@@ -56,6 +63,9 @@ def envoy_extension_package(enabled_default = True):
         name = "is_enabled",
         flag_values = {":enabled": "True"},
     )
+
+def envoy_contrib_package():
+    envoy_extension_package(default_visibility = ["//:contrib_library"])
 
 # A genrule variant that can output a directory. This is useful when doing things like
 # generating a fuzz corpus mechanically.
@@ -145,6 +155,16 @@ def envoy_cc_platform_dep(name):
         "//conditions:default": [name + "_posix"],
     })
 
+# Used to select a dependency that has different implementations on Linux vs rest of POSIX vs Windows.
+# The platform-specific implementations should be specified with envoy_cc_linux_library,
+# envoy_cc_posix_without_library and envoy_cc_win32_library respectively
+def envoy_cc_platform_specific_dep(name):
+    return select({
+        "@envoy//bazel:windows_x86_64": [name + "_win32"],
+        "@envoy//bazel:linux": [name + "_linux"],
+        "//conditions:default": [name + "_posix"],
+    })
+
 # Envoy proto descriptor targets should be specified with this function.
 # This is used for testing only.
 def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
@@ -189,11 +209,14 @@ def envoy_google_grpc_external_deps():
 # Select wrappers (from envoy_select.bzl)
 envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_google_grpc = _envoy_select_google_grpc
+envoy_select_enable_http3 = _envoy_select_enable_http3
 envoy_select_hot_restart = _envoy_select_hot_restart
-envoy_select_wasm = _envoy_select_wasm
+envoy_select_wasm_cpp_tests = _envoy_select_wasm_cpp_tests
+envoy_select_wasm_rust_tests = _envoy_select_wasm_rust_tests
+envoy_select_wasm_v8 = _envoy_select_wasm_v8
+envoy_select_wasm_wamr = _envoy_select_wasm_wamr
 envoy_select_wasm_wavm = _envoy_select_wasm_wavm
 envoy_select_wasm_wasmtime = _envoy_select_wasm_wasmtime
-envoy_select_wasm_v8 = _envoy_select_wasm_v8
 
 # Binary wrappers (from envoy_binary.bzl)
 envoy_cc_binary = _envoy_cc_binary
@@ -201,11 +224,14 @@ envoy_cc_binary = _envoy_cc_binary
 # Library wrappers (from envoy_library.bzl)
 envoy_basic_cc_library = _envoy_basic_cc_library
 envoy_cc_extension = _envoy_cc_extension
+envoy_cc_contrib_extension = _envoy_cc_contrib_extension
 envoy_cc_library = _envoy_cc_library
+envoy_cc_linux_library = _envoy_cc_linux_library
 envoy_cc_posix_library = _envoy_cc_posix_library
+envoy_cc_posix_without_linux_library = _envoy_cc_posix_without_linux_library
 envoy_cc_win32_library = _envoy_cc_win32_library
-envoy_include_prefix = _envoy_include_prefix
 envoy_proto_library = _envoy_proto_library
+envoy_pch_library = _envoy_pch_library
 
 # Test wrappers (from envoy_test.bzl)
 envoy_cc_fuzz_test = _envoy_cc_fuzz_test
@@ -215,5 +241,6 @@ envoy_cc_test_binary = _envoy_cc_test_binary
 envoy_cc_test_library = _envoy_cc_test_library
 envoy_cc_benchmark_binary = _envoy_cc_benchmark_binary
 envoy_benchmark_test = _envoy_benchmark_test
+envoy_py_test = _envoy_py_test
 envoy_py_test_binary = _envoy_py_test_binary
 envoy_sh_test = _envoy_sh_test

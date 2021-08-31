@@ -1,9 +1,8 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
-#include "common/grpc/common.h"
-#include "common/http/header_map_impl.h"
-
-#include "extensions/filters/http/ext_proc/client_impl.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/http/ext_proc/client_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -16,8 +15,6 @@ using envoy::service::ext_proc::v3alpha::ProcessingResponse;
 
 using testing::Invoke;
 using testing::Unused;
-
-using namespace std::chrono_literals;
 
 namespace Envoy {
 namespace Extensions {
@@ -43,7 +40,8 @@ protected:
 
   Grpc::AsyncClientFactoryPtr doFactory(Unused, Unused, Unused) {
     auto factory = std::make_unique<Grpc::MockAsyncClientFactory>();
-    EXPECT_CALL(*factory, create()).WillOnce(Invoke(this, &ExtProcStreamTest::doCreate));
+    EXPECT_CALL(*factory, createUncachedRawAsyncClient())
+        .WillOnce(Invoke(this, &ExtProcStreamTest::doCreate));
     return factory;
   }
 
@@ -56,8 +54,7 @@ protected:
   }
 
   Grpc::RawAsyncStream* doStartRaw(Unused, Unused, Grpc::RawAsyncStreamCallbacks& callbacks,
-                                   const Http::AsyncClient::StreamOptions& options) {
-    EXPECT_GT(*options.timeout, 0ms);
+                                   const Http::AsyncClient::StreamOptions&) {
     stream_callbacks_ = &callbacks;
     return &stream_;
   }
@@ -84,13 +81,13 @@ protected:
 };
 
 TEST_F(ExtProcStreamTest, OpenCloseStream) {
-  auto stream = client_->start(*this, 200ms);
+  auto stream = client_->start(*this);
   EXPECT_CALL(stream_, closeStream());
   stream->close();
 }
 
 TEST_F(ExtProcStreamTest, SendToStream) {
-  auto stream = client_->start(*this, 200ms);
+  auto stream = client_->start(*this);
   // Send something and ensure that we get it. Doesn't really matter what.
   EXPECT_CALL(stream_, sendMessageRaw_(_, false));
   ProcessingRequest req;
@@ -100,14 +97,14 @@ TEST_F(ExtProcStreamTest, SendToStream) {
 }
 
 TEST_F(ExtProcStreamTest, SendAndClose) {
-  auto stream = client_->start(*this, 200ms);
+  auto stream = client_->start(*this);
   EXPECT_CALL(stream_, sendMessageRaw_(_, true));
   ProcessingRequest req;
   stream->send(std::move(req), true);
 }
 
 TEST_F(ExtProcStreamTest, ReceiveFromStream) {
-  auto stream = client_->start(*this, 200ms);
+  auto stream = client_->start(*this);
   ASSERT_NE(stream_callbacks_, nullptr);
   // Send something and ensure that we get it. Doesn't really matter what.
   ProcessingResponse resp;
@@ -136,7 +133,7 @@ TEST_F(ExtProcStreamTest, ReceiveFromStream) {
 }
 
 TEST_F(ExtProcStreamTest, StreamClosed) {
-  auto stream = client_->start(*this, 200ms);
+  auto stream = client_->start(*this);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
@@ -145,13 +142,11 @@ TEST_F(ExtProcStreamTest, StreamClosed) {
   EXPECT_FALSE(last_response_);
   EXPECT_TRUE(grpc_closed_);
   EXPECT_EQ(grpc_status_, 0);
-
-  EXPECT_CALL(stream_, closeStream());
   stream->close();
 }
 
 TEST_F(ExtProcStreamTest, StreamError) {
-  auto stream = client_->start(*this, 200ms);
+  auto stream = client_->start(*this);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
@@ -160,8 +155,6 @@ TEST_F(ExtProcStreamTest, StreamError) {
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
   EXPECT_EQ(grpc_status_, 123);
-
-  EXPECT_CALL(stream_, closeStream());
   stream->close();
 }
 

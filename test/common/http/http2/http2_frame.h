@@ -6,7 +6,7 @@
 
 #include "envoy/http/metadata_interface.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/string_view.h"
 
@@ -129,6 +129,8 @@ public:
   // Methods for creating HTTP2 frames
   static Http2Frame makePingFrame(absl::string_view data = {});
   static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::None);
+  static Http2Frame makeSettingsFrame(SettingsFlags flags,
+                                      std::list<std::pair<uint16_t, uint32_t>> settings);
   static Http2Frame makeEmptyHeadersFrame(uint32_t stream_index,
                                           HeadersFlags flags = HeadersFlags::None);
   static Http2Frame makeHeadersFrameNoStatus(uint32_t stream_index);
@@ -149,7 +151,7 @@ public:
 
   static Http2Frame makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment);
   static Http2Frame makeMetadataFrameFromMetadataMap(uint32_t stream_index,
-                                                     MetadataMap& metadata_map,
+                                                     const MetadataMap& metadata_map,
                                                      MetadataFlags flags);
 
   static Http2Frame makeMalformedRequest(uint32_t stream_index);

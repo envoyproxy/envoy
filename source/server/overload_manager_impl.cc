@@ -1,4 +1,4 @@
-#include "server/overload_manager_impl.h"
+#include "source/server/overload_manager_impl.h"
 
 #include <chrono>
 
@@ -7,13 +7,12 @@
 #include "envoy/config/overload/v3/overload.pb.validate.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/fmt.h"
-#include "common/config/utility.h"
-#include "common/event/scaled_range_timer_manager_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "server/resource_monitor_config_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
+#include "source/common/event/scaled_range_timer_manager_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/server/resource_monitor_config_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
@@ -156,6 +155,7 @@ parseTimerMinimums(const ProtobufWkt::Any& typed_config,
                   Event::ScaledMinimum(UnitFloat(scale_timer.min_scale().value() / 100.0)));
 
     auto [_, inserted] = timer_map.insert(std::make_pair(timer_type, minimum));
+    UNREFERENCED_PARAMETER(_);
     if (!inserted) {
       throw EnvoyException(fmt::format("Found duplicate entry for timer type {}",
                                        Config::TimerType_Name(scale_timer.timer())));
@@ -262,11 +262,12 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
                                          ThreadLocal::SlotAllocator& slot_allocator,
                                          const envoy::config::overload::v3::OverloadManager& config,
                                          ProtobufMessage::ValidationVisitor& validation_visitor,
-                                         Api::Api& api)
+                                         Api::Api& api, const Server::Options& options)
     : started_(false), dispatcher_(dispatcher), tls_(slot_allocator),
       refresh_interval_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))) {
-  Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, api, validation_visitor);
+  Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, options, api,
+                                                           validation_visitor);
   for (const auto& resource : config.resource_monitors()) {
     const auto& name = resource.name();
     ENVOY_LOG(debug, "Adding resource monitor for {}", name);
