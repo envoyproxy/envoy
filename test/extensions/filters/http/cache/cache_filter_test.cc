@@ -137,7 +137,8 @@ protected:
 TEST_F(CacheFilterTest, FilterIsBeingDestroyed) {
   CacheFilterSharedPtr filter = makeFilter(simple_cache_);
   filter->onDestroy();
-  filter->decodeHeaders(request_headers_, true); // Should do nothing... at least make sure it doesn't crash.
+  // decodeHeaders should do nothing... at least make sure it doesn't crash.
+  filter->decodeHeaders(request_headers_, true);
 }
 
 TEST_F(CacheFilterTest, UncacheableRequest) {
