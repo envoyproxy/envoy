@@ -13,10 +13,12 @@ TEST(Coverage, CacheEntryStatusString) {
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Unusable), "Unusable");
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::RequiresValidation), "RequiresValidation");
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::FoundNotModified), "FoundNotModified");
+}
+
+TEST(Coverage, CacheEntryStatusStream) {
   std::ostringstream stream;
-  stream << CacheEntryStatus::Ok << CacheEntryStatus::Unusable
-         << CacheEntryStatus::RequiresValidation << CacheEntryStatus::FoundNotModified;
-  EXPECT_EQ(stream.str(), "OkUnusableRequiresValidationFoundNotModified");
+  stream << CacheEntryStatus::Ok;
+  EXPECT_EQ(stream.str(), "Ok");
 }
 
 } // namespace
