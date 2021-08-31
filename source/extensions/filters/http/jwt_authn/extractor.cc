@@ -10,7 +10,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/singleton/const_singleton.h"
 
-#include "absl/container/node_hash_set.h"
+#include "absl/container/btree_map.h"
 #include "absl/strings/match.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
@@ -184,7 +184,7 @@ private:
     JwtIssuerChecker issuer_checker_;
   };
   // The map of a cookie key to set of issuers specified the cookie.
-  std::map<std::string, CookieLocationSpec> cookie_locations_;
+  absl::btree_map<std::string, CookieLocationSpec> cookie_locations_;
 
   std::vector<LowerCaseString> forward_payload_headers_;
 };
@@ -282,7 +282,8 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
 
   // Check cookie locations.
   if (!cookie_locations_.empty()) {
-    const auto& cookies = Http::Utility::parseCookies(headers);
+    const auto& cookies = Http::Utility::parseCookies(
+        headers, [&](absl::string_view k) -> bool { return cookie_locations_.contains(k); });
 
     for (const auto& location_it : cookie_locations_) {
       const auto& cookie_key = location_it.first;
