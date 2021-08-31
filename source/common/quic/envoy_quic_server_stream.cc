@@ -148,7 +148,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (fin) {
     end_stream_decoded_ = true;
   }
-  quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_EXCESSIVE_LOAD;
+  quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
           header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_, rst);
@@ -233,7 +233,7 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
-    quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_EXCESSIVE_LOAD;
+    quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
     auto trailers = spdyHeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
         received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
         rst);
