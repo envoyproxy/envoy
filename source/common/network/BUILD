@@ -273,6 +273,7 @@ envoy_cc_library(
     srcs = ["listener_filter_buffer_impl.cc"],
     hdrs = ["listener_filter_buffer_impl.h"],
     deps = [
+        "//envoy/network:io_handle_interface",
         "//envoy/network:listener_filter_buffer_interface",
     ],
 )

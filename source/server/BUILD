@@ -199,6 +199,7 @@ envoy_cc_library(
         "//envoy/network:listener_interface",
         "//source/common/common:linked_object",
         "//source/common/network:connection_lib",
+        "//source/common/network:listener_filter_buffer_lib",
         "//source/common/stream_info:stream_info_lib",
     ],
 )
@@ -224,6 +225,7 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:linked_object",
         "//source/common/network:connection_lib",
+        "//source/common/network:listener_filter_buffer_lib",
     ],
 )
 

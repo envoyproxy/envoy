@@ -75,6 +75,22 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
     bool no_error = true;
     if (iter_ == accept_filters_.end()) {
       iter_ = accept_filters_.begin();
+      // TODO(soulxu) This is for PoC, but we should initialize and reset file event
+      // for each filter, then we can back-compatible with existing filter. After all
+      // filter switch to the new method to get peek data, then we can change to this way.
+      if (inspect_buffer_size_ > 0) {
+        listener_filter_buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
+            socket_->ioHandle(), listener_.dispatcher(), [this]() { continueFilterChain(false); },
+            [this]() {
+              Network::FilterStatus status = (*iter_)->onData(*listener_filter_buffer_);
+              if (status == Network::FilterStatus::StopIteration) {
+                return;
+              }
+              continueFilterChain(true);
+            },
+            inspect_buffer_size_);
+        listener_filter_buffer_->initialize();
+      }
     } else {
       iter_ = std::next(iter_);
     }
@@ -89,6 +105,14 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
           no_error = false;
           break;
         } else {
+          // There may already have data peeked due to previous filter.
+          if ((*iter_)->inspectSize() > 0 && listener_filter_buffer_->length() > 0) {
+            Network::FilterStatus status = (*iter_)->onData(*listener_filter_buffer_);
+            // The filter needn't to inspect more data, then go to next filter.
+            if (status == Network::FilterStatus::Continue) {
+              continue;
+            }
+          }
           // Blocking at the filter but no error
           return;
         }
@@ -96,7 +120,10 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
     }
     // Successfully ran all the accept filters.
     if (no_error) {
-      newConnection();
+      listener_filter_buffer_->reset();
+      if (listener_filter_buffer_->drainFromSocket()) {
+        newConnection();
+      }
     } else {
       // Signal the caller that no extra filter chain iteration is needed.
       iter_ = accept_filters_.end();
