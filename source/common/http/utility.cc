@@ -329,41 +329,6 @@ Utility::parseCookies(const RequestHeaderMap& headers,
   return cookies;
 }
 
-std::map<std::string, std::string> Utility::parseCookies(const RequestHeaderMap& headers) {
-  // TODO(theshubhamp): Replace this duplicated logic from parseCookie(...) with a cookie iterator.
-
-  std::map<std::string, std::string> cookies;
-  const Http::HeaderMap::GetResult cookie_headers = headers.get(Http::Headers::get().Cookie);
-
-  for (size_t index = 0; index < cookie_headers.size(); index++) {
-    auto cookie_header_value = cookie_headers[index]->value().getStringView();
-
-    // Split the cookie header into individual cookies.
-    for (const auto& s : StringUtil::splitToken(cookie_header_value, ";")) {
-      // Find the key part of the cookie (i.e. the name of the cookie).
-      size_t first_non_space = s.find_first_not_of(' ');
-      size_t equals_index = s.find('=');
-      if (equals_index == absl::string_view::npos) {
-        // The cookie is malformed if it does not have an `=`. Continue
-        // checking other cookies in this header.
-        continue;
-      }
-      absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
-      absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
-
-      // Cookie values may be wrapped in double quotes.
-      // https://tools.ietf.org/html/rfc6265#section-4.1.1
-      if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
-        v = v.substr(1, v.size() - 2);
-      }
-
-      cookies.emplace(std::string{k}, std::string{v});
-    }
-  }
-
-  return cookies;
-}
-
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   struct http_parser_url u;
   http_parser_url_init(&u);
