@@ -76,6 +76,7 @@ public:
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
+  Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
 
 private:
   ParseState parseClientHello(const void* data, size_t len);

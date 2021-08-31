@@ -75,49 +75,10 @@ Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->ne
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "tls inspector: new connection accepted");
-  Network::ConnectionSocket& socket = cb.socket();
   cb_ = &cb;
 
-  ParseState parse_state = onRead();
-  switch (parse_state) {
-  case ParseState::Error:
-    // As per discussion in https://github.com/envoyproxy/envoy/issues/7864
-    // we don't add new enum in FilterStatus so we have to signal the caller
-    // the new condition.
-    cb.socket().close();
-    return Network::FilterStatus::StopIteration;
-  case ParseState::Done:
-    return Network::FilterStatus::Continue;
-  case ParseState::Continue:
-    // do nothing but create the event
-    socket.ioHandle().initializeFileEvent(
-        cb.dispatcher(),
-        [this](uint32_t events) {
-          if (events & Event::FileReadyType::Closed) {
-            config_->stats().connection_closed_.inc();
-            done(false);
-            return;
-          }
-
-          ASSERT(events == Event::FileReadyType::Read);
-          ParseState parse_state = onRead();
-          switch (parse_state) {
-          case ParseState::Error:
-            done(false);
-            break;
-          case ParseState::Done:
-            done(true);
-            break;
-          case ParseState::Continue:
-            // do nothing but wait for the next event
-            break;
-          }
-        },
-        Event::PlatformDefaultTriggerType,
-        Event::FileReadyType::Read | Event::FileReadyType::Closed);
-    return Network::FilterStatus::StopIteration;
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  // waiting for the inspect data.
+  return Network::FilterStatus::StopIteration;
 }
 
 void Filter::onALPN(const unsigned char* data, unsigned int len) {
@@ -152,39 +113,30 @@ void Filter::onServername(absl::string_view name) {
   clienthello_success_ = true;
 }
 
-ParseState Filter::onRead() {
-  // This receive code is somewhat complicated, because it must be done as a MSG_PEEK because
-  // there is no way for a listener-filter to pass payload data to the ConnectionImpl and filters
-  // that get created later.
-  //
-  // We request from the file descriptor to get events every time new data is available,
-  // even if previous data has not been read, which is always the case due to MSG_PEEK. When
-  // the TlsInspector completes and passes the socket along, a new FileEvent is created for the
-  // socket, so that new event is immediately signaled as readable because it is new and the socket
-  // is readable, even though no new events have occurred.
-  //
-  // TODO(ggreenway): write an integration test to ensure the events work as expected on all
-  // platforms.
-  const auto result = cb_->socket().ioHandle().recv(buf_, config_->maxClientHelloSize(), MSG_PEEK);
-  ENVOY_LOG(trace, "tls inspector: recv: {}", result.return_value_);
-
-  if (!result.ok()) {
-    if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-      return ParseState::Continue;
-    }
-    config_->stats().read_error_.inc();
-    return ParseState::Error;
-  }
+Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
+  auto rc = buffer.copyOut(buf_, config_->maxClientHelloSize());
+  ENVOY_LOG(trace, "tls inspector: recv: {}", rc);
 
   // Because we're doing a MSG_PEEK, data we've seen before gets returned every time, so
   // skip over what we've already processed.
-  if (static_cast<uint64_t>(result.return_value_) > read_) {
+  if (static_cast<uint64_t>(rc) > read_) {
     const uint8_t* data = buf_ + read_;
-    const size_t len = result.return_value_ - read_;
-    read_ = result.return_value_;
-    return parseClientHello(data, len);
+    const size_t len = rc - read_;
+    read_ = rc;
+    ParseState parse_state = parseClientHello(data, len);
+    switch (parse_state) {
+    case ParseState::Error:
+      cb_->socket().ioHandle().close();
+      return Network::FilterStatus::StopIteration;
+    case ParseState::Done:
+      // finish the inspect
+      return Network::FilterStatus::Continue;
+    case ParseState::Continue:
+      // do nothing but wait for the next event
+      return Network::FilterStatus::StopIteration;
+    }
   }
-  return ParseState::Continue;
+  return Network::FilterStatus::StopIteration;
 }
 
 void Filter::done(bool success) {

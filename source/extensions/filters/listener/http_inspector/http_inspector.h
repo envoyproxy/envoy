@@ -70,6 +70,11 @@ public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
+  // TODO (soulxu) implement this instead of filter peek data by itself.
+  Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
+    return Network::FilterStatus::Continue;
+  };
+
 private:
   static const absl::string_view HTTP2_CONNECTION_PREFACE;
 
