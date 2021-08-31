@@ -11,16 +11,6 @@ namespace Envoy {
 namespace Config {
 namespace XdsMux {
 
-namespace {
-
-// Usable with maps and sets. Used for ASSERTs, to avoid too much typing.
-template <typename Container, typename Key>
-bool containerContains(const Container& container, const Key& key) {
-  return container.find(key) != container.end();
-}
-
-} // namespace
-
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
                                                Event::Dispatcher& dispatcher)
@@ -50,9 +40,9 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     } else {
       requested_resource_state_.insert_or_assign(a, ResourceState::waitingForServer());
     }
-    ASSERT(containerContains(requested_resource_state_, a));
-    ASSERT(!containerContains(wildcard_resource_state_, a));
-    ASSERT(!containerContains(ambiguous_resource_state_, a));
+    ASSERT(requested_resource_state_.contains(a));
+    ASSERT(!wildcard_resource_state_.contains(a));
+    ASSERT(!ambiguous_resource_state_.contains(a));
     // If interest in a resource is removed-then-added (all before a discovery request
     // can be sent), we must treat it as a "new" addition: our user may have forgotten its
     // copy of the resource after instructing us to remove it, and need to be reminded of it.
@@ -64,7 +54,7 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     // The resource we are interested in could also come from a wildcard subscription. Instead of
     // removing it outright, mark the resource as not interesting to us any more. The server could
     // later send us an update. If we don't have a wildcard subscription, just drop it.
-    if (containerContains(requested_resource_state_, Wildcard)) {
+    if (requested_resource_state_.contains(Wildcard)) {
       if (auto it = requested_resource_state_.find(r); it != requested_resource_state_.end()) {
         // Wildcard resources always have a version. If our requested resource has no version, it
         // won't be a wildcard resource then. If r is Wildcard itself, then it never has a version
@@ -77,9 +67,9 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     } else {
       requested_resource_state_.erase(r);
     }
-    ASSERT(!containerContains(requested_resource_state_, r));
+    ASSERT(!requested_resource_state_.contains(r));
     // This function shouldn't ever be called for resources that came from wildcard subscription.
-    ASSERT(!containerContains(wildcard_resource_state_, r));
+    ASSERT(!wildcard_resource_state_.contains(r));
     // Ideally, when interest in a resource is added-then-removed in between requests,
     // we would avoid putting a superfluous "unsubscribe [resource that was never subscribed]"
     // in the request. However, the removed-then-added case *does* need to go in the request,
@@ -274,9 +264,9 @@ DeltaSubscriptionState::getNextRequestInternal() {
 bool DeltaSubscriptionState::isInitialRequestForLegacyWildcard() {
   if (in_initial_legacy_wildcard_) {
     requested_resource_state_.insert_or_assign(Wildcard, ResourceState::waitingForServer());
-    ASSERT(containerContains(requested_resource_state_, Wildcard));
-    ASSERT(!containerContains(wildcard_resource_state_, Wildcard));
-    ASSERT(!containerContains(ambiguous_resource_state_, Wildcard));
+    ASSERT(requested_resource_state_.contains(Wildcard));
+    ASSERT(!wildcard_resource_state_.contains(Wildcard));
+    ASSERT(!ambiguous_resource_state_.contains(Wildcard));
     return true;
   }
 
@@ -312,18 +302,18 @@ void DeltaSubscriptionState::addResourceStateFromServer(
       maybe_resource.has_value()) {
     // It is a resource that we requested.
     maybe_resource->setVersion(resource.version());
-    ASSERT(containerContains(requested_resource_state_, resource.name()));
-    ASSERT(!containerContains(wildcard_resource_state_, resource.name()));
-    ASSERT(!containerContains(ambiguous_resource_state_, resource.name()));
+    ASSERT(requested_resource_state_.contains(resource.name()));
+    ASSERT(!wildcard_resource_state_.contains(resource.name()));
+    ASSERT(!ambiguous_resource_state_.contains(resource.name()));
   } else {
     // It is a resource that is a part of our wildcard request.
     wildcard_resource_state_.insert({resource.name(), resource.version()});
     // The resource could be ambiguous before, but now the ambiguity
     // is resolved.
     ambiguous_resource_state_.erase(resource.name());
-    ASSERT(!containerContains(requested_resource_state_, resource.name()));
-    ASSERT(containerContains(wildcard_resource_state_, resource.name()));
-    ASSERT(!containerContains(ambiguous_resource_state_, resource.name()));
+    ASSERT(!requested_resource_state_.contains(resource.name()));
+    ASSERT(wildcard_resource_state_.contains(resource.name()));
+    ASSERT(!ambiguous_resource_state_.contains(resource.name()));
   }
 }
 
