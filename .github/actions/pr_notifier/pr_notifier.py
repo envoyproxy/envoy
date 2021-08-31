@@ -37,13 +37,13 @@ MAINTAINERS = {
 # maintainer owner.
 FIRST_PASS = {
     'adisuissa': 'UT17EMMTP',
-    'dmitri-d' : 'UB1883Q5S',
-    'tonya11en' : 'U989BG2CW',
-    'esmet' : 'U01BCGBUUAE',
-    'KBaichoo' : 'U016ZPU8KBK',
-    'wbpcode' : 'U017KF5C0Q6',
-    'mathetake' : 'UG9TD2FSB',
-    'RyanTheOptimist' : 'U01SW3JC8GP',
+    'dmitri-d': 'UB1883Q5S',
+    'tonya11en': 'U989BG2CW',
+    'esmet': 'U01BCGBUUAE',
+    'KBaichoo': 'U016ZPU8KBK',
+    'wbpcode': 'U017KF5C0Q6',
+    'mathetake': 'UG9TD2FSB',
+    'RyanTheOptimist': 'U01SW3JC8GP',
 }
 
 # Only notify API reviewers who aren't maintainers.
@@ -89,14 +89,15 @@ def pr_message(pr_age, pr_url, pr_title, delta_days, delta_hours):
 
 # Adds reminder lines to the appropriate assignee to review the assigned PRs
 # Returns true if one of the assignees is in the primary_assignee_map, false otherwise.
-def add_reminders(assignees, assignees_and_prs, message, primary_assignee_map, first_pass_assignee_map):
+def add_reminders(
+        assignees, assignees_and_prs, message, primary_assignee_map, first_pass_assignee_map):
     has_primary_assignee = False
     for assignee_info in assignees:
         assignee = assignee_info.login
         if assignee in primary_assignee_map:
-              has_primary_assignee = True
+            has_primary_assignee = True
         elif assignee not in first_pass_assignee_map:
-              continue
+            continue
         if assignee not in assignees_and_prs.keys():
             assignees_and_prs[
                 assignee] = "Hello, %s, here are your PR reminders for the day \n" % assignee
