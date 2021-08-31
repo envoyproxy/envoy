@@ -4,7 +4,6 @@
 #include "source/common/config/datasource.h"
 
 #include "contrib/sxg/filters/http/source/filter_config.h"
-
 #include "libsxg.h"
 
 namespace Envoy {

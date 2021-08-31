@@ -5,11 +5,10 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/secret_provider_impl.h"
 
-#include "contrib/sxg/filters/http/source/config.h"
-#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
-
 #include "test/mocks/server/factory_context.h"
 
+#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
+#include "contrib/sxg/filters/http/source/config.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

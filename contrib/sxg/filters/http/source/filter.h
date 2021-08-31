@@ -2,11 +2,11 @@
 
 #include "envoy/stats/scope.h"
 
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+
 #include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
 #include "contrib/sxg/filters/http/source/encoder.h"
 #include "contrib/sxg/filters/http/source/filter_config.h"
-
-#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {

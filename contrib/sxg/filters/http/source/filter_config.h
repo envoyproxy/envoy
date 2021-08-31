@@ -4,11 +4,11 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
-#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.validate.h"
-
 #include "source/common/config/datasource.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+
+#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
+#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

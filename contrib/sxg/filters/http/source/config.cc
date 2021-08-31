@@ -7,12 +7,12 @@
 #include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret_provider.h"
 
+#include "source/common/protobuf/utility.h"
+
 #include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
 #include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.validate.h"
 #include "contrib/sxg/filters/http/source/encoder.h"
 #include "contrib/sxg/filters/http/source/filter.h"
-
-#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {

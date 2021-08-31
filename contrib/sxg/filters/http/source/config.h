@@ -2,10 +2,10 @@
 
 #include <string>
 
+#include "source/extensions/filters/http/common/factory_base.h"
+
 #include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
 #include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.validate.h"
-
-#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {

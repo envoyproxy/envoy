@@ -9,9 +9,9 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/headers.h"
-#include "contrib/sxg/filters/http/source/filter_config.h"
 
 #include "absl/strings/escaping.h"
+#include "contrib/sxg/filters/http/source/filter_config.h"
 
 namespace Envoy {
 namespace Extensions {
