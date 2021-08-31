@@ -408,8 +408,8 @@ public:
     std::string value;
     const Network::Connection* conn = downstreamConnection();
     // Need to check for null conn if this is ever used by Http::AsyncClient in the future.
-    value = conn->addressProvider().remoteAddress()->asString() +
-            conn->addressProvider().localAddress()->asString();
+    value = conn->connectionInfoProvider().remoteAddress()->asString() +
+            conn->connectionInfoProvider().localAddress()->asString();
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
     downstream_set_cookies_.emplace_back(

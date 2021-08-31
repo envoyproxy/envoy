@@ -10,7 +10,6 @@ envoy_package()
 py_binary(
     name = "generate_extensions_security_rst",
     srcs = ["generate_extensions_security_rst.py"],
-    data = ["//source/extensions:extensions_metadata.yaml"],
     deps = [
         "//tools/base:utils",
     ],

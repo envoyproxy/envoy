@@ -16,8 +16,7 @@ namespace Quic {
 
 // Base class for EnvoyQuicServer|ClientStream.
 class EnvoyQuicStream : public virtual Http::StreamEncoder,
-                        public Http::Stream,
-                        public Http::StreamCallbackHelper,
+                        public Http::MultiplexedStreamImplBase,
                         public SendBufferMonitor,
                         public HeaderValidator,
                         protected Logger::Loggable<Logger::Id::quic_stream> {
@@ -28,7 +27,8 @@ public:
                   std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark, Http::Http3::CodecStats& stats,
                   const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
-      : stats_(stats), http3_options_(http3_options),
+      : Http::MultiplexedStreamImplBase(filter_manager_connection.dispatcher()), stats_(stats),
+        http3_options_(http3_options),
         send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
                                 std::move(above_high_watermark), ENVOY_LOGGER()),
         filter_manager_connection_(filter_manager_connection),
@@ -77,7 +77,7 @@ public:
   }
   uint32_t bufferLimit() override { return send_buffer_simulation_.highWatermark(); }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
-    return connection()->addressProvider().localAddress();
+    return connection()->connectionInfoProvider().localAddress();
   }
 
   void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {

@@ -65,7 +65,7 @@ public:
 
   void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
-    stream_info_.downstream_address_provider_->setLocalAddress(address_);
+    stream_info_.downstream_connection_info_provider_->setLocalAddress(address_);
   }
 
   void setRequestedServerName(std::string server_name) {

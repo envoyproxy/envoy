@@ -9,16 +9,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "api_type_oracle_lib",
-    srcs = ["api_type_oracle.cc"],
-    hdrs = ["api_type_oracle.h"],
-    deps = [
-        "//source/common/protobuf",
-        "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "api_version_lib",
     hdrs = ["api_version.h"],
 )
@@ -196,7 +186,6 @@ envoy_cc_library(
         ":delta_subscription_state_lib",
         ":grpc_stream_lib",
         ":pausable_ack_queue_lib",
-        ":version_converter_lib",
         ":watch_map_lib",
         ":xds_context_params_lib",
         ":xds_resource_lib",
@@ -217,7 +206,6 @@ envoy_cc_library(
     deps = [
         ":api_version_lib",
         ":decoded_resource_lib",
-        ":version_converter_lib",
         "//envoy/config:subscription_interface",
         "//envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
@@ -302,11 +290,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "resource_name_lib",
     hdrs = ["resource_name.h"],
-    deps = [
-        ":api_type_oracle_lib",
-        "//source/common/common:assert_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
+    deps = ["//source/common/common:assert_lib"],
 )
 
 envoy_cc_library(
@@ -383,8 +367,6 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
-        ":api_type_oracle_lib",
-        ":version_converter_lib",
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_interface",
         "//envoy/local_info:local_info_interface",
@@ -409,20 +391,6 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "version_converter_lib",
-    srcs = ["version_converter.cc"],
-    hdrs = ["version_converter.h"],
-    deps = [
-        ":api_type_oracle_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/protobuf",
-        "//source/common/protobuf:visitor_lib",
-        "//source/common/protobuf:well_known_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

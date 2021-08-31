@@ -1,6 +1,6 @@
 import types
 from importlib.machinery import ModuleSpec
-from unittest.mock import patch, PropertyMock
+from unittest.mock import patch, PropertyMock, call
 
 import pytest
 
@@ -26,7 +26,7 @@ def test_extensions_checker_all_extensions():
 
     assert (
         result
-        == set(_configured.keys()) | set(extensions_check.BUILTIN_EXTENSIONS))
+        == set(_configured.keys()) | set(extensions_check.BUILTIN_EXTENSIONS) | set(checker.configured_contrib_extensions.keys()))
     assert "all_extensions" in checker.__dict__
 
 
@@ -134,13 +134,13 @@ def test_extensions_metadata(patches, is_dict):
                 checker.metadata
 
     assert (
-        list(m_utils.from_yaml.call_args)
-        == [(extensions_check.METADATA_PATH,), {}])
+        list(m_utils.from_yaml.call_args_list)
+        == [call(extensions_check.METADATA_PATH), call(extensions_check.CONTRIB_METADATA_PATH)])
 
     if not is_dict:
         assert (
             e.value.args[0]
-            == f'Unable to parse configuration: {extensions_check.METADATA_PATH}')
+            == f'Unable to parse metadata: {extensions_check.METADATA_PATH} {extensions_check.CONTRIB_METADATA_PATH}')
         return
     assert "metadata" in checker.__dict__
 
@@ -339,7 +339,8 @@ def test_extensions__check_metadata_categories(ext_cats, all_cats):
     if wrong_cats:
         assert (
             result
-            == [f'Unknown extension category for EXTENSION: {cat}' for cat in wrong_cats])
+            == [f'Unknown extension category for EXTENSION: {cat}. '
+                'Please add it to tools/extensions/extensions_check.py' for cat in wrong_cats])
         return
 
     assert result == []

@@ -21,11 +21,14 @@ ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedP
                                                           original_transport, original_protocol);
   const bool created = shadow_router->createUpstreamRequest();
   if (!created) {
+    stats_.shadow_request_submit_failure_.inc();
     return absl::nullopt;
   }
 
-  LinkedList::moveIntoList(std::move(shadow_router), active_routers_);
-  return *active_routers_.front();
+  auto& active_routers = tls_->getTyped<ActiveRouters>().activeRouters();
+
+  LinkedList::moveIntoList(std::move(shadow_router), active_routers);
+  return *active_routers.front();
 }
 
 ShadowRouterImpl::ShadowRouterImpl(ShadowWriterImpl& parent, const std::string& cluster_name,
@@ -62,6 +65,18 @@ bool ShadowRouterImpl::createUpstreamRequest() {
 bool ShadowRouterImpl::requestStarted() const {
   return upstream_request_->conn_data_ != nullptr &&
          upstream_request_->upgrade_response_ == nullptr;
+}
+
+void ShadowRouterImpl::flushPendingCallbacks() {
+  if (pending_callbacks_.empty()) {
+    return;
+  }
+
+  for (auto& cb : pending_callbacks_) {
+    cb();
+  }
+
+  pending_callbacks_.clear();
 }
 
 FilterStatus ShadowRouterImpl::passthroughData(Buffer::Instance& data) {
@@ -315,6 +330,8 @@ bool ShadowRouterImpl::requestInProgress() {
 }
 
 void ShadowRouterImpl::onRouterDestroy() {
+  ASSERT(!deferred_deleting_);
+
   // Mark the shadow request to be destroyed when the response gets back
   // or the upstream connection finally fails.
   router_destroyed_ = true;
@@ -329,17 +346,22 @@ bool ShadowRouterImpl::waitingForConnection() const {
 }
 
 void ShadowRouterImpl::maybeCleanup() {
+  if (removed_) {
+    return;
+  }
+
+  ASSERT(!deferred_deleting_);
+
   if (router_destroyed_) {
-    upstream_request_.reset();
-    if (inserted()) {
-      removeFromList(parent_.active_routers_);
-    }
+    removed_ = true;
+    upstream_request_->resetStream();
+    parent_.remove(*this);
   }
 }
 
 void ShadowRouterImpl::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   const bool done =
-      upstream_request_->handleUpstreamData(data, end_stream, *this, *upstream_response_callbacks_);
+      upstream_request_->handleUpstreamData(data, end_stream, *upstream_response_callbacks_);
   if (done) {
     maybeCleanup();
   }
