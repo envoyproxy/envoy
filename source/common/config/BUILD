@@ -316,6 +316,7 @@ envoy_cc_library(
         "//envoy/config:subscription_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
