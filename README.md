@@ -70,8 +70,8 @@ have prior experience. To get started:
 
 ## Community Meeting
 
-The Envoy team meets twice per month on Tuesday at 9am PT. The public
-Google calendar is here: https://goo.gl/PkDijT
+The Envoy team meets twice per month on Tuesday at 11am PT. The public
+Google calendar is here: https://goo.gl/PkDijT (note: US Pacific Time)
 
 * Meeting minutes are [here](https://goo.gl/5Cergb)
 * Recorded videos are posted [here](https://www.youtube.com/channel/UC5z5mvPgqMs1xo5VuIWzYTA)
