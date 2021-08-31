@@ -204,6 +204,8 @@ private:
   bool requestInProgress();
   bool requestStarted() const;
   void flushPendingCallbacks();
+  FilterStatus runOrSave(std::function<FilterStatus()>&& cb,
+                         const std::function<void()>& on_save = {});
 
   ShadowWriterImpl& parent_;
   const std::string cluster_name_;
@@ -222,7 +224,7 @@ private:
   uint64_t response_size_{};
   bool request_ready_ : 1;
 
-  using ConverterCallback = std::function<void()>;
+  using ConverterCallback = std::function<FilterStatus()>;
   std::list<ConverterCallback> pending_callbacks_;
   bool removed_{};
   bool deferred_deleting_{};
