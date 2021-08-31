@@ -198,10 +198,13 @@ threshold for tracking and a single overload action entry that resets streams:
           saturation_threshold: 0.95
   ...
 
-By setting the `minimum_account_to_track_power_of_two` to `20`, we will only track
-streams using >= 1MB worth of allocated memory in buffers. Streams using >= 1MB
-will be classified into 8 power of two sized buckets. For this example, the
-buckets are as follows:
+We will only track streams using >=
+:math:`2^minimum_account_to_track_power_of_two` worth of allocated memory in
+buffers. In this case, by setting the `minimum_account_to_track_power_of_two`
+to `20` we will track streams using >= 1MiB since :math:`2^20` is 1MiB. Streams
+using >= 1MiB will be classified into 8 power of two sized buckets. Currently,
+the number of buckets is hardcoded to 8.  For this example, the buckets are as
+follows:
 
 .. list-table::
   :header-rows: 1
@@ -210,37 +213,37 @@ buckets are as follows:
   * - Bucket index
     - Contains streams using
   * - 0
-    - [1MB,2MB)
+    - [1MiB,2MiB)
   * - 1
-    - [2MB,4MB)
+    - [2MiB,4MiB)
   * - 2
-    - [4MB,8MB)
+    - [4MiB,8MiB)
   * - 3
-    - [8MB,16MB)
+    - [8MiB,16MiB)
   * - 4
-    - [16MB,32MB)
+    - [16MiB,32MiB)
   * - 5
-    - [32MB,64MB)
+    - [32MiB,64MiB)
   * - 6
-    - [64MB,128MB)
+    - [64MiB,128MiB)
   * - 7
-    - >= 128MB
+    - >= 128MiB
 
 The above configuration also configures the overload manager to reset our tracked
 streams based on heap usage as a trigger. When the heap usage is less than 85%,
 no streams will be reset.  When heap usage is at or above 85%, we start to
-reset certain buckets. When the heap usage is at 95% all streams using >= 1MB memory
-are eligible for reset.
+reset buckets according to the strategy described below. When the heap
+usage is at 95% all streams using >= 1MiB memory are eligible for reset.
 
 Given that there are only 8 buckets, we partition the space with a gradation of
 :math:`gradation = (saturation_threshold - scaling_threshold)/8`. Hence at 85%
-heap usage we reset streams in the last bucket e.g. those using `>= 128MB`. At
+heap usage we reset streams in the last bucket e.g. those using `>= 128MiB`. At
 :math:`85% + 1 * gradation` heap usage we reset streams in the last two buckets
-e.g. those using `>= 64MB`. And so forth as the heap usage is higher.
+e.g. those using `>= 64MiB`. And so forth as the heap usage is higher.
 
 It's expected that the first few gradations shouldn't trigger anything, unless
 there's something seriously wrong e.g. in this example streams using `>=
-128MB` in buffers.
+128MiB` in buffers.
 
 
 Statistics
