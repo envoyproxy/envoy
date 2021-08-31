@@ -133,6 +133,7 @@ private:
   envoy_logger logger_;
   envoy_event_tracker event_tracker_;
   Assert::ActionRegistrationPtr assert_handler_registration_;
+  Assert::ActionRegistrationPtr bug_handler_registration_;
   Thread::MutexBasicLockable mutex_;
   Thread::CondVar cv_;
   Http::ClientPtr http_client_;
