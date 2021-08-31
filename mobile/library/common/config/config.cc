@@ -81,6 +81,20 @@ const std::string config_header = R"(
         auto_sni: true
         auto_san_validation: true
 
+!ignore protocol_defs: &http1_protocol_options_defs
+    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+      "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+      explicit_http_config:
+        http_protocol_options:
+          header_key_format:
+            stateful_formatter:
+              name: preserve_case
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig
+      upstream_http_protocol_options:
+        auto_sni: true
+        auto_san_validation: true
+
 !ignore admin_interface_defs: &admin_interface
     address:
       socket_address:
@@ -291,6 +305,7 @@ R"(
       base_ejection_time: 0.001s
       max_ejection_time: 0.001s
       interval: 1s
+    typed_extension_protocol_options: *http1_protocol_options_defs
   - name: base_wlan
     connect_timeout: *connect_timeout
     lb_policy: CLUSTER_PROVIDED
@@ -299,6 +314,7 @@ R"(
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     outlier_detection: *base_outlier_detection
+    typed_extension_protocol_options: *http1_protocol_options_defs
   - name: base_wwan
     connect_timeout: *connect_timeout
     lb_policy: CLUSTER_PROVIDED
@@ -307,6 +323,7 @@ R"(
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     outlier_detection: *base_outlier_detection
+    typed_extension_protocol_options: *http1_protocol_options_defs
   - name: base_clear
     connect_timeout: *connect_timeout
     lb_policy: CLUSTER_PROVIDED
@@ -323,6 +340,7 @@ R"(
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     outlier_detection: *base_outlier_detection
+    typed_extension_protocol_options: *http1_protocol_options_defs
   - name: base_wwan_clear
     connect_timeout: *connect_timeout
     lb_policy: CLUSTER_PROVIDED
@@ -331,6 +349,7 @@ R"(
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     outlier_detection: *base_outlier_detection
+    typed_extension_protocol_options: *http1_protocol_options_defs
   - name: base_h2
     http2_protocol_options: {}
     connect_timeout: *connect_timeout
