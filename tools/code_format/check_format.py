@@ -1253,9 +1253,15 @@ if __name__ == "__main__":
     error_messages = []
     owned_directories = owned_directories(error_messages)
     if os.path.isfile(args.target_path):
-        if not args.target_path.startswith(EXCLUDED_PREFIXES) and args.target_path.endswith(
-                SUFFIXES):
-            error_messages += format_checker.check_format("./" + args.target_path)
+        # All of our EXCLUDED_PREFIXES start with "./", but the provided
+        # target path argument might not. Add it here if it is missing,
+        # and use that normalized path for both lookup and `check_format`.
+        normalized_target_path = args.target_path
+        if not normalized_target_path.startswith("./"):
+            normalized_target_path = "./" + normalized_target_path
+        if not normalized_target_path.startswith(
+                EXCLUDED_PREFIXES) and normalized_target_path.endswith(SUFFIXES):
+            error_messages += format_checker.check_format(normalized_target_path)
     else:
         results = []
 
