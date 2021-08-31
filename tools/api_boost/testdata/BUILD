@@ -19,16 +19,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "deprecate",
-    srcs = ["deprecate.cc"],
-    deps = [
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "elaborated_type",
     srcs = ["elaborated_type.cc"],
     deps = [
