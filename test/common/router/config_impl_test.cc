@@ -1231,8 +1231,8 @@ virtual_hosts:
           header_name: :path
       exact_match_map:
         map:
-          "/new_endpoint/foo": 
-            action: 
+          "/new_endpoint/foo":
+            action:
               name: route
               typed_config:
                 "@type": type.googleapis.com/envoy.config.route.v3.Route
@@ -1244,8 +1244,8 @@ virtual_hosts:
                 - header:
                     key: x-route-header
                     value: match_tree
-          "/new_endpoint/bar": 
-            action: 
+          "/new_endpoint/bar":
+            action:
               name: route
               typed_config:
                 "@type": type.googleapis.com/envoy.config.route.v3.Route
