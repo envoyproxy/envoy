@@ -238,7 +238,7 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
         received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
         rst);
     if (trailers == nullptr) {
-      onStreamError(close_connection_upon_invalid_header_, quic::QUIC_STREAM_EXCESSIVE_LOAD);
+      onStreamError(close_connection_upon_invalid_header_, rst);
       return;
     }
     request_decoder_->decodeTrailers(std::move(trailers));
