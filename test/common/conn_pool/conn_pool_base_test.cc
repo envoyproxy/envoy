@@ -20,13 +20,17 @@ using testing::Return;
 class TestActiveClient : public ActiveClient {
 public:
   using ActiveClient::ActiveClient;
-  void close() override { onEvent(Network::ConnectionEvent::LocalClose); }
+  void close() override {
+    onEvent(Network::ConnectionEvent::LocalClose);
+    closed_ = true;
+  }
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
   uint32_t numActiveStreams() const override { return active_streams_; }
   absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
 
   uint32_t active_streams_{};
+  bool closed_{};
 };
 
 class TestPendingStream : public PendingStream {
@@ -200,6 +204,174 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPreconnectNotHealthy) {
   // Preconnect won't occur if the host is not healthy.
   host_->healthFlagSet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);
   EXPECT_FALSE(pool_.maybePreconnectImpl(1));
+}
+
+TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationTimerNull) {
+  testing::InSequence s;
+
+  ON_CALL(*cluster_, maxConnectionDuration).WillByDefault(Return(absl::nullopt));
+
+  // Create a new stream using the pool
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  pool_.newStreamImpl(context_);
+  ASSERT_EQ(1, clients_.size());
+
+  // Expect the lifetime timer be null both before and after connecting,
+  // since maxConnectionDuration above returns nullopt.
+  EXPECT_CALL(pool_, onPoolReady);
+  EXPECT_EQ(ActiveClient::State::CONNECTING, clients_.back()->state());
+  EXPECT_EQ(nullptr, clients_.back()->lifetime_timer_);
+
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
+  EXPECT_EQ(nullptr, clients_.back()->lifetime_timer_);
+
+  // Close active stream and expect that the client goes back to ready
+  clients_.back()->active_streams_ = 0;
+  pool_.onStreamClosed(*clients_.back(), false);
+  EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
+  EXPECT_EQ(false, clients_.back()->closed_);
+
+  // We are only testing that the timer was never enabled. So, to clean up, just drain
+  // this pool manually.
+  pool_.startDrainImpl();
+}
+
+TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationTimerEnabled) {
+  testing::InSequence s;
+
+  ON_CALL(*cluster_, maxConnectionDuration)
+      .WillByDefault(Return(absl::optional<std::chrono::milliseconds>(900000)));
+
+  // Create a new stream using the pool
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  pool_.newStreamImpl(context_);
+  ASSERT_EQ(1, clients_.size());
+
+  // Expect the lifetime timer to only be enabled after connecting.
+  EXPECT_CALL(pool_, onPoolReady);
+  EXPECT_EQ(ActiveClient::State::CONNECTING, clients_.back()->state());
+  EXPECT_EQ(nullptr, clients_.back()->lifetime_timer_);
+
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
+  EXPECT_EQ(true, clients_.back()->lifetime_timer_->enabled());
+
+  // Close active stream and expect that the client goes back to ready
+  clients_.back()->active_streams_ = 0;
+  pool_.onStreamClosed(*clients_.back(), false);
+  EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
+  EXPECT_EQ(false, clients_.back()->closed_);
+
+  // We are only testing that the timer was enabled. So, to clean up, just disable
+  // the timer and drain this pool manually.
+  clients_.back()->lifetime_timer_->disableTimer();
+  pool_.startDrainImpl();
+}
+
+TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationBusy) {
+  // Create a new stream using the pool
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  pool_.newStreamImpl(context_);
+  ASSERT_EQ(1, clients_.size());
+
+  // Connect and expect busy (1 stream per connection)
+  EXPECT_CALL(pool_, onPoolReady);
+  EXPECT_EQ(ActiveClient::State::CONNECTING, clients_.back()->state());
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
+
+  // Verify that the onLifetimeTimeout transitions a busy client to draining
+  clients_.back()->onLifetimeTimeout();
+  EXPECT_EQ(1,
+            clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
+  EXPECT_EQ(ActiveClient::State::DRAINING, clients_.back()->state());
+
+  // Close active stream and expect that the client closes, since it was previously
+  // draining.
+  clients_.back()->active_streams_ = 0;
+  pool_.onStreamClosed(*clients_.back(), false);
+  EXPECT_EQ(true, clients_.back()->closed_);
+}
+
+TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationReady) {
+  // Create a new stream using the pool
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  pool_.newStreamImpl(context_);
+  ASSERT_EQ(1, clients_.size());
+
+  // Connect and expect busy (1 stream per connection)
+  EXPECT_CALL(pool_, onPoolReady);
+  EXPECT_EQ(ActiveClient::State::CONNECTING, clients_.back()->state());
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
+
+  // Close active stream and expect that the client goes back to ready
+  clients_.back()->active_streams_ = 0;
+  pool_.onStreamClosed(*clients_.back(), false);
+  EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
+  EXPECT_EQ(false, clients_.back()->closed_);
+
+  // Verify that the onLifetimeTimeout transitions a ready client to closed,
+  // because there are no active streams.
+  clients_.back()->onLifetimeTimeout();
+  EXPECT_EQ(1,
+            clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
+  EXPECT_EQ(true, clients_.back()->closed_);
+}
+
+TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationAlreadyClosed) {
+  // Use a stream limit of 1 to force draining.
+  stream_limit_ = 1;
+
+  // Create a new stream using the pool
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  pool_.newStreamImpl(context_);
+  ASSERT_EQ(1, clients_.size());
+
+  // Connect and expect draining (stream limit is only 1)
+  EXPECT_CALL(pool_, onPoolReady);
+  EXPECT_EQ(ActiveClient::State::CONNECTING, clients_.back()->state());
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(ActiveClient::State::DRAINING, clients_.back()->state());
+
+  // Close active stream and expect that the client closes
+  clients_.back()->active_streams_ = 0;
+  pool_.onStreamClosed(*clients_.back(), false);
+  EXPECT_EQ(true, clients_.back()->closed_);
+
+  // Verify that the onLifetimeTimeout does nothing to an active client
+  // that is already closed.
+  clients_.back()->onLifetimeTimeout();
+  EXPECT_EQ(0,
+            clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
+}
+
+TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationAlreadyDraining) {
+  // Use a stream limit of 1 to force draining.
+  stream_limit_ = 1;
+
+  // Create a new stream using the pool
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  pool_.newStreamImpl(context_);
+  ASSERT_EQ(1, clients_.size());
+
+  // Connect and expect draining (stream limit is only 1)
+  EXPECT_CALL(pool_, onPoolReady);
+  EXPECT_EQ(ActiveClient::State::CONNECTING, clients_.back()->state());
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(ActiveClient::State::DRAINING, clients_.back()->state());
+
+  // Verify that the onLifetimeTimeout does nothing to an active client
+  // that is already draining.
+  clients_.back()->onLifetimeTimeout();
+  EXPECT_EQ(0,
+            clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
+
+  // Close active stream and expect that the client closes
+  clients_.back()->active_streams_ = 0;
+  pool_.onStreamClosed(*clients_.back(), false);
+  EXPECT_EQ(true, clients_.back()->closed_);
 }
 
 // Remote close simulates the peer closing the connection.

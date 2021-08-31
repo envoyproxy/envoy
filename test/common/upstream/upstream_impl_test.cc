@@ -2807,10 +2807,51 @@ TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
 )EOF";
 
   auto cluster = makeCluster(yaml);
-  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  EXPECT_FALSE(cluster_config.has_connect_timeout());
   EXPECT_EQ(std::chrono::seconds(5), cluster->info()->connectTimeout());
+}
+
+TEST_F(ClusterInfoImplTest, MaxConnectionDurationTest) {
+  const std::string yaml_default_max_connection_duration = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  )EOF";
+
+  const std::string yaml_set_max_connection_duration = R"EOF(
+  name: cluster2
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  typed_extension_protocol_options:
+    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+      "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+      explicit_http_config:
+        http_protocol_options: {}
+      common_http_protocol_options:
+        max_connection_duration: 9s
+  )EOF";
+
+  const std::string yaml_zero_max_connection_duration = R"EOF(
+  name: cluster2
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  typed_extension_protocol_options:
+    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+      "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+      explicit_http_config:
+        http_protocol_options: {}
+      common_http_protocol_options:
+        max_connection_duration: 0s
+  )EOF";
+
+  auto cluster1 = makeCluster(yaml_default_max_connection_duration);
+  EXPECT_EQ(absl::nullopt, cluster1->info()->maxConnectionDuration());
+
+  auto cluster2 = makeCluster(yaml_set_max_connection_duration);
+  EXPECT_EQ(std::chrono::seconds(9), cluster2->info()->maxConnectionDuration());
+
+  auto cluster3 = makeCluster(yaml_zero_max_connection_duration);
+  EXPECT_EQ(absl::nullopt, cluster3->info()->maxConnectionDuration());
 }
 
 TEST_F(ClusterInfoImplTest, Timeouts) {

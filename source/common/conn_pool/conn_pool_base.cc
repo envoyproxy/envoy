@@ -1,6 +1,5 @@
-#include "source/common/conn_pool/conn_pool_base.h"
-
 #include "source/common/common/assert.h"
+#include "source/common/conn_pool/conn_pool_base.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
@@ -469,6 +468,14 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     ASSERT(client.state() == ActiveClient::State::CONNECTING);
     transitionActiveClientState(client, ActiveClient::State::READY);
 
+    // Now that the active client is ready, set up a timer for max connection duration.
+    const auto max_connection_duration = client.parent_.host()->cluster().maxConnectionDuration();
+    if (max_connection_duration) {
+      client.lifetime_timer_ = client.parent_.dispatcher().createTimer(
+          [&client]() -> void { client.onLifetimeTimeout(); });
+      client.lifetime_timer_->enableTimer(max_connection_duration.value());
+    }
+
     // At this point, for the mixed ALPN pool, the client may be deleted. Do not
     // refer to client after this point.
     onConnected(client);
@@ -564,11 +571,6 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
   conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       parent_.host()->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher().timeSource());
   connect_timer_->enableTimer(parent_.host()->cluster().connectTimeout());
-  const auto max_connection_duration = parent_.host()->cluster().maxConnectionDuration();
-  if (max_connection_duration) {
-    lifetime_timer_ = parent_.dispatcher().createTimer([this]() -> void { onLifetimeTimeout(); });
-    lifetime_timer_->enableTimer(max_connection_duration.value());
-  }
   parent_.host()->stats().cx_total_.inc();
   parent_.host()->stats().cx_active_.inc();
   parent_.host()->cluster().stats().upstream_cx_total_.inc();
@@ -602,11 +604,23 @@ void ActiveClient::onConnectTimeout() {
 }
 
 void ActiveClient::onLifetimeTimeout() {
-  if (state_ != ActiveClient::State::CLOSED) {
-    ENVOY_CONN_LOG(debug, "lifetime timeout, DRAINING", *this);
-    parent_.host()->cluster().stats().upstream_cx_max_duration_.inc();
-    parent_.transitionActiveClientState(*this,
-                                        Envoy::ConnectionPool::ActiveClient::State::DRAINING);
+  // The lifetime timer should only have started after we left the CONNECTING state.
+  ASSERT(state_ != ActiveClient::State::CONNECTING);
+
+  // There's nothing to do if the client is already closed or draining.
+  if (state_ == ActiveClient::State::CLOSED || state_ == ActiveClient::State::DRAINING) {
+    return;
+  }
+
+  ENVOY_CONN_LOG(debug, "lifetime timeout, DRAINING", *this);
+  parent_.host()->cluster().stats().upstream_cx_max_duration_.inc();
+  parent_.transitionActiveClientState(*this, Envoy::ConnectionPool::ActiveClient::State::DRAINING);
+
+  // Close out the draining client if we no longer have active streams.
+  // We have to do this here because there won't be an onStreamClosed (because there are
+  // no active streams) to do it for us later.
+  if (numActiveStreams() == 0) {
+    close();
   }
 }
 
