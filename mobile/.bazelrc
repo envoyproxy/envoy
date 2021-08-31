@@ -36,7 +36,7 @@ build --@envoy//bazel:http3=False
 build:ios --define=manual_stamp=manual_stamp
 
 # Default flags for builds targeting Android
-build:android --define=logger=android
+build:android --define=logger=android --define=include_ifaddrs=true
 
 # Locally-runnable ASAN config for MacOS & Linux with standard dev environment
 # See also:
