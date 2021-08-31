@@ -75,6 +75,9 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
   // Network::ListenerFilterManager
   void addAcceptFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
                        Network::ListenerFilterPtr&& filter) override {
+    if (filter->inspectSize() > inspect_buffer_size_) {
+      inspect_buffer_size_ = filter->inspectSize();
+    }
     accept_filters_.emplace_back(
         std::make_unique<GenericListenerFilter>(listener_filter_matcher, std::move(filter)));
   }
