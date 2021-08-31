@@ -1,5 +1,7 @@
 #include "test/mocks/common.h"
 
+using testing::_;
+using testing::ByMove;
 using testing::Return;
 
 namespace Envoy {
@@ -21,5 +23,10 @@ ReadyWatcher::~ReadyWatcher() = default;
 
 MockTimeSystem::MockTimeSystem() = default;
 MockTimeSystem::~MockTimeSystem() = default;
+
+MockKeyValueStoreFactory::MockKeyValueStoreFactory() {
+  ON_CALL(*this, createStore(_, _, _, _))
+      .WillByDefault(Return(ByMove(std::make_unique<MockKeyValueStore>())));
+}
 
 } // namespace Envoy

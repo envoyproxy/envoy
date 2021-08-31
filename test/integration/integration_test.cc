@@ -3,8 +3,8 @@
 #include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/config/filter/http/grpc_http1_bridge/v2/config.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/http/header_map_impl.h"
@@ -68,7 +68,7 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
-        addr_socket.second->addressProvider().localAddress()->ip()->port());
+        addr_socket.second->connectionInfoProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_PREBIND);
     socket_option->set_level(10000);     // Invalid level.
@@ -89,7 +89,7 @@ TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
-        addr_socket.second->addressProvider().localAddress()->ip()->port());
+        addr_socket.second->connectionInfoProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_BOUND);
     socket_option->set_level(10000);     // Invalid level.
@@ -622,16 +622,13 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
 }
 
-const ::envoy::config::filter::http::grpc_http1_bridge::v2::Config _grpc_http1_bridge_dummy;
-
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a local error reply.
 TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
   config_helper_.addFilter(
       "{ name: grpc_http1_bridge, typed_config: { \"@type\": "
-      "type.googleapis.com/envoy.config.filter.http.grpc_http1_bridge.v2.Config } }");
+      "type.googleapis.com/envoy.extensions.filters.http.grpc_http1_bridge.v3.Config } }");
   config_helper_.setBufferLimits(1024, 1024);
-
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1406,7 +1403,7 @@ TEST_P(IntegrationTest, TestBind) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_NE(fake_upstream_connection_, nullptr);
   std::string address = fake_upstream_connection_->connection()
-                            .addressProvider()
+                            .connectionInfoProvider()
                             .remoteAddress()
                             ->ip()
                             ->addressAsString();
