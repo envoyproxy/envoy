@@ -90,7 +90,7 @@ Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
             .first;
     subscriptions_.emplace(
         type_url, subscription_state_factory_->makeSubscriptionState(
-                      type_url, *watch_maps_[type_url], resource_decoder, resources.empty()));
+                      type_url, *watch_maps_[type_url], resource_decoder));
     subscription_ordering_.emplace_back(type_url);
   }
 

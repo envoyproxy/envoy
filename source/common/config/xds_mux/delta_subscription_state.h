@@ -114,8 +114,8 @@ public:
   ~DeltaSubscriptionStateFactory() override = default;
   std::unique_ptr<DeltaSubscriptionState>
   makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        OpaqueResourceDecoder&, const bool wildcard) override {
-    return std::make_unique<DeltaSubscriptionState>(type_url, callbacks, dispatcher_, wildcard);
+                        OpaqueResourceDecoder&) override {
+    return std::make_unique<DeltaSubscriptionState>(type_url, callbacks, dispatcher_);
   }
 
 private:
