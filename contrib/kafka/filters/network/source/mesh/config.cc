@@ -28,8 +28,11 @@ Network::FilterFactoryCb KafkaMeshConfigFactory::createFilterFactoryFromProtoTyp
 #ifdef WIN32
   throw EnvoyException("Kafka mesh filter is not supported on Windows");
 #else
+  // Shared configuration (tells us where the upstream clusters are).
   const UpstreamKafkaConfigurationSharedPtr configuration =
       std::make_shared<UpstreamKafkaConfigurationImpl>(config);
+
+  // Shared upstream facade (connects us to upstream Kafka clusters).
   const UpstreamKafkaFacadeSharedPtr upstream_kafka_facade =
       std::make_shared<UpstreamKafkaFacadeImpl>(*configuration, context.threadLocal(),
                                                 context.api().threadFactory());

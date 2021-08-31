@@ -3,10 +3,10 @@
 Kafka Mesh filter
 ===================
 
-The Apache Kafka mesh filter provides a facade for `Apache Kafka <https://kafka.apache.org/>`_ producers.
-Produce requests sent to this filter insance can be forwarded to one of multiple clusters, depending on configured forwarding rules.
-The message versions in `Kafka 2.4.0 <http://kafka.apache.org/24/protocol.html#protocol_api_keys>`_
-are supported.
+The Apache Kafka mesh filter provides a facade for `Apache Kafka <https://kafka.apache.org/>`_
+producers. Produce requests sent to this filter insance can be forwarded to one of multiple
+clusters, depending on configured forwarding rules. Corresponding message versions from
+Kafka 2.4.0 are supported.
 
 .. attention::
 
@@ -23,7 +23,8 @@ Configuration
 -------------
 
 Below example shows us typical filter configuration that proxies 3 Kafka clusters.
-Clients are going to connect to '127.0.0.1:19092', and their messages are going to be distributed to cluster depending on topic names.
+Clients are going to connect to '127.0.0.1:19092', and their messages are going to be distributed
+to cluster depending on topic names.
 
 .. code-block:: yaml
 
@@ -64,20 +65,29 @@ Clients are going to connect to '127.0.0.1:19092', and their messages are going 
 
 Notes
 -----
-Given that this filter does its own processing of received requests, there are some changes in behaviour compared to explicit connection to a Kafka cluster:
+Given that this filter does its own processing of received requests, there are some changes
+in behaviour compared to explicit connection to a Kafka cluster:
 
 #. Record headers are not sent upstream.
-#. Only ProduceRequests with version 2 are supported (what means very old producers like 0.8 are not going to be supported).
-#. Python producers need to set API version of at least 1.0.0, so that the produce requests they send are going to have records with magic equal to 2.
+#. Only ProduceRequests with version 2 are supported (what means very old producers like 0.8 are
+   not going to be supported).
+#. Python producers need to set API version of at least 1.0.0, so that the produce requests they
+   send are going to have records with magic equal to 2.
 #. Downstream handling of Kafka producer 'acks' property is delegated to upstream client.
-   E.g. if upstream client is configured to use acks=0 then the response is going to be sent to downstream client as soon as possible (even if they had non-zero acks!).
-#. As the filter splits single producer requests into separate records, it's possible that delivery of only some of these records fails.
-   In that case, the response returned to upstream client is a failure, however it is possible some of the records have been appended in target cluster.
-#. Because of the splitting mentioned above, records are not necessarily appended one after another (as they do not get sent as single request to upstream).
-   Users that want to avoid this scenario might want to take a look into downstream producer configs: 'linger.ms' and 'batch.size'.
-#. Produce requests that reference to topics that do not match any of the rules are going to close connection and fail.
-   This usually should not happen (clients request metadata first, and they should then fail with 'no broker available' first),
-   but is possible if someone tailors binary payloads over the connection.
-#. librdkafka was compiled without ssl, lz4, gssapi, so related custom producer config options are not supported.
-#. Invalid custom producer configs are not found at startup (only when appropriate clusters are being sent to).
-   Requests that would have referenced these clusters are going to close connection and fail.
+   E.g. if upstream client is configured to use acks=0 then the response is going to be sent
+   to downstream client as soon as possible (even if they had non-zero acks!).
+#. As the filter splits single producer requests into separate records, it's possible that delivery
+   of only some of these records fails. In that case, the response returned to upstream client is
+  a failure, however it is possible some of the records have been appended in target cluster.
+#. Because of the splitting mentioned above, records are not necessarily appended one after another
+   (as they do not get sent as single request to upstream). Users that want to avoid this scenario
+   might want to take a look into downstream producer configs: 'linger.ms' and 'batch.size'.
+#. Produce requests that reference to topics that do not match any of the rules are going to close
+   connection and fail. This usually should not happen (clients request metadata first, and they
+   should then fail with 'no broker available' first), but is possible if someone tailors binary
+   payloads over the connection.
+#. librdkafka was compiled without ssl, lz4, gssapi, so related custom producer config options are
+   not supported.
+#. Invalid custom producer configs are not found at startup (only when appropriate clusters are
+   being sent to). Requests that would have referenced these clusters are going to close connection
+   and fail.
