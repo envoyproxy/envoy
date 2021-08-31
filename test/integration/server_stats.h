@@ -67,6 +67,15 @@ public:
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
 
   /**
+   * Wait for a gauge to be destroyed. Note that MockStatStore does not destroy stat.
+   * @param name gauge name.
+   * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
+   */
+  virtual void
+  waitForGaugeDestroyed(const std::string& name,
+                        std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
+
+  /**
    * Counter lookup. This is not thread safe, since we don't get a consistent
    * snapshot, uses counters() instead for this behavior.
    * @param name counter name.

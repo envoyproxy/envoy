@@ -462,6 +462,12 @@ public:
     notifyingStatsAllocator().waitForCounterExists(name);
   }
 
+  void waitForGaugeDestroyed(
+      const std::string& name,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForGaugeDestroyed(statStore(), name, time_system_, timeout));
+  }
+
   void waitUntilHistogramHasSamples(
       const std::string& name,
       std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {

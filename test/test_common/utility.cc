@@ -238,6 +238,26 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
   return AssertionSuccess();
 }
 
+AssertionResult TestUtility::waitForGaugeDestroyed(Stats::Store& store, const std::string& name,
+                                                   Event::TestTimeSystem& time_system,
+                                                   std::chrono::milliseconds timeout) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (findGauge(store, name) != nullptr) {
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      std::string current_value;
+      if (findGauge(store, name)) {
+        current_value = absl::StrCat(findGauge(store, name)->value());
+      } else {
+        current_value = "nil";
+      }
+      return AssertionFailure() << fmt::format(
+                 "timed out waiting for {} destroyed, current value {}", name, current_value);
+    }
+  }
+  return AssertionSuccess();
+}
+
 AssertionResult TestUtility::waitUntilHistogramHasSamples(Stats::Store& store,
                                                           const std::string& name,
                                                           Event::TestTimeSystem& time_system,
