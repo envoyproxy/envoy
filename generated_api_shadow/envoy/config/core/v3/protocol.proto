@@ -491,7 +491,7 @@ message Http3ProtocolOptions {
   // and settings `proposed for HTTP/3
   // <https://github.com/RyanTheOptimist/httpbis-h3-websockets/blob/main/draft-hamilton-httpbis-h3-websockets.md>`_
   // [#alpha:] as HTTP/3 CONNECT is not yet an RFC.
-  bool allow_upgrade_connect = 5;
+  bool allow_extended_connect = 5;
 }
 
 // A message to control transformations to the :scheme header

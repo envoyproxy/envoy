@@ -672,7 +672,7 @@ void ConfigHelper::setConnectConfig(
   hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
   hcm.mutable_http2_protocol_options()->set_allow_connect(true);
   if (http3) {
-    hcm.mutable_http3_protocol_options()->set_allow_upgrade_connect(true);
+    hcm.mutable_http3_protocol_options()->set_allow_extended_connect(true);
   }
 }
 

@@ -14,7 +14,7 @@ namespace {
 // Terminating CONNECT and sending raw TCP upstream.
 class ConnectTerminationIntegrationTest : public HttpProtocolIntegrationTest {
 public:
-  ConnectTerminationIntegrationTest() : HttpProtocolIntegrationTest() { enableHalfClose(true); }
+  ConnectTerminationIntegrationTest() { enableHalfClose(true); }
 
   void initialize() override {
     config_helper_.addConfigModifier(
@@ -66,12 +66,40 @@ public:
                                                   {":protocol", "bytestream"},
                                                   {":scheme", "https"},
                                                   {":authority", "host:80"}};
+  void clearExtendedConnectHeaders() {
+    connect_headers_.removeProtocol();
+    connect_headers_.removePath();
+  }
+
   FakeRawConnectionPtr fake_raw_upstream_connection_;
   IntegrationStreamDecoderPtr response_;
   bool enable_timeout_{};
   bool exact_match_{};
   bool allow_post_{};
 };
+
+TEST_P(ConnectTerminationIntegrationTest, OriginalStyle) {
+  initialize();
+  clearExtendedConnectHeaders();
+
+  setUpConnection();
+  sendBidirectionalData("hello", "hello", "there!", "there!");
+  // Send a second set of data to make sure for example headers are only sent once.
+  sendBidirectionalData(",bye", "hello,bye", "ack", "there!ack");
+
+  // Send an end stream. This should result in half close upstream.
+  codec_client_->sendData(*request_encoder_, "", true);
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
+
+  // Now send a FIN from upstream. This should result in clean shutdown downstream.
+  ASSERT_TRUE(fake_raw_upstream_connection_->close());
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(response_->waitForEndStream());
+    ASSERT_FALSE(response_->reset());
+  }
+}
 
 TEST_P(ConnectTerminationIntegrationTest, Basic) {
   initialize();
@@ -473,7 +501,7 @@ using Params = std::tuple<Network::Address::IpVersion, Http::CodecType>;
 // Tunneling downstream TCP over an upstream HTTP CONNECT tunnel.
 class TcpTunnelingIntegrationTest : public HttpProtocolIntegrationTest {
 public:
-  TcpTunnelingIntegrationTest() : HttpProtocolIntegrationTest() {}
+  TcpTunnelingIntegrationTest() {}
 
   void SetUp() override {
     enableHalfClose(true);
