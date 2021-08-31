@@ -87,6 +87,8 @@ public:
 
 private:
   Configuration::FactoryContext& parent_context_;
+  // filter_chain_scope_ has the exact prefix as listener owners scope.
+  Stats::ScopePtr filter_chain_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
 };
