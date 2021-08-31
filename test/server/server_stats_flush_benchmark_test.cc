@@ -10,6 +10,7 @@
 #include "test/benchmark/main.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "benchmark/benchmark.h"
