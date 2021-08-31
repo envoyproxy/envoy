@@ -36,6 +36,7 @@ MAINTAINERS = {
 # notifications but not result in a PR not getting assigned a
 # maintainer owner.
 FIRST_PASS = {
+    'adisuissa': 'UT17EMMTP',
     'dmitri-d' : 'UB1883Q5S',
     'tonya11en' : 'U989BG2CW',
     'esmet' : 'U01BCGBUUAE',
@@ -161,7 +162,7 @@ def track_prs():
         message = pr_message(delta, pr_info.html_url, pr_info.title, delta_days, delta_hours)
 
         if (needs_api_review(labels, repo, pr_info)):
-          add_reminders(pr_info.assignees, api_review_and_prs, message, API_REVIEWERS, [])
+            add_reminders(pr_info.assignees, api_review_and_prs, message, API_REVIEWERS, [])
 
         # If the PR has been out-SLO for over a day, inform on-call
         if delta > datetime.timedelta(hours=get_slo_hours() + 36):
