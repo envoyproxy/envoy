@@ -25,7 +25,6 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::Eq;
-using testing::UnorderedPointwise;
 
 namespace Envoy {
 namespace Upstream {
