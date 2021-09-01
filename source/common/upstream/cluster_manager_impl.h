@@ -467,9 +467,15 @@ private:
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   const absl::optional<LocalClusterParams>& local_cluster_params);
     ~ThreadLocalClusterManagerImpl() override;
+    // TODO(junr03): clean up drainConnPools vs drainAllConnPools once ConnPoolImplBase::startDrain
+    // and
+    // ConnPoolImplBase::drainConnections() get cleaned up. The code in onHostHealthFailure and the
+    // code in ThreadLocalClusterManagerImpl::drainConnPools(const HostVector& hosts) is very
+    // similar and can be merged in a similar fashion to the ConnPoolImplBase case.
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
     void drainTcpConnPools(TcpConnPoolsContainer& container);
+    void drainAllConnPoolsWorker(const HostSharedPtr& host);
     void httpConnPoolIsIdle(HostConstSharedPtr host, ResourcePriority priority,
                             const std::vector<uint8_t>& hash_key);
     void tcpConnPoolIsIdle(HostConstSharedPtr host, const std::vector<uint8_t>& hash_key);
