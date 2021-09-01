@@ -100,7 +100,7 @@ FilterStatus ShadowRouterImpl::passthroughData(Buffer::Instance& data) {
   }
 
   auto copied = std::make_shared<Buffer::OwnedImpl>(data);
-  auto cb = [copied = std::move(copied), this]() mutable {
+  auto cb = [copied = std::move(copied), this]() mutable -> FilterStatus {
     return ProtocolConverter::passthroughData(*copied);
   };
   pending_callbacks_.push_back(std::move(cb));
@@ -113,7 +113,7 @@ FilterStatus ShadowRouterImpl::structBegin(absl::string_view name) {
     return ProtocolConverter::structBegin(name);
   }
 
-  auto cb = [name_str = std::string(name), this]() {
+  auto cb = [name_str = std::string(name), this]() -> FilterStatus {
     return ProtocolConverter::structBegin(absl::string_view(name_str));
   };
   pending_callbacks_.push_back(std::move(cb));

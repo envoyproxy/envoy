@@ -199,6 +199,7 @@ public:
 
 private:
   friend class ShadowWriterTest;
+  using ConverterCallback = std::function<FilterStatus()>;
 
   void writeRequest();
   bool requestInProgress();
@@ -224,7 +225,6 @@ private:
   uint64_t response_size_{};
   bool request_ready_ : 1;
 
-  using ConverterCallback = std::function<FilterStatus()>;
   std::list<ConverterCallback> pending_callbacks_;
   bool removed_{};
   bool deferred_deleting_{};
