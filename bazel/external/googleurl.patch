@@ -2,7 +2,7 @@
 # project using clang-cl. Tracked in https://github.com/envoyproxy/envoy/issues/11974.
 
 diff --git a/base/compiler_specific.h b/base/compiler_specific.h
-index 3faca72..a3adb1b 100644
+index 6651220..e2eda77 100644
 --- a/base/compiler_specific.h
 +++ b/base/compiler_specific.h
 @@ -7,10 +7,6 @@
@@ -56,10 +56,10 @@ index 3faca72..a3adb1b 100644
 # https://github.com/envoyproxy/envoy/issues/14743.
 
 diff --git a/url/BUILD b/url/BUILD
-index 6ed3fc5..e9d9ac3 100644
+index f2ec8da..951039b 100644
 --- a/url/BUILD
 +++ b/url/BUILD
-@@ -54,3 +54,30 @@ cc_library(
+@@ -52,3 +52,27 @@ cc_library(
          "//polyfills",
      ] + build_config.icuuc_deps,
  )
@@ -79,10 +79,7 @@ index 6ed3fc5..e9d9ac3 100644
 +       "url_canon_stdstring.h",
 +       "url_parse_internal.h",
 +    ],
-+    copts = build_config.default_copts + select({
-+        "@envoy//bazel:windows_x86_64": ["-wd2397"],
-+        "//conditions:default": ["-Wno-c++11-narrowing"],
-+    }),
++    copts = build_config.default_copts,
 +    visibility = ["//visibility:public"],
 +    deps = [
 +       "//base",
