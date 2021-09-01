@@ -61,6 +61,9 @@ to cluster depending on topic names.
           - target_cluster: kafka_c3
             topic_prefix: cherries
 
+It should be noted that Kafka broker filter can be inserted before Kafka mesh filter in the filter
+chain to capture the request processing metrics.
+
 .. _config_network_filters_kafka_mesh_notes:
 
 Notes
@@ -78,7 +81,7 @@ in behaviour compared to explicit connection to a Kafka cluster:
    to downstream client as soon as possible (even if they had non-zero acks!).
 #. As the filter splits single producer requests into separate records, it's possible that delivery
    of only some of these records fails. In that case, the response returned to upstream client is
-  a failure, however it is possible some of the records have been appended in target cluster.
+   a failure, however it is possible some of the records have been appended in target cluster.
 #. Because of the splitting mentioned above, records are not necessarily appended one after another
    (as they do not get sent as single request to upstream). Users that want to avoid this scenario
    might want to take a look into downstream producer configs: 'linger.ms' and 'batch.size'.
