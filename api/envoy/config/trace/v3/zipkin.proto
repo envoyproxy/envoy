@@ -61,8 +61,7 @@ message ZipkinConfig {
   // The default value is true.
   google.protobuf.BoolValue shared_span_context = 4;
 
-  // Determines the selected collector endpoint version. By default, the ``HTTP_JSON_V1`` will be
-  // used.
+  // Determines the selected collector endpoint version.
   CollectorEndpointVersion collector_endpoint_version = 5;
 
   // Optional hostname to use when sending spans to the collector_cluster. Useful for collectors
