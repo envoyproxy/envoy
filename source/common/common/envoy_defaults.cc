@@ -73,8 +73,9 @@ absl::optional<ProtobufWkt::Value> DefaultsProfile::getProtoValue(const std::str
   // case: `field` exists in a map of multiple fields
   if (config_it != fields_map.end()) {
     const ProtobufWkt::Value submap = (config_it->second).edge_config().example();
-    if (!submap.has_struct_value())
+    if (!submap.has_struct_value()) {
       return absl::nullopt;
+    }
     const Protobuf::Map<std::string, ProtobufWkt::Value> fields_submap =
         submap.struct_value().fields();
 
