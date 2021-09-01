@@ -12,9 +12,6 @@ namespace GrpcCommon {
 GrpcAccessLoggerCacheSharedPtr
 getGrpcAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& context);
 
-void checkGrpcCluster(const envoy::config::core::v3::GrpcService& config,
-                      Envoy::Upstream::ClusterManager::ClusterInfoMaps all_clusters);
-
 } // namespace GrpcCommon
 } // namespace AccessLoggers
 } // namespace Extensions

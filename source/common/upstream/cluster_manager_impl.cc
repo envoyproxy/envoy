@@ -971,6 +971,11 @@ void ClusterManagerImpl::drainConnections() {
   });
 }
 
+bool ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
+  const auto& it = active_clusters_.find(cluster);
+  return it != active_clusters_.end() && !it->second->added_via_api_;
+}
+
 void ClusterManagerImpl::postThreadLocalRemoveHosts(const Cluster& cluster,
                                                     const HostVector& hosts_removed) {
   tls_.runOnAllThreads([name = cluster.info()->name(),

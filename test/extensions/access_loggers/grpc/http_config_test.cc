@@ -34,12 +34,9 @@ public:
 
   void run(const std::string cluster_name) {
     const auto fake_static = "fake_static";
-    const auto fake_added_via_api = "fake_added_via_api";
-    context_.cluster_manager_.initializeClusters({fake_static, fake_added_via_api}, {});
-    ON_CALL(*context_.cluster_manager_.active_clusters_[fake_static]->info_, addedViaApi())
-        .WillByDefault(Return(false));
-    ON_CALL(*context_.cluster_manager_.active_clusters_[fake_added_via_api]->info_, addedViaApi())
-        .WillByDefault(Return(true));
+    ON_CALL(context_.cluster_manager_, checkActiveStaticCluster(fake_static))
+        .WillByDefault(
+            Invoke([fake_static](const std::string& cluster) { return fake_static == cluster; }));
 
     auto* common_config = http_grpc_access_log_.mutable_common_config();
     common_config->set_log_name("foo");
@@ -56,14 +53,10 @@ public:
           factory_->createAccessLogInstance(*message_, std::move(filter_), context_);
       EXPECT_NE(nullptr, instance);
       EXPECT_NE(nullptr, dynamic_cast<HttpGrpcAccessLog*>(instance.get()));
-    } else if (cluster_name == fake_added_via_api) {
-      EXPECT_THROW_WITH_MESSAGE(
-          factory_->createAccessLogInstance(*message_, std::move(filter_), context_),
-          EnvoyException, fmt::format("gRPC client cluster '{}' is not static", cluster_name));
     } else {
       EXPECT_THROW_WITH_MESSAGE(
           factory_->createAccessLogInstance(*message_, std::move(filter_), context_),
-          EnvoyException, fmt::format("Unknown gRPC client cluster '{}'", cluster_name));
+          EnvoyException, fmt::format("cluster '{}' is unknown or not static", cluster_name));
     }
   }
 
@@ -78,10 +71,7 @@ public:
 TEST_F(HttpGrpcAccessLogConfigTest, Ok) { run("fake_static"); }
 
 // Wrong configuration with invalid clusters.
-TEST_F(HttpGrpcAccessLogConfigTest, InvalidCluster) {
-  run("fake_added_via_api");
-  run("non_exist");
-}
+TEST_F(HttpGrpcAccessLogConfigTest, InvalidCluster) { run("invalid"); }
 
 } // namespace
 } // namespace HttpGrpc

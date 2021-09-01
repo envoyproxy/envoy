@@ -27,8 +27,13 @@ AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
       const envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  GrpcCommon::checkGrpcCluster(proto_config.common_config().grpc_service(),
-                               context.clusterManager().clusters());
+  const auto service_config = proto_config.common_config().grpc_service();
+  if (service_config.has_envoy_grpc()) {
+    const std::string& cluster_name = service_config.envoy_grpc().cluster_name();
+    if (!context.clusterManager().checkActiveStaticCluster(cluster_name)) {
+      throw EnvoyException(fmt::format("cluster '{}' is unknown or not static", cluster_name));
+    };
+  }
   return std::make_shared<HttpGrpcAccessLog>(std::move(filter), proto_config, context.threadLocal(),
                                              GrpcCommon::getGrpcAccessLoggerCacheSingleton(context),
                                              context.scope());
