@@ -63,7 +63,6 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
                                 src.headers_to_remove.end());
 }
 
-<<<<<<< HEAD
 RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
     const envoy::config::route::v3::Route& route_config, const VirtualHostImpl& vhost,
     const OptionalHttpFilters& optional_http_filters,
