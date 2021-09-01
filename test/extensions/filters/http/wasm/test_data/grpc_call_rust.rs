@@ -35,7 +35,7 @@ impl Context for TestGrpcCallRoot {}
 struct TestGrpcCall;
 
 impl HttpContext for TestGrpcCall {
-    fn on_http_request_headers(&mut self, _: usize) -> Action {
+    fn on_http_request_headers(&mut self, _: usize, end_of_stream: bool) -> Action {
         let mut value = Value::new();
         value.set_string_value(String::from("request"));
         let message = value.write_to_bytes().unwrap();
@@ -52,22 +52,36 @@ impl HttpContext for TestGrpcCall {
             Err(_) => error!("bogus grpc_service rejected"),
         };
 
-        match self.dispatch_grpc_call(
-            "cluster",
-            "service",
-            "method",
-            vec![("source", b"grpc_call")],
-            Some(&message),
-            Duration::from_secs(1),
-        ) {
-            Ok(callout_id) => {
-                CALLOUT_ID.with(|saved_id| saved_id.set(Some(callout_id)));
-                error!("cluster call succeeded")
-            }
-            Err(_) => error!("cluster call rejected"),
-        };
-
-        Action::Pause
+        if end_of_stream {
+            match self.dispatch_grpc_call(
+                "cluster",
+                "service",
+                "method",
+                vec![("source", b"grpc_call")],
+                Some(&message),
+                Duration::from_secs(1),
+            ) {
+                Err(Status::InternalFailure) => error!("expected failure occurred"),
+                _ => error!("unexpected cluster call result"),
+            };
+            Action::Continue
+        } else {
+            match self.dispatch_grpc_call(
+                "cluster",
+                "service",
+                "method",
+                vec![("source", b"grpc_call")],
+                Some(&message),
+                Duration::from_secs(1),
+            ) {
+                Ok(callout_id) => {
+                    CALLOUT_ID.with(|saved_id| saved_id.set(Some(callout_id)));
+                    error!("cluster call succeeded")
+                }
+                Err(_) => error!("cluster call rejected"),
+            };
+            Action::Pause
+        }
     }
 }
 

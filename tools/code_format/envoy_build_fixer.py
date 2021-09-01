@@ -34,6 +34,7 @@ ENVOY_RULE_REGEX = re.compile(r'envoy[_\w]+\(')
 # Match a load() statement for the envoy_package macros.
 PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_package".*?\)\n)', re.DOTALL)
 EXTENSION_PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_extension_package".*?\)\n)', re.DOTALL)
+CONTRIB_PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_contrib_package".*?\)\n)', re.DOTALL)
 
 # Match Buildozer 'print' output. Example of Buildozer print output:
 # cc_library json_transcoder_filter_lib [json_transcoder_filter.cc] (missing) (missing)
@@ -41,7 +42,7 @@ BUILDOZER_PRINT_REGEX = re.compile(
     '\s*([\w_]+)\s+([\w_]+)\s+[(\[](.*?)[)\]]\s+[(\[](.*?)[)\]]\s+[(\[](.*?)[)\]]')
 
 # Match API header include in Envoy source file?
-API_INCLUDE_REGEX = re.compile('#include "(envoy/.*)/[^/]+\.pb\.(validate\.)?h"')
+API_INCLUDE_REGEX = re.compile('#include "(contrib/envoy/.*|envoy/.*)/[^/]+\.pb\.(validate\.)?h"')
 
 
 class EnvoyBuildFixerError(Exception):
@@ -78,6 +79,10 @@ def fix_package_and_license(path, contents):
     if 'source/extensions' in path:
         regex_to_use = EXTENSION_PACKAGE_LOAD_BLOCK_REGEX
         package_string = 'envoy_extension_package'
+
+    if 'contrib/' in path:
+        regex_to_use = CONTRIB_PACKAGE_LOAD_BLOCK_REGEX
+        package_string = 'envoy_contrib_package'
 
     # Ensure we have an envoy_package import load if this is a real Envoy package. We also allow
     # the prefix to be overridden if envoy is included in a larger workspace.

@@ -8,7 +8,6 @@
 
 #include "source/extensions/common/wasm/wasm.h"
 #include "source/extensions/stat_sinks/wasm/wasm_stat_sink_impl.h"
-#include "source/extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -56,7 +55,7 @@ ProtobufTypes::MessagePtr WasmSinkFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::stat_sinks::wasm::v3::Wasm>();
 }
 
-std::string WasmSinkFactory::name() const { return StatsSinkNames::get().Wasm; }
+std::string WasmSinkFactory::name() const { return WasmName; }
 
 /**
  * Static registration for the wasm access log. @see RegisterFactory.

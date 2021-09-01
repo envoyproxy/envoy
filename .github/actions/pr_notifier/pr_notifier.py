@@ -29,6 +29,7 @@ MAINTAINERS = {
     'yanavlasov': 'UJHLR5KFS',
     'asraa': 'UKZKCFRTP',
     'davinci26': 'U013608CUDV',
+    'rojkov': 'UH5EXLYQK',
 }
 
 # Only notify API reviewers who aren't maintainers.
@@ -128,7 +129,11 @@ def track_prs():
         # If the PR is waiting, continue.
         if is_waiting(labels):
             continue
+        # Drafts are not covered by our SLO (repokitteh warns of this)
         if pr_info.draft:
+            continue
+        # Don't warn for dependabot.
+        if pr_info.user.login == 'dependabot[bot]':
             continue
 
         # Update the time based on the time zone delta from github's

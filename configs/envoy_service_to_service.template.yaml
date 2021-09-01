@@ -25,7 +25,8 @@
                 prefix: "/"
                 headers:
                 - name: content-type
-                  exact_match: application/grpc
+                  string_match:
+                    exact: application/grpc
               route:
                 cluster: local_service_grpc
             - match:
@@ -39,7 +40,8 @@
             pass_through_mode: true
             headers:
               - name: ":path"
-                exact_match: "/healthcheck"
+                string_match:
+                  exact: "/healthcheck"
             cache_time: 2.5s
         - name: envoy.filters.http.buffer
           typed_config:

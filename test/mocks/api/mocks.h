@@ -5,6 +5,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
@@ -47,12 +48,14 @@ public:
   MOCK_METHOD(Thread::ThreadFactory&, threadFactory, ());
   MOCK_METHOD(Stats::Scope&, rootScope, ());
   MOCK_METHOD(Random::RandomGenerator&, randomGenerator, ());
+  MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, bootstrap, (), (const));
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
 
   testing::NiceMock<Filesystem::MockInstance> file_system_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
+  envoy::config::bootstrap::v3::Bootstrap empty_bootstrap_;
 };
 
 class MockOsSysCalls : public OsSysCallsImpl {

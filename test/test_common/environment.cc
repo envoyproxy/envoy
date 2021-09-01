@@ -370,9 +370,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   out_json_string = substitute(out_json_string, version);
 
   auto name = Filesystem::fileSystemForTest().splitPathFromFilename(path).file_;
-  const std::string extension = absl::EndsWith(name, ".yaml")      ? ".yaml"
-                                : absl::EndsWith(name, ".pb_text") ? ".pb_text"
-                                                                   : ".json";
+  const std::string extension = std::string(name.substr(name.rfind('.')));
   const std::string out_json_path =
       TestEnvironment::temporaryPath(name) + ".with.ports" + extension;
   {
@@ -414,9 +412,9 @@ std::string TestEnvironment::writeStringToFileForTest(const std::string& filenam
   const Filesystem::FlagSet flags{1 << Filesystem::File::Operation::Write |
                                   1 << Filesystem::File::Operation::Create};
   const Api::IoCallBoolResult open_result = file->open(flags);
-  EXPECT_TRUE(open_result.rc_);
+  EXPECT_TRUE(open_result.return_value_);
   const Api::IoCallSizeResult result = file->write(contents);
-  EXPECT_EQ(contents.length(), result.rc_);
+  EXPECT_EQ(contents.length(), result.return_value_);
   return out_path;
 }
 

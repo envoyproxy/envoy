@@ -15,7 +15,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "fault_filter_test",
     srcs = ["fault_filter_test.cc"],
-    extension_name = "envoy.filters.http.fault",
+    extension_names = ["envoy.filters.http.fault"],
     deps = [
         ":utility_lib",
         "//envoy/event:dispatcher_interface",
@@ -40,7 +40,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.http.fault",
+    extension_names = ["envoy.filters.http.fault"],
     deps = [
         ":utility_lib",
         "//source/extensions/filters/http/fault:config",
@@ -53,7 +53,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "fault_filter_integration_test",
     srcs = ["fault_filter_integration_test.cc"],
-    extension_name = "envoy.filters.http.fault",
+    extension_names = ["envoy.filters.http.fault"],
     deps = [
         "//source/extensions/filters/http/fault:config",
         "//test/integration:http_protocol_integration_lib",

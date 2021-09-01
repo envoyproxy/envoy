@@ -6,7 +6,6 @@
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/common/token_bucket_impl.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/config/xds_context_params.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/memory/utils.h"
@@ -19,28 +18,18 @@ namespace Config {
 namespace {
 class AllMuxesState {
 public:
-  void insert(NewGrpcMuxImpl* mux) {
-    absl::WriterMutexLock locker(&lock_);
-    muxes_.insert(mux);
-  }
+  void insert(NewGrpcMuxImpl* mux) { muxes_.insert(mux); }
 
-  void erase(NewGrpcMuxImpl* mux) {
-    absl::WriterMutexLock locker(&lock_);
-    muxes_.erase(mux);
-  }
+  void erase(NewGrpcMuxImpl* mux) { muxes_.erase(mux); }
 
   void shutdownAll() {
-    absl::WriterMutexLock locker(&lock_);
     for (auto& mux : muxes_) {
       mux->shutdown();
     }
   }
 
 private:
-  absl::flat_hash_set<NewGrpcMuxImpl*> muxes_ ABSL_GUARDED_BY(lock_);
-
-  // TODO(ggreenway): can this lock be removed? Is this code only run on the main thread?
-  absl::Mutex lock_;
+  absl::flat_hash_set<NewGrpcMuxImpl*> muxes_;
 };
 using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
 } // namespace
@@ -48,7 +37,6 @@ using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
 NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                Event::Dispatcher& dispatcher,
                                const Protobuf::MethodDescriptor& service_method,
-                               envoy::config::core::v3::ApiVersion transport_api_version,
                                Random::RandomGenerator& random, Stats::Scope& scope,
                                const RateLimitSettings& rate_limit_settings,
                                const LocalInfo::LocalInfo& local_info)
@@ -59,7 +47,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
           })),
-      transport_api_version_(transport_api_version), dispatcher_(dispatcher) {
+      dispatcher_(dispatcher) {
   AllMuxes::get().insert(this);
 }
 
@@ -282,7 +270,6 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
     } else {
       request = sub->second->sub_state_.getNextRequestAckless();
     }
-    VersionConverter::prepareMessageForGrpcWire(request, transport_api_version_);
     grpc_stream_.sendMessage(request);
   }
   grpc_stream_.maybeUpdateQueueSizeStat(pausable_ack_queue_.size());

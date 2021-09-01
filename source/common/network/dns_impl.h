@@ -24,7 +24,7 @@ class DnsResolverImplPeer;
  * Implementation of DnsResolver that uses c-ares. All calls and callbacks are assumed to
  * happen on the thread that owns the creating dispatcher.
  */
-class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::upstream> {
+class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
   DnsResolverImpl(Event::Dispatcher& dispatcher,
                   const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
@@ -107,7 +107,7 @@ private:
   Event::TimerPtr timer_;
   ares_channel channel_;
   bool dirty_channel_{};
-  const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options_;
+  envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 
   absl::node_hash_map<int, Event::FileEventPtr> events_;
   const absl::optional<std::string> resolvers_csv_;

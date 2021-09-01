@@ -100,6 +100,18 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   request_headers.removeProxyConnection();
   request_headers.removeTransferEncoding();
 
+  // Sanitize referer field if exists.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_http_header_referer")) {
+    auto result = request_headers.get(Http::CustomHeaders::get().Referer);
+    if (!result.empty()) {
+      Utility::Url url;
+      if (result.size() > 1 || !url.initialize(result[0]->value().getStringView(), false)) {
+        // A request header shouldn't have multiple referer field.
+        request_headers.remove(Http::CustomHeaders::get().Referer);
+      }
+    }
+  }
+
   // If we are "using remote address" this means that we create/append to XFF with our immediate
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
   // our peer to have already properly set XFF, etc.
@@ -120,13 +132,14 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     // are but they didn't populate XFF properly, the trusted client address is the
     // source address of the immediate downstream's connection to us.
     if (final_remote_address == nullptr) {
-      final_remote_address = connection.addressProvider().remoteAddress();
+      final_remote_address = connection.connectionInfoProvider().remoteAddress();
     }
     if (!config.skipXffAppend()) {
-      if (Network::Utility::isLoopbackAddress(*connection.addressProvider().remoteAddress())) {
+      if (Network::Utility::isLoopbackAddress(
+              *connection.connectionInfoProvider().remoteAddress())) {
         Utility::appendXff(request_headers, config.localAddress());
       } else {
-        Utility::appendXff(request_headers, *connection.addressProvider().remoteAddress());
+        Utility::appendXff(request_headers, *connection.connectionInfoProvider().remoteAddress());
       }
     }
     // If the prior hop is not a trusted proxy, overwrite any x-forwarded-proto value it set as
@@ -143,7 +156,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     // If we find one, it will be used as the downstream address for logging. It may or may not be
     // used for determining internal/external status (see below).
     OriginalIPDetectionParams params = {request_headers,
-                                        connection.addressProvider().remoteAddress()};
+                                        connection.connectionInfoProvider().remoteAddress()};
     for (const auto& detection_extension : config.originalIpDetectionExtensions()) {
       const auto result = detection_extension->detect(params);
 
@@ -165,10 +178,12 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     request_headers.setReferenceForwardedProto(connection.ssl() ? Headers::get().SchemeValues.Https
                                                                 : Headers::get().SchemeValues.Http);
   }
+
   if (config.schemeToSet().has_value()) {
     request_headers.setScheme(config.schemeToSet().value());
     request_headers.setForwardedProto(config.schemeToSet().value());
   }
+
   // If :scheme is not set, sets :scheme based on X-Forwarded-Proto if a valid scheme,
   // else encryption level.
   // X-Forwarded-Proto and :scheme may still differ if different values are sent from downstream.
@@ -194,7 +209,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // After determining internal request status, if there is no final remote address, due to no XFF,
   // busted XFF, etc., use the direct connection remote address for logging.
   if (final_remote_address == nullptr) {
-    final_remote_address = connection.addressProvider().remoteAddress();
+    final_remote_address = connection.connectionInfoProvider().remoteAddress();
   }
 
   // Edge request is the request from external clients to front Envoy.
@@ -425,7 +440,8 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
 void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,
                                                      const RequestHeaderMap* request_headers,
                                                      ConnectionManagerConfig& config,
-                                                     const std::string& via) {
+                                                     const std::string& via,
+                                                     bool clear_hop_by_hop) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
     // As in mutateRequestHeaders, Upgrade responses have special handling.
@@ -443,19 +459,22 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
       response_headers.setContentLength(uint64_t(0));
     }
   } else {
-    response_headers.removeConnection();
-    response_headers.removeUpgrade();
+    // Only clear these hop by hop headers for non-upgrade connections.
+    if (clear_hop_by_hop) {
+      response_headers.removeConnection();
+      response_headers.removeUpgrade();
+    }
   }
-
-  response_headers.removeTransferEncoding();
+  if (clear_hop_by_hop) {
+    response_headers.removeTransferEncoding();
+    response_headers.removeKeepAlive();
+    response_headers.removeProxyConnection();
+  }
 
   if (request_headers != nullptr &&
       (config.alwaysSetRequestIdInResponse() || request_headers->EnvoyForceTrace())) {
     config.requestIDExtension()->setInResponse(response_headers, *request_headers);
   }
-  response_headers.removeKeepAlive();
-  response_headers.removeProxyConnection();
-
   if (!via.empty()) {
     Utility::appendVia(response_headers, via);
   }
@@ -466,6 +485,20 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
                                              const ConnectionManagerConfig& config) {
   if (!request_headers.Path()) {
     return NormalizePathAction::Continue; // It's as valid as it is going to get.
+  }
+
+  auto fragment_pos = request_headers.getPathValue().find('#');
+  if (fragment_pos != absl::string_view::npos) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_reject_path_with_fragment")) {
+      return NormalizePathAction::Reject;
+    }
+    // Check runtime override and throw away fragment from URI path
+    // TODO(yanavlasov): remove this override after deprecation period.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled")) {
+      request_headers.setPath(request_headers.getPathValue().substr(0, fragment_pos));
+    }
   }
 
   NormalizePathAction final_action = NormalizePathAction::Continue;

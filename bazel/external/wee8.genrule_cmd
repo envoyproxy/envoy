@@ -30,14 +30,18 @@ rm -rf out/wee8
 # Export compiler configuration.
 export CXXFLAGS="$${CXXFLAGS-} -Wno-sign-compare -Wno-deprecated-copy -Wno-unknown-warning-option -Wno-range-loop-analysis -Wno-shorten-64-to-32"
 if [[ ( $${SYSTEM} == "Darwin" && $${CXX-} == "" ) || $${CXX-} == *clang* ]]; then
-  export IS_CLANG=true
   export CC=$${CC:-clang}
   export CXX=$${CXX:-clang++}
+else
+  export CC=$${CC:-gcc}
+  export CXX=$${CXX:-g++}
+fi
+
+if $${CXX} --version 2>&1 | grep -q clang ; then
+  export IS_CLANG=true
   export CXXFLAGS="$${CXXFLAGS} -Wno-implicit-int-float-conversion -Wno-builtin-assume-aligned-alignment -Wno-final-dtor-non-final-class -Wno-invalid-constexpr"
 else
   export IS_CLANG=false
-  export CC=$${CC:-gcc}
-  export CXX=$${CXX:-g++}
 fi
 
 export AR=$${AR:-ar}

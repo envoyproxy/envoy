@@ -31,9 +31,9 @@ namespace {
 
 class ThriftRateLimitConfigurationTest : public testing::Test {
 public:
-  void initialize(const std::string& yaml, bool avoid_boosting = true) {
+  void initialize(const std::string& yaml) {
     envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
-    TestUtility::loadFromYaml(yaml, config, false, avoid_boosting);
+    TestUtility::loadFromYaml(yaml, config);
     initialize(config);
   }
 
@@ -47,8 +47,8 @@ public:
     return *metadata_;
   }
 
-  std::unique_ptr<ThriftProxy::ConfigImpl> config_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  std::unique_ptr<ThriftProxy::ConfigImpl> config_;
   Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};
   MessageMetadataSharedPtr metadata_;
 };
@@ -468,7 +468,8 @@ actions:
       descriptor_value: fake_value
       headers:
         - name: x-header-name
-          exact_match: test_value
+          string_match:
+            exact: test_value
   )EOF";
 
   initialize(yaml);
@@ -487,7 +488,8 @@ actions:
       descriptor_value: fake_value
       headers:
         - name: x-header-name
-          exact_match: test_value
+          string_match:
+            exact: test_value
   )EOF";
 
   initialize(yaml);
@@ -506,7 +508,8 @@ actions:
       expect_match: false
       headers:
         - name: x-header-name
-          exact_match: test_value
+          string_match:
+            exact: test_value
   )EOF";
 
   initialize(yaml);
@@ -525,7 +528,8 @@ actions:
       expect_match: false
       headers:
         - name: x-header-name
-          exact_match: test_value
+          string_match:
+            exact: test_value
   )EOF";
 
   initialize(yaml);
@@ -562,7 +566,8 @@ actions:
       descriptor_value: fake_value
       headers:
         - name: x-header-name
-          exact_match: test_value
+          string_match:
+            exact: test_value
   )EOF";
 
   initialize(yaml);

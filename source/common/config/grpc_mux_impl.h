@@ -4,7 +4,6 @@
 #include <memory>
 #include <queue>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
 #include "envoy/config/grpc_mux.h"
@@ -35,7 +34,6 @@ class GrpcMuxImpl : public GrpcMux,
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              envoy::config::core::v3::ApiVersion transport_api_version,
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
 
@@ -186,7 +184,6 @@ private:
   // store them; rather, they are simply dropped. This string is a type
   // URL.
   std::unique_ptr<std::queue<std::string>> request_queue_;
-  const envoy::config::core::v3::ApiVersion transport_api_version_;
 
   Event::Dispatcher& dispatcher_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;

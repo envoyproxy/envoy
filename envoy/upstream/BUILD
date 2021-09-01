@@ -186,3 +186,10 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "scheduler_interface",
+    hdrs = ["scheduler.h"],
+    deps = [
+    ],
+)

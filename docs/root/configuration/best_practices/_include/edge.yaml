@@ -66,6 +66,8 @@ static_resources:
             initial_connection_window_size: 1048576  # 1 MiB
           stream_idle_timeout: 300s  # 5 mins, must be disabled for long-lived and streaming requests
           request_timeout: 300s  # 5 mins, must be disabled for long-lived and streaming requests
+          http_filters:
+          - name: envoy.filters.http.router
           route_config:
             virtual_hosts:
             - name: default

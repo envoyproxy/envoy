@@ -21,7 +21,7 @@ envoy_cc_test_library(
 envoy_extension_cc_test(
     name = "cache_headers_utils_test",
     srcs = ["cache_headers_utils_test.cc"],
-    extension_name = "envoy.filters.http.cache",
+    extension_names = ["envoy.filters.http.cache"],
     deps = [
         ":common",
         "//envoy/http:header_map_interface",
@@ -35,7 +35,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "http_cache_test",
     srcs = ["http_cache_test.cc"],
-    extension_name = "envoy.filters.http.cache",
+    extension_names = ["envoy.filters.http.cache"],
     deps = [
         ":common",
         "//source/extensions/filters/http/cache:http_cache_lib",
@@ -49,7 +49,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "cache_filter_test",
     srcs = ["cache_filter_test.cc"],
-    extension_name = "envoy.filters.http.cache",
+    extension_names = ["envoy.filters.http.cache"],
     deps = [
         ":common",
         "//source/extensions/filters/http/cache:cache_filter_lib",
@@ -63,7 +63,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "cacheability_utils_test",
     srcs = ["cacheability_utils_test.cc"],
-    extension_name = "envoy.filters.http.cache",
+    extension_names = ["envoy.filters.http.cache"],
     deps = [
         "//source/extensions/filters/http/cache:cacheability_utils_lib",
         "//test/test_common:utility_lib",
@@ -73,7 +73,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.http.cache",
+    extension_names = ["envoy.filters.http.cache"],
     deps = [
         "//source/extensions/filters/http/cache:config",
         "//source/extensions/filters/http/cache/simple_http_cache:config",
@@ -89,7 +89,7 @@ envoy_extension_cc_test(
     srcs = [
         "cache_filter_integration_test.cc",
     ],
-    extension_name = "envoy.filters.http.cache",
+    extension_names = ["envoy.filters.http.cache"],
     deps = [
         "//source/extensions/filters/http/cache:config",
         "//source/extensions/filters/http/cache:http_cache_lib",
@@ -104,7 +104,7 @@ envoy_extension_cc_test(
     srcs = [
         "cache_custom_headers_test.cc",
     ],
-    extension_name = "envoy.filters.http.cache",
+    extension_names = ["envoy.filters.http.cache"],
     deps = [
         "//source/extensions/filters/http/cache:cache_custom_headers",
     ],

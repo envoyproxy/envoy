@@ -192,24 +192,8 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
   actions_ = watchdog.actions();
 }
 
-InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                         const Options& options, Instance& server)
-    : enable_deprecated_v2_api_(options.bootstrapVersion() == 2u) {
+InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   const auto& admin = bootstrap.admin();
-
-  for (const auto& access_log : admin.access_log()) {
-    AccessLog::InstanceSharedPtr current_access_log =
-        AccessLog::AccessLogFactory::fromProto(access_log, server.serverFactoryContext());
-    admin_.access_logs_.emplace_back(current_access_log);
-  }
-
-  if (!admin.access_log_path().empty()) {
-    Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File,
-                                          admin.access_log_path()};
-    admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-        file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
-        server.accessLogManager()));
-  }
 
   admin_.profile_path_ =
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
@@ -233,15 +217,24 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
       layered_runtime_.add_layers()->mutable_admin_layer();
     }
   }
-  if (enable_deprecated_v2_api_) {
-    auto* enabled_deprecated_v2_api_layer = layered_runtime_.add_layers();
-    enabled_deprecated_v2_api_layer->set_name("enabled_deprecated_v2_api (auto-injected)");
-    auto* static_layer = enabled_deprecated_v2_api_layer->mutable_static_layer();
-    ProtobufWkt::Value val;
-    val.set_bool_value(true);
-    (*static_layer
-          ->mutable_fields())["envoy.test_only.broken_in_production.enable_deprecated_v2_api"] =
-        val;
+}
+
+void InitialImpl::initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                     Instance& server) {
+  const auto& admin = bootstrap.admin();
+
+  for (const auto& access_log : admin.access_log()) {
+    AccessLog::InstanceSharedPtr current_access_log =
+        AccessLog::AccessLogFactory::fromProto(access_log, server.serverFactoryContext());
+    admin_.access_logs_.emplace_back(current_access_log);
+  }
+
+  if (!admin.access_log_path().empty()) {
+    Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File,
+                                          admin.access_log_path()};
+    admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
+        file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+        server.accessLogManager()));
   }
 }
 

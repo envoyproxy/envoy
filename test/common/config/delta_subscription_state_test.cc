@@ -27,7 +27,7 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-const char TypeUrl[] = "type.googleapis.com/envoy.api.v2.Cluster";
+const char TypeUrl[] = "type.googleapis.com/envoy.config.cluster.v3.Cluster";
 enum class LegacyOrUnified { Legacy, Unified };
 
 class DeltaSubscriptionStateTestBase : public testing::TestWithParam<LegacyOrUnified> {

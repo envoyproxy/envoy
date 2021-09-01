@@ -11,6 +11,7 @@
 #include "source/common/config/subscription_factory_impl.h"
 #include "source/common/config/xds_resource.h"
 
+#include "test/config/v2_link_hacks.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
@@ -140,7 +141,7 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterSingleton) {
               factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
-        EXPECT_CALL(*async_client_factory, create()).WillOnce(Invoke([] {
+        EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
           return std::make_unique<Grpc::MockAsyncClient>();
         }));
         return async_client_factory;
@@ -205,7 +206,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemSubscriptionNonExistentFile) {
   envoy::config::core::v3::ConfigSource config;
   config.set_path("/blahblah");
   EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}), EnvoyException,
-                            "envoy::api::v2::Path must refer to an existing path in the system: "
+                            "paths must refer to an existing path in the system: "
                             "'/blahblah' does not exist")
 }
 
@@ -223,7 +224,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
 TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile) {
   EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl("file:///blahblah", {})->start({}),
                             EnvoyException,
-                            "envoy::api::v2::Path must refer to an existing path in the system: "
+                            "paths must refer to an existing path in the system: "
                             "'/blahblah' does not exist");
 }
 
@@ -305,7 +306,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
               factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
-        EXPECT_CALL(*async_client_factory, create()).WillOnce(Invoke([] {
+        EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
           return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
         }));
         return async_client_factory;

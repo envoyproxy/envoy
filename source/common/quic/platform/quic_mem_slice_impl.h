@@ -23,6 +23,8 @@ public:
   // Constructs an empty QuicMemSliceImpl.
   QuicMemSliceImpl() = default;
 
+  ~QuicMemSliceImpl();
+
   // Constructs a QuicMemSliceImpl by taking ownership of the memory in |buffer|.
   QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length);
   QuicMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length);
@@ -47,7 +49,11 @@ public:
   }
 
   // Below methods implements interface needed by QuicMemSlice.
-  void Reset() { single_slice_buffer_.drain(length()); }
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  void Reset() {
+    single_slice_buffer_.drain(length());
+    fragment_ = nullptr;
+  }
 
   // Returns a char pointer to the one and only slice in buffer.
   const char* data() const;
@@ -55,10 +61,9 @@ public:
   size_t length() const { return single_slice_buffer_.length(); }
   bool empty() const { return length() == 0; }
 
-  Envoy::Buffer::OwnedImpl& single_slice_buffer() { return single_slice_buffer_; }
+  Envoy::Buffer::OwnedImpl& getSingleSliceBuffer() { return single_slice_buffer_; }
 
 private:
-  // Prerequisite: buffer has at least one slice.
   size_t firstSliceLength(Envoy::Buffer::Instance& buffer);
 
   std::unique_ptr<Envoy::Buffer::BufferFragmentImpl> fragment_;

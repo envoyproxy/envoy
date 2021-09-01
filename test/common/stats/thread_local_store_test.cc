@@ -1557,9 +1557,8 @@ protected:
   };
 
   ThreadLocalRealThreadsTestBase(uint32_t num_threads)
-      : num_threads_(num_threads), start_time_(time_system_.monotonicTime()),
-        api_(Api::createApiForTest()), thread_factory_(api_->threadFactory()),
-        pool_(store_->symbolTable()) {
+      : num_threads_(num_threads), api_(Api::createApiForTest()),
+        thread_factory_(api_->threadFactory()), pool_(store_->symbolTable()) {
     // This is the same order as InstanceImpl::initialize in source/server/server.cc.
     thread_dispatchers_.resize(num_threads_);
     {
@@ -1643,8 +1642,6 @@ protected:
   }
 
   const uint32_t num_threads_;
-  Event::TestRealTimeSystem time_system_;
-  MonotonicTime start_time_;
   Api::ApiPtr api_;
   Event::DispatcherPtr main_dispatcher_;
   std::vector<Event::DispatcherPtr> thread_dispatchers_;
@@ -1661,7 +1658,8 @@ protected:
 
   ClusterShutdownCleanupStarvationTest()
       : ThreadLocalRealThreadsTestBase(NumThreads), my_counter_name_(pool_.add("my_counter")),
-        my_counter_scoped_name_(pool_.add("scope.my_counter")) {}
+        my_counter_scoped_name_(pool_.add("scope.my_counter")),
+        start_time_(time_system_.monotonicTime()) {}
 
   void createScopesIncCountersAndCleanup() {
     for (uint32_t i = 0; i < NumScopes; ++i) {
@@ -1684,8 +1682,10 @@ protected:
                                                             start_time_);
   }
 
+  Event::TestRealTimeSystem time_system_;
   StatName my_counter_name_;
   StatName my_counter_scoped_name_;
+  MonotonicTime start_time_;
 };
 
 // Tests the scenario where a cluster and stat are allocated in multiple

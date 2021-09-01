@@ -190,6 +190,7 @@ envoy_cc_library(
         ":http3_status_tracker",
         ":mixed_conn_pool",
         "//source/common/http/http3:conn_pool_lib",
+        "//source/common/quic:quic_stat_names_lib",
     ],
 )
 
@@ -467,8 +468,10 @@ envoy_cc_library(
         ":header_map_lib",
         ":status_lib",
         ":utility_lib",
+        "//envoy/common:matchers_interface",
         "//envoy/common:regex_interface",
         "//envoy/http:header_map_interface",
+        "//source/common/common:matchers_lib",
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",

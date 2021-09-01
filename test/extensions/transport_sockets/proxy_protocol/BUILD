@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "proxy_protocol_test",
     srcs = ["proxy_protocol_test.cc"],
-    extension_name = "envoy.transport_sockets.upstream_proxy_protocol",
+    extension_names = ["envoy.transport_sockets.upstream_proxy_protocol"],
     deps = [
         "//envoy/network:proxy_protocol_options_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "proxy_protocol_integration_test",
     srcs = ["proxy_protocol_integration_test.cc"],
-    extension_name = "envoy.transport_sockets.upstream_proxy_protocol",
+    extension_names = ["envoy.transport_sockets.upstream_proxy_protocol"],
     deps = [
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/proxy_protocol:upstream_config",

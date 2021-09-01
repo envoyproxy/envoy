@@ -18,13 +18,15 @@ HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
   bindDomainSocket(restart_epoch_, "child", socket_path, socket_mode);
 }
 
-int HotRestartingChild::duplicateParentListenSocket(const std::string& address) {
+int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
+                                                    uint32_t worker_index) {
   if (restart_epoch_ == 0 || parent_terminated_) {
     return -1;
   }
 
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_pass_listen_socket()->set_address(address);
+  wrapped_request.mutable_request()->mutable_pass_listen_socket()->set_worker_index(worker_index);
   sendHotRestartMessage(parent_address_, wrapped_request);
 
   std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
@@ -59,9 +61,10 @@ void HotRestartingChild::drainParentListeners() {
   sendHotRestartMessage(parent_address_, wrapped_request);
 }
 
-void HotRestartingChild::sendParentAdminShutdownRequest(time_t& original_start_time) {
+absl::optional<HotRestart::AdminShutdownResponse>
+HotRestartingChild::sendParentAdminShutdownRequest() {
   if (restart_epoch_ == 0 || parent_terminated_) {
-    return;
+    return absl::nullopt;
   }
 
   HotRestartMessage wrapped_request;
@@ -71,7 +74,10 @@ void HotRestartingChild::sendParentAdminShutdownRequest(time_t& original_start_t
   std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
   RELEASE_ASSERT(replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kShutdownAdmin),
                  "Hot restart parent did not respond as expected to ShutdownParentAdmin.");
-  original_start_time = wrapped_reply->reply().shutdown_admin().original_start_time_unix_seconds();
+  return HotRestart::AdminShutdownResponse{
+      static_cast<time_t>(
+          wrapped_reply->reply().shutdown_admin().original_start_time_unix_seconds()),
+      wrapped_reply->reply().shutdown_admin().enable_reuse_port_default()};
 }
 
 void HotRestartingChild::sendParentTerminateRequest() {

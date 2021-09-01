@@ -13,7 +13,7 @@ pub fn _start() {
 struct TestGrpcStream;
 
 impl HttpContext for TestGrpcStream {
-    fn on_http_request_headers(&mut self, _: usize) -> Action {
+    fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
         match self.open_grpc_stream(
             "bogus service string",
             "service",

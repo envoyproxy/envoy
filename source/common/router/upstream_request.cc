@@ -62,6 +62,11 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   }
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
+      parent_.callbacks()->streamInfo().upstreamClusterInfo();
+  if (cluster_info.has_value()) {
+    stream_info_.setUpstreamClusterInfo(*cluster_info);
+  }
 }
 
 UpstreamRequest::~UpstreamRequest() {
@@ -190,7 +195,7 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
 void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "UpstreamRequest " << this << "\n";
-  const auto addressProvider = connection().addressProviderSharedPtr();
+  const auto addressProvider = connection().connectionInfoProviderSharedPtr();
   const Http::RequestHeaderMap* request_headers = parent_.downstreamHeaders();
   DUMP_DETAILS(addressProvider);
   DUMP_DETAILS(request_headers);
@@ -412,8 +417,15 @@ void UpstreamRequest::onPoolReady(
   stream_info_.setUpstreamLocalAddress(upstream_local_address);
   parent_.callbacks()->streamInfo().setUpstreamLocalAddress(upstream_local_address);
 
-  stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
-  parent_.callbacks()->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
+  stream_info_.setUpstreamSslConnection(info.downstreamAddressProvider().sslConnection());
+  parent_.callbacks()->streamInfo().setUpstreamSslConnection(
+      info.downstreamAddressProvider().sslConnection());
+
+  if (info.downstreamAddressProvider().connectionID().has_value()) {
+    stream_info_.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
+    parent_.callbacks()->streamInfo().setUpstreamConnectionId(
+        info.downstreamAddressProvider().connectionID().value());
+  }
 
   if (parent_.downstreamEndStream()) {
     setupPerTryTimeout();

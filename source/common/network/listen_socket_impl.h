@@ -27,10 +27,10 @@ protected:
     // Using `new` to access a non-public constructor.
     return absl::WrapUnique(
         new ListenSocketImpl(io_handle_ == nullptr ? nullptr : io_handle_->duplicate(),
-                             address_provider_->localAddress()));
+                             connection_info_provider_->localAddress()));
   }
 
-  void setupSocket(const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
+  void setupSocket(const Network::Socket::OptionsSharedPtr& options);
   void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options);
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;
 };
@@ -58,18 +58,17 @@ public:
     if (bind_to_port) {
       RELEASE_ASSERT(io_handle_->isOpen(), "");
       setPrebindSocketOptions();
+      setupSocket(options);
     } else {
       // If the tcp listener does not bind to port, we test that the ip family is supported.
       if (auto ip = address->ip(); ip != nullptr) {
         RELEASE_ASSERT(
             Network::SocketInterfaceSingleton::get().ipFamilySupported(ip->ipv4() ? AF_INET
                                                                                   : AF_INET6),
-            fmt::format(
-                "Creating listen socket address {} but the address familiy is not supported",
-                address->asStringView()));
+            fmt::format("Creating listen socket address {} but the address family is not supported",
+                        address->asStringView()));
       }
     }
-    setupSocket(options, bind_to_port);
   }
 
   NetworkListenSocket(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address,
@@ -109,7 +108,7 @@ protected:
 #ifndef WIN32
     int on = 1;
     auto status = setSocketOption(SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-    RELEASE_ASSERT(status.rc_ != -1, "failed to set SO_REUSEADDR socket option");
+    RELEASE_ASSERT(status.return_value_ != -1, "failed to set SO_REUSEADDR socket option");
 #endif
   }
 };
@@ -144,7 +143,7 @@ public:
   ConnectionSocketImpl(Socket::Type type, const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
       : SocketImpl(type, local_address, remote_address) {
-    address_provider_->setLocalAddress(local_address);
+    connection_info_provider_->setLocalAddress(local_address);
   }
 
   // Network::Socket
@@ -168,10 +167,10 @@ public:
 
   void setRequestedServerName(absl::string_view server_name) override {
     // Always keep the server_name_ as lower case.
-    addressProvider().setRequestedServerName(absl::AsciiStrToLower(server_name));
+    connectionInfoProvider().setRequestedServerName(absl::AsciiStrToLower(server_name));
   }
   absl::string_view requestedServerName() const override {
-    return addressProvider().requestedServerName();
+    return connectionInfoProvider().requestedServerName();
   }
 
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
@@ -181,7 +180,7 @@ public:
   void dumpState(std::ostream& os, int indent_level) const override {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "ListenSocketImpl " << this << DUMP_MEMBER(transport_protocol_) << "\n";
-    DUMP_DETAILS(address_provider_);
+    DUMP_DETAILS(connection_info_provider_);
   }
 
 protected:
