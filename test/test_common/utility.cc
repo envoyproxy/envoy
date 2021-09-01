@@ -242,18 +242,15 @@ AssertionResult TestUtility::waitForGaugeDestroyed(Stats::Store& store, const st
                                                    Event::TestTimeSystem& time_system,
                                                    std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findGauge(store, name) != nullptr) {
+  Stats::GaugeSharedPtr gauge = findGauge(store, name);
+  while (gauge != nullptr) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      std::string current_value;
-      if (findGauge(store, name)) {
-        current_value = absl::StrCat(findGauge(store, name)->value());
-      } else {
-        current_value = "nil";
-      }
       return AssertionFailure() << fmt::format(
-                 "timed out waiting for {} destroyed, current value {}", name, current_value);
+                 "timed out waiting for {} destroyed, current value {}", name,
+                 absl::StrCat(gauge->value()));
     }
+    gauge = findGauge(store, name);
   }
   return AssertionSuccess();
 }
