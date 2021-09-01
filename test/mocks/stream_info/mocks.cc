@@ -130,12 +130,9 @@ MockStreamInfo::MockStreamInfo()
     attempt_count_ = attempt_count;
   }));
   ON_CALL(*this, attemptCount()).WillByDefault(Invoke([this]() { return attempt_count_; }));
-  ON_CALL(*this, getUpstreamBytesMeterer()).WillByDefault(Invoke([this]() {
-    return upstream_bytes_meterer_;
-  }));
-  ON_CALL(*this, getDownstreamBytesMeterer()).WillByDefault(Invoke([this]() {
-    return downstream_bytes_meterer_;
-  }));
+  ON_CALL(*this, getUpstreamBytesMeterer()).WillByDefault(ReturnPointee(&upstream_bytes_meterer_));
+  ON_CALL(*this, getDownstreamBytesMeterer())
+      .WillByDefault(ReturnPointee(&downstream_bytes_meterer_));
   ON_CALL(*this, setUpstreamBytesMeterer(_))
       .WillByDefault(Invoke([this](const BytesMetererSharedPtr& upstream_bytes_meterer) {
         upstream_bytes_meterer_ = upstream_bytes_meterer;
