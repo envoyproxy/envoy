@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Grpc {
 
 // Support parameterizing over state-of-the-world xDS vs delta xDS.
-enum class SotwOrDelta { Sotw, Delta };
+enum class SotwOrDelta { Sotw, Delta, UnifiedSotw, UnifiedDelta };
 
 class BaseGrpcClientIntegrationParamTest {
 public:

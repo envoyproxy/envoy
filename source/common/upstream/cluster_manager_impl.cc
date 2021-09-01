@@ -341,18 +341,16 @@ ClusterManagerImpl::ClusterManagerImpl(
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         ads_mux_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
-            Config::Utility::factoryForGrpcApiConfigSource(
-                Config::Utility::factoryForGrpcApiConfigSource(
-                    *async_client_manager_, dyn_resources.ads_config(), stats, false)
-                    ->createUncachedRawAsyncClient(),
-                main_thread_dispatcher,
-                *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                    "envoy.service.discovery.v3.AggregatedDiscoveryService."
-                    "DeltaAggregatedResources"),
-                random_, stats_,
-                Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
-                local_info),
-            local_info, dyn_resources.ads_config().set_node_on_first_message_only());
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->createUncachedRawAsyncClient(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.discovery.v3.AggregatedDiscoveryService."
+                "DeltaAggregatedResources"),
+            random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
+            dyn_resources.ads_config().set_node_on_first_message_only());
       } else {
         ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
             Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
@@ -368,18 +366,16 @@ ClusterManagerImpl::ClusterManagerImpl(
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         ads_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
-            Config::Utility::factoryForGrpcApiConfigSource(
-                Config::Utility::factoryForGrpcApiConfigSource(
-                    *async_client_manager_, dyn_resources.ads_config(), stats, false)
-                    ->createUncachedRawAsyncClient(),
-                main_thread_dispatcher,
-                *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                    "envoy.service.discovery.v3.AggregatedDiscoveryService."
-                    "StreamAggregatedResources"),
-                random_, stats_,
-                Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
-                local_info),
-            local_info, dyn_resources.ads_config().set_node_on_first_message_only());
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->createUncachedRawAsyncClient(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.discovery.v3.AggregatedDiscoveryService."
+                "StreamAggregatedResources"),
+            random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
+            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
       } else {
         ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
             local_info,

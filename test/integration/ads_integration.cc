@@ -22,9 +22,16 @@ using testing::AssertionResult;
 namespace Envoy {
 
 AdsIntegrationTest::AdsIntegrationTest()
-    : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
-                          ConfigHelper::adsBootstrap(
-                              sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+    : HttpIntegrationTest(
+          Http::CodecType::HTTP2, ipVersion(),
+          ConfigHelper::adsBootstrap((sotwOrDelta() == Grpc::SotwOrDelta::Sotw) ||
+                                             (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
+                                         ? "GRPC"
+                                         : "DELTA_GRPC")) {
+  if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+      sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+  }
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
