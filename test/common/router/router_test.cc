@@ -4361,6 +4361,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+  EXPECT_EQ(1UL, stats_store_.counter("test.passthrough_internal_redirect_stream_request").value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
@@ -4377,6 +4378,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+  EXPECT_EQ(1UL, stats_store_.counter("test.passthrough_internal_redirect_bad_location").value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithRequestBodyDisabledLegacy) {
@@ -4397,6 +4399,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithRequestBodyDisabledLegacy) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+  EXPECT_EQ(1UL, stats_store_.counter("test.passthrough_internal_redirect_body_handling").value());
 }
 
 TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {

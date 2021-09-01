@@ -1491,13 +1491,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
 
   const uint64_t status_code = Http::Utility::getResponseStatus(headers);
 
-  // Redirects are not supported for streaming requests yet.
-  if (downstream_end_stream_ &&
-      ((internal_redirects_with_body_enabled_ && !request_buffer_overflowed_) ||
-       !callbacks_->decodingBuffer()) &&
-      location != nullptr &&
-      convertRequestHeadersForInternalRedirect(*downstream_headers_, *location, status_code) &&
-      callbacks_->recreateStream(&headers)) {
+  if (canInitiateInternalRedirect(headers, location, status_code)) {
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return true;
   }
@@ -1507,6 +1501,39 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
   ENVOY_STREAM_LOG(debug, "Internal redirect failed", *callbacks_);
   cluster_->stats().upstream_internal_redirect_failed_total_.inc();
   return false;
+}
+
+bool Filter::canInitiateInternalRedirect(const Http::ResponseHeaderMap& headers,
+                                         const Http::HeaderEntry* location, uint64_t status_code) {
+  // Redirects are not supported for streaming requests yet.
+  if (!downstream_end_stream_) {
+    config_.stats_.passthrough_internal_redirect_stream_request_.inc();
+    return false;
+  }
+
+  if ((!internal_redirects_with_body_enabled_ || request_buffer_overflowed_) &&
+      callbacks_->decodingBuffer()) {
+    config_.stats_.passthrough_internal_redirect_body_handling_.inc();
+    return false;
+  }
+
+  if (location == nullptr) {
+    config_.stats_.passthrough_internal_redirect_bad_location_.inc();
+    return false;
+  }
+
+  // convertRequestHeadersForInternalRedirect emits stats for its failure modes, no need to
+  // increment an additional stat here.
+  if (!convertRequestHeadersForInternalRedirect(*downstream_headers_, *location, status_code)) {
+    return false;
+  }
+
+  if (!callbacks_->recreateStream(&headers)) {
+    config_.stats_.passthrough_internal_redirect_recreate_stream_failed_.inc();
+    return false;
+  }
+
+  return true;
 }
 
 bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,

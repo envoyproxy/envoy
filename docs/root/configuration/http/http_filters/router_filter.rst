@@ -404,6 +404,14 @@ owning HTTP connection manager.
   rq_direct_response, Counter, Total requests that resulted in a direct response
   rq_total, Counter, Total routed requests
   rq_reset_after_downstream_response_started, Counter, Total requests that were reset after downstream response had started
+  passthrough_internal_redirect_stream_request, Counter, Total unsuccessful internal redirects due to the request stream not being complete
+  passthrough_internal_redirect_body_handling, Counter, Total unsuccessful internal redirects due to the request body
+  passthrough_internal_redirect_bad_location, Counter, Total unsuccessful internal redirects due to an absent location response header
+  passthrough_internal_redirect_no_route, Counter, Total unsuccessful internal redirects due to the location header not matching any configured routes
+  passthrough_internal_redirect_predicate, Counter, Total unsuccessful internal redirects due to a configured predicate rule
+  passthrough_internal_redirect_too_many_redirects, Counter, Total unsuccessful internal redirects due to a redirect loop exceeding the configured threshold
+  passthrough_internal_redirect_unsafe_scheme, Counter, Total unsuccessful internal redirects due to the redirect changing to from a safe scheme to unsafe
+  passthrough_internal_redirect_recreate_stream_failed, Counter, Total unsuccessful internal redirects due the filter manager being unable to recreate the stream
 
 .. _config_http_filters_router_vcluster_stats:
 

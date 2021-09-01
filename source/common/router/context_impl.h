@@ -13,11 +13,14 @@ namespace Router {
 #define ALL_ROUTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                        \
   COUNTER(no_cluster)                                                                              \
   COUNTER(no_route)                                                                                \
+  COUNTER(passthrough_internal_redirect_stream_request)                                            \
+  COUNTER(passthrough_internal_redirect_body_handling)                                             \
   COUNTER(passthrough_internal_redirect_bad_location)                                              \
   COUNTER(passthrough_internal_redirect_no_route)                                                  \
   COUNTER(passthrough_internal_redirect_predicate)                                                 \
   COUNTER(passthrough_internal_redirect_too_many_redirects)                                        \
   COUNTER(passthrough_internal_redirect_unsafe_scheme)                                             \
+  COUNTER(passthrough_internal_redirect_recreate_stream_failed)                                    \
   COUNTER(rq_direct_response)                                                                      \
   COUNTER(rq_redirect)                                                                             \
   COUNTER(rq_reset_after_downstream_response_started)                                              \

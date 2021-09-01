@@ -1461,6 +1461,7 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
   // there was no body from the HCM's point of view.
   if (!complete() ||
       (!parent_.enableInternalRedirectsWithBody() && parent_.stream_info_.bytesReceived() != 0)) {
+    ENVOY_STREAM_LOG(debug, "unable to recreate stream", parent_);
     return false;
   }
 
