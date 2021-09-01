@@ -23,8 +23,11 @@ message PathTransformation {
   // Action to take on a http request when the request path url has been modified by a transformation.
   enum NormalizePathAction {
     DEFAULT = 0;
+    // keep the changes and continue processing the request.
     CONTINUE = 1;
+    // Reject the request.
     REJECT = 2;
+    // Redirect the request with the modified path.
     REDIRECT = 3;
   }
 
