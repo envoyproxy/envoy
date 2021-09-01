@@ -84,6 +84,15 @@ public:
    */
   virtual Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const PURE;
 
+  // Using uint32_t to express expected status of override host. Every bit in the OverrideHostStatus
+  // represent an enum value of Host::Health. The specific correspondence is shown below:
+  //
+  // * 0b001: Host::Health::Unhealthy
+  // * 0b010: Host::Health::Degraded
+  // * 0b100: Host::Health::Healthy
+  //
+  // If multiple bit bits are set, it is acceptable as long as the override host is in any of these
+  // statuses.
   using OverrideHostStatus = uint32_t;
   using OverrideHost = std::pair<std::string, OverrideHostStatus>;
 
