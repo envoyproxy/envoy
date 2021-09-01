@@ -37,6 +37,35 @@ class RetryPolicyMapperTest {
   }
 
   @Test
+  fun `converting from header values delimited with comma yields individual enum values`() {
+    val retryPolicy = RetryPolicy(
+      maxRetryCount = 3,
+      retryOn = listOf(
+        RetryRule.STATUS_5XX,
+        RetryRule.GATEWAY_ERROR
+      ),
+      retryStatusCodes = listOf(400, 422, 500),
+      perRetryTimeoutMS = 15000,
+      totalUpstreamTimeoutMS = 60000
+    )
+
+    val headers = RequestHeadersBuilder(
+      method = RequestMethod.POST, scheme = "https",
+      authority = "envoyproxy.io", path = "/mock"
+    )
+      .add("x-envoy-max-retries", "3")
+      .add("x-envoy-retriable-status-codes", "400,422,500")
+      .add("x-envoy-retry-on", "5xx,gateway-error")
+      .add("x-envoy-upstream-rq-per-try-timeout-ms", "15000")
+      .add("x-envoy-upstream-rq-timeout-ms", "60000")
+      .build()
+
+    val retryPolicyFromHeaders = RetryPolicy.from(headers)!!
+
+    assertThat(retryPolicy).isEqualTo(retryPolicyFromHeaders)
+  }
+
+  @Test
   fun `converting to headers without retry timeout excludes per retry timeout header`() {
     val retryPolicy = RetryPolicy(
       maxRetryCount = 123,

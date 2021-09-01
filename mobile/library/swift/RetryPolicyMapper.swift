@@ -23,6 +23,15 @@ extension RetryPolicy {
     return headers
   }
 
+  // Envoy internally coalesces multiple x-envoy header values into one comma-delimited value.
+  // These functions split those values up to correctly map back to Swift enums.
+  static func splitRetryRule(value: String) -> [RetryRule] {
+    return value.components(separatedBy: ",").compactMap(RetryRule.init)
+  }
+  static func splitRetriableStatusCodes(value: String) -> [UInt] {
+    return value.components(separatedBy: ",").compactMap(UInt.init)
+  }
+
   /// Initialize the retry policy from a set of headers.
   ///
   /// - parameter headers: The headers with which to initialize the retry policy.
@@ -35,9 +44,10 @@ extension RetryPolicy {
 
     return RetryPolicy(
       maxRetryCount: maxRetryCount,
-      retryOn: headers.value(forName: "x-envoy-retry-on")?.compactMap(RetryRule.init) ?? [],
+      retryOn: headers.value(forName: "x-envoy-retry-on")?
+        .flatMap(RetryPolicy.splitRetryRule) ?? [],
       retryStatusCodes: headers.value(forName: "x-envoy-retriable-status-codes")?
-        .compactMap(UInt.init) ?? [],
+        .flatMap(RetryPolicy.splitRetriableStatusCodes) ?? [],
       perRetryTimeoutMS: headers.value(forName: "x-envoy-upstream-rq-per-try-timeout-ms")?
         .first.flatMap(UInt.init),
       totalUpstreamTimeoutMS: headers.value(forName: "x-envoy-upstream-rq-timeout-ms")?

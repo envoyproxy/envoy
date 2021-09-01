@@ -40,10 +40,15 @@ data class RetryPolicy(
 
       return RetryPolicy(
         maxRetries,
+        // Envoy internally coalesces multiple x-envoy header values into one comma-delimited value.
+        // These flatMap transformations split those values up to correctly map back to
+        // Kotlin enums.
         headers.value("x-envoy-retry-on")
-          ?.map { retryOn -> RetryRule.enumValue(retryOn) }?.filterNotNull() ?: emptyList(),
+          ?.flatMap { it.split(",") }?.map { retryOn -> RetryRule.enumValue(retryOn) }
+          ?.filterNotNull() ?: emptyList(),
         headers.value("x-envoy-retriable-status-codes")
-          ?.map { statusCode -> statusCode.toIntOrNull() }?.filterNotNull() ?: emptyList(),
+          ?.flatMap { it.split(",") }?.map { statusCode -> statusCode.toIntOrNull() }
+          ?.filterNotNull() ?: emptyList(),
         headers.value("x-envoy-upstream-rq-per-try-timeout-ms")?.firstOrNull()?.toLongOrNull(),
         headers.value("x-envoy-upstream-rq-timeout-ms")?.firstOrNull()?.toLongOrNull()
       )
