@@ -353,6 +353,8 @@ void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
   }
 
   for (auto& entry : to_close) {
+    ENVOY_LOG_EVENT(debug, "closing_idle_client", "closing idle client {} for cluster {}",
+                    entry->id(), host_->cluster().name());
     entry->close();
   }
 }
