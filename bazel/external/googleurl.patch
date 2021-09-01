@@ -2,7 +2,7 @@
 # project using clang-cl. Tracked in https://github.com/envoyproxy/envoy/issues/11974.
 
 diff --git a/base/compiler_specific.h b/base/compiler_specific.h
-index 6651220..e2eda77 100644
+index 6651220..a469c19 100644
 --- a/base/compiler_specific.h
 +++ b/base/compiler_specific.h
 @@ -7,10 +7,6 @@
@@ -49,6 +49,48 @@ index 6651220..e2eda77 100644
 +#endif
  #else
  #define STACK_UNINITIALIZED
+ #endif
+@@ -365,8 +369,12 @@ inline constexpr bool AnalyzerAssumeTrue(bool arg) {
+ #endif  // defined(__clang_analyzer__)
+ 
+ // Use nomerge attribute to disable optimization of merging multiple same calls.
+-#if defined(__clang__) && __has_attribute(nomerge)
++#if defined(__clang__)
++#if defined(__has_attribute)
++#if __has_attribute(nomerge)
+ #define NOMERGE [[clang::nomerge]]
++#endif
++#endif
+ #else
+ #define NOMERGE
+ #endif
+@@ -392,8 +400,12 @@ inline constexpr bool AnalyzerAssumeTrue(bool arg) {
+ // See also:
+ //   https://clang.llvm.org/docs/AttributeReference.html#trivial-abi
+ //   https://libcxx.llvm.org/docs/DesignDocs/UniquePtrTrivialAbi.html
+-#if defined(__clang__) && __has_attribute(trivial_abi)
++#if defined(__clang__)
++#if defined(__has_attribute)
++#if __has_attribute(trivial_abi)
+ #define TRIVIAL_ABI [[clang::trivial_abi]]
++#endif
++#endif
+ #else
+ #define TRIVIAL_ABI
+ #endif
+@@ -401,8 +413,12 @@ inline constexpr bool AnalyzerAssumeTrue(bool arg) {
+ // Marks a member function as reinitializing a moved-from variable.
+ // See also
+ // https://clang.llvm.org/extra/clang-tidy/checks/bugprone-use-after-move.html#reinitialization
+-#if defined(__clang__) && __has_attribute(reinitializes)
++#if defined(__clang__)
++#if defined(__has_attribute)
++#if __has_attribute(reinitializes)
+ #define REINITIALIZES_AFTER_MOVE [[clang::reinitializes]]
++#endif
++#endif
+ #else
+ #define REINITIALIZES_AFTER_MOVE
  #endif
 
 # TODO(dio): Consider to remove the following patch when we have IDN-free optional build for URL
