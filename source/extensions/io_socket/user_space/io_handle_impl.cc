@@ -280,7 +280,7 @@ Api::SysCallIntResult IoHandleImpl::connect(Network::Address::InstanceConstShare
     // found. Use write or read to determine if peer is closed.
     return {0, 0};
   } else {
-    ENVOY_LOG(debug, "user namespace handle {} connect to {} the closed peer.",
+    ENVOY_LOG(debug, "user namespace handle {} connect to previously closed peer {}.",
               static_cast<void*>(this), address->asStringView());
     return Api::SysCallIntResult{-1, SOCKET_ERROR_INVAL};
   }
