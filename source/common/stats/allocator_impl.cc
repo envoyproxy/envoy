@@ -26,22 +26,24 @@ AllocatorImpl::~AllocatorImpl() {
   ASSERT(counters_.empty());
   ASSERT(gauges_.empty());
 
-  // Move deleted stats into the sets for removeFromSetLockHeld to function.
+#ifndef NDEBUG
+  // Move deleted stats into the sets for the ASSERTs in removeFromSetLockHeld to function.
   for (auto& counter : deleted_counters_) {
+    auto insertion = counters_.insert(counter.get());
     // Assert that there were no duplicates.
-    ASSERT(counters_.count(counter.get()) == 0);
-    counters_.insert(counter.get());
+    ASSERT(insertion.second);
   }
   for (auto& gauge : deleted_gauges_) {
+    auto insertion = gauges_.insert(gauge.get());
     // Assert that there were no duplicates.
-    ASSERT(gauges_.count(gauge.get()) == 0);
-    gauges_.insert(gauge.get());
+    ASSERT(insertion.second);
   }
   for (auto& text_readout : deleted_text_readouts_) {
+    auto insertion = text_readouts_.insert(text_readout.get());
     // Assert that there were no duplicates.
-    ASSERT(text_readouts_.count(text_readout.get()) == 0);
-    text_readouts_.insert(text_readout.get());
+    ASSERT(insertion.second);
   }
+#endif
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
@@ -366,7 +368,7 @@ void AllocatorImpl::markCounterForDeletion(StatName name) {
   if (iter == counters_.end()) {
     return;
   }
-  // Duplicates are checked in ~AllocatorImpl.
+  // Duplicates are ASSERTed in ~AllocatorImpl.
   deleted_counters_.emplace_back(*iter);
   counters_.erase(iter);
 }
@@ -377,7 +379,7 @@ void AllocatorImpl::markGaugeForDeletion(StatName name) {
   if (iter == gauges_.end()) {
     return;
   }
-  // Duplicates are checked in ~AllocatorImpl.
+  // Duplicates are ASSERTed in ~AllocatorImpl.
   deleted_gauges_.emplace_back(*iter);
   gauges_.erase(iter);
 }
@@ -388,7 +390,7 @@ void AllocatorImpl::markTextReadoutForDeletion(StatName name) {
   if (iter == text_readouts_.end()) {
     return;
   }
-  // Duplicates are checked in ~AllocatorImpl.
+  // Duplicates are ASSERTed in ~AllocatorImpl.
   deleted_text_readouts_.emplace_back(*iter);
   text_readouts_.erase(iter);
 }
