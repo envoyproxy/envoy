@@ -66,7 +66,7 @@ public:
         uint64_t default_expected_status);
 
     bool inExpectedRange(uint64_t http_status) const;
-    bool inRetriaableRange(uint64_t http_status) const;
+    bool inRetriableRange(uint64_t http_status) const;
 
   private:
     std::vector<std::pair<uint64_t, uint64_t>> expected_ranges_;
