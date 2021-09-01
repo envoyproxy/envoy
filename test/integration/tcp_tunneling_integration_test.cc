@@ -501,8 +501,6 @@ using Params = std::tuple<Network::Address::IpVersion, Http::CodecType>;
 // Tunneling downstream TCP over an upstream HTTP CONNECT tunnel.
 class TcpTunnelingIntegrationTest : public HttpProtocolIntegrationTest {
 public:
-  TcpTunnelingIntegrationTest() {}
-
   void SetUp() override {
     enableHalfClose(true);
     setDownstreamProtocol(Http::CodecType::HTTP2);
