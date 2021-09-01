@@ -112,6 +112,7 @@ private:
     const std::string& resolvedHost() const override { return resolved_host_; }
     bool isIpAddress() const override { return is_ip_address_; }
     void touch() final { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
+    void updateStale(uint64_t time) { stale_at_time_ = time; }
 
     void setAddress(Network::Address::InstanceConstSharedPtr address) {
       absl::WriterMutexLock lock{&resolve_lock_};
@@ -141,6 +142,7 @@ private:
     // Using std::chrono::steady_clock::duration is required for compilation within an atomic vs.
     // using MonotonicTime.
     std::atomic<std::chrono::steady_clock::duration> last_used_time_;
+    std::atomic<uint64_t> stale_at_time_;
     bool first_resolve_complete_ ABSL_GUARDED_BY(resolve_lock_){false};
   };
 
@@ -186,10 +188,12 @@ private:
   PrimaryHostInfo& getPrimaryHost(const std::string& host);
 
   void addCacheEntry(const std::string& host,
-                     const Network::Address::InstanceConstSharedPtr& address);
+                     const Network::Address::InstanceConstSharedPtr& address,
+                     const std::chrono::seconds& ttl);
   void removeCacheEntry(const std::string& host);
   void loadCacheEntries(
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
+  PrimaryHostInfo* createHost(const std::string& host, uint16_t default_port);
 
   Event::Dispatcher& main_thread_dispatcher_;
   const Network::DnsLookupFamily dns_lookup_family_;

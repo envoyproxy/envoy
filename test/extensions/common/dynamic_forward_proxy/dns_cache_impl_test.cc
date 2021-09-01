@@ -19,6 +19,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+using testing::ContainsRegex;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Return;
@@ -1064,14 +1065,14 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
 
   EXPECT_CALL(*timeout_timer, disableTimer());
   // Make sure the store gets the first insert.
-  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.1:80"));
+  EXPECT_CALL(*store, addOrUpdate("foo.com", ContainsRegex("10.0.0.1:80|30|\\d*)")));
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
   EXPECT_CALL(callbacks,
               onLoadDnsCacheComplete(DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000), _));
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
-             TestUtility::makeDnsResponse({"10.0.0.1"}));
+             TestUtility::makeDnsResponse({"10.0.0.1"}, std::chrono::seconds(30)));
 
   checkStats(1 /* attempt */, 1 /* success */, 0 /* failure */, 1 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
@@ -1089,7 +1090,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   EXPECT_CALL(*timeout_timer, disableTimer());
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000), _));
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
-             TestUtility::makeDnsResponse({"10.0.0.1"}));
+             TestUtility::makeDnsResponse({"10.0.0.1"}, std::chrono::seconds(30)));
 
   checkStats(2 /* attempt */, 2 /* success */, 0 /* failure */, 1 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
@@ -1105,12 +1106,12 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
 
   EXPECT_CALL(*timeout_timer, disableTimer());
   // Make sure the store gets the updated address.
-  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.2:80"));
+  EXPECT_CALL(*store, addOrUpdate("foo.com", ContainsRegex("10.0.0.2:80|30|\\d*")));
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.2:80", "foo.com", false)));
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000), _));
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
-             TestUtility::makeDnsResponse({"10.0.0.2"}));
+             TestUtility::makeDnsResponse({"10.0.0.2"}, std::chrono::seconds(30)));
 
   checkStats(3 /* attempt */, 3 /* success */, 0 /* failure */, 2 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
