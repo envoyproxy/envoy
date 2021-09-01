@@ -65,7 +65,7 @@ protected:
                                               int h1_body_bytes_sent, int h1_body_bytes_received,
                                               int h2_wire_bytes_sent, int h2_wire_bytes_received,
                                               int h2_body_bytes_sent, int h2_body_bytes_received) {
-    auto integer_near = [](int x, int y) -> bool { return std::abs(x - y) <= (x / 10); };
+    auto integer_near = [](int x, int y) -> bool { return std::abs(x - y) <= (x / 20); };
     std::string access_log = waitForAccessLog(log_name, log_index);
     std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
     int wire_bytes_sent = std::stoi(log_entries[0]),
@@ -73,10 +73,14 @@ protected:
         body_bytes_sent = std::stoi(log_entries[2]),
         body_bytes_received = std::stoi(log_entries[3]);
     if (upstreamProtocol() == Http::CodecType::HTTP1) {
-      EXPECT_EQ(h1_wire_bytes_sent, wire_bytes_sent);
-      EXPECT_EQ(h1_wire_bytes_received, wire_bytes_received);
-      EXPECT_EQ(h1_body_bytes_sent, body_bytes_sent);
-      EXPECT_EQ(h1_body_bytes_received, body_bytes_received);
+      EXPECT_TRUE(integer_near(h1_wire_bytes_sent, wire_bytes_sent))
+          << "expect: " << h1_wire_bytes_sent << ", actual: " << wire_bytes_sent;
+      EXPECT_TRUE(integer_near(h1_wire_bytes_received, wire_bytes_received))
+          << "expect: " << h1_wire_bytes_received << ", actual: " << wire_bytes_received;
+      EXPECT_TRUE(integer_near(h1_body_bytes_sent, body_bytes_sent))
+          << "expect: " << h1_body_bytes_sent << ", actual: " << body_bytes_sent;
+      EXPECT_TRUE(integer_near(h1_body_bytes_received, body_bytes_received))
+          << "expect: " << h1_body_bytes_received << ", actual: " << body_bytes_received;
     }
     if (upstreamProtocol() == Http::CodecType::HTTP2) {
       // Because of non-deterministic h2 compression, the same plain text length don't map to the
@@ -106,10 +110,14 @@ protected:
         body_bytes_sent = std::stoi(log_entries[2]),
         body_bytes_received = std::stoi(log_entries[3]);
     if (downstreamProtocol() == Http::CodecType::HTTP1) {
-      EXPECT_EQ(h1_wire_bytes_sent, wire_bytes_sent);
-      EXPECT_EQ(h1_wire_bytes_received, wire_bytes_received);
-      EXPECT_EQ(h1_body_bytes_sent, body_bytes_sent);
-      EXPECT_EQ(h1_body_bytes_received, body_bytes_received);
+      EXPECT_TRUE(integer_near(h1_wire_bytes_sent, wire_bytes_sent))
+          << "expect: " << h1_wire_bytes_sent << ", actual: " << wire_bytes_sent;
+      EXPECT_TRUE(integer_near(h1_wire_bytes_received, wire_bytes_received))
+          << "expect: " << h1_wire_bytes_received << ", actual: " << wire_bytes_received;
+      EXPECT_TRUE(integer_near(h1_body_bytes_sent, body_bytes_sent))
+          << "expect: " << h1_body_bytes_sent << ", actual: " << body_bytes_sent;
+      EXPECT_TRUE(integer_near(h1_body_bytes_received, body_bytes_received))
+          << "expect: " << h1_body_bytes_received << ", actual: " << body_bytes_received;
     }
     if (downstreamProtocol() == Http::CodecType::HTTP2) {
       // Because of non-deterministic h2 compression, the same plain text length don't map to the

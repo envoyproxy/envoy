@@ -3123,8 +3123,8 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountUpstream) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_BODY_BYTES_SENT% %UPSTREAM_BODY_BYTES_RECEIVED%\n");
   testRouterRequestAndResponseWithBody(100, 100, false);
-  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 371, 158, 106, 110, 277, 122, 100,
-                                         100);
+  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 371, 158, 106, 110, 277, 122, 109,
+                                         109);
 }
 
 TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountDownstream) {
