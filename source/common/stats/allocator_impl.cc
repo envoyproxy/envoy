@@ -17,19 +17,6 @@
 
 #include "absl/container/flat_hash_set.h"
 
-namespace {
-// Helper function to check if vector of StatSharedPtrs contains a StatPtr
-// Note this is only meant to be used in asserts as this check is expensive.
-template <typename StatType>
-bool hasStat(const std::vector<Envoy::Stats::RefcountPtr<StatType>>& vec,
-             StatType* const stat_ptr) {
-  return std::find_if(vec.begin(), vec.end(),
-                      [stat_ptr](const Envoy::Stats::RefcountPtr<StatType>& shared_ptr) {
-                        return (shared_ptr.get() == stat_ptr);
-                      }) != vec.end();
-}
-} // namespace
-
 namespace Envoy {
 namespace Stats {
 
@@ -38,6 +25,23 @@ const char AllocatorImpl::DecrementToZeroSyncPoint[] = "decrement-zero";
 AllocatorImpl::~AllocatorImpl() {
   ASSERT(counters_.empty());
   ASSERT(gauges_.empty());
+
+  // Move deleted stats into the sets for removeFromSetLockHeld to function.
+  for (auto& counter : deleted_counters_) {
+    // Assert that there were no duplicates.
+    ASSERT(counters_.count(counter.get()) == 0);
+    counters_.insert(counter.get());
+  }
+  for (auto& gauge : deleted_gauges_) {
+    // Assert that there were no duplicates.
+    ASSERT(gauges_.count(gauge.get()) == 0);
+    gauges_.insert(gauge.get());
+  }
+  for (auto& text_readout : deleted_text_readouts_) {
+    // Assert that there were no duplicates.
+    ASSERT(text_readouts_.count(text_readout.get()) == 0);
+    text_readouts_.insert(text_readout.get());
+  }
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
@@ -136,7 +140,7 @@ public:
 
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.counters_.erase(statName());
-    ASSERT(count == 1 || hasStat<Counter>(alloc_.deleted_counters_, this));
+    ASSERT(count == 1);
   }
 
   // Stats::Counter
@@ -180,7 +184,7 @@ public:
 
   void removeFromSetLockHeld() override ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) {
     const size_t count = alloc_.gauges_.erase(statName());
-    ASSERT(count == 1 || hasStat<Gauge>(alloc_.deleted_gauges_, this));
+    ASSERT(count == 1);
   }
 
   // Stats::Gauge
@@ -252,7 +256,7 @@ public:
 
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.text_readouts_.erase(statName());
-    ASSERT(count == 1 || hasStat<TextReadout>(alloc_.deleted_text_readouts_, this));
+    ASSERT(count == 1);
   }
 
   // Stats::TextReadout
@@ -362,7 +366,7 @@ void AllocatorImpl::markCounterForDeletion(StatName name) {
   if (iter == counters_.end()) {
     return;
   }
-  ASSERT(!hasStat(deleted_counters_, *iter));
+  // Duplicates are checked in ~AllocatorImpl.
   deleted_counters_.emplace_back(*iter);
   counters_.erase(iter);
 }
@@ -373,7 +377,7 @@ void AllocatorImpl::markGaugeForDeletion(StatName name) {
   if (iter == gauges_.end()) {
     return;
   }
-  ASSERT(!hasStat(deleted_gauges_, *iter));
+  // Duplicates are checked in ~AllocatorImpl.
   deleted_gauges_.emplace_back(*iter);
   gauges_.erase(iter);
 }
@@ -384,7 +388,7 @@ void AllocatorImpl::markTextReadoutForDeletion(StatName name) {
   if (iter == text_readouts_.end()) {
     return;
   }
-  ASSERT(!hasStat(deleted_text_readouts_, *iter));
+  // Duplicates are checked in ~AllocatorImpl.
   deleted_text_readouts_.emplace_back(*iter);
   text_readouts_.erase(iter);
 }
