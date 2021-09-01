@@ -17,6 +17,19 @@
 
 #include "absl/container/flat_hash_set.h"
 
+namespace {
+// Helper function to check if vector of StatSharedPtrs contains a StatPtr
+// Note this is only meant to be used in asserts as this check is expensive.
+template <typename StatType>
+bool hasStat(const std::vector<Envoy::Stats::RefcountPtr<StatType>>& vec,
+             StatType* const stat_ptr) {
+  return std::find_if(vec.begin(), vec.end(),
+                      [stat_ptr](const Envoy::Stats::RefcountPtr<StatType>& shared_ptr) {
+                        return (shared_ptr.get() == stat_ptr);
+                      }) != vec.end();
+}
+} // namespace
+
 namespace Envoy {
 namespace Stats {
 
@@ -123,7 +136,7 @@ public:
 
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.counters_.erase(statName());
-    ASSERT(count == 1);
+    ASSERT(count == 1 || hasStat<Counter>(alloc_.deleted_counters_, this));
   }
 
   // Stats::Counter
@@ -167,7 +180,7 @@ public:
 
   void removeFromSetLockHeld() override ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) {
     const size_t count = alloc_.gauges_.erase(statName());
-    ASSERT(count == 1);
+    ASSERT(count == 1 || hasStat<Gauge>(alloc_.deleted_gauges_, this));
   }
 
   // Stats::Gauge
@@ -239,7 +252,7 @@ public:
 
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.text_readouts_.erase(statName());
-    ASSERT(count == 1);
+    ASSERT(count == 1 || hasStat<TextReadout>(alloc_.deleted_text_readouts_, this));
   }
 
   // Stats::TextReadout
@@ -316,8 +329,8 @@ Counter* AllocatorImpl::makeCounterInternal(StatName name, StatName tag_extracte
   return new CounterImpl(name, *this, tag_extracted_name, stat_name_tags);
 }
 
-void AllocatorImpl::forEachSinkedCounter(std::function<void(std::size_t)> f_size,
-                                         std::function<void(Stats::Counter&)> f_stat) {
+void AllocatorImpl::forEachCounter(std::function<void(std::size_t)> f_size,
+                                   std::function<void(Stats::Counter&)> f_stat) const {
   Thread::LockGuard lock(mutex_);
   f_size(counters_.size());
   for (auto& counter : counters_) {
@@ -325,8 +338,8 @@ void AllocatorImpl::forEachSinkedCounter(std::function<void(std::size_t)> f_size
   }
 }
 
-void AllocatorImpl::forEachSinkedGauge(std::function<void(std::size_t)> f_size,
-                                       std::function<void(Stats::Gauge&)> f_stat) {
+void AllocatorImpl::forEachGauge(std::function<void(std::size_t)> f_size,
+                                 std::function<void(Stats::Gauge&)> f_stat) const {
   Thread::LockGuard lock(mutex_);
   f_size(gauges_.size());
   for (auto& gauge : gauges_) {
@@ -334,13 +347,46 @@ void AllocatorImpl::forEachSinkedGauge(std::function<void(std::size_t)> f_size,
   }
 }
 
-void AllocatorImpl::forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
-                                             std::function<void(Stats::TextReadout&)> f_stat) {
+void AllocatorImpl::forEachTextReadout(std::function<void(std::size_t)> f_size,
+                                       std::function<void(Stats::TextReadout&)> f_stat) const {
   Thread::LockGuard lock(mutex_);
   f_size(text_readouts_.size());
   for (auto& text_readout : text_readouts_) {
     f_stat(*text_readout);
   }
+}
+
+void AllocatorImpl::markCounterForDeletion(StatName name) {
+  Thread::LockGuard lock(mutex_);
+  auto iter = counters_.find(name);
+  if (iter == counters_.end()) {
+    return;
+  }
+  ASSERT(!hasStat(deleted_counters_, *iter));
+  deleted_counters_.emplace_back(*iter);
+  counters_.erase(iter);
+}
+
+void AllocatorImpl::markGaugeForDeletion(StatName name) {
+  Thread::LockGuard lock(mutex_);
+  auto iter = gauges_.find(name);
+  if (iter == gauges_.end()) {
+    return;
+  }
+  ASSERT(!hasStat(deleted_gauges_, *iter));
+  deleted_gauges_.emplace_back(*iter);
+  gauges_.erase(iter);
+}
+
+void AllocatorImpl::markTextReadoutForDeletion(StatName name) {
+  Thread::LockGuard lock(mutex_);
+  auto iter = text_readouts_.find(name);
+  if (iter == text_readouts_.end()) {
+    return;
+  }
+  ASSERT(!hasStat(deleted_text_readouts_, *iter));
+  deleted_text_readouts_.emplace_back(*iter);
+  text_readouts_.erase(iter);
 }
 
 } // namespace Stats

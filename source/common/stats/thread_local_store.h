@@ -244,14 +244,14 @@ public:
   std::vector<TextReadoutSharedPtr> textReadouts() const override;
   std::vector<ParentHistogramSharedPtr> histograms() const override;
 
-  void forEachSinkedCounter(std::function<void(std::size_t)> f_size,
-                            std::function<void(Stats::Counter&)> f_stat) override;
+  void forEachCounter(std::function<void(std::size_t)> f_size,
+                      std::function<void(Stats::Counter&)> f_stat) const override;
 
-  void forEachSinkedGauge(std::function<void(std::size_t)> f_size,
-                          std::function<void(Stats::Gauge&)> f_stat) override;
+  void forEachGauge(std::function<void(std::size_t)> f_size,
+                    std::function<void(Stats::Gauge&)> f_stat) const override;
 
-  void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
-                                std::function<void(Stats::TextReadout&)> f_stat) override;
+  void forEachTextReadout(std::function<void(std::size_t)> f_size,
+                          std::function<void(Stats::TextReadout&)> f_stat) const override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -492,6 +492,8 @@ private:
   bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
+  template <class StatMapClass>
+  void removeRejectedStats(StatMapClass& map, std::function<void(StatName name)> f_deletion);
   bool checkAndRememberRejection(StatName name, StatsMatcher::FastResult fast_reject_result,
                                  StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
@@ -536,10 +538,7 @@ private:
   // It seems like it would be better to have each client that expects a stat
   // to exist to hold it as (e.g.) a CounterSharedPtr rather than a Counter&
   // but that would be fairly complex to change.
-  std::vector<CounterSharedPtr> deleted_counters_ ABSL_GUARDED_BY(lock_);
-  std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(lock_);
   std::vector<HistogramSharedPtr> deleted_histograms_ ABSL_GUARDED_BY(lock_);
-  std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(lock_);
 
   // Scope IDs and central cache entries that are queued for cross-scope release.
   // Because there can be a large number of scopes, all of which are released at once,

@@ -11,6 +11,7 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
+#include "metric_impl.h"
 
 namespace Envoy {
 namespace Stats {
@@ -33,14 +34,14 @@ public:
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
-  void forEachSinkedCounter(std::function<void(std::size_t)>,
-                            std::function<void(Stats::Counter&)>) override;
+  void forEachCounter(std::function<void(std::size_t)>,
+                      std::function<void(Stats::Counter&)>) const override;
 
-  void forEachSinkedGauge(std::function<void(std::size_t)>,
-                          std::function<void(Stats::Gauge&)>) override;
+  void forEachGauge(std::function<void(std::size_t)>,
+                    std::function<void(Stats::Gauge&)>) const override;
 
-  void forEachSinkedTextReadout(std::function<void(std::size_t)>,
-                                std::function<void(Stats::TextReadout&)>) override;
+  void forEachTextReadout(std::function<void(std::size_t)>,
+                          std::function<void(Stats::TextReadout&)>) const override;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
@@ -55,6 +56,10 @@ public:
    * @return whether the allocator's mutex is locked, exposed for testing purposes.
    */
   bool isMutexLockedForTest();
+
+  void markCounterForDeletion(StatName name) override;
+  void markGaugeForDeletion(StatName name) override;
+  void markTextReadoutForDeletion(StatName name) override;
 
 protected:
   virtual Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
@@ -71,13 +76,21 @@ private:
   template <typename StatType>
   using SinkedStatsSet = absl::flat_hash_set<StatType*, absl::Hash<StatType*>>;
 
-  void removeCounterFromSetLockHeld(Counter* counter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void removeGaugeFromSetLockHeld(Gauge* gauge) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void removeTextReadoutFromSetLockHeld(Counter* counter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-
   StatSet<Counter> counters_ ABSL_GUARDED_BY(mutex_);
   StatSet<Gauge> gauges_ ABSL_GUARDED_BY(mutex_);
   StatSet<TextReadout> text_readouts_ ABSL_GUARDED_BY(mutex_);
+
+  // Retain storage for deleted stats; these are no longer in maps because
+  // the matcher-pattern was established after they were created. Since the
+  // stats are held by reference in code that expects them to be there, we
+  // can't actually delete the stats.
+  //
+  // It seems like it would be better to have each client that expects a stat
+  // to exist to hold it as (e.g.) a CounterSharedPtr rather than a Counter&
+  // but that would be fairly complex to change.
+  std::vector<CounterSharedPtr> deleted_counters_ ABSL_GUARDED_BY(mutex_);
+  std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(mutex_);
+  std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(mutex_);
 
   SymbolTable& symbol_table_;
 
@@ -85,7 +98,7 @@ private:
   // alloc() and free() operations. Although alloc() operations are called under existing locking,
   // free() operations are made from the destructors of the individual stat objects, which are not
   // protected by locks.
-  Thread::MutexBasicLockable mutex_;
+  mutable Thread::MutexBasicLockable mutex_;
 
   Thread::ThreadSynchronizer sync_;
 };

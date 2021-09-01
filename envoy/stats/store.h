@@ -56,14 +56,14 @@ public:
    * @param f_size functor that is provided the number of all sinked stats.
    * @param f_stat functor that is provided one sinked stat at a time.
    */
-  virtual void forEachSinkedCounter(std::function<void(std::size_t)> f_size,
-                                    std::function<void(Stats::Counter&)> f_stat) PURE;
+  virtual void forEachCounter(std::function<void(std::size_t)> f_size,
+                              std::function<void(Stats::Counter&)> f_stat) const PURE;
 
-  virtual void forEachSinkedGauge(std::function<void(std::size_t)> f_size,
-                                  std::function<void(Stats::Gauge&)> f_stat) PURE;
+  virtual void forEachGauge(std::function<void(std::size_t)> f_size,
+                            std::function<void(Stats::Gauge&)> f_stat) const PURE;
 
-  virtual void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
-                                        std::function<void(Stats::TextReadout&)> f_stat) PURE;
+  virtual void forEachTextReadout(std::function<void(std::size_t)> f_size,
+                                  std::function<void(Stats::TextReadout&)> f_stat) const PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;

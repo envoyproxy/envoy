@@ -508,10 +508,11 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
   scope1.reset();
-  EXPECT_EQ(0UL, store_->counters().size());
+  EXPECT_EQ(1UL, store_->counters().size());
 
   EXPECT_EQ(1L, c1.use_count());
   c1.reset();
+  EXPECT_EQ(0UL, store_->counters().size());
 
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();

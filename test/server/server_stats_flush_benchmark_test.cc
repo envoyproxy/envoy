@@ -18,13 +18,13 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
 class StatsSinkFlushSpeedTest {
 
 public:
   StatsSinkFlushSpeedTest(size_t const num_stats)
       : pool_(symbol_table_), stats_allocator_(symbol_table_), stats_store_(stats_allocator_) {
 
-    sinks_.emplace_back(new testing::NiceMock<Stats::MockSink>());
     // Create counters
     for (uint64_t idx = 0; idx < num_stats; ++idx) {
       auto stat_name = pool_.add(absl::StrCat("counter.", idx));
@@ -46,7 +46,9 @@ public:
   void test(::benchmark::State& state) {
     for (auto _ : state) {
       UNREFERENCED_PARAMETER(state);
-      Server::InstanceUtil::flushMetricsToSinks(sinks_, stats_store_, time_system_);
+      std::list<Stats::SinkPtr> sinks;
+      sinks.emplace_back(new testing::NiceMock<Stats::MockSink>());
+      Server::InstanceUtil::flushMetricsToSinks(sinks, stats_store_, time_system_);
     }
   }
 
@@ -55,7 +57,6 @@ private:
   Stats::StatNamePool pool_;
   Stats::AllocatorImpl stats_allocator_;
   Stats::ThreadLocalStoreImpl stats_store_;
-  std::list<Stats::SinkPtr> sinks_;
   Event::SimulatedTimeSystem time_system_;
 };
 
