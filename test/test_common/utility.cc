@@ -239,18 +239,10 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
 }
 
 AssertionResult TestUtility::waitForGaugeDestroyed(Stats::Store& store, const std::string& name,
-                                                   Event::TestTimeSystem& time_system,
-                                                   std::chrono::milliseconds timeout) {
-  Event::TestTimeSystem::RealTimeBound bound(timeout);
+                                                   Event::TestTimeSystem& time_system) {
   Stats::GaugeSharedPtr gauge = findGauge(store, name);
-  while (gauge != nullptr) {
+  while (findGauge(store, name) == nullptr) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
-    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return AssertionFailure() << fmt::format(
-                 "timed out waiting for {} destroyed, current value {}", name,
-                 absl::StrCat(gauge->value()));
-    }
-    gauge = findGauge(store, name);
   }
   return AssertionSuccess();
 }

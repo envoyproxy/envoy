@@ -291,9 +291,7 @@ class LdsInplaceUpdateHttpIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
 public:
-  LdsInplaceUpdateHttpIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
-    use_real_stats_ = true;
-  }
+  LdsInplaceUpdateHttpIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void inplaceInitialize(bool add_default_filter_chain = false) {
     autonomous_upstream_ = true;
