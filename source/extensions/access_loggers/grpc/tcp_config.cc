@@ -31,7 +31,7 @@ AccessLog::InstanceSharedPtr TcpGrpcAccessLogFactory::createAccessLogInstance(
   if (service_config.has_envoy_grpc()) {
     const std::string& cluster_name = service_config.envoy_grpc().cluster_name();
     if (!context.clusterManager().checkActiveStaticCluster(cluster_name)) {
-      throw EnvoyException(fmt::format("cluster '{}' is unknown or not static", cluster_name));
+      throw EnvoyException(fmt::format("Cluster '{}' is unknown or not static", cluster_name));
     };
   }
   return std::make_shared<TcpGrpcAccessLog>(std::move(filter), proto_config, context.threadLocal(),

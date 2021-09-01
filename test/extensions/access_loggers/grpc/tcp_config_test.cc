@@ -55,7 +55,7 @@ public:
     } else {
       EXPECT_THROW_WITH_MESSAGE(
           factory_->createAccessLogInstance(*message_, std::move(filter_), context_),
-          EnvoyException, fmt::format("cluster '{}' is unknown or not static", cluster_name));
+          EnvoyException, fmt::format("Cluster '{}' is unknown or not static", cluster_name));
     }
   }
 

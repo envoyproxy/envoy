@@ -1055,7 +1055,7 @@ TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
   options_.service_cluster_name_ = "some_service";
   options_.service_node_name_ = "some_node_name";
   EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/runtime_bootstrap_ads_eds.yaml"),
-                          EnvoyException, "Unknown gRPC client cluster");
+                          EnvoyException, "Cluster 'ads_cluster' is unknown or not static");
 }
 
 // Validate invalid runtime in bootstrap is rejected.

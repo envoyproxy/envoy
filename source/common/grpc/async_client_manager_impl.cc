@@ -48,7 +48,7 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
 
   const std::string& cluster_name = config.envoy_grpc().cluster_name();
   if (!cm_.checkActiveStaticCluster(cluster_name)) {
-    throw EnvoyException(fmt::format("cluster '{}' is unknown or not static", cluster_name));
+    throw EnvoyException(fmt::format("Cluster '{}' is unknown or not static", cluster_name));
   }
 }
 
