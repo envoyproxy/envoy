@@ -955,7 +955,7 @@ void ClusterManagerImpl::drainConnections(const std::string& cluster) {
   tls_.runOnAllThreads([cluster](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     auto cluster_entry = cluster_manager->thread_local_clusters_.find(cluster);
     if (cluster_entry != cluster_manager->thread_local_clusters_.end()) {
-      cluster_entry->second->drainConnPools();
+      cluster_entry->second->drainAllConnPools();
     }
   });
 }
@@ -966,7 +966,7 @@ void ClusterManagerImpl::drainConnections() {
 
   tls_.runOnAllThreads([](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     for (const auto& cluster_entry : cluster_manager->thread_local_clusters_) {
-      cluster_entry.second->drainConnPools();
+      cluster_entry.second->drainAllConnPools();
     }
   });
 }
@@ -1405,6 +1405,18 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnPools() {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     parent_.drainConnPools(host_set->hosts());
+  }
+}
+
+// TODO(junr03): clean up this usage and the usage above once ConnPoolImplBase::startDrain and
+// ConnPoolImplBase::drainConnections() get cleaned up. The code in onHostHealthFailure and the code
+// in ThreadLocalClusterManagerImpl::drainConnPools(const HostVector& hosts) is very similar and
+// can be merged in a similar fashion to the ConnPoolImplBase case.
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainAllConnPools() {
+  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
+    for (const HostSharedPtr& host : host_set->hosts()) {
+      parent_.onHostHealthFailure(host);
+    }
   }
 }
 

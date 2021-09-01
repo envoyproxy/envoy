@@ -431,8 +431,10 @@ private:
 
       // Drains any connection pools associated with the removed hosts.
       void drainConnPools(const HostVector& hosts_removed);
-      // Drains connection pools for all hosts.
+      // Drains idle clients in connection pools for all hosts.
       void drainConnPools();
+      // Drain all clients in connection pools for all hosts.
+      void drainAllConnPools();
 
     private:
       Http::ConnectionPool::Instance*
