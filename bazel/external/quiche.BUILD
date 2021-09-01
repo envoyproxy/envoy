@@ -1038,7 +1038,7 @@ envoy_cc_library(
     deps = [
         ":quic_platform_export",
         ":quiche_common_lib",
-	":quiche_common_platform_default_quiche_platform_impl_export_lib",
+        ":quiche_common_platform_default_quiche_platform_impl_export_lib",
         "@envoy//source/common/quic/platform:quic_platform_base_impl_lib",
     ],
 )
