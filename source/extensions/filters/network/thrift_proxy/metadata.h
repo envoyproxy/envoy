@@ -30,6 +30,71 @@ class MessageMetadata {
 public:
   MessageMetadata() = default;
 
+  std::shared_ptr<MessageMetadata> clone() const {
+    auto copy = std::make_shared<MessageMetadata>();
+
+    if (hasFrameSize()) {
+      copy->setFrameSize(frameSize());
+    }
+
+    if (hasProtocol()) {
+      copy->setProtocol(protocol());
+    }
+
+    if (hasMethodName()) {
+      copy->setMethodName(methodName());
+    }
+
+    if (hasSequenceId()) {
+      copy->setSequenceId(sequenceId());
+    }
+
+    if (hasMessageType()) {
+      copy->setMessageType(messageType());
+    }
+
+    Http::HeaderMapImpl::copyFrom(copy->headers(), headers());
+    copy->mutableSpans().assign(spans().begin(), spans().end());
+
+    if (hasAppException()) {
+      copy->setAppException(appExceptionType(), appExceptionMessage());
+    }
+
+    copy->setProtocolUpgradeMessage(isProtocolUpgradeMessage());
+
+    auto trace_id = traceId();
+    if (trace_id.has_value()) {
+      copy->setTraceId(trace_id.value());
+    }
+
+    auto trace_id_high = traceIdHigh();
+    if (trace_id_high.has_value()) {
+      copy->setTraceIdHigh(trace_id_high.value());
+    }
+
+    auto span_id = spanId();
+    if (span_id.has_value()) {
+      copy->setSpanId(span_id.value());
+    }
+
+    auto parent_span_id = parentSpanId();
+    if (parent_span_id.has_value()) {
+      copy->setParentSpanId(parent_span_id.value());
+    }
+
+    auto flags_opt = flags();
+    if (flags_opt.has_value()) {
+      copy->setFlags(flags_opt.value());
+    }
+
+    auto sampled_opt = sampled();
+    if (sampled_opt.has_value()) {
+      copy->setSampled(sampled_opt.value());
+    }
+
+    return copy;
+  }
+
   bool hasFrameSize() const { return frame_size_.has_value(); }
   uint32_t frameSize() const { return frame_size_.value(); }
   void setFrameSize(uint32_t size) { frame_size_ = size; }

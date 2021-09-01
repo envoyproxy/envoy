@@ -21,6 +21,7 @@ AWS
 BACKTRACE
 BSON
 BPF
+btree
 CAS
 CB
 CDN
@@ -41,6 +42,8 @@ RTP
 STATNAME
 SkyWalking
 TIDs
+Timedout
+WRSQ
 WASI
 ceil
 CCM
@@ -246,6 +249,7 @@ PGV
 PID
 PKTINFO
 PNG
+Pointwise
 PostCBs
 PREBIND
 PRNG
@@ -598,6 +602,7 @@ dubbo
 dup
 durations
 dynamodb
+eg
 emplace
 emplaced
 emscripten
@@ -763,6 +768,7 @@ lexically
 libc
 libevent
 libprotobuf
+librdkafka
 libtool
 libstdc
 lifecycle
@@ -1003,6 +1009,7 @@ refcount
 referencee
 referer
 refetch
+refvec
 regex
 regexes
 reified
@@ -1261,6 +1268,7 @@ wildcards
 winsock
 workspace
 writev
+wrsq
 xDS
 xDSes
 xdstp

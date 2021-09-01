@@ -315,9 +315,12 @@ public:
     return cluster_timeout_budget_stat_names_;
   }
 
+  void drainConnections(const std::string& cluster) override;
+
+  void drainConnections() override;
+
 protected:
-  virtual void postThreadLocalDrainConnections(const Cluster& cluster,
-                                               const HostVector& hosts_removed);
+  virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
   // Parameters for calling postThreadLocalClusterUpdate()
   struct ThreadLocalClusterUpdateParams {
@@ -400,17 +403,11 @@ private:
     using TcpConnectionsMap =
         absl::node_hash_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>;
 
-    struct ClusterEntry : public ThreadLocalCluster {
+    class ClusterEntry : public ThreadLocalCluster {
+    public:
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry() override;
-
-      Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
-                                               absl::optional<Http::Protocol> downstream_protocol,
-                                               LoadBalancerContext* context, bool peek);
-
-      Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
-                                                 LoadBalancerContext* context, bool peek);
 
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }
@@ -423,6 +420,28 @@ private:
                                               LoadBalancerContext* context) override;
       Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
       Http::AsyncClient& httpAsyncClient() override;
+
+      // Updates the hosts in the priority set.
+      void updateHosts(const std::string& name, uint32_t priority,
+                       PrioritySet::UpdateHostsParams&& update_hosts_params,
+                       LocalityWeightsConstSharedPtr locality_weights,
+                       const HostVector& hosts_added, const HostVector& hosts_removed,
+                       absl::optional<uint32_t> overprovisioning_factor,
+                       HostMapConstSharedPtr cross_priority_host_map);
+
+      // Drains any connection pools associated with the removed hosts.
+      void drainConnPools(const HostVector& hosts_removed);
+      // Drains connection pools for all hosts.
+      void drainConnPools();
+
+    private:
+      Http::ConnectionPool::Instance*
+      httpConnPoolImpl(ResourcePriority priority,
+                       absl::optional<Http::Protocol> downstream_protocol,
+                       LoadBalancerContext* context, bool peek);
+
+      Tcp::ConnectionPool::Instance* tcpConnPoolImpl(ResourcePriority priority,
+                                                     LoadBalancerContext* context, bool peek);
 
       ThreadLocalClusterManagerImpl& parent_;
       PrioritySetImpl priority_set_;
@@ -458,7 +477,8 @@ private:
                                  PrioritySet::UpdateHostsParams update_hosts_params,
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
-                                 uint64_t overprovisioning_factor);
+                                 uint64_t overprovisioning_factor,
+                                 HostMapConstSharedPtr cross_priority_host_map);
     void onHostHealthFailure(const HostSharedPtr& host);
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,

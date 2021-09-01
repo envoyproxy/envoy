@@ -45,8 +45,9 @@ ValidationInstance::ValidationInstance(
     : options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields(),
                                              !options.ignoreUnknownDynamicFields()),
-      stats_store_(store), api_(new Api::ValidationImpl(thread_factory, store, time_system,
-                                                        file_system, random_generator_)),
+      stats_store_(store),
+      api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system,
+                                   random_generator_, bootstrap_)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
@@ -91,7 +92,7 @@ void ValidationInstance::initialize(const Options& options,
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       dispatcher(), stats(), threadLocal(), bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
-  Configuration::InitialImpl initial_config(bootstrap_, options);
+  Configuration::InitialImpl initial_config(bootstrap_);
   initial_config.initAdminAccessLog(bootstrap_, *this);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
   listener_manager_ =

@@ -22,6 +22,8 @@ class TestPauseFilter;
 
 namespace Network {
 
+class HappyEyeballsConnectionImpl;
+
 /**
  * Utility functions for the connection implementation.
  */
@@ -70,11 +72,11 @@ public:
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
-  const SocketAddressProvider& addressProvider() const override {
-    return socket_->addressProvider();
+  const ConnectionInfoProvider& connectionInfoProvider() const override {
+    return socket_->connectionInfoProvider();
   }
-  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
-    return socket_->addressProviderSharedPtr();
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return socket_->connectionInfoProviderSharedPtr();
   }
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
@@ -166,8 +168,10 @@ protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
+  std::string failure_reason_;
 
 private:
+  friend class HappyEyeballsConnectionImpl;
   friend class Envoy::RandomPauseFilter;
   friend class Envoy::TestPauseFilter;
 

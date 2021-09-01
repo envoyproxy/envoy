@@ -355,24 +355,19 @@ static_resources:
 }
 
 // TODO(#6327) cleaner approach to testing with static config.
-std::string ConfigHelper::adsBootstrap(const std::string& api_type,
-                                       envoy::config::core::v3::ApiVersion resource_api_version,
-                                       envoy::config::core::v3::ApiVersion transport_api_version) {
+std::string ConfigHelper::adsBootstrap(const std::string& api_type) {
   // We use this to allow tests to default to having a single API version but override and make
   // the transport/resource API version distinction when needed.
-  if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO) {
-    transport_api_version = resource_api_version;
-  }
   return fmt::format(R"EOF(
 dynamic_resources:
   lds_config:
-    resource_api_version: {1}
+    resource_api_version: V3
     ads: {{}}
   cds_config:
-    resource_api_version: {1}
+    resource_api_version: V3
     ads: {{}}
   ads_config:
-    transport_api_version: {2}
+    transport_api_version: V3
     api_type: {0}
     set_node_on_first_message_only: true
 static_resources:
@@ -401,16 +396,13 @@ admin:
   - name: envoy.access_loggers.file
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-      path: "{3}"
+      path: "{1}"
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-                     api_type,
-                     resource_api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
-                     transport_api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
-                     Platform::null_device_path);
+                     api_type, Platform::null_device_path);
 }
 
 // TODO(samflattery): bundle this up with buildCluster
@@ -440,9 +432,8 @@ ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::s
                                                                                  address, port));
 }
 
-envoy::config::cluster::v3::Cluster
-ConfigHelper::buildCluster(const std::string& name, const std::string& lb_policy,
-                           envoy::config::core::v3::ApiVersion api_version) {
+envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name,
+                                                               const std::string& lb_policy) {
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
       name: {}
@@ -450,7 +441,7 @@ ConfigHelper::buildCluster(const std::string& name, const std::string& lb_policy
       type: EDS
       eds_cluster_config:
         eds_config:
-          resource_api_version: {}
+          resource_api_version: V3
           ads: {{}}
       lb_policy: {}
       typed_extension_protocol_options:
@@ -459,14 +450,13 @@ ConfigHelper::buildCluster(const std::string& name, const std::string& lb_policy
           explicit_http_config:
             http2_protocol_options: {{}}
     )EOF",
-                                        name, apiVersionStr(api_version), lb_policy),
-                            cluster, shouldBoost(api_version));
+                                        name, lb_policy),
+                            cluster);
   return cluster;
 }
 
-envoy::config::cluster::v3::Cluster
-ConfigHelper::buildTlsCluster(const std::string& name, const std::string& lb_policy,
-                              envoy::config::core::v3::ApiVersion api_version) {
+envoy::config::cluster::v3::Cluster ConfigHelper::buildTlsCluster(const std::string& name,
+                                                                  const std::string& lb_policy) {
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
   TestUtility::loadFromYaml(
       fmt::format(R"EOF(
@@ -475,7 +465,7 @@ ConfigHelper::buildTlsCluster(const std::string& name, const std::string& lb_pol
       type: EDS
       eds_cluster_config:
         eds_config:
-          resource_api_version: {}
+          resource_api_version: V3
           ads: {{}}
       transport_socket:
         name: envoy.transport_sockets.tls
@@ -492,17 +482,16 @@ ConfigHelper::buildTlsCluster(const std::string& name, const std::string& lb_pol
           explicit_http_config:
             http2_protocol_options: {{}}
     )EOF",
-                  name, apiVersionStr(api_version),
+                  name,
                   TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"),
                   lb_policy),
-      cluster, shouldBoost(api_version));
+      cluster);
   return cluster;
 }
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
 ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::string& address,
-                                         uint32_t port,
-                                         envoy::config::core::v3::ApiVersion api_version) {
+                                         uint32_t port) {
   API_NO_BOOST(envoy::config::endpoint::v3::ClusterLoadAssignment) cluster_load_assignment;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
       cluster_name: {}
@@ -515,14 +504,13 @@ ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::str
                 port_value: {}
     )EOF",
                                         name, address, port),
-                            cluster_load_assignment, shouldBoost(api_version));
+                            cluster_load_assignment);
   return cluster_load_assignment;
 }
 
 envoy::config::listener::v3::Listener
 ConfigHelper::buildBaseListener(const std::string& name, const std::string& address,
-                                const std::string& filter_chains,
-                                envoy::config::core::v3::ApiVersion api_version) {
+                                const std::string& filter_chains) {
   API_NO_BOOST(envoy::config::listener::v3::Listener) listener;
   TestUtility::loadFromYaml(fmt::format(
                                 R"EOF(
@@ -535,14 +523,14 @@ ConfigHelper::buildBaseListener(const std::string& name, const std::string& addr
       {}
     )EOF",
                                 name, address, filter_chains),
-                            listener, shouldBoost(api_version));
+                            listener);
   return listener;
 }
 
-envoy::config::listener::v3::Listener
-ConfigHelper::buildListener(const std::string& name, const std::string& route_config,
-                            const std::string& address, const std::string& stat_prefix,
-                            envoy::config::core::v3::ApiVersion api_version) {
+envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::string& name,
+                                                                  const std::string& route_config,
+                                                                  const std::string& address,
+                                                                  const std::string& stat_prefix) {
   std::string hcm = fmt::format(
       R"EOF(
         filters:
@@ -554,17 +542,16 @@ ConfigHelper::buildListener(const std::string& name, const std::string& route_co
             rds:
               route_config_name: {}
               config_source:
-                resource_api_version: {}
+                resource_api_version: V3
                 ads: {{}}
             http_filters: [{{ name: envoy.filters.http.router }}]
     )EOF",
-      stat_prefix, route_config, apiVersionStr(api_version));
-  return buildBaseListener(name, address, hcm, api_version);
+      stat_prefix, route_config);
+  return buildBaseListener(name, address, hcm);
 }
 
 envoy::config::route::v3::RouteConfiguration
-ConfigHelper::buildRouteConfig(const std::string& name, const std::string& cluster,
-                               envoy::config::core::v3::ApiVersion api_version) {
+ConfigHelper::buildRouteConfig(const std::string& name, const std::string& cluster) {
   API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
       name: "{}"
@@ -576,7 +563,7 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
           route: {{ cluster: "{}" }}
     )EOF",
                                         name, cluster),
-                            route, shouldBoost(api_version));
+                            route);
   return route;
 }
 

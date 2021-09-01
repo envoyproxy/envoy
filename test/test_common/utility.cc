@@ -12,6 +12,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
@@ -175,7 +176,14 @@ AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::st
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
+      std::string current_value;
+      if (findCounter(store, name)) {
+        current_value = absl::StrCat(findCounter(store, name)->value());
+      } else {
+        current_value = "nil";
+      }
+      return AssertionFailure() << fmt::format(
+                 "timed out waiting for {} to be {}, current value {}", name, value, current_value);
     }
     if (dispatcher != nullptr) {
       dispatcher->run(Event::Dispatcher::RunType::NonBlock);
@@ -217,7 +225,14 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
+      std::string current_value;
+      if (findGauge(store, name)) {
+        current_value = absl::StrCat(findGauge(store, name)->value());
+      } else {
+        current_value = "nil";
+      }
+      return AssertionFailure() << fmt::format(
+                 "timed out waiting for {} to be {}, current value {}", name, value, current_value);
     }
   }
   return AssertionSuccess();
@@ -399,6 +414,7 @@ protected:
   Event::GlobalTimeSystem global_time_system_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> default_stats_store_;
   testing::NiceMock<Random::MockRandomGenerator> mock_random_generator_;
+  envoy::config::bootstrap::v3::Bootstrap empty_bootstrap_;
 };
 
 class TestImpl : public TestImplProvider, public Impl {
@@ -408,7 +424,7 @@ public:
            Random::RandomGenerator* random = nullptr)
       : Impl(thread_factory, stats_store ? *stats_store : default_stats_store_,
              time_system ? *time_system : global_time_system_, file_system,
-             random ? *random : mock_random_generator_) {}
+             random ? *random : mock_random_generator_, empty_bootstrap_) {}
 };
 
 ApiPtr createApiForTest() {

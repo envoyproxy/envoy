@@ -1,5 +1,6 @@
+import types
 from contextlib import contextmanager
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import AsyncMock, patch, MagicMock, PropertyMock
 
 import pytest
 
@@ -118,7 +119,7 @@ def test_python_yapf_files(patches):
 
 def test_python_add_arguments(patches):
     checker = python_check.PythonChecker("path1", "path2", "path3")
-    add_mock = patch("tools.code_format.python_check.checker.ForkingChecker.add_arguments")
+    add_mock = patch("tools.code_format.python_check.checker.AsyncChecker.add_arguments")
     m_parser = MagicMock()
 
     with add_mock as m_add:
@@ -137,8 +138,9 @@ def test_python_add_arguments(patches):
              {'default': None, 'help': 'Specify the path to a diff file with fixes'}]])
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("errors", [[], ["err1", "err2"]])
-def test_python_check_flake8(patches, errors):
+async def test_python_check_flake8(patches, errors):
     checker = python_check.PythonChecker("path1", "path2", "path3")
 
     patched = patches(
@@ -155,7 +157,7 @@ def test_python_check_flake8(patches, errors):
 
     with patched as (m_buffered, m_error, m_mangle, m_flake8_app):
         m_buffered.side_effect = mock_buffered
-        checker.check_flake8()
+        assert not await checker.check_flake8()
 
     assert (
         list(m_buffered.call_args)
@@ -186,37 +188,41 @@ def test_python_check_recurse():
     assert "recurse" not in checker.__dict__
 
 
-def test_python_check_yapf(patches):
+@pytest.mark.asyncio
+async def test_python_check_yapf(patches):
     checker = python_check.PythonChecker("path1", "path2", "path3")
     patched = patches(
-        "PythonChecker.yapf_run",
+        "aio",
+        ("PythonChecker.yapf_format", dict(new_callable=MagicMock)),
+        "PythonChecker.yapf_result",
         ("PythonChecker.yapf_files", dict(new_callable=PropertyMock)),
         prefix="tools.code_format.python_check")
+    files = ["file1", "file2", "file3"]
 
-    with patched as (m_yapf_run, m_yapf_files):
-        m_yapf_files.return_value = ["file1", "file2", "file3"]
-        checker.check_yapf()
+    async def concurrent(iters):
+        assert isinstance(iters, types.GeneratorType)
+        for i, format_result in enumerate(iters):
+            yield (format_result, (f"REFORMAT{i}", f"ENCODING{i}", f"CHANGED{i}"))
+
+    with patched as (m_aio, m_yapf_format, m_yapf_result, m_yapf_files):
+        m_yapf_files.return_value = files
+        m_aio.concurrent.side_effect = concurrent
+        assert not await checker.check_yapf()
 
     assert (
-        list(list(c) for c in m_yapf_files.call_args_list)
-        == [[(), {}]])
+        list(list(c) for c in m_yapf_format.call_args_list)
+        == [[(file,), {}] for file in files])
     assert (
-        list(list(c) for c in m_yapf_run.call_args_list)
-        == [[('file1',), {}], [('file2',), {}], [('file3',), {}]])
+        list(list(c) for c in m_yapf_result.call_args_list)
+        == [[(m_yapf_format.return_value, f"REFORMAT{i}", f"CHANGED{i}"), {}] for i, _ in enumerate(files)])
 
 
-TEST_CHECK_RESULTS: tuple = (
-    ("check1", [], []),
-    ("check1", ["check2", "check3"], ["check4", "check5"]),
-    ("check1", ["check1", "check3"], ["check4", "check5"]),
-    ("check1", ["check2", "check3"], ["check1", "check5"]),
-    ("check1", ["check1", "check3"], ["check1", "check5"]))
-
-
-@pytest.mark.parametrize("results", TEST_CHECK_RESULTS)
-def test_python_on_check_run(patches, results):
+@pytest.mark.asyncio
+@pytest.mark.parametrize("errors", [[], ["check2", "check3"], ["check1", "check3"]])
+@pytest.mark.parametrize("warnings", [[], ["check4", "check5"], ["check1", "check5"]])
+async def test_python_on_check_run(patches, errors, warnings):
     checker = python_check.PythonChecker("path1", "path2", "path3")
-    checkname, errors, warnings = results
+    checkname = "check1"
     patched = patches(
         "PythonChecker.succeed",
         ("PythonChecker.name", dict(new_callable=PropertyMock)),
@@ -227,7 +233,7 @@ def test_python_on_check_run(patches, results):
     with patched as (m_succeed, m_name, m_failed, m_warned):
         m_failed.return_value = errors
         m_warned.return_value = warnings
-        checker.on_check_run(checkname)
+        assert not await checker.on_check_run(checkname)
 
     if checkname in warnings or checkname in errors:
         assert not m_succeed.called
@@ -237,47 +243,45 @@ def test_python_on_check_run(patches, results):
             == [(checkname, [checkname]), {}])
 
 
-TEST_CHECKS_COMPLETE = (
-    ("DIFF1", False),
-    ("DIFF1", True),
-    ("", False),
-    ("", True))
-
-
-@pytest.mark.parametrize("results", TEST_CHECKS_COMPLETE)
-def test_python_on_checks_complete(patches, results):
+@pytest.mark.asyncio
+@pytest.mark.parametrize("diff_path", ["", "DIFF1"])
+@pytest.mark.parametrize("failed", [True, False])
+async def test_python_on_checks_complete(patches, diff_path, failed):
     checker = python_check.PythonChecker("path1", "path2", "path3")
-    diff_path, failed = results
     patched = patches(
-        "checker.ForkingChecker.subproc_run",
-        "checker.Checker.on_checks_complete",
+        "aio",
+        ("checker.AsyncChecker.on_checks_complete", dict(new_callable=AsyncMock)),
         ("PythonChecker.diff_file_path", dict(new_callable=PropertyMock)),
         ("PythonChecker.has_failed", dict(new_callable=PropertyMock)),
+        ("PythonChecker.path", dict(new_callable=PropertyMock)),
         prefix="tools.code_format.python_check")
 
-    with patched as (m_fork, m_super, m_diff, m_failed):
+    with patched as (m_aio, m_super, m_diff, m_failed, m_path):
+        m_aio.async_subprocess.run = AsyncMock()
         if not diff_path:
             m_diff.return_value = None
         m_failed.return_value = failed
-        assert checker.on_checks_complete() == m_super.return_value
+        assert await checker.on_checks_complete() == m_super.return_value
 
     if diff_path and failed:
         assert (
-            list(m_fork.call_args)
-            == [(['git', 'diff', 'HEAD'],), {}])
+            list(m_aio.async_subprocess.run.call_args)
+            == [(['git', 'diff', 'HEAD'],),
+                dict(capture_output=True, cwd=m_path.return_value)])
         assert (
             list(m_diff.return_value.write_bytes.call_args)
-            == [(m_fork.return_value.stdout,), {}])
+            == [(m_aio.async_subprocess.run.return_value.stdout,), {}])
     else:
-        assert not m_fork.called
+        assert not m_aio.async_subprocess.run.called
 
     assert (
         list(m_super.call_args)
         == [(), {}])
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("fix", [True, False])
-def test_python_yapf_format(patches, fix):
+async def test_python_yapf_format(patches, fix):
     checker = python_check.PythonChecker("path1", "path2", "path3")
     patched = patches(
         "yapf.yapf_api.FormatFile",
@@ -287,7 +291,7 @@ def test_python_yapf_format(patches, fix):
 
     with patched as (m_format, m_config, m_fix):
         m_fix.return_value = fix
-        assert checker.yapf_format("FILENAME") == m_format.return_value
+        assert await checker.yapf_format("FILENAME") == ("FILENAME", m_format.return_value)
 
     assert (
         list(m_format.call_args)
@@ -300,30 +304,21 @@ def test_python_yapf_format(patches, fix):
         == [[(), {}], [(), {}]])
 
 
-TEST_FORMAT_RESULTS = (
-    ("", "", True),
-    ("", "", False),
-    ("REFORMAT", "", True),
-    ("REFORMAT", "", False))
-
-
-@pytest.mark.parametrize("format_results", TEST_FORMAT_RESULTS)
+@pytest.mark.parametrize("reformatted", ["", "REFORMAT"])
 @pytest.mark.parametrize("fix", [True, False])
-def test_python_yapf_run(patches, fix, format_results):
+@pytest.mark.parametrize("changed", [True, False])
+def test_python_yapf_result(patches, reformatted, fix, changed):
     checker = python_check.PythonChecker("path1", "path2", "path3")
-    reformat, encoding, changed = format_results
     patched = patches(
-        "PythonChecker.yapf_format",
         "PythonChecker.succeed",
         "PythonChecker.warn",
         "PythonChecker.error",
         ("PythonChecker.fix", dict(new_callable=PropertyMock)),
         prefix="tools.code_format.python_check")
 
-    with patched as (m_format, m_succeed, m_warn, m_error, m_fix):
+    with patched as (m_succeed, m_warn, m_error, m_fix):
         m_fix.return_value = fix
-        m_format.return_value = format_results
-        checker.yapf_run("FILENAME")
+        checker.yapf_result("FILENAME", reformatted, changed)
 
     if not changed:
         assert (
@@ -341,12 +336,12 @@ def test_python_yapf_run(patches, fix, format_results):
             list(m_warn.call_args)
             == [('yapf', [f'FILENAME: reformatted']), {}])
         return
-    if reformat:
+    if reformatted:
         assert not m_error.called
         assert len(m_warn.call_args_list) == 1
         assert (
             list(m_warn.call_args)
-            == [('yapf', [f'FILENAME: diff\n{reformat}']), {}])
+            == [('yapf', [f'FILENAME: diff\n{reformatted}']), {}])
         return
     assert not m_warn.called
     assert (

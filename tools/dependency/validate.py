@@ -122,7 +122,7 @@ class BuildGraph(object):
     Returns:
       A set of dependency identifiers that are reachable from targets.
     """
-        deps_query = ' union '.join(f'deps({l})' for l in targets)
+        deps_query = 'deps(set({}))'.format(' '.join(targets))
         try:
             deps = subprocess.check_output(['bazel', 'query', deps_query],
                                            stderr=subprocess.PIPE).decode().splitlines()
@@ -259,8 +259,8 @@ class Validator(object):
         if len(bad_controlplane_core_deps) > 0:
             raise DependencyError(
                 f'Observed controlplane core deps {queried_controlplane_core_min_deps} is not covered '
-                'by "use_category" implied core deps {expected_controlplane_core_deps}: '
-                '{bad_controlplane_core_deps} are missing')
+                f'by "use_category" implied core deps {expected_controlplane_core_deps}: '
+                f'{bad_controlplane_core_deps} are missing')
 
     def validate_extension_deps(self, name, target):
         """Validate that extensions are correctly declared for dataplane_ext and observability_ext.
