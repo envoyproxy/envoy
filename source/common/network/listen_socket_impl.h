@@ -27,7 +27,7 @@ protected:
     // Using `new` to access a non-public constructor.
     return absl::WrapUnique(
         new ListenSocketImpl(io_handle_ == nullptr ? nullptr : io_handle_->duplicate(),
-                             address_provider_->localAddress()));
+                             connection_info_provider_->localAddress()));
   }
 
   void setupSocket(const Network::Socket::OptionsSharedPtr& options);
@@ -143,7 +143,7 @@ public:
   ConnectionSocketImpl(Socket::Type type, const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
       : SocketImpl(type, local_address, remote_address) {
-    address_provider_->setLocalAddress(local_address);
+    connection_info_provider_->setLocalAddress(local_address);
   }
 
   // Network::Socket
@@ -180,7 +180,7 @@ public:
   void dumpState(std::ostream& os, int indent_level) const override {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "ListenSocketImpl " << this << DUMP_MEMBER(transport_protocol_) << "\n";
-    DUMP_DETAILS(address_provider_);
+    DUMP_DETAILS(connection_info_provider_);
   }
 
 protected:

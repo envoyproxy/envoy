@@ -25,10 +25,10 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
       .WillByDefault(Return(host_address_));
   ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
       .WillByDefault(ReturnRef(upstream_locality_));
-  router_.downstream_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+  router_.downstream_connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       host_address_);
-  router_.downstream_connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
-      Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+  router_.downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
 
   // Make the "system time" non-zero, because 0 is considered invalid by DateUtil.
   test_time_.setMonotonicTime(std::chrono::milliseconds(50));
