@@ -1157,8 +1157,8 @@ envoy_cc_test_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
-    ":quiche_common_platform_test",
-    "@envoy//test/common/quic/platform:quic_platform_test_impl_lib",
+        ":quiche_common_platform_test",
+        "@envoy//test/common/quic/platform:quic_platform_test_impl_lib",
     ],
 )
 
@@ -4172,9 +4172,9 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
-    ":quic_platform_base",
-    ":quic_core_types_lib",
-    ":quic_core_utils_lib",
+        ":quic_core_types_lib",
+        ":quic_core_utils_lib",
+        ":quic_platform_base",
     ],
 )
 

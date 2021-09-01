@@ -84,12 +84,12 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
   absl::InlinedVector<quic::QuicMemSlice, 4> quic_slices;
   quic_slices.reserve(raw_slices.size());
   for (auto& slice : raw_slices) {
-      ASSERT(slice.len_ != 0);
-      // Move each slice into a stand-alone buffer.
-      // TODO(danzh): investigate the cost of allocating one buffer per slice.
-      // If it turns out to be expensive, add a new function to free data in the middle in buffer
-      // interface and re-design QuicMemSliceImpl.
-     quic_slices.emplace_back(quic::QuicMemSliceImpl(data, slice.len_));
+    ASSERT(slice.len_ != 0);
+    // Move each slice into a stand-alone buffer.
+    // TODO(danzh): investigate the cost of allocating one buffer per slice.
+    // If it turns out to be expensive, add a new function to free data in the middle in buffer
+    // interface and re-design QuicMemSliceImpl.
+    quic_slices.emplace_back(quic::QuicMemSliceImpl(data, slice.len_));
   }
   absl::Span<quic::QuicMemSlice> span(quic_slices);
   // QUIC stream must take all.
