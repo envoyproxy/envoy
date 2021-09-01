@@ -126,6 +126,19 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
   return scope.textReadoutFromStatNameWithTags(StatName(joined.get()), tags);
 }
 
+absl::flat_hash_set<std::string>& customStatNamespaces() {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>);
+}
+
+RegisterCustomStatNamespace::RegisterCustomStatNamespace(absl::string_view name) {
+  customStatNamespaces().insert(std::string(name));
+}
+
+bool customStatNamespaceRegistered(absl::string_view name) {
+  const auto namespaces = customStatNamespaces();
+  return namespaces.find(name) != namespaces.end();
+};
+
 } // namespace Utility
 } // namespace Stats
 } // namespace Envoy

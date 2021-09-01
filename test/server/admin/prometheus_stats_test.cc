@@ -120,20 +120,20 @@ TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST_F(PrometheusStatsFormatterTest, NamespaceRegistry) {
-  std::string raw = "vulture.eats-liver";
+TEST_F(PrometheusStatsFormatterTest, CustomNamespace) {
+  Stats::Utility::RegisterCustomStatNamespace fake_custon_namespace("promstattest");
+  std::string raw = "promstattest.vulture.eats-liver";
   std::string expected = "vulture_eats_liver";
+  auto actual = PrometheusStatsFormatter::metricName(raw);
+  EXPECT_EQ(expected, actual);
+}
 
-  EXPECT_FALSE(PrometheusStatsFormatter::registerPrometheusNamespace("3vulture"));
-  EXPECT_FALSE(PrometheusStatsFormatter::registerPrometheusNamespace(".vulture"));
-
-  EXPECT_FALSE(PrometheusStatsFormatter::unregisterPrometheusNamespace("vulture"));
-  EXPECT_TRUE(PrometheusStatsFormatter::registerPrometheusNamespace("vulture"));
-  EXPECT_FALSE(PrometheusStatsFormatter::registerPrometheusNamespace("vulture"));
-  EXPECT_EQ(expected, PrometheusStatsFormatter::metricName(raw));
-  EXPECT_TRUE(PrometheusStatsFormatter::unregisterPrometheusNamespace("vulture"));
-
-  EXPECT_EQ("envoy_" + expected, PrometheusStatsFormatter::metricName(raw));
+TEST_F(PrometheusStatsFormatterTest, CustomNamespaceWithInvalidPromnamespace) {
+  Stats::Utility::RegisterCustomStatNamespace fake_custon_namespace("promstattest");
+  std::string raw = "promstattest.1234abcd.eats-liver";
+  std::string expected = "";
+  auto actual = PrometheusStatsFormatter::metricName(raw);
+  EXPECT_EQ(expected, actual);
 }
 
 TEST_F(PrometheusStatsFormatterTest, FormattedTags) {

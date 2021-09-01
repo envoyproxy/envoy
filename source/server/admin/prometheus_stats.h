@@ -36,28 +36,6 @@ public:
    * Format the given metric name, prefixed with "envoy_".
    */
   static std::string metricName(const std::string& extracted_name);
-
-  /**
-   * Register a prometheus namespace, stats starting with the namespace will not be
-   * automatically prefixed with envoy namespace.
-   * This method must be called from the main thread.
-   * @returns bool if a new namespace is registered, false if the namespace is already
-   *          registered or the namespace is invalid.
-   */
-  static bool registerPrometheusNamespace(absl::string_view prometheus_namespace);
-
-  /**
-   * Unregister a prometheus namespace registered by `registerPrometheusNamespace`
-   * This method must be called from the main thread.
-   * @returns bool if the Prometheus namespace is unregistered. false if the namespace
-   *          wasn't registered.
-   */
-  static bool unregisterPrometheusNamespace(absl::string_view prometheus_namespace);
-
-  /**
-   * Take a string and sanitize it according to Prometheus conventions.
-   */
-  static std::string sanitizeName(const std::string& name);
 };
 
 } // namespace Server

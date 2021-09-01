@@ -16,6 +16,16 @@ const std::regex& namespaceRegex() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "^[a-zA-Z_][a-zA-Z0-9]*$");
 }
 
+/**
+ * Take a string and sanitize it according to Prometheus conventions.
+ */
+std::string sanitizeName(const std::string& name) {
+  // The name must match the regex [a-zA-Z_][a-zA-Z0-9_]* as required by
+  // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
+  // The initial [a-zA-Z_] constraint is always satisfied by the namespace prefix.
+  return std::regex_replace(name, promRegex(), "_");
+}
+
 /*
  * Determine whether a metric has never been emitted and choose to
  * not show it if we only wanted used metrics.
@@ -105,6 +115,9 @@ uint64_t outputStatType(
   for (auto& group : groups) {
     const std::string prefixed_tag_extracted_name =
         PrometheusStatsFormatter::metricName(global_symbol_table.toString(group.first));
+    if (prefixed_tag_extracted_name.empty()) {
+      continue;
+    }
     response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, type));
 
     // Sort before producing the final output to satisfy the "preferred" ordering from the
@@ -166,10 +179,6 @@ std::string generateHistogramOutput(const Stats::ParentHistogram& histogram,
   return output;
 };
 
-absl::flat_hash_set<std::string>& prometheusNamespaces() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>);
-}
-
 } // namespace
 
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
@@ -184,10 +193,17 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
 std::string PrometheusStatsFormatter::metricName(const std::string& extracted_name) {
   std::string sanitized_name = sanitizeName(extracted_name);
 
-  absl::string_view prom_namespace{sanitized_name};
-  prom_namespace = prom_namespace.substr(0, prom_namespace.find_first_of('_'));
-
-  if (prometheusNamespaces().contains(prom_namespace)) {
+  absl::string_view view{sanitized_name};
+  const auto first_pos = sanitized_name.find_first_of('_');
+  view = view.substr(0, first_pos);
+  if (Stats::Utility::customStatNamespaceRegistered(view)) {
+    // Trim the custom namespace.
+    sanitized_name = sanitized_name.substr(first_pos + 1);
+    // Check the prometheus namespace is valid.
+    view = sanitized_name.substr(0, sanitized_name.find_first_of('_'));
+    if (!std::regex_match(view.begin(), view.end(), namespaceRegex())) {
+      return "";
+    }
     return sanitized_name;
   }
 
@@ -215,49 +231,6 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
       response, used_only, regex, histograms, generateHistogramOutput, "histogram");
 
   return metric_name_count;
-}
-
-bool PrometheusStatsFormatter::registerPrometheusNamespace(absl::string_view prometheus_namespace) {
-  if (!std::regex_match(prometheus_namespace.begin(), prometheus_namespace.end(),
-                        namespaceRegex())) {
-    return false;
-  }
-  // These names are used as prefixes of native Envoy metrics,
-  // so we must avoid registering them as prometheus namespaces.
-  // Otherwise, the native Envoy metrics end up exposed in Prometheus endpoint
-  // without having "envoy_" prefix.
-  // TODO(mathetake): check the completeness of the list in tests.
-  static const absl::flat_hash_set<std::string> reserved_names = {
-      "auth",        "dns",       "cluster_manager",
-      "filesystem",  "http",      "http1",
-      "http2",       "listener",  "listener_manager",
-      "main_thread", "ratelimit", "redis",
-      "runtime",     "server",    "sds",
-      "tcp",         "vhost",     "wasm",
-      "workers",     "mongo",
-  };
-
-  if (reserved_names.find(prometheus_namespace) != reserved_names.end()) {
-    return false;
-  }
-  return prometheusNamespaces().insert(std::string(prometheus_namespace)).second;
-}
-
-bool PrometheusStatsFormatter::unregisterPrometheusNamespace(
-    absl::string_view prometheus_namespace) {
-  auto it = prometheusNamespaces().find(prometheus_namespace);
-  if (it == prometheusNamespaces().end()) {
-    return false;
-  }
-  prometheusNamespaces().erase(it);
-  return true;
-}
-
-std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
-  // The name must match the regex [a-zA-Z_][a-zA-Z0-9_]* as required by
-  // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
-  // The initial [a-zA-Z_] constraint is always satisfied by the namespace prefix.
-  return std::regex_replace(name, promRegex(), "_");
 }
 
 } // namespace Server

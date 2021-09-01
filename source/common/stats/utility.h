@@ -229,6 +229,25 @@ TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
  */
 TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
                                       StatNameTagVectorOptConstRef tags = absl::nullopt);
+
+/**
+ * RegisterCustomStatNamespace is used to register a custom namespace by extensions.
+ * Sinks can lookup them via customStatNamespaceRegistered and determine what do
+ * with the metrics whose prefix (=namespace) is registered.
+ */
+struct RegisterCustomStatNamespace {
+  /**
+   * @param name is the name to register.
+   */
+  RegisterCustomStatNamespace(absl::string_view name);
+};
+
+/**
+ * Check if the given string is registered as a custom namespace.
+ * @return true if registered, false otherwise.
+ */
+bool customStatNamespaceRegistered(absl::string_view name);
+
 } // namespace Utility
 
 /**
