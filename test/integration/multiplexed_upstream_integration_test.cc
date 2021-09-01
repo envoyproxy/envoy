@@ -184,6 +184,7 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
   upstream_request_->encodeResetStream();
   ASSERT_TRUE(response->waitForReset());
   EXPECT_FALSE(response->complete());
+
   // The upstream stats should reflect receiving the reset, and downstream
   // reflect sending it on.
   EXPECT_EQ(1, upstreamRxResetCounterValue());
