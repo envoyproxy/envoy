@@ -166,8 +166,7 @@ public:
   void addIdleCallbackImpl(Instance::IdleCb cb);
   // Returns true if the pool is idle.
   bool isIdleImpl() const;
-  void startDrainImpl();
-  void drainConnectionsImpl();
+  void drainConnectionsImpl(bool drain_for_destruction);
   const Upstream::HostConstSharedPtr& host() const { return host_; }
   // Called if this pool is likely to be picked soon, to determine if it's worth preconnecting.
   bool maybePreconnectImpl(float global_preconnect_ratio);

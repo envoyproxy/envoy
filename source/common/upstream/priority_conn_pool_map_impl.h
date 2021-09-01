@@ -55,16 +55,9 @@ void PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::addIdleCallback(const IdleCb& cb)
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
-void PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::startDrain() {
+void PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections(bool drain_for_destruction) {
   for (auto& pool_map : conn_pool_maps_) {
-    pool_map->startDrain();
-  }
-}
-
-template <typename KEY_TYPE, typename POOL_TYPE>
-void PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections() {
-  for (auto& pool_map : conn_pool_maps_) {
-    pool_map->drainConnections();
+    pool_map->drainConnections(drain_for_destruction);
   }
 }
 

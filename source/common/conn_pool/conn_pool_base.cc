@@ -331,11 +331,6 @@ void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
 
 void ConnPoolImplBase::addIdleCallbackImpl(Instance::IdleCb cb) { idle_callbacks_.push_back(cb); }
 
-void ConnPoolImplBase::startDrainImpl() {
-  is_draining_ = true;
-  checkForIdleAndCloseIdleConnsIfDraining();
-}
-
 void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
   // Create a separate list of elements to close to avoid mutate-while-iterating problems.
   std::list<ActiveClient*> to_close;
@@ -359,8 +354,14 @@ void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
   }
 }
 
-void ConnPoolImplBase::drainConnectionsImpl() {
+void ConnPoolImplBase::drainConnectionsImpl(bool drain_for_destruction) {
+  if (drain_for_destruction) {
+    is_draining_ = true;
+  }
   closeIdleConnectionsForDrainingPool();
+  if (drain_for_destruction) {
+    return;
+  }
 
   // closeIdleConnections() closes all connections in ready_clients_ with no active streams,
   // so all remaining entries in ready_clients_ are serving streams. Move them and all entries

@@ -37,6 +37,22 @@ public:
 };
 
 /**
+ * Controls the behavior when draining a connection poo.
+ */
+enum class DrainBehavior {
+  // Starts draining a pool, by gracefully completing all requests and gracefully closing all
+  // connections, in preparation for deletion. When the process completes, the function registered
+  // via `addIdleCallback()` is called. The callback may occur before this call returns if the pool
+  // can be immediately drained.
+  DrainAndDelete,
+  // Actively drain all existing connection pool connections. This method can be used in cases
+  // where the connection pool is not being destroyed, but the caller wishes to make sure that
+  // all new streams take place on a new connection. For example, when a health check failure
+  // occurs.
+  DrainExistingConnections,
+};
+
+/**
  * An instance of a generic connection pool.
  */
 class Instance {
@@ -64,7 +80,6 @@ public:
    * via `addIdleCallback()` is called. The callback may occur before this call returns if the pool
    * can be immediately drained.
    */
-  virtual void startDrain() PURE;
 
   /**
    * Actively drain all existing connection pool connections. This method can be used in cases
@@ -72,7 +87,7 @@ public:
    * all new streams take place on a new connection. For example, when a health check failure
    * occurs.
    */
-  virtual void drainConnections() PURE;
+  virtual void drainConnections(bool drain_for_destruction) PURE;
 
   /**
    * @return Upstream::HostDescriptionConstSharedPtr the host for which connections are pooled.

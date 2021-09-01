@@ -34,8 +34,7 @@ public:
   // ConnectionPool::Instance
   void addIdleCallback(IdleCb cb) override;
   bool isIdle() const override;
-  void startDrain() override;
-  void drainConnections() override;
+  void drainConnections(bool drain_for_destruction) override;
   void closeConnections() override;
   ConnectionPool::Cancellable* newConnection(ConnectionPool::Callbacks& callbacks) override;
   // The old pool does not implement preconnecting.

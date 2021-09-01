@@ -382,20 +382,20 @@ TEST_F(ConnectivityGridTest, TestCancel) {
 
 // Make sure drains get sent to all active pools.
 TEST_F(ConnectivityGridTest, Drain) {
-  grid_.drainConnections();
+  grid_.drainConnections(/*drain_for_destruction=*/false);
 
   // Synthetically create a pool.
   grid_.createNextPool();
   {
-    EXPECT_CALL(*grid_.first(), drainConnections());
-    grid_.drainConnections();
+    EXPECT_CALL(*grid_.first(), drainConnections(/*drain_for_destruction=*/false));
+    grid_.drainConnections(/*drain_for_destruction=*/false);
   }
 
   grid_.createNextPool();
   {
-    EXPECT_CALL(*grid_.first(), drainConnections());
-    EXPECT_CALL(*grid_.second(), drainConnections());
-    grid_.drainConnections();
+    EXPECT_CALL(*grid_.first(), drainConnections(/*drain_for_destruction=*/false));
+    EXPECT_CALL(*grid_.second(), drainConnections(/*drain_for_destruction=*/false));
+    grid_.drainConnections(/*drain_for_destruction=*/false);
   }
 }
 
@@ -411,16 +411,16 @@ TEST_F(ConnectivityGridTest, DrainCallbacks) {
 
   // The first time a drain is started, both pools should start draining.
   {
-    EXPECT_CALL(*grid_.first(), startDrain());
-    EXPECT_CALL(*grid_.second(), startDrain());
-    grid_.startDrain();
+    EXPECT_CALL(*grid_.first(), drainConnections(/*drain_for_destruction=*/true));
+    EXPECT_CALL(*grid_.second(), drainConnections(/*drain_for_destruction=*/true));
+    grid_.drainConnections(/*drain_for_destruction=*/true);
   }
 
   // The second time, the pools will not see any change.
   {
-    EXPECT_CALL(*grid_.first(), startDrain()).Times(0);
-    EXPECT_CALL(*grid_.second(), startDrain()).Times(0);
-    grid_.startDrain();
+    EXPECT_CALL(*grid_.first(), drainConnections(/*drain_for_destruction=*/true)).Times(0);
+    EXPECT_CALL(*grid_.second(), drainConnections(/*drain_for_destruction=*/true)).Times(0);
+    grid_.drainConnections(/*drain_for_destruction=*/true);
   }
   {
     // Notify the grid the second pool has been drained. This should not be
@@ -481,7 +481,7 @@ TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
 
   {
     grid_.addIdleCallback([&drain_received]() -> void { drain_received = true; });
-    grid_.startDrain();
+    grid_.drainConnections(/*drain_for_destruction=*/true);
   }
 
   grid_.setDestroying(); // Fake being in the destructor.

@@ -150,9 +150,11 @@ public:
 
   void addIdleCallback(IdleCb cb) override { addIdleCallbackImpl(cb); }
   bool isIdle() const override { return isIdleImpl(); }
-  void startDrain() override { startDrainImpl(); }
-  void drainConnections() override {
-    drainConnectionsImpl();
+  void drainConnections(bool drain_for_destruction) override {
+    drainConnectionsImpl(drain_for_destruction);
+    if (drain_for_destruction) {
+      return;
+    }
     // Legacy behavior for the TCP connection pool marks all connecting clients
     // as draining.
     for (auto& connecting_client : connecting_clients_) {

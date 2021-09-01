@@ -107,8 +107,7 @@ public:
 
   void addIdleCallback(IdleCb cb) override { conn_pool_->addIdleCallback(cb); }
   bool isIdle() const override { return conn_pool_->isIdle(); }
-  void startDrain() override { return conn_pool_->startDrain(); }
-  void drainConnections() override { conn_pool_->drainConnections(); }
+  void drainConnections(bool drain_for_destruction) override { conn_pool_->drainConnections(drain_for_destruction); }
   void closeConnections() override { conn_pool_->closeConnections(); }
   ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
     return conn_pool_->newConnection(callbacks);
@@ -442,7 +441,7 @@ TEST_P(TcpConnPoolImplTest, DrainConnections) {
     // This will destroy the ready connection and set requests remaining to 1 on the busy and
     // pending connections.
     EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
-    conn_pool_->drainConnections();
+    conn_pool_->drainConnections(/*drain_for_destruction=*/false);
     dispatcher_.clearDeferredDeleteList();
   }
   {
@@ -977,7 +976,7 @@ TEST_P(TcpConnPoolImplTest, DrainCallback) {
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready());
   conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  conn_pool_->startDrain();
+  conn_pool_->drainConnections(/*drain_for_destruction=*/true);
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
   ActiveTestConn c2(*this, 0, ActiveTestConn::Type::Pending);
@@ -1005,7 +1004,7 @@ TEST_P(TcpConnPoolImplTest, DrainWhileConnecting) {
   EXPECT_NE(nullptr, handle);
 
   conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  conn_pool_->startDrain();
+  conn_pool_->drainConnections(/*drain_for_destruction=*/true);
 
   if (test_new_connection_pool_) {
     // The shared connection pool removes and closes connecting clients if there are no
@@ -1031,7 +1030,7 @@ TEST_P(TcpConnPoolImplTest, DrainOnClose) {
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready());
   conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  conn_pool_->startDrain();
+  conn_pool_->drainConnections(/*drain_for_destruction=*/true);
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
 
@@ -1077,7 +1076,7 @@ TEST_P(TcpConnPoolImplTest, RequestCapacity) {
 
   // This should set the number of requests remaining to 1 on the active
   // connections, and the connecting_request_capacity to 2 as well.
-  conn_pool_->drainConnections();
+  conn_pool_->drainConnections(/*drain_for_destruction=*/false);
 
   // Cancel the connections. Because neither used CloseExcess, the two connections should persist.
   handle1->cancel(ConnectionPool::CancelPolicy::Default);
@@ -1130,7 +1129,7 @@ TEST_P(TcpConnPoolImplTest, TestIdleTimeout) {
 
   testing::MockFunction<void()> drained_callback;
   EXPECT_CALL(idle_callback, Call());
-  conn_pool_->startDrain();
+  conn_pool_->drainConnections(/*drain_for_destruction=*/true);
   EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
   dispatcher_.clearDeferredDeleteList();
 }

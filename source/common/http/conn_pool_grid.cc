@@ -296,24 +296,20 @@ void ConnectivityGrid::addIdleCallback(IdleCb cb) {
   idle_callbacks_.emplace_back(cb);
 }
 
-void ConnectivityGrid::startDrain() {
+void ConnectivityGrid::drainConnections(bool drain_for_destruction) {
   if (draining_) {
     // A drain callback has already been set, and only needs to happen once.
     return;
   }
 
-  // Note that no new pools can be created from this point on
-  // as createNextPool fast-fails if `draining_` is true.
-  draining_ = true;
-
-  for (auto& pool : pools_) {
-    pool->startDrain();
+  if (drain_for_destruction) {
+    // Note that no new pools can be created from this point on
+    // as createNextPool fast-fails if `draining_` is true.
+    draining_ = true;
   }
-}
 
-void ConnectivityGrid::drainConnections() {
   for (auto& pool : pools_) {
-    pool->drainConnections();
+    pool->drainConnections(drain_for_destruction);
   }
 }
 

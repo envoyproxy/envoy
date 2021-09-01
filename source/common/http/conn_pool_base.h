@@ -61,8 +61,7 @@ public:
   // ConnectionPool::Instance
   void addIdleCallback(IdleCb cb) override { addIdleCallbackImpl(cb); }
   bool isIdle() const override { return isIdleImpl(); }
-  void startDrain() override { startDrainImpl(); }
-  void drainConnections() override { drainConnectionsImpl(); }
+  void drainConnections(bool drain_for_destruction) override { drainConnectionsImpl(drain_for_destruction); }
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          Http::ConnectionPool::Callbacks& callbacks) override;
