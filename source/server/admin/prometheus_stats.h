@@ -53,6 +53,11 @@ public:
    *          wasn't registered.
    */
   static bool unregisterPrometheusNamespace(absl::string_view prometheus_namespace);
+
+  /**
+   * Take a string and sanitize it according to Prometheus conventions.
+   */
+  static std::string sanitizeName(const std::string& name);
 };
 
 } // namespace Server

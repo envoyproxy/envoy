@@ -30,6 +30,7 @@
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/wasm.h"
 #include "source/extensions/filters/common/expr/context.h"
+#include "source/server/admin/prometheus_stats.h"
 
 #include "absl/base/casts.h"
 #include "absl/container/flat_hash_map.h"
@@ -1233,9 +1234,18 @@ WasmResult Context::defineMetric(uint32_t metric_type, std::string_view name,
   if (metric_type > static_cast<uint32_t>(MetricType::Max)) {
     return WasmResult::BadArgument;
   }
+  // Automatically register prometheus namespace.
+  const auto str_name = std::string(name);
+  const auto prom_name = Server::PrometheusStatsFormatter::sanitizeName(str_name);
+  auto prom_namespace = prom_name.substr(0, prom_name.find_first_of('_'));
+  wasm()->dispatcher().post([prom_namespace] {
+    if (!Server::PrometheusStatsFormatter::registerPrometheusNamespace(prom_namespace)) {
+      ENVOY_LOG(error, "Failed to register {} as prometheus namespace.");
+    };
+  });
   auto type = static_cast<MetricType>(metric_type);
   // TODO: Consider rethinking the scoping policy as it does not help in this case.
-  Stats::StatNameManagedStorage storage(toAbslStringView(name), wasm()->scope_->symbolTable());
+  Stats::StatNameManagedStorage storage(str_name, wasm()->scope_->symbolTable());
   Stats::StatName stat_name = storage.statName();
   if (type == MetricType::Counter) {
     auto id = wasm()->nextCounterMetricId();
