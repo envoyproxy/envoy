@@ -1,5 +1,6 @@
 #include "source/common/stats/allocator_impl.h"
 
+#include <algorithm>
 #include <cstdint>
 
 #include "envoy/stats/stats.h"
@@ -347,9 +348,17 @@ void AllocatorImpl::forEachCounter(std::function<void(std::size_t)> f_size,
 void AllocatorImpl::forEachGauge(std::function<void(std::size_t)> f_size,
                                  std::function<void(Stats::Gauge&)> f_stat) const {
   Thread::LockGuard lock(mutex_);
-  f_size(gauges_.size());
+  size_t num_gauges = 0;
+  std::for_each(gauges_.begin(), gauges_.end(), [&num_gauges](Gauge* const gauge) mutable {
+    if (gauge->importMode() != Gauge::ImportMode::Uninitialized) {
+      num_gauges++;
+    }
+  });
+  f_size(num_gauges);
   for (auto& gauge : gauges_) {
-    f_stat(*gauge);
+    if (gauge->importMode() != Gauge::ImportMode::Uninitialized) {
+      f_stat(*gauge);
+    }
   }
 }
 
@@ -362,34 +371,40 @@ void AllocatorImpl::forEachTextReadout(std::function<void(std::size_t)> f_size,
   }
 }
 
-void AllocatorImpl::markCounterForDeletion(StatName name) {
+void AllocatorImpl::markCounterForDeletion(const CounterSharedPtr& counter) {
   Thread::LockGuard lock(mutex_);
-  auto iter = counters_.find(name);
+  auto iter = counters_.find(counter->statName());
   if (iter == counters_.end()) {
+    // This has already been marked for deletion.
     return;
   }
+  ASSERT(counter.get() == *iter);
   // Duplicates are ASSERTed in ~AllocatorImpl.
   deleted_counters_.emplace_back(*iter);
   counters_.erase(iter);
 }
 
-void AllocatorImpl::markGaugeForDeletion(StatName name) {
+void AllocatorImpl::markGaugeForDeletion(const GaugeSharedPtr& gauge) {
   Thread::LockGuard lock(mutex_);
-  auto iter = gauges_.find(name);
+  auto iter = gauges_.find(gauge->statName());
   if (iter == gauges_.end()) {
+    // This has already been marked for deletion.
     return;
   }
+  ASSERT(gauge.get() == *iter);
   // Duplicates are ASSERTed in ~AllocatorImpl.
   deleted_gauges_.emplace_back(*iter);
   gauges_.erase(iter);
 }
 
-void AllocatorImpl::markTextReadoutForDeletion(StatName name) {
+void AllocatorImpl::markTextReadoutForDeletion(const TextReadoutSharedPtr& text_readout) {
   Thread::LockGuard lock(mutex_);
-  auto iter = text_readouts_.find(name);
+  auto iter = text_readouts_.find(text_readout->statName());
   if (iter == text_readouts_.end()) {
+    // This has already been marked for deletion.
     return;
   }
+  ASSERT(text_readout.get() == *iter);
   // Duplicates are ASSERTed in ~AllocatorImpl.
   deleted_text_readouts_.emplace_back(*iter);
   text_readouts_.erase(iter);

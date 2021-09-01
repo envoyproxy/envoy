@@ -20,7 +20,6 @@
 namespace Envoy {
 
 class StatsSinkFlushSpeedTest {
-
 public:
   StatsSinkFlushSpeedTest(size_t const num_stats)
       : pool_(symbol_table_), stats_allocator_(symbol_table_), stats_store_(stats_allocator_) {

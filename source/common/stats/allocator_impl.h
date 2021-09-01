@@ -57,9 +57,9 @@ public:
    */
   bool isMutexLockedForTest();
 
-  void markCounterForDeletion(StatName name) override;
-  void markGaugeForDeletion(StatName name) override;
-  void markTextReadoutForDeletion(StatName name) override;
+  void markCounterForDeletion(const CounterSharedPtr& counter) override;
+  void markGaugeForDeletion(const GaugeSharedPtr& gauge) override;
+  void markTextReadoutForDeletion(const TextReadoutSharedPtr& text_readout) override;
 
 protected:
   virtual Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,

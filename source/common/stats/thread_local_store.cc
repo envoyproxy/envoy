@@ -69,13 +69,19 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   Thread::LockGuard lock(lock_);
   const uint32_t first_histogram_index = deleted_histograms_.size();
   for (ScopeImpl* scope : scopes_) {
-    removeRejectedStats(scope->central_cache_->counters_,
-                        [this](StatName name) mutable { alloc_.markCounterForDeletion(name); });
-    removeRejectedStats(scope->central_cache_->gauges_,
-                        [this](StatName name) mutable { alloc_.markGaugeForDeletion(name); });
+    removeRejectedStats<CounterSharedPtr>(scope->central_cache_->counters_,
+                                          [this](const CounterSharedPtr& counter) mutable {
+                                            alloc_.markCounterForDeletion(counter);
+                                          });
+    removeRejectedStats<GaugeSharedPtr>(
+        scope->central_cache_->gauges_,
+        [this](const GaugeSharedPtr& gauge) mutable { alloc_.markGaugeForDeletion(gauge); });
     removeRejectedStats(scope->central_cache_->histograms_, deleted_histograms_);
-    removeRejectedStats(scope->central_cache_->text_readouts_,
-                        [this](StatName name) mutable { alloc_.markTextReadoutForDeletion(name); });
+    removeRejectedStats<TextReadoutSharedPtr>(
+        scope->central_cache_->text_readouts_,
+        [this](const TextReadoutSharedPtr& text_readout) mutable {
+          alloc_.markTextReadoutForDeletion(text_readout);
+        });
   }
 
   // Remove any newly rejected histograms from histogram_set_.
@@ -104,9 +110,9 @@ void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass&
   }
 }
 
-template <class StatMapClass>
-void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map,
-                                               std::function<void(StatName name)> f_deletion) {
+template <class StatSharedPtr>
+void ThreadLocalStoreImpl::removeRejectedStats(
+    StatNameHashMap<StatSharedPtr>& map, std::function<void(const StatSharedPtr&)> f_deletion) {
   StatNameVec remove_list;
   for (auto& stat : map) {
     if (rejects(stat.first)) {
@@ -116,7 +122,7 @@ void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map,
   for (StatName stat_name : remove_list) {
     auto iter = map.find(stat_name);
     ASSERT(iter != map.end());
-    f_deletion(stat_name);
+    f_deletion(iter->second);
     map.erase(iter);
   }
 }

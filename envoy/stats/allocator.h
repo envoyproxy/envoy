@@ -62,9 +62,9 @@ public:
    * Mark rejected stats as deleted by moving them to a different vector, so they don't show up
    * when iterating over stats, but prevent crashes when trying to accesses references to them.
    */
-  virtual void markCounterForDeletion(StatName name) PURE;
-  virtual void markGaugeForDeletion(StatName name) PURE;
-  virtual void markTextReadoutForDeletion(StatName name) PURE;
+  virtual void markCounterForDeletion(const CounterSharedPtr& counter) PURE;
+  virtual void markGaugeForDeletion(const GaugeSharedPtr& gauge) PURE;
+  virtual void markTextReadoutForDeletion(const TextReadoutSharedPtr& text_readout) PURE;
 
   /**
    * Iterate over all stats that need to be sinked. Note, that implementations can potentially hold

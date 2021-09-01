@@ -492,8 +492,9 @@ private:
   bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
-  template <class StatMapClass>
-  void removeRejectedStats(StatMapClass& map, std::function<void(StatName name)> f_deletion);
+  template <class StatSharedPtr>
+  void removeRejectedStats(StatNameHashMap<StatSharedPtr>& map,
+                           std::function<void(const StatSharedPtr&)> f_deletion);
   bool checkAndRememberRejection(StatName name, StatsMatcher::FastResult fast_reject_result,
                                  StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);

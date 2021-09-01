@@ -1,3 +1,4 @@
+#include <cmath>
 #include <string>
 
 #include "source/common/stats/allocator_impl.h"
@@ -6,6 +7,7 @@
 #include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/synchronization/notification.h"
+#include "gmock/gmock-matchers.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -25,12 +27,18 @@ protected:
 
   void clearStorage() {
     pool_.clear();
-    EXPECT_EQ(0, symbol_table_.numSymbols());
+    // If stats have been marked for deletion, they are not cleared until the
+    // destructor of alloc_ is called, and hence the symbol_table_.numSymbols()
+    // will be greater than zero at this point.
+    if (are_stats_marked_for_deletion_ == false) {
+      EXPECT_EQ(0, symbol_table_.numSymbols());
+    }
   }
 
   SymbolTableImpl symbol_table_;
   AllocatorImpl alloc_;
   StatNamePool pool_;
+  bool are_stats_marked_for_deletion_ = false;
 };
 
 // Allocate 2 counters of the same name, and you'll get the same object.
@@ -123,6 +131,177 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
   alloc_.sync().signal(AllocatorImpl::DecrementToZeroSyncPoint);
   thread->join();
   EXPECT_FALSE(alloc_.isMutexLockedForTest());
+}
+
+TEST_F(AllocatorImplTest, ForEachCounter) {
+
+  StatNameHashSet stat_names;
+  std::vector<CounterSharedPtr> counters;
+
+  const size_t num_stats = 11;
+
+  for (size_t idx = 0; idx < num_stats; ++idx) {
+    auto stat_name = makeStat(absl::StrCat("counter.", idx));
+    stat_names.insert(stat_name);
+    counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
+  }
+
+  size_t num_counters = 0;
+  size_t num_iterations = 0;
+  alloc_.forEachCounter([&num_counters](std::size_t size) { num_counters = size; },
+                        [&num_iterations, &stat_names](Stats::Counter& counter) {
+                          EXPECT_EQ(stat_names.count(counter.statName()), 1);
+                          ++num_iterations;
+                        });
+  EXPECT_EQ(num_counters, 11);
+  EXPECT_EQ(num_iterations, 11);
+
+  // Reject a stat and remove it from "scope".
+  StatName rejected_stat_name = counters[4]->statName();
+  alloc_.markCounterForDeletion(counters[4]);
+  are_stats_marked_for_deletion_ = true;
+  // Save a local reference to rejected stat.
+  Counter& rejected_counter = *counters[4];
+  counters.erase(counters.begin() + 4);
+
+  // Verify that the rejected stat does not show up during iteration.
+  num_iterations = 0;
+  num_counters = 0;
+  alloc_.forEachCounter([&num_counters](std::size_t size) { num_counters = size; },
+                        [&num_iterations, &rejected_stat_name](Stats::Counter& counter) {
+                          EXPECT_THAT(counter.statName(), ::testing::Ne(rejected_stat_name));
+                          ++num_iterations;
+                        });
+  EXPECT_EQ(num_iterations, 10);
+  EXPECT_EQ(num_counters, 10);
+
+  // Verify that we can access the local reference without a crash.
+  rejected_counter.inc();
+
+  // Erase all stats.
+  counters.clear();
+  num_iterations = 0;
+  alloc_.forEachCounter([&num_counters](std::size_t size) { num_counters = size; },
+                        [&num_iterations](Stats::Counter&) { ++num_iterations; });
+  EXPECT_EQ(num_counters, 0);
+  EXPECT_EQ(num_iterations, 0);
+}
+
+TEST_F(AllocatorImplTest, ForEachGauge) {
+
+  StatNameHashSet stat_names;
+  std::vector<GaugeSharedPtr> gauges;
+
+  const size_t num_stats = 11;
+
+  for (size_t idx = 0; idx < num_stats; ++idx) {
+    auto stat_name = makeStat(absl::StrCat("gauge.", idx));
+    // Set every 5th gauge as Uninitialized.
+    if ((idx + 1) % 5 == 0) {
+      gauges.emplace_back(
+          alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Uninitialized));
+    } else {
+      stat_names.insert(stat_name);
+      gauges.emplace_back(
+          alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
+    }
+  }
+
+  size_t num_gauges = 0;
+  size_t num_iterations = 0;
+  alloc_.forEachGauge([&num_gauges](std::size_t size) { num_gauges = size; },
+                      [&num_iterations, &stat_names](Stats::Gauge& gauge) {
+                        EXPECT_EQ(stat_names.count(gauge.statName()), 1);
+                        ++num_iterations;
+                      });
+  // We should see two less as we should not iterate over Uninitialized gauges.
+  EXPECT_EQ(num_gauges, 9);
+  EXPECT_EQ(num_iterations, 9);
+
+  // Reject a stat and remove it from "scope".
+  StatName rejected_stat_name = gauges[3]->statName();
+  alloc_.markGaugeForDeletion(gauges[3]);
+  are_stats_marked_for_deletion_ = true;
+  // Save a local reference to rejected stat.
+  Gauge& rejected_gauge = *gauges[3];
+  gauges.erase(gauges.begin() + 3);
+
+  // Verify that the rejected stat does not show up during iteration.
+  num_iterations = 0;
+  num_gauges = 0;
+  alloc_.forEachGauge([&num_gauges](std::size_t size) { num_gauges = size; },
+                      [&num_iterations, &rejected_stat_name](Stats::Gauge& gauge) {
+                        EXPECT_THAT(gauge.statName(), ::testing::Ne(rejected_stat_name));
+                        ++num_iterations;
+                      });
+  EXPECT_EQ(num_iterations, 8);
+  EXPECT_EQ(num_gauges, 8);
+
+  // Verify that we can access the local reference without a crash.
+  rejected_gauge.inc();
+
+  // Erase all stats.
+  gauges.clear();
+  num_iterations = 0;
+  alloc_.forEachGauge([&num_gauges](std::size_t size) { num_gauges = size; },
+                      [&num_iterations](Stats::Gauge&) { ++num_iterations; });
+  EXPECT_EQ(num_gauges, 0);
+  EXPECT_EQ(num_iterations, 0);
+}
+
+TEST_F(AllocatorImplTest, ForEachTextReadout) {
+
+  StatNameHashSet stat_names;
+  std::vector<TextReadoutSharedPtr> text_readouts;
+
+  const size_t num_stats = 11;
+
+  for (size_t idx = 0; idx < num_stats; ++idx) {
+    auto stat_name = makeStat(absl::StrCat("text_readout.", idx));
+    stat_names.insert(stat_name);
+    text_readouts.emplace_back(alloc_.makeTextReadout(stat_name, StatName(), {}));
+  }
+
+  size_t num_text_readouts = 0;
+  size_t num_iterations = 0;
+  alloc_.forEachTextReadout([&num_text_readouts](std::size_t size) { num_text_readouts = size; },
+                            [&num_iterations, &stat_names](Stats::TextReadout& text_readout) {
+                              EXPECT_EQ(stat_names.count(text_readout.statName()), 1);
+                              ++num_iterations;
+                            });
+  EXPECT_EQ(num_text_readouts, 11);
+  EXPECT_EQ(num_iterations, 11);
+
+  // Reject a stat and remove it from "scope".
+  StatName rejected_stat_name = text_readouts[4]->statName();
+  alloc_.markTextReadoutForDeletion(text_readouts[4]);
+  are_stats_marked_for_deletion_ = true;
+  // Save a local reference to rejected stat.
+  TextReadout& rejected_text_readout = *text_readouts[4];
+  text_readouts.erase(text_readouts.begin() + 4);
+
+  // Verify that the rejected stat does not show up during iteration.
+  num_iterations = 0;
+  num_text_readouts = 0;
+  alloc_.forEachTextReadout(
+      [&num_text_readouts](std::size_t size) { num_text_readouts = size; },
+      [&num_iterations, &rejected_stat_name](Stats::TextReadout& text_readout) {
+        EXPECT_THAT(text_readout.statName(), ::testing::Ne(rejected_stat_name));
+        ++num_iterations;
+      });
+  EXPECT_EQ(num_iterations, 10);
+  EXPECT_EQ(num_text_readouts, 10);
+
+  // Verify that we can access the local reference without a crash.
+  rejected_text_readout.set("no crash");
+
+  // Erase all stats.
+  text_readouts.clear();
+  num_iterations = 0;
+  alloc_.forEachTextReadout([&num_text_readouts](std::size_t size) { num_text_readouts = size; },
+                            [&num_iterations](Stats::TextReadout&) { ++num_iterations; });
+  EXPECT_EQ(num_text_readouts, 0);
+  EXPECT_EQ(num_iterations, 0);
 }
 
 } // namespace
