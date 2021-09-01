@@ -34,9 +34,8 @@ public:
 
   void run(const std::string cluster_name) {
     const auto fake_static = "fake_static";
-    ON_CALL(context_.cluster_manager_, checkActiveStaticCluster(fake_static))
-        .WillByDefault(
-            Invoke([fake_static](const std::string& cluster) { return fake_static == cluster; }));
+    EXPECT_CALL(context_.cluster_manager_, checkActiveStaticCluster(cluster_name))
+        .WillOnce(Return(fake_static == cluster_name));
 
     auto* common_config = http_grpc_access_log_.mutable_common_config();
     common_config->set_log_name("foo");
