@@ -24,23 +24,6 @@ class JvmBridgeUtilityTest {
   }
 
   @Test
-  fun `retrieveHeaders splits list-encoded header values when producing the Map`() {
-    val utility = JvmBridgeUtility()
-    utility.passHeader("test-0".toByteArray(), "value-0".toByteArray(), true)
-    utility.passHeader("test-1".toByteArray(), "value-1, value-2".toByteArray(), false)
-
-    val headers = utility.retrieveHeaders()
-    val expectedHeaders = mapOf(
-      "test-0" to listOf("value-0"),
-      "test-1" to listOf("value-1", "value-2")
-    )
-
-    assertThat(headers)
-      .hasSize(2) // Two keys / header name
-      .usingRecursiveComparison().isEqualTo(expectedHeaders)
-  }
-
-  @Test
   fun `validateCount checks if the expected number of header values in the map matches the actual`() {
     val utility = JvmBridgeUtility()
     assertThat(utility.validateCount(1)).isFalse()

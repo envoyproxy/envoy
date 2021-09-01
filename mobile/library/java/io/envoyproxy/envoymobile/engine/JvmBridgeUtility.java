@@ -47,18 +47,7 @@ class JvmBridgeUtility {
       values = new ArrayList(1);
       headerAccumulator.put(headerKey, values);
     }
-
-    // These headers may contain commas in single values, in contravention of the RFC.
-    if (headerKey.equals("cookie") || headerKey.equals("proxy-authenticate") ||
-        headerKey.equals("set-cookie") || headerKey.equals("www-authenticate")) {
-      values.add(headerValue);
-    } else {
-      // Add trimmed, comma-separated values as individual members of the list.
-      String[] newValues = headerValue.split(",");
-      for (int i = 0; i < newValues.length; i++) {
-        values.add(newValues[i].trim());
-      }
-    }
+    values.add(headerValue);
 
     headerCount++;
   }

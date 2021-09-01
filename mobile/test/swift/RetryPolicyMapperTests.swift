@@ -22,6 +22,23 @@ final class RetryPolicyMapperTests: XCTestCase {
     XCTAssertEqual(expectedHeaders, policy.outboundHeaders())
   }
 
+  func testConvertingHeaderValuesDelimitedWithCommaResultsInProperEnumValues() {
+    let policy = RetryPolicy(maxRetryCount: 3,
+                             retryOn: [.status5xx, .gatewayError],
+                             retryStatusCodes: [400, 422, 500],
+                             perRetryTimeoutMS: 15_000,
+                             totalUpstreamTimeoutMS: 60_000)
+    let headers = [
+      "x-envoy-retriable-status-codes": ["400,422,500"],
+      "x-envoy-max-retries": ["3"],
+      "x-envoy-retry-on": ["5xx,gateway-error"],
+      "x-envoy-upstream-rq-per-try-timeout-ms": ["15000"],
+      "x-envoy-upstream-rq-timeout-ms": ["60000"],
+    ]
+
+    XCTAssertEqual(RetryPolicy.from(headers: Headers(headers: headers)), policy)
+  }
+
   func testConvertingToHeadersWithoutRetryTimeoutExcludesPerRetryTimeoutHeader() {
     let policy = RetryPolicy(maxRetryCount: 123, retryOn: RetryRule.allCases)
     XCTAssertNil(policy.outboundHeaders()["x-envoy-upstream-rq-per-try-timeout-ms"])
