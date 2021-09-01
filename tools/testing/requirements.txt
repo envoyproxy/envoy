@@ -78,9 +78,9 @@ packaging==21.0 \
     # via
     #   -r tools/testing/requirements.txt
     #   pytest
-pluggy==0.13.1 \
-    --hash=sha256:15b2acde666561e1298d71b523007ed7364de07029219b604cf808bfa1c765b0 \
-    --hash=sha256:966c145cd83c96502c3c3868f50408687b38434af77734af1e9ca461a4081d2d
+pluggy==1.0.0 \
+    --hash=sha256:74134bbf457f031a36d68416e1509f34bd5ccc019f0bcc952c7b909d06b37bd3 \
+    --hash=sha256:4224373bacce55f955a878bf9cfa763c1e360858e330072059e10bad68531159
     # via
     #   -r tools/testing/requirements.txt
     #   pytest
@@ -104,8 +104,8 @@ pytest-cov==2.12.1 \
     --hash=sha256:261bb9e47e65bd099c89c3edf92972865210c36813f80ede5277dceb77a4a62a \
     --hash=sha256:261ceeb8c227b726249b376b8526b600f38667ee314f910353fa318caa01f4d7
     # via -r tools/testing/requirements.txt
-pytest-patches==0.0.1 \
-    --hash=sha256:48fe763f7e603f20a73a8c09684d31ec9929646b86fceb496599970fe86685b0
+pytest-patches==0.0.3 \
+    --hash=sha256:6f8cdc8641c708c4812f58ae48d410f373a6fd16cd6cc4dc4d3fb8951df9c92a
     # via -r tools/testing/requirements.txt
 pytest==6.2.4 \
     --hash=sha256:50bcad0a0b9c5a72c8e4e7c9855a3ad496ca6a881a3641b4260605450772c54b \
