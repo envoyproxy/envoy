@@ -757,53 +757,10 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNotConfigured) {
                             "'cluster_0' provided one. Check cluster documentation.");
 }
 
-class CustomLbFactory : public TypedLoadBalancerFactoryBase {
-public:
-  CustomLbFactory() : TypedLoadBalancerFactoryBase("envoy.load_balancers.custom_lb") {}
-
-  ThreadAwareLoadBalancerPtr
-  create(const PrioritySet&, ClusterStats&, Stats::Scope&, Runtime::Loader&,
-         Random::RandomGenerator&,
-         const ::envoy::config::cluster::v3::LoadBalancingPolicy_Policy&) override {
-    return std::make_unique<ThreadAwareLbImpl>();
-  }
-
-private:
-  class LbImpl : public LoadBalancer {
-  public:
-    LbImpl() = default;
-
-    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override {
-      return nullptr;
-    }
-    Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
-      return nullptr;
-    }
-  };
-
-  class LbFactory : public LoadBalancerFactory {
-  public:
-    LbFactory() = default;
-
-    Upstream::LoadBalancerPtr create() override { return std::make_unique<LbImpl>(); }
-  };
-
-  class ThreadAwareLbImpl : public Upstream::ThreadAwareLoadBalancer {
-  public:
-    ThreadAwareLbImpl() = default;
-
-    Upstream::LoadBalancerFactorySharedPtr factory() override {
-      return std::make_shared<LbFactory>();
-    }
-    void initialize() override {}
-  };
-};
-
 // Verify that specifying LOAD_BALANCING_POLICY_CONFIG with CommonLbConfig is an error.
 TEST_F(ClusterManagerImplTest, LbPolicyConfigCannotSpecifyCommonLbConfig) {
-  CustomLbFactory factory;
-  Registry::InjectFactory<TypedLoadBalancerFactory> registration(factory);
-
+  // envoy.load_balancers.custom_lb is registered by linking in
+  // //test/integration/load_balancers:custom_lb_policy.
   const std::string yaml = fmt::format(R"EOF(
  static_resources:
   clusters:
@@ -871,9 +828,8 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfigMustSpecifyLbPolicy) {
 // Verify that multiple load balancing policies can be specified, and Envoy selects the first
 // policy that it has a factory for.
 TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
-  CustomLbFactory factory;
-  Registry::InjectFactory<TypedLoadBalancerFactory> registration(factory);
-
+  // envoy.load_balancers.custom_lb is registered by linking in
+  // //test/integration/load_balancers:custom_lb_policy.
   const std::string yaml = fmt::format(R"EOF(
  static_resources:
   clusters:
