@@ -52,6 +52,9 @@ namespace CommonUtility = ::Envoy::Http2::Utility;
 
 class Http2CodecImplTestFixture {
 public:
+  static bool slowContainsStreamId(int id, ConnectionImpl& connection) {
+    return connection.slowContainsStreamId(id);
+  }
   // The Http::Connection::dispatch method does not throw (any more). However unit tests in this
   // file use codecs for sending test data through mock network connections to the codec under test.
   // It is infeasible to plumb error codes returned by the dispatch() method of the codecs under
@@ -406,6 +409,7 @@ TEST_P(Http2CodecImplTest, TrailerStatus) {
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  EXPECT_TRUE(Http2CodecImplTestFixture::slowContainsStreamId(1, *client_));
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
   EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
@@ -418,6 +422,7 @@ TEST_P(Http2CodecImplTest, TrailerStatus) {
   // nghttp2 doesn't allow :status in trailers
   EXPECT_THROW(response_encoder_->encode100ContinueHeaders(continue_headers), ClientCodecError);
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
+  EXPECT_FALSE(Http2CodecImplTestFixture::slowContainsStreamId(1, *client_));
 };
 
 // Multiple 100 responses are passed to the response encoder (who is responsible for coalescing).
