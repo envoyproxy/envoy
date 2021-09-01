@@ -65,27 +65,11 @@ size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
-  Network::ConnectionSocket& socket = cb.socket();
-  socket.ioHandle().initializeFileEvent(
-      cb.dispatcher(),
-      [this](uint32_t events) {
-        ASSERT(events == Event::FileReadyType::Read);
-        onRead();
-      },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   cb_ = &cb;
   return Network::FilterStatus::StopIteration;
 }
 
-void Filter::onRead() {
-  const ReadOrParseState read_state = onReadWorker();
-  if (read_state == ReadOrParseState::Error) {
-    config_->stats_.downstream_cx_proxy_proto_error_.inc();
-    cb_->continueFilterChain(false);
-  }
-}
-
-ReadOrParseState Filter::onReadWorker() {
+Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   Network::ConnectionSocket& socket = cb_->socket();
 
   // We return if a) we do not yet have the header, b) we have the header but not yet all
@@ -93,15 +77,19 @@ ReadOrParseState Filter::onReadWorker() {
   // data. In cases a) and b) we'll be called again when the socket is ready to read and pick up
   // where we left off.
   if (!proxy_protocol_header_.has_value()) {
-    const ReadOrParseState read_header_state = readProxyHeader(socket.ioHandle());
+    const ReadOrParseState read_header_state = readProxyHeader(buffer);
     if (read_header_state != ReadOrParseState::Done) {
-      return read_header_state;
+      config_->stats_.downstream_cx_proxy_proto_error_.inc();
+      cb_->continueFilterChain(false);
+      return Network::FilterStatus::StopIteration;
     }
   }
   if (proxy_protocol_header_.has_value()) {
-    const ReadOrParseState read_ext_state = readExtensions(socket.ioHandle());
+    const ReadOrParseState read_ext_state = readExtensions(buffer);
     if (read_ext_state != ReadOrParseState::Done) {
-      return read_ext_state;
+      config_->stats_.downstream_cx_proxy_proto_error_.inc();
+      cb_->continueFilterChain(false);
+      return Network::FilterStatus::StopIteration;
     }
   }
 
@@ -116,13 +104,17 @@ ReadOrParseState Filter::onReadWorker() {
     if (remote_version != proxy_protocol_header_.value().protocol_version_ ||
         local_version != proxy_protocol_header_.value().protocol_version_) {
       ENVOY_LOG(debug, "failed to read proxy protocol");
-      return ReadOrParseState::Error;
+      config_->stats_.downstream_cx_proxy_proto_error_.inc();
+      cb_->continueFilterChain(false);
+      return Network::FilterStatus::StopIteration;
     }
     // Check that both addresses are valid unicast addresses, as required for TCP
     if (!proxy_protocol_header_.value().remote_address_->ip()->isUnicastAddress() ||
         !proxy_protocol_header_.value().local_address_->ip()->isUnicastAddress()) {
       ENVOY_LOG(debug, "failed to read proxy protocol");
-      return ReadOrParseState::Error;
+      config_->stats_.downstream_cx_proxy_proto_error_.inc();
+      cb_->continueFilterChain(false);
+      return Network::FilterStatus::StopIteration;
     }
 
     // Only set the local address if it really changed, and mark it as address being restored.
@@ -135,10 +127,7 @@ ReadOrParseState Filter::onReadWorker() {
         proxy_protocol_header_.value().remote_address_);
   }
 
-  // Release the file event so that we do not interfere with the connection read events.
-  socket.ioHandle().resetFileEvents();
-  cb_->continueFilterChain(true);
-  return ReadOrParseState::Done;
+  return Network::FilterStatus::Continue;
 }
 
 absl::optional<size_t> Filter::lenV2Address(char* buf) {
@@ -299,26 +288,18 @@ bool Filter::parseV1Header(char* buf, size_t len) {
   return true;
 }
 
-ReadOrParseState Filter::parseExtensions(Network::IoHandle& io_handle, uint8_t* buf,
+ReadOrParseState Filter::parseExtensions(Network::ListenerFilterBuffer& buffer, uint8_t* buf,
                                          size_t buf_size, size_t* buf_off) {
   // If we ever implement extensions elsewhere, be sure to
   // continue to skip and ignore those for LOCAL.
   while (proxy_protocol_header_.value().extensions_length_) {
     int to_read = std::min(buf_size, proxy_protocol_header_.value().extensions_length_);
     buf += (nullptr != buf_off) ? *buf_off : 0;
-    const auto recv_result = io_handle.recv(buf, to_read, 0);
-    if (!recv_result.ok()) {
-      if (recv_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-        return ReadOrParseState::TryAgainLater;
-      }
-      ENVOY_LOG(debug, "failed to read proxy protocol (no bytes avail)");
-      return ReadOrParseState::Error;
-    }
-
-    proxy_protocol_header_.value().extensions_length_ -= recv_result.return_value_;
+    const auto recv_result = buffer.drain(to_read);
+    proxy_protocol_header_.value().extensions_length_ -= recv_result;
 
     if (nullptr != buf_off) {
-      *buf_off += recv_result.return_value_;
+      *buf_off += recv_result;
     }
   }
 
@@ -390,12 +371,12 @@ bool Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
   return true;
 }
 
-ReadOrParseState Filter::readExtensions(Network::IoHandle& io_handle) {
+ReadOrParseState Filter::readExtensions(Network::ListenerFilterBuffer& buffer) {
   // Parse and discard the extensions if this is a local command or there's no TLV needs to be saved
   // to metadata.
   if (proxy_protocol_header_.value().local_command_ || 0 == config_->numberOfNeededTlvTypes()) {
     // buf_ is no longer in use so we re-use it to read/discard.
-    return parseExtensions(io_handle, reinterpret_cast<uint8_t*>(buf_), sizeof(buf_), nullptr);
+    return parseExtensions(buffer, reinterpret_cast<uint8_t*>(buf_), sizeof(buf_), nullptr);
   }
 
   // Initialize the buf_tlv_ only when we need to read the TLVs.
@@ -405,7 +386,7 @@ ReadOrParseState Filter::readExtensions(Network::IoHandle& io_handle) {
 
   // Parse until we have all the TLVs in buf_tlv.
   const ReadOrParseState parse_extensions_state =
-      parseExtensions(io_handle, buf_tlv_.data(), buf_tlv_.size(), &buf_tlv_off_);
+      parseExtensions(buffer, buf_tlv_.data(), buf_tlv_.size(), &buf_tlv_off_);
   if (parse_extensions_state != ReadOrParseState::Done) {
     return parse_extensions_state;
   }
@@ -417,19 +398,11 @@ ReadOrParseState Filter::readExtensions(Network::IoHandle& io_handle) {
   return ReadOrParseState::Done;
 }
 
-ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
+ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) {
   while (buf_off_ < MAX_PROXY_PROTO_LEN_V2) {
-    const auto result =
-        io_handle.recv(buf_ + buf_off_, MAX_PROXY_PROTO_LEN_V2 - buf_off_, MSG_PEEK);
+    const auto rc = buffer.copyOut(buf_ + buf_off_, MAX_PROXY_PROTO_LEN_V2 - buf_off_);
 
-    if (!result.ok()) {
-      if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-        return ReadOrParseState::TryAgainLater;
-      }
-      ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
-      return ReadOrParseState::Error;
-    }
-    ssize_t nread = result.return_value_;
+    ssize_t nread = rc;
 
     if (nread < 1) {
       ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
@@ -455,13 +428,13 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
       }
       if (buf_off_ < PROXY_PROTO_V2_HEADER_LEN) {
         ssize_t exp = PROXY_PROTO_V2_HEADER_LEN - buf_off_;
-        const auto read_result = io_handle.recv(buf_ + buf_off_, exp, 0);
-        if (!result.ok() || read_result.return_value_ != uint64_t(exp)) {
+        auto rc = buffer.drain(exp);
+        if (rc != uint64_t(exp)) {
           ENVOY_LOG(debug, "failed to read proxy protocol (remote closed)");
           return ReadOrParseState::Error;
         }
-        buf_off_ += read_result.return_value_;
-        nread -= read_result.return_value_;
+        buf_off_ += rc;
+        nread -= rc;
       }
       absl::optional<ssize_t> addr_len_opt = lenV2Address(buf_);
       if (!addr_len_opt.has_value()) {
@@ -477,12 +450,12 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
       }
       if (ssize_t(buf_off_) + nread >= PROXY_PROTO_V2_HEADER_LEN + addr_len) {
         ssize_t missing = (PROXY_PROTO_V2_HEADER_LEN + addr_len) - buf_off_;
-        const auto read_result = io_handle.recv(buf_ + buf_off_, missing, 0);
-        if (!result.ok() || read_result.return_value_ != uint64_t(missing)) {
+        const auto read_result = buffer.drain(missing);
+        if (read_result != uint64_t(missing)) {
           ENVOY_LOG(debug, "failed to read proxy protocol (remote closed)");
           return ReadOrParseState::Error;
         }
-        buf_off_ += read_result.return_value_;
+        buf_off_ += read_result;
         // The TLV remain, they are read/discard in parseExtensions() which is called from the
         // parent (if needed).
         if (parseV2Header(buf_)) {
@@ -491,12 +464,8 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
           return ReadOrParseState::Error;
         }
       } else {
-        const auto result = io_handle.recv(buf_ + buf_off_, nread, 0);
-        nread = result.return_value_;
-        if (!result.ok()) {
-          ENVOY_LOG(debug, "failed to read proxy protocol (remote closed)");
-          return ReadOrParseState::Error;
-        }
+        const auto result = buffer.drain(nread);
+        nread = result;
         buf_off_ += nread;
       }
     } else {
@@ -525,9 +494,10 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
         ntoread = search_index_ - buf_off_;
       }
 
-      const auto result = io_handle.recv(buf_ + buf_off_, ntoread, 0);
-      nread = result.return_value_;
-      ASSERT(result.ok() && size_t(nread) == ntoread);
+      const auto result = buffer.drain(ntoread);
+      nread = result;
+      buffer.drain(nread);
+      ASSERT(size_t(nread) == ntoread);
 
       buf_off_ += nread;
 

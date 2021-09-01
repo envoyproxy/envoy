@@ -1,5 +1,8 @@
 #pragma once
 
+#include <bits/stdint-uintn.h>
+
+#include "envoy/buffer/buffer.h"
 #include "envoy/event/file_event.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/network/filter.h"
@@ -87,33 +90,28 @@ public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
-  // TODO (soulxu) implement this instead of filter peek data by itself.
-  Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
-    return Network::FilterStatus::Continue;
-  };
+  Network::FilterStatus onData(Network::ListenerFilterBuffer&) override;
+  uint64_t inspectSize() const override { return MAX_PROXY_PROTO_LEN_V2; }
 
 private:
   static const size_t MAX_PROXY_PROTO_LEN_V2 =
       PROXY_PROTO_V2_HEADER_LEN + PROXY_PROTO_V2_ADDR_LEN_UNIX;
   static const size_t MAX_PROXY_PROTO_LEN_V1 = 108;
 
-  void onRead();
-  ReadOrParseState onReadWorker();
-
   /**
    * Helper function that attempts to read the proxy header
    * (delimited by \r\n if V1 format, or with length if V2)
    * @return bool true valid header, false if more data is needed or socket errors occurred.
    */
-  ReadOrParseState readProxyHeader(Network::IoHandle& io_handle);
+  ReadOrParseState readProxyHeader(Network::ListenerFilterBuffer& buffer);
 
   /**
    * Parse (and discard unknown) header extensions (until hdr.extensions_length == 0)
    */
-  ReadOrParseState parseExtensions(Network::IoHandle& io_handle, uint8_t* buf, size_t buf_size,
-                                   size_t* buf_off = nullptr);
+  ReadOrParseState parseExtensions(Network::ListenerFilterBuffer& buffer, uint8_t* buf,
+                                   size_t buf_size, size_t* buf_off = nullptr);
   bool parseTlvs(const std::vector<uint8_t>& tlvs);
-  ReadOrParseState readExtensions(Network::IoHandle& io_handle);
+  ReadOrParseState readExtensions(Network::ListenerFilterBuffer& buffer);
 
   /**
    * Given a char * & len, parse the header as per spec.
