@@ -339,7 +339,9 @@ Counter* AllocatorImpl::makeCounterInternal(StatName name, StatName tag_extracte
 void AllocatorImpl::forEachCounter(std::function<void(std::size_t)> f_size,
                                    std::function<void(Stats::Counter&)> f_stat) const {
   Thread::LockGuard lock(mutex_);
-  f_size(counters_.size());
+  if (f_size != nullptr) {
+    f_size(counters_.size());
+  }
   for (auto& counter : counters_) {
     f_stat(*counter);
   }
@@ -348,17 +350,11 @@ void AllocatorImpl::forEachCounter(std::function<void(std::size_t)> f_size,
 void AllocatorImpl::forEachGauge(std::function<void(std::size_t)> f_size,
                                  std::function<void(Stats::Gauge&)> f_stat) const {
   Thread::LockGuard lock(mutex_);
-  size_t num_gauges = 0;
-  std::for_each(gauges_.begin(), gauges_.end(), [&num_gauges](Gauge* const gauge) mutable {
-    if (gauge->importMode() != Gauge::ImportMode::Uninitialized) {
-      num_gauges++;
-    }
-  });
-  f_size(num_gauges);
+  if (f_size != nullptr) {
+    f_size(gauges_.size());
+  }
   for (auto& gauge : gauges_) {
-    if (gauge->importMode() != Gauge::ImportMode::Uninitialized) {
-      f_stat(*gauge);
-    }
+    f_stat(*gauge);
   }
 }
 

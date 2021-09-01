@@ -30,7 +30,7 @@ protected:
     // If stats have been marked for deletion, they are not cleared until the
     // destructor of alloc_ is called, and hence the symbol_table_.numSymbols()
     // will be greater than zero at this point.
-    if (are_stats_marked_for_deletion_ == false) {
+    if (!are_stats_marked_for_deletion_) {
       EXPECT_EQ(0, symbol_table_.numSymbols());
     }
   }
@@ -134,7 +134,6 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
 }
 
 TEST_F(AllocatorImplTest, ForEachCounter) {
-
   StatNameHashSet stat_names;
   std::vector<CounterSharedPtr> counters;
 
@@ -188,7 +187,6 @@ TEST_F(AllocatorImplTest, ForEachCounter) {
 }
 
 TEST_F(AllocatorImplTest, ForEachGauge) {
-
   StatNameHashSet stat_names;
   std::vector<GaugeSharedPtr> gauges;
 
@@ -196,15 +194,8 @@ TEST_F(AllocatorImplTest, ForEachGauge) {
 
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("gauge.", idx));
-    // Set every 5th gauge as Uninitialized.
-    if ((idx + 1) % 5 == 0) {
-      gauges.emplace_back(
-          alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Uninitialized));
-    } else {
-      stat_names.insert(stat_name);
-      gauges.emplace_back(
-          alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
-    }
+    stat_names.insert(stat_name);
+    gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
   }
 
   size_t num_gauges = 0;
@@ -214,9 +205,8 @@ TEST_F(AllocatorImplTest, ForEachGauge) {
                         EXPECT_EQ(stat_names.count(gauge.statName()), 1);
                         ++num_iterations;
                       });
-  // We should see two less as we should not iterate over Uninitialized gauges.
-  EXPECT_EQ(num_gauges, 9);
-  EXPECT_EQ(num_iterations, 9);
+  EXPECT_EQ(num_gauges, 11);
+  EXPECT_EQ(num_iterations, 11);
 
   // Reject a stat and remove it from "scope".
   StatName rejected_stat_name = gauges[3]->statName();
@@ -234,8 +224,8 @@ TEST_F(AllocatorImplTest, ForEachGauge) {
                         EXPECT_THAT(gauge.statName(), ::testing::Ne(rejected_stat_name));
                         ++num_iterations;
                       });
-  EXPECT_EQ(num_iterations, 8);
-  EXPECT_EQ(num_gauges, 8);
+  EXPECT_EQ(num_iterations, 10);
+  EXPECT_EQ(num_gauges, 10);
 
   // Verify that we can access the local reference without a crash.
   rejected_gauge.inc();
@@ -250,7 +240,6 @@ TEST_F(AllocatorImplTest, ForEachGauge) {
 }
 
 TEST_F(AllocatorImplTest, ForEachTextReadout) {
-
   StatNameHashSet stat_names;
   std::vector<TextReadoutSharedPtr> text_readouts;
 

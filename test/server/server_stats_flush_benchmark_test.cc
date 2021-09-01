@@ -44,7 +44,7 @@ public:
 
   void test(::benchmark::State& state) {
     for (auto _ : state) {
-      UNREFERENCED_PARAMETER(state);
+      UNREFERENCED_PARAMETER(_);
       std::list<Stats::SinkPtr> sinks;
       sinks.emplace_back(new testing::NiceMock<Stats::MockSink>());
       Server::InstanceUtil::flushMetricsToSinks(sinks, stats_store_, time_system_);

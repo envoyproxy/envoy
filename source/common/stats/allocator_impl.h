@@ -11,7 +11,6 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
-#include "metric_impl.h"
 
 namespace Envoy {
 namespace Stats {

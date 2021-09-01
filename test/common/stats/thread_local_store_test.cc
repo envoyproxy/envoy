@@ -509,7 +509,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
   scope1.reset();
   // The counter is gone from all scopes, but is still held in the local
-  // variable c1. Hence, it will no be removed from the allocator or store.
+  // variable c1. Hence, it will not be removed from the allocator or store.
   EXPECT_EQ(1UL, store_->counters().size());
 
   EXPECT_EQ(1L, c1.use_count());

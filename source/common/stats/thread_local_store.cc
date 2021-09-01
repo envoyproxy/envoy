@@ -161,7 +161,11 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
   forEachGauge([&ret](std::size_t size) mutable { ret.reserve(size); },
-               [&ret](Gauge& gauge) mutable { ret.emplace_back(GaugeSharedPtr(&gauge)); });
+               [&ret](Gauge& gauge) mutable {
+                 if (gauge.importMode() != Gauge::ImportMode::Uninitialized) {
+                   ret.emplace_back(GaugeSharedPtr(&gauge));
+                 }
+               });
   return ret;
 }
 
