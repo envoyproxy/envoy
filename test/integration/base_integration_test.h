@@ -70,7 +70,7 @@ public:
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
-  void setDeterministicValue(uint64_t value) { deterministic_value_ = value; }
+  void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 

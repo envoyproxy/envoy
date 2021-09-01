@@ -16,8 +16,7 @@ namespace Envoy {
 namespace RepickClusterFilter {
 
 // A test filter that modifies the request header (i.e. map the cluster header
-// to cluster name), clear the route cache, then will trigger the cluster
-// re-pick at router filter later in the filter chain.
+// to cluster name), clear the route cache.
 class RepickClusterFilter : public Http::PassThroughFilter {
 public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& request_header, bool) override {

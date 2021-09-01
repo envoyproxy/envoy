@@ -142,15 +142,21 @@ private:
   std::vector<uint64_t> default_weights_;
 };
 
+// Steer the traffic (i.e. send the request) to the weighted cluster with `cluster_name` specified.
 TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithName) {
-  setDeterministicValue(0);
+  setDeterministicValue();
   initializeConfig(getDefaultWeights());
 
   // The expected destination cluster upstream is index 0 since the selected
-  // value is set to 0 indirectly via `setDeterministicValue(0)`.
+  // value is set to 0 indirectly via `setDeterministicValue()`.
   sendRequestAndValidateResponse({0});
+
+  // Check that the expected upstream cluster has incoming request.
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 }
 
+// Steer the traffic (i.e. send the request) to the weighted cluster with `cluster_header_name`
+// specified.
 TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithHeader) {
   const std::vector<uint64_t>& default_weights = getDefaultWeights();
   uint64_t deterministric_value = std::accumulate(
@@ -161,8 +167,14 @@ TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithHeader) {
   // The expected destination cluster upstream is index
   // `TotalUpstreamClusterWithNameCount`.
   sendRequestAndValidateResponse({static_cast<uint64_t>(TotalUpstreamClusterWithNameCount)});
+
+  // Check that the expected upstream cluster has incoming request.
+  std::string target_name =
+      absl::StrFormat("cluster.cluster_%d.upstream_cx_total", TotalUpstreamClusterWithNameCount);
+  EXPECT_EQ(test_server_->counter(target_name)->value(), 1);
 }
 
+// Send the traffic (i.e. send the request) to the weighted clusters randomly based on weight.
 TEST_F(WeightedClusterIntegrationTest, SplitTrafficRandomly) {
   std::vector<uint64_t> weights;
   weights.reserve(TotalUpstreamClusterCount);
@@ -179,7 +191,7 @@ TEST_F(WeightedClusterIntegrationTest, SplitTrafficRandomly) {
   }
 
   std::string target_name;
-  // Check that all the upstream cluster have been routed to at least once.
+  // Check that all the upstream clusters have been routed to at least once.
   for (int i = 0; i < TotalUpstreamClusterCount; ++i) {
     target_name = absl::StrFormat("cluster.cluster_%d.upstream_cx_total", i);
     EXPECT_GE(test_server_->counter(target_name)->value(), 1);

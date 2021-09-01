@@ -1035,31 +1035,29 @@ void RouteEntryImplBase::validateClusters(
     return;
   }
 
-  // Currently, we verify that the cluster exists in the CM if we have an
-  // explicit cluster or weighted cluster rule. We obviously do not verify a
-  // cluster_header rule. This means that trying to use all CDS clusters with a
-  // static route table will not work. In the upcoming RDS change we will make
-  // it so that dynamically loaded route tables do *not* perform CM checks. In
-  // the future we might decide to also have a config option that turns off
-  // checks for static route tables. This would enable the all CDS with static
-  // route table case.
-  // For weighted clusters, we only verify that the `cluster_header_name` is
-  // not empty because the cluster name is not set yet at config time (hence the
-  // validation here).
+  // Currently, we verify that the cluster exists in the CM if we have an explicit cluster or
+  // weighted cluster rule. We obviously do not verify a cluster_header rule. This means that
+  // trying to use all CDS clusters with a static route table will not work. In the upcoming RDS
+  // change we will make it so that dynamically loaded route tables do *not* perform CM checks.
+  // In the future we might decide to also have a config option that turns off checks for static
+  // route tables. This would enable the all CDS with static route table case.
   if (!cluster_name_.empty()) {
     if (!cluster_info_maps.hasCluster(cluster_name_)) {
       throw EnvoyException(fmt::format("route: unknown cluster '{}'", cluster_name_));
     }
   } else if (!weighted_clusters_.empty()) {
     for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
-      if (!cluster_info_maps.hasCluster(cluster->clusterName()) &&
-          cluster->clusterHeaderName().get().empty()) {
-        if (!cluster->clusterName().empty()) {
+      if (!cluster->clusterName().empty()) {
+        if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
           throw EnvoyException(
               fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
-        } else {
-          throw EnvoyException("route: unknown weighted cluster with no cluster_header field");
         }
+      }
+      // For weighted clusters with `cluster_header_name`, we only verify that this field is
+      // not empty because the cluster name is not set yet at config time (hence the validation
+      // here).
+      else if (cluster->clusterHeaderName().get().empty()) {
+        throw EnvoyException("route: unknown weighted cluster with no cluster_header field");
       }
     }
   }

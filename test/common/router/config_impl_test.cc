@@ -2892,7 +2892,6 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, WeightedClusterHeader) {
-
   const std::string yaml = R"EOF(
       virtual_hosts:
         - name: www1
@@ -2915,8 +2914,8 @@ TEST_F(RouteMatcherTest, WeightedClusterHeader) {
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
-  // Cluster name is empty here because it will pick the cluster with cluster_header
-  // (i.e. no cluster_name) first.
+  // The configured cluster header isn't present in the request headers, therefore cluster selection
+  // fails and we get the empty string
   EXPECT_EQ("", config.route(headers, 115)->routeEntry()->clusterName());
   // Modify the header mapping.
   headers.addCopy("some_header", "some_cluster");
