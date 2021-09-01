@@ -34,7 +34,8 @@ def envoy_py_library(
         deps = [],
         data = [],
         visibility = ["//visibility:public"],
-        envoy_prefix = ""):
+        envoy_prefix = "",
+        test = True):
     _parts = name.split(".")
     package = ".".join(_parts[:-1])
     name = _parts[-1]
@@ -46,15 +47,16 @@ def envoy_py_library(
         data = data,
         visibility = visibility,
     )
-
-    envoy_py_test(name, package, visibility, envoy_prefix = envoy_prefix)
+    if test:
+        envoy_py_test(name, package, visibility, envoy_prefix = envoy_prefix)
 
 def envoy_py_binary(
         name = None,
         deps = [],
         data = [],
         visibility = ["//visibility:public"],
-        envoy_prefix = "@envoy"):
+        envoy_prefix = "@envoy",
+        test = True):
     _parts = name.split(".")
     package = ".".join(_parts[:-1])
     name = _parts[-1]
@@ -67,4 +69,33 @@ def envoy_py_binary(
         visibility = visibility,
     )
 
-    envoy_py_test(name, package, visibility, envoy_prefix = envoy_prefix)
+    if test:
+        envoy_py_test(name, package, visibility, envoy_prefix = envoy_prefix)
+
+def envoy_py_script(
+        name,
+        entry_point,
+        deps = [],
+        data = [],
+        visibility = ["//visibility:public"],
+        envoy_prefix = "@envoy"):
+    py_file = "%s.py" % name.split(".")[-1]
+    output = "$(@D)/%s" % py_file
+    template_rule = "%s//tools/base:base_command.py" % envoy_prefix
+    template = "$(location %s)" % template_rule
+
+    native.genrule(
+        name = "py_script_%s" % py_file,
+        cmd = "sed s/__UPSTREAM_PACKAGE__/%s/ %s > \"%s\"" % (entry_point, template, output),
+        tools = [template_rule],
+        outs = [py_file],
+    )
+
+    envoy_py_binary(
+        name = name,
+        deps = deps,
+        data = data,
+        visibility = visibility,
+        envoy_prefix = envoy_prefix,
+        test = False,
+    )
