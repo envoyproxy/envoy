@@ -110,6 +110,11 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
   }
 }
 
+void EnvoyQuicClientConnection::OnPathDegradingDetected() {
+  QuicConnection::OnPathDegradingDetected();
+  MaybeMigratePort();
+}
+
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
   ASSERT(events & (Event::FileReadyType::Read | Event::FileReadyType::Write));

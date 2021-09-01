@@ -73,6 +73,9 @@ public:
   // Switch underlying socket with the given one. This is used in connection migration.
   void switchConnectionSocket(Network::ConnectionSocketPtr&& connection_socket);
 
+  // Potentially trigger migration.
+  void OnPathDegradingDetected() override;
+
 private:
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
@@ -82,6 +85,8 @@ private:
                             Network::ConnectionSocketPtr&& connection_socket);
 
   void onFileEvent(uint32_t events);
+
+  void MaybeMigratePort();
 
   OptRef<PacketsToReadDelegate> delegate_;
   uint32_t packets_dropped_{0};
