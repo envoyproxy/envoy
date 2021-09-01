@@ -193,13 +193,12 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
     return;
   }
 
-
   primary_host = createHost(host, default_port);
   startResolve(host, *primary_host);
 }
 
-
-DnsCacheImpl::PrimaryHostInfo* DnsCacheImpl::createHost(const std::string& host, uint16_t default_port) {
+DnsCacheImpl::PrimaryHostInfo* DnsCacheImpl::createHost(const std::string& host,
+                                                        uint16_t default_port) {
   const auto host_attributes = Http::Utility::parseAuthority(host);
   // TODO(mattklein123): Right now, the same host with different ports will become two
   // independent primary hosts with independent DNS resolutions. I'm not sure how much this will
@@ -207,14 +206,14 @@ DnsCacheImpl::PrimaryHostInfo* DnsCacheImpl::createHost(const std::string& host,
   {
     absl::WriterMutexLock writer_lock{&primary_hosts_lock_};
     return primary_hosts_
-                       // try_emplace() is used here for direct argument forwarding.
-                       .try_emplace(host, std::make_unique<PrimaryHostInfo>(
-                                              *this, std::string(host_attributes.host_),
-                                              host_attributes.port_.value_or(default_port),
-                                              host_attributes.is_ip_address_,
-                                              [this, host]() { onReResolve(host); },
-                                              [this, host]() { onResolveTimeout(host); }))
-                       .first->second.get();
+        // try_emplace() is used here for direct argument forwarding.
+        .try_emplace(host,
+                     std::make_unique<PrimaryHostInfo>(
+                         *this, std::string(host_attributes.host_),
+                         host_attributes.port_.value_or(default_port),
+                         host_attributes.is_ip_address_, [this, host]() { onReResolve(host); },
+                         [this, host]() { onResolveTimeout(host); }))
+        .first->second.get();
   }
 }
 
@@ -349,7 +348,9 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   SystemTime now = main_thread_dispatcher_.timeSource().systemTime();
   uint64_t ms_since_epoch =
       std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-  uint64_t stale_at = ms_since_epoch + std::chrono::duration_cast<std::chrono::seconds>(response.front().ttl_).count();
+  uint64_t stale_at =
+      ms_since_epoch +
+      std::chrono::duration_cast<std::chrono::seconds>(response.front().ttl_).count();
   primary_host_info->host_info_->updateStale(stale_at);
 
   if (first_resolve) {
@@ -448,9 +449,9 @@ void DnsCacheImpl::addCacheEntry(const std::string& host,
   }
   SystemTime now = main_thread_dispatcher_.timeSource().systemTime();
   uint64_t ms_since_epoch =
-              std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-  const std::string value = absl::StrCat(address->asString(), "|", ttl.count(), "|",
-                                         ms_since_epoch);
+      std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+  const std::string value =
+      absl::StrCat(address->asString(), "|", ttl.count(), "|", ms_since_epoch);
   key_value_store_->addOrUpdate(host, value);
 }
 

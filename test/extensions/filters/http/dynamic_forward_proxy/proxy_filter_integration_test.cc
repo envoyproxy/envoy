@@ -122,8 +122,8 @@ typed_config:
     if (write_cache_file_) {
       std::string host =
           fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port());
-      std::string value = absl::StrCat(
-          fake_upstreams_[0]->localAddress()->asString(), "|1000000|0");
+      std::string value =
+          absl::StrCat(fake_upstreams_[0]->localAddress()->asString(), "|1000000|0");
       TestEnvironment::writeStringToFileForTest(
           "dns_cache.txt", absl::StrCat(host.length(), "\n", host, value.length(), "\n", value));
     }
