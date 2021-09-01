@@ -85,7 +85,14 @@ public:
   RtdsIntegrationTest()
       : HttpIntegrationTest(
             Http::CodecType::HTTP2, ipVersion(),
-            tdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+            tdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+                                       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw
+                                   ? "GRPC"
+                                   : "DELTA_GRPC")) {
+    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
     use_lds_ = false;
     create_xds_upstream_ = true;
     sotw_or_delta_ = sotwOrDelta();
