@@ -4,6 +4,12 @@
 #
 #    pip-compile --allow-unsafe --generate-hashes tools/base/requirements.txt
 #
+abstracts==0.0.12 \
+    --hash=sha256:acc01ff56c8a05fb88150dff62e295f9071fc33388c42f1dfc2787a8d1c755ff
+    # via aio.functional
+aio.functional==0.0.9 \
+    --hash=sha256:824a997a394ad891bc9f403426babc13c9d0d1f4d1708c38e77d6aecae1cab1d
+    # via -r tools/base/requirements.txt
 colorama==0.4.4 \
     --hash=sha256:5941b2b48a20143d2267e95b1c2a7603ce057ee39fd88e7329b0c292aa16869b \
     --hash=sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2
@@ -13,8 +19,8 @@ coloredlogs==15.0.1 \
     --hash=sha256:7c991aa71a4577af2f82600d8f8f3a89f936baeaf9b50a9c197da014e5bf16b0
     # via -r tools/base/requirements.txt
 frozendict==2.0.6 \
-    --hash=sha256:5d3f75832c35d4df041f0e19c268964cbef29c1eb34cd3517cf883f1c2d089b9 \
-    --hash=sha256:3f00de72805cf4c9e81b334f3f04809278b967d2fed84552313a0fcce511beb1
+    --hash=sha256:3f00de72805cf4c9e81b334f3f04809278b967d2fed84552313a0fcce511beb1 \
+    --hash=sha256:5d3f75832c35d4df041f0e19c268964cbef29c1eb34cd3517cf883f1c2d089b9
     # via -r tools/base/requirements.txt
 humanfriendly==9.2 \
     --hash=sha256:332da98c24cc150efcc91b5508b19115209272bfdf4b0764a56795932f854271 \
