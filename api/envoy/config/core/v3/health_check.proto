@@ -127,13 +127,13 @@ message HealthCheck {
     // <arch_overview_health_checking_identity>` for more information.
     type.matcher.v3.StringMatcher service_name_matcher = 11;
 
-    // Specifies a list of HTTP response statuses considered retryable. If provided, responses in this range
+    // Specifies a list of HTTP response statuses considered retriable. If provided, responses in this range
     // will count towards the configured :ref:`unhealthy_threshold <envoy_api_field_core.HealthCheck.unhealthy_threshold>`.
     // By default all responses not in :ref:`expected_statuses <envoy_api_field_core.HealthCheck.HttpHealthCheck.expected_statuses>`
     // will result in the host being considered immediately unhealthy. Ranges follow half-open semantics of
     // :ref:`Int64Range <envoy_v3_api_msg_type.v3.Int64Range>`. The start and end of each range are required.
     // Only statuses in the range [100, 600) are allowed.
-    repeated type.v3.Int64Range retryable_statuses = 12;
+    repeated type.v3.Int64Range retriable_statuses = 12;
   }
 
   message TcpHealthCheck {
@@ -253,7 +253,7 @@ message HealthCheck {
   // The number of unhealthy health checks required before a host is marked
   // unhealthy. Note that for *http* health checking if a host responds with a code not in
   // :ref:`expected_statuses <envoy_api_field_core.HealthCheck.HttpHealthCheck.expected_statuses>`
-  // or :ref:`retryable_statuses <envoy_api_field_core.HealthCheck.HttpHealthCheck.retryable_statuses>`,
+  // or :ref:`retriable_statuses <envoy_api_field_core.HealthCheck.HttpHealthCheck.retriable_statuses>`,
   // this threshold is ignored and the host is considered immediately unhealthy.
   google.protobuf.UInt32Value unhealthy_threshold = 4 [(validate.rules).message = {required: true}];
 

@@ -138,7 +138,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),
       http_status_checker_(config.http_health_check().expected_statuses(),
-                           config.http_health_check().retryable_statuses(),
+                           config.http_health_check().retriable_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
       codec_client_type_(codecClientType(config.http_health_check().codec_client_type())),
       random_generator_(random) {
@@ -149,7 +149,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
 
 HttpHealthCheckerImpl::HttpStatusChecker::HttpStatusChecker(
     const Protobuf::RepeatedPtrField<envoy::type::v3::Int64Range>& expected_statuses,
-    const Protobuf::RepeatedPtrField<envoy::type::v3::Int64Range>& retryable_statuses,
+    const Protobuf::RepeatedPtrField<envoy::type::v3::Int64Range>& retriable_statuses,
     uint64_t default_expected_status) {
   for (const auto& status_range : expected_statuses) {
     const auto start = status_range.start();
@@ -178,27 +178,27 @@ HttpHealthCheckerImpl::HttpStatusChecker::HttpStatusChecker(
     expected_ranges_.emplace_back(std::make_pair(default_expected_status, default_expected_status + 1));
   }
 
-  for (const auto& status_range : retryable_statuses) {
+  for (const auto& status_range : retriable_statuses) {
     const auto start = status_range.start();
     const auto end = status_range.end();
 
     if (start >= end) {
       throw EnvoyException(fmt::format(
-          "Invalid http retryable status range: expecting start < end, but found start={} and end={}", start,
+          "Invalid http retriable status range: expecting start < end, but found start={} and end={}", start,
           end));
     }
 
     if (start < 100) {
       throw EnvoyException(fmt::format(
-          "Invalid http retryable status range: expecting start >= 100, but found start={}", start));
+          "Invalid http retriable status range: expecting start >= 100, but found start={}", start));
     }
 
     if (end > 600) {
       throw EnvoyException(
-          fmt::format("Invalid http retryable status range: expecting end <= 600, but found end={}", end));
+          fmt::format("Invalid http retriable status range: expecting end <= 600, but found end={}", end));
     }
 
-    retryable_ranges_.emplace_back(std::make_pair(static_cast<uint64_t>(start), static_cast<uint64_t>(end)));
+    retriable_ranges_.emplace_back(std::make_pair(static_cast<uint64_t>(start), static_cast<uint64_t>(end)));
   }
 }
 
@@ -212,8 +212,8 @@ bool HttpHealthCheckerImpl::HttpStatusChecker::inExpectedRange(uint64_t http_sta
   return false;
 }
 
-bool HttpHealthCheckerImpl::HttpStatusChecker::inRetryableRange(uint64_t http_status) const {
-  for (const auto& range : retryable_ranges_) {
+bool HttpHealthCheckerImpl::HttpStatusChecker::inRetriableRange(uint64_t http_status) const {
+  for (const auto& range : retriable_ranges_) {
     if (http_status >= range.first && http_status < range.second) {
       return true;
     }
@@ -377,8 +377,8 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
       host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
     }
 
-    if (parent_.http_status_checker_.inRetryableRange(response_code)) {
-      return HealthCheckResult::Retryable;
+    if (parent_.http_status_checker_.inRetriableRange(response_code)) {
+      return HealthCheckResult::Retriable;
     } else {
       return HealthCheckResult::Failed;
     }
@@ -416,7 +416,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
   case HealthCheckResult::Failed:
     handleFailure(envoy::data::core::v3::ACTIVE, false);
     break;
-  case HealthCheckResult::Retryable:
+  case HealthCheckResult::Retriable:
     handleFailure(envoy::data::core::v3::ACTIVE, true);
     break;
   }
