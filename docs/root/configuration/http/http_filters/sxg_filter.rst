@@ -9,9 +9,11 @@ SXG
 
 .. attention::
 
-  The SXG filter is currently under active development.
+  The SXG filter is experimental and is currently under active development.
 
 This filter generates a Signed HTTP Exchange (SXG) package from a downstream web application. It uses `libsxg <https://github.com/google/libsxg/>`_ to perform the SXG packaging and signing, setting the Content-Type header to `application/signed-exchange;v=b3` and response body with the generated SXG document.
+
+The SXG filter is only included in :ref:`contrib images <install_contrib>`
 
 Transaction flow:
 
