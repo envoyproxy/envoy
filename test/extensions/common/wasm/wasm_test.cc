@@ -530,15 +530,6 @@ TEST_P(WasmCommonTest, Stats) {
         return root_context;
       });
   wasm->start(plugin);
-  for (auto metric : wasm->countersForTesting()) {
-    EXPECT_TRUE(metric.second->isCustomMetric());
-  }
-  for (auto metric : wasm->gaugesForTesting()) {
-    EXPECT_TRUE(metric.second->isCustomMetric());
-  }
-  for (auto metric : wasm->histogramForTesting()) {
-    EXPECT_TRUE(metric.second->isCustomMetric());
-  }
 }
 
 TEST_P(WasmCommonTest, Foreign) {

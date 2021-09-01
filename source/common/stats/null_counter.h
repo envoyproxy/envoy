@@ -31,7 +31,6 @@ public:
 
   // Metric
   bool used() const override { return false; }
-  bool isCustomMetric() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
   // RefcountInterface

@@ -27,32 +27,26 @@ ScopePtr ScopePrefixer::createScope(const std::string& name) {
 }
 
 Counter& ScopePrefixer::counterFromStatNameWithTags(const StatName& name,
-                                                    StatNameTagVectorOptConstRef tags,
-                                                    bool is_custom_metric) {
+                                                    StatNameTagVectorOptConstRef tags) {
   Stats::SymbolTable::StoragePtr stat_name_storage =
       scope_.symbolTable().join({prefix_.statName(), name});
-  return scope_.counterFromStatNameWithTags(StatName(stat_name_storage.get()), tags,
-                                            is_custom_metric);
+  return scope_.counterFromStatNameWithTags(StatName(stat_name_storage.get()), tags);
 }
 
 Gauge& ScopePrefixer::gaugeFromStatNameWithTags(const StatName& name,
                                                 StatNameTagVectorOptConstRef tags,
-                                                Gauge::ImportMode import_mode,
-                                                bool is_custom_metric) {
+                                                Gauge::ImportMode import_mode) {
   Stats::SymbolTable::StoragePtr stat_name_storage =
       scope_.symbolTable().join({prefix_.statName(), name});
-  return scope_.gaugeFromStatNameWithTags(StatName(stat_name_storage.get()), tags, import_mode,
-                                          is_custom_metric);
+  return scope_.gaugeFromStatNameWithTags(StatName(stat_name_storage.get()), tags, import_mode);
 }
 
 Histogram& ScopePrefixer::histogramFromStatNameWithTags(const StatName& name,
                                                         StatNameTagVectorOptConstRef tags,
-                                                        Histogram::Unit unit,
-                                                        bool is_custom_metric) {
+                                                        Histogram::Unit unit) {
   Stats::SymbolTable::StoragePtr stat_name_storage =
       scope_.symbolTable().join({prefix_.statName(), name});
-  return scope_.histogramFromStatNameWithTags(StatName(stat_name_storage.get()), tags, unit,
-                                              is_custom_metric);
+  return scope_.histogramFromStatNameWithTags(StatName(stat_name_storage.get()), tags, unit);
 }
 
 TextReadout& ScopePrefixer::textReadoutFromStatNameWithTags(const StatName& name,

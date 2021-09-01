@@ -21,18 +21,15 @@ IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table
 
 IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
     : StoreImpl(symbol_table), alloc_(symbol_table),
-      counters_([this](StatName name, bool is_custom_metric) -> CounterSharedPtr {
-        return alloc_.makeCounter(name, name, StatNameTagVector{}, is_custom_metric);
+      counters_([this](StatName name) -> CounterSharedPtr {
+        return alloc_.makeCounter(name, name, StatNameTagVector{});
       }),
-      gauges_([this](StatName name, Gauge::ImportMode import_mode,
-                     bool is_custom_metric) -> GaugeSharedPtr {
-        return alloc_.makeGauge(name, name, StatNameTagVector{}, import_mode, is_custom_metric);
+      gauges_([this](StatName name, Gauge::ImportMode import_mode) -> GaugeSharedPtr {
+        return alloc_.makeGauge(name, name, StatNameTagVector{}, import_mode);
       }),
-      histograms_(
-          [this](StatName name, Histogram::Unit unit, bool is_custom_metric) -> HistogramSharedPtr {
-            return HistogramSharedPtr(
-                new HistogramImpl(name, unit, *this, name, StatNameTagVector{}, is_custom_metric));
-          }),
+      histograms_([this](StatName name, Histogram::Unit unit) -> HistogramSharedPtr {
+        return HistogramSharedPtr(new HistogramImpl(name, unit, *this, name, StatNameTagVector{}));
+      }),
       text_readouts_([this](StatName name, TextReadout::Type) -> TextReadoutSharedPtr {
         return alloc_.makeTextReadout(name, name, StatNameTagVector{});
       }),

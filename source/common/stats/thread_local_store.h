@@ -35,8 +35,7 @@ namespace Stats {
 class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
   ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit, StatName tag_extracted_name,
-                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table,
-                           bool is_custom_metric);
+                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table);
   ~ThreadLocalHistogramImpl() override;
 
   void merge(histogram_t* target);
@@ -62,7 +61,6 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() final { return symbol_table_; }
   bool used() const override { return used_; }
-  bool isCustomMetric() const override { return is_custom_metric_; };
 
 private:
   Histogram::Unit unit_;
@@ -70,7 +68,6 @@ private:
   uint64_t current_active_;
   histogram_t* histograms_[2];
   std::atomic<bool> used_;
-  const bool is_custom_metric_;
   std::thread::id created_thread_id_;
   SymbolTable& symbol_table_;
 };
@@ -86,7 +83,7 @@ class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, ThreadLocalStoreImpl& parent,
                       StatName tag_extracted_name, const StatNameTagVector& stat_name_tags,
-                      ConstSupportedBuckets& supported_buckets, uint64_t id, bool is_custom_metric);
+                      ConstSupportedBuckets& supported_buckets, uint64_t id);
   ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
@@ -113,7 +110,6 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() override;
   bool used() const override;
-  bool isCustomMetric() const override;
 
   // RefcountInterface
   void incRefCount() override;
@@ -136,7 +132,6 @@ private:
   mutable Thread::MutexBasicLockable merge_lock_;
   std::list<TlsHistogramSharedPtr> tls_histograms_ ABSL_GUARDED_BY(merge_lock_);
   bool merged_;
-  const bool is_custom_metric_;
   std::atomic<bool> shutting_down_{false};
   std::atomic<uint32_t> ref_count_{0};
   const uint64_t id_; // Index into TlsCache::histogram_cache_.
@@ -156,9 +151,9 @@ public:
   ~ThreadLocalStoreImpl() override;
 
   // Stats::Scope
-  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                       bool is_custom_metric) override {
-    return default_scope_->counterFromStatNameWithTags(name, tags, is_custom_metric);
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef tags) override {
+    return default_scope_->counterFromStatNameWithTags(name, tags);
   }
   Counter& counterFromString(const std::string& name) override {
     return default_scope_->counterFromString(name);
@@ -169,15 +164,15 @@ public:
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode, bool is_custom_metric) override {
-    return default_scope_->gaugeFromStatNameWithTags(name, tags, import_mode, is_custom_metric);
+                                   Gauge::ImportMode import_mode) override {
+    return default_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
   }
   Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
     return default_scope_->gaugeFromString(name, import_mode);
   }
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit, bool is_custom_metric) override {
-    return default_scope_->histogramFromStatNameWithTags(name, tags, unit, is_custom_metric);
+                                           Histogram::Unit unit) override {
+    return default_scope_->histogramFromStatNameWithTags(name, tags, unit);
   }
   Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
     return default_scope_->histogramFromString(name, unit);
@@ -261,7 +256,7 @@ public:
   void shutdownThreading() override;
   void mergeHistograms(PostMergeCb merge_cb) override;
 
-  Histogram& tlsHistogram(ParentHistogramImpl& parent, uint64_t id, bool is_custom_metric);
+  Histogram& tlsHistogram(ParentHistogramImpl& parent, uint64_t id);
 
   /**
    * @return a thread synchronizer object used for controlling thread behavior in tests.
@@ -331,14 +326,14 @@ private:
     ~ScopeImpl() override;
 
     // Stats::Scope
-    Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                         bool is_custom_metric) override;
+    Counter& counterFromStatNameWithTags(const StatName& name,
+                                         StatNameTagVectorOptConstRef tags) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                     Gauge::ImportMode import_mode, bool is_custom_metric) override;
+                                     Gauge::ImportMode import_mode) override;
     Histogram& histogramFromStatNameWithTags(const StatName& name,
                                              StatNameTagVectorOptConstRef tags,
-                                             Histogram::Unit unit, bool is_custom_metric) override;
+                                             Histogram::Unit unit) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
     ScopePtr createScope(const std::string& name) override {

@@ -89,10 +89,6 @@ public:
   }
   void setFailStateForTesting(proxy_wasm::FailState fail_state) { failed_ = fail_state; }
 
-  absl::flat_hash_map<uint32_t, Stats::Counter*>& countersForTesting() { return counters_; }
-  absl::flat_hash_map<uint32_t, Stats::Gauge*>& gaugesForTesting() { return gauges_; }
-  absl::flat_hash_map<uint32_t, Stats::Histogram*>& histogramForTesting() { return histograms_; }
-
 protected:
   friend class Context;
 
@@ -112,8 +108,6 @@ protected:
   LifecycleStatsHandler lifecycle_stats_handler_;
 
   // Plugin stats
-  // Note that these raw pointers never outlive the scope_ that own them,
-  // and therefore never be dangling pointers.
   absl::flat_hash_map<uint32_t, Stats::Counter*> counters_;
   absl::flat_hash_map<uint32_t, Stats::Gauge*> gauges_;
   absl::flat_hash_map<uint32_t, Stats::Histogram*> histograms_;

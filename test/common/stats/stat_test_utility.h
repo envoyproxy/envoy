@@ -143,14 +143,12 @@ public:
   Counter& counterFromString(const std::string& name) override;
   Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override;
   Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override;
-  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                       bool is_custom_metric = false) override;
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef tags) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode,
-                                   bool is_custom_metric = false) override;
+                                   Gauge::ImportMode import_mode) override;
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit,
-                                           bool is_custom_metric = false) override;
+                                           Histogram::Unit unit) override;
 
   // New APIs available for tests.
   CounterOptConstRef findCounterByString(const std::string& name) const;

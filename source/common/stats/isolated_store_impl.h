@@ -26,11 +26,9 @@ namespace Stats {
  */
 template <class Base> class IsolatedStatsCache {
 public:
-  using CounterAllocator = std::function<RefcountPtr<Base>(StatName name, bool is_custom_metric)>;
-  using GaugeAllocator =
-      std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode, bool is_custom_metric)>;
-  using HistogramAllocator =
-      std::function<RefcountPtr<Base>(StatName, Histogram::Unit, bool is_custom_metric)>;
+  using CounterAllocator = std::function<RefcountPtr<Base>(StatName name)>;
+  using GaugeAllocator = std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode)>;
+  using HistogramAllocator = std::function<RefcountPtr<Base>(StatName, Histogram::Unit)>;
   using TextReadoutAllocator = std::function<RefcountPtr<Base>(StatName name, TextReadout::Type)>;
   using BaseOptConstRef = absl::optional<std::reference_wrapper<const Base>>;
 
@@ -39,35 +37,35 @@ public:
   IsolatedStatsCache(HistogramAllocator alloc) : histogram_alloc_(alloc) {}
   IsolatedStatsCache(TextReadoutAllocator alloc) : text_readout_alloc_(alloc) {}
 
-  Base& get(StatName name, bool is_custom_metric) {
+  Base& get(StatName name) {
     auto stat = stats_.find(name);
     if (stat != stats_.end()) {
       return *stat->second;
     }
 
-    RefcountPtr<Base> new_stat = counter_alloc_(name, is_custom_metric);
+    RefcountPtr<Base> new_stat = counter_alloc_(name);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
 
-  Base& get(StatName name, Gauge::ImportMode import_mode, bool is_custom_metric) {
+  Base& get(StatName name, Gauge::ImportMode import_mode) {
     auto stat = stats_.find(name);
     if (stat != stats_.end()) {
       return *stat->second;
     }
 
-    RefcountPtr<Base> new_stat = gauge_alloc_(name, import_mode, is_custom_metric);
+    RefcountPtr<Base> new_stat = gauge_alloc_(name, import_mode);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
 
-  Base& get(StatName name, Histogram::Unit unit, bool is_custom_metric) {
+  Base& get(StatName name, Histogram::Unit unit) {
     auto stat = stats_.find(name);
     if (stat != stats_.end()) {
       return *stat->second;
     }
 
-    RefcountPtr<Base> new_stat = histogram_alloc_(name, unit, is_custom_metric);
+    RefcountPtr<Base> new_stat = histogram_alloc_(name, unit);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
@@ -126,30 +124,28 @@ public:
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
 
   // Stats::Scope
-  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                       bool is_custom_metric = false) override {
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef tags) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
-    Counter& counter = counters_.get(joiner.nameWithTags(), is_custom_metric);
+    Counter& counter = counters_.get(joiner.nameWithTags());
     return counter;
   }
   ScopePtr createScope(const std::string& name) override;
   ScopePtr scopeFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode,
-                                   bool is_custom_metric = false) override {
+                                   Gauge::ImportMode import_mode) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
-    Gauge& gauge = gauges_.get(joiner.nameWithTags(), import_mode, is_custom_metric);
+    Gauge& gauge = gauges_.get(joiner.nameWithTags(), import_mode);
     gauge.mergeImportMode(import_mode);
     return gauge;
   }
   NullCounterImpl& nullCounter() { return *null_counter_; }
   NullGaugeImpl& nullGauge(const std::string&) override { return *null_gauge_; }
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit,
-                                           bool is_custom_metric = false) override {
+                                           Histogram::Unit unit) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
-    Histogram& histogram = histograms_.get(joiner.nameWithTags(), unit, is_custom_metric);
+    Histogram& histogram = histograms_.get(joiner.nameWithTags(), unit);
     return histogram;
   }
   TextReadout& textReadoutFromStatNameWithTags(const StatName& name,

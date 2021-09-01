@@ -33,9 +33,26 @@ public:
   static std::string formattedTags(const std::vector<Stats::Tag>& tags);
 
   /**
-   * Format the given metric name, prefixed with "envoy_" if it is not a custom metric.
+   * Format the given metric name, prefixed with "envoy_".
    */
-  static std::string metricName(const std::string& extracted_name, bool is_custom_metric);
+  static std::string metricName(const std::string& extracted_name);
+
+  /**
+   * Register a prometheus namespace, stats starting with the namespace will not be
+   * automatically prefixed with envoy namespace.
+   * This method must be called from the main thread.
+   * @returns bool if a new namespace is registered, false if the namespace is already
+   *          registered or the namespace is invalid.
+   */
+  static bool registerPrometheusNamespace(absl::string_view prometheus_namespace);
+
+  /**
+   * Unregister a prometheus namespace registered by `registerPrometheusNamespace`
+   * This method must be called from the main thread.
+   * @returns bool if the Prometheus namespace is unregistered. false if the namespace
+   *          wasn't registered.
+   */
+  static bool unregisterPrometheusNamespace(absl::string_view prometheus_namespace);
 };
 
 } // namespace Server

@@ -66,23 +66,20 @@ public:
   /**
    * Creates a Counter from the stat name. Tag extraction will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
-   * @param is_custom_metric true if this is a custom metric, false otherwise.
    * @return a counter within the scope's namespace.
    */
-  Counter& counterFromStatName(const StatName& name, bool is_custom_metric = false) {
-    return counterFromStatNameWithTags(name, absl::nullopt, is_custom_metric);
+  Counter& counterFromStatName(const StatName& name) {
+    return counterFromStatNameWithTags(name, absl::nullopt);
   }
   /**
    * Creates a Counter from the stat name and tags. If tags are not provided, tag extraction
    * will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @param tags optionally specified tags.
-   * @param is_custom_metric true if this is a custom metric, false otherwise.
    * @return a counter within the scope's namespace.
    */
   virtual Counter& counterFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags,
-                                               bool is_custom_metric = false) PURE;
+                                               StatNameTagVectorOptConstRef tags) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.
@@ -95,12 +92,10 @@ public:
    * Creates a Gauge from the stat name. Tag extraction will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @param import_mode Whether hot-restart should accumulate this value.
-   * @param is_custom_metric true if this is a custom metric, false otherwise.
    * @return a gauge within the scope's namespace.
    */
-  Gauge& gaugeFromStatName(const StatName& name, Gauge::ImportMode import_mode,
-                           bool is_custom_metric = false) {
-    return gaugeFromStatNameWithTags(name, absl::nullopt, import_mode, is_custom_metric);
+  Gauge& gaugeFromStatName(const StatName& name, Gauge::ImportMode import_mode) {
+    return gaugeFromStatNameWithTags(name, absl::nullopt, import_mode);
   }
 
   /**
@@ -109,12 +104,10 @@ public:
    * @param name The name of the stat, obtained from the SymbolTable.
    * @param tags optionally specified tags.
    * @param import_mode Whether hot-restart should accumulate this value.
-   * @param is_custom_metric true if this is a custom metric, false otherwise.
    * @return a gauge within the scope's namespace.
    */
   virtual Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Gauge::ImportMode import_mode,
-                                           bool is_custom_metric = false) PURE;
+                                           Gauge::ImportMode import_mode) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use gaugeFromStatName.
@@ -133,12 +126,10 @@ public:
    * Creates a Histogram from the stat name. Tag extraction will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @param unit The unit of measurement.
-   * @param is_custom_metric true if this is a custom metric, false otherwise.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  Histogram& histogramFromStatName(const StatName& name, Histogram::Unit unit,
-                                   bool is_custom_metric = false) {
-    return histogramFromStatNameWithTags(name, absl::nullopt, unit, is_custom_metric);
+  Histogram& histogramFromStatName(const StatName& name, Histogram::Unit unit) {
+    return histogramFromStatNameWithTags(name, absl::nullopt, unit);
   }
 
   /**
@@ -147,13 +138,11 @@ public:
    * @param name The name of the stat, obtained from the SymbolTable.
    * @param tags optionally specified tags.
    * @param unit The unit of measurement.
-   * @param is_custom_metric true if this is a custom metric, false otherwise.
    * @return a histogram within the scope's namespace with a particular value type.
    */
   virtual Histogram& histogramFromStatNameWithTags(const StatName& name,
                                                    StatNameTagVectorOptConstRef tags,
-                                                   Histogram::Unit unit,
-                                                   bool is_custom_metric = false) PURE;
+                                                   Histogram::Unit unit) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use histogramFromStatName.

@@ -1239,23 +1239,21 @@ WasmResult Context::defineMetric(uint32_t metric_type, std::string_view name,
   Stats::StatName stat_name = storage.statName();
   if (type == MetricType::Counter) {
     auto id = wasm()->nextCounterMetricId();
-    auto c = &wasm()->scope_->counterFromStatName(stat_name, true);
+    auto c = &wasm()->scope_->counterFromStatName(stat_name);
     wasm()->counters_.emplace(id, c);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
   if (type == MetricType::Gauge) {
     auto id = wasm()->nextGaugeMetricId();
-    auto g =
-        &wasm()->scope_->gaugeFromStatName(stat_name, Stats::Gauge::ImportMode::Accumulate, true);
+    auto g = &wasm()->scope_->gaugeFromStatName(stat_name, Stats::Gauge::ImportMode::Accumulate);
     wasm()->gauges_.emplace(id, g);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
   // (type == MetricType::Histogram) {
   auto id = wasm()->nextHistogramMetricId();
-  auto h =
-      &wasm()->scope_->histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified, true);
+  auto h = &wasm()->scope_->histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified);
   wasm()->histograms_.emplace(id, h);
   *metric_id_ptr = id;
   return WasmResult::Ok;

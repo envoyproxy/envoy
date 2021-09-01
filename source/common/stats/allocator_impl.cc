@@ -50,13 +50,9 @@ void AllocatorImpl::debugPrint() {
 template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> {
 public:
   StatsSharedImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
-                  const StatNameTagVector& stat_name_tags, bool is_custom_metric = false)
+                  const StatNameTagVector& stat_name_tags)
       : MetricImpl<BaseClass>(name, tag_extracted_name, stat_name_tags, alloc.symbolTable()),
-        alloc_(alloc) {
-    if (is_custom_metric) {
-      flags_ |= Metric::Flags::CustomMetric;
-    }
-  }
+        alloc_(alloc) {}
 
   ~StatsSharedImpl() override {
     // MetricImpl must be explicitly cleared() before destruction, otherwise it
@@ -69,7 +65,6 @@ public:
   // Metric
   SymbolTable& symbolTable() final { return alloc_.symbolTable(); }
   bool used() const override { return flags_ & Metric::Flags::Used; }
-  bool isCustomMetric() const override { return flags_ & Metric::Flags::CustomMetric; }
 
   // RefcountInterface
   void incRefCount() override { ++ref_count_; }
@@ -123,8 +118,8 @@ protected:
 class CounterImpl : public StatsSharedImpl<Counter> {
 public:
   CounterImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
-              const StatNameTagVector& stat_name_tags, bool is_custom_metric = false)
-      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags, is_custom_metric) {}
+              const StatNameTagVector& stat_name_tags)
+      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
 
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.counters_.erase(statName());
@@ -152,9 +147,8 @@ private:
 class GaugeImpl : public StatsSharedImpl<Gauge> {
 public:
   GaugeImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
-            const StatNameTagVector& stat_name_tags, ImportMode import_mode,
-            bool is_custom_metric = false)
-      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags, is_custom_metric) {
+            const StatNameTagVector& stat_name_tags, ImportMode import_mode)
+      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {
     switch (import_mode) {
     case ImportMode::Accumulate:
       flags_ |= Flags::LogicAccumulate;
@@ -265,35 +259,31 @@ private:
 };
 
 CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracted_name,
-                                            const StatNameTagVector& stat_name_tags,
-                                            bool is_custom_metric) {
+                                            const StatNameTagVector& stat_name_tags) {
   Thread::LockGuard lock(mutex_);
   ASSERT(gauges_.find(name) == gauges_.end());
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
   auto iter = counters_.find(name);
   if (iter != counters_.end()) {
-    ASSERT((*iter)->isCustomMetric() == is_custom_metric);
     return CounterSharedPtr(*iter);
   }
-  auto counter = CounterSharedPtr(
-      makeCounterInternal(name, tag_extracted_name, stat_name_tags, is_custom_metric));
+  auto counter = CounterSharedPtr(makeCounterInternal(name, tag_extracted_name, stat_name_tags));
   counters_.insert(counter.get());
   return counter;
 }
 
 GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_name,
                                         const StatNameTagVector& stat_name_tags,
-                                        Gauge::ImportMode import_mode, bool is_custom_metric) {
+                                        Gauge::ImportMode import_mode) {
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
   auto iter = gauges_.find(name);
   if (iter != gauges_.end()) {
-    ASSERT((*iter)->isCustomMetric() == is_custom_metric);
     return GaugeSharedPtr(*iter);
   }
-  auto gauge = GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, stat_name_tags,
-                                            import_mode, is_custom_metric));
+  auto gauge =
+      GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, stat_name_tags, import_mode));
   gauges_.insert(gauge.get());
   return gauge;
 }
@@ -322,9 +312,8 @@ bool AllocatorImpl::isMutexLockedForTest() {
 }
 
 Counter* AllocatorImpl::makeCounterInternal(StatName name, StatName tag_extracted_name,
-                                            const StatNameTagVector& stat_name_tags,
-                                            bool is_counter_metric) {
-  return new CounterImpl(name, *this, tag_extracted_name, stat_name_tags, is_counter_metric);
+                                            const StatNameTagVector& stat_name_tags) {
+  return new CounterImpl(name, *this, tag_extracted_name, stat_name_tags);
 }
 
 } // namespace Stats

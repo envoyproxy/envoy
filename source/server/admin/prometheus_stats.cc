@@ -12,6 +12,9 @@ namespace Server {
 namespace {
 
 const std::regex& promRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "[^a-zA-Z0-9_]"); }
+const std::regex& namespaceRegex() {
+  CONSTRUCT_ON_FIRST_USE(std::regex, "^[a-zA-Z_][a-zA-Z0-9]*$");
+}
 
 /**
  * Take a string and sanitize it according to Prometheus conventions.
@@ -30,20 +33,8 @@ std::string sanitizeName(const std::string& name) {
 template <class StatType>
 static bool shouldShowMetric(const StatType& metric, const bool used_only,
                              const absl::optional<std::regex>& regex) {
-  if (used_only && !metric.used()) {
-    return false;
-  } else if (!metric.isCustomMetric()) {
-    return !regex.has_value() || std::regex_search(metric.name(), regex.value());
-  } else {
-    const std::string name = metric.name();
-    return (!regex.has_value() || std::regex_search(name, regex.value())) &&
-           // If this is custom metric and starts with envoy_,
-           // it would potentially collides with the native metrics,
-           // and might end up breaking the assumption that the exposed
-           // prometheus metric names are unique. Therefore
-           // we do not show such custom metrics.
-           !absl::StartsWith(name, "envoy_");
-  }
+  return ((!used_only || metric.used()) &&
+          (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
 }
 
 /*
@@ -108,10 +99,8 @@ uint64_t outputStatType(
 
   // Sorted collection of metrics sorted by their tagExtractedName, to satisfy the requirements
   // of the exposition format.
-  using SortedCollections =
-      std::map<Stats::StatName, StatTypeUnsortedCollection, Stats::StatNameLessThan>;
-  // Map isCustomMetric() to SortedCollections.
-  std::map<bool, SortedCollections> groups;
+  std::map<Stats::StatName, StatTypeUnsortedCollection, Stats::StatNameLessThan> groups(
+      global_symbol_table);
 
   for (const auto& metric : metrics) {
     ASSERT(&global_symbol_table == &metric->constSymbolTable());
@@ -120,31 +109,25 @@ uint64_t outputStatType(
       continue;
     }
 
-    auto iter = groups.try_emplace(metric->isCustomMetric(), global_symbol_table);
-    iter.first->second[metric->tagExtractedStatName()].push_back(metric.get());
+    groups[metric->tagExtractedStatName()].push_back(metric.get());
   }
 
-  auto result = 0;
-  for (auto& it : groups) {
-    const bool is_custom_metric = it.first;
-    result += it.second.size();
-    for (auto& group : it.second) {
-      const std::string prefixed_tag_extracted_name = PrometheusStatsFormatter::metricName(
-          global_symbol_table.toString(group.first), is_custom_metric);
-      response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, type));
+  for (auto& group : groups) {
+    const std::string prefixed_tag_extracted_name =
+        PrometheusStatsFormatter::metricName(global_symbol_table.toString(group.first));
+    response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, type));
 
-      // Sort before producing the final output to satisfy the "preferred" ordering from the
-      // prometheus spec: metrics will be sorted by their tags' textual representation, which will
-      // be consistent across calls.
-      std::sort(group.second.begin(), group.second.end(), MetricLessThan());
+    // Sort before producing the final output to satisfy the "preferred" ordering from the
+    // prometheus spec: metrics will be sorted by their tags' textual representation, which will
+    // be consistent across calls.
+    std::sort(group.second.begin(), group.second.end(), MetricLessThan());
 
-      for (const auto& metric : group.second) {
-        response.add(generate_output(*metric, prefixed_tag_extracted_name));
-      }
-      response.add("\n");
+    for (const auto& metric : group.second) {
+      response.add(generate_output(*metric, prefixed_tag_extracted_name));
     }
+    response.add("\n");
   }
-  return result;
+  return groups.size();
 }
 
 /*
@@ -193,6 +176,10 @@ std::string generateHistogramOutput(const Stats::ParentHistogram& histogram,
   return output;
 };
 
+absl::flat_hash_set<std::string>& prometheusNamespaces() {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>);
+}
+
 } // namespace
 
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
@@ -204,15 +191,17 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
   return absl::StrJoin(buf, ",");
 }
 
-std::string PrometheusStatsFormatter::metricName(const std::string& extracted_name,
-                                                 bool is_custom_metric) {
+std::string PrometheusStatsFormatter::metricName(const std::string& extracted_name) {
   std::string sanitized_name = sanitizeName(extracted_name);
 
-  // If the metric is not a native Envoy metric, we do not prefix with "envoy_".
-  if (is_custom_metric) {
+  absl::string_view prom_namespace{sanitized_name};
+  prom_namespace = prom_namespace.substr(0, prom_namespace.find_first_of('_'));
+
+  if (prometheusNamespaces().contains(prom_namespace)) {
     return sanitized_name;
   }
-  // Otherwise, add namespacing prefix to avoid conflicts, as per best practice:
+
+  // Add namespacing prefix to avoid conflicts, as per best practice:
   // https://prometheus.io/docs/practices/naming/#metric-names
   // Also, naming conventions on https://prometheus.io/docs/concepts/data_model/
   return absl::StrCat("envoy_", sanitized_name);
@@ -236,6 +225,24 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
       response, used_only, regex, histograms, generateHistogramOutput, "histogram");
 
   return metric_name_count;
+}
+
+bool PrometheusStatsFormatter::registerPrometheusNamespace(absl::string_view prometheus_namespace) {
+  if (std::regex_match(prometheus_namespace.begin(), prometheus_namespace.end(),
+                       namespaceRegex())) {
+    return prometheusNamespaces().insert(std::string(prometheus_namespace)).second;
+  }
+  return false;
+}
+
+bool PrometheusStatsFormatter::unregisterPrometheusNamespace(
+    absl::string_view prometheus_namespace) {
+  auto it = prometheusNamespaces().find(prometheus_namespace);
+  if (it == prometheusNamespaces().end()) {
+    return false;
+  }
+  prometheusNamespaces().erase(it);
+  return true;
 }
 
 } // namespace Server

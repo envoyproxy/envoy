@@ -526,7 +526,7 @@ StatTypeOptConstRef<StatType> ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, bool is_custom_metric) {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
   if (parent_.rejectsAll()) {
     return parent_.null_counter_;
   }
@@ -561,9 +561,9 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
   return safeMakeStat<Counter>(
       final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->counters_,
       fast_reject_result, central_cache_->rejected_stats_,
-      [is_custom_metric](Allocator& allocator, StatName name, StatName tag_extracted_name,
-                         const StatNameTagVector& tags) -> CounterSharedPtr {
-        return allocator.makeCounter(name, tag_extracted_name, tags, is_custom_metric);
+      [](Allocator& allocator, StatName name, StatName tag_extracted_name,
+         const StatNameTagVector& tags) -> CounterSharedPtr {
+        return allocator.makeCounter(name, tag_extracted_name, tags);
       },
       tls_cache, tls_rejected_stats, parent_.null_counter_);
 }
@@ -586,8 +586,7 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
 
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
-    Gauge::ImportMode import_mode, bool is_custom_metric) {
-
+    Gauge::ImportMode import_mode) {
   if (parent_.rejectsAll()) {
     return parent_.null_gauge_;
   }
@@ -619,10 +618,9 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   Gauge& gauge = safeMakeStat<Gauge>(
       final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->gauges_,
       fast_reject_result, central_cache_->rejected_stats_,
-      [import_mode, is_custom_metric](Allocator& allocator, StatName name,
-                                      StatName tag_extracted_name,
-                                      const StatNameTagVector& tags) -> GaugeSharedPtr {
-        return allocator.makeGauge(name, tag_extracted_name, tags, import_mode, is_custom_metric);
+      [import_mode](Allocator& allocator, StatName name, StatName tag_extracted_name,
+                    const StatNameTagVector& tags) -> GaugeSharedPtr {
+        return allocator.makeGauge(name, tag_extracted_name, tags, import_mode);
       },
       tls_cache, tls_rejected_stats, parent_.null_gauge_);
   gauge.mergeImportMode(import_mode);
@@ -630,8 +628,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, Histogram::Unit unit,
-    bool is_custom_metric) {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, Histogram::Unit unit) {
   if (parent_.rejectsAll()) {
     return parent_.null_histogram_;
   }
@@ -673,7 +670,6 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
   ParentHistogramImplSharedPtr* central_ref = nullptr;
   if (iter != central_cache_->histograms_.end()) {
     central_ref = &iter->second;
-    ASSERT(central_ref->get()->isCustomMetric() == is_custom_metric);
   } else if (parent_.checkAndRememberRejection(final_stat_name, fast_reject_result,
                                                central_cache_->rejected_stats_,
                                                tls_rejected_stats)) {
@@ -693,7 +689,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
       } else {
         stat = new ParentHistogramImpl(final_stat_name, unit, parent_,
                                        tag_helper.tagExtractedName(), tag_helper.statNameTags(),
-                                       *buckets, parent_.next_histogram_id_++, is_custom_metric);
+                                       *buckets, parent_.next_histogram_id_++);
         if (!parent_.shutting_down_) {
           parent_.histogram_set_.insert(stat.get());
         }
@@ -775,8 +771,7 @@ TextReadoutOptConstRef ThreadLocalStoreImpl::ScopeImpl::findTextReadout(StatName
   return findStatLockHeld<TextReadout>(name, central_cache_->text_readouts_);
 }
 
-Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint64_t id,
-                                              bool is_custom_metric) {
+Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint64_t id) {
   // tlsHistogram() is generally not called for a histogram that is rejected by
   // the matcher, so no further rejection-checking is needed at this level.
   // TlsHistogram inherits its reject/accept status from ParentHistogram.
@@ -795,7 +790,7 @@ Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint6
 
   TlsHistogramSharedPtr hist_tls_ptr(
       new ThreadLocalHistogramImpl(parent.statName(), parent.unit(), tag_helper.tagExtractedName(),
-                                   tag_helper.statNameTags(), symbolTable(), is_custom_metric));
+                                   tag_helper.statNameTags(), symbolTable()));
 
   parent.addTlsHistogram(hist_tls_ptr);
 
@@ -809,10 +804,10 @@ Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint6
 ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
                                                    StatName tag_extracted_name,
                                                    const StatNameTagVector& stat_name_tags,
-                                                   SymbolTable& symbol_table, bool is_custom_metric)
+                                                   SymbolTable& symbol_table)
     : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, symbol_table), unit_(unit),
-      current_active_(0), used_(false), is_custom_metric_(is_custom_metric),
-      created_thread_id_(std::this_thread::get_id()), symbol_table_(symbol_table) {
+      current_active_(0), used_(false), created_thread_id_(std::this_thread::get_id()),
+      symbol_table_(symbol_table) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();
 }
@@ -839,14 +834,12 @@ ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
                                          ThreadLocalStoreImpl& thread_local_store,
                                          StatName tag_extracted_name,
                                          const StatNameTagVector& stat_name_tags,
-                                         ConstSupportedBuckets& supported_buckets, uint64_t id,
-                                         bool is_custom_metric)
+                                         ConstSupportedBuckets& supported_buckets, uint64_t id)
     : MetricImpl(name, tag_extracted_name, stat_name_tags, thread_local_store.symbolTable()),
       unit_(unit), thread_local_store_(thread_local_store), interval_histogram_(hist_alloc()),
       cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_, supported_buckets),
-      cumulative_statistics_(cumulative_histogram_, supported_buckets), merged_(false),
-      is_custom_metric_(is_custom_metric), id_(id) {}
+      cumulative_statistics_(cumulative_histogram_, supported_buckets), merged_(false), id_(id) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   thread_local_store_.releaseHistogramCrossThread(id_);
@@ -906,7 +899,7 @@ SymbolTable& ParentHistogramImpl::symbolTable() { return thread_local_store_.sym
 Histogram::Unit ParentHistogramImpl::unit() const { return unit_; }
 
 void ParentHistogramImpl::recordValue(uint64_t value) {
-  Histogram& tls_histogram = thread_local_store_.tlsHistogram(*this, id_, is_custom_metric_);
+  Histogram& tls_histogram = thread_local_store_.tlsHistogram(*this, id_);
   tls_histogram.recordValue(value);
   thread_local_store_.deliverHistogramToSinks(*this, value);
 }
@@ -915,8 +908,6 @@ bool ParentHistogramImpl::used() const {
   // Consider ParentHistogram used only if has ever been merged.
   return merged_;
 }
-
-bool ParentHistogramImpl::isCustomMetric() const { return is_custom_metric_; }
 
 void ParentHistogramImpl::merge() {
   Thread::ReleasableLockGuard lock(merge_lock_);

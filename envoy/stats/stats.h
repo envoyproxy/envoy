@@ -84,23 +84,14 @@ public:
   virtual bool used() const PURE;
 
   /**
-   * Indicates whether this metric is a custom metric or not. Custom metrics are created by
-   * extensions outside the Envoy codebase, such as Wasm.
-   */
-  virtual bool isCustomMetric() const PURE;
-
-  /**
    * Flags:
    * Used: used by all stats types to figure out whether they have been used.
-   * LogicAccumulate: used by gauges to cache how they should be combined with a parent's value.
-   * NeverImport: on hot-restart, each process starts with gauge at 0.
-   * CustomMetric: used to indicate this is a custom metric, not a native Envoy metric.
+   * Logic...: used by gauges to cache how they should be combined with a parent's value.
    */
   struct Flags {
     static constexpr uint8_t Used = 0x01;
     static constexpr uint8_t LogicAccumulate = 0x02;
     static constexpr uint8_t NeverImport = 0x04;
-    static constexpr uint8_t CustomMetric = 0x08;
   };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;

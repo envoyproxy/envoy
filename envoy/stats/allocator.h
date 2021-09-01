@@ -32,23 +32,20 @@ public:
    * @param name the full name of the stat.
    * @param tag_extracted_name the name of the stat with tag-values stripped out.
    * @param tags the tag values.
-   * @param is_custom_metric true if this is a custom metric, false otherwise.
    * @return CounterSharedPtr a counter.
    */
   virtual CounterSharedPtr makeCounter(StatName name, StatName tag_extracted_name,
-                                       const StatNameTagVector& stat_name_tags,
-                                       bool is_custom_metric) PURE;
+                                       const StatNameTagVector& stat_name_tags) PURE;
 
   /**
    * @param name the full name of the stat.
    * @param tag_extracted_name the name of the stat with tag-values stripped out.
    * @param stat_name_tags the tag values.
-   * @param is_custom_metric true if this is a custom metric, false otherwise.
    * @return GaugeSharedPtr a gauge.
    */
   virtual GaugeSharedPtr makeGauge(StatName name, StatName tag_extracted_name,
                                    const StatNameTagVector& stat_name_tags,
-                                   Gauge::ImportMode import_mode, bool is_custom_metric) PURE;
+                                   Gauge::ImportMode import_mode) PURE;
 
   /**
    * @param name the full name of the stat.
