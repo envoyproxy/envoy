@@ -148,11 +148,12 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (fin) {
     end_stream_decoded_ = true;
   }
+  quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
-          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_);
+          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_, rst);
   if (headers == nullptr) {
-    onStreamError(close_connection_upon_invalid_header_);
+    onStreamError(close_connection_upon_invalid_header_, rst);
     return;
   }
   if (Http::HeaderUtility::requestHeadersValid(*headers) != absl::nullopt) {
@@ -232,10 +233,12 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
+    quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
     auto trailers = spdyHeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
-        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_);
+        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
+        rst);
     if (trailers == nullptr) {
-      onStreamError(close_connection_upon_invalid_header_);
+      onStreamError(close_connection_upon_invalid_header_, rst);
       return;
     }
     request_decoder_->decodeTrailers(std::move(trailers));
@@ -364,7 +367,8 @@ EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
   return result;
 }
 
-void EnvoyQuicServerStream::onStreamError(absl::optional<bool> should_close_connection) {
+void EnvoyQuicServerStream::onStreamError(absl::optional<bool> should_close_connection,
+                                          quic::QuicRstStreamErrorCode rst) {
   if (details_.empty()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
   }
@@ -379,7 +383,7 @@ void EnvoyQuicServerStream::onStreamError(absl::optional<bool> should_close_conn
   if (close_connection_upon_invalid_header) {
     stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
   } else {
-    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+    Reset(rst);
   }
 }
 
