@@ -42,6 +42,7 @@ RTP
 STATNAME
 SkyWalking
 TIDs
+Timedout
 WRSQ
 WASI
 ceil
@@ -248,6 +249,7 @@ PGV
 PID
 PKTINFO
 PNG
+Pointwise
 PostCBs
 PREBIND
 PRNG
@@ -1007,6 +1009,7 @@ refcount
 referencee
 referer
 refetch
+refvec
 regex
 regexes
 reified

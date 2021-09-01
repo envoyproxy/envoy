@@ -434,6 +434,29 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "leds_lib",
+    srcs = ["leds.cc"],
+    hdrs = ["leds.h"],
+    deps = [
+        ":upstream_includes",
+        "//envoy/config:grpc_mux_interface",
+        "//envoy/config:subscription_factory_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/local_info:local_info_interface",
+        "//source/common/config:decoded_resource_lib",
+        "//source/common/config:subscription_base_interface",
+        "//source/common/config:subscription_factory_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:resolver_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "subset_lb_lib",
     srcs = ["subset_lb.cc"],
     hdrs = ["subset_lb.h"],
