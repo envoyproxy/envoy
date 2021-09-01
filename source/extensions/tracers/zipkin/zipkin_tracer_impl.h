@@ -162,10 +162,8 @@ struct CollectorInfo {
   std::string endpoint_;
 
   // The version of the collector. This is related to endpoint's supported payload specification and
-  // transport. Currently it defaults to envoy::config::trace::v3::ZipkinConfig::HTTP_JSON. In
-  // the future, we will throw when collector_endpoint_version is not specified.
-  envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion version_{
-      envoy::config::trace::v3::ZipkinConfig::HTTP_JSON};
+  // transport.
+  envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion version_;
 
   bool shared_span_context_{DEFAULT_SHARED_SPAN_CONTEXT};
 };

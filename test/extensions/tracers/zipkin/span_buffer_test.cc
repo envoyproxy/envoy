@@ -466,7 +466,8 @@ TEST(ZipkinSpanBufferTest, TestDeprecationOfHttpJsonV1) {
       SpanBuffer buffer1(
           envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1, false),
       Envoy::EnvoyException,
-      "hidden_envoy_deprecated_HTTP_JSON_V1 has been deprecated. Please use other ZipkinConfig.");
+      "hidden_envoy_deprecated_HTTP_JSON_V1 has been deprecated. Please use a non-default "
+      "envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion value.");
 }
 
 } // namespace

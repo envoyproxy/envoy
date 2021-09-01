@@ -50,7 +50,8 @@ SerializerPtr SpanBuffer::makeSerializer(
   switch (version) {
   case envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1:
     throw EnvoyException(
-        "hidden_envoy_deprecated_HTTP_JSON_V1 has been deprecated. Please use other ZipkinConfig.");
+        "hidden_envoy_deprecated_HTTP_JSON_V1 has been deprecated. Please use a non-default "
+        "envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion value.");
   case envoy::config::trace::v3::ZipkinConfig::HTTP_JSON:
     return std::make_unique<JsonV2Serializer>(shared_span_context);
   case envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO:
