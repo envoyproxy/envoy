@@ -62,12 +62,15 @@ public:
   public:
     HttpStatusChecker(
         const Protobuf::RepeatedPtrField<envoy::type::v3::Int64Range>& expected_statuses,
+        const Protobuf::RepeatedPtrField<envoy::type::v3::Int64Range>& retryable_statuses,
         uint64_t default_expected_status);
 
-    bool inRange(uint64_t http_status) const;
+    bool inExpectedRange(uint64_t http_status) const;
+    bool inRetryableRange(uint64_t http_status) const;
 
   private:
-    std::vector<std::pair<uint64_t, uint64_t>> ranges_;
+    std::vector<std::pair<uint64_t, uint64_t>> expected_ranges_;
+    std::vector<std::pair<uint64_t, uint64_t>> retryable_ranges_;
   };
 
 private:
@@ -78,7 +81,7 @@ private:
     ~HttpActiveHealthCheckSession() override;
 
     void onResponseComplete();
-    enum class HealthCheckResult { Succeeded, Degraded, Failed };
+    enum class HealthCheckResult { Succeeded, Degraded, Failed, Retryable };
     HealthCheckResult healthCheckResult();
     bool shouldClose() const;
 
