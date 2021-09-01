@@ -1505,7 +1505,7 @@ TEST_F(EdsTest, EndpointLocalityWeightsIgnored) {
 
 class EdsLocalityWeightsTest : public EdsTest {
 public:
-  void ExpectLocalityWeightsPresentForClusterConfig(const std::string& config) {
+  void expectLocalityWeightsPresentForClusterConfig(const std::string& config) {
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("fare");
     resetCluster(config, Cluster::InitializePhase::Secondary);
@@ -1573,7 +1573,7 @@ public:
 // Validate that onConfigUpdate() propagates locality weights to the host set when locality
 // weighted balancing is configured.
 TEST_F(EdsLocalityWeightsTest, WeightsPresentWithLocalityWeightedConfig) {
-  ExpectLocalityWeightsPresentForClusterConfig(R"EOF(
+  expectLocalityWeightsPresentForClusterConfig(R"EOF(
       name: name
       connect_timeout: 0.25s
       type: EDS
@@ -1596,7 +1596,7 @@ TEST_F(EdsLocalityWeightsTest, WeightsPresentWithLocalityWeightedConfig) {
 TEST_F(EdsLocalityWeightsTest, WeightsPresentWithLoadBalancingPolicyConfig) {
   // envoy.load_balancers.custom_lb is registered by linking in
   // //test/integration/load_balancers:custom_lb_policy.
-  ExpectLocalityWeightsPresentForClusterConfig(R"EOF(
+  expectLocalityWeightsPresentForClusterConfig(R"EOF(
       name: name
       connect_timeout: 0.25s
       type: EDS
