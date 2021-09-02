@@ -125,8 +125,8 @@ To add an extension config to the API, the steps below should be followed:
        deps = ["@com_github_cncf_udpa//udpa/annotations:pkg"],
    )
    ```
-1. Update `source/extensions/extensions_metadata.yaml` with the category,
-   security posture, and status. The category field will have to match an
+1. Update [source/extensions/extensions_metadata.yaml](../source/extensions/extensions_metadata.yaml)
+   with the category, security posture, and status. The category field will have to match an
    annotation of the form `// [#extension-category: your.extension.category]`
    one of the proto files for the docs build to pass.
 1. If the extension is not hidden, find or create a docs file with a toctree
