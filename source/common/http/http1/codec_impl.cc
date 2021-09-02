@@ -252,9 +252,9 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   if (data.length() > 0) {
     size_t body_frame_size = data.length();
     if (chunk_encoding_) {
-      std::string chunk_beginning = absl::StrCat(absl::Hex(data.length()), CRLF);
-      body_frame_size += chunk_beginning.size();
-      connection_.buffer().add(std::move(chunk_beginning));
+      std::string chunk_header = absl::StrCat(absl::Hex(data.length()), CRLF);
+      body_frame_size += chunk_header.size();
+      connection_.buffer().add(std::move(chunk_header));
     }
 
     connection_.buffer().move(data);
