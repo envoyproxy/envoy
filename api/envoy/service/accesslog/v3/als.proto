@@ -26,7 +26,7 @@ service AccessLogService {
   rpc StreamAccessLogs(stream StreamAccessLogsMessage) returns (StreamAccessLogsResponse) {
   }
 
-  // This endpoint provides acknowledgment of logs marked as requiring this.
+  // This endpoint provides acknowledgment of logs marked as requiring acknowledgment.
   // The requirement for an acknowledgment can be set in
   // :ref:`critical_buffer_log_filter <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.critical_buffer_log_filter>`.
   // Log messages that match this filter will be guaranteed delivery. In order to guarantee
