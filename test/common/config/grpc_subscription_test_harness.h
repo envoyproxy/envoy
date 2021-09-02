@@ -50,7 +50,7 @@ public:
 
     timer_ = new Event::MockTimer(&dispatcher_);
 
-    if (legacy_or_unified == Envoy::Config::LegacyOrUnified::Unified) {
+    if (should_use_unified_) {
       mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
           random_, stats_store_, rate_limit_settings_, local_info_, true);

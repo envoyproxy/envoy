@@ -78,16 +78,14 @@ class SubscriptionFactoryTestUnifiedOrLegacyMux
     : public SubscriptionFactoryTest,
       public testing::WithParamInterface<LegacyOrUnified> {
 public:
-  SubscriptionFactoryTestUnifiedOrLegacyMux()
-      : should_use_unified_(GetParam() == LegacyOrUnified::Unified) {
-    if (should_use_unified_) {
+  SubscriptionFactoryTestUnifiedOrLegacyMux() {
+    if (GetParam() == LegacyOrUnified::Unified) {
       Runtime::LoaderSingleton::getExisting()->mergeValues(
-          {{"envoy.reloadable_features.treat_host_like_authority", "false"}});
+          {{"envoy.reloadable_features.unified_mux", "true"}});
     }
   }
 
   TestScopedRuntime scoped_runtime_;
-  bool should_use_unified_;
 };
 
 class SubscriptionFactoryTestApiConfigSource
