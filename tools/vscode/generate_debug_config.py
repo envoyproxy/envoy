@@ -89,19 +89,31 @@ def lldb_config(target, binary, workspace, execroot, arguments):
     }
 
 
-def add_to_launch_json(target, binary, workspace, execroot, arguments, debugger_type):
+def add_to_launch_json(target, binary, workspace, execroot, arguments, debugger_type, overwrite):
     launch = get_launch_json(workspace)
     new_config = {}
+    always_overwritten_fields = []
     if debugger_type == "lldb":
+        always_overwritten_fields = ["program", "sourceMap", "cwd", "type", "request"]
         new_config = lldb_config(target, binary, workspace, execroot, arguments)
     else:
+        always_overwritten_fields = [
+            "request", "type", "target", "debugger_args", "cwd", "valuesFormatting"
+        ]
         new_config = gdb_config(target, binary, workspace, execroot, arguments)
 
     configurations = launch.get("configurations", [])
     for config in configurations:
         if config.get("name", None) == new_config["name"]:
-            config.clear()
-            config.update(new_config)
+            if overwrite:
+                config.clear()
+                config.update(new_config)
+            else:
+                for k in always_overwritten_fields:
+                    config[k] = new_config[k]
+                print(
+                    f"old config exists, only {always_overwritten_fields} will be updated, use --overwrite to recreate config"
+                )
             break
     else:
         configurations.append(new_config)
@@ -112,13 +124,18 @@ def add_to_launch_json(target, binary, workspace, execroot, arguments, debugger_
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Build and generate launch config for VSCode')
-    parser.add_argument('--debugger', default="gdb")
-    parser.add_argument('--args', default='')
-    parser.add_argument('target')
+    parser.add_argument('--debugger', default="gdb", help="debugger type, one of [gdb, lldb]")
+    parser.add_argument('--args', default='', help="command line arguments if target binary")
+    parser.add_argument(
+        '--overwrite',
+        action="store_true",
+        help="recreate config without preserving any existing config")
+    parser.add_argument('target', help="target binary which you want to build")
     args = parser.parse_args()
 
     workspace = get_workspace()
     execution_root = get_execution_root(workspace)
     debug_binary = build_binary_with_debug_info(args.target)
     add_to_launch_json(
-        args.target, debug_binary, workspace, execution_root, args.args, args.debugger)
+        args.target, debug_binary, workspace, execution_root, args.args, args.debugger,
+        args.overwrite)

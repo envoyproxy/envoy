@@ -1,10 +1,10 @@
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include <cstdint>
 #include <memory>
 #include <string>
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/container/fixed_array.h"
 #include "event2/buffer.h"
@@ -43,10 +43,10 @@ void OwnedImpl::addDrainTracker(std::function<void()> drain_tracker) {
 
 void OwnedImpl::bindAccount(BufferMemoryAccountSharedPtr account) {
   ASSERT(slices_.empty());
-  // We don't yet have an account bound.
-  ASSERT(!account_);
   account_ = std::move(account);
 }
+
+BufferMemoryAccountSharedPtr OwnedImpl::getAccountForTest() { return account_; }
 
 void OwnedImpl::add(const void* data, uint64_t size) { addImpl(data, size); }
 

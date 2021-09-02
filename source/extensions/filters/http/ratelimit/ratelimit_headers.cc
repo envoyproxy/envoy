@@ -1,6 +1,6 @@
-#include "extensions/filters/http/ratelimit/ratelimit_headers.h"
+#include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
-#include "common/http/header_map_impl.h"
+#include "source/common/http/header_map_impl.h"
 
 #include "absl/strings/substitute.h"
 

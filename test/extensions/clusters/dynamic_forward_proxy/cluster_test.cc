@@ -2,10 +2,9 @@
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/cluster_factory_impl.h"
-
-#include "extensions/clusters/dynamic_forward_proxy/cluster.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
@@ -38,7 +37,6 @@ public:
         Upstream::parseClusterFromV3Yaml(yaml_config);
     envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     Stats::ScopePtr scope = stats_store_.createScope("cluster.name.");
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -204,9 +202,9 @@ TEST_F(ClusterTest, PopulatedCache) {
 
 class ClusterFactoryTest : public testing::Test {
 protected:
-  void createCluster(const std::string& yaml_config, bool avoid_boosting = true) {
+  void createCluster(const std::string& yaml_config) {
     envoy::config::cluster::v3::Cluster cluster_config =
-        Upstream::parseClusterFromV3Yaml(yaml_config, avoid_boosting);
+        Upstream::parseClusterFromV3Yaml(yaml_config);
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
         cm_, stats_store_, tls_, nullptr, ssl_context_manager_, runtime_, dispatcher_, log_manager_,
         local_info_, admin_, singleton_manager_, nullptr, true, validation_visitor_, *api_,
@@ -235,56 +233,6 @@ private:
   Server::MockOptions options_;
 };
 
-// Verify that using 'sni' causes a failure.
-TEST_F(ClusterFactoryTest, DEPRECATED_FEATURE_TEST(InvalidSNI)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml_config = TestEnvironment::substitute(R"EOF(
-name: name
-connect_timeout: 0.25s
-cluster_type:
-  name: dynamic_forward_proxy
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
-    dns_cache_config:
-      name: foo
-tls_context:
-  sni: api.lyft.com
-  common_tls_context:
-    validation_context:
-      trusted_ca:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-)EOF");
-
-  EXPECT_THROW_WITH_MESSAGE(
-      createCluster(yaml_config, false), EnvoyException,
-      "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
-}
-
-// Verify that using 'verify_subject_alt_name' causes a failure.
-TEST_F(ClusterFactoryTest, DEPRECATED_FEATURE_TEST(InvalidVerifySubjectAltName)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml_config = TestEnvironment::substitute(R"EOF(
-name: name
-connect_timeout: 0.25s
-cluster_type:
-  name: dynamic_forward_proxy
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
-    dns_cache_config:
-      name: foo
-tls_context:
-  common_tls_context:
-    validation_context:
-      trusted_ca:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-      verify_subject_alt_name: [api.lyft.com]
-)EOF");
-
-  EXPECT_THROW_WITH_MESSAGE(
-      createCluster(yaml_config, false), EnvoyException,
-      "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
-}
-
 TEST_F(ClusterFactoryTest, InvalidUpstreamHttpProtocolOptions) {
   const std::string yaml_config = TestEnvironment::substitute(R"EOF(
 name: name
@@ -300,8 +248,8 @@ upstream_http_protocol_options: {}
 
   EXPECT_THROW_WITH_MESSAGE(
       createCluster(yaml_config), EnvoyException,
-      "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true when "
-      "configured with upstream_http_protocol_options");
+      "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true unless "
+      "allow_insecure_cluster_options is set.");
 }
 
 TEST_F(ClusterFactoryTest, InsecureUpstreamHttpProtocolOptions) {

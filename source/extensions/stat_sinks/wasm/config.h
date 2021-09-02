@@ -5,14 +5,16 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/server/instance.h"
 
-#include "common/config/datasource.h"
-
-#include "server/configuration_impl.h"
+#include "source/common/config/datasource.h"
+#include "source/server/configuration_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace Wasm {
+
+// WebAssembly sink
+constexpr char WasmName[] = "envoy.stat_sinks.wasm";
 
 /**
  * Config registration for the Wasm statsd sink. @see StatSinkFactory.

@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-
-#include "extensions/filters/network/ext_authz/ext_authz.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/filters/network/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/network/ext_authz/ext_authz_fuzz.pb.validate.h"
@@ -14,7 +13,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::ReturnRef;
 using testing::WithArgs;
 
 namespace Envoy {
@@ -65,8 +63,9 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   Stats::TestUtil::TestStore stats_store;
   Filters::Common::ExtAuthz::MockClient* client = new Filters::Common::ExtAuthz::MockClient();
   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config = input.config();
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
 
-  ConfigSharedPtr config = std::make_shared<Config>(proto_config, stats_store);
+  ConfigSharedPtr config = std::make_shared<Config>(proto_config, stats_store, bootstrap);
   std::unique_ptr<Filter> filter =
       std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
 
@@ -75,8 +74,10 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   static Network::Address::InstanceConstSharedPtr addr =
       std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
 
-  filter_callbacks.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr);
-  filter_callbacks.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr);
+  filter_callbacks.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr);
+  filter_callbacks.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr);
 
   for (const auto& action : input.actions()) {
     switch (action.action_selector_case()) {

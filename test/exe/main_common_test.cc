@@ -1,15 +1,13 @@
 #include "envoy/common/platform.h"
 
-#include "common/common/lock_guard.h"
-#include "common/common/mutex_tracer_impl.h"
-#include "common/common/random_generator.h"
-#include "common/common/thread.h"
-#include "common/runtime/runtime_impl.h"
-
-#include "exe/main_common.h"
-#include "exe/platform_impl.h"
-
-#include "server/options_impl.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/mutex_tracer_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/common/thread.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/exe/main_common.h"
+#include "source/exe/platform_impl.h"
+#include "source/server/options_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/contention.h"
@@ -20,7 +18,7 @@
 #include "gtest/gtest.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "common/signal/signal_action.h"
+#include "source/common/signal/signal_action.h"
 #endif
 
 #include "absl/synchronization/notification.h"

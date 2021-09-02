@@ -4,11 +4,11 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 
-#include "common/common/fmt.h"
-#include "common/json/json_loader.h"
-#include "common/network/address_impl.h"
-#include "common/network/cidr_range.h"
-#include "common/network/utility.h"
+#include "source/common/common/fmt.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/cidr_range.h"
+#include "source/common/network/utility.h"
 
 #include "gtest/gtest.h"
 

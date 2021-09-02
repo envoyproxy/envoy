@@ -1,11 +1,11 @@
 #pragma once
 
-#include "common/quic/envoy_quic_proof_verifier_base.h"
+#include "source/common/quic/envoy_quic_proof_verifier_base.h"
 
 namespace Envoy {
 namespace Quic {
 
-// A test quic::ProofVerifier which always approves the certs and signature.
+// A test quic::ProofVerifier which always approves the certs.
 class TestProofVerifier : public EnvoyQuicProofVerifierBase {
 public:
   //  quic::ProofVerifier
@@ -17,14 +17,6 @@ public:
                   std::unique_ptr<quic::ProofVerifyDetails>* /*details*/, uint8_t* /*out_alert*/,
                   std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) override {
     return quic::QUIC_SUCCESS;
-  }
-
-protected:
-  // EnvoyQuicProofVerifierBase
-  bool verifySignature(const std::string& /*server_config*/, absl::string_view /*chlo_hash*/,
-                       const std::string& /*cert*/, const std::string& /*signature*/,
-                       std::string* /*error_details*/) override {
-    return true;
   }
 };
 

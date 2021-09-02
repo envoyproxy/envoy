@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "common/http/mixed_conn_pool.h"
-#include "common/http/utility.h"
+#include "source/common/http/mixed_conn_pool.h"
+#include "source/common/http/utility.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"

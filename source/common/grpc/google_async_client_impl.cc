@@ -1,17 +1,17 @@
-#include "common/grpc/google_async_client_impl.h"
+#include "source/common/grpc/google_async_client_impl.h"
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/base64.h"
-#include "common/common/empty_string.h"
-#include "common/common/lock_guard.h"
-#include "common/config/datasource.h"
-#include "common/grpc/common.h"
-#include "common/grpc/google_grpc_creds_impl.h"
-#include "common/grpc/google_grpc_utils.h"
-#include "common/router/header_parser.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/config/datasource.h"
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/google_grpc_creds_impl.h"
+#include "source/common/grpc/google_grpc_utils.h"
+#include "source/common/router/header_parser.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 #include "grpcpp/support/proto_buffer_reader.h"
 
@@ -108,6 +108,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
 }
 
 GoogleAsyncClientImpl::~GoogleAsyncClientImpl() {
+  ASSERT(isThreadSafe());
   ENVOY_LOG(debug, "Client teardown, resetting streams");
   while (!active_streams_.empty()) {
     active_streams_.front()->resetStream();
@@ -120,6 +121,7 @@ AsyncRequest* GoogleAsyncClientImpl::sendRaw(absl::string_view service_full_name
                                              RawAsyncRequestCallbacks& callbacks,
                                              Tracing::Span& parent_span,
                                              const Http::AsyncClient::RequestOptions& options) {
+  ASSERT(isThreadSafe());
   auto* const async_request = new GoogleAsyncRequestImpl(
       *this, service_full_name, method_name, std::move(request), callbacks, parent_span, options);
   GoogleAsyncStreamImplPtr grpc_stream{async_request};
@@ -137,6 +139,7 @@ RawAsyncStream* GoogleAsyncClientImpl::startRaw(absl::string_view service_full_n
                                                 absl::string_view method_name,
                                                 RawAsyncStreamCallbacks& callbacks,
                                                 const Http::AsyncClient::StreamOptions& options) {
+  ASSERT(isThreadSafe());
   auto grpc_stream = std::make_unique<GoogleAsyncStreamImpl>(*this, service_full_name, method_name,
                                                              callbacks, options);
 

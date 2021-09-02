@@ -37,6 +37,32 @@ cc_library(
     ],
 )
 
+# Kafka client dependency used by Kafka-mesh filter.
+# librdkafka build generates extra headers that need to be copied into source to get it to compile.
+configure_make(
+    name = "librdkafka_build",
+    configure_in_place = True,
+    configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd && cp Makefile.config src/.. && cp config.h src/.."],
+    lib_source = "@edenhill_librdkafka//:all",
+    make_commands = [
+        "make ARFLAGS='' libs install-subdirs",
+    ],
+    static_libraries = [
+        "librdkafka.a",
+        "librdkafka++.a",
+    ],
+    tags = ["skip_on_windows"],
+    alwayslink = True,
+)
+
+cc_library(
+    name = "librdkafka",
+    tags = ["skip_on_windows"],
+    deps = [
+        "librdkafka_build",
+    ],
+)
+
 configure_make(
     name = "luajit",
     configure_command = "build.py",
@@ -77,6 +103,24 @@ configure_make(
 )
 
 envoy_cmake_external(
+    name = "libsxg",
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SXG_BUILD_EXECUTABLES": "off",
+        "SXG_BUILD_SHARED": "off",
+        "SXG_BUILD_STATIC": "on",
+        "SXG_WITH_CERT_CHAIN": "off",
+        "RUN_TEST": "off",
+        "CMAKE_INSTALL_LIBDIR": "lib",
+        "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
+    },
+    lib_source = "@com_github_google_libsxg//:all",
+    static_libraries = ["libsxg.a"],
+    tags = ["skip_on_windows"],
+    deps = ["@boringssl//:ssl"],
+)
+
+envoy_cmake_external(
     name = "ares",
     cache_entries = {
         "CARES_BUILD_TOOLS": "no",
@@ -92,7 +136,7 @@ envoy_cmake_external(
         "//conditions:default": [],
     }),
     postfix_script = select({
-        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/nameser.h $INSTALLDIR/include/nameser.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
+        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_nameser.h $INSTALLDIR/include/ares_nameser.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
         "//conditions:default": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
     }),
     static_libraries = select({
@@ -197,6 +241,8 @@ envoy_cmake_external(
     cache_entries = {
         # Disable both: BUILD and INCLUDE, since some of the INCLUDE
         # targets build code instead of only generating build files.
+        "LLVM_BUILD_BENCHMARKS": "off",
+        "LLVM_INCLUDE_BENCHMARKS": "off",
         "LLVM_BUILD_DOCS": "off",
         "LLVM_INCLUDE_DOCS": "off",
         "LLVM_BUILD_EXAMPLES": "off",
@@ -210,6 +256,7 @@ envoy_cmake_external(
         "LLVM_INCLUDE_TOOLS": "off",
         "LLVM_BUILD_UTILS": "off",
         "LLVM_INCLUDE_UTILS": "off",
+        "LLVM_ENABLE_IDE": "off",
         "LLVM_ENABLE_LIBEDIT": "off",
         "LLVM_ENABLE_LIBXML2": "off",
         "LLVM_ENABLE_TERMINFO": "off",
@@ -230,70 +277,63 @@ envoy_cmake_external(
     lib_source = "@org_llvm_llvm//:all",
     static_libraries = select({
         "//conditions:default": [
-            # Order from llvm-config --libnames.
+            # Order from llvm-config --libnames asmparser core debuginfodwarf
+            # engine lto mcparser mirparser orcjit passes runtimedyld
+            # support x86asmparser x86desc
+            "libLLVMOrcJIT.a",
+            "libLLVMOrcError.a",
+            "libLLVMJITLink.a",
+            "libLLVMMIRParser.a",
             "libLLVMLTO.a",
             "libLLVMPasses.a",
             "libLLVMObjCARCOpts.a",
-            "libLLVMSymbolize.a",
-            "libLLVMDebugInfoPDB.a",
-            "libLLVMDebugInfoDWARF.a",
-            "libLLVMFuzzMutate.a",
-            "libLLVMTableGen.a",
-            "libLLVMDlltoolDriver.a",
-            "libLLVMLineEditor.a",
-            "libLLVMOrcJIT.a",
-            "libLLVMCoverage.a",
-            "libLLVMMIRParser.a",
-            "libLLVMObjectYAML.a",
-            "libLLVMLibDriver.a",
-            "libLLVMOption.a",
-            "libLLVMWindowsManifest.a",
-            "libLLVMX86Disassembler.a",
-            "libLLVMX86AsmParser.a",
-            "libLLVMX86CodeGen.a",
-            "libLLVMGlobalISel.a",
-            "libLLVMSelectionDAG.a",
-            "libLLVMAsmPrinter.a",
-            "libLLVMDebugInfoCodeView.a",
-            "libLLVMDebugInfoMSF.a",
-            "libLLVMX86Desc.a",
-            "libLLVMMCDisassembler.a",
-            "libLLVMX86Info.a",
-            "libLLVMX86Utils.a",
-            "libLLVMMCJIT.a",
-            "libLLVMInterpreter.a",
-            "libLLVMExecutionEngine.a",
-            "libLLVMRuntimeDyld.a",
-            "libLLVMCodeGen.a",
-            "libLLVMTarget.a",
-            "libLLVMCoroutines.a",
             "libLLVMipo.a",
             "libLLVMInstrumentation.a",
             "libLLVMVectorize.a",
-            "libLLVMScalarOpts.a",
             "libLLVMLinker.a",
             "libLLVMIRReader.a",
-            "libLLVMAsmParser.a",
+            "libLLVMX86Disassembler.a",
+            "libLLVMX86AsmParser.a",
+            "libLLVMX86CodeGen.a",
+            "libLLVMCFGuard.a",
+            "libLLVMGlobalISel.a",
+            "libLLVMSelectionDAG.a",
+            "libLLVMAsmPrinter.a",
+            "libLLVMCodeGen.a",
+            "libLLVMScalarOpts.a",
             "libLLVMInstCombine.a",
+            "libLLVMAggressiveInstCombine.a",
             "libLLVMTransformUtils.a",
             "libLLVMBitWriter.a",
+            "libLLVMX86Desc.a",
+            "libLLVMMCDisassembler.a",
+            "libLLVMX86Utils.a",
+            "libLLVMX86Info.a",
+            "libLLVMMCJIT.a",
+            "libLLVMExecutionEngine.a",
+            "libLLVMTarget.a",
             "libLLVMAnalysis.a",
             "libLLVMProfileData.a",
+            "libLLVMRuntimeDyld.a",
+            "libLLVMDebugInfoDWARF.a",
             "libLLVMObject.a",
+            "libLLVMTextAPI.a",
             "libLLVMMCParser.a",
             "libLLVMMC.a",
+            "libLLVMDebugInfoCodeView.a",
+            "libLLVMDebugInfoMSF.a",
             "libLLVMBitReader.a",
-            "libLLVMBitstreamReader.a",
+            "libLLVMAsmParser.a",
             "libLLVMCore.a",
+            "libLLVMRemarks.a",
+            "libLLVMBitstreamReader.a",
             "libLLVMBinaryFormat.a",
             "libLLVMSupport.a",
             "libLLVMDemangle.a",
-            "libLLVMRemarks.a",
-            "libLLVMCFGuard.a",
-            "libLLVMTextAPI.a",
         ],
     }),
     tags = ["skip_on_windows"],
+    alwayslink = True,
 )
 
 envoy_cmake_external(
@@ -316,6 +356,24 @@ envoy_cmake_external(
 )
 
 envoy_cmake_external(
+    name = "wamr",
+    cache_entries = {
+        "LLVM_DIR": "$EXT_BUILD_DEPS/copy_llvm/llvm/lib/cmake/llvm",
+        "WAMR_BUILD_INTERP": "0",
+        "WAMR_BUILD_JIT": "1",
+        "WAMR_BUILD_AOT": "1",
+        "WAMR_BUILD_SIMD": "0",
+        "WAMR_BUILD_MULTI_MODULE": "1",
+        "WAMR_BUILD_LIBC_WASI": "0",
+        "WAMR_BUILD_TAIL_CALL": "1",
+    },
+    lib_source = "@com_github_wamr//:all",
+    static_libraries = ["libvmlib.a"],
+    tags = ["skip_on_windows"],
+    deps = [":llvm"],
+)
+
+envoy_cmake_external(
     name = "wavm",
     binaries = ["wavm"],
     cache_entries = {
@@ -327,7 +385,6 @@ envoy_cmake_external(
         # using -l:libstdc++.a.
         "CMAKE_CXX_FLAGS": "-lstdc++ -Wno-unused-command-line-argument",
     },
-    defines = ["ENVOY_WASM_WAVM"],
     env_vars = {
         # Workaround for the -DDEBUG flag added in fastbuild on macOS,
         # which conflicts with DEBUG macro used in LLVM.

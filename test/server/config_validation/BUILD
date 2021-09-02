@@ -10,8 +10,8 @@ envoy_cc_test(
     name = "cluster_manager_test",
     srcs = ["cluster_manager_test.cc"],
     deps = [
-        "//include/envoy/upstream:resource_manager_interface",
-        "//include/envoy/upstream:upstream_interface",
+        "//envoy/upstream:resource_manager_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/api:api_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:stats_lib",
@@ -48,6 +48,7 @@ envoy_cc_test(
         "//configs:example_configs",
         "//test/config_test:example_configs_test_setup.sh",
     ],
+    env = {"EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar"},
     deps = [
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/listener/original_dst:config",
@@ -74,6 +75,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 
@@ -133,6 +135,7 @@ envoy_cc_test_library(
     deps = [
         ":xds_fuzz_proto_cc_proto",
         ":xds_verifier_lib",
+        "//source/common/common:matchers_lib",
         "//test/fuzz:utility_lib",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

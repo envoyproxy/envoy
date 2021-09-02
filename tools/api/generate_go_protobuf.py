@@ -22,12 +22,12 @@ USER_NAME = 'go-control-plane(Azure Pipelines)'
 USER_EMAIL = 'go-control-plane@users.noreply.github.com'
 
 
-def generate_protobufs(output):
+def generate_protobufs(targets, output, api_repo):
     bazel_bin = check_output(['bazel', 'info', 'bazel-bin']).decode().strip()
     go_protos = check_output([
         'bazel',
         'query',
-        'kind("go_proto_library", %s)' % TARGETS,
+        'kind("go_proto_library", %s)' % targets,
     ]).split()
 
     # Each rule has the form @envoy_api//foo/bar:baz_go_proto.
@@ -47,9 +47,10 @@ def generate_protobufs(output):
         #
         # Example output directory:
         # go_out/envoy/config/bootstrap/v2
-        rule_dir, proto = rule.decode()[len('@envoy_api//'):].rsplit(':', 1)
-        input_dir = os.path.join(
-            bazel_bin, 'external', 'envoy_api', rule_dir, proto + '_', IMPORT_BASE, rule_dir)
+        rule_dir, proto = rule.decode().rsplit('//', 1)[1].rsplit(':', 1)
+
+        prefix = '' if not api_repo else os.path.join('external', api_repo)
+        input_dir = os.path.join(bazel_bin, prefix, rule_dir, proto + '_', IMPORT_BASE, rule_dir)
         input_files = glob.glob(os.path.join(input_dir, '*.go'))
         output_dir = os.path.join(output, rule_dir)
 
@@ -97,13 +98,14 @@ def write_revision_info(repo, sha):
 
 
 def sync_go_protobufs(output, repo):
-    # Sync generated content against repo and return true if there is a commit necessary
-    dst = os.path.join(repo, 'envoy')
-    # Remove subtree at envoy in repo
-    git(repo, 'rm', '-r', 'envoy')
-    # Copy subtree at envoy from output to repo
-    shutil.copytree(os.path.join(output, 'envoy'), dst)
-    git(repo, 'add', 'envoy')
+    for folder in ['envoy', 'contrib']:
+        # Sync generated content against repo and return true if there is a commit necessary
+        dst = os.path.join(repo, folder)
+        # Remove subtree in repo
+        git(repo, 'rm', '-r', '--ignore-unmatch', folder)
+        # Copy subtree from output to repo
+        shutil.copytree(os.path.join(output, folder), dst)
+        git(repo, 'add', folder)
 
 
 def publish_go_protobufs(repo, sha):
@@ -111,6 +113,7 @@ def publish_go_protobufs(repo, sha):
     git(repo, 'config', 'user.name', USER_NAME)
     git(repo, 'config', 'user.email', USER_EMAIL)
     git(repo, 'add', 'envoy')
+    git(repo, 'add', 'contrib')
     git(repo, 'commit', '--allow-empty', '-s', '-m', MIRROR_MSG + sha)
     git(repo, 'push', 'origin', BRANCH)
 
@@ -126,11 +129,13 @@ if __name__ == "__main__":
         description='Generate Go protobuf files and sync with go-control-plane')
     parser.add_argument('--sync', action='store_true')
     parser.add_argument('--output_base', default='build_go')
+    parser.add_argument('--targets', default=TARGETS)
+    parser.add_argument('--api_repo', default="envoy_api")
     args = parser.parse_args()
 
     workspace = check_output(['bazel', 'info', 'workspace']).decode().strip()
     output = os.path.join(workspace, args.output_base)
-    generate_protobufs(output)
+    generate_protobufs(args.targets, output, args.api_repo)
     if not args.sync:
         print('Skipping sync with go-control-plane')
         sys.exit()

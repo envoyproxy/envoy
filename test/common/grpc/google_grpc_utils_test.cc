@@ -1,6 +1,6 @@
 #include "envoy/common/platform.h"
 
-#include "common/grpc/google_grpc_utils.h"
+#include "source/common/grpc/google_grpc_utils.h"
 
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/utility.h"

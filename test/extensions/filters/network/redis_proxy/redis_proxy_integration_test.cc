@@ -1,10 +1,9 @@
 #include <sstream>
 #include <vector>
 
-#include "common/common/fmt.h"
-
-#include "extensions/filters/network/common/redis/fault_impl.h"
-#include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/extensions/filters/network/common/redis/fault_impl.h"
+#include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
 #include "test/integration/integration.h"
 

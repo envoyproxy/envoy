@@ -5,9 +5,8 @@
 #include "envoy/extensions/transport_sockets/starttls/v3/starttls.pb.validate.h"
 #include "envoy/network/connection.h"
 
-#include "common/network/transport_socket_options_impl.h"
-
-#include "extensions/transport_sockets/starttls/starttls_socket.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/extensions/transport_sockets/starttls/starttls_socket.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
@@ -26,7 +25,7 @@ public:
 };
 
 TEST(StartTlsTest, BasicSwitch) {
-  Network::TransportSocketOptionsSharedPtr options =
+  Network::TransportSocketOptionsConstSharedPtr options =
       std::make_shared<Network::TransportSocketOptionsImpl>();
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
   NiceMock<StartTlsTransportSocketMock>* raw_socket = new NiceMock<StartTlsTransportSocketMock>;

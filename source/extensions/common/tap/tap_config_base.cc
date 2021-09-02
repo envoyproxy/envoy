@@ -1,15 +1,13 @@
-#include "extensions/common/tap/tap_config_base.h"
+#include "source/extensions/common/tap/tap_config_base.h"
 
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/common/matcher/matcher.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/common/matcher/matcher.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -84,7 +82,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     // Fallback to use the deprecated match_config field and upgrade (wire cast) it to the new
     // MatchPredicate which is backward compatible with the old MatchPredicate originally
     // introduced in the Tap filter.
-    Config::VersionConverter::upgrade(proto_config.match_config(), match);
+    MessageUtil::wireCast(proto_config.match_config(), match);
   } else {
     throw EnvoyException(fmt::format("Neither match nor match_config is set in TapConfig: {}",
                                      proto_config.DebugString()));

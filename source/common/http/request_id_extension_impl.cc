@@ -1,6 +1,6 @@
-#include "common/http/request_id_extension_impl.h"
+#include "source/common/http/request_id_extension_impl.h"
 
-#include "common/config/utility.h"
+#include "source/common/config/utility.h"
 
 namespace Envoy {
 namespace Http {

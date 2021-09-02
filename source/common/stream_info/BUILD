@@ -13,8 +13,8 @@ envoy_cc_library(
     hdrs = ["stream_info_impl.h"],
     deps = [
         ":filter_state_lib",
-        "//include/envoy/http:request_id_extension_interface",
-        "//include/envoy/stream_info:stream_info_interface",
+        "//envoy/http:request_id_extension_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:dump_state_utils",
         "//source/common/network:socket_lib",
@@ -27,7 +27,7 @@ envoy_cc_library(
     srcs = ["filter_state_impl.cc"],
     hdrs = ["filter_state_impl.h"],
     deps = [
-        "//include/envoy/stream_info:filter_state_interface",
+        "//envoy/stream_info:filter_state_interface",
     ],
 )
 
@@ -37,8 +37,8 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/common:time_interface",
-        "//include/envoy/stream_info:stream_info_interface",
+        "//envoy/common:time_interface",
+        "//envoy/stream_info:stream_info_interface",
     ],
 )
 
@@ -46,6 +46,6 @@ envoy_cc_library(
     name = "uint32_accessor_lib",
     hdrs = ["uint32_accessor_impl.h"],
     deps = [
-        "//include/envoy/stream_info:uint32_accessor_interface",
+        "//envoy/stream_info:uint32_accessor_interface",
     ],
 )

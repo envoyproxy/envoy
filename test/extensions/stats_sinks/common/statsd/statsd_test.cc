@@ -2,10 +2,9 @@
 #include <memory>
 #include <string>
 
-#include "common/network/utility.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/stat_sinks/common/statsd/statsd.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/stat_sinks/common/statsd/statsd.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"

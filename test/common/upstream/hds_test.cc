@@ -5,13 +5,12 @@
 #include "envoy/service/health/v3/hds.pb.h"
 #include "envoy/type/v3/http.pb.h"
 
-#include "common/protobuf/protobuf.h"
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/health_discovery_service.h"
-#include "common/upstream/transport_socket_match_impl.h"
-
-#include "extensions/transport_sockets/raw_buffer/config.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/health_discovery_service.h"
+#include "source/common/upstream/transport_socket_match_impl.h"
+#include "source/extensions/transport_sockets/raw_buffer/config.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -94,8 +93,7 @@ protected:
         .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockTimer>>());
 
     hds_delegate_ = std::make_unique<HdsDelegate>(
-        stats_store_, Grpc::RawAsyncClientPtr(async_client_),
-        envoy::config::core::v3::ApiVersion::AUTO, dispatcher_, runtime_, stats_store_,
+        stats_store_, Grpc::RawAsyncClientPtr(async_client_), dispatcher_, runtime_, stats_store_,
         ssl_context_manager_, test_factory_, log_manager_, cm_, local_info_, admin_,
         singleton_manager_, tls_, validation_visitor_, *api_, options_);
   }

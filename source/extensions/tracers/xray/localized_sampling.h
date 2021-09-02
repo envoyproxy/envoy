@@ -6,11 +6,10 @@
 
 #include "envoy/common/time.h"
 
-#include "common/common/logger.h"
-#include "common/common/random_generator.h"
-
-#include "extensions/tracers/xray/reservoir.h"
-#include "extensions/tracers/xray/sampling_strategy.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/random_generator.h"
+#include "source/extensions/tracers/xray/reservoir.h"
+#include "source/extensions/tracers/xray/sampling_strategy.h"
 
 #include "absl/strings/string_view.h"
 

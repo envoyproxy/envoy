@@ -4,10 +4,9 @@
 
 #include "envoy/tracing/trace_driver.h"
 
-#include "common/tracing/common_values.h"
-#include "common/tracing/null_span_impl.h"
-
-#include "extensions/tracers/skywalking/trace_segment_reporter.h"
+#include "source/common/tracing/common_values.h"
+#include "source/common/tracing/null_span_impl.h"
+#include "source/extensions/tracers/skywalking/trace_segment_reporter.h"
 
 #include "cpp2sky/tracing_context.h"
 #include "cpp2sky/well_known_names.h"
@@ -67,7 +66,7 @@ public:
   void setTag(absl::string_view name, absl::string_view value) override;
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
-  void injectContext(Http::RequestHeaderMap& request_headers) override;
+  void injectContext(Tracing::TraceContext& trace_context) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool do_sample) override;

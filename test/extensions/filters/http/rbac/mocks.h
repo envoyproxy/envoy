@@ -2,8 +2,8 @@
 
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 
-#include "extensions/filters/common/rbac/utility.h"
-#include "extensions/filters/http/rbac/rbac_filter.h"
+#include "source/extensions/filters/common/rbac/utility.h"
+#include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 #include "gmock/gmock.h"
 

@@ -1,8 +1,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "common/network/address_impl.h"
-#include "common/upstream/load_balancer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
 
 #include "test/config/utility.h"
 #include "test/integration/clusters/cluster_factory_config.pb.h"
@@ -18,8 +18,7 @@ const int UpstreamIndex = 0;
 class CustomClusterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                      public HttpIntegrationTest {
 public:
-  CustomClusterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  CustomClusterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void initialize() override {
     setUpstreamCount(1);

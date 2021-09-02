@@ -21,7 +21,6 @@ dynamic_resources:
 static_resources:
   clusters:
   - name: ads_cluster
-    connect_timeout: 5s
     type: STRICT_DNS
     load_assignment:
       cluster_name: ads_cluster

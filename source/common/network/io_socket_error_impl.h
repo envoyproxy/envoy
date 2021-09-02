@@ -2,7 +2,7 @@
 
 #include "envoy/api/io_error.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Network {
@@ -18,6 +18,7 @@ public:
 
   Api::IoError::IoErrorCode getErrorCode() const override;
   std::string getErrorDetails() const override;
+  int getSystemErrorCode() const override { return errno_; }
 
   // IoErrorCode::Again is used frequently. Define it to be a singleton to avoid frequent memory
   // allocation of such instance. If this is used, IoHandleCallResult has to be instantiated with

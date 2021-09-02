@@ -1,4 +1,4 @@
-#include "common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
 
 #include <cstdint>
 #include <memory>
@@ -9,8 +9,8 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/assert.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/fixed_array.h"
 

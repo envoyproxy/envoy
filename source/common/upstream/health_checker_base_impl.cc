@@ -1,12 +1,12 @@
-#include "common/upstream/health_checker_base_impl.h"
+#include "source/common/upstream/health_checker_base_impl.h"
 
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/network/utility.h"
-#include "common/router/router.h"
+#include "source/common/network/utility.h"
+#include "source/common/router/router.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -72,6 +72,10 @@ MetadataConstSharedPtr HealthCheckerImplBase::initTransportSocketMatchMetadata(
 }
 
 HealthCheckerImplBase::~HealthCheckerImplBase() {
+  // First clear callbacks that otherwise will be run from
+  // ActiveHealthCheckSession::onDeferredDeleteBase(). This prevents invoking a callback on a
+  // deleted parent object (e.g. Cluster).
+  callbacks_.clear();
   // ASSERTs inside the session destructor check to make sure we have been previously deferred
   // deleted. Unify that logic here before actual destruction happens.
   for (auto& session : active_sessions_) {
@@ -258,6 +262,11 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
     parent_.decDegraded();
   }
   onDeferredDelete();
+
+  // Run callbacks in case something is waiting for health checks to run which will now never run.
+  if (first_check_) {
+    parent_.runCallbacks(host_, HealthTransition::Unchanged);
+  }
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degraded) {

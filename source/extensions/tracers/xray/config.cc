@@ -1,4 +1,4 @@
-#include "extensions/tracers/xray/config.h"
+#include "source/extensions/tracers/xray/config.h"
 
 #include <string>
 
@@ -7,10 +7,9 @@
 #include "envoy/config/trace/v3/xray.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/utility.h"
-#include "common/config/datasource.h"
-
-#include "extensions/tracers/xray/xray_tracer_impl.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/datasource.h"
+#include "source/extensions/tracers/xray/xray_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

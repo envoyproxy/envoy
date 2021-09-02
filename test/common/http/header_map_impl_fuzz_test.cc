@@ -1,8 +1,8 @@
 #include <functional>
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/http/header_map_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/header_map_impl.h"
 
 #include "test/common/http/header_map_impl_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"

@@ -5,7 +5,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/resolver.h"
 
-#include "common/network/address_impl.h"
+#include "source/common/network/address_impl.h"
 
 namespace Envoy {
 namespace Network {

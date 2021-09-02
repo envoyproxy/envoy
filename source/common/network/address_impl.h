@@ -10,7 +10,8 @@
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/statusor.h"
 
 namespace Envoy {
 namespace Network {
@@ -25,8 +26,23 @@ namespace Address {
  * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
  * @return InstanceConstSharedPtr the address.
  */
-InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
-                                           bool v6only = true);
+StatusOr<InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
+                                                     bool v6only = true);
+InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storage& ss, socklen_t len,
+                                                  bool v6only = true);
+
+/**
+ * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
+ * a Network::Address::Instance and return a pointer to it. Die on failure.
+ * @param ss a valid address with family AF_INET, AF_INET6 or AF_UNIX.
+ * @param len length of the address (e.g. from accept, getsockname or getpeername). If len > 0,
+ *        it is used to validate the structure contents; else if len == 0, it is ignored.
+ * @param fd the file descriptor for the created address instance.
+ * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
+ * @return InstanceConstSharedPtr the address.
+ */
+InstanceConstSharedPtr addressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len,
+                                                os_fd_t fd, bool v6only = true);
 
 /**
  * Base class for all address types.
@@ -51,6 +67,22 @@ protected:
 
 private:
   const Type type_;
+};
+
+// Create an address instance. Upon failure, return an error status without throwing.
+class InstanceFactory {
+public:
+  template <typename InstanceType, typename... Args>
+  static StatusOr<InstanceConstSharedPtr> createInstancePtr(Args&&... args) {
+    absl::Status status;
+    // Use new instead of make_shared here because the instance constructors are private and must be
+    // called directly here.
+    std::shared_ptr<InstanceType> instance(new InstanceType(status, std::forward<Args>(args)...));
+    if (!status.ok()) {
+      return status;
+    }
+    return instance;
+  }
 };
 
 /**
@@ -100,7 +132,20 @@ public:
    */
   static std::string sockaddrToString(const sockaddr_in& addr);
 
+  // Validate that IPv4 is supported on this platform, raise an exception for the
+  // given address if not.
+  static absl::Status validateProtocolSupported();
+
 private:
+  /**
+   * Construct from an existing unix IPv4 socket address (IP v4 address and port).
+   * Store the status code in passed in parameter instead of throwing.
+   * It is called by the factory method and the partially constructed instance will be discarded
+   * upon error.
+   */
+  explicit Ipv4Instance(absl::Status& error, const sockaddr_in* address,
+                        const SocketInterface* sock_interface = nullptr);
+
   struct Ipv4Helper : public Ipv4 {
     uint32_t address() const override { return address_.sin_addr.s_addr; }
 
@@ -124,7 +169,10 @@ private:
     std::string friendly_address_;
   };
 
+  void initHelper(const sockaddr_in* address);
+
   IpHelper ip_;
+  friend class InstanceFactory;
 };
 
 /**
@@ -166,7 +214,19 @@ public:
   }
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in6); }
 
+  // Validate that IPv6 is supported on this platform
+  static absl::Status validateProtocolSupported();
+
 private:
+  /**
+   * Construct from an existing unix IPv6 socket address (IP v6 address and port).
+   * Store the status code in passed in parameter instead of throwing.
+   * It is called by the factory method and the partially constructed instance will be discarded
+   * upon error.
+   */
+  Ipv6Instance(absl::Status& error, const sockaddr_in6& address, bool v6only = true,
+               const SocketInterface* sock_interface = nullptr);
+
   struct Ipv6Helper : public Ipv6 {
     Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
     absl::uint128 address() const override;
@@ -199,7 +259,10 @@ private:
     std::string friendly_address_;
   };
 
+  void initHelper(const sockaddr_in6& address, bool v6only);
+
   IpHelper ip_;
+  friend class InstanceFactory;
 };
 
 /**
@@ -219,6 +282,8 @@ public:
   explicit PipeInstance(const std::string& pipe_path, mode_t mode = 0,
                         const SocketInterface* sock_interface = nullptr);
 
+  static absl::Status validateProtocolSupported() { return absl::OkStatus(); }
+
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return nullptr; }
@@ -236,6 +301,15 @@ public:
   }
 
 private:
+  /**
+   * Construct from an existing unix address.
+   * Store the error status code in passed in parameter instead of throwing.
+   * It is called by the factory method and the partially constructed instance will be discarded
+   * upon error.
+   */
+  PipeInstance(absl::Status& error, const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0,
+               const SocketInterface* sock_interface = nullptr);
+
   struct PipeHelper : public Pipe {
 
     bool abstractNamespace() const override { return abstract_namespace_; }
@@ -248,7 +322,10 @@ private:
     mode_t mode_{0};
   };
 
+  absl::Status initHelper(const sockaddr_un* address, mode_t mode);
+
   PipeHelper pipe_;
+  friend class InstanceFactory;
 };
 
 class EnvoyInternalInstance : public InstanceBase {

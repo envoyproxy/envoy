@@ -1,9 +1,9 @@
-#include "common/singleton/manager_impl.h"
+#include "source/common/singleton/manager_impl.h"
 
 #include "envoy/registry/registry.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
 
 namespace Envoy {
 namespace Singleton {

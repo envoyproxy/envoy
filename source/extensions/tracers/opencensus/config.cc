@@ -1,10 +1,10 @@
-#include "extensions/tracers/opencensus/config.h"
+#include "source/extensions/tracers/opencensus/config.h"
 
 #include "envoy/config/trace/v3/opencensus.pb.h"
 #include "envoy/config/trace/v3/opencensus.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/tracers/opencensus/opencensus_tracer_impl.h"
+#include "source/extensions/tracers/opencensus/opencensus_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

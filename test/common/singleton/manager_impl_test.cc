@@ -1,6 +1,6 @@
 #include "envoy/registry/registry.h"
 
-#include "common/singleton/manager_impl.h"
+#include "source/common/singleton/manager_impl.h"
 
 #include "test/test_common/utility.h"
 

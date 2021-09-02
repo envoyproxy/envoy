@@ -292,15 +292,21 @@
         "request_header_matches": [
           {
             "name": ":authority",
-            "exact_match": "new_host"
+            "string_match": {
+              "exact": "new_host"
+            }
           },
           {
             "name": ":path",
-            "exact_match": "/host/rewrite/me"
+            "string_match": {
+              "exact": "/host/rewrite/me"
+            }
           },
           {
             "name": ":method",
-            "exact_match": "GET"
+            "string_match": {
+              "exact": "GET"
+            }
           },
           {
             "name": ":cookie",
@@ -320,7 +326,9 @@
         "request_header_matches": [
           {
             "name": "X-Client-IP",
-            "exact_match": "127.0.0.1"
+            "string_match": {
+              "exact": "127.0.0.1"
+            }
           }
         ]
       }
@@ -342,7 +350,9 @@
         "response_header_matches": [
           {
             "name": "content-type",
-            "exact_match": "text/plain"
+            "string_match": {
+              "exact": "text/plain"
+            }
           },
           {
             "name": "content-length",
@@ -354,7 +364,9 @@
           },
           {
             "name": "x-ping-response",
-            "exact_match": "yes"
+            "string_match": {
+              "exact": "yes"
+            }
           },
           {
             "name": "x-ping-response",

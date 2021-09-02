@@ -1,9 +1,8 @@
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
-#include "extensions/tracers/zipkin/zipkin_core_types.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_types.h"
 
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"

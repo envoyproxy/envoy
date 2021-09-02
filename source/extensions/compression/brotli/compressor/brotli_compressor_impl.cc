@@ -1,6 +1,6 @@
-#include "extensions/compression/brotli/compressor/brotli_compressor_impl.h"
+#include "source/extensions/compression/brotli/compressor/brotli_compressor_impl.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

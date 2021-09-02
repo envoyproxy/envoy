@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 // This is a minimal Envoy adaptation layer for the Chromium URL library.
 // NOLINT(namespace-envoy)

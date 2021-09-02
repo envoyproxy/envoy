@@ -10,15 +10,15 @@
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/grpc/common.h"
-#include "common/http/headers.h"
-#include "common/json/json_loader.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/health_checker_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/headers.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/upstream/health_checker_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -124,7 +124,7 @@ public:
   // HttpHealthCheckerImpl
   MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
 
-  Http::CodecClient::Type codecClientType() { return codec_client_type_; }
+  Http::CodecType codecClientType() { return codec_client_type_; }
 };
 
 class HttpHealthCheckerImplTest : public Event::TestUsingSimulatedTime,
@@ -147,9 +147,9 @@ public:
       absl::node_hash_map<std::string,
                           const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
 
-  void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true) {
+  void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
@@ -363,7 +363,7 @@ public:
     addCompletionCallback();
   }
 
-  void setupDeprecatedServiceNameValidationHC(const std::string& prefix) {
+  void setupServiceNameValidationHC(const std::string& prefix) {
     std::string yaml = fmt::format(R"EOF(
     timeout: 1s
     interval: 1s
@@ -584,9 +584,9 @@ public:
                   new NiceMock<Upstream::MockClusterInfo>()};
               Event::MockDispatcher dispatcher_;
               test_session.codec_client_ = new CodecClientForTest(
-                  Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
-                  test_session.codec_, nullptr,
-                  Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()), dispatcher_);
+                  Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
+                  nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
+                  dispatcher_);
               return test_session.codec_client_;
             }));
   }
@@ -1074,7 +1074,7 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
 }
 
 MATCHER_P(ApplicationProtocolListEq, expected, "") {
-  const Network::TransportSocketOptionsSharedPtr& options = arg;
+  const Network::TransportSocketOptionsConstSharedPtr& options = arg;
   EXPECT_EQ(options->applicationProtocolListOverride(), std::vector<std::string>{expected});
   return true;
 }
@@ -2076,6 +2076,7 @@ TEST_F(HttpHealthCheckerImplTest, DynamicAddAndRemove) {
   HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
 }
 
@@ -2530,7 +2531,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostsAndAltPort) {
 
 TEST_F(HttpHealthCheckerImplTest, Http2ClusterUseHttp2CodecClient) {
   setupNoServiceValidationHCWithHttp2();
-  EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->codecClientType());
+  EXPECT_EQ(Http::CodecType::HTTP2, health_checker_->codecClientType());
 }
 
 MATCHER_P(MetadataEq, expected, "") {
@@ -2948,9 +2949,9 @@ public:
 
 class ProdHttpHealthCheckerTest : public testing::Test, public HealthCheckerTestBase {
 public:
-  void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true) {
+  void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestProdHttpHealthChecker>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
@@ -3006,12 +3007,11 @@ public:
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH1HealthChecking) {
   setupNoServiceValidationHC();
-  EXPECT_EQ(Http::CodecClient::Type::HTTP1,
+  EXPECT_EQ(Http::CodecType::HTTP1,
             health_checker_->createCodecClientForTest(std::move(connection_))->type());
 }
 
-TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http1CodecClient)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
+TEST_F(HttpHealthCheckerImplTest, Http1CodecClient) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -3023,16 +3023,15 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http1CodecClient)) {
       service_name_matcher:
         prefix: locations
       path: /healthcheck
-      use_http2: false
+      codec_client_type: Http1
     )EOF";
 
-  allocHealthChecker(yaml, false);
+  allocHealthChecker(yaml);
   addCompletionCallback();
-  EXPECT_EQ(Http::CodecClient::Type::HTTP1, health_checker_->codecClientType());
+  EXPECT_EQ(Http::CodecType::HTTP1, health_checker_->codecClientType());
 }
 
-TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http2CodecClient)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
+TEST_F(HttpHealthCheckerImplTest, Http2CodecClient) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -3044,18 +3043,18 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http2CodecClient)) {
       service_name_matcher:
         prefix: locations
       path: /healthcheck
-      use_http2: true
+      codec_client_type: Http2
     )EOF";
 
-  allocHealthChecker(yaml, false);
+  allocHealthChecker(yaml);
   addCompletionCallback();
-  EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->codecClientType());
+  EXPECT_EQ(Http::CodecType::HTTP2, health_checker_->codecClientType());
 }
 
-TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMatch)) {
+TEST_F(HttpHealthCheckerImplTest, ServiceNameMatch) {
   const std::string host = "fake_cluster";
   const std::string path = "/healthcheck";
-  setupDeprecatedServiceNameValidationHC("locations");
+  setupServiceNameValidationHC("locations");
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
@@ -3087,8 +3086,8 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMatch)) {
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
-TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMismatch)) {
-  setupDeprecatedServiceNameValidationHC("locations");
+TEST_F(HttpHealthCheckerImplTest, ServiceNameMismatch) {
+  setupServiceNameValidationHC("locations");
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
@@ -3120,7 +3119,7 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMismatch)) 
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
   setupNoServiceValidationHCWithHttp2();
-  EXPECT_EQ(Http::CodecClient::Type::HTTP2,
+  EXPECT_EQ(Http::CodecType::HTTP2,
             health_checker_->createCodecClientForTest(std::move(connection_))->type());
 }
 
@@ -3372,9 +3371,9 @@ class TcpHealthCheckerImplTest : public testing::Test,
                                  public HealthCheckerTestBase,
                                  public Event::TestUsingSimulatedTime {
 public:
-  void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true) {
+  void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
@@ -4122,9 +4121,9 @@ public:
               Event::MockDispatcher dispatcher_;
 
               test_session.codec_client_ = new CodecClientForTest(
-                  Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
-                  test_session.codec_, nullptr,
-                  Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()), dispatcher_);
+                  Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
+                  nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
+                  dispatcher_);
               return test_session.codec_client_;
             }));
   }
@@ -4659,6 +4658,7 @@ TEST_F(GrpcHealthCheckerImplTest, DynamicAddAndRemove) {
   HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
 }
 

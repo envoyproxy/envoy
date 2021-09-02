@@ -1,13 +1,13 @@
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include <algorithm>
 #include <cstring>
 #include <string>
 
-#include "common/common/utility.h"
-#include "common/stats/histogram_impl.h"
-#include "common/stats/scope_prefixer.h"
-#include "common/stats/utility.h"
+#include "source/common/common/utility.h"
+#include "source/common/stats/histogram_impl.h"
+#include "source/common/stats/scope_prefixer.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Stats {

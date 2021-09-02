@@ -5,6 +5,7 @@ package envoy.config.route.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
+import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/metadata/v3/metadata.proto";
@@ -311,7 +312,7 @@ message Route {
 message WeightedCluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.WeightedCluster";
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 13]
   message ClusterWeight {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.WeightedCluster.ClusterWeight";
@@ -320,9 +321,31 @@ message WeightedCluster {
 
     reserved "per_filter_config";
 
+    // Only one of *name* and *cluster_header* may be specified.
+    // [#next-major-version: Need to add back the validation rule: (validate.rules).string = {min_len: 1}]
     // Name of the upstream cluster. The cluster must exist in the
     // :ref:`cluster manager configuration <config_cluster_manager>`.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+    string name = 1 [(udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"];
+
+    // Only one of *name* and *cluster_header* may be specified.
+    // [#next-major-version: Need to add back the validation rule: (validate.rules).string = {min_len: 1 }]
+    // Envoy will determine the cluster to route to by reading the value of the
+    // HTTP header named by cluster_header from the request headers. If the
+    // header is not found or the referenced cluster does not exist, Envoy will
+    // return a 404 response.
+    //
+    // .. attention::
+    //
+    //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
+    //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
+    string cluster_header = 12 [
+      (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
+    ];
 
     // An integer between 0 and :ref:`total_weight
     // <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>`. When a request matches the route,
@@ -378,6 +401,13 @@ message WeightedCluster {
     // :ref:`FilterConfig<envoy_v3_api_msg_config.route.v3.FilterConfig>`
     // message to specify additional options.]
     map<string, google.protobuf.Any> typed_per_filter_config = 10;
+
+    oneof host_rewrite_specifier {
+      // Indicates that during forwarding, the host header will be swapped with
+      // this value.
+      string host_rewrite_literal = 11
+          [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+    }
   }
 
   // Specifies one or more upstream clusters associated with the route.
@@ -398,7 +428,7 @@ message WeightedCluster {
   string runtime_key_prefix = 2;
 }
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
@@ -466,7 +496,7 @@ message RouteMatch {
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default
-  // is true.
+  // is true. Ignored for safe_regex matching.
   google.protobuf.BoolValue case_sensitive = 4;
 
   // Indicates that the route should additionally match on a runtime key. Every time the route
@@ -511,6 +541,12 @@ message RouteMatch {
   //
   // [#next-major-version: unify with RBAC]
   TlsContextMatchOptions tls_context = 11;
+
+  // Specifies a set of dynamic metadata matchers on which the route should match.
+  // The router will check the dynamic metadata against all the specified dynamic metadata matchers.
+  // If the number of specified dynamic metadata matchers is nonzero, they all must match the
+  // dynamic metadata for a match to occur.
+  repeated type.matcher.v3.MetadataMatcher dynamic_metadata = 13;
 }
 
 // [#next-free-field: 12]
@@ -563,7 +599,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -839,6 +875,14 @@ message RouteAction {
     // :ref:`traffic splitting <config_http_conn_man_route_table_traffic_splitting_split>`
     // for additional documentation.
     WeightedCluster weighted_clusters = 3;
+
+    // [#not-implemented-hide:]
+    // Name of the cluster specifier plugin to use to determine the cluster for
+    // requests on this route. The plugin name must be defined in the associated
+    // :ref:`envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_specifier_plugins`
+    // in the
+    // :ref:`envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name` field.
+    string cluster_specifier_plugin = 37;
   }
 
   // The HTTP status code to use when configured cluster is not found.
@@ -1850,7 +1894,7 @@ message RateLimit {
 //   value.
 //
 //  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message HeaderMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.HeaderMatcher";
 
@@ -1865,12 +1909,16 @@ message HeaderMatcher {
   // Specifies how the header match will be performed to route the request.
   oneof header_match_specifier {
     // If specified, header match will be performed based on the value of the header.
-    string exact_match = 4;
+    // This field is deprecated. Please use :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>`.
+    string exact_match = 4
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the
     // request header value matches the regex.
-    type.matcher.v3.RegexMatcher safe_regex_match = 11;
+    // This field is deprecated. Please use :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>`.
+    type.matcher.v3.RegexMatcher safe_regex_match = 11
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // If specified, header match will be performed based on range.
     // The rule will match if the request header value is within this range.
@@ -1885,34 +1933,52 @@ message HeaderMatcher {
     //   "-1somestring"
     type.v3.Int64Range range_match = 6;
 
-    // If specified, header match will be performed based on whether the header is in the
-    // request.
+    // If specified as true, header match will be performed based on whether the header is in the
+    // request. If specified as false, header match will be performed based on whether the header is absent.
     bool present_match = 7;
 
     // If specified, header match will be performed based on the prefix of the header value.
     // Note: empty prefix is not allowed, please use present_match instead.
+    // This field is deprecated. Please use :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>`.
     //
     // Examples:
     //
     // * The prefix *abcd* matches the value *abcdxyz*, but not for *abcxyz*.
-    string prefix_match = 9 [(validate.rules).string = {min_len: 1}];
+    string prefix_match = 9 [
+      deprecated = true,
+      (validate.rules).string = {min_len: 1},
+      (envoy.annotations.deprecated_at_minor_version) = "3.0"
+    ];
 
     // If specified, header match will be performed based on the suffix of the header value.
     // Note: empty suffix is not allowed, please use present_match instead.
+    // This field is deprecated. Please use :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>`.
     //
     // Examples:
     //
     // * The suffix *abcd* matches the value *xyzabcd*, but not for *xyzbcd*.
-    string suffix_match = 10 [(validate.rules).string = {min_len: 1}];
+    string suffix_match = 10 [
+      deprecated = true,
+      (validate.rules).string = {min_len: 1},
+      (envoy.annotations.deprecated_at_minor_version) = "3.0"
+    ];
 
     // If specified, header match will be performed based on whether the header value contains
     // the given value or not.
     // Note: empty contains match is not allowed, please use present_match instead.
+    // This field is deprecated. Please use :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>`.
     //
     // Examples:
     //
     // * The value *abcd* matches the value *xyzabcdpqr*, but not for *xyzbcdpqr*.
-    string contains_match = 12 [(validate.rules).string = {min_len: 1}];
+    string contains_match = 12 [
+      deprecated = true,
+      (validate.rules).string = {min_len: 1},
+      (envoy.annotations.deprecated_at_minor_version) = "3.0"
+    ];
+
+    // If specified, header match will be performed based on the string match of the header value.
+    type.matcher.v3.StringMatcher string_match = 13;
   }
 
   // If specified, the match result will be inverted before checking. Defaults to false.

@@ -1,4 +1,4 @@
-#include "common/network/dns_impl.h"
+#include "source/common/network/dns_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -8,11 +8,11 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/thread.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 #include "absl/strings/str_join.h"
 #include "ares.h"
@@ -23,10 +23,10 @@ namespace Network {
 DnsResolverImpl::DnsResolverImpl(
     Event::Dispatcher& dispatcher,
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-    const bool use_tcp_for_dns_lookups)
+    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
-      use_tcp_for_dns_lookups_(use_tcp_for_dns_lookups),
+      dns_resolver_options_(dns_resolver_options),
       resolvers_csv_(maybeBuildResolversCsv(resolvers)) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
@@ -66,9 +66,14 @@ absl::optional<std::string> DnsResolverImpl::maybeBuildResolversCsv(
 DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
   AresOptions options{};
 
-  if (use_tcp_for_dns_lookups_) {
+  if (dns_resolver_options_.use_tcp_for_dns_lookups()) {
     options.optmask_ |= ARES_OPT_FLAGS;
     options.options_.flags |= ARES_FLAG_USEVC;
+  }
+
+  if (dns_resolver_options_.no_default_search_domain()) {
+    options.optmask_ |= ARES_OPT_FLAGS;
+    options.options_.flags |= ARES_FLAG_NOSEARCH;
   }
 
   return options;
@@ -100,6 +105,9 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     // callback_ target _should_ still be around. In that case, raise the callback_ so the target
     // can be done with this query and initiate a new one.
     if (!cancelled_) {
+      ENVOY_LOG_EVENT(debug, "cares_dns_resolution_destroyed", "dns resolution for {} destroyed",
+                      dns_name_);
+
       callback_(ResolutionStatus::Failure, {});
     }
     delete this;
@@ -169,10 +177,16 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
 
   if (completed_) {
     if (!cancelled_) {
-      // TODO(chaoqin-li1123): remove this exception catching by refactoring.
-      //  We can't add a main thread assertion here because both this code is reused by dns filter
-      //  and executed in both main thread and worker thread. Maybe split the code for filter and
-      //  main thread.
+      // Use a raw try here because it is used in both main thread and filter.
+      // Can not convert to use status code as there may be unexpected exceptions in server fuzz
+      // tests, which must be handled. Potential exception may come from getAddressWithPort() or
+      // portFromTcpUrl().
+      // TODO(chaoqin-li1123): remove try catch pattern here once we figure how to handle unexpected
+      // exception in fuzz tests.
+      ENVOY_LOG_EVENT(debug, "cares_dns_resolution_complete",
+                      "dns resolution for {} completed with status {}", dns_name_,
+                      resolution_status);
+
       TRY_NEEDS_AUDIT { callback_(resolution_status, std::move(address_list)); }
       catch (const EnvoyException& e) {
         ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
@@ -246,6 +260,8 @@ void DnsResolverImpl::onAresSocketStateChange(os_fd_t fd, int read, int write) {
 
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
                                          DnsLookupFamily dns_lookup_family, ResolveCb callback) {
+  ENVOY_LOG_EVENT(debug, "cares_dns_resolution_start", "dns resolution for {} started", dns_name);
+
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
   // failed initial call to getAddrInfo followed by a synchronous IPv4
   // resolution.
@@ -257,8 +273,8 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     initializeChannel(&options.options_, options.optmask_);
   }
 
-  std::unique_ptr<PendingResolution> pending_resolution(
-      new PendingResolution(*this, callback, dispatcher_, channel_, dns_name));
+  auto pending_resolution =
+      std::make_unique<PendingResolution>(*this, callback, dispatcher_, channel_, dns_name);
   if (dns_lookup_family == DnsLookupFamily::Auto) {
     pending_resolution->fallback_if_failed_ = true;
   }

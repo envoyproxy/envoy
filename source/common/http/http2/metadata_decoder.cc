@@ -1,6 +1,6 @@
-#include "common/http/http2/metadata_decoder.h"
+#include "source/common/http/http2/metadata_decoder.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -22,7 +22,7 @@ bool MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len) {
   ASSERT(data != nullptr && len != 0);
   payload_.add(data, len);
 
-  total_payload_size_ += payload_.length();
+  total_payload_size_ += len;
   return total_payload_size_ <= max_payload_size_bound_;
 }
 

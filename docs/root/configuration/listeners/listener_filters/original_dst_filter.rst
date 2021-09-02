@@ -4,14 +4,14 @@ Original Destination
 ====================
 
 Linux
-===============
+-----
 
 Original destination listener filter reads the SO_ORIGINAL_DST socket option set when a connection
 has been redirected by an iptables REDIRECT target, or by an iptables TPROXY target in combination
 with setting the listener's :ref:`transparent <envoy_v3_api_field_config.listener.v3.Listener.transparent>` option.
 
 Windows
-===============
+-------
 
 Original destination listener filter reads the SO_ORIGINAL_DST socket option set when a connection has been redirected by an
 `HNS <https://docs.microsoft.com/en-us/virtualization/windowscontainers/container-networking/architecture#container-network-management-with-host-network-service>`_

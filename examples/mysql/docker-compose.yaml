@@ -6,19 +6,19 @@ services:
       context: .
       dockerfile: Dockerfile-proxy
     networks:
-      - envoymesh
+    - envoymesh
     ports:
-      - "1999:1999"
-      - "8001:8001"
+    - "1999:1999"
+    - "8001:8001"
 
   mysql:
     build:
       context: .
       dockerfile: Dockerfile-mysql
     networks:
-      - envoymesh
+    - envoymesh
     environment:
-      - MYSQL_ALLOW_EMPTY_PASSWORD=yes
+    - MYSQL_ALLOW_EMPTY_PASSWORD=yes
 
 networks:
   envoymesh:

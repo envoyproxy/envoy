@@ -3,7 +3,7 @@
 #include "envoy/config/trace/v3/zipkin.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/tracers/zipkin/config.h"
+#include "source/extensions/tracers/zipkin/config.h"
 
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
@@ -29,7 +29,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
       collector_cluster: fake_cluster
-      collector_endpoint: /api/v1/spans
+      collector_endpoint: /api/v2/spans
       collector_endpoint_version: HTTP_JSON
   )EOF";
 

@@ -2,9 +2,8 @@
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/bootstrap/wasm/config.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/bootstrap/wasm/config.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/event/mocks.h"

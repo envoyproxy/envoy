@@ -1,9 +1,8 @@
-#include "extensions/filters/network/dubbo_proxy/active_message.h"
+#include "source/extensions/filters/network/dubbo_proxy/active_message.h"
 
-#include "common/stats/timespan_impl.h"
-
-#include "extensions/filters/network/dubbo_proxy/app_exception.h"
-#include "extensions/filters/network/dubbo_proxy/conn_manager.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/app_exception.h"
+#include "source/extensions/filters/network/dubbo_proxy/conn_manager.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -186,7 +185,7 @@ ActiveMessage::ActiveMessage(ConnectionManager& parent)
     : parent_(parent), request_timer_(std::make_unique<Stats::HistogramCompletableTimespanImpl>(
                            parent_.stats().request_time_ms_, parent.timeSystem())),
       request_id_(-1), stream_id_(parent.randomGenerator().random()),
-      stream_info_(parent.timeSystem(), parent_.connection().addressProviderSharedPtr()),
+      stream_info_(parent.timeSystem(), parent_.connection().connectionInfoProviderSharedPtr()),
       pending_stream_decoded_(false), local_response_sent_(false) {
   parent_.stats().request_active_.inc();
 }

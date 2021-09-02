@@ -35,7 +35,7 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
   EXPECT_TRUE(response->complete());
 
   EXPECT_EQ("200", response->headers().getStatusValue());
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+  if (downstream_protocol_ == Http::CodecType::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   } else {
     EXPECT_EQ("close", response->headers().getConnectionValue());
@@ -66,7 +66,7 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseImmediate) {
   EXPECT_TRUE(response->complete());
 
   EXPECT_EQ("200", response->headers().getStatusValue());
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+  if (downstream_protocol_ == Http::CodecType::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   } else {
     EXPECT_EQ("close", response->headers().getConnectionValue());
@@ -108,7 +108,7 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
 
   // Connections will terminate on request complete
   ASSERT_TRUE(codec_client_->waitForDisconnect());
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+  if (downstream_protocol_ == Http::CodecType::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   } else {
     EXPECT_EQ("close", response->headers().getConnectionValue());
@@ -169,8 +169,8 @@ TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
 
 INSTANTIATE_TEST_SUITE_P(Protocols, DrainCloseIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
-                             {FakeHttpConnection::Type::HTTP1})),
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+                             {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 } // namespace

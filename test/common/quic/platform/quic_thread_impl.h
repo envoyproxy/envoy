@@ -10,7 +10,7 @@
 
 #include "envoy/thread/thread.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "test/test_common/thread_factory_for_test.h"
 

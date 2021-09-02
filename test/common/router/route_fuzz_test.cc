@@ -2,7 +2,7 @@
 #include "envoy/config/route/v3/route.pb.validate.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/router/config_impl.h"
+#include "source/common/router/config_impl.h"
 
 #include "test/common/router/route_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -39,7 +39,7 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
   static NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   try {
     TestUtility::validate(input);
-    ConfigImpl config(cleanRouteConfig(input.config()), factory_context,
+    ConfigImpl config(cleanRouteConfig(input.config()), OptionalHttpFilters(), factory_context,
                       ProtobufMessage::getNullValidationVisitor(), true);
     auto headers = Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.headers());
     auto route = config.route(headers, stream_info, input.random_value());

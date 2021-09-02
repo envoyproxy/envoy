@@ -8,6 +8,7 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
+    "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
@@ -134,6 +135,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_benchmark()
     _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
+    _com_github_google_libsxg()
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
@@ -155,7 +157,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
     _com_googlesource_chromium_v8()
-    _com_googlesource_quiche()
+    _com_github_google_quiche()
     _com_googlesource_googleurl()
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
@@ -175,6 +177,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
     external_http_archive("rules_cc")
+    external_http_archive("rules_pkg")
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
@@ -186,6 +189,7 @@ def envoy_dependencies(skip_targets = []):
     _kafka_deps()
 
     _org_llvm_llvm()
+    _com_github_wamr()
     _com_github_wavm_wavm()
     _com_github_wasmtime()
     _com_github_wasm_c_api()
@@ -308,6 +312,17 @@ def _com_github_google_libprotobuf_mutator():
     external_http_archive(
         name = "com_github_google_libprotobuf_mutator",
         build_file = "@envoy//bazel/external:libprotobuf_mutator.BUILD",
+    )
+
+def _com_github_google_libsxg():
+    external_http_archive(
+        name = "com_github_google_libsxg",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+    native.bind(
+        name = "libsxg",
+        actual = "@envoy//bazel/foreign_cc:libsxg",
     )
 
 def _com_github_jbeder_yaml_cpp():
@@ -515,7 +530,11 @@ def _com_google_googletest():
 # pull in more bits of abseil as needed, and is now the preferred
 # method for pure Bazel deps.
 def _com_google_absl():
-    external_http_archive("com_google_absl")
+    external_http_archive(
+        name = "com_google_absl",
+        patches = ["@envoy//bazel:abseil.patch"],
+        patch_args = ["-p1"],
+    )
     native.bind(
         name = "abseil_any",
         actual = "@com_google_absl//absl/types:any",
@@ -732,31 +751,31 @@ def _com_googlesource_chromium_v8():
         actual = "@com_googlesource_chromium_v8//:wee8",
     )
 
-def _com_googlesource_quiche():
+def _com_github_google_quiche():
     external_genrule_repository(
-        name = "com_googlesource_quiche",
+        name = "com_github_google_quiche",
         genrule_cmd_file = "@envoy//bazel/external:quiche.genrule_cmd",
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
     native.bind(
         name = "quiche_common_platform",
-        actual = "@com_googlesource_quiche//:quiche_common_platform",
+        actual = "@com_github_google_quiche//:quiche_common_platform",
     )
     native.bind(
         name = "quiche_http2_platform",
-        actual = "@com_googlesource_quiche//:http2_platform",
+        actual = "@com_github_google_quiche//:http2_platform",
     )
     native.bind(
         name = "quiche_spdy_platform",
-        actual = "@com_googlesource_quiche//:spdy_platform",
+        actual = "@com_github_google_quiche//:spdy_platform",
     )
     native.bind(
         name = "quiche_quic_platform",
-        actual = "@com_googlesource_quiche//:quic_platform",
+        actual = "@com_github_google_quiche//:quic_platform",
     )
     native.bind(
         name = "quiche_quic_platform_base",
-        actual = "@com_googlesource_quiche//:quic_platform_base",
+        actual = "@com_github_google_quiche//:quic_platform_base",
     )
 
 def _com_googlesource_googleurl():
@@ -826,8 +845,18 @@ def _com_github_grpc_grpc():
     )
 
     native.bind(
+        name = "upb_lib_descriptor_reflection",
+        actual = "@upb//:descriptor_upb_proto_reflection",
+    )
+
+    native.bind(
         name = "upb_textformat_lib",
         actual = "@upb//:textformat",
+    )
+
+    native.bind(
+        name = "upb_json_lib",
+        actual = "@upb//:json",
     )
 
 def _upb():
@@ -842,10 +871,7 @@ def _proxy_wasm_cpp_sdk():
     external_http_archive(name = "proxy_wasm_cpp_sdk")
 
 def _proxy_wasm_cpp_host():
-    external_http_archive(
-        name = "proxy_wasm_cpp_host",
-        build_file = "@envoy//bazel/external:proxy_wasm_cpp_host.BUILD",
-    )
+    external_http_archive(name = "proxy_wasm_cpp_host")
 
 def _emscripten_toolchain():
     external_http_archive(
@@ -865,6 +891,11 @@ def _com_github_google_jwt_verify():
     native.bind(
         name = "jwt_verify_lib",
         actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
+    )
+
+    native.bind(
+        name = "simple_lru_cache_lib",
+        actual = "@com_github_google_jwt_verify//:simple_lru_cache_lib",
     )
 
 def _com_github_luajit_luajit():
@@ -927,6 +958,16 @@ def _org_llvm_llvm():
         actual = "@envoy//bazel/foreign_cc:llvm",
     )
 
+def _com_github_wamr():
+    external_http_archive(
+        name = "com_github_wamr",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "wamr",
+        actual = "@envoy//bazel/foreign_cc:wamr",
+    )
+
 def _com_github_wavm_wavm():
     external_http_archive(
         name = "com_github_wavm_wavm",
@@ -947,6 +988,10 @@ def _com_github_wasm_c_api():
     external_http_archive(
         name = "com_github_wasm_c_api",
         build_file = "@envoy//bazel/external:wasm-c-api.BUILD",
+    )
+    native.bind(
+        name = "wasmtime",
+        actual = "@com_github_wasm_c_api//:wasmtime_lib",
     )
 
 def _rules_fuzzing():
@@ -976,6 +1021,17 @@ filegroup(
         name = "kafka_source",
         build_file_content = KAFKASOURCE_BUILD_CONTENT,
         patches = ["@envoy//bazel/external:kafka_int32.patch"],
+    )
+
+    # This archive provides Kafka C/CPP client used by mesh filter to communicate with upstream
+    # Kafka clusters.
+    external_http_archive(
+        name = "edenhill_librdkafka",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "librdkafka",
+        actual = "@envoy//bazel/foreign_cc:librdkafka",
     )
 
     # This archive provides Kafka (and Zookeeper) binaries, that are used during Kafka integration

@@ -12,13 +12,12 @@
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "common/event/dispatcher_impl.h"
-#include "common/network/connection_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
 
 #include "test/extensions/common/tap/common.h"
 #include "test/integration/autonomous_upstream.h"
@@ -139,7 +138,7 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 }
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2) {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
   config_helper_.setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::
                                     HttpConnectionManager::AUTO);
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
@@ -158,7 +157,7 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferVerifySAN) {
 }
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2VerifySAN) {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(ClientSslTransportOptions().setAlpn(true).setSan(san_to_match_));
   };
@@ -194,7 +193,7 @@ TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
 #if defined(__APPLE__) || defined(WIN32)
   // Skip this test on OS X + Windows: we can't detect the early close on non-Linux, and we
   // won't clean up the upstream connection until it times out. See #4294.
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     return;
   }
 #endif
@@ -666,10 +665,12 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   checkStats();
   envoy::config::core::v3::Address expected_local_address;
   Network::Utility::addressToProtobufAddress(
-      *codec_client_->connection()->addressProvider().remoteAddress(), expected_local_address);
+      *codec_client_->connection()->connectionInfoProvider().remoteAddress(),
+      expected_local_address);
   envoy::config::core::v3::Address expected_remote_address;
   Network::Utility::addressToProtobufAddress(
-      *codec_client_->connection()->addressProvider().localAddress(), expected_remote_address);
+      *codec_client_->connection()->connectionInfoProvider().localAddress(),
+      expected_remote_address);
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::data::tap::v3::TraceWrapper trace;

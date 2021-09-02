@@ -8,10 +8,8 @@
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/config/version_converter.h"
-
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/config/api_version.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
@@ -64,7 +62,7 @@ public:
   // Finalize the config and spin up an Envoy instance.
   virtual void createEnvoy();
   // Sets upstream_protocol_ and alters the upstream protocol in the config_helper_
-  void setUpstreamProtocol(FakeHttpConnection::Type protocol);
+  void setUpstreamProtocol(Http::CodecType protocol);
   // Sets fake_upstreams_count_
   void setUpstreamCount(uint32_t count) { fake_upstreams_count_ = count; }
   // Skip validation that ensures that all upstream ports are referenced by the
@@ -73,7 +71,7 @@ public:
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministic() { deterministic_ = true; }
 
-  FakeHttpConnection::Type upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
+  Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
   IntegrationTcpClientPtr
   makeTcpConnection(uint32_t port,
@@ -144,12 +142,11 @@ public:
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
-                             const std::vector<std::string>& removed, const std::string& version,
-                             const bool api_downgrade = false) {
+                             const std::vector<std::string>& removed, const std::string& version) {
     if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
-      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, api_downgrade);
+      sendSotwDiscoveryResponse(type_url, state_of_the_world, version);
     } else {
-      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, api_downgrade);
+      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version);
     }
   }
 
@@ -179,16 +176,12 @@ public:
 
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version, const bool api_downgrade = false) {
+                                 const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
-      if (api_downgrade) {
-        discovery_response.add_resources()->PackFrom(API_DOWNGRADE(message));
-      } else {
-        discovery_response.add_resources()->PackFrom(message);
-      }
+      discovery_response.add_resources()->PackFrom(message);
     }
     static int next_nonce_counter = 0;
     discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
@@ -196,21 +189,18 @@ public:
   }
 
   template <class T>
-  void sendDeltaDiscoveryResponse(const std::string& type_url,
-                                  const std::vector<T>& added_or_updated,
-                                  const std::vector<std::string>& removed,
-                                  const std::string& version, const bool api_downgrade = false) {
-    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {},
-                               api_downgrade);
+  void
+  sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version) {
+    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {});
   }
   template <class T>
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
-                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {},
-                             const bool api_downgrade = false) {
-    auto response = createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
-                                                    aliases, api_downgrade);
+                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {}) {
+    auto response =
+        createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version, aliases);
     stream->sendGrpcMessage(response);
   }
 
@@ -218,22 +208,15 @@ public:
   envoy::service::discovery::v3::DeltaDiscoveryResponse
   createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                                const std::vector<std::string>& removed, const std::string& version,
-                               const std::vector<std::string>& aliases,
-                               const bool api_downgrade = false) {
-
+                               const std::vector<std::string>& aliases) {
     envoy::service::discovery::v3::DeltaDiscoveryResponse response;
     response.set_system_version_info("system_version_info_this_is_a_test");
     response.set_type_url(type_url);
     for (const auto& message : added_or_updated) {
       auto* resource = response.add_resources();
       ProtobufWkt::Any temp_any;
-      if (api_downgrade) {
-        temp_any.PackFrom(API_DOWNGRADE(message));
-        resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
-      } else {
-        temp_any.PackFrom(message);
-        resource->mutable_resource()->PackFrom(message);
-      }
+      temp_any.PackFrom(message);
+      resource->mutable_resource()->PackFrom(message);
       resource->set_name(intResourceName(message));
       resource->set_version(version);
       for (const auto& alias : aliases) {
@@ -274,7 +257,8 @@ public:
    * @param if the connection should be terminated once '\r\n\r\n' has been read.
    **/
   void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
-                                     bool disconnect_after_headers_complete = false);
+                                     bool disconnect_after_headers_complete = false,
+                                     Network::TransportSocketPtr transport_socket = nullptr);
 
   /**
    * Helper to create ConnectionDriver.
@@ -285,10 +269,11 @@ public:
    **/
   std::unique_ptr<RawConnectionDriver> createConnectionDriver(
       uint32_t port, const std::string& initial_data,
-      std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback) {
+      std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback,
+      Network::TransportSocketPtr transport_socket = nullptr) {
     Buffer::OwnedImpl buffer(initial_data);
     return std::make_unique<RawConnectionDriver>(port, buffer, data_callback, version_,
-                                                 *dispatcher_);
+                                                 *dispatcher_, std::move(transport_socket));
   }
 
   /**
@@ -307,17 +292,24 @@ public:
                                                  *dispatcher_, std::move(transport_socket));
   }
 
-  // Add a fake upstream bound to INADDR_ANY and there is no specified port.
-  FakeUpstream& addFakeUpstream(FakeHttpConnection::Type type) {
+  FakeUpstreamConfig configWithType(Http::CodecType type) const {
     FakeUpstreamConfig config = upstream_config_;
     config.upstream_protocol_ = type;
+    if (type != Http::CodecType::HTTP3) {
+      config.udp_fake_upstream_ = absl::nullopt;
+    }
+    return config;
+  }
+
+  FakeUpstream& addFakeUpstream(Http::CodecType type) {
+    auto config = configWithType(type);
     fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(0, version_, config));
     return *fake_upstreams_.back();
   }
+
   FakeUpstream& addFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                                FakeHttpConnection::Type type) {
-    FakeUpstreamConfig config = upstream_config_;
-    config.upstream_protocol_ = type;
+                                Http::CodecType type) {
+    auto config = configWithType(type);
     fake_upstreams_.emplace_back(
         std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
     return *fake_upstreams_.back();
@@ -394,7 +386,8 @@ protected:
   bool use_lds_{true}; // Use the integration framework's LDS set up.
   bool upstream_tls_{false};
 
-  Network::TransportSocketFactoryPtr createUpstreamTlsContext();
+  Network::TransportSocketFactoryPtr
+  createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
 
@@ -433,12 +426,7 @@ protected:
   // This override exists for tests measuring stats memory.
   bool use_real_stats_{};
 
-  // Use a v2 bootstrap.
-  bool v2_bootstrap_{false};
-
 private:
-  friend class MixedUpstreamIntegrationTest;
-
   // Configuration for the fake upstream.
   FakeUpstreamConfig upstream_config_{time_system_};
   // True if initialized() has been called.

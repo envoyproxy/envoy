@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
+#include "source/extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
 #include <chrono>
 
@@ -9,26 +9,22 @@
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
 
-GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(
-    Grpc::AsyncClientFactoryPtr&& factory, const LocalInfo::LocalInfo& local_info,
-    envoy::config::core::v3::ApiVersion transport_api_version)
+GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(Grpc::RawAsyncClientSharedPtr raw_async_client,
+                                                 const LocalInfo::LocalInfo& local_info)
     : GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
-                          envoy::service::metrics::v3::StreamMetricsResponse>(*factory),
+                          envoy::service::metrics::v3::StreamMetricsResponse>(raw_async_client),
       local_info_(local_info),
-      service_method_(
-          Grpc::VersionedMethods("envoy.service.metrics.v3.MetricsService.StreamMetrics",
-                                 "envoy.service.metrics.v2.MetricsService.StreamMetrics")
-              .getMethodDescriptorForVersion(transport_api_version)),
-      transport_api_version_(transport_api_version) {}
+      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.metrics.v3.MetricsService.StreamMetrics")) {}
 
 void GrpcMetricsStreamerImpl::send(MetricsPtr&& metrics) {
   envoy::service::metrics::v3::StreamMetricsMessage message;
@@ -42,7 +38,7 @@ void GrpcMetricsStreamerImpl::send(MetricsPtr&& metrics) {
     *identifier->mutable_node() = local_info_.node();
   }
   if (stream_ != nullptr) {
-    stream_->sendMessage(message, transport_api_version_, false);
+    stream_->sendMessage(message, false);
   }
 }
 
@@ -59,19 +55,19 @@ MetricsPtr MetricsFlusher::flush(Stats::MetricSnapshot& snapshot) const {
                                  snapshot.snapshotTime().time_since_epoch())
                                  .count();
   for (const auto& counter : snapshot.counters()) {
-    if (counter.counter_.get().used()) {
+    if (predicate_(counter.counter_.get())) {
       flushCounter(*metrics->Add(), counter, snapshot_time_ms);
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
-    if (gauge.get().used()) {
+    if (predicate_(gauge)) {
       flushGauge(*metrics->Add(), gauge.get(), snapshot_time_ms);
     }
   }
 
   for (const auto& histogram : snapshot.histograms()) {
-    if (histogram.get().used()) {
+    if (predicate_(histogram.get())) {
       flushHistogram(*metrics->Add(), *metrics->Add(), histogram.get(), snapshot_time_ms);
     }
   }

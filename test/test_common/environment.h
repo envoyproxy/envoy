@@ -7,7 +7,7 @@
 #include "envoy/network/address.h"
 #include "envoy/server/options.h"
 
-#include "common/json/json_loader.h"
+#include "source/common/json/json_loader.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"

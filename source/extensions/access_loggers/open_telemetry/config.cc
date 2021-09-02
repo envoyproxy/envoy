@@ -1,4 +1,4 @@
-#include "extensions/access_loggers/open_telemetry/config.h"
+#include "source/extensions/access_loggers/open_telemetry/config.h"
 
 #include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.validate.h"
@@ -6,14 +6,12 @@
 #include "envoy/server/access_log_config.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/assert.h"
-#include "common/common/macros.h"
-#include "common/grpc/async_client_impl.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/access_loggers/open_telemetry/access_log_impl.h"
-#include "extensions/access_loggers/open_telemetry/access_log_proto_descriptors.h"
-#include "extensions/access_loggers/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/access_loggers/open_telemetry/access_log_impl.h"
+#include "source/extensions/access_loggers/open_telemetry/access_log_proto_descriptors.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -53,7 +51,7 @@ ProtobufTypes::MessagePtr AccessLogFactory::createEmptyConfigProto() {
       envoy::extensions::access_loggers::open_telemetry::v3alpha::OpenTelemetryAccessLogConfig>();
 }
 
-std::string AccessLogFactory::name() const { return AccessLogNames::get().OpenTelemetry; }
+std::string AccessLogFactory::name() const { return "envoy.access_loggers.open_telemetry"; }
 
 /**
  * Static registration for the OpenTelemetry (gRPC) access log. @see RegisterFactory.

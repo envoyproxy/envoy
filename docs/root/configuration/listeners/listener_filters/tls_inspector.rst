@@ -29,7 +29,6 @@ A sample filter configuration could be:
 
   listener_filters:
   - name: "envoy.filters.listener.tls_inspector"
-    typed_config: {}
 
 Or by specifying the `type_url <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Any.FIELDS.string.google.protobuf.Any.type_url>`_
 of the *typed_config*:

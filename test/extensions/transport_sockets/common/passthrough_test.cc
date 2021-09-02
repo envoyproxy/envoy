@@ -1,4 +1,4 @@
-#include "extensions/transport_sockets/common/passthrough.h"
+#include "source/extensions/transport_sockets/common/passthrough.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"

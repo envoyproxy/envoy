@@ -4,8 +4,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/listen_socket.h"
 
-#include "common/common/logger.h"
-#include "common/network/socket_option_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/socket_option_impl.h"
 
 #include "absl/types/optional.h"
 

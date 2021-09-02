@@ -1,6 +1,6 @@
 
 
-#include "extensions/transport_sockets/alts/tsi_socket.h"
+#include "source/extensions/transport_sockets/alts/tsi_socket.h"
 
 #include "test/mocks/network/mocks.h"
 
@@ -171,8 +171,8 @@ protected:
     EXPECT_EQ(0L, client_.read_buffer_.length());
 
     EXPECT_CALL(*server_.raw_socket_, doRead(_));
-    EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
     EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+    EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
     EXPECT_CALL(*server_.raw_socket_, doRead(_));
     expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                    server_.tsi_socket_->doRead(server_.read_buffer_));
@@ -248,7 +248,7 @@ TEST_F(TsiSocketTest, HandshakeWithoutValidationAndTransferData) {
 }
 
 TEST_F(TsiSocketTest, HandshakeWithSucessfulValidationAndTransferData) {
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -260,7 +260,7 @@ TEST_F(TsiSocketTest, HandshakeWithSucessfulValidationAndTransferData) {
 }
 
 TEST_F(TsiSocketTest, HandshakeWithSucessfulValidationAndTransferInvalidData) {
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -278,7 +278,7 @@ TEST_F(TsiSocketTest, HandshakeWithSucessfulValidationAndTransferInvalidData) {
 }
 
 TEST_F(TsiSocketTest, HandshakeValidationFail) {
-  auto validator = [](const tsi_peer&, std::string&) { return false; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return false; };
   initialize(validator, validator);
 
   InSequence s;
@@ -306,7 +306,7 @@ TEST_F(TsiSocketTest, HandshakerCreationFail) {
   client_.handshaker_factory_ =
       [](Event::Dispatcher&, const Network::Address::InstanceConstSharedPtr&,
          const Network::Address::InstanceConstSharedPtr&) { return nullptr; };
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -342,8 +342,8 @@ TEST_F(TsiSocketTest, HandshakeWithUnusedData) {
   client_to_server_.add(makeFakeTsiFrame(ClientToServerData));
 
   EXPECT_CALL(*server_.raw_socket_, doRead(_));
-  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
   EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
   EXPECT_CALL(*server_.raw_socket_, doRead(_));
   expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
                  server_.tsi_socket_->doRead(server_.read_buffer_));
@@ -378,8 +378,8 @@ TEST_F(TsiSocketTest, HandshakeWithUnusedDataAndEndOfStream) {
     buffer.move(client_to_server_);
     return result;
   }));
-  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
   EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
   expectIoResult({Network::PostIoAction::KeepOpen, 17UL, true},
                  server_.tsi_socket_->doRead(server_.read_buffer_));
   EXPECT_EQ(makeFakeTsiFrame("SERVER_FINISHED"), server_to_client_.toString());
@@ -651,7 +651,7 @@ TEST_F(TsiSocketTest, DoReadDrainBufferTwice) {
 }
 
 TEST_F(TsiSocketTest, DoWriteSmallFrameSize) {
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -696,7 +696,7 @@ TEST_F(TsiSocketTest, DoWriteSmallFrameSize) {
 }
 
 TEST_F(TsiSocketTest, DoWriteSingleShortWrite) {
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -729,7 +729,7 @@ TEST_F(TsiSocketTest, DoWriteSingleShortWrite) {
 }
 
 TEST_F(TsiSocketTest, DoWriteMultipleShortWrites) {
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -773,7 +773,7 @@ TEST_F(TsiSocketTest, DoWriteMultipleShortWrites) {
 }
 
 TEST_F(TsiSocketTest, DoWriteMixShortFullWrites) {
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -827,7 +827,7 @@ TEST_F(TsiSocketTest, DoWriteMixShortFullWrites) {
 }
 
 TEST_F(TsiSocketTest, DoWriteOutstandingHandshakeData) {
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -841,7 +841,6 @@ TEST_F(TsiSocketTest, DoWriteOutstandingHandshakeData) {
   EXPECT_EQ(0L, client_.read_buffer_.length());
 
   EXPECT_CALL(*server_.raw_socket_, doRead(_));
-  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
 
   // Write the first part of handshake data (14 bytes).
   EXPECT_CALL(*server_.raw_socket_, doWrite(_, false))
@@ -850,6 +849,7 @@ TEST_F(TsiSocketTest, DoWriteOutstandingHandshakeData) {
         server_to_client_.move(buffer, 14);
         return result;
       }));
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
   EXPECT_CALL(*server_.raw_socket_, doRead(_));
   expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  server_.tsi_socket_->doRead(server_.read_buffer_));

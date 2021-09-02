@@ -1,10 +1,10 @@
 #include "envoy/http/metadata_interface.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-#include "common/common/random_generator.h"
-#include "common/http/http2/metadata_decoder.h"
-#include "common/http/http2/metadata_encoder.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/http/http2/metadata_decoder.h"
+#include "source/common/http/http2/metadata_encoder.h"
 
 #include "test/test_common/logging.h"
 
@@ -179,6 +179,20 @@ TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
   EXPECT_FALSE(
       decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()), payload.size()));
 
+  cleanUp();
+}
+
+TEST_F(MetadataEncoderDecoderTest, TestTotalPayloadSize) {
+  initialize([](MetadataMapPtr&&) {});
+
+  const std::string payload = std::string(1024, 'a');
+  EXPECT_EQ(0, decoder_->totalPayloadSize());
+  EXPECT_TRUE(
+      decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()), payload.size()));
+  EXPECT_EQ(payload.size(), decoder_->totalPayloadSize());
+  EXPECT_TRUE(
+      decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()), payload.size()));
+  EXPECT_EQ(2 * payload.size(), decoder_->totalPayloadSize());
   cleanUp();
 }
 

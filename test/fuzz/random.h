@@ -7,8 +7,8 @@
 
 #include "envoy/common/random_generator.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Random {

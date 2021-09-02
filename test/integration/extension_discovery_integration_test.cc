@@ -4,6 +4,7 @@
 #include "envoy/service/extension/v3/config_discovery.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/filters/set_is_terminal_filter_config.pb.h"
 #include "test/integration/filters/set_response_code_filter_config.pb.h"
 #include "test/integration/http_integration.h"
@@ -30,7 +31,7 @@ std::string denyPrivateConfigWithMatcher() {
         "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
         prefix: "/private"
         code: 403
-    matcher:
+    xds_matcher:
       matcher_tree:
         input:
           name: request-headers
@@ -56,8 +57,7 @@ std::string terminalFilterConfig() { return "is_terminal_filter: true"; }
 class ExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                           public HttpIntegrationTest {
 public:
-  ExtensionDiscoveryIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  ExtensionDiscoveryIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   void addDynamicFilter(const std::string& name, bool apply_without_warming,
                         bool set_default_config = true, bool rate_limit = false,
@@ -85,7 +85,7 @@ public:
                       typed_config:
                         "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
                         code: 403
-                    matcher:
+                    xds_matcher:
                       matcher_tree:
                         input:
                           name: request-headers
@@ -195,9 +195,9 @@ public:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     // Create the extension config discovery upstream (fake_upstreams_[1]).
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
     // Create the listener config discovery upstream (fake_upstreams_[2]).
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void waitXdsStream() {

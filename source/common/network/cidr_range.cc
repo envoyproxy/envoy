@@ -1,4 +1,4 @@
-#include "common/network/cidr_range.h"
+#include "source/common/network/cidr_range.h"
 
 #include <array>
 #include <cstdint>
@@ -9,12 +9,12 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/safe_memcpy.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Network {

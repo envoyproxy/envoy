@@ -1,8 +1,7 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/http/message_impl.h"
-
-#include "extensions/common/aws/signer_impl.h"
-#include "extensions/common/aws/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/message_impl.h"
+#include "source/extensions/common/aws/signer_impl.h"
+#include "source/extensions/common/aws/utility.h"
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/test_common/simulated_time_system.h"

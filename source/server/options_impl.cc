@@ -1,4 +1,4 @@
-#include "server/options_impl.h"
+#include "source/server/options_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -7,13 +7,12 @@
 
 #include "envoy/admin/v3/server_info.pb.h"
 
-#include "common/common/fmt.h"
-#include "common/common/logger.h"
-#include "common/common/macros.h"
-#include "common/protobuf/utility.h"
-#include "common/version/version.h"
-
-#include "server/options_impl_platform.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/version/version.h"
+#include "source/server/options_impl_platform.h"
 
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
@@ -41,8 +40,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
 OptionsImpl::OptionsImpl(std::vector<std::string> args,
                          const HotRestartVersionCb& hot_restart_version_cb,
-                         spdlog::level::level_enum default_log_level)
-    : signal_handling_enabled_(true) {
+                         spdlog::level::level_enum default_log_level) {
   std::string log_levels_string = fmt::format("Log levels: {}", allowedLogLevels());
   log_levels_string +=
       fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);
@@ -73,11 +71,6 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<std::string> config_yaml(
       "", "config-yaml", "Inline YAML configuration, merges with the contents of --config-path",
       false, "", "string", cmd);
-  TCLAP::ValueArg<uint32_t> bootstrap_version(
-      "", "bootstrap-version",
-      "API version to parse the bootstrap config as (e.g. 3). If "
-      "unset, all known versions will be attempted",
-      false, 0, "string", cmd);
 
   TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
                                         "allow unknown fields in static configuration (DEPRECATED)",
@@ -243,9 +236,6 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
-  if (bootstrap_version.getValue() != 0) {
-    bootstrap_version_ = bootstrap_version.getValue();
-  }
   if (allow_unknown_fields.getValue()) {
     ENVOY_LOG(warn,
               "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.");
@@ -349,7 +339,7 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
 
 uint32_t OptionsImpl::count() const { return count_; }
 
-void OptionsImpl::logError(const std::string& error) const { throw MalformedArgvException(error); }
+void OptionsImpl::logError(const std::string& error) { throw MalformedArgvException(error); }
 
 Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   Server::CommandLineOptionsPtr command_line_options =

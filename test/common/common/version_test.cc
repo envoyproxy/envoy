@@ -1,4 +1,4 @@
-#include "common/version/version.h"
+#include "source/common/version/version.h"
 
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"

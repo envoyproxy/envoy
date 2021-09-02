@@ -6,18 +6,18 @@ services:
       context: .
       dockerfile: Dockerfile-proxy
     networks:
-      - envoymesh
+    - envoymesh
     ports:
-      - "8000:8000"
+    - "8000:8000"
 
   web_service:
     build:
       context: .
       dockerfile: Dockerfile-web-service
     networks:
-      - envoymesh
+    - envoymesh
     ports:
-      - "8080:80"
+    - "8080:80"
 
 networks:
   envoymesh: {}

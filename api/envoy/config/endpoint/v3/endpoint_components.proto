@@ -4,10 +4,12 @@ package envoy.config.endpoint.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/health_check.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -108,20 +110,50 @@ message LbEndpoint {
   google.protobuf.UInt32Value load_balancing_weight = 4 [(validate.rules).uint32 = {gte: 1}];
 }
 
+// [#not-implemented-hide:]
+// A configuration for a LEDS collection.
+message LedsClusterLocalityConfig {
+  // Configuration for the source of LEDS updates for a Locality.
+  core.v3.ConfigSource leds_config = 1;
+
+  // The xDS transport protocol glob collection resource name.
+  // The service is only supported in delta xDS (incremental) mode.
+  string leds_collection_name = 2;
+}
+
 // A group of endpoints belonging to a Locality.
 // One can have multiple LocalityLbEndpoints for a locality, but this is
 // generally only done if the different groups need to have different load
 // balancing weights or different priorities.
-// [#next-free-field: 7]
+// [#next-free-field: 9]
 message LocalityLbEndpoints {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.endpoint.LocalityLbEndpoints";
+
+  // [#not-implemented-hide:]
+  // A list of endpoints of a specific locality.
+  message LbEndpointList {
+    repeated LbEndpoint lb_endpoints = 1;
+  }
 
   // Identifies location of where the upstream hosts run.
   core.v3.Locality locality = 1;
 
   // The group of endpoints belonging to the locality specified.
+  // [#comment:TODO(adisuissa): Once LEDS is implemented this field needs to be
+  // deprecated and replaced by *load_balancer_endpoints*.]
   repeated LbEndpoint lb_endpoints = 2;
+
+  // [#not-implemented-hide:]
+  oneof lb_config {
+    // The group of endpoints belonging to the locality.
+    // [#comment:TODO(adisuissa): Once LEDS is implemented the *lb_endpoints* field
+    // needs to be deprecated.]
+    LbEndpointList load_balancer_endpoints = 7;
+
+    // LEDS Configuration for the current locality.
+    LedsClusterLocalityConfig leds_cluster_locality_config = 8;
+  }
 
   // Optional: Per priority/region/zone/sub_zone weight; at least 1. The load
   // balancing weight for a locality is divided by the sum of the weights of all
