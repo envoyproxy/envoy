@@ -355,8 +355,8 @@ private:
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
-  BytesMetererSharedPtr upstream_bytes_meterer_ = std::make_shared<BytesMeterer>();
-  BytesMetererSharedPtr downstream_bytes_meterer_ = std::make_shared<BytesMeterer>();
+  BytesMetererSharedPtr upstream_bytes_meterer_;
+  BytesMetererSharedPtr downstream_bytes_meterer_;
 };
 
 } // namespace StreamInfo

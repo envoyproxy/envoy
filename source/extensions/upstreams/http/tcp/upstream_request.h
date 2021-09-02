@@ -89,7 +89,7 @@ public:
 private:
   Router::UpstreamToDownstream* upstream_request_;
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
-  StreamInfo::BytesMetererSharedPtr bytes_meterer_;
+  StreamInfo::BytesMetererSharedPtr bytes_meterer_{std::make_shared<StreamInfo::BytesMeterer>()};
 };
 
 } // namespace Tcp
