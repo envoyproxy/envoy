@@ -16,7 +16,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/network/filter_matcher.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
@@ -72,7 +71,7 @@ envoy::admin::v3::ListenersConfigDump::DynamicListener* getOrCreateDynamicListen
 void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& state,
                const ListenerImpl& listener) {
   state.set_version_info(listener.versionInfo());
-  state.mutable_listener()->PackFrom(API_RECOVER_ORIGINAL(listener.config()));
+  state.mutable_listener()->PackFrom(listener.config());
   TimestampUtil::systemClockToTimestamp(listener.last_updated_, *(state.mutable_last_updated()));
 }
 } // namespace
@@ -87,10 +86,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
-                  proto_config.has_typed_config()
-                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                      : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config())));
+                  static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -121,10 +117,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
-                  proto_config.has_typed_config()
-                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                      : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config())));
+                  static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -149,10 +142,7 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
-                  proto_config.has_typed_config()
-                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                      : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config())));
+                  static_cast<const Protobuf::Message&>(proto_config.typed_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -274,7 +264,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
     }
     if (listener->blockRemove()) {
       auto& static_listener = *config_dump->mutable_static_listeners()->Add();
-      static_listener.mutable_listener()->PackFrom(API_RECOVER_ORIGINAL(listener->config()));
+      static_listener.mutable_listener()->PackFrom(listener->config());
       TimestampUtil::systemClockToTimestamp(listener->last_updated_,
                                             *(static_listener.mutable_last_updated()));
       continue;
@@ -378,7 +368,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
     TimestampUtil::systemClockToTimestamp(server_.api().timeSource().systemTime(),
                                           *(it->second->mutable_last_update_attempt()));
     it->second->set_details(e.what());
-    it->second->mutable_failed_configuration()->PackFrom(API_RECOVER_ORIGINAL(config));
+    it->second->mutable_failed_configuration()->PackFrom(config);
     throw e;
   }
   error_state_tracker_.erase(it);

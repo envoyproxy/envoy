@@ -464,21 +464,9 @@ public:
   virtual void healthCheck(bool is_health_check) PURE;
 
   /**
-   * @return the downstream address provider.
+   * @return the downstream connection info provider.
    */
-  virtual const Network::SocketAddressProvider& downstreamAddressProvider() const PURE;
-
-  /**
-   * @param connection_info sets the downstream ssl connection.
-   */
-  virtual void
-  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
-
-  /**
-   * @return the downstream SSL connection. This will be nullptr if the downstream
-   * connection does not use SSL.
-   */
-  virtual Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const PURE;
+  virtual const Network::ConnectionInfoProvider& downstreamAddressProvider() const PURE;
 
   /**
    * @param connection_info sets the upstream ssl connection.
@@ -593,6 +581,27 @@ public:
    * @return Network filter chain name of the downstream connection.
    */
   virtual const std::string& filterChainName() const PURE;
+
+  /**
+   * @param connection ID of the upstream connection.
+   */
+  virtual void setUpstreamConnectionId(uint64_t id) PURE;
+
+  /**
+   * @return the ID of the upstream connection, or absl::nullopt if not available.
+   */
+  virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
+
+  /**
+   * @param attempt_count, the number of times the request was attempted upstream.
+   */
+  virtual void setAttemptCount(uint32_t attempt_count) PURE;
+
+  /**
+   * @return the number of times the request was attempted upstream, absl::nullopt if the request
+   * was never attempted upstream.
+   */
+  virtual absl::optional<uint32_t> attemptCount() const PURE;
 };
 
 } // namespace StreamInfo

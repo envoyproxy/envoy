@@ -9,6 +9,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/io_handle.h"
+#include "envoy/ssl/connection.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -49,9 +50,9 @@ private:
  * TODO(soulxu): Since there are more than address information inside the provider, this will be
  * renamed as ConnectionInfoProvider. Ref https://github.com/envoyproxy/envoy/issues/17168
  */
-class SocketAddressProvider {
+class ConnectionInfoProvider {
 public:
-  virtual ~SocketAddressProvider() = default;
+  virtual ~ConnectionInfoProvider() = default;
 
   /**
    * @return the local address of the socket.
@@ -86,15 +87,21 @@ public:
   virtual absl::optional<uint64_t> connectionID() const PURE;
 
   /**
-   * Dumps the state of the SocketAddressProvider to the given ostream.
+   * Dumps the state of the ConnectionInfoProvider to the given ostream.
    *
    * @param os the std::ostream to dump to.
    * @param indent_level the level of indentation.
    */
   virtual void dumpState(std::ostream& os, int indent_level) const PURE;
+
+  /**
+   * @return the downstream SSL connection. This will be nullptr if the downstream
+   * connection does not use SSL.
+   */
+  virtual Ssl::ConnectionInfoConstSharedPtr sslConnection() const PURE;
 };
 
-class SocketAddressSetter : public SocketAddressProvider {
+class ConnectionInfoSetter : public ConnectionInfoProvider {
 public:
   /**
    * Set the local address of the socket. On accepted sockets the local address defaults to the
@@ -131,10 +138,15 @@ public:
    * @param id Connection ID of the downstream connection.
    **/
   virtual void setConnectionID(uint64_t id) PURE;
+
+  /**
+   * @param connection_info sets the downstream ssl connection.
+   */
+  virtual void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
 };
 
-using SocketAddressSetterSharedPtr = std::shared_ptr<SocketAddressSetter>;
-using SocketAddressProviderSharedPtr = std::shared_ptr<const SocketAddressProvider>;
+using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;
+using ConnectionInfoProviderSharedPtr = std::shared_ptr<const ConnectionInfoProvider>;
 
 /**
  * Base class for Sockets
@@ -149,11 +161,11 @@ public:
   enum class Type { Stream, Datagram };
 
   /**
-   * @return the address provider backing this socket.
+   * @return the connection info provider backing this socket.
    */
-  virtual SocketAddressSetter& addressProvider() PURE;
-  virtual const SocketAddressProvider& addressProvider() const PURE;
-  virtual SocketAddressProviderSharedPtr addressProviderSharedPtr() const PURE;
+  virtual ConnectionInfoSetter& connectionInfoProvider() PURE;
+  virtual const ConnectionInfoProvider& connectionInfoProvider() const PURE;
+  virtual ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const PURE;
 
   /**
    * @return IoHandle for the underlying connection

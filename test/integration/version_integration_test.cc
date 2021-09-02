@@ -24,21 +24,6 @@ const char ExampleIpTaggingConfig[] = R"EOF(
           - {address_prefix: 1.2.3.4, prefix_len: 32}
 )EOF";
 
-// envoy.filters.http.ip_tagging from v2 Struct config.
-TEST_P(VersionIntegrationTest, DEPRECATED_FEATURE_TEST(IpTaggingV2StaticStructConfig)) {
-  config_helper_.addFilter(absl::StrCat(R"EOF(
-  name: envoy.filters.http.ip_tagging
-  hidden_envoy_deprecated_config:
-  )EOF",
-                                        ExampleIpTaggingConfig));
-
-  config_helper_.addRuntimeOverride(
-      "envoy.deprecated_features:envoy.extensions.filters.network."
-      "http_connection_manager.v3.HttpFilter.hidden_envoy_deprecated_config",
-      "true");
-  initialize();
-}
-
 // envoy.filters.http.ip_tagging from v3 TypedStruct config.
 TEST_P(VersionIntegrationTest, IpTaggingV3StaticTypedStructConfig) {
   config_helper_.addFilter(absl::StrCat(R"EOF(

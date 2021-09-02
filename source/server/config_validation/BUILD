@@ -26,6 +26,7 @@ envoy_cc_library(
         "//envoy/api:api_interface",
         "//envoy/filesystem:filesystem_interface",
         "//source/common/api:api_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 

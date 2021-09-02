@@ -48,11 +48,18 @@ bool anyFilterChain(
 }
 
 bool usesProxyProto(const envoy::config::listener::v3::Listener& config) {
-  // TODO(#14085): `use_proxy_proto` should be deprecated.
   // Checking only the first or default filter chain is done for backwards compatibility.
-  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+  const bool use_proxy_proto = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       config.filter_chains().empty() ? config.default_filter_chain() : config.filter_chains()[0],
       use_proxy_proto, false);
+  if (use_proxy_proto) {
+    ENVOY_LOG_MISC(warn,
+                   "using deprecated field 'use_proxy_proto' is dangerous as it does not respect "
+                   "listener filter order. Do not use this field and instead configure the proxy "
+                   "proto listener filter directly.");
+  }
+
+  return use_proxy_proto;
 }
 
 bool shouldBindToPort(const envoy::config::listener::v3::Listener& config) {
@@ -86,7 +93,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
   sockets_.push_back(createListenSocketAndApplyOptions(factory, socket_type, 0));
 
   if (sockets_[0] != nullptr && local_address_->ip() && local_address_->ip()->port() == 0) {
-    local_address_ = sockets_[0]->addressProvider().localAddress();
+    local_address_ = sockets_[0]->connectionInfoProvider().localAddress();
   }
   ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name,
             local_address_->asString());
@@ -168,25 +175,33 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
     return;
   }
 
-  for (auto& socket : sockets_) {
-    const auto rc = socket->ioHandle().listen(tcp_backlog_size_);
-#ifndef WIN32
+  ASSERT(!sockets_.empty());
+  auto listen_and_apply_options = [](Envoy::Network::SocketSharedPtr socket, int tcp_backlog_size) {
+    const auto rc = socket->ioHandle().listen(tcp_backlog_size);
     if (rc.return_value_ != 0) {
       throw EnvoyException(fmt::format("cannot listen() errno={}", rc.errno_));
     }
-#else
-    // TODO(davinci26): listen() error handling and generally listening on multiple workers
-    // is broken right now. This needs follow up to do something better on Windows.
-    UNREFERENCED_PARAMETER(rc);
-#endif
-
     if (!Network::Socket::applyOptions(socket->options(), *socket,
                                        envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
       throw Network::SocketOptionException(
           fmt::format("cannot set post-listen socket option on socket: {}",
-                      socket->addressProvider().localAddress()->asString()));
+                      socket->connectionInfoProvider().localAddress()->asString()));
     }
+  };
+  // On all platforms we should listen on the first socket.
+  auto iterator = sockets_.begin();
+  listen_and_apply_options(*iterator, tcp_backlog_size_);
+  ++iterator;
+#ifndef WIN32
+  // With this implementation on Windows we only accept
+  // connections on Worker 1 and then we use the `ExactConnectionBalancer`
+  // to balance these connections to all workers.
+  // TODO(davinci26): We should update the behavior when socket duplication
+  // does not cause accepts to hang in the OS.
+  for (; iterator != sockets_.end(); ++iterator) {
+    listen_and_apply_options(*iterator, tcp_backlog_size_);
   }
+#endif
 }
 
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
@@ -311,6 +326,13 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                               listener_init_target_.ready();
                             }
                           }),
+      transport_factory_context_(
+          std::make_shared<Server::Configuration::TransportSocketFactoryContextImpl>(
+              parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
+              parent_.server_.clusterManager(), parent_.server_.localInfo(),
+              parent_.server_.dispatcher(), parent_.server_.stats(),
+              parent_.server_.singletonManager(), parent_.server_.threadLocal(),
+              validation_visitor_, parent_.server_.api(), parent_.server_.options())),
       quic_stat_names_(parent_.quicStatNames()) {
 
   const absl::optional<std::string> runtime_val =
@@ -381,6 +403,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                             ASSERT(workers_started_);
                             parent_.inPlaceFilterChainUpdate(*this);
                           }),
+      transport_factory_context_(origin.transport_factory_context_),
       quic_stat_names_(parent_.quicStatNames()) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
@@ -421,6 +444,10 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(config_.udp_listener_config());
   if (config_.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC
+    if (config_.has_connection_balance_config()) {
+      throw EnvoyException("connection_balance_config is configured for QUIC listener which "
+                           "doesn't work with connection balancer.");
+    }
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_);
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
@@ -529,13 +556,8 @@ void ListenerImpl::validateFilterChains(Network::Socket::Type socket_type) {
 }
 
 void ListenerImpl::buildFilterChains() {
-  Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
-      parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
-      parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
-      parent_.server_.stats(), parent_.server_.singletonManager(), parent_.server_.threadLocal(),
-      validation_visitor_, parent_.server_.api(), parent_.server_.options());
-  transport_factory_context.setInitManager(*dynamic_init_manager_);
-  ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
+  transport_factory_context_->setInitManager(*dynamic_init_manager_);
+  ListenerFilterChainFactoryBuilder builder(*this, *transport_factory_context_);
   filter_chain_manager_.addFilterChains(
       config_.filter_chains(),
       config_.has_default_filter_chain() ? &config_.default_filter_chain() : nullptr, builder,
@@ -545,6 +567,19 @@ void ListenerImpl::buildFilterChains() {
 void ListenerImpl::buildSocketOptions() {
   // TCP specific setup.
   if (connection_balancer_ == nullptr) {
+#ifdef WIN32
+    // On Windows we use the exact connection balancer to dispatch connections
+    // from worker 1 to all workers. This is a perf hit but it is the only way
+    // to make all the workers do work.
+    // TODO(davinci26): We can be faster here if we create a balancer implementation
+    // that dispatches the connection to a random thread.
+    ENVOY_LOG(warn,
+              "ExactBalance was forced enabled for TCP listener '{}' because "
+              "Envoy is running on Windows."
+              "ExactBalance is used to load balance connections between workers on Windows.",
+              config_.name());
+    connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
+#else
     // Not in place listener update.
     if (config_.has_connection_balance_config()) {
       // Currently exact balance is the only supported type and there are no options.
@@ -553,6 +588,7 @@ void ListenerImpl::buildSocketOptions() {
     } else {
       connection_balancer_ = std::make_shared<Network::NopConnectionBalancerImpl>();
     }
+#endif
   }
 
   if (config_.has_tcp_fast_open_queue_length()) {

@@ -9,6 +9,8 @@ envoy_package()
 envoy_py_binary(
     name = "tools.extensions.extensions_check",
     data = [
+        "//contrib:contrib_build_config.bzl",
+        "//contrib:extensions_metadata.yaml",
         "//source/extensions:extensions_metadata.yaml",
         "//source/extensions:extensions_build_config.bzl",
         "//test/extensions/filters/network/common/fuzz:uber_per_readfilter.cc",

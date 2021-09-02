@@ -24,7 +24,7 @@
 # Deviations from Google C++ style guidelines
 
 * Exceptions are allowed and encouraged where appropriate. When using exceptions, do not add
-  additional error handing that cannot possibly happen in the case an exception is thrown.
+  additional error handling that cannot possibly happen in the case an exception is thrown.
 * Do use exceptions for:
   - Configuration ingestion error handling. Invalid configurations (dynamic and
     static) should throw meaningful `EnvoyException`s, the configuration

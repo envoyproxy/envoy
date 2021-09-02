@@ -58,24 +58,24 @@ Config::RouteImpl::RouteImpl(
 
 bool Config::RouteImpl::matches(Network::Connection& connection) const {
   if (!source_port_ranges_.empty() &&
-      !Network::Utility::portInRangeList(*connection.addressProvider().remoteAddress(),
+      !Network::Utility::portInRangeList(*connection.connectionInfoProvider().remoteAddress(),
                                          source_port_ranges_)) {
     return false;
   }
 
   if (!source_ips_.empty() &&
-      !source_ips_.contains(*connection.addressProvider().remoteAddress())) {
+      !source_ips_.contains(*connection.connectionInfoProvider().remoteAddress())) {
     return false;
   }
 
   if (!destination_port_ranges_.empty() &&
-      !Network::Utility::portInRangeList(*connection.addressProvider().localAddress(),
+      !Network::Utility::portInRangeList(*connection.connectionInfoProvider().localAddress(),
                                          destination_port_ranges_)) {
     return false;
   }
 
   if (!destination_ips_.empty() &&
-      !destination_ips_.contains(*connection.addressProvider().localAddress())) {
+      !destination_ips_.contains(*connection.connectionInfoProvider().localAddress())) {
     return false;
   }
 
@@ -137,13 +137,6 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
         std::make_shared<UpstreamDrainManager>();
     return drain_manager;
   });
-
-  if (config.has_hidden_envoy_deprecated_deprecated_v1()) {
-    for (const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute&
-             route_desc : config.hidden_envoy_deprecated_deprecated_v1().routes()) {
-      routes_.emplace_back(std::make_shared<const RouteImpl>(*this, route_desc));
-    }
-  }
 
   if (!config.cluster().empty()) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute
@@ -431,9 +424,9 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
                  Network::ProxyProtocolFilterState::key())) {
       read_callbacks_->connection().streamInfo().filterState()->setData(
           Network::ProxyProtocolFilterState::key(),
-          std::make_unique<Network::ProxyProtocolFilterState>(
-              Network::ProxyProtocolData{downstreamConnection()->addressProvider().remoteAddress(),
-                                         downstreamConnection()->addressProvider().localAddress()}),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+              downstreamConnection()->connectionInfoProvider().remoteAddress(),
+              downstreamConnection()->connectionInfoProvider().localAddress()}),
           StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
@@ -485,6 +478,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
+    getStreamInfo().setAttemptCount(connect_attempts_);
     generic_conn_pool_->newStream(*this);
     // Because we never return open connections to the pool, this either has a handle waiting on
     // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.

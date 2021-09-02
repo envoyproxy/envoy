@@ -35,22 +35,25 @@ const ReplacementMap& emptySpaceReplacement() {
 } // namespace
 
 struct StreamInfoImpl : public StreamInfo {
-  StreamInfoImpl(TimeSource& time_source,
-                 const Network::SocketAddressProviderSharedPtr& downstream_address_provider,
-                 FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain)
-      : StreamInfoImpl(absl::nullopt, time_source, downstream_address_provider,
+  StreamInfoImpl(
+      TimeSource& time_source,
+      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
+      FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain)
+      : StreamInfoImpl(absl::nullopt, time_source, downstream_connection_info_provider,
                        std::make_shared<FilterStateImpl>(life_span)) {}
 
-  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
-                 const Network::SocketAddressProviderSharedPtr& downstream_address_provider)
-      : StreamInfoImpl(protocol, time_source, downstream_address_provider,
+  StreamInfoImpl(
+      Http::Protocol protocol, TimeSource& time_source,
+      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider)
+      : StreamInfoImpl(protocol, time_source, downstream_connection_info_provider,
                        std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
-  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
-                 const Network::SocketAddressProviderSharedPtr& downstream_address_provider,
-                 FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan life_span)
+  StreamInfoImpl(
+      Http::Protocol protocol, TimeSource& time_source,
+      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
+      FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan life_span)
       : StreamInfoImpl(
-            protocol, time_source, downstream_address_provider,
+            protocol, time_source, downstream_connection_info_provider,
             std::make_shared<FilterStateImpl>(
                 FilterStateImpl::LazyCreateAncestor(std::move(parent_filter_state), life_span),
                 FilterState::LifeSpan::FilterChain)) {}
@@ -67,6 +70,10 @@ struct StreamInfoImpl : public StreamInfo {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(time.value() -
                                                                 start_time_monotonic_);
   }
+
+  void setUpstreamConnectionId(uint64_t id) override { upstream_connection_id_ = id; }
+
+  absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
 
   absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const override {
     return duration(last_downstream_rx_byte_received);
@@ -193,17 +200,8 @@ struct StreamInfoImpl : public StreamInfo {
 
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
 
-  const Network::SocketAddressProvider& downstreamAddressProvider() const override {
-    return *downstream_address_provider_;
-  }
-
-  void
-  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
-    downstream_ssl_info_ = connection_info;
-  }
-
-  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
-    return downstream_ssl_info_;
+  const Network::ConnectionInfoProvider& downstreamAddressProvider() const override {
+    return *downstream_connection_info_provider_;
   }
 
   void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
@@ -260,8 +258,9 @@ struct StreamInfoImpl : public StreamInfo {
 
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
-       << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
+    os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(upstream_connection_id_)
+       << DUMP_OPTIONAL_MEMBER(protocol_) << DUMP_OPTIONAL_MEMBER(response_code_)
+       << DUMP_OPTIONAL_MEMBER(response_code_details_) << DUMP_OPTIONAL_MEMBER(attempt_count_)
        << DUMP_MEMBER(health_check_request_) << DUMP_MEMBER(route_name_) << "\n";
   }
 
@@ -279,6 +278,10 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   const std::string& filterChainName() const override { return filter_chain_name_; }
+
+  void setAttemptCount(uint32_t attempt_count) override { attempt_count_ = attempt_count; }
+
+  absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
   TimeSource& time_source_;
   const SystemTime start_time_;
@@ -301,30 +304,32 @@ struct StreamInfoImpl : public StreamInfo {
   FilterStateSharedPtr filter_state_;
   FilterStateSharedPtr upstream_filter_state_;
   std::string route_name_;
+  absl::optional<uint64_t> upstream_connection_id_;
+  absl::optional<uint32_t> attempt_count_;
 
 private:
-  static Network::SocketAddressProviderSharedPtr emptyDownstreamAddressProvider() {
+  static Network::ConnectionInfoProviderSharedPtr emptyDownstreamAddressProvider() {
     MUTABLE_CONSTRUCT_ON_FIRST_USE(
-        Network::SocketAddressProviderSharedPtr,
-        std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr));
+        Network::ConnectionInfoProviderSharedPtr,
+        std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr));
   }
 
-  StreamInfoImpl(absl::optional<Http::Protocol> protocol, TimeSource& time_source,
-                 const Network::SocketAddressProviderSharedPtr& downstream_address_provider,
-                 FilterStateSharedPtr filter_state)
+  StreamInfoImpl(
+      absl::optional<Http::Protocol> protocol, TimeSource& time_source,
+      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
+      FilterStateSharedPtr filter_state)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
         filter_state_(std::move(filter_state)),
-        downstream_address_provider_(downstream_address_provider != nullptr
-                                         ? downstream_address_provider
-                                         : emptyDownstreamAddressProvider()),
+        downstream_connection_info_provider_(downstream_connection_info_provider != nullptr
+                                                 ? downstream_connection_info_provider
+                                                 : emptyDownstreamAddressProvider()),
         trace_reason_(Tracing::Reason::NotTraceable) {}
 
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  const Network::SocketAddressProviderSharedPtr downstream_address_provider_;
-  Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
+  const Network::ConnectionInfoProviderSharedPtr downstream_connection_info_provider_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
