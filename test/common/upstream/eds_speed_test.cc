@@ -188,6 +188,7 @@ static void priorityAndLocalityWeighted(State& state) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
+  // codechecker_intentional [deadcode.DeadStores] suppress deadcode
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(2));
     // if we've been instructed to skip tests, only run once no matter the argument:
@@ -206,6 +207,7 @@ static void duplicateUpdate(State& state) {
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
 
+  // codechecker_intentional [deadcode.DeadStores] suppress deadcode
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(1));
     uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
@@ -221,6 +223,7 @@ static void healthOnlyUpdate(State& state) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
+  // codechecker_intentional [deadcode.DeadStores] suppress deadcode
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(1));
     uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
