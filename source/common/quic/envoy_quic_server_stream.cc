@@ -381,7 +381,7 @@ void EnvoyQuicServerStream::onStreamError(absl::optional<bool> should_close_conn
         !http3_options_.override_stream_error_on_invalid_http_message().value();
   }
   if (close_connection_upon_invalid_header) {
-    stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
+    stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, std::string(details_));
   } else {
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
   }
