@@ -1471,7 +1471,13 @@ void PriorityStateManager::updateClusterPrioritySet(
   LocalityWeightsSharedPtr locality_weights;
   std::vector<HostVector> per_locality;
 
-  // If we are configured for locality weighted LB we populate the locality weights.
+  // If we are configured for locality weighted LB we populate the locality weights. We also
+  // populate locality weights if the cluster uses load balancing extensions, since the extension
+  // may want to make use of locality weights and we cannot tell by inspecting the config whether
+  // this is the case.
+  //
+  // TODO: have the load balancing extension indicate, programatically, whether it needs locality
+  // weights, as an optimization in cases where it doesn't.
   const bool locality_weighted_lb =
       parent_.info()->lbConfig().has_locality_weighted_lb_config() ||
       parent_.info()->lbType() == LoadBalancerType::LoadBalancingPolicyConfig;
