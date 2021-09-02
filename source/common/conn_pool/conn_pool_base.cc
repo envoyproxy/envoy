@@ -229,7 +229,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
 }
 
 ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& context) {
-  ASSERT(!is_draining_);
+  ASSERT(!is_draining_for_deletion_);
   ASSERT(!deferred_deleting_);
 
   ASSERT(static_cast<ssize_t>(connecting_stream_capacity_) ==
@@ -357,7 +357,7 @@ void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
 
 void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
   if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
-    is_draining_ = true;
+    is_draining_for_deletion_ = true;
     checkForIdleAndCloseIdleConnsIfDraining();
     return;
   }
@@ -388,12 +388,12 @@ bool ConnPoolImplBase::isIdleImpl() const {
 }
 
 void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
-  if (is_draining_) {
+  if (is_draining_for_deletion_) {
     closeIdleConnectionsForDrainingPool();
   }
 
   if (isIdleImpl()) {
-    ENVOY_LOG(debug, "invoking idle callbacks - is_draining_={}", is_draining_);
+    ENVOY_LOG(debug, "invoking idle callbacks - is_draining_for_deletion_={}", is_draining_for_deletion_);
     for (const Instance::IdleCb& cb : idle_callbacks_) {
       cb();
     }

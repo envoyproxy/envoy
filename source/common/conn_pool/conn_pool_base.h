@@ -334,7 +334,7 @@ private:
 
   // Whether the connection pool is currently in the process of closing
   // all connections so that it can be gracefully deleted.
-  bool is_draining_{false};
+  bool is_draining_for_deletion_{false};
 
   // True iff this object is in the deferred delete list.
   bool deferred_deleting_{false};
