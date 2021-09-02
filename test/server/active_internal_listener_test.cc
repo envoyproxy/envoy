@@ -110,7 +110,7 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateListenerFilter) {
       }));
   EXPECT_CALL(*test_listener_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
-        cb.socket().addressProvider().restoreLocalAddress(original_dst_address);
+        cb.socket().connectionInfoProvider().restoreLocalAddress(original_dst_address);
         return Network::FilterStatus::Continue;
       }));
   EXPECT_CALL(*test_listener_filter, destroy_());
@@ -140,7 +140,7 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
       }));
   EXPECT_CALL(*test_listener_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
-        cb.socket().addressProvider().restoreLocalAddress(original_dst_address);
+        cb.socket().connectionInfoProvider().restoreLocalAddress(original_dst_address);
         return Network::FilterStatus::Continue;
       }));
   EXPECT_CALL(*test_listener_filter, destroy_());

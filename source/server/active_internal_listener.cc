@@ -167,9 +167,9 @@ void ActiveInternalListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   auto active_socket = std::make_unique<ActiveTcpSocket>(
       *this, std::move(socket), false /* do not handle off at internal listener */);
   // TODO(lambdai): restore address from either socket options, or from listener config.
-  active_socket->socket_->addressProvider().restoreLocalAddress(
+  active_socket->socket_->connectionInfoProvider().restoreLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("255.255.255.255", 0));
-  active_socket->socket_->addressProvider().setRemoteAddress(
+  active_socket->socket_->connectionInfoProvider().setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("255.255.255.254", 0));
 
   onSocketAccepted(std::move(active_socket));
@@ -185,7 +185,7 @@ void ActiveInternalListener::newActiveConnection(
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
     ENVOY_CONN_LOG(debug, "new connection from {}", *active_connection->connection_,
-                   active_connection->connection_->addressProvider().remoteAddress()->asString());
+                   active_connection->connection_->connectionInfoProvider().remoteAddress()->asString());
     active_connection->connection_->addConnectionCallbacks(*active_connection);
     LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
   }
