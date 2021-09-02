@@ -387,14 +387,17 @@ TEST_F(ConnectivityGridTest, Drain) {
   // Synthetically create a pool.
   grid_.createNextPool();
   {
-    EXPECT_CALL(*grid_.first(), drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+    EXPECT_CALL(*grid_.first(),
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
     grid_.drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   }
 
   grid_.createNextPool();
   {
-    EXPECT_CALL(*grid_.first(), drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
-    EXPECT_CALL(*grid_.second(), drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+    EXPECT_CALL(*grid_.first(),
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+    EXPECT_CALL(*grid_.second(),
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
     grid_.drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   }
 }
@@ -411,15 +414,21 @@ TEST_F(ConnectivityGridTest, DrainCallbacks) {
 
   // The first time a drain is started, both pools should start draining.
   {
-    EXPECT_CALL(*grid_.first(), drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
-    EXPECT_CALL(*grid_.second(), drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
+    EXPECT_CALL(*grid_.first(),
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
+    EXPECT_CALL(*grid_.second(),
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
     grid_.drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   }
 
   // The second time, the pools will not see any change.
   {
-    EXPECT_CALL(*grid_.first(), drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).Times(0);
-    EXPECT_CALL(*grid_.second(), drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).Times(0);
+    EXPECT_CALL(*grid_.first(),
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+        .Times(0);
+    EXPECT_CALL(*grid_.second(),
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+        .Times(0);
     grid_.drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   }
   {

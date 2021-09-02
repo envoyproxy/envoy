@@ -198,8 +198,10 @@ TEST_F(ConnPoolMapImplTest, DrainConnectionsForwarded) {
 
   test_map->getPool(1, getBasicFactory());
   test_map->getPool(2, getBasicFactory());
-  EXPECT_CALL(*mock_pools_[0], drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
-  EXPECT_CALL(*mock_pools_[1], drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*mock_pools_[0],
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*mock_pools_[1],
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
 
   test_map->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 }

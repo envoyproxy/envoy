@@ -1953,7 +1953,8 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
     outlier_detector.runCallbacks(test_host);
     health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
 
-    EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+    EXPECT_CALL(*cp1,
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     outlier_detector.runCallbacks(test_host);
 
@@ -1963,8 +1964,10 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
   }
 
   // Order of these calls is implementation dependent, so can't sequence them!
-  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
-  EXPECT_CALL(*cp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*cp2,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker.runCallbacks(test_host, HealthTransition::Changed);
 
@@ -2017,7 +2020,9 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsAndDeletePoolOnHealthFailure)
   outlier_detector.runCallbacks(test_host);
   health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
 
-  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections)).WillOnce(Invoke([&]() { cp1->idle_cb_(); }));
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections))
+      .WillOnce(Invoke([&]() { cp1->idle_cb_(); }));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
 
@@ -2064,7 +2069,8 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
     outlier_detector.runCallbacks(test_host);
     health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
 
-    EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+    EXPECT_CALL(*cp1,
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     outlier_detector.runCallbacks(test_host);
 
@@ -2074,8 +2080,10 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
   }
 
   // Order of these calls is implementation dependent, so can't sequence them!
-  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
-  EXPECT_CALL(*cp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*cp2,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker.runCallbacks(test_host, HealthTransition::Changed);
 
@@ -3000,14 +3008,16 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
                                    ->tcpConnPool(ResourcePriority::Default, nullptr));
 
   // Immediate drain, since this can happen with the HTTP codecs.
-  EXPECT_CALL(*cp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
-    cp->idle_cb_();
-    cp->idle_cb_ = nullptr;
-  }));
-  EXPECT_CALL(*tcp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
-    tcp->idle_cb_();
-    tcp->idle_cb_ = nullptr;
-  }));
+  EXPECT_CALL(*cp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        cp->idle_cb_();
+        cp->idle_cb_ = nullptr;
+      }));
+  EXPECT_CALL(*tcp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        tcp->idle_cb_();
+        tcp->idle_cb_ = nullptr;
+      }));
 
   // Remove the first host, this should lead to the cp being drained, without
   // crash.
@@ -4647,22 +4657,26 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   EXPECT_NE(cp1, cp2);
   EXPECT_NE(tcp1, tcp2);
 
-  EXPECT_CALL(*cp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
-    cp2->idle_cb_();
-    cp2->idle_cb_ = nullptr;
-  }));
-  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
-    cp1->idle_cb_();
-    cp1->idle_cb_ = nullptr;
-  }));
-  EXPECT_CALL(*tcp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
-    tcp1->idle_cb_();
-    tcp1->idle_cb_ = nullptr;
-  }));
-  EXPECT_CALL(*tcp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
-    tcp2->idle_cb_();
-    tcp2->idle_cb_ = nullptr;
-  }));
+  EXPECT_CALL(*cp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        cp2->idle_cb_();
+        cp2->idle_cb_ = nullptr;
+      }));
+  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        cp1->idle_cb_();
+        cp1->idle_cb_ = nullptr;
+      }));
+  EXPECT_CALL(*tcp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        tcp1->idle_cb_();
+        tcp1->idle_cb_ = nullptr;
+      }));
+  EXPECT_CALL(*tcp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        tcp2->idle_cb_();
+        tcp2->idle_cb_ = nullptr;
+      }));
 
   HostVector hosts_removed;
   hosts_removed.push_back(host2);
@@ -4685,14 +4699,16 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   HostVector hosts_added;
   hosts_added.push_back(host3);
 
-  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
-    cp1->idle_cb_();
-    cp1->idle_cb_ = nullptr;
-  }));
-  EXPECT_CALL(*tcp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
-    tcp1->idle_cb_();
-    tcp1->idle_cb_ = nullptr;
-  }));
+  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        cp1->idle_cb_();
+        cp1->idle_cb_ = nullptr;
+      }));
+  EXPECT_CALL(*tcp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        tcp1->idle_cb_();
+        tcp1->idle_cb_ = nullptr;
+      }));
 
   // Adding host3 should drain connection pool for host1.
   cluster.prioritySet().updateHosts(
@@ -4756,8 +4772,12 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   hosts_added.push_back(host2);
 
   // No connection pools should be drained.
-  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections)).Times(0);
-  EXPECT_CALL(*tcp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections)).Times(0);
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections))
+      .Times(0);
+  EXPECT_CALL(*tcp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections))
+      .Times(0);
 
   // No connection pools should be drained.
   cluster.prioritySet().updateHosts(

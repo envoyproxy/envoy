@@ -107,7 +107,9 @@ public:
 
   void addIdleCallback(IdleCb cb) override { conn_pool_->addIdleCallback(cb); }
   bool isIdle() const override { return conn_pool_->isIdle(); }
-  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override { conn_pool_->drainConnections(drain_behavior); }
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override {
+    conn_pool_->drainConnections(drain_behavior);
+  }
   void closeConnections() override { conn_pool_->closeConnections(); }
   ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
     return conn_pool_->newConnection(callbacks);
