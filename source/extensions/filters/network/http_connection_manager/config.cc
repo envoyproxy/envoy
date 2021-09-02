@@ -319,14 +319,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stream_error_on_invalid_http_message, false)),
       delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)),
 #ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
-      normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, normalize_path,
+      normalize_path_(PROTOBUF_GET_BOOL_OR_PROFILE_DEFAULT(
+          config, DefaultsProfile::ConfigContext(config), normalize_path,
           // TODO(htuch): we should have a boolean variant of featureEnabled() here.
           context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
                                                       100))),
 #else
-      normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, normalize_path,
+      normalize_path_(PROTOBUF_GET_BOOL_OR_PROFILE_DEFAULT(
+          config, DefaultsProfile::ConfigContext(config), normalize_path,
           // TODO(htuch): we should have a boolean variant of featureEnabled() here.
           context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
                                                       0))),

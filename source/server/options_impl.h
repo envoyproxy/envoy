@@ -58,6 +58,9 @@ public:
     config_proto_ = config_proto;
   }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
+  void setDefaultsProfile(DefaultsProfile::Profile defaults_profile) {
+    defaults_profile_ = defaults_profile;
+  }
   void setAdminAddressPath(const std::string& admin_address_path) {
     admin_address_path_ = admin_address_path;
   }
@@ -113,6 +116,7 @@ public:
     return config_proto_;
   }
   const std::string& configYaml() const override { return config_yaml_; }
+  DefaultsProfile::Profile defaultsProfile() const override { return defaults_profile_; }
   bool allowUnknownStaticFields() const override { return allow_unknown_static_fields_; }
   bool rejectUnknownDynamicFields() const override { return reject_unknown_dynamic_fields_; }
   bool ignoreUnknownDynamicFields() const override { return ignore_unknown_dynamic_fields_; }
@@ -174,6 +178,7 @@ private:
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
   std::string config_yaml_;
+  DefaultsProfile::Profile defaults_profile_{DefaultsProfile::Profile::Performant};
   bool allow_unknown_static_fields_{false};
   bool reject_unknown_dynamic_fields_{false};
   bool ignore_unknown_dynamic_fields_{false};

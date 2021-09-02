@@ -71,6 +71,10 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<std::string> config_yaml(
       "", "config-yaml", "Inline YAML configuration, merges with the contents of --config-path",
       false, "", "string", cmd);
+  TCLAP::ValueArg<std::string> defaults_profile(
+      "", "defaults-profile",
+      "choose a profile to run envoy with default settings tailored to a specific use case. One of 'performant' (default) or 'safe'.", false,
+      "performant", "string", cmd);
 
   TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
                                         "allow unknown fields in static configuration (DEPRECATED)",
@@ -236,6 +240,16 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
+
+  if (defaults_profile.getValue() == "performant") {
+    defaults_profile_ = DefaultsProfile::Profile::Performant;
+  } else if (defaults_profile.getValue() == "safe") {
+    defaults_profile_ = DefaultsProfile::Profile::Safe;
+  } else {
+    throw MalformedArgvException(
+        fmt::format("error: unknown defaults-profile '{}'", mode.getValue()));
+  }
+
   if (allow_unknown_fields.getValue()) {
     ENVOY_LOG(warn,
               "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.");
@@ -350,6 +364,9 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_concurrency(concurrency());
   command_line_options->set_config_path(configPath());
   command_line_options->set_config_yaml(configYaml());
+  command_line_options->set_defaults_profile(defaultsProfile() == DefaultsProfile::Profile::Performant
+                                              ? envoy::admin::v3::CommandLineOptions::Performant
+                                              : envoy::admin::v3::CommandLineOptions::Safe);
   command_line_options->set_allow_unknown_static_fields(allow_unknown_static_fields_);
   command_line_options->set_reject_unknown_dynamic_fields(reject_unknown_dynamic_fields_);
   command_line_options->set_ignore_unknown_dynamic_fields(ignore_unknown_dynamic_fields_);

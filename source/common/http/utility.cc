@@ -166,8 +166,6 @@ initializeAndValidateOptions(const DefaultsProfile::ConfigContext& context,
   }
   ASSERT(options_clone.hpack_table_size().value() <= OptionsLimits::MAX_HPACK_TABLE_SIZE);
   if (!options_clone.has_max_concurrent_streams()) {
-    // options_clone.mutable_max_concurrent_streams()->set_value(
-    //     OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
     options_clone.mutable_max_concurrent_streams()->set_value(DefaultsProfile::get().getNumber(
         context, "max_concurrent_streams", OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS));
   }
@@ -175,8 +173,6 @@ initializeAndValidateOptions(const DefaultsProfile::ConfigContext& context,
       options_clone.max_concurrent_streams().value() >= OptionsLimits::MIN_MAX_CONCURRENT_STREAMS &&
       options_clone.max_concurrent_streams().value() <= OptionsLimits::MAX_MAX_CONCURRENT_STREAMS);
   if (!options_clone.has_initial_stream_window_size()) {
-    // options_clone.mutable_initial_stream_window_size()->set_value(
-    //     OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
     options_clone.mutable_initial_stream_window_size()->set_value(DefaultsProfile::get().getNumber(
         context, "initial_stream_window_size", OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE));
   }
@@ -185,8 +181,6 @@ initializeAndValidateOptions(const DefaultsProfile::ConfigContext& context,
          options_clone.initial_stream_window_size().value() <=
              OptionsLimits::MAX_INITIAL_STREAM_WINDOW_SIZE);
   if (!options_clone.has_initial_connection_window_size()) {
-    // options_clone.mutable_initial_connection_window_size()->set_value(
-    //     OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
     options_clone.mutable_initial_connection_window_size()->set_value(
         DefaultsProfile::get().getNumber(context, "initial_connection_window_size",
                                          OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE));

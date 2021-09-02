@@ -370,7 +370,7 @@ TEST(HttpUtility, TestDefaultsProfile) {
     http2_options = ::Envoy::Http2::Utility::initializeAndValidateOptions(context, http2_options);
 
     EXPECT_EQ(100, http2_options.max_concurrent_streams().value());
-    EXPECT_EQ(268435456, http2_options.initial_stream_window_size().value());
+    EXPECT_EQ(65536, http2_options.initial_stream_window_size().value());
     EXPECT_EQ(1048576, http2_options.initial_connection_window_size().value());
   }
 
@@ -458,7 +458,7 @@ TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
   hcm_value.set_value(false);
   EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
-                  .stream_error_on_invalid_http_message_);
+                  .stream_error_on_invalid_htFZtp_message_);
 
   // http1_options.stream_error overrides HCM.stream_error (flip boolean value)
   http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(false);

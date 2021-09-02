@@ -191,6 +191,46 @@ filter_chains:
             manager_->listeners().front().get().listenerFiltersTimeout());
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, TestDefaultsProfileSafe) {
+  const std::string yaml = R"EOF(
+address:
+ socket_address:
+   address: 127.0.0.1
+   port_value: 1234
+filter_chains:
+- filters: []
+ )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  std::unique_ptr<ScopedDefaultsProfileSingleton> dp =
+      std::make_unique<ScopedDefaultsProfileSingleton>(
+          std::make_unique<DefaultsProfile>(DefaultsProfile::Safe));
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->transportSocketConnectTimeout(), std::chrono::seconds(10));
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TestDefaultsProfileBlank) {
+  const std::string yaml = R"EOF(
+address:
+ socket_address:
+   address: 127.0.0.1
+   port_value: 1234
+filter_chains:
+- filters: []
+ )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  // invoke DefaultsProfile constructor with no args, creating a blank profile
+  std::unique_ptr<ScopedDefaultsProfileSingleton> dp =
+      std::make_unique<ScopedDefaultsProfileSingleton>(std::make_unique<DefaultsProfile>());
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->transportSocketConnectTimeout(), std::chrono::seconds(0));
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, DefaultListenerPerConnectionBufferLimit) {
   const std::string yaml = R"EOF(
 address:

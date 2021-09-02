@@ -946,8 +946,8 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
                                                   std::move(server_names)),
       listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),
                                                                  *filter_chain_factory_context),
-      std::chrono::milliseconds(
-          PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)),
+      PROTOBUF_GET_MS_OR_PROFILE_DEFAULT(filter_chain, DefaultsProfile::ConfigContext(filter_chain),
+                                         transport_socket_connect_timeout, 0),
       filter_chain.name());
 
   filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));

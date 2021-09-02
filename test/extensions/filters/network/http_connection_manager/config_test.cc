@@ -1282,7 +1282,7 @@ TEST_F(HttpConnectionManagerConfigTest, TestDefaultsProfile) {
 
     EXPECT_EQ(300 * 1000, config.streamIdleTimeout().count());
     EXPECT_EQ(10 * 1000, config.requestHeadersTimeout().count());
-    EXPECT_EQ(0, config.requestTimeout().count());
+    EXPECT_EQ(300 * 1000, config.requestTimeout().count());
   }
 
   {

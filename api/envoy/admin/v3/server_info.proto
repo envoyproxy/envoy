@@ -79,6 +79,14 @@ message CommandLineOptions {
     InitOnly = 2;
   }
 
+  enum DefaultsProfile {
+    // Default option: run with settings optimized for performance.
+    Performant = 0;
+
+    // Run in a less resource intensive manner, safer against resource exhaustion DoS attacks.
+    Safe = 1;
+  }
+
   enum DrainStrategy {
     // Gradually discourage connections over the course of the drain period.
     Gradual = 0;
@@ -189,4 +197,7 @@ message CommandLineOptions {
 
   // See :option:`--enable-core-dump` for details.
   bool enable_core_dump = 37;
+
+  // See :option:`--defaults-profile` for details.
+  DefaultsProfile defaults_profile = 38;
 }

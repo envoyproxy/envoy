@@ -149,6 +149,7 @@ envoy_cc_library(
     deps = [
         "//envoy/network:address_interface",
         "//envoy/stats:stats_interface",
+        "//source/common/common:envoy_defaults_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],

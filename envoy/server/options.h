@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/admin/v3/server_info.pb.h"
+#include "source/common/common/envoy_defaults.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/address.h"
@@ -41,6 +42,22 @@ enum class Mode {
   // etc. Validation will pass even if those files are malformed or don't exist, allowing the config
   // to be validated in a non-prod environment.
 };
+
+/**
+* Choose a profile to run envoy with default settings tailored to a specific use case.
+*/
+enum class Profile {
+ /**
+  * Default option: run envoy with its setting optimized for performance.
+  */
+ Performant,
+
+ /**
+  * Run envoy in a less resource intensive manner, safer against resource exhaustion DoS attacks.
+  */
+ Safe,
+};
+
 
 /**
  * During the drain sequence, different components ask the DrainManager
@@ -125,6 +142,11 @@ public:
    * that merges into the config last, after configYaml and configPath.
    */
   virtual const envoy::config::bootstrap::v3::Bootstrap& configProto() const PURE;
+
+  /**
+   *
+   */
+  virtual DefaultsProfile::Profile defaultsProfile() const PURE;
 
   /**
    * @return bool allow unknown fields in the static configuration?
