@@ -174,7 +174,8 @@ def verify_and_print_release_dates(repository_locations, github_instance, create
             release_date = get_untagged_release_date(repo, metadata['version'], github_release)
         if release_date:
             # Check whether there is a more recent version and warn if necessary.
-            verify_and_print_latest_release(dep, repo, github_release.version, release_date, create_issue)
+            verify_and_print_latest_release(
+                    dep, repo, github_release.version, release_date, create_issue)
             # Verify that the release date in metadata and GitHub correspond,
             # otherwise throw ReleaseDateVersionError.
             verify_and_print_release_date(dep, release_date, metadata['release_date'])
@@ -202,7 +203,8 @@ if __name__ == '__main__':
     path_module = exports.load_module('repository_locations', path)
     try:
         verify_and_print_release_dates(
-            spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC), github.Github(access_token), cron_action)
+            spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC), github.Github(access_token),
+            cron_action)
     except ReleaseDateVersionError as e:
         print(
             f'{Fore.RED}An error occurred while processing {path}, please verify the correctness of the '
