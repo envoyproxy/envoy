@@ -96,8 +96,6 @@ GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip:
     compressor.add_content_type(ctype);
   }
   compressor.set_disable_on_etag_header(gzip.hidden_envoy_deprecated_disable_on_etag_header());
-  compressor.set_remove_accept_encoding_header(
-      gzip.hidden_envoy_deprecated_remove_accept_encoding_header());
   return compressor;
 }
 
