@@ -142,11 +142,14 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (fin) {
     end_stream_decoded_ = true;
   }
+
+  quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(
-          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_);
+          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_,
+          transform_rst);
   if (headers == nullptr) {
-    onStreamError(close_connection_upon_invalid_header_, quic::QUIC_STREAM_EXCESSIVE_LOAD);
+    onStreamError(close_connection_upon_invalid_header_, transform_rst);
     return;
   }
   const absl::optional<uint64_t> optional_status =
@@ -241,10 +244,12 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
+    quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
     auto trailers = spdyHeaderBlockToEnvoyTrailers<Http::ResponseTrailerMapImpl>(
-        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_);
+        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
+        transform_rst);
     if (trailers == nullptr) {
-      onStreamError(close_connection_upon_invalid_header_, quic::QUIC_STREAM_EXCESSIVE_LOAD);
+      onStreamError(close_connection_upon_invalid_header_, transform_rst);
       return;
     }
     response_decoder_->decodeTrailers(std::move(trailers));

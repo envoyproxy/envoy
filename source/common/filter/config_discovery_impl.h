@@ -261,7 +261,7 @@ public:
   DynamicFilterConfigProviderPtr createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
-      const std::string& stat_prefix, bool last_filter_in_filter_config,
+      const std::string& stat_prefix, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type) override;
 
   FilterConfigProviderPtr
@@ -274,7 +274,7 @@ protected:
   virtual Http::FilterFactoryCb
   getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
                    Server::Configuration::FactoryContext& factory_context,
-                   const std::string& stat_prefix, bool last_filter_in_filter_config,
+                   const std::string& stat_prefix, bool last_filter_in_filter_chain,
                    const std::string& filter_chain_type,
                    const absl::flat_hash_set<std::string> require_type_urls) const PURE;
 };
@@ -284,7 +284,7 @@ protected:
   Http::FilterFactoryCb
   getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
                    Server::Configuration::FactoryContext& factory_context,
-                   const std::string& stat_prefix, bool last_filter_in_filter_config,
+                   const std::string& stat_prefix, bool last_filter_in_filter_chain,
                    const std::string& filter_chain_type,
                    const absl::flat_hash_set<std::string> require_type_urls) const override;
 };
