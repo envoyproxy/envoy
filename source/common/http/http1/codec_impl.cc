@@ -80,6 +80,17 @@ StatefulHeaderKeyFormatterPtr statefulFormatterFromSettings(const Http::Http1Set
   return nullptr;
 }
 
+int countHexDigits(int number) {
+  int hex_digits_count = 0;
+  do {
+    hex_digits_count++;
+    number /= 16;
+  } while (number > 0);
+  return hex_digits_count;
+}
+
+constexpr size_t CRLF_SIZE = 2;
+
 } // namespace
 
 const std::string StreamEncoderImpl::CRLF = "\r\n";
@@ -250,7 +261,7 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 
     if (chunk_encoding_) {
       connection_.buffer().add(CRLF);
-      body_frame_size += 2;
+      body_frame_size += CRLF_SIZE;
     }
     bytes_meterer_->addBodyBytesSent(body_frame_size);
   }
@@ -849,16 +860,11 @@ void ConnectionImpl::dispatchBufferedBody() {
 
 void ConnectionImpl::onChunkHeader(int content_length) {
   bool is_final_chunk = (content_length == 0);
-  int content_length_digits = 0;
-  do {
-    content_length_digits++;
-    content_length /= 10;
-  } while (content_length > 0);
 
   StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
   // Count overhead of chunk encoding per chunk.
   if (bytes_meterer) {
-    bytes_meterer->addBodyBytesReceived(is_final_chunk ? 3 : 4 + content_length_digits);
+    bytes_meterer->addBodyBytesReceived(is_final_chunk ? 3 : 4 + countHexDigits(content_length));
   }
 
   if (is_final_chunk) {

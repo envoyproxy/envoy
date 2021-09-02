@@ -663,7 +663,8 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyBytesCount) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 90, 80, 0, 0, 0, 0, 0, 0);
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 80, 0, 0),
+                                       BytesCountExpectation(0, 0, 0, 0));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
@@ -708,7 +709,8 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBodyBytesC
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 109, 1144, 0, 0, 0, 0, 0, 0);
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(109, 1144, 0, 0),
+                                       BytesCountExpectation(0, 0, 0, 0));
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10270
@@ -3102,7 +3104,8 @@ TEST_P(ProtocolIntegrationTest, HeaderOnlyBytesCountUpstream) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_BODY_BYTES_SENT% %UPSTREAM_BODY_BYTES_RECEIVED%\n");
   testRouterRequestAndResponseWithBody(0, 0, false);
-  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 251, 38, 0, 0, 168, 13, 0, 0);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(251, 38, 0, 0),
+                                     BytesCountExpectation(168, 13, 0, 0));
 }
 
 TEST_P(ProtocolIntegrationTest, HeaderOnlyBytesCountDownstream) {
@@ -3112,7 +3115,8 @@ TEST_P(ProtocolIntegrationTest, HeaderOnlyBytesCountDownstream) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_BODY_BYTES_SENT% %DOWNSTREAM_BODY_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(0, 0, false);
-  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 124, 111, 0, 0, 68, 0, 0, 0);
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(124, 111, 0, 0),
+                                       BytesCountExpectation(68, 0, 0, 0));
 }
 
 TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountUpstream) {
@@ -3123,8 +3127,8 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountUpstream) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_BODY_BYTES_SENT% %UPSTREAM_BODY_BYTES_RECEIVED%\n");
   testRouterRequestAndResponseWithBody(100, 100, false);
-  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 371, 158, 106, 110, 277, 122, 109,
-                                         109);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(371, 158, 106, 110),
+                                     BytesCountExpectation(277, 122, 109, 109));
 }
 
 TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountDownstream) {
@@ -3135,8 +3139,8 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountDownstream) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_BODY_BYTES_SENT% %DOWNSTREAM_BODY_BYTES_RECEIVED%\n");
   testRouterRequestAndResponseWithBody(100, 100, false);
-  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 244, 231, 106, 110, 177, 109, 100,
-                                           100);
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 231, 106, 110),
+                                       BytesCountExpectation(177, 109, 100, 100));
 }
 
 TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUpstream) {
@@ -3151,7 +3155,8 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUpstream) {
 
   testTrailers(10, 20, true, true);
 
-  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 248, 120, 15, 29, 172, 81, 19, 29);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(248, 120, 15, 29),
+                                     BytesCountExpectation(172, 81, 19, 29));
 }
 
 TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountDownstream) {
@@ -3166,7 +3171,8 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountDownstream) {
 
   testTrailers(10, 20, true, true);
 
-  expectDownstreamWireBytesSentAndReceived(access_log_name_, 0, 206, 132, 26, 19, 136, 58, 29, 19);
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(206, 132, 26, 19),
+                                       BytesCountExpectation(136, 58, 29, 19));
 }
 
 TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireBytesCountUpstream) {
@@ -3179,7 +3185,8 @@ TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireByt
 
   testRouterDownstreamDisconnectBeforeRequestComplete(nullptr);
 
-  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 187, 0, 0, 0, 114, 0, 0, 0);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(187, 0, 0, 0),
+                                     BytesCountExpectation(114, 0, 0, 0));
 }
 
 TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytesCountUpstream) {
@@ -3192,7 +3199,8 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytes
 
   testRouterUpstreamDisconnectBeforeRequestComplete();
 
-  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 187, 0, 0, 0, 114, 0, 0, 0);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(187, 0, 0, 0),
+                                     BytesCountExpectation(114, 0, 0, 0));
 }
 
 TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireBytesCountUpstream) {
@@ -3205,7 +3213,8 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireByte
 
   testRouterUpstreamDisconnectBeforeResponseComplete();
 
-  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 159, 47, 0, 0, 113, 13, 0, 0);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(159, 47, 0, 0),
+                                     BytesCountExpectation(113, 13, 0, 0));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, BadRequest) {
@@ -3224,7 +3233,8 @@ TEST_P(DownstreamProtocolIntegrationTest, BadRequest) {
 
   sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
 
-  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 156, 200, 11, 0, 113, 13, 0, 0);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(156, 200, 11, 0),
+                                     BytesCountExpectation(113, 13, 0, 0));
 }
 
 TEST_P(ProtocolIntegrationTest, DownstreamResetWireBytesCountUpstream) {
@@ -3237,7 +3247,8 @@ TEST_P(ProtocolIntegrationTest, DownstreamResetWireBytesCountUpstream) {
 
   testDownstreamResetBeforeResponseComplete();
 
-  expectUpstreamWireBytesSentAndReceived(access_log_name_, 0, 210, 566, 0, 519, 132, 534, 9, 521);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(210, 566, 0, 519),
+                                     BytesCountExpectation(132, 534, 9, 521));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, PathWithFragmentRejectedByDefault) {
