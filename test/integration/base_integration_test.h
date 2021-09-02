@@ -111,8 +111,6 @@ public:
 
   // Enable the listener access log
   void useListenerAccessLog(absl::string_view format = "");
-  // Enable the router upstream access log
-  void useUpstreamAccessLog(absl::string_view format = "");
   // Waits for the nth access log entry, defaulting to log entry 0.
   std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0);
 

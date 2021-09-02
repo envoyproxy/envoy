@@ -1139,31 +1139,6 @@ bool ConfigHelper::setAccessLog(
   return true;
 }
 
-bool ConfigHelper::setUpstreamAccessLog(const std::string& filename, absl::string_view format) {
-  RELEASE_ASSERT(!finalized_, "");
-  envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
-  if (!format.empty()) {
-    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-        std::string(format));
-  }
-  access_log_config.set_path(filename);
-
-  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
-      hcm_config;
-  loadHttpConnectionManager(hcm_config);
-
-  envoy::extensions::filters::http::router::v3::Router router_config;
-  router_config.add_upstream_log()->mutable_typed_config()->PackFrom(access_log_config);
-
-  hcm_config.mutable_http_filters(hcm_config.http_filters_size() - 1)
-      ->mutable_typed_config()
-      ->PackFrom(router_config);
-
-  storeHttpConnectionManager(hcm_config);
-
-  return true;
-}
-
 bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::string_view format) {
   RELEASE_ASSERT(!finalized_, "");
   if (bootstrap_.mutable_static_resources()->listeners_size() == 0) {
