@@ -31,6 +31,8 @@ envoy_cc_library(
         "//conditions:default": "posix",
     }),
     deps = [
+        "//envoy/network:client_connection_manager",
+        "//source/common/config:utility_lib",
         ":dispatcher_includes",
         ":libevent_scheduler_lib",
         ":real_time_system_lib",

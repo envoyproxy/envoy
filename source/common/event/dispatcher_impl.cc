@@ -28,6 +28,9 @@
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "source/common/config/utility.h"
+#include "envoy/network/client_connection_manager.h"
+
 #include "event2/event.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
@@ -153,8 +156,27 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                        Network::TransportSocketPtr&& transport_socket,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
-                                                         std::move(transport_socket), options);
+
+  auto address_type_name = [](const Network::Address::InstanceConstSharedPtr& addr) {
+    ASSERT(addr != nullptr);
+    switch (addr->type()) {
+    // TODO: create IP and
+    case Network::Address::Type::Ip:
+    case Network::Address::Type::Pipe:
+      return "does-not-exist";
+    case Network::Address::Type::EnvoyInternal:
+      return "envoy-internal";
+    }
+  };
+  // TODO: register and find by address type instead of name.
+  auto factory = Config::Utility::getFactoryByName<Network::ClientConnectionFactory>(
+      address_type_name(address));
+  if (factory == nullptr) {
+    // get rid of this once the ip and pipe factory is offered.
+    return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
+                                                           std::move(transport_socket), options);
+  }
+  return factory->createClientConnection(Network::CCContext());
 }
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(

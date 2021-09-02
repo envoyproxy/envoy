@@ -13,6 +13,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.h"],
     deps = [
+        ":client_connection_factory",
         ":io_handle_impl_lib",
     ],
 )
@@ -55,5 +56,20 @@ envoy_cc_library(
         "//source/common/event:dispatcher_includes",
         "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "client_connection_factory",
+    srcs = [
+        "client_connection_factory.cc",
+    ],
+    hdrs = [
+        "client_connection_factory.h",
+    ],
+    deps = [
+        "//envoy/network:client_connection_manager",
+        "//envoy/network:connection_interface",
+        "//envoy/registry",
     ],
 )
