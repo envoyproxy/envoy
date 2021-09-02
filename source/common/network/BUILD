@@ -275,6 +275,7 @@ envoy_cc_library(
     deps = [
         "//envoy/network:io_handle_interface",
         "//envoy/network:listener_filter_buffer_interface",
+        "//source/common/buffer:buffer_lib",
     ],
 )
 

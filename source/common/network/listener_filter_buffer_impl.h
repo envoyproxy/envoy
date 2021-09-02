@@ -6,8 +6,11 @@
 #include <functional>
 #include <memory>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/network/io_handle.h"
 #include "envoy/network/listener_filter_buffer.h"
+
+#include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -15,18 +18,22 @@ namespace Network {
 using ListenerFilterBufferOnCloseCb = std::function<void()>;
 using ListenerFilterBufferOnDataCb = std::function<void()>;
 
-class ListenerFilterBufferImpl : public ListenerFilterBuffer {
+class ListenerFilterBufferImpl : public ListenerFilterBuffer, Logger::Loggable<Logger::Id::filter> {
 public:
   ListenerFilterBufferImpl(IoHandle& io_handle, Event::Dispatcher& dispatcher,
                            ListenerFilterBufferOnCloseCb close_cb,
                            ListenerFilterBufferOnDataCb on_data_cb, uint64_t buffer_size)
       : io_handle_(io_handle), dispatcher_(dispatcher), on_close_cb_(close_cb),
-        on_data_cb_(on_data_cb), buffer_(new uint8_t[buffer_size]), buffer_size_(buffer_size),
-        base_(buffer_.get()) {}
+        on_data_cb_(on_data_cb), buffer_(new Buffer::OwnedImpl()) {
+    // Since we need the single slice for peek from the socket, so initialize that
+    // single slice.
+    auto reservation = buffer_->reserveSingleSlice(buffer_size);
+    reservation.commit(buffer_size);
+  }
 
   uint64_t copyOut(void* buffer, uint64_t length) override;
   uint64_t drain(uint64_t length) override;
-  uint64_t length() const override { return data_size_; }
+  uint64_t length() const override { return buffer_->length(); }
 
   /**
    * sync the drain to the actual socket.
@@ -43,7 +50,6 @@ public:
   void reset() { io_handle_.resetFileEvents(); }
 
 private:
-  uint64_t drainedSize() const { return base_ - buffer_.get(); }
   void onFileEvent(uint32_t events);
 
   IoHandle& io_handle_;
@@ -52,15 +58,12 @@ private:
   ListenerFilterBufferOnDataCb on_data_cb_;
 
   // The buffer for the data peeked from the socket.
-  std::unique_ptr<uint8_t[]> buffer_;
-  // The max size of the buffer.
-  uint64_t buffer_size_;
-  // The pointer of the beginning of the valid data.
-  uint8_t* base_{nullptr};
-  // The size of valid data.
+  Buffer::InstancePtr buffer_;
+  // the size of valid data.
   uint64_t data_size_{0};
-  // true means already drain the data from the actual socket.
-  bool drained_to_socket{false};
+  // This is used for counting the drained data size before
+  // drain the data from actual socket.
+  uint64_t drained_size_{0};
 };
 
 using ListenerFilterBufferImplPtr = std::unique_ptr<ListenerFilterBufferImpl>;

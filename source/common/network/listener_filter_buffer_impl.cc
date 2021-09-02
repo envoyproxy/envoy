@@ -7,28 +7,33 @@ namespace Network {
 
 uint64_t ListenerFilterBufferImpl::copyOut(void* buffer, uint64_t length) {
   auto size = std::min(length, data_size_);
-  if (data_size_ == 0) {
+  if (size == 0) {
     return 0;
   }
-  memcpy(buffer, base_, size); // NOLINT(safe-memcpy)
+  buffer_->copyOut(drained_size_, size, buffer);
   return size;
 }
 
 uint64_t ListenerFilterBufferImpl::drain(uint64_t length) {
   auto size_to_drain = std::min(length, data_size_);
-  base_ += size_to_drain;
+  // It doesn't drain the data from buffer directly until drain the data
+  // from actual socket.
+  drained_size_ += size_to_drain;
   data_size_ -= size_to_drain;
   return size_to_drain;
 }
 
 bool ListenerFilterBufferImpl::drainFromSocket() {
-  std::unique_ptr<uint8_t[]> buf(new uint8_t[drainedSize()]);
-  auto result = io_handle_.recv(buf.get(), drainedSize(), 0);
+  // Since we want to drain the data from the socket, so a
+  // temporary buffer need here.
+  std::unique_ptr<uint8_t[]> buf(new uint8_t[drained_size_]);
+  auto result = io_handle_.recv(buf.get(), drained_size_, 0);
   if (!result.ok()) {
     on_close_cb_();
     return false;
   }
-  drained_to_socket = true;
+  buffer_->drain(drained_size_);
+  drained_size_ = 0;
   return true;
 }
 
@@ -37,7 +42,9 @@ void ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
     on_close_cb_();
   }
 
-  const auto result = io_handle_.recv(buffer_.get(), buffer_size_, MSG_PEEK);
+  auto raw_slice = buffer_->frontSlice();
+
+  const auto result = io_handle_.recv(raw_slice.mem_, raw_slice.len_, MSG_PEEK);
   if (!result.ok()) {
     if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
       return;
@@ -45,15 +52,7 @@ void ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
     on_close_cb_();
     return;
   }
-
-  // the drain already sync to socket, so reset the base_ to the beginning of the buffer.
-  if (drained_to_socket) {
-    base_ = buffer_.get();
-    drained_to_socket = false;
-  }
-
-  // the data may be drained.
-  data_size_ = result.return_value_ - drainedSize();
+  data_size_ = result.return_value_ - drained_size_;
   on_data_cb_();
 }
 
