@@ -433,8 +433,8 @@ envoy_cmake_external(
         "UNALIGNED_OK": "off",
     },
     lib_source = select({
-        "//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:all",
-        "//conditions:default": "@net_zlib//:all",
+        "//bazel:zlib_original": "@net_zlib//:all",
+        "//conditions:default": "@com_github_zlib_ng_zlib_ng//:all",
     }),
     static_libraries = select({
         "//bazel:windows_x86_64": ["zlib.lib"],

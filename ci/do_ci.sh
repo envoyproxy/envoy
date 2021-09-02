@@ -324,7 +324,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "path_normalization_by_default=true"
     "--define" "deprecated_features=disabled"
     "--define" "tcmalloc=gperftools"
-    "--define" "zlib=ng"
+    "--define" "zlib=original"
     "--@envoy//bazel:http3=False"
     "--@envoy//source/extensions/filters/http/kill_request:enabled"
     "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true")

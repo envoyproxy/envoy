@@ -388,11 +388,11 @@ config_setting(
 )
 
 config_setting(
-    name = "zlib_ng",
+    name = "zlib_original",
     constraint_values = [
         "@bazel_tools//platforms:linux",
     ],
-    values = {"define": "zlib=ng"},
+    values = {"define": "zlib=original"},
 )
 
 # TODO: consider converting WAVM VM support to an extension (https://github.com/envoyproxy/envoy/issues/12574)
