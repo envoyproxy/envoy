@@ -496,7 +496,6 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
 
       const auto result = buffer.drain(ntoread);
       nread = result;
-      buffer.drain(nread);
       ASSERT(size_t(nread) == ntoread);
 
       buf_off_ += nread;
