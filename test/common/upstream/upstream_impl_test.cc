@@ -2807,7 +2807,9 @@ TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
 )EOF";
 
   auto cluster = makeCluster(yaml);
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
+  EXPECT_FALSE(cluster_config.has_connect_timeout());
   EXPECT_EQ(std::chrono::seconds(5), cluster->info()->connectTimeout());
 }
 
