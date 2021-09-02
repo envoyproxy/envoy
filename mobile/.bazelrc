@@ -148,6 +148,21 @@ build:remote-ci-linux-clang --java_toolchain=@bazel_tools//tools/jdk:toolchain_j
 build:remote-ci-linux-clang --platforms=@engflow_remote_config_clang//config:platform
 build:remote-ci-linux-clang --config=remote-ci-common
 #############################################################################
+# remote-ci-linux-asan: These options are Linux-only using Clang and AddressSanitizer
+#############################################################################
+build:remote-ci-linux-asan --config=clang-asan
+build:remote-ci-linux-asan --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:remote-ci-linux-asan --action_env=CC=/opt/llvm/bin/clang
+build:remote-ci-linux-asan --action_env=CXX=/opt/llvm/bin/clang++
+build:remote-ci-linux-asan --crosstool_top=@engflow_remote_config_clang_asan//cc:toolchain
+build:remote-ci-linux-asan --extra_execution_platforms=@engflow_remote_config_clang_asan//config:platform
+build:remote-ci-linux-asan --extra_toolchains=@engflow_remote_config_clang_asan//config:cc-toolchain
+build:remote-ci-linux-asan --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_java11
+build:remote-ci-linux-asan --host_platform=@engflow_remote_config_clang_asan//config:platform
+build:remote-ci-linux-asan --java_toolchain=@bazel_tools//tools/jdk:toolchain_java11
+build:remote-ci-linux-asan --platforms=@engflow_remote_config_clang_asan//config:platform
+build:remote-ci-linux-asan --config=remote-ci-common
+#############################################################################
 # remote-ci-macos: These options are macOS-only
 # TODO(lfpino): Add --remote_default_exec_properties=Pool=macos once the pool is defined
 #############################################################################

@@ -83,3 +83,22 @@ rbe_autoconfig(
     },
     create_java_configs = False,
 )
+
+rbe_autoconfig(
+    name = "engflow_remote_config_clang_asan",
+    digest = "sha256:375bf44de0d891f881fd38d7732db411f1f34ec6200eac2f1c9fedf4ad0e474d",
+    registry = "docker.io",
+    repository = "envoyproxy/envoy-build-ubuntu",
+    use_legacy_platform_definition = False,
+    env = {
+        "CC": "/opt/llvm/bin/clang",
+        "CXX": "/opt/llvm/bin/clang++",
+    },
+    exec_properties = {
+        "Pool": "linux",
+        # Necessary to workaround https://github.com/google/sanitizers/issues/916, otherwise, dangling threads in the
+        # docker container fail tests on teardown (example: https://github.com/envoyproxy/envoy-mobile/runs/3443649963)
+        "dockerAddCapabilities": "SYS_PTRACE",
+    },
+    create_java_configs = False,
+)
