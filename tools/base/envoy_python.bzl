@@ -79,6 +79,33 @@ def envoy_py_script(
         data = [],
         visibility = ["//visibility:public"],
         envoy_prefix = "@envoy"):
+    """This generates a `py_binary` from an entry_point in a python package
+
+    Currently, the actual entrypoint callable is hard-coded to `main`.
+
+    For example, if you wish to make use of a `console_script` in an upstream
+    package that resolves as `envoy.code_format.python.command.main` from a
+    package named `envoy.code_format.python`, you can use this macro as
+    follows:
+
+    ```skylark
+
+    envoy_py_script(
+        name = "tools.code_format.python",
+        entry_point = "envoy.code_format.python.command",
+        deps = [requirement("envoy.code_format.python")],
+    ```
+
+    You will then be able to use the console script from bazel.
+
+    Separate args to be passed to the console_script with `--`, eg:
+
+    ```console
+
+    $ bazel run //tools/code_format:python -- -h
+    ```
+
+    """
     py_file = "%s.py" % name.split(".")[-1]
     output = "$(@D)/%s" % py_file
     template_rule = "%s//tools/base:base_command.py" % envoy_prefix
