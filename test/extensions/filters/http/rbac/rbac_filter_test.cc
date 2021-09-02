@@ -1,6 +1,6 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/common/rbac/v3/upstream_ip_matcher.pb.h"
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
-#include "envoy/extensions/filters/http/rbac/v3/upstream_ip_matcher.pb.h"
 
 #include "source/common/config/metadata.h"
 #include "source/common/network/utility.h"
@@ -294,7 +294,7 @@ void upstreamIpTestsBasicPolicySetup(RoleBasedAccessControlFilterTest& test,
   // Setup upstream ip to match.
 
   for (const auto& ip : upstream_ips) {
-    envoy::extensions::filters::http::rbac::v3::UpstreamIpMatcher matcher;
+    envoy::extensions::filters::common::rbac::v3::UpstreamIpMatcher matcher;
     matcher.mutable_upstream_ip()->set_address_prefix(ip);
     matcher.mutable_upstream_ip()->mutable_prefix_len()->set_value(32);
 
@@ -334,7 +334,7 @@ void upstreamIpTestsFilterStateSetup(NiceMock<Http::MockStreamDecoderFilterCallb
 
   // Set the filter state data.
   callback.streamInfo().filterState()->setData(
-      AddressSetAccessorImplImpl::key(), std::move(address_set),
+      AddressSetFilterStateObjectImpl::key(), std::move(address_set),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
 }
 

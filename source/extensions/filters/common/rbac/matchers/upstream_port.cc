@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/rbac/matchers/upstream_port.h"
+#include "source/extensions/filters/common/rbac/matchers/upstream_port.h"
 
 #include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -7,9 +7,10 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
-namespace RBACFilter {
-namespace Matcher {
+namespace Filters {
+namespace Common {
+namespace RBAC {
+namespace Matchers {
 
 using namespace Filters::Common::RBAC;
 
@@ -50,8 +51,9 @@ bool UpstreamPortMatcher::matches(const Network::Connection&, const Envoy::Http:
 
 REGISTER_FACTORY(UpstreamPortMatcherFactory, MatcherExtensionFactory);
 
-} // namespace Matcher
-} // namespace RBACFilter
-} // namespace HttpFilters
+} // namespace Matchers
+} // namespace RBAC
+} // namespace Common
+} // namespace Filters
 } // namespace Extensions
 } // namespace Envoy
