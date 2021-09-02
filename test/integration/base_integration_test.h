@@ -115,7 +115,6 @@ public:
   std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0);
 
   std::string listener_access_log_name_;
-  std::string upstream_access_log_name_;
 
   // Last node received on an xDS stream from the server.
   envoy::config::core::v3::Node last_node_;
