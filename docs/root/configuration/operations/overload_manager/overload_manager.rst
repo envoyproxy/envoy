@@ -234,7 +234,7 @@ streams based on heap usage as a trigger. When the heap usage is less than 85%,
 no streams will be reset.  When heap usage is at or above 85%, we start to
 reset buckets according to the strategy described below. When the heap
 usage is at 95% all streams using >= 1MiB memory are eligible for reset.
-This Overload action will reset up to 50 streams (this is a hardcoded limit)
+This overload action will reset up to 50 streams (this is a hardcoded limit)
 per worker everytime the action is invoked. This is both to reduce the amount
 of streams that end up getting reset and to prevent the worker thread from
 locking up and triggering the Watchdog system.

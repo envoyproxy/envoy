@@ -16,6 +16,8 @@ namespace {
 // Effectively disables tracking as this should zero out all reasonable account
 // balances when shifted by this amount.
 constexpr uint32_t kEffectivelyDisableTrackingBitshift = 63;
+// 50 is an arbitrary limit, and is meant to both limit the number of streams
+// Envoy ends up resetting and avoid triggering the Watchdog system.
 constexpr uint32_t kMaxNumberOfStreamsToResetPerInvocation = 50;
 } // end namespace
 
