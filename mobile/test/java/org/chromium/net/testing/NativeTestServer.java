@@ -82,6 +82,8 @@ public final class NativeTestServer {
 
   public static String getSuccessURL() { return getUrl("/success.txt"); }
 
+  public static String getInternalErrorURL() { return getUrl("/internalerror.txt"); }
+
   public static String getRedirectURL() { return getUrl("/redirect.html"); }
 
   public static String getMultiRedirectURL() { return getUrl("/multiredirect.html"); }

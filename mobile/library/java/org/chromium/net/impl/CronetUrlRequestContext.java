@@ -5,6 +5,7 @@ import static android.os.Process.THREAD_PRIORITY_MORE_FAVORABLE;
 
 import android.os.ConditionVariable;
 import androidx.annotation.GuardedBy;
+import androidx.annotation.VisibleForTesting;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Engine;
 import java.io.IOException;
@@ -301,6 +302,11 @@ public final class CronetUrlRequestContext extends CronetEngineBase {
    * requests.
    */
   void onRequestDestroyed() { mActiveRequestCount.decrementAndGet(); }
+
+  @VisibleForTesting
+  public boolean hasShutdown() {
+    synchronized (mLock) { return !haveRequestContextAdapter(); }
+  }
 
   @GuardedBy("mLock")
   private void checkHaveAdapter() throws IllegalStateException {
