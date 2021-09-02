@@ -150,9 +150,9 @@ public:
 
   void addIdleCallback(IdleCb cb) override { addIdleCallbackImpl(cb); }
   bool isIdle() const override { return isIdleImpl(); }
-  void drainConnections(bool drain_for_destruction) override {
-    drainConnectionsImpl(drain_for_destruction);
-    if (drain_for_destruction) {
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override {
+    drainConnectionsImpl(drain_behavior);
+    if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
       return;
     }
     // Legacy behavior for the TCP connection pool marks all connecting clients

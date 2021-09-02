@@ -354,14 +354,13 @@ void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
   }
 }
 
-void ConnPoolImplBase::drainConnectionsImpl(bool drain_for_destruction) {
-  if (drain_for_destruction) {
+void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
+  if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
+    checkForIdleAndCloseIdleConnsIfDraining();
     is_draining_ = true;
-  }
-  closeIdleConnectionsForDrainingPool();
-  if (drain_for_destruction) {
     return;
   }
+  closeIdleConnectionsForDrainingPool();
 
   // closeIdleConnections() closes all connections in ready_clients_ with no active streams,
   // so all remaining entries in ready_clients_ are serving streams. Move them and all entries

@@ -1813,8 +1813,8 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   // Now remove the cluster. This should drain the connection pools, but not affect
   // tcp connections.
   EXPECT_CALL(*callbacks, onClusterRemoval(_));
-  EXPECT_CALL(*cp, drainConnections(/*drain_for_destruction=*/true));
-  EXPECT_CALL(*cp2, drainConnections(/*drain_for_destruction=*/true));
+  EXPECT_CALL(*cp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
+  EXPECT_CALL(*cp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
   EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
   EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("fake_cluster"));
   EXPECT_EQ(0UL, cluster_manager_->clusters().active_clusters_.size());
@@ -1953,7 +1953,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
     outlier_detector.runCallbacks(test_host);
     health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
 
-    EXPECT_CALL(*cp1, drainConnections(/*drain_for_destruction=*/false));
+    EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     outlier_detector.runCallbacks(test_host);
 
@@ -1963,8 +1963,8 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
   }
 
   // Order of these calls is implementation dependent, so can't sequence them!
-  EXPECT_CALL(*cp1, drainConnections(/*drain_for_destruction=*/false));
-  EXPECT_CALL(*cp2, drainConnections(/*drain_for_destruction=*/false));
+  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*cp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker.runCallbacks(test_host, HealthTransition::Changed);
 
@@ -2017,7 +2017,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsAndDeletePoolOnHealthFailure)
   outlier_detector.runCallbacks(test_host);
   health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
 
-  EXPECT_CALL(*cp1, drainConnections(/*drain_for_destruction=*/false)).WillOnce(Invoke([&]() { cp1->idle_cb_(); }));
+  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections)).WillOnce(Invoke([&]() { cp1->idle_cb_(); }));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
 
@@ -2064,7 +2064,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
     outlier_detector.runCallbacks(test_host);
     health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
 
-    EXPECT_CALL(*cp1, drainConnections(/*drain_for_destruction=*/false));
+    EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     outlier_detector.runCallbacks(test_host);
 
@@ -2074,8 +2074,8 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
   }
 
   // Order of these calls is implementation dependent, so can't sequence them!
-  EXPECT_CALL(*cp1, drainConnections(/*drain_for_destruction=*/false));
-  EXPECT_CALL(*cp2, drainConnections(/*drain_for_destruction=*/false));
+  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*cp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker.runCallbacks(test_host, HealthTransition::Changed);
 
@@ -3000,11 +3000,11 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
                                    ->tcpConnPool(ResourcePriority::Default, nullptr));
 
   // Immediate drain, since this can happen with the HTTP codecs.
-  EXPECT_CALL(*cp, drainConnections(/*drain_for_destruction=*/true)).WillOnce(Invoke([&]() {
+  EXPECT_CALL(*cp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
     cp->idle_cb_();
     cp->idle_cb_ = nullptr;
   }));
-  EXPECT_CALL(*tcp, drainConnections(/*drain_for_destruction=*/true)).WillOnce(Invoke([&]() {
+  EXPECT_CALL(*tcp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
     tcp->idle_cb_();
     tcp->idle_cb_ = nullptr;
   }));
@@ -3079,13 +3079,13 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   Http::ConnectionPool::Instance::IdleCb drained_cb;
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(mock_cp));
   EXPECT_CALL(*mock_cp, addIdleCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
-  EXPECT_CALL(*mock_cp, drainConnections(/*drain_for_destruction=*/true));
+  EXPECT_CALL(*mock_cp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
 
   MockTcpConnPoolWithDestroy* mock_tcp = new NiceMock<MockTcpConnPoolWithDestroy>();
   Tcp::ConnectionPool::Instance::IdleCb tcp_drained_cb;
   EXPECT_CALL(factory_, allocateTcpConnPool_).WillOnce(Return(mock_tcp));
   EXPECT_CALL(*mock_tcp, addIdleCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
-  EXPECT_CALL(*mock_tcp, drainConnections(/*drain_for_destruction=*/true));
+  EXPECT_CALL(*mock_tcp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
 
   HttpPoolDataPeer::getPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
@@ -4647,19 +4647,19 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   EXPECT_NE(cp1, cp2);
   EXPECT_NE(tcp1, tcp2);
 
-  EXPECT_CALL(*cp2, drainConnections(/*drain_for_destruction=*/true)).WillOnce(Invoke([&]() {
+  EXPECT_CALL(*cp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
     cp2->idle_cb_();
     cp2->idle_cb_ = nullptr;
   }));
-  EXPECT_CALL(*cp1, drainConnections(/*drain_for_destruction=*/true)).WillOnce(Invoke([&]() {
+  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
     cp1->idle_cb_();
     cp1->idle_cb_ = nullptr;
   }));
-  EXPECT_CALL(*tcp1, drainConnections(/*drain_for_destruction=*/true)).WillOnce(Invoke([&]() {
+  EXPECT_CALL(*tcp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
     tcp1->idle_cb_();
     tcp1->idle_cb_ = nullptr;
   }));
-  EXPECT_CALL(*tcp2, drainConnections(/*drain_for_destruction=*/true)).WillOnce(Invoke([&]() {
+  EXPECT_CALL(*tcp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
     tcp2->idle_cb_();
     tcp2->idle_cb_ = nullptr;
   }));
@@ -4685,11 +4685,11 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   HostVector hosts_added;
   hosts_added.push_back(host3);
 
-  EXPECT_CALL(*cp1, drainConnections(/*drain_for_destruction=*/true)).WillOnce(Invoke([&]() {
+  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
     cp1->idle_cb_();
     cp1->idle_cb_ = nullptr;
   }));
-  EXPECT_CALL(*tcp1, drainConnections(/*drain_for_destruction=*/true)).WillOnce(Invoke([&]() {
+  EXPECT_CALL(*tcp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).WillOnce(Invoke([&]() {
     tcp1->idle_cb_();
     tcp1->idle_cb_ = nullptr;
   }));
@@ -4756,8 +4756,8 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   hosts_added.push_back(host2);
 
   // No connection pools should be drained.
-  EXPECT_CALL(*cp1, drainConnections(/*drain_for_destruction=*/false)).Times(0);
-  EXPECT_CALL(*tcp1, drainConnections(/*drain_for_destruction=*/false)).Times(0);
+  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections)).Times(0);
+  EXPECT_CALL(*tcp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections)).Times(0);
 
   // No connection pools should be drained.
   cluster.prioritySet().updateHosts(

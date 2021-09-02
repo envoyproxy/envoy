@@ -31,7 +31,7 @@ public:
   MOCK_METHOD(Http::Protocol, protocol, (), (const));
   MOCK_METHOD(void, addIdleCallback, (IdleCb cb));
   MOCK_METHOD(bool, isIdle, (), (const));
-  MOCK_METHOD(void, drainConnections, (bool drain_for_destruction));
+  MOCK_METHOD(void, drainConnections, (Envoy::ConnectionPool::DrainBehavior drain_behavior));
   MOCK_METHOD(bool, hasActiveConnections, (), (const));
   MOCK_METHOD(Cancellable*, newStream, (ResponseDecoder & response_decoder, Callbacks& callbacks));
   MOCK_METHOD(bool, maybePreconnect, (float));

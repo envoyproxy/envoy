@@ -382,20 +382,20 @@ TEST_F(ConnectivityGridTest, TestCancel) {
 
 // Make sure drains get sent to all active pools.
 TEST_F(ConnectivityGridTest, Drain) {
-  grid_.drainConnections(/*drain_for_destruction=*/false);
+  grid_.drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 
   // Synthetically create a pool.
   grid_.createNextPool();
   {
-    EXPECT_CALL(*grid_.first(), drainConnections(/*drain_for_destruction=*/false));
-    grid_.drainConnections(/*drain_for_destruction=*/false);
+    EXPECT_CALL(*grid_.first(), drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+    grid_.drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   }
 
   grid_.createNextPool();
   {
-    EXPECT_CALL(*grid_.first(), drainConnections(/*drain_for_destruction=*/false));
-    EXPECT_CALL(*grid_.second(), drainConnections(/*drain_for_destruction=*/false));
-    grid_.drainConnections(/*drain_for_destruction=*/false);
+    EXPECT_CALL(*grid_.first(), drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+    EXPECT_CALL(*grid_.second(), drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+    grid_.drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   }
 }
 
@@ -411,16 +411,16 @@ TEST_F(ConnectivityGridTest, DrainCallbacks) {
 
   // The first time a drain is started, both pools should start draining.
   {
-    EXPECT_CALL(*grid_.first(), drainConnections(/*drain_for_destruction=*/true));
-    EXPECT_CALL(*grid_.second(), drainConnections(/*drain_for_destruction=*/true));
-    grid_.drainConnections(/*drain_for_destruction=*/true);
+    EXPECT_CALL(*grid_.first(), drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
+    EXPECT_CALL(*grid_.second(), drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
+    grid_.drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   }
 
   // The second time, the pools will not see any change.
   {
-    EXPECT_CALL(*grid_.first(), drainConnections(/*drain_for_destruction=*/true)).Times(0);
-    EXPECT_CALL(*grid_.second(), drainConnections(/*drain_for_destruction=*/true)).Times(0);
-    grid_.drainConnections(/*drain_for_destruction=*/true);
+    EXPECT_CALL(*grid_.first(), drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).Times(0);
+    EXPECT_CALL(*grid_.second(), drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete)).Times(0);
+    grid_.drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   }
   {
     // Notify the grid the second pool has been drained. This should not be
@@ -481,7 +481,7 @@ TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
 
   {
     grid_.addIdleCallback([&drain_received]() -> void { drain_received = true; });
-    grid_.drainConnections(/*drain_for_destruction=*/true);
+    grid_.drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   }
 
   grid_.setDestroying(); // Fake being in the destructor.

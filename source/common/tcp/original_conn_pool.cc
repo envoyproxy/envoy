@@ -37,8 +37,8 @@ OriginalConnPoolImpl::~OriginalConnPoolImpl() {
   dispatcher_.clearDeferredDeleteList();
 }
 
-void OriginalConnPoolImpl::drainConnections(bool drain_for_destruction) {
-  if (drain_for_destruction) {
+void OriginalConnPoolImpl::drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) {
+  if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
     is_draining_ = true;
     checkForIdleAndCloseIdleConnsIfDraining();
     return;

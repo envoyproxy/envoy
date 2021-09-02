@@ -54,7 +54,7 @@ public:
   /**
    * See `Envoy::ConnectionPool::Instance::drainConnections()`.
    */
-  void drainConnections(bool drain_for_destruction);
+  void drainConnections(ConnectionPool::DrainBehavior drain_behavior);
 
 private:
   size_t getPriorityIndex(ResourcePriority priority) const;
