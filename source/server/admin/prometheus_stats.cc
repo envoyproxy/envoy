@@ -1,7 +1,10 @@
 #include "source/server/admin/prometheus_stats.h"
 
+#include "envoy/registry/registry.h"
+
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
+#include "source/common/stats/custom_namespace.h"
 #include "source/common/stats/histogram_impl.h"
 
 #include "absl/strings/str_cat.h"
@@ -112,9 +115,13 @@ uint64_t outputStatType(
     groups[metric->tagExtractedStatName()].push_back(metric.get());
   }
 
+  const auto custom_namespace_factory =
+      Registry::FactoryRegistry<Stats::CustomStatNamespaceFactory>::getFactory(
+          "envoy.stats.custom_namespace");
+  ASSERT(custom_namespace_factory != nullptr);
   for (auto& group : groups) {
-    const std::string prefixed_tag_extracted_name =
-        PrometheusStatsFormatter::metricName(global_symbol_table.toString(group.first));
+    const std::string prefixed_tag_extracted_name = PrometheusStatsFormatter::metricName(
+        global_symbol_table.toString(group.first), *custom_namespace_factory);
     if (prefixed_tag_extracted_name.empty()) {
       continue;
     }
@@ -190,15 +197,18 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
   return absl::StrJoin(buf, ",");
 }
 
-std::string PrometheusStatsFormatter::metricName(const std::string& extracted_name) {
-  std::string sanitized_name = sanitizeName(extracted_name);
+std::string PrometheusStatsFormatter::metricName(
+    const std::string& extracted_name,
+    const Stats::CustomStatNamespaceFactory& custom_namespace_factory) {
+  absl::string_view view{extracted_name};
 
-  absl::string_view view{sanitized_name};
-  const auto first_pos = sanitized_name.find_first_of('_');
-  view = view.substr(0, first_pos);
-  if (Stats::Utility::customStatNamespaceRegistered(view)) {
-    // Trim the custom namespace.
-    sanitized_name = sanitized_name.substr(first_pos + 1);
+  std::string sanitized_name = custom_namespace_factory.trySanitizeStatName(view);
+  if (!sanitized_name.empty()) {
+    // This case the name has a custom namespace, and it is a custom metric.
+    // And sanitized_name now is the extracted_name without the namespace.
+    // We expose these metrics without modifying (e.g. without "envoy_"),
+    // so we have to check the "user-defined" namespace is valid as Prometheus namespace.
+    sanitized_name = sanitizeName(sanitized_name);
     // Check the prometheus namespace is valid.
     view = sanitized_name.substr(0, sanitized_name.find_first_of('_'));
     if (!std::regex_match(view.begin(), view.end(), namespaceRegex())) {
@@ -207,10 +217,10 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extracted_na
     return sanitized_name;
   }
 
-  // Add namespacing prefix to avoid conflicts, as per best practice:
-  // https://prometheus.io/docs/practices/naming/#metric-names
-  // Also, naming conventions on https://prometheus.io/docs/concepts/data_model/
-  return absl::StrCat("envoy_", sanitized_name);
+  // If it does not have a custom namespace, add namespacing prefix to avoid conflicts, as per best
+  // practice: https://prometheus.io/docs/practices/naming/#metric-names Also, naming conventions on
+  // https://prometheus.io/docs/concepts/data_model/
+  return absl::StrCat("envoy_", sanitizeName(extracted_name));
 }
 
 // TODO(efimki): Add support of text readouts stats.

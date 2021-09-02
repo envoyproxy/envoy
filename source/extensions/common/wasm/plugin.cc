@@ -1,6 +1,9 @@
 #include "source/extensions/common/wasm/plugin.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/registry/registry.h"
+
+#include "source/common/stats/custom_namespace.h"
 
 #include "include/proxy-wasm/wasm.h"
 
@@ -8,6 +11,23 @@ namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Wasm {
+
+// The custom namespace which prefixes all the user-defined metrics.
+constexpr absl::string_view CustomMetricNamespace = "wasmcustom";
+
+// Register the custom namespace which prefixes all the user-defined metrics.
+// Note that the prefix is removed from the final output of /stats endpoints
+void ensureCustomStatNamespaceRegistered() {
+  static bool registered = false;
+  if (!registered) {
+    auto namespace_factory =
+        Registry::FactoryRegistry<Stats::CustomStatNamespaceFactory>::getFactory(
+            "envoy.stats.custom_namespace");
+    ASSERT(namespace_factory != nullptr);
+    namespace_factory->registerStatNamespace(CustomMetricNamespace);
+    registered = true;
+  }
+}
 
 WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) : config_(config) {
   for (auto& capability : config_.capability_restriction_config().allowed_capabilities()) {
@@ -52,6 +72,11 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
       }
     }
   }
+
+  // Ensure that the Wasm extension's custom stat namespace is registered.
+  // We do that here because this is the only code path of
+  // all kinds of Wasm extension points.
+  ensureCustomStatNamespaceRegistered();
 }
 
 } // namespace Wasm

@@ -7,6 +7,8 @@
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
+#include "source/common/stats/custom_namespace.h"
+
 namespace Envoy {
 namespace Server {
 /**
@@ -33,9 +35,13 @@ public:
   static std::string formattedTags(const std::vector<Stats::Tag>& tags);
 
   /**
-   * Format the given metric name, prefixed with "envoy_".
+   * Format the given metric name, and prefixed with "envoy_" if it does not have a custom
+   * stat namespace. If it has a custom stat namespace AND the name without the custom namespace
+   * has a valid prometheus namespace, the trimmed name is returned.
+   * Otherwise, Return the empty string
    */
-  static std::string metricName(const std::string& extracted_name);
+  static std::string metricName(const std::string& extracted_name,
+                                const Stats::CustomStatNamespaceFactory& custom_namespace_factory);
 };
 
 } // namespace Server

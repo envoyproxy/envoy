@@ -55,11 +55,9 @@ namespace Wasm {
 
 namespace {
 
-// Register the custom namespace which prefixes all the user-defined metrics.
+// The custom namespace prefix which prepends the user-defined metrics.
 // Note that the prefix is removed from the final output of /stats endpoints.
-constexpr absl::string_view CustomMetricNamespace = "wasmcustom";
 constexpr absl::string_view CustomMetricNamespacePrefix = "wasmcustom.";
-Stats::Utility::RegisterCustomStatNamespace RegisterNamespace{CustomMetricNamespace};
 
 // FilterState prefix for CelState values.
 constexpr absl::string_view CelStateKeyPrefix = "wasm.";
@@ -1240,7 +1238,7 @@ WasmResult Context::defineMetric(uint32_t metric_type, std::string_view name,
     return WasmResult::BadArgument;
   }
   auto type = static_cast<MetricType>(metric_type);
-  // Prefix the given name with CustomMetricNamespace so that these user-defined
+  // Prefix the given name with CustomMetricNamespacePrefix so that these user-defined
   // custom metrics can be distinguished from native Envoy metrics.
   const auto prefixed_name = absl::StrCat(CustomMetricNamespacePrefix, std::string(name));
   // TODO: Consider rethinking the scoping policy as it does not help in this case.

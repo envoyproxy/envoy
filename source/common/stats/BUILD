@@ -25,6 +25,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "custom_namespace_lib",
+    srcs = ["custom_namespace.cc"],
+    hdrs = ["custom_namespace.h"],
+    deps = [
+        "//envoy/registry",
+    ],
+)
+
+envoy_cc_library(
     name = "histogram_lib",
     srcs = ["histogram_impl.cc"],
     hdrs = ["histogram_impl.h"],

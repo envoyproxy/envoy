@@ -118,6 +118,7 @@ envoy_cc_library(
     deps = [
         ":utils_lib",
         "//source/common/buffer:buffer_lib",
+        "//source/common/stats:custom_namespace_lib",
         "//source/common/stats:histogram_lib",
     ],
 )

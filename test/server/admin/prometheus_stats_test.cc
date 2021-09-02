@@ -100,39 +100,44 @@ protected:
 };
 
 TEST_F(PrometheusStatsFormatterTest, MetricName) {
+  Stats::CustomStatNamespaceFactoryImpl custom_namespace_factory;
   std::string raw = "vulture.eats-liver";
   std::string expected = "envoy_vulture_eats_liver";
-  auto actual = PrometheusStatsFormatter::metricName(raw);
+  auto actual = PrometheusStatsFormatter::metricName(raw, custom_namespace_factory);
   EXPECT_EQ(expected, actual);
 }
 
 TEST_F(PrometheusStatsFormatterTest, SanitizeMetricName) {
+  Stats::CustomStatNamespaceFactoryImpl custom_namespace_factory;
   std::string raw = "An.artist.plays-violin@019street";
   std::string expected = "envoy_An_artist_plays_violin_019street";
-  auto actual = PrometheusStatsFormatter::metricName(raw);
+  auto actual = PrometheusStatsFormatter::metricName(raw, custom_namespace_factory);
   EXPECT_EQ(expected, actual);
 }
 
 TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
+  Stats::CustomStatNamespaceFactoryImpl custom_namespace_factory;
   std::string raw = "3.artists.play-violin@019street";
   std::string expected = "envoy_3_artists_play_violin_019street";
-  auto actual = PrometheusStatsFormatter::metricName(raw);
+  auto actual = PrometheusStatsFormatter::metricName(raw, custom_namespace_factory);
   EXPECT_EQ(expected, actual);
 }
 
 TEST_F(PrometheusStatsFormatterTest, CustomNamespace) {
-  Stats::Utility::RegisterCustomStatNamespace fake_custon_namespace("promstattest");
+  Stats::CustomStatNamespaceFactoryImpl custom_namespace_factory;
+  custom_namespace_factory.registerStatNamespace("promstattest");
   std::string raw = "promstattest.vulture.eats-liver";
   std::string expected = "vulture_eats_liver";
-  auto actual = PrometheusStatsFormatter::metricName(raw);
+  auto actual = PrometheusStatsFormatter::metricName(raw, custom_namespace_factory);
   EXPECT_EQ(expected, actual);
 }
 
 TEST_F(PrometheusStatsFormatterTest, CustomNamespaceWithInvalidPromnamespace) {
-  Stats::Utility::RegisterCustomStatNamespace fake_custon_namespace("promstattest");
+  Stats::CustomStatNamespaceFactoryImpl custom_namespace_factory;
+  custom_namespace_factory.registerStatNamespace("promstattest");
   std::string raw = "promstattest.1234abcd.eats-liver";
   std::string expected = "";
-  auto actual = PrometheusStatsFormatter::metricName(raw);
+  auto actual = PrometheusStatsFormatter::metricName(raw, custom_namespace_factory);
   EXPECT_EQ(expected, actual);
 }
 
