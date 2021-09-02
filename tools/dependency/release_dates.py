@@ -175,7 +175,7 @@ def verify_and_print_release_dates(repository_locations, github_instance, create
         if release_date:
             # Check whether there is a more recent version and warn if necessary.
             verify_and_print_latest_release(
-                    dep, repo, github_release.version, release_date, create_issue)
+                dep, repo, github_release.version, release_date, create_issue)
             # Verify that the release date in metadata and GitHub correspond,
             # otherwise throw ReleaseDateVersionError.
             verify_and_print_release_date(dep, release_date, metadata['release_date'])
