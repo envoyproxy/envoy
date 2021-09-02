@@ -74,7 +74,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
-  FilterConfigPerRoute(
+  explicit FilterConfigPerRoute(
       const envoy::extensions::filters::http::ext_proc::v3alpha::ExtProcPerRoute& config);
 
   void merge(const FilterConfigPerRoute& other);
