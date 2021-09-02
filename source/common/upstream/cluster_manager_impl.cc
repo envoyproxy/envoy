@@ -1418,7 +1418,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainAllConnPoolsWorker(
             ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
           pool->closeConnections();
         } else {
-          pool->drainConnections();
+          pool->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
         }
       }
     }
