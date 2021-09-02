@@ -18,6 +18,15 @@ namespace Network {
 using ListenerFilterBufferOnCloseCb = std::function<void()>;
 using ListenerFilterBufferOnDataCb = std::function<void()>;
 
+enum class PeekState {
+  // Peek data status successful.
+  Done,
+  // Need to try again.
+  Again,
+  // Error to peek data.
+  Error
+};
+
 class ListenerFilterBufferImpl : public ListenerFilterBuffer, Logger::Loggable<Logger::Id::filter> {
 public:
   ListenerFilterBufferImpl(IoHandle& io_handle, Event::Dispatcher& dispatcher,
@@ -31,10 +40,14 @@ public:
     reservation.commit(buffer_size);
   }
 
-  uint64_t copyOut(void* buffer, uint64_t length) override;
   uint64_t copyOut(Buffer::Instance& buffer, uint64_t length) override;
   uint64_t drain(uint64_t length) override;
   uint64_t length() const override { return buffer_->length(); }
+
+  /**
+   * trigger the data peek from the socket.
+   */
+  PeekState peekFromSocket();
 
   /**
    * sync the drain to the actual socket.

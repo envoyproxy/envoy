@@ -39,23 +39,31 @@ bool ListenerFilterBufferImpl::drainFromSocket() {
   return true;
 }
 
-void ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
-  if (events & Event::FileReadyType::Closed) {
-    on_close_cb_();
-  }
-
+PeekState ListenerFilterBufferImpl::peekFromSocket() {
   auto raw_slice = buffer_->frontSlice();
 
   const auto result = io_handle_.recv(raw_slice.mem_, raw_slice.len_, MSG_PEEK);
   if (!result.ok()) {
     if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-      return;
+      return PeekState::Again;
     }
-    on_close_cb_();
-    return;
+    return PeekState::Error;
   }
   data_size_ = result.return_value_ - drained_size_;
-  on_data_cb_();
+  return PeekState::Done;
+}
+
+void ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
+  if (events & Event::FileReadyType::Closed) {
+    on_close_cb_();
+  }
+
+  auto state = peekFromSocket();
+  if (state == PeekState::Done) {
+    on_data_cb_();
+  } else if (state == PeekState::Error) {
+    on_close_cb_();
+  }
 }
 
 } // namespace Network

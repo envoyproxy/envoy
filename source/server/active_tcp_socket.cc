@@ -90,6 +90,12 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
             },
             inspect_buffer_size_);
         listener_filter_buffer_->initialize();
+        // when accept the connection, the socket already has the data, so trigger
+        // the data peek manually instead of waiting for next reading event.
+        if (listener_filter_buffer_->peekFromSocket() == Network::PeekState::Error) {
+          continueFilterChain(false);
+          return;
+        }
       }
     } else {
       iter_ = std::next(iter_);
