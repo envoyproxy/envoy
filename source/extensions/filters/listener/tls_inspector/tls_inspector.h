@@ -96,7 +96,7 @@ private:
   bool alpn_found_{false};
   bool clienthello_success_{false};
 
-  static thread_local uint8_t buf_[Config::TLS_MAX_CLIENT_HELLO];
+  static thread_local Buffer::InstancePtr buffer_;
 
   // Allows callbacks on the SSL_CTX to set fields in this class.
   friend class Config;

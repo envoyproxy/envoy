@@ -11,6 +11,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 
 #include "absl/strings/str_join.h"
@@ -64,11 +65,9 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
 
 bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_ctx_.get())}; }
 
-thread_local uint8_t Filter::buf_[Config::TLS_MAX_CLIENT_HELLO];
+thread_local Buffer::InstancePtr Filter::buffer_(new Buffer::OwnedImpl());
 
 Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->newSsl()) {
-  RELEASE_ASSERT(sizeof(buf_) >= config_->maxClientHelloSize(), "");
-
   SSL_set_app_data(ssl_.get(), this);
   SSL_set_accept_state(ssl_.get());
 }
@@ -114,13 +113,14 @@ void Filter::onServername(absl::string_view name) {
 }
 
 Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
-  auto rc = buffer.copyOut(buf_, config_->maxClientHelloSize());
+  auto rc = buffer.copyOut(*buffer_, config_->maxClientHelloSize());
   ENVOY_LOG(trace, "tls inspector: recv: {}", rc);
 
   // Because we're doing a MSG_PEEK, data we've seen before gets returned every time, so
   // skip over what we've already processed.
   if (static_cast<uint64_t>(rc) > read_) {
-    const uint8_t* data = buf_ + read_;
+    uint8_t* buf = static_cast<uint8_t*>(buffer_->linearize(buffer_->length()));
+    const uint8_t* data = buf + read_;
     const size_t len = rc - read_;
     read_ = rc;
     ParseState parse_state = parseClientHello(data, len);
