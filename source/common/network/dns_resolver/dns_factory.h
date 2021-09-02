@@ -44,7 +44,7 @@ void makeEmptyAppleDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
 // If it is MacOS and the run time flag: envoy.restart_features.use_apple_api_for_dns_lookups
-// is enabled, synthetic an AppleDnsResolverConfig typed config.
+// is enabled, create an AppleDnsResolverConfig typed config.
 bool checkUseAppleApiForDnsLookups(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
@@ -67,7 +67,7 @@ bool checkTypedDnsResolverConfigExist(
   return false;
 }
 
-// If the config has dns_resolution_config, synthetic a CaresDnsResolverConfig typed config based on
+// If the config has dns_resolution_config, create a CaresDnsResolverConfig typed config based on
 // it.
 template <class ConfigType>
 bool checkDnsResolutionConfigExist(
@@ -87,7 +87,7 @@ bool checkDnsResolutionConfigExist(
   return false;
 }
 
-// For backward compatibility, copy over set_use_tcp_for_dns_lookups from config, and synthetic
+// For backward compatibility, copy over use_tcp_for_dns_lookups from config, and create
 // a CaresDnsResolverConfig typed config. This logic fit for bootstrap, and dns_cache config types.
 template <class ConfigType>
 void handleLegacyDnsResolverData(
@@ -107,7 +107,7 @@ void handleLegacyDnsResolverData(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
 // Overloading the template function for Cluster config type, which need to copy
-// both set_use_tcp_for_dns_lookups and dns_resolvers.
+// both use_tcp_for_dns_lookups and dns_resolvers.
 void handleLegacyDnsResolverData(
     const envoy::config::cluster::v3::Cluster& config,
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
@@ -123,7 +123,7 @@ void makeDnsResolverConfig(
     return;
   }
 
-  // If use apple API for DNS lookups, synthetic an AppleDnsResolverConfig typed config.
+  // If use apple API for DNS lookups, create an AppleDnsResolverConfig typed config.
   if (checkUseAppleApiForDnsLookups(typed_dns_resolver_config)) {
     return;
   }

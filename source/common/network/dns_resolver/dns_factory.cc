@@ -20,7 +20,7 @@ void makeEmptyAppleDnsResolverConfig(
 }
 
 // If it is MacOS and the run time flag: envoy.restart_features.use_apple_api_for_dns_lookups
-// is enabled, synthetic an AppleDnsResolverConfig typed config.
+// is enabled, create an AppleDnsResolverConfig typed config.
 bool checkUseAppleApiForDnsLookups(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   if ((Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(
@@ -41,7 +41,7 @@ void handleLegacyDnsResolverData(
 }
 
 // Overloading the template function for Cluster config type, which need to copy
-// both set_use_tcp_for_dns_lookups and dns_resolvers.
+// both use_tcp_for_dns_lookups and dns_resolvers.
 void handleLegacyDnsResolverData(
     const envoy::config::cluster::v3::Cluster& config,
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {

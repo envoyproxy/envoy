@@ -108,12 +108,8 @@ MATCHER_P3(DnsHostInfoEquals, address, resolved_host, is_ip_address, "") {
 
 MATCHER(DnsHostInfoAddressIsNull, "") { return arg->address() == nullptr; }
 
-MATCHER_P(CustomTypedDnsResolverConfigEquals, expectedTypedDnsResolverConfig, "") {
-  return TestUtility::protoEqual(expectedTypedDnsResolverConfig, arg);
-}
-
 void verifyCaresDnsConfigAndUnpack(
-    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
+    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& cares) {
   // Verify typed DNS resolver config is c-ares.
   EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::CaresDnsResolver));
@@ -981,8 +977,7 @@ TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolutionConfig) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   empty_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   empty_typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
-  EXPECT_CALL(dispatcher, createDnsResolver(
-                              CustomTypedDnsResolverConfigEquals(empty_typed_dns_resolver_config)))
+  EXPECT_CALL(dispatcher, createDnsResolver(ProtoEq(empty_typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
   NiceMock<Filesystem::MockInstance> filesystem;
   Envoy::ProtobufMessage::MockValidationVisitor visitor;
@@ -1009,8 +1004,7 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfig) {
   cares.add_resolvers()->MergeFrom(*dns_resolvers);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
-  EXPECT_CALL(dispatcher,
-              createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
+  EXPECT_CALL(dispatcher, createDnsResolver(ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
   NiceMock<Filesystem::MockInstance> filesystem;
   Envoy::ProtobufMessage::MockValidationVisitor visitor;
@@ -1051,8 +1045,7 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfigOverridingUseTcp) {
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
-  EXPECT_CALL(dispatcher,
-              createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
+  EXPECT_CALL(dispatcher, createDnsResolver(ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
   NiceMock<Filesystem::MockInstance> filesystem;
   Envoy::ProtobufMessage::MockValidationVisitor visitor;
@@ -1101,8 +1094,7 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyTypedDnsResolverConfig) {
   expected_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   expected_typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
-  EXPECT_CALL(dispatcher, createDnsResolver(CustomTypedDnsResolverConfigEquals(
-                              expected_typed_dns_resolver_config)))
+  EXPECT_CALL(dispatcher, createDnsResolver(ProtoEq(expected_typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
   NiceMock<Filesystem::MockInstance> filesystem;
   Envoy::ProtobufMessage::MockValidationVisitor visitor;

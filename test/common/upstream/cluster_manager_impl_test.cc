@@ -22,6 +22,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_aware_load_balancer.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -70,7 +71,7 @@ std::string clustersJson(const std::vector<std::string>& clusters) {
 }
 
 void verifyCaresDnsConfigAndUnpack(
-    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
+    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& cares) {
   // Verify typed DNS resolver config is c-ares.
   EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::CaresDnsResolver));
@@ -189,11 +190,6 @@ public:
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
 };
-
-// Compare the expected protobuf message matches with typed_dns_resolver_config parameter.
-MATCHER_P(CustomTypedDnsResolverConfigEquals, expectedTypedDnsResolverConfig, "") {
-  return TestUtility::protoEqual(expectedTypedDnsResolverConfig, arg);
-}
 
 envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
   const std::string yaml = R"EOF(
@@ -2642,8 +2638,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedField) {
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   // As custom resolver is specified via deprecated field `dns_resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_,
-              createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -2686,8 +2681,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedFieldMulti
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   // As custom resolver is specified via deprecated field `dns_resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_,
-              createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -2724,8 +2718,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecified) {
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_,
-              createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
@@ -2771,8 +2764,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedMultipleResolvers) {
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_,
-              createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
@@ -2815,8 +2807,7 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedOveridingDeprecatedReso
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_,
-              createDnsResolver(CustomTypedDnsResolverConfigEquals(typed_dns_resolver_config)))
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
