@@ -38,7 +38,7 @@ public:
    * Format the given metric name, and prefixed with "envoy_" if it does not have a custom
    * stat namespace. If it has a custom stat namespace AND the name without the custom namespace
    * has a valid prometheus namespace, the trimmed name is returned.
-   * Otherwise, Return the empty string
+   * Otherwise, Return the empty string.
    */
   static std::string metricName(const std::string& extracted_name,
                                 const Stats::CustomStatNamespaceFactory& custom_namespace_factory);

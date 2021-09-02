@@ -229,7 +229,6 @@ TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
  */
 TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
                                       StatNameTagVectorOptConstRef tags = absl::nullopt);
-
 } // namespace Utility
 
 /**
