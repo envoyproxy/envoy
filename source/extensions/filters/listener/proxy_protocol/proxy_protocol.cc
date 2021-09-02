@@ -376,7 +376,7 @@ ReadOrParseState Filter::readExtensions(Network::ListenerFilterBuffer& buffer) {
   // to metadata.
   if (proxy_protocol_header_.value().local_command_ || 0 == config_->numberOfNeededTlvTypes()) {
     // buf_ is no longer in use so we re-use it to read/discard.
-    return parseExtensions(buffer, reinterpret_cast<uint8_t*>(buf_), sizeof(buf_), nullptr);
+    return parseExtensions(buffer, reinterpret_cast<uint8_t*>(buffer_->frontSlice().mem_), sizeof(buffer_->frontSlice().len_), nullptr);
   }
 
   // Initialize the buf_tlv_ only when we need to read the TLVs.
@@ -400,8 +400,8 @@ ReadOrParseState Filter::readExtensions(Network::ListenerFilterBuffer& buffer) {
 
 ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) {
   while (buf_off_ < MAX_PROXY_PROTO_LEN_V2) {
-    const auto rc = buffer.copyOut(buf_ + buf_off_, MAX_PROXY_PROTO_LEN_V2 - buf_off_);
-
+    const auto rc = buffer.copyOut(*buffer_, MAX_PROXY_PROTO_LEN_V2);
+    char* raw_buffer = static_cast<char *>(buffer_->linearize(buffer_->length()));
     ssize_t nread = rc;
 
     if (nread < 1) {
@@ -411,9 +411,9 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
 
     if (buf_off_ + nread >= PROXY_PROTO_V2_HEADER_LEN) {
       const char* sig = PROXY_PROTO_V2_SIGNATURE;
-      if (!memcmp(buf_, sig, PROXY_PROTO_V2_SIGNATURE_LEN)) {
+      if (!memcmp(raw_buffer, sig, PROXY_PROTO_V2_SIGNATURE_LEN)) {
         header_version_ = V2;
-      } else if (memcmp(buf_, PROXY_PROTO_V1_SIGNATURE, PROXY_PROTO_V1_SIGNATURE_LEN)) {
+      } else if (memcmp(raw_buffer, PROXY_PROTO_V1_SIGNATURE, PROXY_PROTO_V1_SIGNATURE_LEN)) {
         // It is not v2, and can't be v1, so no sense hanging around: it is invalid
         ENVOY_LOG(debug, "failed to read proxy protocol (exceed max v1 header len)");
         return ReadOrParseState::Error;
@@ -421,7 +421,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
     }
 
     if (header_version_ == V2) {
-      const int ver_cmd = buf_[PROXY_PROTO_V2_SIGNATURE_LEN];
+      const int ver_cmd = raw_buffer[PROXY_PROTO_V2_SIGNATURE_LEN];
       if (((ver_cmd & 0xf0) >> 4) != PROXY_PROTO_V2_VERSION) {
         ENVOY_LOG(debug, "Unsupported V2 proxy protocol version");
         return ReadOrParseState::Error;
@@ -436,13 +436,13 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
         buf_off_ += rc;
         nread -= rc;
       }
-      absl::optional<ssize_t> addr_len_opt = lenV2Address(buf_);
+      absl::optional<ssize_t> addr_len_opt = lenV2Address(raw_buffer);
       if (!addr_len_opt.has_value()) {
         return ReadOrParseState::Error;
       }
       ssize_t addr_len = addr_len_opt.value();
-      uint8_t upper_byte = buf_[PROXY_PROTO_V2_HEADER_LEN - 2];
-      uint8_t lower_byte = buf_[PROXY_PROTO_V2_HEADER_LEN - 1];
+      uint8_t upper_byte = raw_buffer[PROXY_PROTO_V2_HEADER_LEN - 2];
+      uint8_t lower_byte = raw_buffer[PROXY_PROTO_V2_HEADER_LEN - 1];
       ssize_t hdr_addr_len = (upper_byte << 8) + lower_byte;
       if (hdr_addr_len < addr_len) {
         ENVOY_LOG(debug, "failed to read proxy protocol (insufficient data)");
@@ -458,7 +458,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
         buf_off_ += read_result;
         // The TLV remain, they are read/discard in parseExtensions() which is called from the
         // parent (if needed).
-        if (parseV2Header(buf_)) {
+        if (parseV2Header(raw_buffer)) {
           return ReadOrParseState::Done;
         } else {
           return ReadOrParseState::Error;
@@ -471,7 +471,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
     } else {
       // continue searching buf_ from where we left off
       for (; search_index_ < buf_off_ + nread; search_index_++) {
-        if (buf_[search_index_] == '\n' && buf_[search_index_ - 1] == '\r') {
+        if (raw_buffer[search_index_] == '\n' && raw_buffer[search_index_ - 1] == '\r') {
           if (search_index_ == 1) {
             // This could be the binary protocol. It cannot be the ascii protocol
             header_version_ = InProgress;
@@ -501,7 +501,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
       buf_off_ += nread;
 
       if (header_version_ == V1) {
-        if (parseV1Header(buf_, buf_off_)) {
+        if (parseV1Header(raw_buffer, buf_off_)) {
           return ReadOrParseState::Done;
         } else {
           return ReadOrParseState::Error;

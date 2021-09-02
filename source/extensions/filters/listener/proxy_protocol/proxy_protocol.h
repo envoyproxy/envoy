@@ -9,6 +9,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
@@ -85,7 +86,7 @@ enum class ReadOrParseState { Done, TryAgainLater, Error };
  */
 class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(const ConfigSharedPtr& config) : config_(config) {}
+  Filter(const ConfigSharedPtr& config) :  buffer_(new Buffer::OwnedImpl()), config_(config) {}
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
@@ -131,8 +132,7 @@ private:
 
   ProxyProtocolVersion header_version_{Unknown};
 
-  // Stores the portion of the first line that has been read so far.
-  char buf_[MAX_PROXY_PROTO_LEN_V2];
+  Buffer::InstancePtr buffer_;
 
   /**
    * Store the extension TLVs if they need to be read.
