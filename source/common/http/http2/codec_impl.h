@@ -225,7 +225,7 @@ protected:
     void readDisable(bool disable) override;
     uint32_t bufferLimit() override { return pending_recv_data_->highWatermark(); }
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
-      return parent_.connection_.addressProvider().localAddress();
+      return parent_.connection_.connectionInfoProvider().localAddress();
     }
     absl::string_view responseDetails() override { return details_; }
     void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;

@@ -124,7 +124,6 @@ parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
 
 ProtocolOptionsConfigConstSharedPtr
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
-                            const ProtobufWkt::Struct& config,
                             Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
@@ -152,7 +151,7 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
   }
 
   Envoy::Config::Utility::translateOpaqueConfig(
-      typed_config, config, factory_context.messageValidationVisitor(), *proto_config);
+      typed_config, factory_context.messageValidationVisitor(), *proto_config);
   return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
@@ -167,8 +166,7 @@ absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExten
     // protocol options.
     auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
-    auto object = createProtocolOptionsConfig(
-        name, it.second, ProtobufWkt::Struct::default_instance(), factory_context);
+    auto object = createProtocolOptionsConfig(name, it.second, factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
@@ -939,7 +937,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     auto& factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(proto_config);
     auto message = factory.createEmptyConfigProto();
-    Config::Utility::translateOpaqueConfig(proto_config.typed_config(), ProtobufWkt::Struct(),
+    Config::Utility::translateOpaqueConfig(proto_config.typed_config(),
                                            factory_context.messageValidationVisitor(), *message);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);

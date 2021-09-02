@@ -18,8 +18,9 @@ ThriftFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoT
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
   UNREFERENCED_PARAMETER(proto_config);
 
-  auto shadow_writer = std::make_shared<ShadowWriterImpl>(context.clusterManager(), stat_prefix,
-                                                          context.scope(), context.dispatcher());
+  auto shadow_writer =
+      std::make_shared<ShadowWriterImpl>(context.clusterManager(), stat_prefix, context.scope(),
+                                         context.dispatcher(), context.threadLocal());
 
   return [&context, stat_prefix,
           shadow_writer](ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {

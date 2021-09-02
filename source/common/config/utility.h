@@ -375,9 +375,7 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
 
-    translateOpaqueConfig(enclosing_message.typed_config(),
-                          enclosing_message.hidden_envoy_deprecated_config(), validation_visitor,
-                          *config);
+    translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config);
     return config;
   }
 
@@ -401,7 +399,7 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
 
-    translateOpaqueConfig(typed_config, ProtobufWkt::Struct(), validation_visitor, *config);
+    translateOpaqueConfig(typed_config, validation_visitor, *config);
     return config;
   }
 
@@ -445,15 +443,12 @@ public:
                                 Stats::Scope& scope, bool skip_cluster_check);
 
   /**
-   * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto
-   * message.
+   * Translate opaque config from google.protobuf.Any to defined proto message.
    * @param typed_config opaque config packed in google.protobuf.Any
-   * @param config the deprecated google.protobuf.Struct config, empty struct if doesn't exist.
    * @param validation_visitor message validation visitor instance.
    * @param out_proto the proto message instantiated by extensions
    */
   static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
-                                    const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto);
 

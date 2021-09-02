@@ -25,8 +25,10 @@ ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedP
     return absl::nullopt;
   }
 
-  LinkedList::moveIntoList(std::move(shadow_router), active_routers_);
-  return *active_routers_.front();
+  auto& active_routers = tls_->getTyped<ActiveRouters>().activeRouters();
+
+  LinkedList::moveIntoList(std::move(shadow_router), active_routers);
+  return *active_routers.front();
 }
 
 ShadowRouterImpl::ShadowRouterImpl(ShadowWriterImpl& parent, const std::string& cluster_name,
@@ -63,6 +65,18 @@ bool ShadowRouterImpl::createUpstreamRequest() {
 bool ShadowRouterImpl::requestStarted() const {
   return upstream_request_->conn_data_ != nullptr &&
          upstream_request_->upgrade_response_ == nullptr;
+}
+
+void ShadowRouterImpl::flushPendingCallbacks() {
+  if (pending_callbacks_.empty()) {
+    return;
+  }
+
+  for (auto& cb : pending_callbacks_) {
+    cb();
+  }
+
+  pending_callbacks_.clear();
 }
 
 FilterStatus ShadowRouterImpl::passthroughData(Buffer::Instance& data) {
@@ -316,6 +330,8 @@ bool ShadowRouterImpl::requestInProgress() {
 }
 
 void ShadowRouterImpl::onRouterDestroy() {
+  ASSERT(!deferred_deleting_);
+
   // Mark the shadow request to be destroyed when the response gets back
   // or the upstream connection finally fails.
   router_destroyed_ = true;
@@ -330,11 +346,16 @@ bool ShadowRouterImpl::waitingForConnection() const {
 }
 
 void ShadowRouterImpl::maybeCleanup() {
+  if (removed_) {
+    return;
+  }
+
+  ASSERT(!deferred_deleting_);
+
   if (router_destroyed_) {
-    upstream_request_.reset();
-    if (inserted()) {
-      removeFromList(parent_.active_routers_);
-    }
+    removed_ = true;
+    upstream_request_->resetStream();
+    parent_.remove(*this);
   }
 }
 

@@ -6,7 +6,7 @@ import inspect
 from typing import Any, Callable, Optional
 
 
-class NoCache(Exception):
+class NoCache(Exception):  # noqa: N818
     pass
 
 

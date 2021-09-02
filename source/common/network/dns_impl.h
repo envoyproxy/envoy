@@ -24,7 +24,7 @@ class DnsResolverImplPeer;
  * Implementation of DnsResolver that uses c-ares. All calls and callbacks are assumed to
  * happen on the thread that owns the creating dispatcher.
  */
-class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::upstream> {
+class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
   DnsResolverImpl(Event::Dispatcher& dispatcher,
                   const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
