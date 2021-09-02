@@ -183,7 +183,7 @@ public:
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
     EXPECT_CALL(*timer_, enableTimer(_, _));
     config_.set_log_name("test_log_name");
-    config_.mutable_pending_critical_buffer_size_bytes()->set_value(0);
+    config_.mutable_max_pending_buffer_size_bytes()->set_value(0);
     logger_ = std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_},
                                                      config_, FlushInterval, BUFFER_SIZE_BYTES,
                                                      dispatcher_, local_info_, stats_store_);

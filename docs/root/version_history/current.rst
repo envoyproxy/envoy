@@ -84,7 +84,7 @@ Removed Config or Runtime
 
 New Features
 ------------
-* access log: added :ref:`critical endpoint <envoy_v3_api_field_service.accesslog.v3.AccessLogService.CriticalAccessLogs>` to AccessLogService to guarantee log arrival.
+* access log: added :ref:`critical log message <envoy_v3_api_field_service.accesslog.v3.CriticalAccessLogsMessage.message>` to AccessLogService to guarantee log arrival.
 * access_log: added :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` token to handle all types of metadata (DYNAMIC, CLUSTER, ROUTE).
 * bootstrap: added :ref:`inline_headers <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.inline_headers>` in the bootstrap to make custom inline headers bootstrap configurable.
 * contrib: added new :ref:`contrib images <install_contrib>` which contain contrib extensions.

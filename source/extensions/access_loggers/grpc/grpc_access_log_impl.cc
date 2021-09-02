@@ -24,7 +24,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
                        dispatcher, scope, GRPC_LOG_STATS_PREFIX.data(),
                        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                            "envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs")),
-      approximate_critical_message_size_bytes_(max_buffer_size_bytes), log_name_(config.log_name()),
+      max_critical_message_size_bytes_(max_buffer_size_bytes), log_name_(config.log_name()),
       local_info_(local_info) {
   critical_client_ = std::make_unique<
       CriticalAccessLoggerGrpcClientImpl<envoy::service::accesslog::v3::CriticalAccessLogsMessage>>(
@@ -32,7 +32,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.accesslog.v3.AccessLogService.CriticalAccessLogs"),
       dispatcher, scope, PROTOBUF_GET_MS_OR_DEFAULT(config, message_ack_timeout, 5000),
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, pending_critical_buffer_size_bytes, 16384));
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_pending_buffer_size_bytes, 16384));
 }
 
 void GrpcAccessLoggerImpl::addEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
@@ -81,7 +81,7 @@ void GrpcAccessLoggerImpl::logCritical(envoy::data::accesslog::v3::HTTPAccessLog
   approximate_critical_message_size_bytes_ += entry.ByteSizeLong();
   addCriticalMessageEntry(std::move(entry));
 
-  if (approximate_critical_message_size_bytes_ >= max_critical_buffer_size_bytes_) {
+  if (approximate_critical_message_size_bytes_ >= max_critical_message_size_bytes_) {
     flushCriticalMessage();
   }
 }

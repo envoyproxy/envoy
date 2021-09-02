@@ -48,7 +48,7 @@ service AccessLogService {
   //
   // 1. :ref:`critical_buffer_log_filter <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.critical_buffer_log_filter>`
   //    should be set strictly. A loose filter may encourage rapid buffer overwhelm and leading to OOM.
-  // 2. :ref:`pending_critical_buffer_size_bytes <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.pending_critical_buffer_size_bytes>`
+  // 2. :ref:`max_pending_buffer_size_bytes <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.max_pending_buffer_size_bytes>`
   //    should be set appropriately to prevent OOM.
   // 3. Make sure that ALS receiver is implemented properly. If it is not implemented, all messages will
   //    be buffered, which may cause OOM soon.

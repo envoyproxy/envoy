@@ -97,7 +97,7 @@ public:
 
       if (parent_.buffered_messages_.find(id) != parent_.buffered_messages_.end()) {
         // After response wait time exceeded, the state should be Buffered.
-        if (parent_.buffered_messages_.at(id).state_ != BufferedMessage::State::Pending) {
+        if (parent_.buffered_messages_.at(id).state_ == BufferedMessage::State::Buffered) {
           return;
         }
 
@@ -105,9 +105,9 @@ public:
         case envoy::service::accesslog::v3::CriticalAccessLogsResponse::ACK:
           parent_.stats_.critical_logs_ack_received_.inc();
           parent_.stats_.pending_critical_logs_.dec();
-          parent_.current_critical_buffer_size_bytes_ -=
+          parent_.current_pending_buffer_size_bytes_ -=
               parent_.buffered_messages_.at(id).message_.ByteSizeLong();
-          ASSERT(parent_.current_critical_buffer_size_bytes_ >= 0);
+          ASSERT(parent_.current_pending_buffer_size_bytes_ >= 0);
           parent_.buffered_messages_.erase(id);
           break;
         case envoy::service::accesslog::v3::CriticalAccessLogsResponse::NACK:
@@ -123,8 +123,8 @@ public:
     }
     void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
     void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {
-      if (parent_.active_stream_->stream_ != nullptr) {
-        parent_.active_stream_.reset();
+      if (stream_ != nullptr) {
+        stream_ = nullptr;
       }
     }
 
@@ -136,13 +136,13 @@ public:
                                      const Protobuf::MethodDescriptor& method,
                                      Event::Dispatcher& dispatcher, Stats::Scope& scope,
                                      uint64_t message_ack_timeout,
-                                     uint64_t max_critical_buffer_size_bytes)
+                                     uint64_t max_pending_buffer_size_bytes)
       : client_(client), service_method_(method), dispatcher_(dispatcher),
         message_ack_timeout_(message_ack_timeout),
         stats_({CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(
             POOL_COUNTER_PREFIX(scope, GRPC_LOG_STATS_PREFIX.data()),
             POOL_GAUGE_PREFIX(scope, GRPC_LOG_STATS_PREFIX.data()))}),
-        max_critical_buffer_size_bytes_(max_critical_buffer_size_bytes),
+        max_pending_buffer_size_bytes_(max_pending_buffer_size_bytes),
         active_stream_(std::make_unique<ActiveStream>(*this)) {}
 
   // Copy messages in the buffer. Take care about memory pressure.
@@ -152,8 +152,7 @@ public:
           client_.start(service_method_, *active_stream_, Http::AsyncClient::StreamOptions());
     }
 
-    if (active_stream_->stream_ == nullptr ||
-        active_stream_->stream_.isAboveWriteBufferHighWatermark()) {
+    if (active_stream_->stream_.isAboveWriteBufferHighWatermark()) {
       stats_.critical_logs_disposed_.inc();
       active_stream_.reset();
       return;
@@ -162,14 +161,14 @@ public:
     uint32_t id = MessageUtil::hash(message);
     const auto message_byte_size = message.ByteSizeLong();
 
-    if (current_critical_buffer_size_bytes_ + message_byte_size > max_critical_buffer_size_bytes_) {
+    if (current_pending_buffer_size_bytes_ + message_byte_size > max_pending_buffer_size_bytes_) {
       stats_.critical_logs_disposed_.inc();
       return;
     }
 
-    buffered_messages_[id] = BufferedMessage{nullptr, BufferedMessage::State::Pending, message};
-    current_critical_buffer_size_bytes_ += message_byte_size;
-    ASSERT(current_critical_buffer_size_bytes_ >= 0);
+    buffered_messages_[id] = BufferedMessage{nullptr, BufferedMessage::State::Buffered, message};
+    current_pending_buffer_size_bytes_ += message_byte_size;
+    ASSERT(current_pending_buffer_size_bytes_ >= 0);
     stats_.pending_critical_logs_.inc();
 
     // Creates a timer for each message sent. For messages that failed to be sent in the previous
@@ -179,6 +178,10 @@ public:
         std::make_shared<InflightMessageTimer>(dispatcher_, stats_);
 
     for (auto&& buffered_message : buffered_messages_) {
+      if (buffered_message.second.state_ == BufferedMessage::State::Pending) {
+        continue;
+      }
+
       const uint32_t id = buffered_message.first;
       buffered_message.second.message_.set_id(id);
       inflight_timer->add(buffered_message.second);
@@ -198,6 +201,11 @@ private:
     auto& inflight_message_timer = buffered_messages_.begin()->second.timer_;
 
     for (auto&& buffered_message : buffered_messages_) {
+      if (buffered_message.second.state_ == BufferedMessage::State::Pending) {
+        continue;
+      }
+
+      buffered_message.second.state_ = BufferedMessage::State::Pending;
       stats_.critical_logs_sent_.inc();
       active_stream_->stream_->sendMessage(buffered_message.second.message_, false);
     }
@@ -212,8 +220,8 @@ private:
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds message_ack_timeout_;
   CriticalAccessLoggerGrpcClientStats stats_;
-  uint64_t current_critical_buffer_size_bytes_ = 0;
-  const uint64_t max_critical_buffer_size_bytes_;
+  uint64_t current_pending_buffer_size_bytes_ = 0;
+  const uint64_t max_pending_buffer_size_bytes_;
   std::unique_ptr<ActiveStream> active_stream_;
 };
 
@@ -245,7 +253,7 @@ private:
   void logCritical(envoy::data::accesslog::v3::HTTPAccessLogEntry&&) override;
 
   uint64_t approximate_critical_message_size_bytes_ = 0;
-  uint64_t max_critical_buffer_size_bytes_ = 0;
+  uint64_t max_critical_message_size_bytes_ = 0;
   Common::CriticalAccessLoggerGrpcClientPtr<
       envoy::service::accesslog::v3::CriticalAccessLogsMessage>
       critical_client_;
