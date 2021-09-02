@@ -389,9 +389,6 @@ config_setting(
 
 config_setting(
     name = "zlib_ng",
-    constraint_values = [
-        "@bazel_tools//platforms:linux",
-    ],
     values = {"define": "zlib=ng"},
 )
 

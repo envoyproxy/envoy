@@ -17,4 +17,4 @@ libraries.
   Envoy can be built to use `zlib-ng <https://github.com/zlib-ng/zlib-ng>`_ instead of regular
   `zlib <http://zlib.net>`_ by using ``--define zlib=ng`` Bazel option. The relevant build options
   used to build `zlib-ng <https://github.com/zlib-ng/zlib-ng>`_ can be evaluated in :repo:`here
-  <bazel/foreign_cc/BUILD>`. Currently, this option is only available on Linux.
+  <bazel/foreign_cc/BUILD>`.
