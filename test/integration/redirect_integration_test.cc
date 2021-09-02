@@ -475,6 +475,11 @@ TEST_P(RedirectIntegrationTest, InternalRedirectCancelledDueToEarlyResponse) {
   // Ensure the redirect was returned to the client and not handled internally.
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("302", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_failed_total")
+                   ->value());
+  EXPECT_EQ(
+      1, test_server_->counter("http.config_test.passthrough_internal_redirect_stream_request")
+             ->value());
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
@@ -795,6 +800,9 @@ TEST_P(RedirectIntegrationTest, InvalidRedirect) {
       1,
       test_server_->counter("cluster.cluster_0.upstream_internal_redirect_failed_total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
+  EXPECT_EQ(
+      1,
+      test_server_->counter("http.config_test.passthrough_internal_redirect_bad_location")->value());
   EXPECT_THAT(waitForAccessLog(access_log_name_),
               HasSubstr("302 via_upstream test-header-value\n"));
   EXPECT_EQ("test-header-value",
