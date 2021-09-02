@@ -7,7 +7,7 @@ import org.chromium.net.RequestFinishedInfo;
 /**
  * Implementation of {@link RequestFinishedInfo.Metrics}.
  */
-final class CronetMetrics extends RequestFinishedInfo.Metrics {
+public final class CronetMetrics extends RequestFinishedInfo.Metrics {
   private final long mRequestStartMs;
   private final long mDnsStartMs;
   private final long mDnsEndMs;
@@ -43,11 +43,11 @@ final class CronetMetrics extends RequestFinishedInfo.Metrics {
   }
 
   /** New-style constructor */
-  CronetMetrics(long requestStartMs, long dnsStartMs, long dnsEndMs, long connectStartMs,
-                long connectEndMs, long sslStartMs, long sslEndMs, long sendingStartMs,
-                long sendingEndMs, long pushStartMs, long pushEndMs, long responseStartMs,
-                long requestEndMs, boolean socketReused, long sentByteCount,
-                long receivedByteCount) {
+  public CronetMetrics(long requestStartMs, long dnsStartMs, long dnsEndMs, long connectStartMs,
+                       long connectEndMs, long sslStartMs, long sslEndMs, long sendingStartMs,
+                       long sendingEndMs, long pushStartMs, long pushEndMs, long responseStartMs,
+                       long requestEndMs, boolean socketReused, long sentByteCount,
+                       long receivedByteCount) {
     // Check that no end times are before corresponding start times,
     // or exist when start time doesn't.
     assert checkOrder(dnsStartMs, dnsEndMs);
