@@ -241,6 +241,62 @@ The following command operators are supported:
   TCP
     Downstream bytes sent on connection.
 
+%UPSTREAM_WIRE_BYTES_SENT%
+  HTTP
+    Total number of bytes sent to the upstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%UPSTREAM_WIRE_BYTES_RECEIVED%
+  HTTP
+    Total number of bytes received from the upstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%UPSTREAM_BODY_BYTES_SENT%
+  HTTP
+    Number of body bytes sent to the upstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%UPSTREAM_BODY_BYTES_RECEIVED%
+  HTTP
+    Number of body bytes received from the upstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%DOWNSTREAM_WIRE_BYTES_SENT%
+  HTTP
+    Total number of bytes sent to the downstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%DOWNSTREAM_WIRE_BYTES_RECEIVED%
+  HTTP
+    Total number of bytes received from the downstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%DOWNSTREAM_BODY_BYTES_SENT%
+  HTTP
+    Number of body bytes sent to the downstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%DOWNSTREAM_BODY_BYTES_RECEIVED%
+  HTTP
+    Number of body bytes received from the downstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
   Renders a numeric value in typed JSON logs.
 
 %DURATION%
