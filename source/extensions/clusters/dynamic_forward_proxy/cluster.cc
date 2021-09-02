@@ -220,7 +220,7 @@ void Cluster::LoadBalancer::onConnectionOpen(Envoy::Http::ConnectionPool::Instan
     // Only enable coalesced connections for HTTP/2 and HTTP/3.
     return;
   }
-  const LookupKey key = {hash_key, *connection.addressProvider().remoteAddress()};
+  const LookupKey key = {hash_key, *connection.connectionInfoProvider().remoteAddress()};
   ConnectionInfo info = {&pool, &connection};
   connection_info_map_[key].push_back(info);
 }
@@ -228,7 +228,7 @@ void Cluster::LoadBalancer::onConnectionOpen(Envoy::Http::ConnectionPool::Instan
 void Cluster::LoadBalancer::onConnectionDraining(Envoy::Http::ConnectionPool::Instance& pool,
                                                  std::vector<uint8_t>& hash_key,
                                                  const Network::Connection& connection) {
-  const LookupKey key = {hash_key, *connection.addressProvider().remoteAddress()};
+  const LookupKey key = {hash_key, *connection.connectionInfoProvider().remoteAddress()};
   connection_info_map_[key].erase(
       std::remove_if(connection_info_map_[key].begin(), connection_info_map_[key].end(),
                      [&pool, &connection](const ConnectionInfo& info) {

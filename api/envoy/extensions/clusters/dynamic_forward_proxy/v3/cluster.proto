@@ -41,7 +41,8 @@ message ClusterConfig {
   // that is valid for `*.example.com`, then this connection could be used for requests to
   // bar.example.com if that also resolved to 1.2.3.4.
   //
-  // NOTE: The coalesced connections might be to upstreams that would not be otherwise
+  // .. note::
+  // The coalesced connections might be to upstreams that would not be otherwise
   // selected by Envoy.
   bool allow_coalesced_connections = 3;
 }
