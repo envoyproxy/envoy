@@ -4441,8 +4441,12 @@ TEST_F(RouterTest, InternalRedirectWithFailedStreamRecreate) {
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(false));
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_internal_redirect_failed_total").value());
-  EXPECT_EQ(1U, stats_store_.counter("test.passthrough_internal_redirect_recreate_stream_failed").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+  EXPECT_EQ(
+      1U,
+      stats_store_.counter("test.passthrough_internal_redirect_recreate_stream_failed").value());
 }
 
 TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
