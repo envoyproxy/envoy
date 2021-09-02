@@ -467,9 +467,9 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   // Test that all three addresses were populated correctly. Only check the first line of
   // log output for simplicity.
   EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={1} sent=5 "
-                                       "received=0\r?\n.*",
-                                       ip_port_regex, ip_regex)));
+              MatchesRegex(fmt::format(
+                  "upstreamlocal={0} upstreamhost={0} downstream={1} sent=5 received=0\r?\n.*",
+                  ip_port_regex, ip_regex)));
 }
 
 // Test that the server shuts down without crashing when connections are open.
