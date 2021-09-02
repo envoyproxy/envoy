@@ -75,11 +75,6 @@ public:
  */
 class AndMatcher : public Matcher {
 public:
-  // TODO(Jojy): Adding `validation_visitor` as optional here. Reasons for this design choice:
-  //    - Operator `And` is not dependent on protobuf validator. The dependency is artificial.
-  //    - Adding a non-optional parameter would change the existing API and will have larger radius
-  //    of impact.
-  //    Will revisit it and consider alternatives like a separate API for setting the validator.
   AndMatcher(const envoy::config::rbac::v3::Permission::Set& rules,
              const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor);
   AndMatcher(const envoy::config::rbac::v3::Principal::Set& ids);
@@ -97,11 +92,6 @@ private:
  */
 class OrMatcher : public Matcher {
 public:
-  // TODO(Jojy): Adding `validation_visitor` as optional here. Reasons for this design choice:
-  //    - Operator `Or` is not dependent on protobuf validator. The dependency is artificial.
-  //    - Adding a non-optional parameter would change the existing API and will have larger radius
-  //    of impact.
-  //    Will revisit it and consider alternatives like a separate API for setting the validator.
   OrMatcher(const envoy::config::rbac::v3::Permission::Set& set,
             const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor)
       : OrMatcher(set.rules(), validation_visitor) {}
@@ -119,11 +109,6 @@ private:
 
 class NotMatcher : public Matcher {
 public:
-  // TODO(Jojy): Adding `validation_visitor` as optional here. Reasons for this design choice:
-  //    - Operator `Not` is not dependent on protobuf validator. The dependency is artificial.
-  //    - Adding a non-optional parameter would change the existing API and will have larger radius
-  //    of impact.
-  //    Will revisit it and consider alternatives like a separate API for setting the validator.
   NotMatcher(const envoy::config::rbac::v3::Permission& permission,
              const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor)
       : matcher_(Matcher::create(permission, validation_visitor)) {}
