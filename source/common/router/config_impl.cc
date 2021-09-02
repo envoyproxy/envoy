@@ -1318,6 +1318,11 @@ VirtualHostImpl::VirtualHostImpl(
     hedge_policy_ = virtual_host.hedge_policy();
   }
 
+  if (virtual_host.has_matcher() &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.experimental_matching_api")) {
+    throw EnvoyException("Experimental matching API is not enabled");
+  }
+
   if (virtual_host.has_matcher() && !virtual_host.routes().empty()) {
     throw EnvoyException("cannot set both matcher and routes on virtual host");
   }
