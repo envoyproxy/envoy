@@ -27,6 +27,7 @@ AllocatorImpl::~AllocatorImpl() {
   ASSERT(counters_.empty());
   ASSERT(gauges_.empty());
 
+#ifndef NDEBUG
   // Move deleted stats into the sets for the ASSERTs in removeFromSetLockHeld to function.
   for (auto& counter : deleted_counters_) {
     auto insertion = counters_.insert(counter.get());
@@ -43,12 +44,7 @@ AllocatorImpl::~AllocatorImpl() {
     // Assert that there were no duplicates.
     ASSERT(insertion.second);
   }
-  // Make sure all stats are deleted BEFORE threads are shutdown. This is
-  // because the stat destructors need to lock a mutex, which will lead to
-  // undefined behavior once the threads are destroyed.
-  deleted_counters_.clear();
-  deleted_text_readouts_.clear();
-  deleted_gauges_.clear();
+#endif
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
@@ -365,7 +361,9 @@ void AllocatorImpl::forEachGauge(std::function<void(std::size_t)> f_size,
 void AllocatorImpl::forEachTextReadout(std::function<void(std::size_t)> f_size,
                                        std::function<void(Stats::TextReadout&)> f_stat) const {
   Thread::LockGuard lock(mutex_);
-  f_size(text_readouts_.size());
+  if (f_size != nullptr) {
+    f_size(text_readouts_.size());
+  }
   for (auto& text_readout : text_readouts_) {
     f_stat(*text_readout);
   }

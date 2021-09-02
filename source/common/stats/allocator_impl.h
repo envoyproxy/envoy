@@ -71,9 +71,11 @@ private:
   friend class TextReadoutImpl;
   friend class NotifyingAllocatorImpl;
 
-  // We don't need to check StatName to compare flushed stats.
-  template <typename StatType>
-  using SinkedStatsSet = absl::flat_hash_set<StatType*, absl::Hash<StatType*>>;
+  // A mutex is needed here to protect both the stats_ object from both
+  // alloc() and free() operations. Although alloc() operations are called under existing locking,
+  // free() operations are made from the destructors of the individual stat objects, which are not
+  // protected by locks.
+  mutable Thread::MutexBasicLockable mutex_;
 
   StatSet<Counter> counters_ ABSL_GUARDED_BY(mutex_);
   StatSet<Gauge> gauges_ ABSL_GUARDED_BY(mutex_);
@@ -92,12 +94,6 @@ private:
   std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(mutex_);
 
   SymbolTable& symbol_table_;
-
-  // A mutex is needed here to protect both the stats_ object from both
-  // alloc() and free() operations. Although alloc() operations are called under existing locking,
-  // free() operations are made from the destructors of the individual stat objects, which are not
-  // protected by locks.
-  mutable Thread::MutexBasicLockable mutex_;
 
   Thread::ThreadSynchronizer sync_;
 };

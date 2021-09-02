@@ -293,6 +293,52 @@ TEST_F(AllocatorImplTest, ForEachTextReadout) {
   EXPECT_EQ(num_iterations, 0);
 }
 
+// Verify that we don't crash if a nullptr is passed in for the size lambda for
+// the for each stat methods.
+TEST_F(AllocatorImplTest, ForEachWithNullSizeLambda) {
+  std::vector<CounterSharedPtr> counters;
+  std::vector<TextReadoutSharedPtr> text_readouts;
+  std::vector<GaugeSharedPtr> gauges;
+
+  const size_t num_stats = 3;
+
+  // For each counter.
+  for (size_t idx = 0; idx < num_stats; ++idx) {
+    auto stat_name = makeStat(absl::StrCat("counter.", idx));
+    counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
+  }
+  size_t num_iterations = 0;
+  alloc_.forEachCounter(nullptr, [&num_iterations](Stats::Counter& counter) {
+    (void)counter;
+    ++num_iterations;
+  });
+  EXPECT_EQ(num_iterations, num_stats);
+
+  // For each gauge.
+  for (size_t idx = 0; idx < num_stats; ++idx) {
+    auto stat_name = makeStat(absl::StrCat("gauge.", idx));
+    gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
+  }
+  num_iterations = 0;
+  alloc_.forEachGauge(nullptr, [&num_iterations](Stats::Gauge& gauge) {
+    (void)gauge;
+    ++num_iterations;
+  });
+  EXPECT_EQ(num_iterations, num_stats);
+
+  // For each text readout.
+  for (size_t idx = 0; idx < num_stats; ++idx) {
+    auto stat_name = makeStat(absl::StrCat("text_readout.", idx));
+    text_readouts.emplace_back(alloc_.makeTextReadout(stat_name, StatName(), {}));
+  }
+  num_iterations = 0;
+  alloc_.forEachTextReadout(nullptr, [&num_iterations](Stats::TextReadout& text_readout) {
+    (void)text_readout;
+    ++num_iterations;
+  });
+  EXPECT_EQ(num_iterations, num_stats);
+}
+
 } // namespace
 } // namespace Stats
 } // namespace Envoy
