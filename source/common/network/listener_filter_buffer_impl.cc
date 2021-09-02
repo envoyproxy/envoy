@@ -5,15 +5,6 @@
 namespace Envoy {
 namespace Network {
 
-uint64_t ListenerFilterBufferImpl::copyOut(void* buffer, uint64_t length) {
-  auto size = std::min(length, data_size_);
-  if (size == 0) {
-    return 0;
-  }
-  buffer_->copyOut(drained_size_, size, buffer);
-  return size;
-}
-
 uint64_t ListenerFilterBufferImpl::copyOut(Buffer::Instance& buffer, uint64_t length) {
   auto size = std::min(length, data_size_);
   if (size == 0) {
