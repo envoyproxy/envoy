@@ -129,6 +129,9 @@ To add an extension config to the API, the steps below should be followed:
    with the category, security posture, and status. The category field will have to match an
    annotation of the form `// [#extension-category: your.extension.category]`
    in one of the proto files for the docs build to pass.
+1. Update
+   [source/extensions/extensions_build_config.bzl](source/extensions/extensions_build_config.bzl)
+   to include the new extension.
 1. If the extension is not hidden, find or create a docs file with a toctree
    and to reference your proto to make sure users can navigate to it from the API docs
    (and to not break the docs build).
