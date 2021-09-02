@@ -335,7 +335,8 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
 
   HealthTransition changed_state = HealthTransition::Unchanged;
   if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    if ((!networkHealthCheckFailureType(type) && !retriable) || ++num_unhealthy_ == parent_.unhealthy_threshold_) {
+    if ((!networkHealthCheckFailureType(type) && !retriable) ||
+        ++num_unhealthy_ == parent_.unhealthy_threshold_) {
       host_->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.decHealthy();
       changed_state = HealthTransition::Changed;

@@ -76,7 +76,8 @@ protected:
   class ActiveHealthCheckSession : public Event::DeferredDeletable {
   public:
     ~ActiveHealthCheckSession() override;
-    HealthTransition setUnhealthy(envoy::data::core::v3::HealthCheckFailureType type, bool retriable);
+    HealthTransition setUnhealthy(envoy::data::core::v3::HealthCheckFailureType type,
+                                  bool retriable);
     void onDeferredDeleteBase();
     void start() { onInitialInterval(); }
 

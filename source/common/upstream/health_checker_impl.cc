@@ -171,11 +171,13 @@ HttpHealthCheckerImpl::HttpStatusChecker::HttpStatusChecker(
           fmt::format("Invalid http status range: expecting end <= 600, but found end={}", end));
     }
 
-    expected_ranges_.emplace_back(std::make_pair(static_cast<uint64_t>(start), static_cast<uint64_t>(end)));
+    expected_ranges_.emplace_back(
+        std::make_pair(static_cast<uint64_t>(start), static_cast<uint64_t>(end)));
   }
 
   if (expected_ranges_.empty()) {
-    expected_ranges_.emplace_back(std::make_pair(default_expected_status, default_expected_status + 1));
+    expected_ranges_.emplace_back(
+        std::make_pair(default_expected_status, default_expected_status + 1));
   }
 
   for (const auto& status_range : retriable_statuses) {
@@ -183,22 +185,24 @@ HttpHealthCheckerImpl::HttpStatusChecker::HttpStatusChecker(
     const auto end = status_range.end();
 
     if (start >= end) {
-      throw EnvoyException(fmt::format(
-          "Invalid http retriable status range: expecting start < end, but found start={} and end={}", start,
-          end));
+      throw EnvoyException(fmt::format("Invalid http retriable status range: expecting start < "
+                                       "end, but found start={} and end={}",
+                                       start, end));
     }
 
     if (start < 100) {
       throw EnvoyException(fmt::format(
-          "Invalid http retriable status range: expecting start >= 100, but found start={}", start));
+          "Invalid http retriable status range: expecting start >= 100, but found start={}",
+          start));
     }
 
     if (end > 600) {
-      throw EnvoyException(
-          fmt::format("Invalid http retriable status range: expecting end <= 600, but found end={}", end));
+      throw EnvoyException(fmt::format(
+          "Invalid http retriable status range: expecting end <= 600, but found end={}", end));
     }
 
-    retriable_ranges_.emplace_back(std::make_pair(static_cast<uint64_t>(start), static_cast<uint64_t>(end)));
+    retriable_ranges_.emplace_back(
+        std::make_pair(static_cast<uint64_t>(start), static_cast<uint64_t>(end)));
   }
 }
 
