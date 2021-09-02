@@ -459,12 +459,6 @@ envoy_cmake(
         # Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
         "UNALIGNED_OK": "off",
     },
-    lib_source = select({
-        "//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:all",
-        "//conditions:default": "@net_zlib//:all",
-    }),
-    out_static_libs = select({
-        "//bazel:windows_x86_64": ["zlib.lib"],
-        "//conditions:default": ["libz.a"],
-    }),
+    lib_source = "@com_github_zlib_ng_zlib_ng//:all",
+    out_static_libs = ["libz.a"],
 )
