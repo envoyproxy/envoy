@@ -25,5 +25,5 @@ python_venv() {
   pip3 install -r "${SCRIPT_DIR}"/requirements.txt
 
   shift
-  python3 "${SCRIPT_DIR}/${PY_NAME}.py" "$*"
+  python3 "${SCRIPT_DIR}/${PY_NAME}.py" "$@"
 }

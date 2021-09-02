@@ -2,7 +2,7 @@ name: Check for latest_release of deps
 
 on :
   schedule :
-    - cron : '*/5 * * * *'
+    - cron : '0 8 * * *'
 
   workflow_dispatch :
 
@@ -28,5 +28,7 @@ jobs :
       - name: setting up virtualenv
         run : |
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          ./tools/dependency/release_dates.sh ./bazel/repository_locations.bzl --cron
-          ./tools/dependency/release_dates.sh ./api/bazel/repository_locations.bzl --cron
+          # True arg is for the --cron flag to create issue only in github action
+          # and not interfere with the CI
+          ./tools/dependency/release_dates.sh ./bazel/repository_locations.bzl True
+          ./tools/dependency/release_dates.sh ./api/bazel/repository_locations.bzl True
