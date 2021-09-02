@@ -976,12 +976,11 @@ TEST_P(TcpConnPoolImplTest, ConnectionStateWithConcurrentConnections) {
 TEST_P(TcpConnPoolImplTest, DrainCallback) {
   initialize();
   ReadyWatcher drained;
-  EXPECT_CALL(drained, ready());
   conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
   ActiveTestConn c2(*this, 0, ActiveTestConn::Type::Pending);
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   c2.handle_->cancel(ConnectionPool::CancelPolicy::Default);
 
   EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
@@ -1030,11 +1029,10 @@ TEST_P(TcpConnPoolImplTest, DrainWhileConnecting) {
 TEST_P(TcpConnPoolImplTest, DrainOnClose) {
   initialize();
   ReadyWatcher drained;
-  EXPECT_CALL(drained, ready());
   conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
-
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
+
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 
   EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   EXPECT_CALL(c1.callbacks_.callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))

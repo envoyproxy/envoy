@@ -229,6 +229,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
 }
 
 ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& context) {
+  ASSERT(!is_draining_);
   ASSERT(!deferred_deleting_);
 
   ASSERT(static_cast<ssize_t>(connecting_stream_capacity_) ==
