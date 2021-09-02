@@ -37,7 +37,7 @@ public:
 
   // Dispatcher
   const std::string& name() override { return name_; }
-  TimeSource& timeSource() override { return time_system_; }
+  TimeSource& timeSource() override { return *time_system_; }
   Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket,
@@ -162,7 +162,7 @@ public:
   MOCK_METHOD(void, updateApproximateMonotonicTime, ());
   MOCK_METHOD(void, shutdown, ());
 
-  GlobalTimeSystem time_system_;
+  std::unique_ptr<TimeSource> time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
   testing::NiceMock<MockBufferFactory> buffer_factory_;
   bool allow_null_callback_{};

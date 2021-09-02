@@ -290,9 +290,11 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
 
 void DnsCacheImpl::finishResolve(const std::string& host,
                                  Network::DnsResolver::ResolutionStatus status,
-                                 std::list<Network::DnsResponse>&& response, bool from_cache) {
+                                 std::list<Network::DnsResponse>&& response,
+                                 absl::optional<MonotonicTime> resolution_time) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
   ENVOY_LOG(debug, "main thread resolve complete for host '{}'. {} results", host, response.size());
+  const bool from_cache = resolution_time.has_value();
 
   // Functions like this one that modify primary_hosts_ are only called in the main thread so we
   // know it is safe to use the PrimaryHostInfo pointers outside of the lock.
@@ -335,9 +337,6 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   bool address_changed = false;
   auto current_address = primary_host_info->host_info_->address();
   if (new_address != nullptr && (current_address == nullptr || *current_address != *new_address)) {
-    if (!from_cache) {
-      addCacheEntry(host, new_address, response.front().ttl_);
-    }
     ENVOY_LOG(debug, "host '{}' address has changed", host);
     primary_host_info->host_info_->setAddress(new_address);
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
@@ -345,13 +344,14 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     stats_.host_address_changed_.inc();
   }
 
-  SystemTime now = main_thread_dispatcher_.timeSource().systemTime();
-  uint64_t ms_since_epoch =
-      std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-  uint64_t stale_at =
-      ms_since_epoch +
-      std::chrono::duration_cast<std::chrono::seconds>(response.front().ttl_).count();
-  primary_host_info->host_info_->updateStale(stale_at);
+  if (!resolution_time.has_value()) {
+    resolution_time = main_thread_dispatcher_.timeSource().monotonicTime();
+  }
+  if (new_address) {
+    // Always update the cache entry and staleness.
+    addCacheEntry(host, new_address, response.front().ttl_);
+    primary_host_info->host_info_->updateStale(resolution_time.value(), response.front().ttl_);
+  }
 
   if (first_resolve) {
     primary_host_info->host_info_->setFirstResolveComplete();
@@ -447,11 +447,11 @@ void DnsCacheImpl::addCacheEntry(const std::string& host,
   if (!key_value_store_) {
     return;
   }
-  SystemTime now = main_thread_dispatcher_.timeSource().systemTime();
-  uint64_t ms_since_epoch =
-      std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+  MonotonicTime now = main_thread_dispatcher_.timeSource().monotonicTime();
+  uint64_t seconds_since_epoch =
+      std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
   const std::string value =
-      absl::StrCat(address->asString(), "|", ttl.count(), "|", ms_since_epoch);
+      absl::StrCat(address->asString(), "|", ttl.count(), "|", seconds_since_epoch);
   key_value_store_->addOrUpdate(host, value);
 }
 
@@ -475,6 +475,7 @@ void DnsCacheImpl::loadCacheEntries(
     Network::Address::InstanceConstSharedPtr address;
     const auto parts = StringUtil::splitToken(value, "|");
     std::chrono::seconds ttl(0);
+    absl::optional<MonotonicTime> resolution_time;
     if (parts.size() == 3) {
       address = Network::Utility::parseInternetAddressAndPortNoThrow(std::string(parts[0]));
       if (address == nullptr) {
@@ -486,10 +487,18 @@ void DnsCacheImpl::loadCacheEntries(
       } else {
         ENVOY_LOG(warn, "{} is not a valid ttl", parts[1]);
       }
+      uint64_t epoch_int;
+      if (absl::SimpleAtoi(parts[2], &epoch_int)) {
+        MonotonicTime now = main_thread_dispatcher_.timeSource().monotonicTime();
+        const std::chrono::seconds seconds_since_epoch =
+            std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
+        resolution_time = main_thread_dispatcher_.timeSource().monotonicTime() -
+                          (seconds_since_epoch - std::chrono::seconds(epoch_int));
+      }
     } else {
       ENVOY_LOG(warn, "Incorrect number of tokens in the cache line");
     }
-    if (address == nullptr || ttl == std::chrono::seconds(0)) {
+    if (address == nullptr || ttl == std::chrono::seconds(0) || !resolution_time.has_value()) {
       ENVOY_LOG(warn, "Unable to parse cache line '{}'", value);
       return KeyValueStore::Iterate::Break;
     }
@@ -497,7 +506,8 @@ void DnsCacheImpl::loadCacheEntries(
     std::list<Network::DnsResponse> response;
     createHost(key, address->ip()->port());
     response.emplace_back(Network::DnsResponse(address, ttl));
-    finishResolve(key, Network::DnsResolver::ResolutionStatus::Success, std::move(response), true);
+    finishResolve(key, Network::DnsResolver::ResolutionStatus::Success, std::move(response),
+                  resolution_time);
     return KeyValueStore::Iterate::Continue;
   };
   key_value_store_->iterate(load);
