@@ -220,8 +220,7 @@ message Permission {
     // setup SNI.
     type.matcher.v3.StringMatcher requested_server_name = 9;
 
-    // Optional extension for configuring custom matchers for RBAC. An example could be - matcher
-    // for CIDR AND Port range for upstream connection.
+    // Optional extension for configuring custom matchers for RBAC.
     // [#extension-category: filters.common.rbac]
     core.v3.TypedExtensionConfig matcher = 12;
   }

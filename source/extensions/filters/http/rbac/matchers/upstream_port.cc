@@ -3,7 +3,7 @@
 #include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "source/common/stream_info/address_set_accessor_impl.h"
+#include "source/common/stream_info/set_filter_state_object_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,7 +16,10 @@ using namespace Filters::Common::RBAC;
 bool UpstreamPortMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                                   const StreamInfo::StreamInfo& info) const {
 
-  if (!info.filterState().hasDataWithName(StreamInfo::AddressSetAccessorImpl::key())) {
+  using AddressSetFilterStateObjectImpl =
+      StreamInfo::SetFilterStateObjectImpl<Network::Address::InstanceConstSharedPtr>;
+
+  if (!info.filterState().hasDataWithName(AddressSetFilterStateObjectImpl::key())) {
     ENVOY_LOG_MISC(warn, "Did not find dynamic forward proxy metadata. Do you have dynamic "
                          "forward proxy in the filter chain before the RBAC filter ?");
     return false;
@@ -24,9 +27,9 @@ bool UpstreamPortMatcher::matches(const Network::Connection&, const Envoy::Http:
 
   bool isMatch = false;
 
-  const StreamInfo::AddressSetAccessor& address_set =
-      info.filterState().getDataReadOnly<StreamInfo::AddressSetAccessor>(
-          StreamInfo::AddressSetAccessorImpl::key());
+  const AddressSetFilterStateObjectImpl& address_set =
+      info.filterState().getDataReadOnly<AddressSetFilterStateObjectImpl>(
+          AddressSetFilterStateObjectImpl::key());
 
   address_set.iterate([&, this](const Network::Address::InstanceConstSharedPtr& address) {
     auto port = address->ip()->port();

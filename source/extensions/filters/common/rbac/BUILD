@@ -35,7 +35,6 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/network:cidr_range_lib",
-        "//source/common/stream_info:address_set_accessor_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",

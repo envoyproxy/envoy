@@ -1,7 +1,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
-#include "source/common/stream_info/address_set_accessor_impl.h"
+#include "source/common/stream_info/set_filter_state_object_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "source/extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
@@ -10,7 +10,6 @@
 #include "test/mocks/upstream/basic_resource_limit.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/transport_socket_match.h"
-#include "test/test_common/test_runtime.h"
 
 using testing::AtLeast;
 using testing::Eq;
@@ -32,19 +31,31 @@ using MockLoadDnsCacheEntryResult =
 class ProxyFilterTest : public testing::Test,
                         public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
 public:
-  ProxyFilterTest() {
+  void SetUp() override {
+    setupSocketMatcher();
+    setupFilter();
+    setupCluster();
+  }
+
+  void setupSocketMatcher() {
     cm_.initializeThreadLocalClusters({"fake_cluster"});
     transport_socket_match_ = new NiceMock<Upstream::MockTransportSocketMatcher>(
         Network::TransportSocketFactoryPtr(transport_socket_factory_));
     cm_.thread_local_cluster_.cluster_.info_->transport_socket_matcher_.reset(
         transport_socket_match_);
+  }
+
+  virtual void setupFilter() {
+    EXPECT_CALL(*dns_cache_manager_, getCache(_));
 
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
-    EXPECT_CALL(*dns_cache_manager_, getCache(_));
     filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
-    filter_->setDecoderFilterCallbacks(callbacks_);
 
+    filter_->setDecoderFilterCallbacks(callbacks_);
+  }
+
+  void setupCluster() {
     // Allow for an otherwise strict mock.
     EXPECT_CALL(callbacks_, connection()).Times(AtLeast(0));
     EXPECT_CALL(callbacks_, streamId()).Times(AtLeast(0));
@@ -331,12 +342,21 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
   filter_->onDestroy();
 }
 
-class UpstreamResolvedHostFilterStateHelper : public TestScopedRuntime, public ProxyFilterTest {
+class UpstreamResolvedHostFilterStateHelper : public ProxyFilterTest {
 public:
-  UpstreamResolvedHostFilterStateHelper() {
-    Runtime::LoaderSingleton::getExisting()->mergeValues({
-        {"envoy.reloadable_features.enable_rbac_upstream_address", "true"},
-    });
+  using AddressSetFilterStateObjectImpl =
+      StreamInfo::SetFilterStateObjectImpl<Network::Address::InstanceConstSharedPtr>;
+
+  virtual void setupFilter() override {
+    EXPECT_CALL(*dns_cache_manager_, getCache(_));
+
+    envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
+    proto_config.set_save_upstream_address(true);
+
+    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_);
+    filter_ = std::make_unique<ProxyFilter>(filter_config_);
+
+    filter_->setDecoderFilterCallbacks(callbacks_);
   }
 };
 
@@ -381,8 +401,8 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, AddResolvedHostFilterStateMetadata
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
   // We expect FilterState to be populated
-  EXPECT_TRUE(filter_state->hasData<StreamInfo::AddressSetAccessor>(
-      StreamInfo::AddressSetAccessorImpl::key()));
+  EXPECT_TRUE(filter_state->hasData<AddressSetFilterStateObjectImpl>(
+      AddressSetFilterStateObjectImpl::key()));
 
   filter_->onDestroy();
 }
@@ -425,8 +445,8 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
   // We do not expect FilterState to be populated
-  EXPECT_FALSE(filter_state->hasData<StreamInfo::AddressSetAccessor>(
-      StreamInfo::AddressSetAccessorImpl::key()));
+  EXPECT_FALSE(filter_state->hasData<AddressSetFilterStateObjectImpl>(
+      AddressSetFilterStateObjectImpl::key()));
 
   filter_->onDestroy();
 }
@@ -442,9 +462,9 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
   // Pre-populate the filter state with an address.
   auto& filter_state = callbacks_.streamInfo().filterState();
   const auto pre_address = Network::Utility::parseInternetAddress("1.2.3.3", 80);
-  auto address_set = std::make_unique<StreamInfo::AddressSetAccessorImpl>();
+  auto address_set = std::make_unique<AddressSetFilterStateObjectImpl>();
   address_set->add(pre_address);
-  filter_state->setData(StreamInfo::AddressSetAccessorImpl::key(), std::move(address_set),
+  filter_state->setData(AddressSetFilterStateObjectImpl::key(), std::move(address_set),
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Request);
 
@@ -480,13 +500,13 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
   // We expect FilterState to be populated
-  EXPECT_TRUE(filter_state->hasData<StreamInfo::AddressSetAccessor>(
-      StreamInfo::AddressSetAccessorImpl::key()));
+  EXPECT_TRUE(filter_state->hasData<AddressSetFilterStateObjectImpl>(
+      AddressSetFilterStateObjectImpl::key()));
 
   // Make sure filter state has pre and new addresses.
-  const StreamInfo::AddressSetAccessor& updated_address_set =
-      filter_state->getDataReadOnly<StreamInfo::AddressSetAccessor>(
-          StreamInfo::AddressSetAccessorImpl::key());
+  const AddressSetFilterStateObjectImpl& updated_address_set =
+      filter_state->getDataReadOnly<AddressSetFilterStateObjectImpl>(
+          AddressSetFilterStateObjectImpl::key());
 
   absl::flat_hash_set<absl::string_view> populated_addresses;
   updated_address_set.iterate([&](const Network::Address::InstanceConstSharedPtr& address) {

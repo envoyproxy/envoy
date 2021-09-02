@@ -47,8 +47,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "address_set_accessor_interface",
-    hdrs = ["address_set_accessor.h"],
+    name = "set_filter_state_object_interface",
+    hdrs = ["set_filter_state_object.h"],
     deps = [
         ":filter_state_interface",
     ],

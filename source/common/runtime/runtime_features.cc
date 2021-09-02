@@ -84,7 +84,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.new_tcp_connection_pool",
     "envoy.reloadable_features.no_chunked_encoding_header_for_304",
     "envoy.reloadable_features.preserve_downstream_scheme",
-    "envoy.reloadable_features.rbac_policy_upstream_address",
     "envoy.reloadable_features.remove_forked_chromium_url",
     "envoy.reloadable_features.require_strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.return_502_for_upstream_protocol_errors",

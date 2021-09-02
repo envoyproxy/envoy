@@ -27,6 +27,9 @@ message FilterConfig {
   // <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`.
   common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 1
       [(validate.rules).message = {required: true}];
+
+  // When this flag is set, the filter will save the resolved upstream address in the filter state.
+  bool save_upstream_address = 2;
 }
 
 // Per route Configuration for the dynamic forward proxy HTTP filter.

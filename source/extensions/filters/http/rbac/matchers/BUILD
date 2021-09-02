@@ -20,6 +20,7 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/http:utility_lib",
+        "//source/common/stream_info:set_filter_state_object_lib",
         "//source/extensions/filters/common/rbac:engine_lib",
         "//source/extensions/filters/common/rbac:matchers_lib",
         "//source/extensions/filters/common/rbac:utility_lib",

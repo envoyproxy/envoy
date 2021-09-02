@@ -5,8 +5,7 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "source/common/http/utility.h"
-#include "source/common/runtime/runtime_features.h"
-#include "source/common/stream_info/address_set_accessor_impl.h"
+#include "source/common/stream_info/set_filter_state_object_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
@@ -31,7 +30,8 @@ ProxyFilterConfig::ProxyFilterConfig(
     Upstream::ClusterManager& cluster_manager)
     : dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())),
-      cluster_manager_(cluster_manager) {}
+      cluster_manager_(cluster_manager),
+      save_upstream_address_(proto_config.save_upstream_address()) {}
 
 ProxyPerRouteConfig::ProxyPerRouteConfig(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig& config)
@@ -125,7 +125,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     ASSERT(cache_load_handle_ == nullptr);
     ENVOY_STREAM_LOG(debug, "DNS cache entry already loaded, continuing", *decoder_callbacks_);
 
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.rbac_policy_upstream_address")) {
+    if (config_->saveUpstreamAddress()) {
       auto const& host = config_->cache().getHost(headers.Host()->value().getStringView());
       if (host.has_value()) {
         addHostAddressToFilterState(host.value()->address());
@@ -151,6 +151,9 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
 void ProxyFilter::addHostAddressToFilterState(
     const Network::Address::InstanceConstSharedPtr& address) {
+  using AddressSetFilterStateObjectImpl =
+      StreamInfo::SetFilterStateObjectImpl<Network::Address::InstanceConstSharedPtr>;
+
   if (!decoder_callbacks_ || !address) {
     ENVOY_LOG_MISC(warn, "Bad parameter - decoder callbacks or address");
     return;
@@ -162,19 +165,19 @@ void ProxyFilter::addHostAddressToFilterState(
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
 
-  if (!filter_state->hasData<StreamInfo::AddressSetAccessor>(
-          StreamInfo::AddressSetAccessorImpl::key())) {
-    auto address_set = std::make_unique<StreamInfo::AddressSetAccessorImpl>();
+  if (!filter_state->hasData<AddressSetFilterStateObjectImpl>(
+          AddressSetFilterStateObjectImpl::key())) {
+    auto address_set = std::make_unique<AddressSetFilterStateObjectImpl>();
     address_set->add(address);
 
-    filter_state->setData(StreamInfo::AddressSetAccessorImpl::key(), std::move(address_set),
+    filter_state->setData(AddressSetFilterStateObjectImpl::key(), std::move(address_set),
                           StreamInfo::FilterState::StateType::Mutable,
                           StreamInfo::FilterState::LifeSpan::Request);
 
   } else {
-    StreamInfo::AddressSetAccessor& address_set =
-        filter_state->getDataMutable<StreamInfo::AddressSetAccessor>(
-            StreamInfo::AddressSetAccessorImpl::key());
+    AddressSetFilterStateObjectImpl& address_set =
+        filter_state->getDataMutable<AddressSetFilterStateObjectImpl>(
+            AddressSetFilterStateObjectImpl::key());
     address_set.clear();
     address_set.add(address);
   }
@@ -187,7 +190,7 @@ void ProxyFilter::onLoadDnsCacheComplete(
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.rbac_policy_upstream_address")) {
+  if (config_->saveUpstreamAddress()) {
     addHostAddressToFilterState(host_info->address());
   }
 

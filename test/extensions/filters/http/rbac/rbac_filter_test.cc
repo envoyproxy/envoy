@@ -4,7 +4,7 @@
 
 #include "source/common/config/metadata.h"
 #include "source/common/network/utility.h"
-#include "source/common/stream_info/address_set_accessor_impl.h"
+#include "source/common/stream_info/set_filter_state_object_impl.h"
 #include "source/extensions/filters/common/rbac/utility.h"
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
 
@@ -320,7 +320,10 @@ void upstreamIpTestsBasicPolicySetup(RoleBasedAccessControlFilterTest& test,
 
 void upstreamIpTestsFilterStateSetup(NiceMock<Http::MockStreamDecoderFilterCallbacks>& callback,
                                      const std::vector<std::string>& upstream_ips) {
-  auto address_set = std::make_unique<StreamInfo::AddressSetAccessorImpl>();
+  using AddressSetFilterStateObjectImpl =
+      StreamInfo::SetFilterStateObjectImpl<Network::Address::InstanceConstSharedPtr>;
+
+  auto address_set = std::make_unique<AddressSetFilterStateObjectImpl>();
 
   for (const auto& ip : upstream_ips) {
     Network::Address::InstanceConstSharedPtr address =
@@ -331,7 +334,7 @@ void upstreamIpTestsFilterStateSetup(NiceMock<Http::MockStreamDecoderFilterCallb
 
   // Set the filter state data.
   callback.streamInfo().filterState()->setData(
-      StreamInfo::AddressSetAccessorImpl::key(), std::move(address_set),
+      AddressSetAccessorImplImpl::key(), std::move(address_set),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
 }
 
