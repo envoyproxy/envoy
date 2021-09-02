@@ -86,7 +86,7 @@ enum class ReadOrParseState { Done, TryAgainLater, Error };
  */
 class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(const ConfigSharedPtr& config) :  buffer_(new Buffer::OwnedImpl()), config_(config) {}
+  Filter(const ConfigSharedPtr& config) : buffer_(new Buffer::OwnedImpl()), config_(config) {}
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;

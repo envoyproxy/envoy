@@ -376,7 +376,8 @@ ReadOrParseState Filter::readExtensions(Network::ListenerFilterBuffer& buffer) {
   // to metadata.
   if (proxy_protocol_header_.value().local_command_ || 0 == config_->numberOfNeededTlvTypes()) {
     // buf_ is no longer in use so we re-use it to read/discard.
-    return parseExtensions(buffer, reinterpret_cast<uint8_t*>(buffer_->frontSlice().mem_), sizeof(buffer_->frontSlice().len_), nullptr);
+    return parseExtensions(buffer, reinterpret_cast<uint8_t*>(buffer_->frontSlice().mem_),
+                           sizeof(buffer_->frontSlice().len_), nullptr);
   }
 
   // Initialize the buf_tlv_ only when we need to read the TLVs.
@@ -401,7 +402,7 @@ ReadOrParseState Filter::readExtensions(Network::ListenerFilterBuffer& buffer) {
 ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) {
   while (buf_off_ < MAX_PROXY_PROTO_LEN_V2) {
     const auto rc = buffer.copyOut(*buffer_, MAX_PROXY_PROTO_LEN_V2);
-    char* raw_buffer = static_cast<char *>(buffer_->linearize(buffer_->length()));
+    char* raw_buffer = static_cast<char*>(buffer_->linearize(buffer_->length()));
     ssize_t nread = rc;
 
     if (nread < 1) {
