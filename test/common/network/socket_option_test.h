@@ -25,7 +25,7 @@ namespace {
 class SocketOptionTest : public testing::Test {
 public:
   SocketOptionTest() {
-    socket_.address_provider_->setLocalAddress(nullptr);
+    socket_.connection_info_provider_->setLocalAddress(nullptr);
 
     EXPECT_CALL(os_sys_calls_, socket(_, _, _))
         .Times(AnyNumber())

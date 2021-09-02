@@ -96,6 +96,10 @@ The following overload actions are supported:
     - Envoy will reduce the waiting period for a configured set of timeouts. See
       :ref:`below <config_overload_manager_reducing_timeouts>` for details on configuration.
 
+  * - envoy.overload_actions.reset_high_memory_stream
+    - Envoy will reset expensive streams to terminate them. See
+      :ref:`below <config_overload_manager_reset_streams>` for details on configuration.
+
 .. _config_overload_manager_reducing_timeouts:
 
 Reducing timeouts
@@ -162,6 +166,85 @@ limit for that specific listener and allow the global limit to enforce resource 
 all listeners.
 
 An example configuration can be found in the :ref:`edge best practices document <best_practices_edge>`.
+
+.. _config_overload_manager_reset_streams:
+
+Reset Streams
+^^^^^^^^^^^^^
+
+.. warning::
+   Resetting streams via an overload action currently only works with HTTP2.
+
+The ``envoy.overload_actions.reset_high_memory_stream`` overload action will reset
+expensive streams. This requires `minimum_account_to_track_power_of_two` to be
+configured via :ref:`buffer_factory_config
+<envoy_v3_api_field_config.overload.v3.OverloadManager.buffer_factory_config>`.
+To understand the memory class scheme in detail see :ref:`minimum_account_to_track_power_of_two
+<envoy_v3_api_field_config.overload.v3.BufferFactoryConfig.minimum_account_to_track_power_of_two>`
+
+As an example, here is a partial Overload Manager configuration with minimum
+threshold for tracking and a single overload action entry that resets streams:
+
+.. code-block:: yaml
+
+  buffer_factory_config:
+    minimum_account_to_track_power_of_two: 20
+  actions:
+    name: "envoy.overload_actions.reset_high_memory_stream"
+    triggers:
+      - name: "envoy.resource_monitors.fixed_heap"
+        scaled:
+          scaling_threshold: 0.85
+          saturation_threshold: 0.95
+  ...
+
+We will only track streams using >=
+:math:`2^minimum_account_to_track_power_of_two` worth of allocated memory in
+buffers. In this case, by setting the `minimum_account_to_track_power_of_two`
+to `20` we will track streams using >= 1MiB since :math:`2^20` is 1MiB. Streams
+using >= 1MiB will be classified into 8 power of two sized buckets. Currently,
+the number of buckets is hardcoded to 8.  For this example, the buckets are as
+follows:
+
+.. list-table::
+  :header-rows: 1
+  :widths: 1, 2
+
+  * - Bucket index
+    - Contains streams using
+  * - 0
+    - [1MiB,2MiB)
+  * - 1
+    - [2MiB,4MiB)
+  * - 2
+    - [4MiB,8MiB)
+  * - 3
+    - [8MiB,16MiB)
+  * - 4
+    - [16MiB,32MiB)
+  * - 5
+    - [32MiB,64MiB)
+  * - 6
+    - [64MiB,128MiB)
+  * - 7
+    - >= 128MiB
+
+The above configuration also configures the overload manager to reset our tracked
+streams based on heap usage as a trigger. When the heap usage is less than 85%,
+no streams will be reset.  When heap usage is at or above 85%, we start to
+reset buckets according to the strategy described below. When the heap
+usage is at 95% all streams using >= 1MiB memory are eligible for reset.
+
+Given that there are only 8 buckets, we partition the space with a gradation of
+:math:`gradation = (saturation_threshold - scaling_threshold)/8`. Hence at 85%
+heap usage we reset streams in the last bucket e.g. those using `>= 128MiB`. At
+:math:`85% + 1 * gradation` heap usage we reset streams in the last two buckets
+e.g. those using `>= 64MiB`. And so forth as the heap usage is higher.
+
+It's expected that the first few gradations shouldn't trigger anything, unless
+there's something seriously wrong e.g. in this example streams using `>=
+128MiB` in buffers.
+
 
 Statistics
 ----------

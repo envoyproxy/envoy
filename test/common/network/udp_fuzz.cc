@@ -90,7 +90,7 @@ public:
                                                    dispatcherImpl().timeSource(), config);
 
     Network::Address::Instance* send_to_addr_ = new Network::Address::Ipv4Instance(
-        "127.0.0.1", server_socket_->addressProvider().localAddress()->ip()->port());
+        "127.0.0.1", server_socket_->connectionInfoProvider().localAddress()->ip()->port());
 
     // Now do all of the fuzzing
     static const int MaxPackets = 15;

@@ -68,7 +68,7 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
-        addr_socket.second->addressProvider().localAddress()->ip()->port());
+        addr_socket.second->connectionInfoProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_PREBIND);
     socket_option->set_level(10000);     // Invalid level.
@@ -89,7 +89,7 @@ TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
-        addr_socket.second->addressProvider().localAddress()->ip()->port());
+        addr_socket.second->connectionInfoProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_BOUND);
     socket_option->set_level(10000);     // Invalid level.
@@ -1403,7 +1403,7 @@ TEST_P(IntegrationTest, TestBind) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_NE(fake_upstream_connection_, nullptr);
   std::string address = fake_upstream_connection_->connection()
-                            .addressProvider()
+                            .connectionInfoProvider()
                             .remoteAddress()
                             ->ip()
                             ->addressAsString();

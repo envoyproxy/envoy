@@ -821,13 +821,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Chrome URL parsing library",
         project_desc = "Chrome URL parsing library",
         project_url = "https://quiche.googlesource.com/googleurl",
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/ef0d23689e240e6c8de4c3a5296b209128c87373.tar.gz.
-        version = "ef0d23689e240e6c8de4c3a5296b209128c87373",
-        sha256 = "d769283fed1319bca68bae8bdd47fbc3a7933999329eee850eff1f1ea61ce176",
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/561705e0066ff11e6cb97b8092f1547835beeb92.tar.gz.
+        version = "561705e0066ff11e6cb97b8092f1547835beeb92",
+        sha256 = "7ce00768fea1fa4c7bf658942f13e41c9ba30e9cff931a6cda2f9fd02289f673",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
         extensions = [],
-        release_date = "2020-07-30",
+        release_date = "2021-08-31",
         cpe = "N/A",
     ),
     com_google_cel_cpp = dict(
@@ -925,6 +925,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.filters.network.kafka_broker"],
         release_date = "2020-03-03",
         cpe = "cpe:2.3:a:apache:kafka:*",
+    ),
+    edenhill_librdkafka = dict(
+        project_name = "Kafka (C/C++ client)",
+        project_desc = "C/C++ client for Apache Kafka (open-source distributed event streaming platform)",
+        project_url = "https://github.com/edenhill/librdkafka",
+        version = "1.7.0",
+        sha256 = "c71b8c5ff419da80c31bb8d3036a408c87ad523e0c7588e7660ee5f3c8973057",
+        strip_prefix = "librdkafka-{version}",
+        urls = ["https://github.com/edenhill/librdkafka/archive/v{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.filters.network.kafka_broker"],
+        release_date = "2021-05-10",
+        cpe = "N/A",
     ),
     kafka_server_binary = dict(
         project_name = "Kafka (server binary)",

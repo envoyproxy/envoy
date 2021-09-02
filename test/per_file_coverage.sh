@@ -12,7 +12,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/filesystem/posix:96.2"
 "source/common/json:90.9"
 "source/common/network:95.0"  # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl` do not always report LCOV
-"source/common/protobuf:94.8"
+"source/common/protobuf:94.7"
 "source/common/signal:84.5" # Death tests don't report LCOV
 "source/common/singleton:95.8"
 "source/common/thread:0.0" # Death tests don't report LCOV
@@ -30,7 +30,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/expr:96.4"
 "source/extensions/filters/common/fault:94.6"
 "source/extensions/filters/common/rbac:88.6"
-"source/extensions/filters/http/cache:92.7"
+"source/extensions/filters/http/cache:92.6"
 "source/extensions/filters/http/cache/simple_http_cache:95.6"
 "source/extensions/filters/http/grpc_json_transcoder:95.6"
 "source/extensions/filters/http/ip_tagging:91.2"

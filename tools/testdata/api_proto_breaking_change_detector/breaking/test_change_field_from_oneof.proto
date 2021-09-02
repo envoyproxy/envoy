@@ -1,0 +1,10 @@
+syntax = "proto3";
+package test.protos.breaking;
+
+message FromOneofMessage {
+  oneof test_oneof {
+    string name = 4;
+    string sub_message = 9;
+    float special = 10;
+  }
+}

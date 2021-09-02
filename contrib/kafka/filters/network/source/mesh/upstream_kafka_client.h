@@ -17,6 +17,13 @@ namespace Mesh {
 // in case of success this means offset (if acks > 0), or error code.
 struct DeliveryMemento {
 
+  // Pointer to byte array that was passed to Kafka producer.
+  // We use this to tell apart messages.
+  // Important: we do not free this memory, it's still part of the 'ProduceRequestHandler' object.
+  // Future work: adopt Kafka's opaque-pointer functionality so we use less memory instead of
+  // keeping whole payload until we receive a confirmation.
+  const void* data_;
+
   // Kafka producer error code.
   const int32_t error_code_;
 
@@ -44,9 +51,18 @@ class KafkaProducer {
 public:
   virtual ~KafkaProducer() = default;
 
-  // Sends given record (key, value) to Kafka (topic, partition).
-  // When delivery is finished, it notifies the callback provided with corresponding delivery data
-  // (error code, offset).
+  /*
+   * Sends given record (key, value) to Kafka (topic, partition).
+   * When delivery is finished, it notifies the callback provided with corresponding delivery data
+   * (error code, offset).
+   *
+   * @param origin origin of payload to be notified when delivery finishes.
+   * @param topic Kafka topic.
+   * @param partition Kafka partition (as clients do partitioning, we just reuse what downstream
+   * gave us).
+   * @param key Kafka message key.
+   * @param value Kafka message value.
+   */
   virtual void send(const ProduceFinishCbSharedPtr origin, const std::string& topic,
                     const int32_t partition, const absl::string_view key,
                     const absl::string_view value) PURE;

@@ -9,7 +9,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/decoded_resource_impl.h"
-#include "source/common/config/version_converter.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -21,7 +20,6 @@ EdsClusterImpl::EdsClusterImpl(
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api, factory_context.dispatcher().timeSource()),
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          cluster.eds_cluster_config().eds_config().resource_api_version(),
           factory_context.messageValidationVisitor(), "cluster_name"),
       local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
@@ -132,9 +130,6 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
                                      cluster_load_assignment.cluster_name()));
   }
-  // Scrub original type information; we don't config dump endpoints today and
-  // this is significant memory overhead.
-  Config::VersionConverter::eraseOriginalTypeInformation(cluster_load_assignment);
 
   // Disable timer (if enabled) as we have received new assignment.
   if (assignment_timeout_->enabled()) {
