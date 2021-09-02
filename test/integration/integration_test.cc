@@ -568,7 +568,7 @@ TEST_P(IntegrationTest, MatchTreeRouting) {
   const std::string vhost_yaml = R"EOF(
     name: vhost
     domains: ["matcher.com"]
-    matcher: 
+    matcher:
       matcher_tree:
         input:
           name: request-headers
