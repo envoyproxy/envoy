@@ -33,8 +33,7 @@ service AccessLogService {
   // the arrival, this endpoint performs the following process.
   //
   // 1. A response message is returned for each log. The response message includes ACK/NACK status,
-  //    and in case of NACK, the target log is not flushed but buffered by Envoy. In case of NACK,
-  //    it will be buffered by Envoy without flushing the target log.
+  //    and in case of NACK, the target log is not flushed but buffered by Envoy.
   // 2. Timeout for response message is set and if no message is returned within a certain time,
   //    it will be considered as unreachable and buffered by Envoy without flushing the target log. This timeout is set by
   //    :ref:`message_ack_timeout <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.message_ack_timeout>`.
@@ -53,8 +52,8 @@ service AccessLogService {
   //    should be set appropriately to prevent OOM.
   // 3. Make sure that ALS receiver is implemented properly. If it is not implemented, all messages will
   //    be buffered, which may cause OOM soon.
-  rpc BufferedCriticalAccessLogs(stream BufferedCriticalAccessLogsMessage)
-      returns (stream BufferedCriticalAccessLogsResponse) {
+  rpc CriticalAccessLogs(stream CriticalAccessLogsMessage)
+      returns (stream CriticalAccessLogsResponse) {
   }
 }
 
@@ -64,8 +63,8 @@ message StreamAccessLogsResponse {
       "envoy.service.accesslog.v2.StreamAccessLogsResponse";
 }
 
-// Response received to identify undelivered or delivered messages in BufferedCriticalAccessLogs.
-message BufferedCriticalAccessLogsResponse {
+// Response received to identify undelivered or delivered messages in CriticalAccessLogs.
+message CriticalAccessLogsResponse {
   enum Status {
     // Indicates that the message has been received.
     ACK = 0;
@@ -132,12 +131,12 @@ message StreamAccessLogsMessage {
   }
 }
 
-// Stream message for the BufferedCriticalAccessLogs API.
+// Stream message for the CriticalAccessLogs API.
 // Envoy opens a stream to the server and streams the access log,
 // expecting a response. Each message sent is assigned an individual ID,
 // and the state of the message is tracked based on the ID.
-message BufferedCriticalAccessLogsMessage {
-  // The body of the log message sent to BufferedCriticalAccessLogs.
+message CriticalAccessLogsMessage {
+  // The body of the log message sent to CriticalAccessLogs.
   StreamAccessLogsMessage message = 1;
 
   // This is an ID to identify the message, and should be added to the Critical Endpoint

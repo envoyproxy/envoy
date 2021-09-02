@@ -60,12 +60,12 @@ public:
   }
 
   void expectStreamCriticalMessage(const std::string& expected_message_yaml) {
-    envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage expected_message;
+    envoy::service::accesslog::v3::CriticalAccessLogsMessage expected_message;
     TestUtility::loadFromYaml(expected_message_yaml, expected_message);
     EXPECT_CALL(stream_, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
     EXPECT_CALL(stream_, sendMessageRaw_(_, false))
         .WillOnce(Invoke([expected_message](Buffer::InstancePtr& request, bool) {
-          envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage message;
+          envoy::service::accesslog::v3::CriticalAccessLogsMessage message;
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
           EXPECT_GT(message.id(), 0);
@@ -148,6 +148,7 @@ public:
   CriticalGrpcAccessLoggerImplTest() {
     mock_buffer_timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(*mock_buffer_timer_, enableTimer(_, _));
+    EXPECT_CALL(*mock_buffer_timer_, disableTimer());
   }
 
 private:
@@ -205,7 +206,7 @@ TEST_F(CriticalGrpcAccessLoggerImplBufferLimitTest, BasicBehavior) {
   entry.mutable_request()->set_path("/test/path1");
   logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry), true);
   EXPECT_EQ(
-      stats_store_.counterFromString("access_logs.grpc_access_log.ciritcal_logs_disposed").value(),
+      stats_store_.counterFromString("access_logs.grpc_access_log.critical_logs_disposed").value(),
       1);
 }
 

@@ -75,7 +75,7 @@ public:
                                                       logger_cache_, factory_context_);
   }
 
-  void expectLog(const std::string& expected_log_entry_yaml, bool expect_critical) {
+  void expectLog(const std::string& expected_log_entry_yaml, bool expect_critical = false) {
     if (access_log_ == nullptr) {
       init();
     }
@@ -119,8 +119,7 @@ request:
   request_headers_bytes: {}
 response: {{}}
     )EOF",
-                          request_method, request_method.length() + 7),
-              false);
+                          request_method, request_method.length() + 7));
     access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
 
@@ -201,8 +200,7 @@ common_properties:
       value: 10s
 request: {}
 response: {}
-)EOF",
-              false);
+)EOF");
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 
@@ -232,8 +230,7 @@ common_properties:
     nanos: 2000000
 request: {}
 response: {}
-)EOF",
-              false);
+)EOF");
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 
@@ -335,8 +332,7 @@ response:
   response_headers_bytes: 10
   response_body_bytes: 20
   response_code_details: "via_upstream"
-)EOF",
-              false);
+)EOF");
     access_log_->log(&request_headers, &response_headers, nullptr, stream_info);
   }
 
@@ -371,8 +367,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
   request_headers_bytes: 16
 response: {}
-)EOF",
-              false);
+)EOF");
     access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
 
@@ -438,8 +433,7 @@ request:
   request_method: "METHOD_UNSPECIFIED"
   request_headers_bytes: 16
 response: {}
-)EOF",
-              false);
+)EOF");
     access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
 
@@ -489,8 +483,7 @@ common_properties:
 request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
-)EOF",
-              false);
+)EOF");
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 
@@ -540,8 +533,7 @@ common_properties:
 request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
-)EOF",
-              false);
+)EOF");
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 
@@ -591,8 +583,7 @@ common_properties:
 request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
-)EOF",
-              false);
+)EOF");
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 
@@ -642,8 +633,7 @@ common_properties:
 request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
-)EOF",
-              false);
+)EOF");
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 }
@@ -730,8 +720,7 @@ response:
   response_trailers:
     "x-logged-trailer": "value"
     "x-empty-trailer": ""
-)EOF",
-              false);
+)EOF");
     access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info);
   }
 }

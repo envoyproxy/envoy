@@ -155,14 +155,14 @@ public:
 
   ABSL_MUST_USE_RESULT
   AssertionResult waitForCriticalAccessLogRequest(const std::string& expected_request_msg_yaml) {
-    envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage request_msg;
+    envoy::service::accesslog::v3::CriticalAccessLogsMessage request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
     EXPECT_EQ("POST", access_log_request_->headers().getMethodValue());
-    EXPECT_EQ("/envoy.service.accesslog.v3.AccessLogService/BufferedCriticalAccessLogs",
+    EXPECT_EQ("/envoy.service.accesslog.v3.AccessLogService/CriticalAccessLogs",
               access_log_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", access_log_request_->headers().getContentTypeValue());
 
-    envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage expected_request_msg;
+    envoy::service::accesslog::v3::CriticalAccessLogsMessage expected_request_msg;
     TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
 
     // Clear fields which are not deterministic.
@@ -229,10 +229,10 @@ message:
 )EOF")));
 
   access_log_request_->startGrpcStream();
-  envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse response_msg;
+  envoy::service::accesslog::v3::CriticalAccessLogsResponse response_msg;
   response_msg.set_id(pending_message_id_);
   pending_message_id_ = 0;
-  response_msg.set_status(envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::ACK);
+  response_msg.set_status(envoy::service::accesslog::v3::CriticalAccessLogsResponse::ACK);
   access_log_request_->sendGrpcMessage(response_msg);
   access_log_request_->finishGrpcStream(Grpc::Status::Ok);
   switch (clientType()) {
@@ -246,7 +246,8 @@ message:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_succeeded", 1);
+  test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_sent", 1);
+  test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_ack_received", 1);
   test_server_->waitForGaugeEq("access_logs.grpc_access_log.pending_critical_logs", 0);
   cleanup();
 }
@@ -286,10 +287,10 @@ message:
 )EOF")));
 
   access_log_request_->startGrpcStream();
-  envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse response_msg;
+  envoy::service::accesslog::v3::CriticalAccessLogsResponse response_msg;
   response_msg.set_id(pending_message_id_);
   pending_message_id_ = 0;
-  response_msg.set_status(envoy::service::accesslog::v3::BufferedCriticalAccessLogsResponse::NACK);
+  response_msg.set_status(envoy::service::accesslog::v3::CriticalAccessLogsResponse::NACK);
   access_log_request_->sendGrpcMessage(response_msg);
   access_log_request_->finishGrpcStream(Grpc::Status::Ok);
   switch (clientType()) {
@@ -303,6 +304,8 @@ message:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
+  test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_sent", 1);
+  test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_nack_received", 1);
   test_server_->waitForGaugeEq("access_logs.grpc_access_log.pending_critical_logs", 1);
   cleanup();
 }
@@ -341,7 +344,8 @@ message:
         response_headers_bytes: 54
 )EOF")));
 
-  test_server_->waitForCounterEq("access_logs.grpc_access_log.pending_timeout", 1);
+  test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_sent", 1);
+  test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_message_timeout", 1);
   test_server_->waitForGaugeEq("access_logs.grpc_access_log.pending_critical_logs", 1);
   cleanup();
 }

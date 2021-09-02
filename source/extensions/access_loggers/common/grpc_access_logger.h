@@ -197,12 +197,6 @@ public:
   }
 
   void log(HttpLogProto&& entry, bool is_critical) {
-    // TODO(shikugawa): If the log is critical, it will be stored in a message for critical log, but
-    // for gRPC logger (e.g. OpenTelemetry) that does not support Critical Logging Endpoint, the
-    // critical message will not be flushed forever In the case of a gRPC logger (e.g.
-    // OpenTelemetry) that does not support critical logging endpoint, the critical message will not
-    // be flushed forever. This can lead to a continual memory drain. Messages for critical logs may
-    // need to be flushed at regular intervals in such cases.
     if (is_critical) {
       logCritical(std::move(entry));
       return;

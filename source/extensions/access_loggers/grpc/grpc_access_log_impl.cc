@@ -26,11 +26,11 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
                            "envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs")),
       approximate_critical_message_size_bytes_(max_buffer_size_bytes), log_name_(config.log_name()),
       local_info_(local_info) {
-  critical_client_ = std::make_unique<CriticalAccessLoggerGrpcClientImpl<
-      envoy::service::accesslog::v3::BufferedCriticalAccessLogsMessage>>(
+  critical_client_ = std::make_unique<
+      CriticalAccessLoggerGrpcClientImpl<envoy::service::accesslog::v3::CriticalAccessLogsMessage>>(
       client,
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.accesslog.v3.AccessLogService.BufferedCriticalAccessLogs"),
+          "envoy.service.accesslog.v3.AccessLogService.CriticalAccessLogs"),
       dispatcher, scope, PROTOBUF_GET_MS_OR_DEFAULT(config, message_ack_timeout, 5000),
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, pending_critical_buffer_size_bytes, 16384));
 }
