@@ -32,6 +32,7 @@ public:
   }
 
   uint64_t copyOut(void* buffer, uint64_t length) override;
+  uint64_t copyOut(Buffer::Instance& buffer, uint64_t length) override;
   uint64_t drain(uint64_t length) override;
   uint64_t length() const override { return buffer_->length(); }
 

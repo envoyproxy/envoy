@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 
 namespace Envoy {
@@ -22,6 +23,15 @@ public:
    * @return the length of data read into the buffer.
    */
   virtual uint64_t copyOut(void* buffer, uint64_t length) PURE;
+
+  /**
+   * Copy the bufferred data into the specific Buffer::Instance.
+   * But it won't drain the data after copyOut, except an explicit drain method invoked.
+   * @param buffer supplies the buffer to read into.
+   * @param max_length supplies the maximum length to read.
+   * @return the length of data read into the buffer.
+   */
+  virtual uint64_t copyOut(Buffer::Instance& buffer, uint64_t length) PURE;
 
   /**
    * Drain the data from the beginning of the buffer.

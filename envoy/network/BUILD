@@ -145,7 +145,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "listener_filter_buffer_interface",
     hdrs = ["listener_filter_buffer.h"],
-    deps = [],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+    ],
 )
 
 envoy_cc_library(
