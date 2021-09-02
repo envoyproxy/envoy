@@ -33,26 +33,24 @@ using testing::Return;
 namespace Envoy {
 namespace Config {
 
-enum class LegacyOrUnified { Legacy, Unified };
-
 class GrpcSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
-  GrpcSubscriptionTestHarness(LegacyOrUnified legacy_or_unified)
+  GrpcSubscriptionTestHarness(Envoy::Config::LegacyOrUnified legacy_or_unified)
       : GrpcSubscriptionTestHarness(legacy_or_unified, std::chrono::milliseconds(0)) {}
 
-  GrpcSubscriptionTestHarness(LegacyOrUnified legacy_or_unified,
+  GrpcSubscriptionTestHarness(Envoy::Config::LegacyOrUnified legacy_or_unified,
                               std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new NiceMock<Grpc::MockAsyncClient>()),
-        should_use_unified_(legacy_or_unified == LegacyOrUnified::Unified) {
+        should_use_unified_(legacy_or_unified == Envoy::Config::LegacyOrUnified::Unified) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
 
     timer_ = new Event::MockTimer(&dispatcher_);
 
-    if (legacy_or_unified == LegacyOrUnified::Unified) {
+    if (legacy_or_unified == Envoy::Config::LegacyOrUnified::Unified) {
       mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
           random_, stats_store_, rate_limit_settings_, local_info_, true);

@@ -31,18 +31,16 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-enum class LegacyOrUnified { Legacy, Unified };
-
 class DeltaSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
-  DeltaSubscriptionTestHarness(LegacyOrUnified legacy_or_unified)
+  DeltaSubscriptionTestHarness(Envoy::Config::LegacyOrUnified legacy_or_unified)
       : DeltaSubscriptionTestHarness(legacy_or_unified, std::chrono::milliseconds(0)) {}
-  DeltaSubscriptionTestHarness(LegacyOrUnified legacy_or_unified,
+  DeltaSubscriptionTestHarness(Envoy::Config::LegacyOrUnified legacy_or_unified,
                                std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new Grpc::MockAsyncClient()),
-        should_use_unified_(legacy_or_unified == LegacyOrUnified::Unified) {
+        should_use_unified_(legacy_or_unified == Envoy::Config::LegacyOrUnified::Unified) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);

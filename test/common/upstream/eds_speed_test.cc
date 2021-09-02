@@ -207,7 +207,7 @@ static void duplicateUpdate(State& state) {
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
 
   for (auto _ : state) {
-    Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(2));
+    Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(1));
     uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
@@ -222,7 +222,7 @@ static void healthOnlyUpdate(State& state) {
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
-    Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(2));
+    Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(1));
     uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
