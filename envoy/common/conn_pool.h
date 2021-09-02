@@ -41,8 +41,8 @@ public:
  */
 enum class DrainBehavior {
   // Starts draining a pool, by gracefully completing all requests and gracefully closing all
-  // connections, in preparation for deletion.
-  // can be immediately drained.
+  // connections, in preparation for deletion. It is invalid to create new streams or
+  // connections from this pool after draining a pool with this behavior.
   DrainAndDelete,
   // Actively drain all existing connection pool connections. This can be used in cases where
   // the connection pool is not being destroyed, but the caller wishes to make sure that

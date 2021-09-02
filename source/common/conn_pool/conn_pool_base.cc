@@ -356,8 +356,8 @@ void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
 
 void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
   if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
-    checkForIdleAndCloseIdleConnsIfDraining();
     is_draining_ = true;
+    checkForIdleAndCloseIdleConnsIfDraining();
     return;
   }
   closeIdleConnectionsForDrainingPool();
