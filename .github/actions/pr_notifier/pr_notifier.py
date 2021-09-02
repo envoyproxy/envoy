@@ -32,6 +32,20 @@ MAINTAINERS = {
     'rojkov': 'UH5EXLYQK',
 }
 
+# First pass reviewers who are not maintainers should get
+# notifications but not result in a PR not getting assigned a
+# maintainer owner.
+FIRST_PASS = {
+    'adisuissa': 'UT17EMMTP',
+    'dmitri-d': 'UB1883Q5S',
+    'tonya11en': 'U989BG2CW',
+    'esmet': 'U01BCGBUUAE',
+    'KBaichoo': 'U016ZPU8KBK',
+    'wbpcode': 'U017KF5C0Q6',
+    'mathetake': 'UG9TD2FSB',
+    'RyanTheOptimist': 'U01SW3JC8GP',
+}
+
 # Only notify API reviewers who aren't maintainers.
 # Maintainers are already notified of pending PRs.
 API_REVIEWERS = {
@@ -74,19 +88,21 @@ def pr_message(pr_age, pr_url, pr_title, delta_days, delta_hours):
 
 
 # Adds reminder lines to the appropriate assignee to review the assigned PRs
-# Returns true if one of the assignees is in the known_assignee_map, false otherwise.
-def add_reminders(assignees, assignees_and_prs, message, known_assignee_map):
-    has_known_assignee = False
+# Returns true if one of the assignees is in the primary_assignee_map, false otherwise.
+def add_reminders(
+        assignees, assignees_and_prs, message, primary_assignee_map, first_pass_assignee_map):
+    has_primary_assignee = False
     for assignee_info in assignees:
         assignee = assignee_info.login
-        if assignee not in known_assignee_map:
+        if assignee in primary_assignee_map:
+            has_primary_assignee = True
+        elif assignee not in first_pass_assignee_map:
             continue
-        has_known_assignee = True
         if assignee not in assignees_and_prs.keys():
             assignees_and_prs[
                 assignee] = "Hello, %s, here are your PR reminders for the day \n" % assignee
         assignees_and_prs[assignee] = assignees_and_prs[assignee] + message
-    return has_known_assignee
+    return has_primary_assignee
 
 
 # Returns true if the PR needs an LGTM from an API shephard.
@@ -147,7 +163,7 @@ def track_prs():
         message = pr_message(delta, pr_info.html_url, pr_info.title, delta_days, delta_hours)
 
         if (needs_api_review(labels, repo, pr_info)):
-            add_reminders(pr_info.assignees, api_review_and_prs, message, API_REVIEWERS)
+            add_reminders(pr_info.assignees, api_review_and_prs, message, API_REVIEWERS, [])
 
         # If the PR has been out-SLO for over a day, inform on-call
         if delta > datetime.timedelta(hours=get_slo_hours() + 36):
@@ -155,7 +171,7 @@ def track_prs():
 
         # Add a reminder to each maintainer-assigner on the PR.
         has_maintainer_assignee = add_reminders(
-            pr_info.assignees, maintainers_and_prs, message, MAINTAINERS)
+            pr_info.assignees, maintainers_and_prs, message, MAINTAINERS, FIRST_PASS)
 
         # If there was no maintainer, track it as unassigned.
         if not has_maintainer_assignee:
