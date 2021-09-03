@@ -2,6 +2,7 @@
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
+#include "source/common/common/regex.h"
 #include "source/common/stats/custom_namespace.h"
 #include "source/common/stats/histogram_impl.h"
 
@@ -13,8 +14,8 @@ namespace Server {
 namespace {
 
 const std::regex& promRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "[^a-zA-Z0-9_]"); }
-const std::regex& namespaceRegex() {
-  CONSTRUCT_ON_FIRST_USE(std::regex, "^[a-zA-Z_][a-zA-Z0-9]*$");
+const Regex::CompiledGoogleReMatcher& namespaceRegex() {
+  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, "^[a-zA-Z_][a-zA-Z0-9]*$", false);
 }
 
 /**
@@ -207,7 +208,7 @@ PrometheusStatsFormatter::metricName(const std::string& extracted_name,
     sanitized_name = sanitizeName(sanitized_name);
     // Check the prometheus namespace is valid.
     view = sanitized_name.substr(0, sanitized_name.find_first_of('_'));
-    if (!std::regex_match(view.begin(), view.end(), namespaceRegex())) {
+    if (!namespaceRegex().match(view)) {
       return "";
     }
     return sanitized_name;
