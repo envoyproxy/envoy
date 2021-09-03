@@ -171,8 +171,8 @@ public:
 
   void initAddress() {
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
-    connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
-    connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+    connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+    connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   }
 
   Http::StreamFilterSharedPtr createFilterFromFilterFactory(Http::FilterFactoryCb filter_factory) {
