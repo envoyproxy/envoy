@@ -146,7 +146,22 @@ public:
                                   bool per_try_timeout_hedging_enabled,
                                   bool respect_expected_rq_timeout);
 
-  static bool trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_entry,
+  /**
+   * Try to parse a header entry that may have a timeout field
+   *
+   * @param header_timeout_entry header entry which may contain a timeout value.
+   * @return result timeout value from header. It will return nullopt if parse failed.
+   */
+  static absl::optional<std::chrono::milliseconds>
+  tryParseHeaderTimeout(const Http::HeaderEntry& header_timeout_entry);
+
+  /**
+   * Try to set global timeout.
+   *
+   * @param header_timeout_entry header entry which may contain a timeout value.
+   * @param timeout timeout data to set from header timeout entry.
+   */
+  static void trySetGlobalTimeout(const Http::HeaderEntry& header_timeout_entry,
                                   TimeoutData& timeout);
 
   /**
@@ -262,6 +277,7 @@ public:
   virtual Upstream::ClusterInfoConstSharedPtr cluster() PURE;
   virtual FilterConfig& config() PURE;
   virtual FilterUtility::TimeoutData timeout() PURE;
+  virtual absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const PURE;
   virtual Http::RequestHeaderMap* downstreamHeaders() PURE;
   virtual Http::RequestTrailerMap* downstreamTrailers() PURE;
   virtual bool downstreamResponseStarted() const PURE;
@@ -436,6 +452,9 @@ public:
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
   FilterConfig& config() override { return config_; }
   FilterUtility::TimeoutData timeout() override { return timeout_; }
+  absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const override {
+    return dynamic_max_stream_duration_;
+  }
   Http::RequestHeaderMap* downstreamHeaders() override { return downstream_headers_; }
   Http::RequestTrailerMap* downstreamTrailers() override { return downstream_trailers_; }
   bool downstreamResponseStarted() const override { return downstream_response_started_; }
@@ -535,7 +554,8 @@ private:
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
-
+  // The stream lifetime configured by request header.
+  absl::optional<std::chrono::milliseconds> dynamic_max_stream_duration_;
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;
 
