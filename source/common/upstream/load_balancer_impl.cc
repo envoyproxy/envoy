@@ -544,20 +544,27 @@ HostConstSharedPtr LoadBalancerContextBase::selectOverrideHost(const HostMap* ho
   }
 
   auto host_iter = host_map->find(override_host.value().first);
-  HostConstSharedPtr host = host_iter != host_map->end() ? host_iter->second : nullptr;
 
-  if (host != nullptr && LoadBalancerContextBase::validateOverrideHostStatus(
-                             host->health(), override_host.value().second)) {
+  // The override host cannot be found in the host map.
+  if (host_iter == host_map->end()) {
+    return nullptr;
+  }
+
+  HostConstSharedPtr host = host_iter->second;
+  ASSERT(host != nullptr);
+
+  // Verify the host status.
+  if (LoadBalancerContextBase::validateOverrideHostStatus(host->health(),
+                                                          override_host.value().second)) {
     return host;
   }
   return nullptr;
 }
 
 HostConstSharedPtr ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
-  HostConstSharedPtr host;
-
-  if (host = LoadBalancerContextBase::selectOverrideHost(cross_priority_host_map_.get(), context);
-      host != nullptr) {
+  HostConstSharedPtr host =
+      LoadBalancerContextBase::selectOverrideHost(cross_priority_host_map_.get(), context);
+  if (host != nullptr) {
     return host;
   }
 

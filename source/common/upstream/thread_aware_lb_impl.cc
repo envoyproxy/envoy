@@ -144,9 +144,9 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
     return nullptr;
   }
 
-  HostConstSharedPtr host;
-  if (host = LoadBalancerContextBase::selectOverrideHost(cross_priority_host_map_.get(), context);
-      host != nullptr) {
+  HostConstSharedPtr host =
+      LoadBalancerContextBase::selectOverrideHost(cross_priority_host_map_.get(), context);
+  if (host != nullptr) {
     return host;
   }
 

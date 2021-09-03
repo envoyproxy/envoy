@@ -621,7 +621,7 @@ TEST_F(ZoneAwareLoadBalancerBaseTest, SelectOverrideHostTestInLb) {
     priority_set_.cross_priority_host_map_ = host_map;
     host_set_.runCallbacks({}, {});
 
-    // Expected host is not exist in the host map and then `chooseHostOnce` will be called.
+    // The expected host does not exist in the host map, therefore `chooseHostOnce` will be called.
     EXPECT_EQ(lb_.choose_host_once_host_, lb_.chooseHost(&context));
   }
 
@@ -639,7 +639,8 @@ TEST_F(ZoneAwareLoadBalancerBaseTest, SelectOverrideHostTestInLb) {
     priority_set_.cross_priority_host_map_ = host_map;
     host_set_.runCallbacks({}, {});
 
-    // Host status does not match the expected host status and then `chooseHostOnce` will be called.
+    // Host status does not match the expected host status, therefore `chooseHostOnce` will be
+    // called.
     EXPECT_EQ(lb_.choose_host_once_host_, lb_.chooseHost(&context));
   }
 
@@ -2027,7 +2028,7 @@ TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetEqualKeysInvalid) {
 
 TEST(LoadBalancerContextBaseTest, LoadBalancerContextBaseTest) {
   {
-    auto context = LoadBalancerContextBase();
+    LoadBalancerContextBase context;
     MockPrioritySet mock_priority_set;
     HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({100, 0, 0}),
                                          Upstream::DegradedLoad({0, 0, 0})};
