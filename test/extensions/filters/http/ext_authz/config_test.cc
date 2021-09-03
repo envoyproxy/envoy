@@ -263,6 +263,7 @@ TEST_F(ExtAuthzFilterTest, ExtAuthzFilterFactoryTestHttp) {
     Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
     EXPECT_NE(filter, nullptr);
   });
+  postWorkToMain([&]() { async_client_manager_.reset(); });
   cleanUpThreading();
 }
 
@@ -283,6 +284,7 @@ TEST_F(ExtAuthzFilterTest, ExtAuthzFilterFactoryTestEnvoyGrpc) {
     Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
     testExtAuthzFilter(filter);
   });
+  postWorkToMain([&]() { async_client_manager_.reset(); });
   cleanUpThreading();
 }
 
@@ -304,6 +306,7 @@ TEST_F(ExtAuthzFilterTest, ExtAuthzFilterFactoryTestGoogleGrpc) {
     Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
     testExtAuthzFilter(filter);
   });
+  postWorkToMain([&]() { async_client_manager_.reset(); });
   cleanUpThreading();
 }
 
