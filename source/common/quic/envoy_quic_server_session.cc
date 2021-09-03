@@ -7,9 +7,6 @@
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 
-#include "envoy_quic_server_connection.h"
-#include "quic_transport_socket_factory.h"
-
 namespace Envoy {
 namespace Quic {
 
