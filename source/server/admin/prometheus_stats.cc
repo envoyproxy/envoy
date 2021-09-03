@@ -2,7 +2,6 @@
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
-#include "source/common/common/regex.h"
 #include "source/common/stats/custom_namespace.h"
 #include "source/common/stats/histogram_impl.h"
 
@@ -14,9 +13,6 @@ namespace Server {
 namespace {
 
 const std::regex& promRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "[^a-zA-Z0-9_]"); }
-const Regex::CompiledGoogleReMatcher& namespaceRegex() {
-  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, "^[a-zA-Z_][a-zA-Z0-9]*$", false);
-}
 
 /**
  * Take a string and sanitize it according to Prometheus conventions.
@@ -197,21 +193,23 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
 std::string
 PrometheusStatsFormatter::metricName(const std::string& extracted_name,
                                      const Stats::CustomStatNamespaces& custom_namespaces) {
-  absl::string_view view{extracted_name};
-
-  std::string sanitized_name = custom_namespaces.trySanitizeStatName(view);
+  std::string sanitized_name = custom_namespaces.trySanitizeStatName(extracted_name);
   if (!sanitized_name.empty()) {
     // This case the name has a custom namespace, and it is a custom metric.
-    // And sanitized_name now is the extracted_name without the namespace.
-    // We expose these metrics without modifying (e.g. without "envoy_"),
-    // so we have to check the "user-defined" namespace is valid as Prometheus namespace.
+    // sanitized_name now is the extracted_name without the namespace.
     sanitized_name = sanitizeName(sanitized_name);
-    // Check the prometheus namespace is valid.
-    view = sanitized_name.substr(0, sanitized_name.find_first_of('_'));
-    if (!namespaceRegex().match(view)) {
+    // We expose these metrics without modifying (e.g. without "envoy_"),
+    // so we have to check the "user-defined" stat name complies with the Prometheus naming
+    // convention. Specifically the name must start with the "[a-zA-Z_]" pattern, and other parts
+    // are already valid thanks to sanitizeName above.
+    switch (sanitized_name.front()) {
+    case 'a' ... 'z':
+    case 'A' ... 'Z':
+    case '_':
+      return sanitized_name;
+    default:
       return "";
     }
-    return sanitized_name;
   }
 
   // If it does not have a custom namespace, add namespacing prefix to avoid conflicts, as per best

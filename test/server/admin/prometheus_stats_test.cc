@@ -332,7 +332,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
            {{makeStat("another_tag_name_3"), makeStat("another_tag_3-value")}});
   addGauge("cluster.test_4.upstream_cx_total",
            {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
-  addGauge("promtest.myapp.test.bar", {{makeStat("tag_name"), makeStat("tag-value")}});
+  addGauge("promtest.MYAPP.test.bar", {{makeStat("tag_name"), makeStat("tag-value")}});
   // Metric with invalid prometheus namespace in the custom metric must be excluded in the output.
   addGauge("promtest.1234abcd.test.bar", {{makeStat("tag_name"), makeStat("tag-value")}});
 
@@ -368,8 +368,8 @@ envoy_cluster_test_3_upstream_cx_total{another_tag_name_3="another_tag_3-value"}
 # TYPE envoy_cluster_test_4_upstream_cx_total gauge
 envoy_cluster_test_4_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
 
-# TYPE myapp_test_bar gauge
-myapp_test_bar{tag_name="tag-value"} 0
+# TYPE MYAPP_test_bar gauge
+MYAPP_test_bar{tag_name="tag-value"} 0
 
 # TYPE envoy_cluster_test_1_upstream_rq_time histogram
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="0.5"} 0
