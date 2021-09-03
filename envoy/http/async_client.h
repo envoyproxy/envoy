@@ -17,10 +17,6 @@
 
 namespace Envoy {
 namespace Http {
-namespace {
-constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
-constexpr uint32_t RetryMaxDelayMilliseconds = 10 * 1000;
-} // namespace
 
 /**
  * Supports sending an HTTP request message and receiving a response asynchronously.
@@ -225,43 +221,6 @@ public:
       return *this;
     }
 
-    StreamOptions& setRetryPolicy(const envoy::config::core::v3::RetryPolicy& p,
-                                  const std::string& retry_on) {
-      envoy::config::route::v3::RetryPolicy route_retry_policy;
-
-      uint64_t base_interval_ms = RetryInitialDelayMilliseconds;
-      uint64_t max_interval_ms = RetryMaxDelayMilliseconds;
-
-      if (p.has_retry_back_off()) {
-        const auto& core_back_off = p.retry_back_off();
-
-        base_interval_ms = PROTOBUF_GET_MS_REQUIRED(core_back_off, base_interval);
-        max_interval_ms =
-            PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
-
-        if (max_interval_ms < base_interval_ms) {
-          max_interval_ms = base_interval_ms * 10;
-        }
-      }
-
-      route_retry_policy.mutable_num_retries()->set_value(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(p, num_retries, 1));
-
-      auto* route_mutable_back_off = route_retry_policy.mutable_retry_back_off();
-
-      route_mutable_back_off->mutable_base_interval()->CopyFrom(
-          Protobuf::util::TimeUtil::MillisecondsToDuration(base_interval_ms));
-      route_mutable_back_off->mutable_max_interval()->CopyFrom(
-          Protobuf::util::TimeUtil::MillisecondsToDuration(max_interval_ms));
-
-      // set all the other fields with appropriate values.
-      route_retry_policy.set_retry_on(retry_on);
-      route_retry_policy.mutable_per_try_timeout()->CopyFrom(
-          route_retry_policy.retry_back_off().max_interval());
-
-      return setRetryPolicy(route_retry_policy);
-    }
-
     // For gmock test
     bool operator==(const StreamOptions& src) const {
       return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
@@ -327,11 +286,6 @@ public:
     }
     RequestOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
       StreamOptions::setRetryPolicy(p);
-      return *this;
-    }
-    RequestOptions& setRetryPolicy(const envoy::config::core::v3::RetryPolicy& p,
-                                   const std::string& retry_on) {
-      StreamOptions::setRetryPolicy(p, retry_on);
       return *this;
     }
     RequestOptions& setParentSpan(Tracing::Span& parent_span) {

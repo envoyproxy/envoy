@@ -64,8 +64,9 @@ public:
                        .setChildSpanName("JWT Remote PubKey Fetch");
 
     if (remote_jwks_.has_retry_policy()) {
-      options.setRetryPolicy(remote_jwks_.retry_policy(),
-                             "5xx,gateway-error,connect-failure,reset");
+      auto route_retry_policy = Http::Utility::convertCoreToRouteRetryPolicy(
+          remote_jwks_.retry_policy(), "5xx,gateway-error,connect-failure,reset");
+      options.setRetryPolicy(route_retry_policy);
       options.setBufferBodyForRetry(true);
     }
 

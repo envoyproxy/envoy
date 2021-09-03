@@ -971,6 +971,34 @@ TEST(HttpUtility, CheckIsIpAddress) {
   }
 }
 
+TEST(HttpUtility, TestConvertCoreToRouteRetryPolicy) {
+  std::string core_policy = R"(
+num_retries: 10
+)";
+
+  envoy::config::core::v3::RetryPolicy core_retry_policy;
+  TestUtility::loadFromYaml(core_policy, core_retry_policy);
+
+  const auto route_retry_policy = Utility::convertCoreToRouteRetryPolicy(
+      core_retry_policy, "5xx,gateway-error,connect-failure,reset");
+  EXPECT_EQ(route_retry_policy.num_retries().value(), 10);
+  EXPECT_EQ(route_retry_policy.per_try_timeout().seconds(), 10);
+  EXPECT_EQ(route_retry_policy.retry_back_off().base_interval().seconds(), 1);
+  EXPECT_EQ(route_retry_policy.retry_back_off().max_interval().seconds(), 10);
+  EXPECT_EQ(route_retry_policy.retry_on(), "5xx,gateway-error,connect-failure,reset");
+
+  std::string core_policy2 = R"(
+retry_back_off:
+  base_interval: 32s
+  max_interval: 1s
+num_retries: 10
+)";
+
+  envoy::config::core::v3::RetryPolicy core_retry_policy2;
+  TestUtility::loadFromYaml(core_policy2, core_retry_policy2);
+  EXPECT_THROW(Utility::convertCoreToRouteRetryPolicy(core_retry_policy2, "5xx"), EnvoyException);
+}
+
 // Validates TE header is stripped if it contains an unsupported value
 // Also validate the behavior if a nominated header does not exist
 TEST(HttpUtility, TestTeHeaderGzipTrailersSanitized) {
