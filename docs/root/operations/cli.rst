@@ -42,6 +42,14 @@ following are the command line options that Envoy supports.
     No network traffic is generated, and the hot restart process is not performed, so no other Envoy
     process on the machine will be disturbed.
 
+.. option:: --defaults-profile <string>
+
+  *(optional)* Select a profile to run Envoy with configuration values tailored to a specific use case.
+
+  * ``performant``: *(default)* Run Envoy with settings optimized for performance.
+
+  * ``safe``: Run Envoy in a less resource intensive manner, safer against resource exhaustion DoS attacks.
+
 .. option:: --admin-address-path <path string>
 
   *(optional)* The output file path where the admin address and port will be written.

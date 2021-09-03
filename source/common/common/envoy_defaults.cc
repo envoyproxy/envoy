@@ -17,8 +17,7 @@ const DefaultsProfile& DefaultsProfile::get() {
     return DefaultsProfileSingleton::get();
   }
 
-  static DefaultsProfile no_singleton_profile_;
-  return no_singleton_profile_;
+  CONSTRUCT_ON_FIRST_USE(DefaultsProfile);
 };
 
 // Retrieve number value in defaults profile @ config_name.field if it exists, otherwise return
