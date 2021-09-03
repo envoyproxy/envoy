@@ -85,6 +85,7 @@ public:
 
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {
+    // Setting socket options is not supported.
     ASSERT(!options);
     return makeClientConnectionWithHost(port, "");
   }
@@ -106,8 +107,6 @@ public:
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
-    std::cerr << "======= persistent_info.host " << persistent_info.server_id_.host()
-              << "host is empty " << host.empty() << "\n";
     auto session = std::make_unique<EnvoyQuicClientSession>(
         persistent_info.quic_config_, supported_versions_, std::move(connection),
         (host.empty() ? persistent_info.server_id_
@@ -596,10 +595,8 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
   new_config_helper1.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 2);
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
-  std::cerr << "=========== after rename default filter chain\n";
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
 
-  std::cerr << "=========== after default filter chain drained\n";
   makeRequestAndWaitForResponse(*codec_client_0);
   EXPECT_TRUE(codec_client_default->sawGoAway());
   codec_client_default->close();
@@ -607,7 +604,6 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
   // This connection should pick up the new default filter chain.
   auto codec_client_1 =
       makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "lyft.com"));
-  std::cerr << "=========== a new connection after renaming default filter chain\n";
   makeRequestAndWaitForResponse(*codec_client_1);
 
   // Remove the default filter chain.
@@ -622,7 +618,6 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
   new_config_helper2.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 3);
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
-  std::cerr << "============= after removing default filter chain\n";
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
 
   makeRequestAndWaitForResponse(*codec_client_0);
