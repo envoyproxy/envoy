@@ -164,13 +164,14 @@ public:
                              const quic::ParsedQuicVersionVector& supported_versions,
                              std::unique_ptr<EnvoyQuicClientConnection> connection,
                              Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-                             EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory)
+                             EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
+                             Network::TransportSocketFactory& transport_socket_factory)
       : EnvoyQuicClientSession(config, supported_versions, std::move(connection),
                                quic::QuicServerId("example.com", 443, false),
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
                                nullptr, dispatcher, send_buffer_limit, crypto_stream_factory,
-                               quic_stat_names_, stats_store_) {}
+                               quic_stat_names_, stats_store_, transport_socket_factory, "") {}
 
   void Initialize() override {
     EnvoyQuicClientSession::Initialize();

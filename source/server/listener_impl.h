@@ -413,7 +413,7 @@ private:
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
-  std::unique_ptr<UdpListenerConfigImpl> udp_listener_config_;
+  std::shared_ptr<UdpListenerConfigImpl> udp_listener_config_;
   Network::ConnectionBalancerSharedPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;

@@ -29,6 +29,21 @@
 namespace Envoy {
 namespace Quic {
 
+using FilterChainToConnectionMap =
+    absl::flat_hash_map<const Network::FilterChain*,
+                        std::list<std::reference_wrapper<Network::Connection>>>;
+using ConnectionMapIter = std::list<std::reference_wrapper<Network::Connection>>::iterator;
+
+struct ConnectionMapPosition {
+  ConnectionMapPosition(FilterChainToConnectionMap& connection_map,
+                        const Network::FilterChain& filter_chain, ConnectionMapIter iterator)
+      : connection_map_(connection_map), filter_chain_(filter_chain), iterator_(iterator) {}
+
+  FilterChainToConnectionMap& connection_map_;
+  const Network::FilterChain& filter_chain_;
+  ConnectionMapIter iterator_;
+};
+
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
 // TODO(danzh) Lifetime of quic connection and filter manager connection can be
 // simplified by changing the inheritance to a member variable instantiated
@@ -45,8 +60,7 @@ public:
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
                          QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
-                         EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-                         OptRef<const Network::TransportSocketFactory> transport_socket_factory);
+                         EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
 
   ~EnvoyQuicServerSession() override;
 
@@ -76,6 +90,13 @@ public:
           headers_with_underscores_action) {
     headers_with_underscores_action_ = headers_with_underscores_action;
   }
+
+  void storeConnectionMapPosition(FilterChainToConnectionMap& connection_map,
+                                  const Network::FilterChain& filter_chain,
+                                  ConnectionMapIter position);
+
+  std::vector<absl::string_view>::const_iterator
+  SelectAlpn(const std::vector<absl::string_view>& alpns) const override;
 
   using quic::QuicSession::PerformActionOnActiveStreams;
 
@@ -113,7 +134,7 @@ private:
   Stats::Scope& listener_scope_;
 
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
-  OptRef<const Network::TransportSocketFactory> transport_socket_factory_;
+  absl::optional<ConnectionMapPosition> position_;
 };
 
 } // namespace Quic

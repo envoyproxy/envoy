@@ -709,6 +709,8 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
                 // listener while filters might still be using its context (stats, etc.).
                 server_.dispatcher().post([this, draining_group]() -> void {
                   if (draining_group->decWorkersPendingRemoval() == 0) {
+                    std::cerr << "============ Complete draining filter chain from listener "
+                              << draining_group->getDrainingListener().name() << "\n";
                     draining_group->getDrainingListener().debugLog(
                         absl::StrCat("draining filter chains from listener ",
                                      draining_group->getDrainingListener().name(), " complete"));

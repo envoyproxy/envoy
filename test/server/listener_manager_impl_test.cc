@@ -5102,9 +5102,9 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWo
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
 }
 
-// This case also verifies that listeners that share port but do not share socket type (TCP vs. UDP)
+// This case verifies that listeners that share port but do not share socket type (TCP vs. UDP)
 // do not share a listener.
-TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfAnyListenerIsNotTcp) {
+TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfDifferentSocketType) {
   EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 

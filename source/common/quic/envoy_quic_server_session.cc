@@ -1,10 +1,14 @@
 #include "source/common/quic/envoy_quic_server_session.h"
 
+#include <iterator>
 #include <memory>
 
 #include "source/common/common/assert.h"
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
+
+#include "envoy_quic_server_connection.h"
+#include "quic_transport_socket_factory.h"
 
 namespace Envoy {
 namespace Quic {
@@ -15,15 +19,14 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     quic::QuicCryptoServerStream::Helper* helper, const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit, QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
-    EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-    OptRef<const Network::TransportSocketFactory> transport_socket_factory)
+    EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
       QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
                                       send_buffer_limit),
       quic_connection_(std::move(connection)), quic_stat_names_(quic_stat_names),
-      listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory),
-      transport_socket_factory_(transport_socket_factory) {}
+      listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory) {
+}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());
@@ -39,7 +42,9 @@ EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache) {
   return crypto_server_stream_factory_.createEnvoyQuicCryptoServerStream(
-      crypto_config, compressed_certs_cache, this, stream_helper(), transport_socket_factory_,
+      crypto_config, compressed_certs_cache, this, stream_helper(),
+      makeOptRefFromPtr(position_.has_value() ? &position_->filter_chain_.transportSocketFactory()
+                                              : nullptr),
       dispatcher());
 }
 
@@ -89,6 +94,17 @@ void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseF
                                                 quic::ConnectionCloseSource source) {
   quic::QuicServerSessionBase::OnConnectionClosed(frame, source);
   onConnectionCloseEvent(frame, source, version());
+  if (position_.has_value()) {
+    // Remove this connection from the map.
+    std::list<std::reference_wrapper<Network::Connection>>& connections =
+        position_->connection_map_[&position_->filter_chain_];
+    connections.erase(position_->iterator_);
+    if (connections.empty()) {
+      // Remove the whole entry if this is the last connection using this filter chain.
+      position_->connection_map_.erase(&position_->filter_chain_);
+    }
+    position_.reset();
+  }
 }
 
 void EnvoyQuicServerSession::Initialize() {
@@ -131,6 +147,34 @@ void EnvoyQuicServerSession::OnRstStream(const quic::QuicRstStreamFrame& frame) 
   QuicServerSessionBase::OnRstStream(frame);
   quic_stat_names_.chargeQuicResetStreamErrorStats(listener_scope_, frame.error_code,
                                                    /*from_self*/ false, /*is_upstream*/ false);
+}
+
+void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionMap& connection_map,
+                                                        const Network::FilterChain& filter_chain,
+                                                        ConnectionMapIter position) {
+  position_.emplace(connection_map, filter_chain, position);
+}
+
+std::vector<absl::string_view>::const_iterator
+EnvoyQuicServerSession::SelectAlpn(const std::vector<absl::string_view>& alpns) const {
+  ASSERT(position_.has_value());
+  const std::vector<std::string>& alpns_configured =
+      dynamic_cast<const QuicServerTransportSocketFactory&>(
+          position_->filter_chain_.transportSocketFactory())
+          .alpnsConfigured();
+  if (alpns_configured.empty()) {
+    // If the server transport socket doesn't specify supported ALPNs, select the first one provided
+    // by the peer.
+    return alpns.begin();
+  }
+  // Otherwise select the first one mutually supported.
+  for (auto iter = alpns.begin(); iter != alpns.end(); ++iter) {
+    if (std::find(alpns_configured.begin(), alpns_configured.end(), *iter) !=
+        alpns_configured.end()) {
+      return iter;
+    }
+  }
+  return alpns.end();
 }
 
 } // namespace Quic

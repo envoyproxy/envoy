@@ -149,10 +149,14 @@ public:
   // Schedule listener destroy.
   void startDrainSequence(std::chrono::seconds drain_time, Event::Dispatcher& dispatcher,
                           std::function<void()> completion) {
+    std::cerr << "=========== startDrainSequence with timeout " << drain_time.count() << "\n";
     drain_sequence_completion_ = completion;
     ASSERT(!drain_timer_);
 
-    drain_timer_ = dispatcher.createTimer([this]() -> void { drain_sequence_completion_(); });
+    drain_timer_ = dispatcher.createTimer([this]() -> void {
+      std::cerr << "=========== drain_sequence_completion_\n";
+      drain_sequence_completion_();
+    });
     drain_timer_->enableTimer(drain_time);
   }
 

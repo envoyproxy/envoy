@@ -371,7 +371,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
-                           uint64_t hash, uint32_t concurrency)
+                           uint64_t hash, uint32_t /*concurrency*/)
     : parent_(parent), address_(origin.address_), bind_to_port_(shouldBindToPort(config)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
@@ -392,6 +392,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
+      udp_listener_config_(origin.udp_listener_config_),
       connection_balancer_(origin.connection_balancer_),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
@@ -407,18 +408,18 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       quic_stat_names_(parent_.quicStatNames()) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
-  // buildUdpListenerFactory() must come before buildListenSocketOptions() because the UDP
-  // listener factory can provide additional options.
-  buildUdpListenerFactory(socket_type, concurrency);
   buildListenSocketOptions(socket_type);
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
-  // In place update is tcp only so it's safe to apply below tcp only initialization.
-  buildSocketOptions();
-  buildOriginalDstListenerFilter();
-  buildProxyProtocolListenerFilter();
-  open_connections_ = origin.open_connections_;
+
+  if (socket_type == Network::Socket::Type::Stream) {
+    // Apply below tcp only initialization.
+    buildSocketOptions();
+    buildOriginalDstListenerFilter();
+    buildProxyProtocolListenerFilter();
+    open_connections_ = origin.open_connections_;
+  }
 }
 
 void ListenerImpl::buildAccessLog() {
@@ -441,7 +442,7 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
                          "set concurrency = 1.");
   }
 
-  udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(config_.udp_listener_config());
+  udp_listener_config_ = std::make_shared<UdpListenerConfigImpl>(config_.udp_listener_config());
   if (config_.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC
     if (config_.has_connection_balance_config()) {
@@ -764,14 +765,6 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   // The in place update needs the active listener in worker thread. worker_started guarantees the
   // existence of that active listener.
   if (!worker_started) {
-    return false;
-  }
-
-  // Currently we only support TCP filter chain update.
-  if (Network::Utility::protobufAddressSocketType(config_.address()) !=
-          Network::Socket::Type::Stream ||
-      Network::Utility::protobufAddressSocketType(config.address()) !=
-          Network::Socket::Type::Stream) {
     return false;
   }
 

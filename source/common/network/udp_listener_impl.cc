@@ -132,7 +132,6 @@ UdpListenerWorkerRouterImpl::UdpListenerWorkerRouterImpl(uint32_t concurrency)
 
 void UdpListenerWorkerRouterImpl::registerWorkerForListener(UdpListenerCallbacks& listener) {
   absl::WriterMutexLock lock(&mutex_);
-
   ASSERT(listener.workerIndex() < workers_.size());
   ASSERT(workers_.at(listener.workerIndex()) == nullptr);
   workers_.at(listener.workerIndex()) = &listener;
@@ -140,7 +139,8 @@ void UdpListenerWorkerRouterImpl::registerWorkerForListener(UdpListenerCallbacks
 
 void UdpListenerWorkerRouterImpl::unregisterWorkerForListener(UdpListenerCallbacks& listener) {
   absl::WriterMutexLock lock(&mutex_);
-
+  ASSERT(workers_.at(listener.workerIndex()) != nullptr,
+         fmt::format("no listener is registered at {}", listener.workerIndex()));
   ASSERT(workers_.at(listener.workerIndex()) == &listener);
   workers_.at(listener.workerIndex()) = nullptr;
 }

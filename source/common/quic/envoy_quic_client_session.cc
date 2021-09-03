@@ -1,6 +1,7 @@
 #include "source/common/quic/envoy_quic_client_session.h"
 
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 
 namespace Envoy {
 namespace Quic {
@@ -11,14 +12,17 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
     quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
-    QuicStatNames& quic_stat_names, Stats::Scope& scope)
+    QuicStatNames& quic_stat_names, Stats::Scope& scope,
+    const Network::TransportSocketFactory& transport_socket_factory,
+    const std::string& alpn_override)
     : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
                                       send_buffer_limit),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
       host_name_(server_id.host()), crypto_config_(crypto_config),
       crypto_stream_factory_(crypto_stream_factory), quic_stat_names_(quic_stat_names),
-      scope_(scope) {}
+      scope_(scope), transport_socket_factory_(transport_socket_factory),
+      alpn_override_(alpn_override) {}
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
@@ -120,6 +124,20 @@ std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::Create
   return crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
       server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(), crypto_config(),
       this, /*has_application_state = */ version().UsesHttp3());
+}
+
+std::vector<std::string> EnvoyQuicClientSession::GetAlpnsToOffer() const {
+  if (!alpn_override_.empty()) {
+    return {alpn_override_};
+  }
+  const std::vector<std::string>& alpns_configured =
+      dynamic_cast<const QuicClientTransportSocketFactory&>(transport_socket_factory_)
+          .alpnsConfigured();
+  if (!alpns_configured.empty()) {
+    return alpns_configured;
+  }
+  // Offer the default ALPN which is "h3".
+  return quic::QuicSpdyClientSession::GetAlpnsToOffer();
 }
 
 } // namespace Quic
