@@ -15,7 +15,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: RBAC Upstream Ip matcher plugin]
 
 // [#alpha:]
-// [#extension: filters.common.rbac]
 // This is configuration for matching upstream ip.
 message UpstreamIpMatcher {
   // A CIDR block that will be used to match the upstream IP.
