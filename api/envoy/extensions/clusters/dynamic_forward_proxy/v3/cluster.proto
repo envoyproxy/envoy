@@ -42,7 +42,9 @@ message ClusterConfig {
   // bar.example.com if that also resolved to 1.2.3.4.
   //
   // .. note::
-  // The coalesced connections might be to upstreams that would not be otherwise
-  // selected by Envoy.
+  //
+  //   The coalesced connections might be to upstreams that would not be otherwise
+  //   selected by Envoy.
+  //
   bool allow_coalesced_connections = 3;
 }
