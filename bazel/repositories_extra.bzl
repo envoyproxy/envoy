@@ -45,28 +45,18 @@ def _python_deps():
         extra_pip_args = ["--require-hashes"],
     )
     pip_install(
-        name = "docker_pip3",
-        requirements = "@envoy//tools/docker:requirements.txt",
-        extra_pip_args = ["--require-hashes"],
-    )
-    pip_install(
         name = "deps_pip3",
         requirements = "@envoy//tools/dependency:requirements.txt",
         extra_pip_args = ["--require-hashes"],
     )
     pip_install(
+        name = "distribution_pip3",
+        requirements = "@envoy//tools/distribution:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
         name = "git_pip3",
         requirements = "@envoy//tools/git:requirements.txt",
-        extra_pip_args = ["--require-hashes"],
-    )
-    pip_install(
-        name = "github_pip3",
-        requirements = "@envoy//tools/github:requirements.txt",
-        extra_pip_args = ["--require-hashes"],
-    )
-    pip_install(
-        name = "gpg_pip3",
-        requirements = "@envoy//tools/gpg:requirements.txt",
         extra_pip_args = ["--require-hashes"],
     )
     pip_install(
