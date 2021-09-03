@@ -3,7 +3,6 @@
 #include <cstdint>
 
 #include "source/common/common/assert.h"
-#include "source/common/event/dispatcher_impl.h"
 
 #include "event2/event.h"
 

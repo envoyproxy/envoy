@@ -168,6 +168,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/matching/common_inputs/environment @snowp @donyu
 # user space socket pair and event
 /*/extensions/io_socket/user_space @lambdai @antoniovicente
+# io_uring-based IO socket
+/*/extensions/io_socket/io_uring @rojkov @antoniovicente
 # Default UUID4 request ID extension
 /*/extensions/request_id/uuid @mattklein123 @alyssawilk
 # HTTP header formatters

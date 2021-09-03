@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package envoy.extensions.network.socket_interface.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.network.socket_interface.v3";
+option java_outer_classname = "IoUringSocketInterfaceProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: ``io_uring`` Socket Interface configuration]
+
+// Configuration for a socket interface that relies on Linux specific ``io_uring`` API to create
+// sockets.
+message IoUringSocketInterface {
+  // The size of read buffer. If not set, defaults to 8192.
+  google.protobuf.UInt32Value read_buffer_size = 1 [(validate.rules).uint32 = {gte: 4096}];
+
+  // The size of ``io_uring`` queues. For heavily loaded processes 300 is a
+  // good enough value. If the load is not high and memory is a constraint
+  // then it's safe to have smaller queues. If not set, defaults to 300.
+  google.protobuf.UInt32Value io_uring_size = 2 [(validate.rules).uint32 = {gte: 16}];
+
+  // When this flag is specified, a kernel thread is created to perform submission queue
+  // polling. An ``io_uring`` instance configured in this way enables ``io_uring`` sockets to issue
+  // I/O without ever context switching into the kernel.
+  bool use_submission_queue_polling = 3;
+}

@@ -10,6 +10,7 @@ The most notable features that are not supported on Windows are:
 * :ref:`Hot restart <arch_overview_hot_restart>`
 * :ref:`Signed Exchange Filter <config_http_filters_sxg>`
 * :ref:`VCL Socket Interface <config_sock_interface_vcl>`
+* :ref:`io_uring Socket Interface <config_sock_interface_io_uring>`
 
 There are certain Envoy features that require newer versions of Windows. These features explicitly document the required version.
 

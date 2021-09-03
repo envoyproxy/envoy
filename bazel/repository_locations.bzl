@@ -113,6 +113,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-06-03",
         cpe = "N/A",
     ),
+    com_github_axboe_liburing = dict(
+        project_name = "liburing",
+        project_desc = "C helpers to set up and tear down io_uring instances",
+        project_url = "https://github.com/axboe/liburing",
+        version = "2.0",
+        sha256 = "ca069ecc4aa1baf1031bd772e4e97f7e26dfb6bb733d79f70159589b22ab4dc0",
+        strip_prefix = "liburing-liburing-{version}",
+        urls = ["https://github.com/axboe/liburing/archive/liburing-{version}.tar.gz"],
+        use_category = ["dataplane_core", "controlplane"],
+        release_date = "2021-03-03",
+        cpe = "N/A",
+    ),
     com_github_c_ares_c_ares = dict(
         project_name = "c-ares",
         project_desc = "C library for asynchronous DNS requests",

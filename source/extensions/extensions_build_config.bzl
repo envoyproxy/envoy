@@ -260,6 +260,7 @@ EXTENSIONS = {
     #
 
     "envoy.io_socket.user_space":                       "//source/extensions/io_socket/user_space:config",
+    "envoy.io_socket.io_uring":                         "//source/extensions/io_socket/io_uring:config",
 
     #
     # TLS peer certification validators

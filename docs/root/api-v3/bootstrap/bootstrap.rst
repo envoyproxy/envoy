@@ -6,6 +6,7 @@ Bootstrap
   :maxdepth: 2
 
   ../config/bootstrap/v3/bootstrap.proto
+  ../extensions/network/socket_interface/v3/io_uring_socket_interface.proto
   ../config/metrics/v3/stats.proto
   ../config/metrics/v3/metrics_service.proto
   ../config/overload/v3/overload.proto
