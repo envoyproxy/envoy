@@ -126,19 +126,43 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
   if (VaryHeaderUtils::hasVary(*(entry.response_headers_))) {
     return;
   }
+  
+  // using CustomHeaderRegistryHandle = 
+  //   Http::CustomInlineHeaderRegistry::Handle<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>;
 
-  // https://www.rfc-editor.org/rfc/pdfrfc/rfc7234.txt.pdf
-  // 4.3.4 Freshening Stored Responses upon Validation
-  // use other header fields provided in the 304 (Not Modified)
-  // response to replace all instances of the corresponding header
-  // fields in the stored response.
-  //
+  // Skip headers that we don't want to update because of specific reasons
+  static const auto* headersNotToUpdate = new absl::flat_hash_set<Http::LowerCaseString>({
+      // The age is calculated and set by the general cache_filter code logic.
+      Http::CustomHeaders::get().Age,
+
+      // Headers that describe the body content should never be updated.
+      Http::Headers::get().ContentLength,
+      Http::Headers::get().ContentType,
+
+      // It does not make sense for this level of the code to be updating the ETag, when presumably the
+      // cached_response_headers reflect this specific ETag.
+      Http::CustomHeaders::get().Etag,
+
+      // We don't update the cached response on a Vary; we just delete it
+      // entirely. So don't bother copying over the Vary header.
+      Http::CustomHeaders::get().Vary,
+  });
+
   // Assumptions:
   // 1. The internet is fast, i.e. we get the result as soon as the server sends it.
   // Race conditions would not be possible because we are always processing up-to-date data.
   // 2. No key collision for etag. Therefore, if etag matches it's the same resource.
   // 3. Backend is correct. etag is being used as a unique identifier to the resource
   // TODO(tangsaidi) merge the header map instead of replacing it according to rfc7234
+  response_headers.iterate([&entry](const Http::HeaderEntry& response_header) -> Http::HeaderMap::Iterate {
+      Http::LowerCaseString lower_case_key{response_header.key().getStringView()};
+      if (headersNotToUpdate->contains(lower_case_key)) {
+        return Http::HeaderMap::Iterate::Continue;
+      }
+      entry.response_headers_->remove(lower_case_key);
+      entry.response_headers_->addCopy(lower_case_key, response_header.value().getStringView());
+      return Http::HeaderMap::Iterate::Continue;
+  });
   entry.response_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
   entry.metadata_ = metadata;
 }
