@@ -234,8 +234,13 @@ TEST_F(ClusterTest, LoadBalancer_LifetimeCallbacksWithCoalescing) {
 TEST_F(ClusterTest, LoadBalancer_SelectPoolNoConnections) {
   initialize(coalesce_connection_config_, false);
 
+  const std::string hostname = "mail.example.org";
   Upstream::MockHost host;
-  std::vector<uint8_t> hash_key;
+  EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+  EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
+  std::vector<uint8_t> hash_key = {1, 2, 3};
 
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectPool(&lb_context_, host, hash_key);
