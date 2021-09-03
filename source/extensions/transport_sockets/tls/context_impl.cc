@@ -333,7 +333,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   for (auto& ctx : tls_contexts_) {
     SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
   }
-  std::cerr << "============= configured ALPNs " << config.alpnProtocols() << "\n";
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
 
@@ -396,11 +395,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,
                                           const unsigned char* in, unsigned int inlen) {
-  std::cerr << "========= alpnSelectCallback with peer selected ALPNs "
-            << std::string(reinterpret_cast<const char*>(in), inlen) << " configured ALPNs "
-            << std::string(reinterpret_cast<const char*>(parsed_alpn_protocols_.data()),
-                           parsed_alpn_protocols_.size())
-            << "\n";
   // Currently this uses the standard selection algorithm in priority order.
   const uint8_t* alpn_data = parsed_alpn_protocols_.data();
   size_t alpn_data_size = parsed_alpn_protocols_.size();
