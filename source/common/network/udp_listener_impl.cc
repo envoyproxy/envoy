@@ -140,6 +140,7 @@ void UdpListenerWorkerRouterImpl::registerWorkerForListener(UdpListenerCallbacks
 
 void UdpListenerWorkerRouterImpl::unregisterWorkerForListener(UdpListenerCallbacks& listener) {
   absl::WriterMutexLock lock(&mutex_);
+
   ASSERT(workers_.at(listener.workerIndex()) == &listener);
   workers_.at(listener.workerIndex()) = nullptr;
 }
