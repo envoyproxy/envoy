@@ -7,8 +7,9 @@ set -e
 
 build_setup_args=""
 if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "docs" ||  \
-          "$1" == "bazel.clang_tidy" || "$1" == "tooling" || "$1" == "deps" || "$1" == "verify_examples" || \
-          "$1" == "verify_build_examples" ]]; then
+          "$1" == "bazel.clang_tidy" || "$1" == "bazel.packaging" || "$1" == "tooling" \
+          || "$1" == "deps" || "$1" == "verify_examples" || "$1" == "verify_build_examples" \
+          || "$1" == "verify_distro" ]]; then
     build_setup_args="-nofetch"
 fi
 
@@ -214,6 +215,27 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   echo "bazel contrib release build..."
   bazel_contrib_binary_build release
 
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.packaging" ]]; then
+  setup_clang_toolchain
+
+  gpg --import "${PWD}/snakeoil-maintainers.gpg"
+
+  echo "Building distro packages..."
+
+  BAZEL_BUILD_OPTIONS+=(
+      "--strategy=Genrule=sandboxed,local"
+      "--strategy=PackageTar=sandboxed,local")
+
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c opt //distribution:build
+
+  mkdir -p "${ENVOY_DELIVERY_DIR}/envoy"
+
+  if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+      cp -a bazel-bin/distribution/build.tar.gz "${ENVOY_DELIVERY_DIR}/envoy/build.x64.tar.gz"
+  else
+      cp -a bazel-bin/distribution/build.tar.gz "${ENVOY_DELIVERY_DIR}/envoy/build.arm64.tar.gz"
+  fi
   exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
@@ -499,6 +521,14 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   run_ci_verify "*" "wasm-cc|win32-front-proxy"
   exit 0
+elif [[ "$CI_TARGET" == "verify_distro" ]]; then
+    if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+        export PACKAGE_BUILD=/build/bazel.packaging/source/exe/envoy/build.x64.tar.gz
+    else
+        export PACKAGE_BUILD=/build/bazel.packaging.arm64/source/exe/envoy/build.arm64.tar.gz
+    fi
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD" --  -k "${PWD}/snakeoil-maintainers.public.gpg"
+    exit 0
 elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
   run_ci_verify wasm-cc
   exit 0

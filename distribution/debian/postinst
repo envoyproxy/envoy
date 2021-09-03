@@ -1,0 +1,13 @@
+#! /bin/sh
+
+# postinst script for envoy
+
+set -e
+
+if [ "$1" != "configure" ]; then
+    exit 0
+fi
+
+#DEBHELPER#
+
+exit 0

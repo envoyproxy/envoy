@@ -44,6 +44,8 @@ else
     && useradd -o --uid $(id -u) --gid $(id -g) --no-create-home --home-dir /build envoybuild \
     && usermod -a -G pcap envoybuild \
     && chown envoybuild:envoygroup /build \
+    && apt update \
+    && apt install -y -qq --no-install-recommends devscripts \
     && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 

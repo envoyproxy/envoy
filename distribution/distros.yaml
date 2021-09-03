@@ -1,0 +1,12 @@
+
+debian_bullseye:
+  image: debian:bullseye-slim
+  ext: bullseye.changes
+
+ubuntu_impish:
+  image: ubuntu:21.10
+  ext: impish.changes
+
+ubuntu_hirstute:
+  image: ubuntu:21.04
+  ext: hirstute.changes
