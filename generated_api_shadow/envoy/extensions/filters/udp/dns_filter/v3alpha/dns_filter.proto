@@ -57,11 +57,13 @@ message DnsFilterConfig {
 
     // This field was used for `dns_resolution_config` in Envoy 1.19.0 and
     // 1.19.1.
-    // Control planes should set this field for Envoy 1.19.0 and 1.19.1
-    // clients should fork the protobufs and change this field to type
-    // `DnsResolutionConfig`.
-    // Control planes that need to simultaneously support Envoy 1.18 should
-    // avoid Envoy 1.19.0 and 1.19.1.
+    // Control planes that need to set this field for Envoy 1.19.0 and
+    // 1.19.1 clients should fork the protobufs and change the field type
+    // to `DnsResolutionConfig`.
+    // Control planes that need to simultaneously support Envoy 1.18.x and
+    // Envoy 1.19.x should avoid Envoy 1.19.0 and 1.19.1.
+    //
+    // [#not-implemented-hide:]
     repeated config.core.v3.Address upstream_resolvers = 2
         [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
