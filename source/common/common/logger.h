@@ -447,6 +447,14 @@ public:
                       (STREAM).connection() ? (STREAM).connection()->id() : 0,                     \
                       (STREAM).streamId(), ##__VA_ARGS__)
 
+/**
+ * Convenience macros for logging events with a stream ID and a connection ID.
+ */
+#define ENVOY_STREAM_LOG_EVENT_TO_LOGGER(LOGGER, LEVEL, EVENT_NAME, FORMAT, STREAM, ...)           \
+  ENVOY_LOG_EVENT_TO_LOGGER(LOGGER, LEVEL, EVENT_NAME, "[C{}][S{}] " FORMAT,                       \
+                            (STREAM).connection() ? (STREAM).connection()->id() : 0,               \
+                            (STREAM).streamId(), ##__VA_ARGS__)
+
 // TODO(danielhochman): macros(s)/function(s) for logging structures that support iteration.
 
 /**
@@ -586,4 +594,9 @@ using t_logclock = std::chrono::steady_clock; // NOLINT
     }                                                                                              \
   } while (0)
 
+#define ENVOY_STREAM_LOG_EVENT(LEVEL, EVENT_NAME, FORMAT, STREAM, ...)                             \
+  do {                                                                                             \
+    ENVOY_STREAM_LOG_EVENT_TO_LOGGER(ENVOY_LOGGER(), LEVEL, EVENT_NAME, FORMAT, STREAM,            \
+                                     ##__VA_ARGS__);                                               \
+  } while (0)
 } // namespace Envoy

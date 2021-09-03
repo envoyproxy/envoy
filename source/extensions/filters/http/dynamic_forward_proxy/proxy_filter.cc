@@ -121,11 +121,14 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   switch (result.status_) {
   case LoadDnsCacheEntryStatus::InCache:
     ASSERT(cache_load_handle_ == nullptr);
-    ENVOY_STREAM_LOG(debug, "DNS cache entry already loaded, continuing", *decoder_callbacks_);
+    ENVOY_STREAM_LOG_EVENT(debug, "DNS cache entry already loaded, continuing",
+                           *decoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
   case LoadDnsCacheEntryStatus::Loading:
     ASSERT(cache_load_handle_ != nullptr);
-    ENVOY_STREAM_LOG(debug, "waiting to load DNS cache entry", *decoder_callbacks_);
+    ENVOY_STREAM_LOG(debug, "dfp_paused_request_pending_dns",
+                     "waiting to load DNS cache entry for {} for cluster {}", *decoder_callbacks_,
+                     headers.Host()->value().getStringView(), cluster_info_->name());
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   case LoadDnsCacheEntryStatus::Overflow:
     ASSERT(cache_load_handle_ == nullptr);
@@ -139,7 +142,9 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) {
-  ENVOY_STREAM_LOG(debug, "load DNS cache complete, continuing", *decoder_callbacks_);
+  ENVOY_STREAM_LOG(debug, "dfp_resumed_request",
+                   "load DNS cache complete, continuing request for cluster {}",
+                   *decoder_callbacks_, cluster_info_.name());
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();
   decoder_callbacks_->continueDecoding();

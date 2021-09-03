@@ -1620,7 +1620,8 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
 }
 
 void Filter::doRetry() {
-  ENVOY_STREAM_LOG(debug, "performing retry", *callbacks_);
+  ENVOY_STREAM_LOG_EVENT(debug, "http_router_retry", "performing retry to cluster {}", *callbacks_,
+                         route_entry_->clusterName());
 
   is_retry_ = true;
   attempt_count_++;
