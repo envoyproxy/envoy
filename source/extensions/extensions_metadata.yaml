@@ -704,8 +704,8 @@ envoy.key_value.file_based:
   - envoy.common.key_value
   security_posture: data_plane_agnostic
   status: alpha
-envoy.rbac.matchers.upstream:
+envoy.filters.common.rbac.matcher.upstream:
   categories:
-  - envoy.rbac.matchers
+  - envoy.filters.common.rbac.matcher
   security_posture: unknown
   status: alpha

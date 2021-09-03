@@ -64,7 +64,7 @@ proto_library(
         "//envoy/extensions/filters/common/dependency/v3:pkg",
         "//envoy/extensions/filters/common/fault/v3:pkg",
         "//envoy/extensions/filters/common/matcher/action/v3:pkg",
-        "//envoy/extensions/filters/common/rbac/matchers/v3:pkg",
+        "//envoy/extensions/filters/common/rbac/matcher/upstream/v3:pkg",
         "//envoy/extensions/filters/http/adaptive_concurrency/v3:pkg",
         "//envoy/extensions/filters/http/admission_control/v3alpha:pkg",
         "//envoy/extensions/filters/http/alternate_protocols_cache/v3:pkg",

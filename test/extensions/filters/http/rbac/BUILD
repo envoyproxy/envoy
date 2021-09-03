@@ -37,7 +37,7 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/common/rbac/matchers/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/common/rbac/matcher/upstream/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
     ],
 )

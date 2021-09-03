@@ -221,7 +221,7 @@ message Permission {
     type.matcher.v3.StringMatcher requested_server_name = 9;
 
     // Optional extension for configuring custom matchers for RBAC.
-    // [#extension-category: filters.common.rbac]
+    // [#extension-category: envoy.filters.common.rbac.matcher]
     core.v3.TypedExtensionConfig matcher = 12;
   }
 }

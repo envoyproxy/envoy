@@ -25,6 +25,6 @@ envoy_cc_extension(
         "//source/extensions/filters/common/rbac:matchers_lib",
         "//source/extensions/filters/common/rbac:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/common/rbac/matchers/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/common/rbac/matcher/upstream/v3:pkg_cc_proto",
     ],
 )
