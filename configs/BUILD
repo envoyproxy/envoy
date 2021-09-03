@@ -3,7 +3,7 @@ load(
     "envoy_package",
 )
 load("@rules_python//python:defs.bzl", "py_binary")
-load("@configs_pip3//:requirements.bzl", "requirement")
+load("@docs_pip3//:requirements.bzl", docs_requirement = "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -20,8 +20,8 @@ py_binary(
         "*.yaml",
     ]),
     deps = [
-        requirement("Jinja2"),
-        requirement("MarkupSafe"),
+        docs_requirement("Jinja2"),
+        docs_requirement("MarkupSafe"),
     ],
 )
 

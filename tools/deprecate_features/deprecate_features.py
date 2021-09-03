@@ -4,7 +4,6 @@ from __future__ import print_function
 import re
 import subprocess
 import fileinput
-from six.moves import input
 
 
 # Sorts out the list of deprecated proto fields which should be disallowed and returns a tuple of

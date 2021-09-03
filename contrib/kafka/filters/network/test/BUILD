@@ -5,7 +5,7 @@ load(
     "envoy_contrib_package",
 )
 load("@rules_python//python:defs.bzl", "py_binary")
-load("@kafka_pip3//:requirements.bzl", "requirement")
+load("@docs_pip3//:requirements.bzl", docs_requirement = "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -72,8 +72,8 @@ py_binary(
     main = "serialization/launcher.py",
     deps = [
         "//contrib/kafka/filters/network/source:serialization_composite_generator_lib",
-        requirement("Jinja2"),
-        requirement("MarkupSafe"),
+        docs_requirement("Jinja2"),
+        docs_requirement("MarkupSafe"),
     ],
 )
 
@@ -237,8 +237,8 @@ py_binary(
     main = "protocol/launcher.py",
     deps = [
         "//contrib/kafka/filters/network/source:kafka_protocol_generator_lib",
-        requirement("Jinja2"),
-        requirement("MarkupSafe"),
+        docs_requirement("Jinja2"),
+        docs_requirement("MarkupSafe"),
     ],
 )
 

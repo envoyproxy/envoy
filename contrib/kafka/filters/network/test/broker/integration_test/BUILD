@@ -3,7 +3,7 @@ load(
     "envoy_contrib_package",
     "envoy_py_test",
 )
-load("@kafka_pip3//:requirements.bzl", "requirement")
+load("@docs_pip3//:requirements.bzl", docs_requirement = "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -25,7 +25,7 @@ envoy_py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
-        requirement("Jinja2"),
-        requirement("MarkupSafe"),
+        docs_requirement("Jinja2"),
+        docs_requirement("MarkupSafe"),
     ],
 )

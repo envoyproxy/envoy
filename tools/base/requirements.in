@@ -1,0 +1,9 @@
+abstracts
+aio.functional
+colorama
+coloredlogs
+frozendict
+humanfriendly
+pyyaml
+setuptools
+verboselogs

@@ -1,0 +1,5 @@
+coverage
+pytest-asyncio
+pytest-cov
+pytest-patches
+pytest

@@ -1,0 +1,8 @@
+colorama
+sphinx
+setuptools
+sphinx-copybutton
+sphinx-rtd-theme
+sphinx-tabs
+sphinxcontrib-httpdomain
+sphinxext-rediraffe

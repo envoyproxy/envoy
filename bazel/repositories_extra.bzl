@@ -10,84 +10,14 @@ def _python_deps():
         extra_pip_args = ["--require-hashes"],
     )
     pip_install(
-        name = "config_validation_pip3",
-        requirements = "@envoy//tools/config_validation:requirements.txt",
-        extra_pip_args = ["--require-hashes"],
-
-        # project_name = "PyYAML",
-        # project_url = "https://github.com/yaml/pyyaml",
-        # version = "5.4.1",
-        # release_date = "2021-01-20"
-        # use_category = ["devtools"],
-        # cpe = "cpe:2.3:a:pyyaml:pyyaml:*",
-    )
-    pip_install(
-        name = "configs_pip3",
-        requirements = "@envoy//configs:requirements.txt",
-        extra_pip_args = ["--require-hashes"],
-
-        # project_name = "Jinja",
-        # project_url = "http://palletsprojects.com/p/jinja",
-        # version = "2.11.2",
-        # release_date = "2020-04-13"
-        # use_category = ["test"],
-        # cpe = "cpe:2.3:a:palletsprojects:jinja:*",
-
-        # project_name = "MarkupSafe",
-        # project_url = "https://markupsafe.palletsprojects.com/en/1.1.x/",
-        # version = "1.1.1",
-        # release_date = "2019-02-23"
-        # use_category = ["test"],
-    )
-    pip_install(
         name = "docs_pip3",
         requirements = "@envoy//tools/docs:requirements.txt",
-        extra_pip_args = ["--require-hashes"],
-    )
-    pip_install(
-        name = "deps_pip3",
-        requirements = "@envoy//tools/dependency:requirements.txt",
         extra_pip_args = ["--require-hashes"],
     )
     pip_install(
         name = "distribution_pip3",
         requirements = "@envoy//tools/distribution:requirements.txt",
         extra_pip_args = ["--require-hashes"],
-    )
-    pip_install(
-        name = "git_pip3",
-        requirements = "@envoy//tools/git:requirements.txt",
-        extra_pip_args = ["--require-hashes"],
-    )
-    pip_install(
-        name = "kafka_pip3",
-        requirements = "@envoy//contrib/kafka/filters/network/source:requirements.txt",
-        extra_pip_args = ["--require-hashes"],
-
-        # project_name = "Jinja",
-        # project_url = "http://palletsprojects.com/p/jinja",
-        # version = "2.11.2",
-        # release_date = "2020-04-13"
-        # use_category = ["test"],
-        # cpe = "cpe:2.3:a:palletsprojects:jinja:*",
-
-        # project_name = "MarkupSafe",
-        # project_url = "https://markupsafe.palletsprojects.com/en/1.1.x/",
-        # version = "1.1.1",
-        # release_date = "2019-02-23"
-        # use_category = ["test"],
-    )
-    pip_install(
-        name = "protodoc_pip3",
-        requirements = "@envoy//tools/protodoc:requirements.txt",
-        extra_pip_args = ["--require-hashes"],
-
-        # project_name = "PyYAML",
-        # project_url = "https://github.com/yaml/pyyaml",
-        # version = "5.4.1",
-        # release_date = "2021-01-20"
-        # use_category = ["docs"],
-        # cpe = "cpe:2.3:a:pyyaml:pyyaml:*",
     )
     pip_install(
         name = "pylint_pip3",

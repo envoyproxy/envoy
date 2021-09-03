@@ -12,11 +12,6 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/contrib/kafka/filters/network/source"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/examples/grpc-bridge/client"
   schedule:
     interval: "daily"
@@ -32,21 +27,6 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/git"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/config_validation"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/dependency"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/tools/deprecate_version"
   schedule:
     interval: "daily"
@@ -57,27 +37,12 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/protodoc"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/deprecate_features"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/tools/code_format"
   schedule:
     interval: "daily"
 
 - package-ecosystem: "pip"
   directory: "/ci/flaky_test"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/configs"
   schedule:
     interval: "daily"
 
