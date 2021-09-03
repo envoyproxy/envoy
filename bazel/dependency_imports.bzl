@@ -9,6 +9,7 @@ load("@upb//bazel:workspace_deps.bzl", "upb_deps")
 load("@rules_rust//rust:repositories.bzl", "rust_repositories")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
+load("@com_github_google_rpmpack//:deps.bzl", "rpmpack_dependencies")
 
 # go version for rules_go
 GO_VERSION = "1.15.5"
@@ -20,6 +21,7 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     rbe_toolchains_config()
     gazelle_dependencies()
     apple_rules_dependencies()
+    rpmpack_dependencies()
     rust_repositories()
     upb_deps()
     antlr_dependencies(472)
