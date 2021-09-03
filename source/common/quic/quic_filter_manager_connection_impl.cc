@@ -16,7 +16,7 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
       filter_manager_(
           std::make_unique<Network::FilterManagerImpl>(*this, *connection.connectionSocket())),
       stream_info_(dispatcher.timeSource(),
-                   connection.connectionSocket()->addressProviderSharedPtr()),
+                   connection.connectionSocket()->connectionInfoProviderSharedPtr()),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {

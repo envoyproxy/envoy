@@ -6,6 +6,7 @@
 
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
+#include "source/extensions/filters/network/common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -179,15 +180,10 @@ ClusterFactory::createClusterWithConfig(
       context.singletonManager(), context.dispatcher(), context.tls(), context.api(),
       context.runtime(), context.stats(), context.messageValidationVisitor());
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
-  if (cluster_config.has_upstream_http_protocol_options()) {
-    if (!proto_config.allow_insecure_cluster_options() &&
-        (!cluster_config.upstream_http_protocol_options().auto_sni() ||
-         !cluster_config.upstream_http_protocol_options().auto_san_validation())) {
-      throw EnvoyException(
-          "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true when "
-          "configured with upstream_http_protocol_options");
-    }
-  } else {
+  if (!cluster_config.has_upstream_http_protocol_options()) {
+    // This sets defaults which will only apply if using old style http config.
+    // They will be a no-op if typed_extension_protocol_options are used for
+    // http config.
     cluster_config.mutable_upstream_http_protocol_options()->set_auto_sni(true);
     cluster_config.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
   }
@@ -195,6 +191,18 @@ ClusterFactory::createClusterWithConfig(
   auto new_cluster = std::make_shared<Cluster>(
       cluster_config, proto_config, context.runtime(), cache_manager_factory, context.localInfo(),
       socket_factory_context, std::move(stats_scope), context.addedViaApi());
+
+  auto& options = new_cluster->info()->upstreamHttpProtocolOptions();
+
+  if (!proto_config.allow_insecure_cluster_options()) {
+    if (!options.has_value() ||
+        (!options.value().auto_sni() || !options.value().auto_san_validation())) {
+      throw EnvoyException(
+          "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true unless "
+          "allow_insecure_cluster_options is set.");
+    }
+  }
+
   auto lb = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }

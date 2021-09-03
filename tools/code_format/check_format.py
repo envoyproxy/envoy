@@ -64,7 +64,7 @@ REAL_TIME_ALLOWLIST = (
 # perform temporary registrations.
 REGISTER_FACTORY_TEST_ALLOWLIST = (
     "./test/common/config/registry_test.cc", "./test/integration/clusters/",
-    "./test/integration/filters/")
+    "./test/integration/filters/", "./test/integration/load_balancers/")
 
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_ALLOWLIST = (
@@ -175,7 +175,7 @@ MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*
 HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
 TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
 EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
-CONTRIB_CODEOWNERS_REGEX = re.compile(r'(/contrib/\w+/\s+)(@.*)')
+CONTRIB_CODEOWNERS_REGEX = re.compile(r'(/contrib/[^@]*\s+)(@.*)')
 COMMENT_REGEX = re.compile(r"//|\*")
 DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
@@ -1223,7 +1223,22 @@ if __name__ == "__main__":
 
                     m = CONTRIB_CODEOWNERS_REGEX.search(line)
                     if m is not None and not line.startswith('#'):
-                        owned.append(m.group(1).strip())
+                        stripped_path = m.group(1).strip()
+                        if not stripped_path.endswith('/'):
+                            error_messages.append(
+                                "Contrib CODEOWNERS entry '{}' must end in '/'".format(
+                                    stripped_path))
+                            continue
+
+                        if not (stripped_path.count('/') == 3 or
+                                (stripped_path.count('/') == 4
+                                 and stripped_path.startswith('/contrib/common/'))):
+                            error_messages.append(
+                                "Contrib CODEOWNERS entry '{}' must be 2 directories deep unless in /contrib/common/ and then it can be 3 directories deep"
+                                .format(stripped_path))
+                            continue
+
+                        owned.append(stripped_path)
                         owners = re.findall('@\S+', m.group(2).strip())
                         if len(owners) < 2:
                             error_messages.append(
@@ -1238,9 +1253,15 @@ if __name__ == "__main__":
     error_messages = []
     owned_directories = owned_directories(error_messages)
     if os.path.isfile(args.target_path):
-        if not args.target_path.startswith(EXCLUDED_PREFIXES) and args.target_path.endswith(
-                SUFFIXES):
-            error_messages += format_checker.check_format("./" + args.target_path)
+        # All of our EXCLUDED_PREFIXES start with "./", but the provided
+        # target path argument might not. Add it here if it is missing,
+        # and use that normalized path for both lookup and `check_format`.
+        normalized_target_path = args.target_path
+        if not normalized_target_path.startswith("./"):
+            normalized_target_path = "./" + normalized_target_path
+        if not normalized_target_path.startswith(
+                EXCLUDED_PREFIXES) and normalized_target_path.endswith(SUFFIXES):
+            error_messages += format_checker.check_format(normalized_target_path)
     else:
         results = []
 

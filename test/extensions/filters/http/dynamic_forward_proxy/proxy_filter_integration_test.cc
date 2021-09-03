@@ -62,6 +62,12 @@ typed_config:
     cluster_.set_name("cluster_0");
     cluster_.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
 
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+    protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
+    protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+    ConfigHelper::setProtocolOptions(cluster_, protocol_options);
+
     if (upstream_tls_) {
       envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
       auto* validation_context =

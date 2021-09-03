@@ -140,7 +140,6 @@ void ActiveMessageDecoderFilter::continueDecoding() {
       // If the filter stack was paused during messageEnd, handle end-of-request details.
       parent_.finalizeRequest();
     }
-    parent_.continueDecoding();
   }
 }
 
@@ -185,7 +184,7 @@ ActiveMessage::ActiveMessage(ConnectionManager& parent)
     : parent_(parent), request_timer_(std::make_unique<Stats::HistogramCompletableTimespanImpl>(
                            parent_.stats().request_time_ms_, parent.timeSystem())),
       request_id_(-1), stream_id_(parent.randomGenerator().random()),
-      stream_info_(parent.timeSystem(), parent_.connection().addressProviderSharedPtr()),
+      stream_info_(parent.timeSystem(), parent_.connection().connectionInfoProviderSharedPtr()),
       pending_stream_decoded_(false), local_response_sent_(false) {
   parent_.stats().request_active_.inc();
 }
@@ -413,8 +412,6 @@ uint64_t ActiveMessage::requestId() const {
 }
 
 uint64_t ActiveMessage::streamId() const { return stream_id_; }
-
-void ActiveMessage::continueDecoding() { parent_.continueDecoding(); }
 
 SerializationType ActiveMessage::serializationType() const {
   return parent_.downstreamSerializationType();

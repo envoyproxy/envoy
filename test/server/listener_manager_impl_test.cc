@@ -1516,7 +1516,7 @@ filter_chains:
 
   Network::Address::InstanceConstSharedPtr local_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 1234));
-  listener_factory_.socket_->address_provider_->setLocalAddress(local_address);
+  listener_factory_.socket_->connection_info_provider_->setLocalAddress(local_address);
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
@@ -1576,7 +1576,7 @@ filter_chains:
 
   Network::Address::InstanceConstSharedPtr local_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 1234));
-  listener_factory_.socket_->address_provider_->setLocalAddress(local_address);
+  listener_factory_.socket_->connection_info_provider_->setLocalAddress(local_address);
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
@@ -4026,8 +4026,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-  EXPECT_TRUE(socket.addressProvider().localAddressRestored());
-  EXPECT_EQ("127.0.0.2:2345", socket.addressProvider().localAddress()->asString());
+  EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
+  EXPECT_EQ("127.0.0.2:2345", socket.connectionInfoProvider().localAddress()->asString());
 #endif
 }
 
@@ -4123,8 +4123,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-  EXPECT_TRUE(socket.addressProvider().localAddressRestored());
-  EXPECT_EQ("127.0.0.2:2345", socket.addressProvider().localAddress()->asString());
+  EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
+  EXPECT_EQ("127.0.0.2:2345", socket.connectionInfoProvider().localAddress()->asString());
 #endif
 }
 
@@ -4204,8 +4204,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-  EXPECT_TRUE(socket.addressProvider().localAddressRestored());
-  EXPECT_EQ("[1::2]:2345", socket.addressProvider().localAddress()->asString());
+  EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
+  EXPECT_EQ("[1::2]:2345", socket.connectionInfoProvider().localAddress()->asString());
 }
 
 // Validate that when neither transparent nor freebind is not set in the
