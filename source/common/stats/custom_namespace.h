@@ -23,7 +23,7 @@ public:
    * @param name is the name to check.
    * @return true if the given name is registered as a custom stat namespace, false otherwise.
    */
-  bool registered(const absl::string_view& name);
+  bool registered(const absl::string_view& name) const;
 
   /**
    * Used to register a custom namespace by extensions.
