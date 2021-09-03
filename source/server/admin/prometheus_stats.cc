@@ -1,7 +1,5 @@
 #include "source/server/admin/prometheus_stats.h"
 
-#include "envoy/registry/registry.h"
-
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
 #include "source/common/stats/custom_namespace.h"
