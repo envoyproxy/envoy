@@ -1,0 +1,12 @@
+#!/bin/bash -e
+
+echo "$@"
+
+VERIFY_COMMAND="$1"
+TESTFILE="$2"
+DISTRO_TAR="$3"
+PACKAGE_BUILD="$4"
+
+shift 4
+
+"$VERIFY_COMMAND" "$TESTFILE" "$DISTRO_TAR" "$PACKAGE_BUILD" "${@}"

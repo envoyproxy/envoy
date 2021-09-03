@@ -5,10 +5,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-exports_files([
-    "distrotest.sh",
-])
-
 alias(
     name = "release",
     actual = entry_point(
