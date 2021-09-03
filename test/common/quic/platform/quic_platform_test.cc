@@ -37,7 +37,6 @@
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_mem_slice.h"
-#include "quiche/quic/platform/api/quic_mem_slice_span.h"
 #include "quiche/quic/platform/api/quic_mem_slice_storage.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
@@ -623,47 +622,6 @@ TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
   EXPECT_TRUE(slice2.empty());
   EXPECT_EQ(nullptr, slice2.data());
   EXPECT_TRUE(fragment_releaser_called);
-}
-
-TEST(EnvoyQuicMemSliceTest, ConstructQuicMemSliceSpan) {
-  Envoy::Buffer::OwnedImpl buffer;
-  std::string str(1024, 'a');
-  buffer.add(str);
-  quic::QuicMemSlice slice{quic::QuicMemSliceImpl(buffer, str.length())};
-
-  QuicMemSliceSpan span(&slice);
-  EXPECT_EQ(1024u, span.total_length());
-  EXPECT_EQ(str, span.GetData(0));
-  span.ConsumeAll([](quic::QuicMemSlice&& mem_slice) { mem_slice.Reset(); });
-  EXPECT_EQ(0u, span.total_length());
-
-  QuicMemSlice slice3;
-  {
-    quic::QuicMemSlice slice2{quic::QuicMemSliceImpl(std::make_unique<char[]>(5), 5u)};
-
-    QuicMemSliceSpan span2(&slice2);
-    EXPECT_EQ(5u, span2.total_length());
-    span2.ConsumeAll([&slice3](quic::QuicMemSlice&& mem_slice) { slice3 = std::move(mem_slice); });
-    EXPECT_EQ(0u, span2.total_length());
-  }
-  slice3.Reset();
-}
-
-TEST(EnvoyQuicMemSliceTest, QuicMemSliceStorage) {
-  std::string str(512, 'a');
-  iovec iov = {const_cast<char*>(str.data()), str.length()};
-  SimpleBufferAllocator allocator;
-  QuicMemSliceStorage storage(&iov, 1, &allocator, 1024);
-  // Test copy constructor.
-  QuicMemSliceStorage other = storage;
-  QuicMemSliceSpan span = storage.ToSpan();
-  EXPECT_EQ(1u, span.NumSlices());
-  EXPECT_EQ(str.length(), span.total_length());
-  EXPECT_EQ(str, span.GetData(0));
-  QuicMemSliceSpan span_other = other.ToSpan();
-  EXPECT_EQ(1u, span_other.NumSlices());
-  EXPECT_EQ(str, span_other.GetData(0));
-  EXPECT_NE(span_other.GetData(0).data(), span.GetData(0).data());
 }
 
 } // namespace
