@@ -259,6 +259,7 @@ typedef int signal_t;           // NOLINT(modernize-use-using)
 #define SOCKET_ERROR_ADDR_IN_USE EADDRINUSE
 #define SOCKET_ERROR_BADF EBADF
 #define SOCKET_ERROR_CONNRESET ECONNRESET
+#define SOCKET_ERROR_NETUNREACH ENETUNREACH
 
 // Mapping POSIX file errors to common error names
 #define HANDLE_ERROR_PERM EACCES
