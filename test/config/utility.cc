@@ -1103,18 +1103,11 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-void ConfigHelper::addQuicDownstreamTransportSocketConfig(
-    const std::vector<std::string>& extra_alpns) {
+void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
   configDownstreamTransportSocketWithTls(
       bootstrap_,
-      [&extra_alpns](
-          envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
+      [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
         initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context);
-        common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http3);
-        std::cerr << "============= add extra alpns " << extra_alpns.size();
-        for (auto& alpn : extra_alpns) {
-          common_tls_context.add_alpn_protocols(alpn);
-        }
       });
 }
 

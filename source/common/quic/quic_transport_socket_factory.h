@@ -37,12 +37,8 @@ QuicTransportSocketFactoryStats generateStats(Stats::Scope& store, const std::st
 class QuicTransportSocketFactoryBase : public Network::TransportSocketFactory,
                                        protected Logger::Loggable<Logger::Id::quic> {
 public:
-  QuicTransportSocketFactoryBase(Stats::Scope& store, const std::string& perspective,
-                                 const Protobuf::RepeatedPtrField<std::string>& alpns)
-      : stats_(generateStats(store, perspective)) {
-    for_each(alpns.begin(), alpns.end(),
-             [this](const std::string& alpn) { alpns_.push_back(alpn); });
-  }
+  QuicTransportSocketFactoryBase(Stats::Scope& store, const std::string& perspective)
+      : stats_(generateStats(store, perspective)) {}
 
   // To be called right after construction.
   virtual void initialize() PURE;
@@ -55,21 +51,18 @@ public:
   bool implementsSecureTransport() const override { return true; }
   bool usesProxyProtocolOptions() const override { return false; }
   bool supportsAlpn() const override { return true; }
-  const std::vector<std::string>& alpnsConfigured() const { return alpns_; }
 
 protected:
   virtual void onSecretUpdated() PURE;
   QuicTransportSocketFactoryStats stats_;
-  std::vector<std::string> alpns_;
 };
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to
 // differentiate server and client side context config.
 class QuicServerTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
-  QuicServerTransportSocketFactory(Stats::Scope& store, Ssl::ServerContextConfigPtr config,
-                                   const Protobuf::RepeatedPtrField<std::string>& alpns)
-      : QuicTransportSocketFactoryBase(store, "server", alpns), config_(std::move(config)) {}
+  QuicServerTransportSocketFactory(Stats::Scope& store, Ssl::ServerContextConfigPtr config)
+      : QuicTransportSocketFactoryBase(store, "server"), config_(std::move(config)) {}
 
   void initialize() override {
     config_->setSecretUpdateCallback([this]() {
@@ -100,8 +93,7 @@ class QuicClientTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
   QuicClientTransportSocketFactory(
       Ssl::ClientContextConfigPtr config,
-      Server::Configuration::TransportSocketFactoryContext& factory_context,
-      const Protobuf::RepeatedPtrField<std::string>& alpns);
+      Server::Configuration::TransportSocketFactoryContext& factory_context);
 
   void initialize() override {}
 

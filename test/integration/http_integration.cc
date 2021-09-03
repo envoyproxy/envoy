@@ -232,8 +232,7 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
   return Quic::createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
-                                           server_addr, local_addr, quic_stat_names_, stats_store_,
-                                           "", "");
+                                           server_addr, local_addr, quic_stat_names_, stats_store_);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;

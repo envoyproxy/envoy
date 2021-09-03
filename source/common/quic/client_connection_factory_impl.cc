@@ -33,9 +33,8 @@ std::shared_ptr<quic::QuicCryptoClientConfig> PersistentQuicInfoImpl::cryptoConf
   if (context.get() != client_context_.get()) {
     client_context_ = context;
     client_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
-        std::make_unique<EnvoyQuicProofVerifier>(std::move(context)),
+        std::make_unique<EnvoyQuicProofVerifier>(getContext(transport_socket_factory_)),
         std::make_unique<EnvoyQuicSessionCache>((time_source_)));
-    ASSERT(server_id_.host() == getConfig(transport_socket_factory_).serverNameIndication());
   }
   // Return the latest client config.
   return client_config_;
@@ -53,15 +52,14 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(
   quiche::FlagRegistry::getInstance();
 }
 
-std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
-    Http::PersistentQuicInfo& info, Event::Dispatcher& dispatcher,
-    Network::Address::InstanceConstSharedPtr server_addr,
-    Network::Address::InstanceConstSharedPtr local_addr, QuicStatNames& quic_stat_names,
-    Stats::Scope& scope, const std::string& host_name_override, const std::string& alpn_override) {
+std::unique_ptr<Network::ClientConnection>
+createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& dispatcher,
+                            Network::Address::InstanceConstSharedPtr server_addr,
+                            Network::Address::InstanceConstSharedPtr local_addr,
+                            QuicStatNames& quic_stat_names, Stats::Scope& scope) {
   // This flag fix a QUICHE issue which may crash Envoy during connection close.
   SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
-  ASSERT(info_impl);
   auto config = info_impl->cryptoConfig();
   if (config == nullptr) {
     return nullptr; // no secrets available yet.
@@ -74,14 +72,9 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
 
   // QUICHE client session always use the 1st version to start handshake.
   auto ret = std::make_unique<EnvoyQuicClientSession>(
-      info_impl->quic_config_, quic_versions, std::move(connection),
-      (host_name_override.empty()
-           ? info_impl->server_id_
-           : quic::QuicServerId{host_name_override,
-                                static_cast<uint16_t>(server_addr->ip()->port()), false}),
+      info_impl->quic_config_, quic_versions, std::move(connection), info_impl->server_id_,
       std::move(config), &info_impl->push_promise_index_, dispatcher, info_impl->buffer_limit_,
-      info_impl->crypto_stream_factory_, quic_stat_names, scope,
-      info_impl->transport_socket_factory_, alpn_override);
+      info_impl->crypto_stream_factory_, quic_stat_names, scope);
   return ret;
 }
 

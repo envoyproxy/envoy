@@ -152,27 +152,5 @@ void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionM
   position_.emplace(connection_map, filter_chain, position);
 }
 
-std::vector<absl::string_view>::const_iterator
-EnvoyQuicServerSession::SelectAlpn(const std::vector<absl::string_view>& alpns) const {
-  ASSERT(position_.has_value());
-  const std::vector<std::string>& alpns_configured =
-      dynamic_cast<const QuicServerTransportSocketFactory&>(
-          position_->filter_chain_.transportSocketFactory())
-          .alpnsConfigured();
-  if (alpns_configured.empty()) {
-    // If the server transport socket doesn't specify supported ALPNs, select the first one provided
-    // by the peer.
-    return alpns.begin();
-  }
-  // Otherwise select the first one mutually supported.
-  for (auto iter = alpns.begin(); iter != alpns.end(); ++iter) {
-    if (std::find(alpns_configured.begin(), alpns_configured.end(), *iter) !=
-        alpns_configured.end()) {
-      return iter;
-    }
-  }
-  return alpns.end();
-}
-
 } // namespace Quic
 } // namespace Envoy

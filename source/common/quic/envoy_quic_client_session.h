@@ -40,9 +40,7 @@ public:
                          quic::QuicClientPushPromiseIndex* push_promise_index,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
                          EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
-                         QuicStatNames& quic_stat_names, Stats::Scope& scope,
-                         const Network::TransportSocketFactory& transport_socket_factory,
-                         const std::string& alpn_override);
+                         QuicStatNames& quic_stat_names, Stats::Scope& scope);
 
   ~EnvoyQuicClientSession() override;
 
@@ -80,7 +78,6 @@ public:
     // active stream.
     return std::max<size_t>(1, GetNumActiveStreams()) * Network::NUM_DATAGRAMS_PER_RECEIVE;
   }
-  std::vector<std::string> GetAlpnsToOffer() const override;
 
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
@@ -108,8 +105,6 @@ private:
   EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory_;
   QuicStatNames& quic_stat_names_;
   Stats::Scope& scope_;
-  const Network::TransportSocketFactory& transport_socket_factory_;
-  std::string alpn_override_;
 };
 
 } // namespace Quic
