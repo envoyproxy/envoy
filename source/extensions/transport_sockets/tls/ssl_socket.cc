@@ -60,12 +60,11 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
     SSL_set_accept_state(rawSsl());
   }
 
+  enable_sslkey_log_ = false;
+  bio_keylog_ = nullptr;
   if (transport_socket_options != nullptr && transport_socket_options.get()->enableSSLKeyLog()) {
     ENVOY_LOG(info, "enable tls key log");
     setSSLKeyLog(true);
-  } else {
-    enable_sslkey_log_ = false;
-    bio_keylog_ = nullptr;
   }
 }
 
