@@ -264,10 +264,10 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
 
   // Wait for health check
   test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 1);
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
-  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
 
   // Wait until the next attempt is made.
   test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 2);
@@ -288,7 +288,6 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
   // Wait for second health check
   test_server_->waitForCounterEq("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
 
@@ -311,9 +310,8 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
   // Wait for third health check
   test_server_->waitForCounterEq("cluster.cluster_1.health_check.failure", 2);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
-  EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 0);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
-  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
 
   // Wait until the next attempt is made.
   test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 4);
@@ -333,10 +331,9 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
 
   // Wait for fourth health check
   test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 2);
-  EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
-  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
 }
 
 // Verify that immediate health check fail causes cluster exclusion.
