@@ -73,8 +73,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       false, "", "string", cmd);
   TCLAP::ValueArg<std::string> defaults_profile(
       "", "defaults-profile",
-      "choose a profile to run envoy with default settings tailored to a specific use case. One of 'performant' (default) or 'safe'.", false,
-      "performant", "string", cmd);
+      "choose a profile to run envoy with default settings tailored to a specific use case. One of "
+      "'performant' (default) or 'safe'.",
+      false, "performant", "string", cmd);
 
   TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
                                         "allow unknown fields in static configuration (DEPRECATED)",
@@ -364,9 +365,10 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_concurrency(concurrency());
   command_line_options->set_config_path(configPath());
   command_line_options->set_config_yaml(configYaml());
-  command_line_options->set_defaults_profile(defaultsProfile() == DefaultsProfile::Profile::Performant
-                                              ? envoy::admin::v3::CommandLineOptions::Performant
-                                              : envoy::admin::v3::CommandLineOptions::Safe);
+  command_line_options->set_defaults_profile(defaultsProfile() ==
+                                                     DefaultsProfile::Profile::Performant
+                                                 ? envoy::admin::v3::CommandLineOptions::Performant
+                                                 : envoy::admin::v3::CommandLineOptions::Safe);
   command_line_options->set_allow_unknown_static_fields(allow_unknown_static_fields_);
   command_line_options->set_reject_unknown_dynamic_fields(reject_unknown_dynamic_fields_);
   command_line_options->set_ignore_unknown_dynamic_fields(ignore_unknown_dynamic_fields_);

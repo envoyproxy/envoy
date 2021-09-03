@@ -458,7 +458,7 @@ TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
   hcm_value.set_value(false);
   EXPECT_TRUE(Http1::parseHttp1Settings(http1_options, validation_visitor, hcm_value, false)
-                  .stream_error_on_invalid_htFZtp_message_);
+                  .stream_error_on_invalid_http_message_);
 
   // http1_options.stream_error overrides HCM.stream_error (flip boolean value)
   http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(false);

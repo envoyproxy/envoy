@@ -59,7 +59,7 @@ message ServerInfo {
   config.core.v3.Node node = 7;
 }
 
-// [#next-free-field: 38]
+// [#next-free-field: 39]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.CommandLineOptions";
@@ -78,6 +78,14 @@ message CommandLineOptions {
 
     // Completely load and initialize the config, and then exit without running the listener loop.
     InitOnly = 2;
+  }
+
+  enum DefaultsProfile {
+    // Default option: run with settings optimized for performance.
+    Performant = 0;
+
+    // Run in a less resource intensive manner, safer against resource exhaustion DoS attacks.
+    Safe = 1;
   }
 
   enum DrainStrategy {
@@ -190,6 +198,9 @@ message CommandLineOptions {
 
   // See :option:`--enable-core-dump` for details.
   bool enable_core_dump = 37;
+
+  // See :option:`--defaults-profile` for details.
+  DefaultsProfile defaults_profile = 38;
 
   uint64 hidden_envoy_deprecated_max_stats = 20 [
     deprecated = true,

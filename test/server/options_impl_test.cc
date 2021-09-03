@@ -87,6 +87,7 @@ TEST_F(OptionsImplTest, All) {
       "--local-address-ip-version v6 -l info --component-log-level upstream:debug,connection:trace "
       "--service-cluster cluster --service-node node --service-zone zone "
       "--file-flush-interval-msec 9000 "
+      "--defaults-profile safe "
       "--drain-time-s 60 --log-format [%v] --enable-fine-grain-logging --parent-shutdown-time-s 90 "
       "--log-path "
       "/foo/bar "
@@ -108,6 +109,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ("cluster", options->serviceClusterName());
   EXPECT_EQ("node", options->serviceNodeName());
   EXPECT_EQ("zone", options->serviceZone());
+  EXPECT_EQ(DefaultsProfile::Profile::Safe, options->defaultsProfile());
   EXPECT_EQ(std::chrono::milliseconds(9000), options->fileFlushIntervalMsec());
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
@@ -160,6 +162,7 @@ TEST_F(OptionsImplTest, SetAll) {
   bootstrap_foo.mutable_node()->set_id("foo");
   options->setConfigProto(bootstrap_foo);
   options->setConfigYaml("bogus:");
+  options->setDefaultsProfile(DefaultsProfile::Profile::Safe);
   options->setAdminAddressPath("path");
   options->setLocalAddressIpVersion(Network::Address::IpVersion::v6);
   options->setDrainTime(std::chrono::seconds(42));
@@ -191,6 +194,7 @@ TEST_F(OptionsImplTest, SetAll) {
   bootstrap_bar.mutable_node()->set_id("foo");
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap_bar, options->configProto()));
   EXPECT_EQ("bogus:", options->configYaml());
+  EXPECT_EQ(DefaultsProfile::Profile::Safe, options->defaultsProfile());
   EXPECT_EQ("path", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v6, options->localAddressIpVersion());
   EXPECT_EQ(std::chrono::seconds(42), options->drainTime());
@@ -248,7 +252,7 @@ TEST_F(OptionsImplTest, SetAll) {
 
 TEST_F(OptionsImplTest, DefaultParams) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
-  // EXPECT_EQ(DefaultsProfile::Profile::Performant, options->defaultsProfile());
+  EXPECT_EQ(DefaultsProfile::Profile::Performant, options->defaultsProfile());
   EXPECT_EQ(std::chrono::seconds(600), options->drainTime());
   EXPECT_EQ(Server::DrainStrategy::Gradual, options->drainStrategy());
   EXPECT_EQ(std::chrono::seconds(900), options->parentShutdownTime());
@@ -413,6 +417,7 @@ TEST_F(OptionsImplTest, SaneTestConstructor) {
   EXPECT_TRUE(TestUtility::protoEqual(regular_options_impl->configProto(),
                                       test_options_impl.configProto()));
   EXPECT_EQ(regular_options_impl->configYaml(), test_options_impl.configYaml());
+  EXPECT_EQ(regular_options_impl->defaultsProfile(), test_options_impl.defaultsProfile());
   EXPECT_EQ(regular_options_impl->adminAddressPath(), test_options_impl.adminAddressPath());
   EXPECT_EQ(regular_options_impl->localAddressIpVersion(),
             test_options_impl.localAddressIpVersion());

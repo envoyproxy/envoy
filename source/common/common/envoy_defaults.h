@@ -35,19 +35,23 @@
 
 namespace Envoy {
 
-struct DefaultsProfile {
+class DefaultsProfile {
+public:
   enum Profile {
     Performant,
     Safe,
   };
 
+  /**
+   * ConfigContext encapsulates the full name of the config Protobuf message containing the field(s)
+   * for which defaults are being accessed.
+   */
   class ConfigContext {
   public:
     ConfigContext() = default;
     ConfigContext(const ConfigContext& context) = default;
     ConfigContext(const Protobuf::Message& config) : ctx_(config.GetDescriptor()->full_name()) {}
-    // ConfigContext(const ConfigContext& context) : ctx_(context.ctx_) {}
-    ConfigContext(const std::string& context) : ctx_(context) {}
+    ConfigContext(absl::string_view context) : ctx_(context) {}
     const absl::string_view getContext() const { return ctx_; }
     ConfigContext& appendField(absl::string_view field) {
       absl::StrAppend(&ctx_, ".", field);
@@ -71,17 +75,39 @@ struct DefaultsProfile {
   static const DefaultsProfile& get();
 
   /**
-   * Getters return the value associated with `field` in the DefaultsProfile if it exists,
-   * otherwise they return `default_value`.
+   * Returns the double value associated with `field` in the DefaultsProfile if it exists,
+   * otherwise returns `default_value`.
    * @param config encapsulates the full name of the Protobuf config message under which
    * `field` should appear
    * @param field to be searched for in the defaults profile
    * @param default_value to be returned if `field` not present in the defaults profile
+   * @return double value associated with `field`, or `default_value` if `field` is not
+   * present in profile
    */
   double getNumber(const ConfigContext& config, const std::string& field,
                    double default_value) const;
+  /**
+   * Returns the ms value associated with `field` in the DefaultsProfile if it exists,
+   * otherwise returns `default_value`.
+   * @param config encapsulates the full name of the Protobuf config message under which
+   * `field` should appear
+   * @param field to be searched for in the defaults profile
+   * @param default_value to be returned if `field` not present in the defaults profile
+   * @return ms value associated with `field`, or `default_value` if `field` is not
+   * present in profile
+   */
   std::chrono::milliseconds getMs(const ConfigContext& config, const std::string& field,
                                   int default_value) const;
+  /**
+   * Returns the bool value associated with `field` in the DefaultsProfile if it exists,
+   * otherwise returns `default_value`.
+   * @param config encapsulates the full name of the Protobuf config message under which
+   * `field` should appear
+   * @param field to be searched for in the defaults profile
+   * @param default_value to be returned if `field` not present in the defaults profile
+   * @return bool value associated with `field`, or `default_value` if `field` is not
+   * present in profile
+   */
   bool getBool(const ConfigContext& config, const std::string& field, bool default_value) const;
 
 private:

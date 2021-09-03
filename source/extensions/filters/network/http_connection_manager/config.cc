@@ -302,8 +302,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_PROFILE_DEFAULT(config, DefaultsProfile::ConfigContext(config),
                                              stream_idle_timeout, StreamIdleTimeoutMs)),
-      request_timeout_(PROTOBUF_GET_MS_OR_PROFILE_DEFAULT(
-          config, DefaultsProfile::ConfigContext(config), request_timeout, RequestTimeoutMs)),
+      request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
       request_headers_timeout_(
           PROTOBUF_GET_MS_OR_PROFILE_DEFAULT(config, DefaultsProfile::ConfigContext(config),
                                              request_headers_timeout, RequestHeaderTimeoutMs)),

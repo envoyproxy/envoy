@@ -43,7 +43,8 @@ std::chrono::milliseconds DefaultsProfile::getMs(const ConfigContext& config,
 
   if (value && value->has_string_value()) {
     ProtobufWkt::Duration duration;
-    auto result = ProtobufUtil::JsonStringToMessage("\"" + value->string_value() + "\"", &duration);
+    auto result = ProtobufUtil::JsonStringToMessage(absl::StrCat("\"", value->string_value(), "\""),
+                                                    &duration);
     return std::chrono::milliseconds(result.ok() ? DurationUtil::durationToMilliseconds(duration)
                                                  : default_value);
   }
@@ -67,27 +68,32 @@ bool DefaultsProfile::getBool(const ConfigContext& config, const std::string& fi
 // Search defaults profile for `field`, return value if found
 absl::optional<ProtobufWkt::Value> DefaultsProfile::getProtoValue(const std::string config_name,
                                                                   const std::string& field) const {
-  auto fields_map = defaults_manifest_.fields();
+  const auto& fields_map = defaults_manifest_.fields();
   auto config_it = fields_map.find(config_name);
 
   // case: `field` exists in a map of multiple fields
   if (config_it != fields_map.end()) {
-    const ProtobufWkt::Value submap = (config_it->second).edge_config().example();
+    ASSERT(config_it->second.has_edge_config() && config_it->second.edge_config().has_example());
+
+    const ProtobufWkt::Value& submap = (config_it->second).edge_config().example();
     if (!submap.has_struct_value()) {
       return absl::nullopt;
     }
-    const Protobuf::Map<std::string, ProtobufWkt::Value> fields_submap =
-        submap.struct_value().fields();
 
-    return fields_submap.count(field) ? absl::make_optional(fields_submap.at(field))
-                                      : absl::nullopt;
+    const Protobuf::Map<std::string, ProtobufWkt::Value>& fields_submap =
+        submap.struct_value().fields();
+    auto value_it = fields_submap.find(field);
+    return value_it == fields_submap.end() ? absl::nullopt : absl::make_optional(value_it->second);
   }
 
   // otherwise, `field` may exist in a single key-value pairing
-  std::string full_field_name = config_name + "." + field;
-  return fields_map.count(full_field_name)
-             ? absl::make_optional(fields_map.at(full_field_name).edge_config().example())
-             : absl::nullopt;
+  std::string full_field_name = absl::StrCat(config_name, ".", field);
+  auto value_it = fields_map.find(full_field_name);
+  if (value_it == fields_map.end()) {
+    return absl::nullopt;
+  }
+  ASSERT(value_it->second.has_edge_config() && value_it->second.edge_config().has_example());
+  return absl::make_optional(value_it->second.edge_config().example());
 }
 
 } // namespace Envoy
