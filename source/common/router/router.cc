@@ -1315,7 +1315,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   if (route_entry_->internalRedirectPolicy().enabled() &&
       route_entry_->internalRedirectPolicy().shouldRedirectForResponseCode(
           static_cast<Http::Code>(response_code)) &&
-      setupRedirect(*headers, upstream_request)) {
+      setupRedirect(*headers)) {
     return;
     // If the redirect could not be handled, fail open and let it pass to the
     // next downstream.
@@ -1487,23 +1487,9 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   cleanup();
 }
 
-bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
-                           UpstreamRequest& upstream_request) {
+bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   ENVOY_STREAM_LOG(debug, "attempting internal redirect", *callbacks_);
   const Http::HeaderEntry* location = headers.Location();
-
-  // If the internal redirect succeeds, callbacks_->recreateStream() will result in the
-  // destruction of this filter before the stream is marked as complete, and onDestroy will reset
-  // the stream.
-  //
-  // Normally when a stream is complete we signal this by resetting the upstream but this cannot
-  // be done in this case because if recreateStream fails, the "failure" path continues to call
-  // code in onUpstreamHeaders which requires the upstream *not* be reset. To avoid onDestroy
-  // performing a spurious stream reset in the case recreateStream() succeeds, we explicitly track
-  // stream completion here and check it in onDestroy. This is annoyingly complicated but is
-  // better than needlessly resetting streams.
-  attempting_internal_redirect_with_complete_stream_ =
-      upstream_request.upstreamTiming().last_upstream_rx_byte_received_ && downstream_end_stream_;
 
   const uint64_t status_code = Http::Utility::getResponseStatus(headers);
 
@@ -1517,8 +1503,6 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return true;
   }
-
-  attempting_internal_redirect_with_complete_stream_ = false;
 
   ENVOY_STREAM_LOG(debug, "Internal redirect failed", *callbacks_);
   cluster_->stats().upstream_internal_redirect_failed_total_.inc();

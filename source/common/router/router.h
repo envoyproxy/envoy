@@ -301,9 +301,7 @@ public:
   Filter(FilterConfig& config)
       : config_(config), final_upstream_request_(nullptr),
         downstream_100_continue_headers_encoded_(false), downstream_response_started_(false),
-        downstream_end_stream_(false), is_retry_(false),
-        attempting_internal_redirect_with_complete_stream_(false),
-        request_buffer_overflowed_(false) {}
+        downstream_end_stream_(false), is_retry_(false), request_buffer_overflowed_(false) {}
 
   ~Filter() override;
 
@@ -516,7 +514,7 @@ private:
   // for the remaining upstream requests to return.
   void resetOtherUpstreams(UpstreamRequest& upstream_request);
   void sendNoHealthyUpstreamResponse();
-  bool setupRedirect(const Http::ResponseHeaderMap& headers, UpstreamRequest& upstream_request);
+  bool setupRedirect(const Http::ResponseHeaderMap& headers);
   bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
                                                 const Http::HeaderEntry& internal_redirect,
                                                 uint64_t status_code);
@@ -564,7 +562,6 @@ private:
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;
   bool include_attempt_count_in_request_ : 1;
-  bool attempting_internal_redirect_with_complete_stream_ : 1;
   bool request_buffer_overflowed_ : 1;
   bool internal_redirects_with_body_enabled_ : 1;
   uint32_t attempt_count_{1};
