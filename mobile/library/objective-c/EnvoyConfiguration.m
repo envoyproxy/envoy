@@ -4,26 +4,31 @@
 
 @implementation EnvoyConfiguration
 
-- (instancetype)
-    initWithAdminInterfaceEnabled:(BOOL)adminInterfaceEnabled
-                  GrpcStatsDomain:(nullable NSString *)grpcStatsDomain
-            connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
-                dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
-     dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
-      dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
-           dnsQueryTimeoutSeconds:(UInt32)dnsQueryTimeoutSeconds
-           dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
-                statsFlushSeconds:(UInt32)statsFlushSeconds
-         streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
-                       appVersion:(NSString *)appVersion
-                            appId:(NSString *)appId
-                  virtualClusters:(NSString *)virtualClusters
-           directResponseMatchers:(NSString *)directResponseMatchers
-                  directResponses:(NSString *)directResponses
-                nativeFilterChain:(NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
-              platformFilterChain:(NSArray<EnvoyHTTPFilterFactory *> *)httpPlatformFilterFactories
-                  stringAccessors:
-                      (NSDictionary<NSString *, EnvoyStringAccessor *> *)stringAccessors {
+- (instancetype)initWithAdminInterfaceEnabled:(BOOL)adminInterfaceEnabled
+                                  GrpcStatsDomain:(nullable NSString *)grpcStatsDomain
+                            connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
+                                dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
+                     dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
+                      dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
+                           dnsQueryTimeoutSeconds:(UInt32)dnsQueryTimeoutSeconds
+                           dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
+    h2ConnectionKeepaliveIdleIntervalMilliseconds:
+        (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
+              h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
+                                statsFlushSeconds:(UInt32)statsFlushSeconds
+                         streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
+                                       appVersion:(NSString *)appVersion
+                                            appId:(NSString *)appId
+                                  virtualClusters:(NSString *)virtualClusters
+                           directResponseMatchers:(NSString *)directResponseMatchers
+                                  directResponses:(NSString *)directResponses
+                                nativeFilterChain:
+                                    (NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
+                              platformFilterChain:
+                                  (NSArray<EnvoyHTTPFilterFactory *> *)httpPlatformFilterFactories
+                                  stringAccessors:
+                                      (NSDictionary<NSString *, EnvoyStringAccessor *> *)
+                                          stringAccessors {
   self = [super init];
   if (!self) {
     return nil;
@@ -37,6 +42,9 @@
   self.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
   self.dnsQueryTimeoutSeconds = dnsQueryTimeoutSeconds;
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
+  self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
+      h2ConnectionKeepaliveIdleIntervalMilliseconds;
+  self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
   self.statsFlushSeconds = statsFlushSeconds;
   self.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
   self.appVersion = appVersion;
@@ -108,6 +116,10 @@
   [definitions
       appendFormat:@"- &dns_query_timeout %lus\n", (unsigned long)self.dnsQueryTimeoutSeconds];
   [definitions appendFormat:@"- &dns_preresolve_hostnames %@\n", self.dnsPreresolveHostnames];
+  [definitions appendFormat:@"- &h2_connection_keepalive_idle_interval %.*fs\n", 3,
+                            (double)self.h2ConnectionKeepaliveIdleIntervalMilliseconds / 1000.0];
+  [definitions appendFormat:@"- &h2_connection_keepalive_timeout %lus\n",
+                            (unsigned long)self.h2ConnectionKeepaliveTimeoutSeconds];
   [definitions
       appendFormat:@"- &stream_idle_timeout %lus\n", (unsigned long)self.streamIdleTimeoutSeconds];
   [definitions appendFormat:@"- &metadata { device_os: %@, app_version: %@, app_id: %@ }\n", @"iOS",
