@@ -249,7 +249,7 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
 DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
     const envoy::config::core::v3::ExtensionConfigSource& config_source,
     const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
-    const std::string& stat_prefix, bool last_filter_in_filter_config,
+    const std::string& stat_prefix, bool last_filter_in_filter_chain,
     const std::string& filter_chain_type) {
   auto subscription = getSubscription(config_source.config_source(), filter_config_name,
                                       factory_context, stat_prefix);
@@ -268,13 +268,13 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
   Envoy::Http::FilterFactoryCb default_config = nullptr;
   if (config_source.has_default_config()) {
     default_config = getDefaultConfig(config_source.default_config(), filter_config_name,
-                                      factory_context, stat_prefix, last_filter_in_filter_config,
+                                      factory_context, stat_prefix, last_filter_in_filter_chain,
                                       filter_chain_type, require_type_urls);
   }
 
   auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(
-      subscription, require_type_urls, factory_context, default_config,
-      last_filter_in_filter_config, filter_chain_type);
+      subscription, require_type_urls, factory_context, default_config, last_filter_in_filter_chain,
+      filter_chain_type);
 
   // Ensure the subscription starts if it has not already.
   if (config_source.apply_default_config_without_warming()) {
@@ -287,7 +287,7 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
 Http::FilterFactoryCb HttpFilterConfigProviderManagerImpl::getDefaultConfig(
     const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-    bool last_filter_in_filter_config, const std::string& filter_chain_type,
+    bool last_filter_in_filter_chain, const std::string& filter_chain_type,
     const absl::flat_hash_set<std::string> require_type_urls) const {
   auto* default_factory =
       Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
@@ -303,7 +303,7 @@ Http::FilterFactoryCb HttpFilterConfigProviderManagerImpl::getDefaultConfig(
   Config::Utility::validateTerminalFilters(
       filter_config_name, default_factory->name(), filter_chain_type,
       default_factory->isTerminalFilterByProto(*message, factory_context),
-      last_filter_in_filter_config);
+      last_filter_in_filter_chain);
   return default_factory->createFilterFactoryFromProto(*message, stat_prefix, factory_context);
 }
 
