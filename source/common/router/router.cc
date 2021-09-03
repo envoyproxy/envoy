@@ -1504,7 +1504,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
 }
 
 bool Filter::initiateInternalRedirect(const Http::ResponseHeaderMap& headers,
-                                         const Http::HeaderEntry* location, uint64_t status_code) {
+                                      const Http::HeaderEntry* location, uint64_t status_code) {
   // Redirects are not supported for streaming requests yet.
   if (!downstream_end_stream_) {
     config_.stats_.passthrough_internal_redirect_stream_request_.inc();
