@@ -13,7 +13,7 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: RBAC Upstream Ip matcher plugin]
-// [#extension-category: envoy.rbac.matchers]
+// [#extension-category: envoy.rbac.matchers.upstream]
 // [#alpha:]
 // This is configuration for matching upstream ip.
 message UpstreamIpMatcher {
