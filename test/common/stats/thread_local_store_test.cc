@@ -1203,7 +1203,7 @@ TEST_F(StatsThreadLocalStoreTest, AskForRejectedStat) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
   Counter& counter = store_->counterFromString("c1");
   Gauge& gauge = store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
-  TextReadout& textReadout = store_->textReadoutFromString("t1");
+  TextReadout& text_readout = store_->textReadoutFromString("t1");
   ASSERT_EQ(1, store_->counters().size()); // "c1".
   ASSERT_EQ(1, store_->gauges().size());
   ASSERT_EQ(1, store_->textReadouts().size());
@@ -1219,20 +1219,15 @@ TEST_F(StatsThreadLocalStoreTest, AskForRejectedStat) {
   EXPECT_EQ(0, store_->gauges().size());
   EXPECT_EQ(0, store_->textReadouts().size());
 
-  // Set values for the rejected stats.
-  counter.inc();
-  gauge.inc();
-  textReadout.set("fortytwo");
-
   // Ask for the rejected stats again by name.
   Counter& counter2 = store_->counterFromString("c1");
   Gauge& gauge2 = store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
-  TextReadout& textReadout2 = store_->textReadoutFromString("t1");
+  TextReadout& text_readout2 = store_->textReadoutFromString("t1");
 
-  // Verify that we're getting the values previously set.
-  EXPECT_EQ(counter2.value(), 1);
-  EXPECT_EQ(gauge2.value(), 1);
-  EXPECT_EQ(textReadout2.value(), "fortytwo");
+  // Verify we got the same stats.
+  EXPECT_EQ(&counter, &counter2);
+  EXPECT_EQ(&gauge, &gauge2);
+  EXPECT_EQ(&text_readout, &text_readout2);
 
   // Verify that new stats were not created.
   EXPECT_EQ(0, store_->counters().size());

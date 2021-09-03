@@ -339,7 +339,7 @@ TEST_F(AllocatorImplTest, ForEachWithNullSizeLambda) {
   EXPECT_EQ(num_iterations, num_stats);
 }
 
-// Currently, if we ask for a stat from the  Allocator that has already been
+// Currently, if we ask for a stat from the Allocator that has already been
 // marked for deletion (i.e. rejected) we get a new stat with the same name.
 // This test documents this behavior.
 TEST_F(AllocatorImplTest, AskForDeletedStat) {

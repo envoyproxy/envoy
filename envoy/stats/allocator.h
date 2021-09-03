@@ -61,6 +61,9 @@ public:
   /**
    * Mark rejected stats as deleted by moving them to a different vector, so they don't show up
    * when iterating over stats, but prevent crashes when trying to access references to them.
+   * Note that allocating a stat with the same name after calling this will
+   * return a new stat. Hence callers should seek to avoid this situation, as is
+   * done in ThreadLocalStore.
    */
   virtual void markCounterForDeletion(const CounterSharedPtr& counter) PURE;
   virtual void markGaugeForDeletion(const GaugeSharedPtr& gauge) PURE;
