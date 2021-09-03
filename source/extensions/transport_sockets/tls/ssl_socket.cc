@@ -345,6 +345,9 @@ int SslSocket::setSSLKeyLog(bool enable) {
 }
 
 void SslSocket::shutdownSsl() {
+  if (enable_sslkey_log_) {
+    setSSLKeyLog(false);
+  }
   ASSERT(info_->state() != Ssl::SocketState::PreHandshake);
   if (info_->state() != Ssl::SocketState::ShutdownSent &&
       callbacks_->connection().state() != Network::Connection::State::Closed) {
@@ -377,9 +380,6 @@ void SslSocket::shutdownBasic() {
 
 void SslSocket::closeSocket(Network::ConnectionEvent) {
   // Unregister the SSL connection object from private key method providers.
-  if (enable_sslkey_log_) {
-    setSSLKeyLog(false);
-  }
   for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
     provider->unregisterPrivateKeyMethod(rawSsl());
   }
