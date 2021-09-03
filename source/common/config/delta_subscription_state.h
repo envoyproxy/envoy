@@ -57,9 +57,7 @@ namespace Config {
 // when we receive messages from the server - if a resource in the message is in "added resources"
 // list (thus contains version information), the resource becomes "complete". If the resource in the
 // message is in "removed resources" list, it changes into the "waiting for server" state. If a
-// server sends us a resource that we didn't request, it's going to end up in the "wildcard"
-// category. Such resources are dropped when the server send us a message with the resource in
-// "removed resources" list. But this normally should not happen.
+// server sends us a resource that we didn't request, it's going to be ignored.
 //
 // In the "wildcard subscription" scenario, "requested" category is the same as in "no wildcard
 // subscription" scenario, with one exception - the unsubscribed "complete" resource is not removed
