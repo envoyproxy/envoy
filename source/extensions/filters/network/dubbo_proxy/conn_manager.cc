@@ -97,11 +97,6 @@ void ConnectionManager::dispatch() {
     return;
   }
 
-  if (stopped_) {
-    ENVOY_CONN_LOG(debug, "dubbo: dubbo filter stopped", read_callbacks_->connection());
-    return;
-  }
-
   try {
     bool underflow = false;
     while (!underflow) {
