@@ -64,15 +64,15 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
       .WillByDefault([&](auto, auto callback) {
         return filter_callbacks_.connection_.dispatcher_.createTimer(callback).release();
       });
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 443));
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setDirectRemoteAddressForTest(std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRequestedServerName(
-      server_name_);
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setSslConnection(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setRequestedServerName(server_name_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setSslConnection(
       ssl_connection_);
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
       *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,

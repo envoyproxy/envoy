@@ -423,7 +423,7 @@ tracing:
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
       collector_cluster: zipkin
-      collector_endpoint: "/api/v1/spans"
+      collector_endpoint: "/api/v2/spans"
       collector_endpoint_version: HTTP_JSON
 http_filters:
 - name: envoy.filters.http.router
@@ -441,7 +441,7 @@ http_filters:
   inlined_tracing_config.set_name("zipkin");
   envoy::config::trace::v3::ZipkinConfig zipkin_config;
   zipkin_config.set_collector_cluster("zipkin");
-  zipkin_config.set_collector_endpoint("/api/v1/spans");
+  zipkin_config.set_collector_endpoint("/api/v2/spans");
   zipkin_config.set_collector_endpoint_version(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON);
   inlined_tracing_config.mutable_typed_config()->PackFrom(zipkin_config);
 
