@@ -84,7 +84,8 @@ test "$(stat -L -c "%a %G %U" /usr/bin/envoy)" == "$BINARY_PERMISSIONS" && echo 
 run_log config-permissions "Check ownership/permissions of envoy config"
 test "$(stat -L -c "%a %G %U" /etc/envoy/envoy.yaml)" == "$CONFIG_PERMISSIONS" && echo "Correct permissions: ${CONFIG_PERMISSIONS}"
 
-run_log envoy-version "Envoy version"
+run_log envoy-version "Envoy version: ${ENVOY_VERSION}"
+envoy --version
 envoy --version | grep "$ENVOY_VERSION"
 
 run_log start-envoy "Start Envoy"
@@ -99,7 +100,7 @@ pgrep envoy
 
 run_log proxy-responds "Check proxy responds"
 RESPONSE=$(curl -s http://localhost:10000/)
-echo "$RESPONSE" | grep "Welcome to Envoy"
+echo "$RESPONSE" | grep "Envoy is an open source edge and service proxy, designed for cloud-native applications"
 
 run_log stop-envoy "Stop envoy"
 sudo -u envoy pkill envoy && echo "Envoy stopped"
