@@ -443,10 +443,8 @@ public:
                                 Stats::Scope& scope, bool skip_cluster_check);
 
   /**
-   * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto
-   * message.
+   * Translate opaque config from google.protobuf.Any to defined proto message.
    * @param typed_config opaque config packed in google.protobuf.Any
-   * @param config the deprecated google.protobuf.Struct config, empty struct if doesn't exist.
    * @param validation_visitor message validation visitor instance.
    * @param out_proto the proto message instantiated by extensions
    */
