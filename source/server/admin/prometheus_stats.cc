@@ -200,16 +200,14 @@ PrometheusStatsFormatter::metricName(const std::string& extracted_name,
     sanitized_name = sanitizeName(sanitized_name);
     // We expose these metrics without modifying (e.g. without "envoy_"),
     // so we have to check the "user-defined" stat name complies with the Prometheus naming
-    // convention. Specifically the name must start with the "[a-zA-Z_]" pattern, and other parts
-    // are already valid thanks to sanitizeName above.
-    switch (sanitized_name.front()) {
-    case 'a' ... 'z':
-    case 'A' ... 'Z':
-    case '_':
-      return sanitized_name;
-    default:
+    // convention. Specifically the name must start with the "[a-zA-Z_]" pattern.
+    // All the characters in sanitized_name are already in "[a-zA-Z0-9_]" pattern
+    // thanks to sanitizeName above, so the only thing we have to check is check
+    // if it does not start with digits.
+    if ('0' <= sanitized_name.front() && sanitized_name.front() <= '9') {
       return "";
     }
+    return sanitized_name;
   }
 
   // If it does not have a custom namespace, add namespacing prefix to avoid conflicts, as per best
