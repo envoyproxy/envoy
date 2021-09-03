@@ -443,7 +443,8 @@ TEST_P(DeltaSubscriptionStateTestBlank, IgnoreSuperfluousResources) {
   EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("foo", "bar"));
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
   EXPECT_TRUE(req->initial_resource_versions().empty());
-  deliverSimpleDiscoveryResponse({{"foo", "1"}, {"bar", "1"}, {"did-not-want", "1"}, {"spam", "1"}}, {}, "d1");
+  deliverSimpleDiscoveryResponse({{"foo", "1"}, {"bar", "1"}, {"did-not-want", "1"}, {"spam", "1"}},
+                                 {}, "d1");
 
   // Force a reconnection and resending of the "initial" message. If the initial_resource_versions
   // in the message contains resources like did-not-want or spam, we haven't ignored that as we
