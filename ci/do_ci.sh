@@ -7,9 +7,9 @@ set -e
 
 build_setup_args=""
 if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "docs" ||  \
-          "$1" == "bazel.clang_tidy" || "$1" == "bazel.packaging" || "$1" == "tooling" \
-          || "$1" == "deps" || "$1" == "verify_examples" || "$1" == "verify_build_examples" \
-          || "$1" == "verify_distro" ]]; then
+          "$1" == "bazel.clang_tidy" || "$1" == "bazel.packaging" || "$1" == "publish_distro" || \
+          "$1" == "tooling" || "$1" == "deps" || "$1" == "verify_examples" || \
+          "$1" == "verify_build_examples" || "$1" == "verify_distro" ]]; then
     build_setup_args="-nofetch"
 fi
 
@@ -204,7 +204,6 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # test/common/stats/stat_test_utility.cc when computing
   # Stats::TestUtil::MemoryTest::mode().
   [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]] && BAZEL_BUILD_OPTIONS+=("--test_env=ENVOY_MEMORY_TEST_EXACT=true")
-
   setup_clang_toolchain
   echo "Testing ${TEST_TARGETS[*]} with options: ${BAZEL_BUILD_OPTIONS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c opt "${TEST_TARGETS[@]}"
@@ -521,6 +520,28 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   run_ci_verify "*" "wasm-cc|win32-front-proxy"
   exit 0
+elif [[ "$CI_TARGET" == "publish_distro" ]]; then
+
+    # TODO - move all of the github/gpg setup to azp
+
+    # add the github keys for publishing to envoy-distro
+    mkdir -p ~/.ssh
+    cp -a snakeoil-publishing-keys/* ~/.ssh/
+    chmod 600 ~/.ssh/id_rsa
+    echo "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==" >> ~/.ssh/known_hosts
+
+    # this only actually needs the public key
+    gpg --import "${PWD}/snakeoil-maintainers.gpg"
+
+    cat snakeoil-release.key | base64 --decode > /tmp/release.key
+
+    bazel run //tools/distribution:release \
+          "phlax/release-testing" \
+          /tmp/release.key \
+          create 1.19.0 \
+          -- --assets "/build/bazel.packaging/source/exe/envoy/build.x64.tar.gz" \
+          --continue
+    exit 0
 elif [[ "$CI_TARGET" == "verify_distro" ]]; then
     if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
         export PACKAGE_BUILD=/build/bazel.packaging/source/exe/envoy/build.x64.tar.gz

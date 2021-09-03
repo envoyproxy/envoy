@@ -1,5 +1,6 @@
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("//distribution/debian:packages.bzl", "envoy_pkg_debs")
+load("//distribution/rpm:packages.bzl", "envoy_pkg_rpms")
 
 
 def envoy_common_data():
@@ -26,6 +27,11 @@ def envoy_pkg_distros(version = None, maintainer = None, envoy_bin = ":envoy-bin
         release_version = release_version,
         envoy_bin = envoy_bin,
         maintainer = maintainer)
+    envoy_pkg_rpms(
+        version = version,
+        release_version = release_version,
+        envoy_bin = envoy_bin,
+        maintainer = MAINTAINER)
 
     pkg_tar(
         name = "packages_build",

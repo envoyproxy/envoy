@@ -1,5 +1,5 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_py_script")
+load("//tools/base:envoy_python.bzl", "envoy_py_script", "envoy_py_binary")
 load("@distribution_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
@@ -23,6 +23,13 @@ envoy_py_script(
     entry_point = "envoy.gpg.sign",
     deps = [
         requirement("envoy.gpg.sign"),
+    ],
+)
+
+envoy_py_binary(
+    name = "tools.distribution.strip_dirs",
+    deps = [
+        "//tools/base:runner",
     ],
 )
 
