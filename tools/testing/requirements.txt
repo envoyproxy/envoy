@@ -107,9 +107,9 @@ pytest-cov==2.12.1 \
 pytest-patches==0.0.3 \
     --hash=sha256:6f8cdc8641c708c4812f58ae48d410f373a6fd16cd6cc4dc4d3fb8951df9c92a
     # via -r tools/testing/requirements.txt
-pytest==6.2.4 \
-    --hash=sha256:50bcad0a0b9c5a72c8e4e7c9855a3ad496ca6a881a3641b4260605450772c54b \
-    --hash=sha256:91ef2131a9bd6be8f76f1f08eac5c5317221d6ad1e143ae03894b862e8976890
+pytest==6.2.5 \
+    --hash=sha256:7310f8d27bc79ced999e760ca304d69f6ba6c6649c0b60fb0e04a4a77cacc134 \
+    --hash=sha256:131b36680866a76e6781d13f101efb86cf674ebb9762eb70d3082b6f29889e89
     # via
     #   -r tools/testing/requirements.txt
     #   pytest-asyncio
