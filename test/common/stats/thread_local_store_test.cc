@@ -1197,6 +1197,53 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   tls_.shutdownThread();
 }
 
+// Verify that asking for deleted stats by name does not create new copies on
+// the allocator.
+TEST_F(StatsThreadLocalStoreTest, AskForRejectedStat) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  Counter& counter = store_->counterFromString("c1");
+  Gauge& gauge = store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+  TextReadout& textReadout = store_->textReadoutFromString("t1");
+  ASSERT_EQ(1, store_->counters().size()); // "c1".
+  ASSERT_EQ(1, store_->gauges().size());
+  ASSERT_EQ(1, store_->textReadouts().size());
+
+  // Will effectively block all stats, and remove all the non-matching stats.
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
+      "no-such-stat");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config, symbol_table_));
+
+  // They can no longer be found.
+  EXPECT_EQ(0, store_->counters().size());
+  EXPECT_EQ(0, store_->gauges().size());
+  EXPECT_EQ(0, store_->textReadouts().size());
+
+  // Set values for the rejected stats.
+  counter.inc();
+  gauge.inc();
+  textReadout.set("fortytwo");
+
+  // Ask for the rejected stats again by name.
+  Counter& counter2 = store_->counterFromString("c1");
+  Gauge& gauge2 = store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+  TextReadout& textReadout2 = store_->textReadoutFromString("t1");
+
+  // Verify that we're getting the values previously set.
+  EXPECT_EQ(counter2.value(), 1);
+  EXPECT_EQ(gauge2.value(), 1);
+  EXPECT_EQ(textReadout2.value(), "fortytwo");
+
+  // Verify that new stats were not created.
+  EXPECT_EQ(0, store_->counters().size());
+  EXPECT_EQ(0, store_->gauges().size());
+  EXPECT_EQ(0, store_->textReadouts().size());
+
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
 TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);

@@ -60,7 +60,7 @@ public:
 
   /**
    * Mark rejected stats as deleted by moving them to a different vector, so they don't show up
-   * when iterating over stats, but prevent crashes when trying to accesses references to them.
+   * when iterating over stats, but prevent crashes when trying to access references to them.
    */
   virtual void markCounterForDeletion(const CounterSharedPtr& counter) PURE;
   virtual void markGaugeForDeletion(const GaugeSharedPtr& gauge) PURE;

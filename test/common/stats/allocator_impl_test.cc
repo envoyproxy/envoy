@@ -339,6 +339,77 @@ TEST_F(AllocatorImplTest, ForEachWithNullSizeLambda) {
   EXPECT_EQ(num_iterations, num_stats);
 }
 
+// Currently, if we ask for a stat from the  Allocator that has already been
+// marked for deletion (i.e. rejected) we get a new stat with the same name.
+// This test documents this behavior.
+TEST_F(AllocatorImplTest, AskForDeletedStat) {
+  const size_t num_stats = 10;
+  are_stats_marked_for_deletion_ = true;
+
+  std::vector<CounterSharedPtr> counters;
+  for (size_t idx = 0; idx < num_stats; ++idx) {
+    auto stat_name = makeStat(absl::StrCat("counter.", idx));
+    counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
+  }
+  // Reject a stat and remove it from "scope".
+  StatName const rejected_counter_name = counters[4]->statName();
+  alloc_.markCounterForDeletion(counters[4]);
+  // Save a local reference to rejected stat.
+  Counter& rejected_counter = *counters[4];
+  counters.erase(counters.begin() + 4);
+
+  rejected_counter.inc();
+  rejected_counter.inc();
+
+  // Make the deleted stat again.
+  CounterSharedPtr deleted_counter = alloc_.makeCounter(rejected_counter_name, StatName(), {});
+
+  EXPECT_EQ(deleted_counter->value(), 0);
+  EXPECT_EQ(rejected_counter.value(), 2);
+
+  std::vector<GaugeSharedPtr> gauges;
+  for (size_t idx = 0; idx < num_stats; ++idx) {
+    auto stat_name = makeStat(absl::StrCat("gauge.", idx));
+    gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
+  }
+  // Reject a stat and remove it from "scope".
+  StatName const rejected_gauge_name = gauges[4]->statName();
+  alloc_.markGaugeForDeletion(gauges[4]);
+  // Save a local reference to rejected stat.
+  Gauge& rejected_gauge = *gauges[4];
+  gauges.erase(gauges.begin() + 4);
+
+  rejected_gauge.set(10);
+
+  // Make the deleted stat again.
+  GaugeSharedPtr deleted_gauge =
+      alloc_.makeGauge(rejected_gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate);
+
+  EXPECT_EQ(deleted_gauge->value(), 0);
+  EXPECT_EQ(rejected_gauge.value(), 10);
+
+  std::vector<TextReadoutSharedPtr> text_readouts;
+  for (size_t idx = 0; idx < num_stats; ++idx) {
+    auto stat_name = makeStat(absl::StrCat("text_readout.", idx));
+    text_readouts.emplace_back(alloc_.makeTextReadout(stat_name, StatName(), {}));
+  }
+  // Reject a stat and remove it from "scope".
+  StatName const rejected_text_readout_name = text_readouts[4]->statName();
+  alloc_.markTextReadoutForDeletion(text_readouts[4]);
+  // Save a local reference to rejected stat.
+  TextReadout& rejected_text_readout = *text_readouts[4];
+  text_readouts.erase(text_readouts.begin() + 4);
+
+  rejected_text_readout.set("deleted value");
+
+  // Make the deleted stat again.
+  TextReadoutSharedPtr deleted_text_readout =
+      alloc_.makeTextReadout(rejected_text_readout_name, StatName(), {});
+
+  EXPECT_EQ(deleted_text_readout->value(), "");
+  EXPECT_EQ(rejected_text_readout.value(), "deleted value");
+}
+
 } // namespace
 } // namespace Stats
 } // namespace Envoy
