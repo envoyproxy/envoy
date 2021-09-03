@@ -72,6 +72,7 @@ public:
 
   SSL* rawSslForTest() const { return rawSsl(); }
   int setSSLKeyLog(bool enable);
+  bool isSSLKeyLogEnabled() { return enable_sslkey_log_; }
 
 protected:
   SSL* rawSsl() const { return info_->ssl_.get(); }
