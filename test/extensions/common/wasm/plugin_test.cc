@@ -84,6 +84,12 @@ TEST(TestWasmConfig, NullVMEnv) {
       "not be set for NullVm.");
 }
 
+TEST(TestWasm, ensureCustomStatNamespaceRegistered) {
+  Stats::CustomStatNamespaces namespaces;
+  ensureCustomStatNamespaceRegistered(namespaces);
+  EXPECT_TRUE(namespaces.registered("wasmcustom"));
+}
+
 } // namespace
 } // namespace Wasm
 } // namespace Common

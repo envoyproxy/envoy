@@ -70,7 +70,7 @@ uint64_t outputStatType(
     const std::vector<Stats::RefcountPtr<StatType>>& metrics,
     const std::function<std::string(
         const StatType& metric, const std::string& prefixed_tag_extracted_name)>& generate_output,
-    absl::string_view type) {
+    absl::string_view type, const Stats::CustomStatNamespaces& custom_namespaces) {
 
   /*
    * From
@@ -115,14 +115,12 @@ uint64_t outputStatType(
     groups[metric->tagExtractedStatName()].push_back(metric.get());
   }
 
-  const auto custom_namespace_factory =
-      Registry::FactoryRegistry<Stats::CustomStatNamespaceFactory>::getFactory(
-          "envoy.stats.custom_namespace");
-  ASSERT(custom_namespace_factory != nullptr);
+  auto result = groups.size();
   for (auto& group : groups) {
     const std::string prefixed_tag_extracted_name = PrometheusStatsFormatter::metricName(
-        global_symbol_table.toString(group.first), *custom_namespace_factory);
+        global_symbol_table.toString(group.first), custom_namespaces);
     if (prefixed_tag_extracted_name.empty()) {
+      --result;
       continue;
     }
     response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, type));
@@ -137,7 +135,7 @@ uint64_t outputStatType(
     }
     response.add("\n");
   }
-  return groups.size();
+  return result;
 }
 
 /*
@@ -197,12 +195,12 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
   return absl::StrJoin(buf, ",");
 }
 
-std::string PrometheusStatsFormatter::metricName(
-    const std::string& extracted_name,
-    const Stats::CustomStatNamespaceFactory& custom_namespace_factory) {
+std::string
+PrometheusStatsFormatter::metricName(const std::string& extracted_name,
+                                     const Stats::CustomStatNamespaces& custom_namespaces) {
   absl::string_view view{extracted_name};
 
-  std::string sanitized_name = custom_namespace_factory.trySanitizeStatName(view);
+  std::string sanitized_name = custom_namespaces.trySanitizeStatName(view);
   if (!sanitized_name.empty()) {
     // This case the name has a custom namespace, and it is a custom metric.
     // And sanitized_name now is the extracted_name without the namespace.
@@ -228,17 +226,21 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::CounterSharedPtr>& counters,
     const std::vector<Stats::GaugeSharedPtr>& gauges,
     const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
-    const bool used_only, const absl::optional<std::regex>& regex) {
+    const bool used_only, const absl::optional<std::regex>& regex,
+    const Stats::CustomStatNamespaces& custom_namespaces) {
 
   uint64_t metric_name_count = 0;
-  metric_name_count += outputStatType<Stats::Counter>(
-      response, used_only, regex, counters, generateNumericOutput<Stats::Counter>, "counter");
+  metric_name_count += outputStatType<Stats::Counter>(response, used_only, regex, counters,
+                                                      generateNumericOutput<Stats::Counter>,
+                                                      "counter", custom_namespaces);
 
-  metric_name_count += outputStatType<Stats::Gauge>(response, used_only, regex, gauges,
-                                                    generateNumericOutput<Stats::Gauge>, "gauge");
+  metric_name_count +=
+      outputStatType<Stats::Gauge>(response, used_only, regex, gauges,
+                                   generateNumericOutput<Stats::Gauge>, "gauge", custom_namespaces);
 
-  metric_name_count += outputStatType<Stats::ParentHistogram>(
-      response, used_only, regex, histograms, generateHistogramOutput, "histogram");
+  metric_name_count += outputStatType<Stats::ParentHistogram>(response, used_only, regex,
+                                                              histograms, generateHistogramOutput,
+                                                              "histogram", custom_namespaces);
 
   return metric_name_count;
 }

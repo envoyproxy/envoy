@@ -29,7 +29,7 @@ envoy_cc_library(
     srcs = ["custom_namespace.cc"],
     hdrs = ["custom_namespace.h"],
     deps = [
-        "//envoy/registry",
+        "//source/common/common:macros",
     ],
 )
 

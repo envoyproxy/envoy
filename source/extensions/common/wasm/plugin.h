@@ -8,6 +8,7 @@
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/custom_namespace.h"
 
 #include "include/proxy-wasm/wasm.h"
 
@@ -69,6 +70,9 @@ private:
 };
 
 using PluginSharedPtr = std::shared_ptr<Plugin>;
+
+// Register the Wasm extension's custom stat namespace which prefixes all the user-defined metrics.
+void ensureCustomStatNamespaceRegistered(Stats::CustomStatNamespaces& custom_namespaces);
 
 } // namespace Wasm
 } // namespace Common

@@ -1,15 +1,12 @@
 #pragma once
 
-#include "envoy/common/pure.h"
-#include "envoy/stats/scope.h"
-
 #include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Stats {
 
 /**
- * The factory which manages custom stat namespaces. Custom stat namespaces are registered
+ * CustomStatNamespaces manages custom stat namespaces. Custom stat namespaces are registered
  * by extensions that create user-defined metrics, and these metrics are all prefixed
  * by the namespace. For example, Wasm extension registers "wasmcustom" as a custom stat namespace,
  * and all the metrics created by user Wasm programs are prefixed by "wasmcustom." internally.
@@ -17,16 +14,22 @@ namespace Stats {
  * the native metrics defined by Envoy codebase, and this way stat sinks are able to determine
  * how to expose these two kinds of metrics.
  */
-class CustomStatNamespaceFactory {
+class CustomStatNamespaces {
 public:
-  virtual ~CustomStatNamespaceFactory() = default;
-  virtual absl::string_view name() PURE;
+  CustomStatNamespaces() = default;
+  ~CustomStatNamespaces() = default;
+
+  /**
+   * @param name is the name to check.
+   * @return true if the given name is registered as a custom stat namespace, false otherwise.
+   */
+  bool registered(const absl::string_view& name);
 
   /**
    * Used to register a custom namespace by extensions.
    * @param name is the name to register.
    */
-  virtual void registerStatNamespace(const absl::string_view& name) PURE;
+  void registerStatNamespace(const absl::string_view& name);
 
   /**
    * Sanitizes the given stat name depending on whether or not it lives in a registered custom
@@ -37,22 +40,18 @@ public:
    * @return the sanitized string if stat_name has a registered custom stat namespace. Otherwise,
    * return the empty string.
    */
-  virtual std::string trySanitizeStatName(const absl::string_view& stat_name) const PURE;
-
-  std::string category() { return "envoy.stats"; }
-};
-
-class CustomStatNamespaceFactoryImpl : public CustomStatNamespaceFactory {
-public:
-  CustomStatNamespaceFactoryImpl() = default;
-  ~CustomStatNamespaceFactoryImpl() override = default;
-  absl::string_view name() override { return "envoy.stats.custom_namespace"; };
-  void registerStatNamespace(const absl::string_view& name) override;
-  std::string trySanitizeStatName(const absl::string_view& stat_name) const override;
+  std::string trySanitizeStatName(const absl::string_view& stat_name) const;
 
 private:
   absl::flat_hash_set<std::string> namespaces_;
 };
+
+/**
+ * Returns the global mutable singleton of CustomStatNamespaces.
+ * Stat sinks and extensions must use CustomStatNamespaces via this getter
+ * except unit tests.
+ */
+CustomStatNamespaces& getCustomStatNamespaces();
 
 } // namespace Stats
 } // namespace Envoy

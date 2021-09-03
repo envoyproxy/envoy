@@ -1,16 +1,19 @@
 #include "source/common/stats/custom_namespace.h"
 
-#include "envoy/registry/registry.h"
+#include "source/common/common/macros.h"
 
 namespace Envoy {
 namespace Stats {
 
-void CustomStatNamespaceFactoryImpl::registerStatNamespace(const absl::string_view& name) {
+bool CustomStatNamespaces::registered(const absl::string_view& name) {
+  return namespaces_.find(name) != namespaces_.end();
+}
+
+void CustomStatNamespaces::registerStatNamespace(const absl::string_view& name) {
   namespaces_.insert(std::string(name));
 };
 
-std::string
-CustomStatNamespaceFactoryImpl::trySanitizeStatName(const absl::string_view& stat_name) const {
+std::string CustomStatNamespaces::trySanitizeStatName(const absl::string_view& stat_name) const {
   const auto pos = stat_name.find_first_of('.');
   if (namespaces_.find(stat_name.substr(0, pos)) != namespaces_.end()) {
     // Trim the custom namespace.
@@ -19,7 +22,9 @@ CustomStatNamespaceFactoryImpl::trySanitizeStatName(const absl::string_view& sta
   return "";
 };
 
-REGISTER_FACTORY(CustomStatNamespaceFactoryImpl, CustomStatNamespaceFactory);
+CustomStatNamespaces& getCustomStatNamespaces() {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(CustomStatNamespaces);
+}
 
 } // namespace Stats
 } // namespace Envoy
