@@ -436,6 +436,26 @@ TEST_P(DeltaSubscriptionStateTestBlank, AmbiguousResourceTTL) {
   ttl_timer_->invokeCallback();
 }
 
+// Checks that we ignore resources that we haven't asked for.
+TEST_P(DeltaSubscriptionStateTestBlank, IgnoreSuperfluousResources) {
+  updateSubscriptionInterest({"foo", "bar"}, {});
+  auto req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("foo", "bar"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_TRUE(req->initial_resource_versions().empty());
+  deliverSimpleDiscoveryResponse({{"foo", "1"}, {"bar", "1"}, {"did-not-want", "1"}, {"spam", "1"}}, {}, "d1");
+
+  // Force a reconnection and resending of the "initial" message. If the initial_resource_versions
+  // in the message contains resources like did-not-want or spam, we haven't ignored that as we
+  // should.
+  markStreamFresh();
+  req = getNextRequestAckless();
+  EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("foo", "bar"));
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+  EXPECT_THAT(req->initial_resource_versions(),
+              UnorderedElementsAre(Pair("foo", "1"), Pair("bar", "1")));
+}
+
 class DeltaSubscriptionStateTestWithResources : public DeltaSubscriptionStateTestBase {
 protected:
   DeltaSubscriptionStateTestWithResources(
