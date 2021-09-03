@@ -72,6 +72,7 @@ protected:
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config_;
+  envoy::config::cluster::v3::Cluster::RoundRobinLbConfig round_robin_lb_config_;
 };
 
 class TestLb : public LoadBalancerBase {
@@ -569,7 +570,8 @@ public:
       local_priority_set_->getOrCreateHostSet(0);
     }
     lb_ = std::make_shared<RoundRobinLoadBalancer>(priority_set_, local_priority_set_.get(), stats_,
-                                                   runtime_, random_, common_config_, simTime());
+                                                   runtime_, random_, common_config_,
+                                                   round_robin_lb_config_, simTime());
   }
 
   // Updates priority 0 with the given hosts and hosts_per_locality.
@@ -1495,7 +1497,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithDefaultParams) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
-  common_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
+  round_robin_lb_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
   simTime().advanceTimeWait(std::chrono::seconds(1));
   auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80", simTime());
   host_set_.hosts_ = {host1};
@@ -1568,7 +1570,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForPassingHC) {
-  common_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(10);
+  round_robin_lb_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(10);
   simTime().advanceTimeWait(std::chrono::seconds(1));
   auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80", simTime());
   host1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -1633,9 +1635,10 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForPassingHC) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeAggression) {
-  common_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(10);
-  common_config_.mutable_slow_start_config()->mutable_aggression()->set_runtime_key("aggression");
-  common_config_.mutable_slow_start_config()->mutable_aggression()->set_default_value(1.0);
+  round_robin_lb_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(10);
+  round_robin_lb_config_.mutable_slow_start_config()->mutable_aggression()->set_runtime_key(
+      "aggression");
+  round_robin_lb_config_.mutable_slow_start_config()->mutable_aggression()->set_default_value(1.0);
 
   init(true);
   EXPECT_CALL(runtime_.snapshot_, getDouble("aggression", 1.0)).WillRepeatedly(Return(1.0));
@@ -1700,9 +1703,10 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeAggression) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitNonLinearAggression) {
-  common_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
-  common_config_.mutable_slow_start_config()->mutable_aggression()->set_runtime_key("aggression");
-  common_config_.mutable_slow_start_config()->mutable_aggression()->set_default_value(2.0);
+  round_robin_lb_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
+  round_robin_lb_config_.mutable_slow_start_config()->mutable_aggression()->set_runtime_key(
+      "aggression");
+  round_robin_lb_config_.mutable_slow_start_config()->mutable_aggression()->set_default_value(2.0);
   simTime().advanceTimeWait(std::chrono::seconds(1));
 
   init(true);
@@ -2050,8 +2054,8 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithDefaultParams) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {
-  common_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
+  lr_lb_config.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
   lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
   lr_lb_config.mutable_active_request_bias()->set_default_value(1.0);
   LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
@@ -2120,10 +2124,10 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, SlowStartWaitForPassingHC) {
-  common_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(10);
-  common_config_.mutable_slow_start_config()->mutable_aggression()->set_runtime_key("aggression");
-  common_config_.mutable_slow_start_config()->mutable_aggression()->set_default_value(0.9);
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
+  lr_lb_config.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(10);
+  lr_lb_config.mutable_slow_start_config()->mutable_aggression()->set_runtime_key("aggression");
+  lr_lb_config.mutable_slow_start_config()->mutable_aggression()->set_default_value(0.9);
   lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
   lr_lb_config.mutable_active_request_bias()->set_default_value(0.9);
 

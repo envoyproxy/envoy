@@ -71,6 +71,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   Random::RandomGeneratorImpl random_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
+  envoy::config::cluster::v3::Cluster::RoundRobinLbConfig round_robin_lb_config_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
 };
 
@@ -81,7 +82,8 @@ public:
 
   void initialize() {
     lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set_, &local_priority_set_, stats_,
-                                                   runtime_, random_, common_config_, simTime());
+                                                   runtime_, random_, common_config_,
+                                                   round_robin_lb_config_, simTime());
   }
 
   std::unique_ptr<RoundRobinLoadBalancer> lb_;
@@ -541,10 +543,10 @@ public:
     *selector->mutable_keys()->Add() = std::string(metadata_key);
 
     subset_info_ = std::make_unique<LoadBalancerSubsetInfoImpl>(subset_config);
-    lb_ = std::make_unique<SubsetLoadBalancer>(LoadBalancerType::Random, priority_set_,
-                                               &local_priority_set_, stats_, stats_store_, runtime_,
-                                               random_, *subset_info_, absl::nullopt, absl::nullopt,
-                                               absl::nullopt, common_config_, simTime());
+    lb_ = std::make_unique<SubsetLoadBalancer>(
+        LoadBalancerType::Random, priority_set_, &local_priority_set_, stats_, stats_store_,
+        runtime_, random_, *subset_info_, absl::nullopt, absl::nullopt, absl::nullopt,
+        absl::nullopt, common_config_, simTime());
 
     const HostVector& hosts = priority_set_.getOrCreateHostSet(0).hosts();
     ASSERT(hosts.size() == num_hosts);

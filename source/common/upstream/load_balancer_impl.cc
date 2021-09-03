@@ -707,8 +707,8 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
                              : std::chrono::milliseconds(0)),
       aggression_runtime_(
           slow_start_config.has_value() && slow_start_config.value().has_aggression()
-              ? std::make_unique<Runtime::Double>(slow_start_config.value().aggression(), runtime)
-              : nullptr),
+              ? absl::optional<Runtime::Double>({slow_start_config.value().aggression(), runtime})
+              : absl::nullopt),
       time_source_(time_source),
       slow_start_enabled_(slow_start_window_ > std::chrono::milliseconds(0)),
       latest_host_added_time_(time_source_.monotonicTime()) {
@@ -752,7 +752,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // Nuke existing scheduler if it exists.
     auto& scheduler = scheduler_[source] = Scheduler{};
     refreshHostSource(source);
-    if (slow_start_enabled_) {
+    if (!noHostsAreInSlowStart()) {
       recalculateHostsInSlowStart(hosts);
     }
 
@@ -895,7 +895,7 @@ double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host&
       time_source_.monotonicTime() - host.creationTime());
   if (host_create_duration < slow_start_window_ &&
       host.health() == Upstream::Host::Health::Healthy) {
-    aggression_ = aggression_runtime_ != nullptr ? aggression_runtime_->value() : 1.0;
+    aggression_ = aggression_runtime_ != absl::nullopt ? aggression_runtime_.value().value() : 1.0;
     aggression_ = std::max(0.0, aggression_);
 
     ASSERT(aggression_ > 0.0);

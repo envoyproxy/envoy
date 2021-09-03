@@ -433,7 +433,7 @@ protected:
   // Slow start related config
   const std::chrono::milliseconds slow_start_window_;
   double aggression_{1.0};
-  const std::unique_ptr<Runtime::Double> aggression_runtime_;
+  const absl::optional<Runtime::Double> aggression_runtime_;
   TimeSource& time_source_;
   bool slow_start_enabled_;
   MonotonicTime latest_host_added_time_;
@@ -473,7 +473,7 @@ private:
     peekahead_index_ = 0;
   }
   double hostWeight(const Host& host) override {
-    if (slow_start_enabled_) {
+    if (!noHostsAreInSlowStart()) {
       return applySlowStartFactor(host.weight(), host);
     }
     return host.weight();
@@ -544,16 +544,17 @@ public:
                 : 2),
         active_request_bias_runtime_(
             least_request_config.has_value() && least_request_config->has_active_request_bias()
-                ? std::make_unique<Runtime::Double>(least_request_config->active_request_bias(),
-                                                    runtime)
-                : nullptr) {
+                ? absl::optional<Runtime::Double>(
+                      {least_request_config->active_request_bias(), runtime})
+                : absl::nullopt) {
     initialize();
   }
 
 protected:
   void refresh(uint32_t priority) override {
-    active_request_bias_ =
-        active_request_bias_runtime_ != nullptr ? active_request_bias_runtime_->value() : 1.0;
+    active_request_bias_ = active_request_bias_runtime_ != absl::nullopt
+                               ? active_request_bias_runtime_.value().value()
+                               : 1.0;
 
     if (active_request_bias_ < 0.0) {
       ENVOY_LOG_MISC(warn,
@@ -595,7 +596,7 @@ private:
                     std::pow(host.stats().rq_active_.value() + 1, active_request_bias_);
     }
 
-    if (slow_start_enabled_) {
+    if (!noHostsAreInSlowStart()) {
       return applySlowStartFactor(host_weight, host);
     } else {
       return host_weight;
@@ -613,7 +614,7 @@ private:
   // whenever a `HostSet` is updated.
   double active_request_bias_{};
 
-  const std::unique_ptr<Runtime::Double> active_request_bias_runtime_;
+  const absl::optional<Runtime::Double> active_request_bias_runtime_;
 };
 
 /**
