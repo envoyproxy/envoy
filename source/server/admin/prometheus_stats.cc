@@ -112,13 +112,14 @@ uint64_t outputStatType(
 
   auto result = groups.size();
   for (auto& group : groups) {
-    const std::string prefixed_tag_extracted_name = PrometheusStatsFormatter::metricName(
-        global_symbol_table.toString(group.first), custom_namespaces);
-    if (prefixed_tag_extracted_name.empty()) {
+    const absl::optional<std::string> prefixed_tag_extracted_name =
+        PrometheusStatsFormatter::metricName(global_symbol_table.toString(group.first),
+                                             custom_namespaces);
+    if (!prefixed_tag_extracted_name.has_value()) {
       --result;
       continue;
     }
-    response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, type));
+    response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name.value(), type));
 
     // Sort before producing the final output to satisfy the "preferred" ordering from the
     // prometheus spec: metrics will be sorted by their tags' textual representation, which will
@@ -126,7 +127,7 @@ uint64_t outputStatType(
     std::sort(group.second.begin(), group.second.end(), MetricLessThan());
 
     for (const auto& metric : group.second) {
-      response.add(generate_output(*metric, prefixed_tag_extracted_name));
+      response.add(generate_output(*metric, prefixed_tag_extracted_name.value()));
     }
     response.add("\n");
   }
@@ -190,22 +191,22 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
   return absl::StrJoin(buf, ",");
 }
 
-std::string
+absl::optional<std::string>
 PrometheusStatsFormatter::metricName(const std::string& extracted_name,
                                      const Stats::CustomStatNamespaces& custom_namespaces) {
-  std::string sanitized_name = custom_namespaces.trySanitizeStatName(extracted_name);
-  if (!sanitized_name.empty()) {
+  const absl::optional<std::string> custom_namespace_sanitized =
+      custom_namespaces.trySanitizeStatName(extracted_name);
+  if (custom_namespace_sanitized.has_value()) {
     // This case the name has a custom namespace, and it is a custom metric.
-    // sanitized_name now is the extracted_name without the namespace.
-    sanitized_name = sanitizeName(sanitized_name);
+    const auto sanitized_name = sanitizeName(custom_namespace_sanitized.value());
     // We expose these metrics without modifying (e.g. without "envoy_"),
     // so we have to check the "user-defined" stat name complies with the Prometheus naming
     // convention. Specifically the name must start with the "[a-zA-Z_]" pattern.
     // All the characters in sanitized_name are already in "[a-zA-Z0-9_]" pattern
-    // thanks to sanitizeName above, so the only thing we have to check is check
+    // thanks to sanitizeName above, so the only thing we have to do is check
     // if it does not start with digits.
     if ('0' <= sanitized_name.front() && sanitized_name.front() <= '9') {
-      return "";
+      return absl::nullopt;
     }
     return sanitized_name;
   }

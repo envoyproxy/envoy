@@ -23,7 +23,8 @@ using EnvironmentVariableMap = std::unordered_map<std::string, std::string>;
 
 class WasmConfig {
 public:
-  WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config);
+  WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
+             Stats::CustomStatNamespaces& custom_namespaces);
   const envoy::extensions::wasm::v3::PluginConfig& config() { return config_; }
   proxy_wasm::AllowedCapabilitiesMap& allowedCapabilities() { return allowed_capabilities_; }
   EnvironmentVariableMap& environmentVariables() { return envs_; }
@@ -47,7 +48,7 @@ public:
                    config.vm_config().runtime(), MessageUtil::anyToBytes(config.configuration()),
                    config.fail_open(), createPluginKey(config, direction, listener_metadata)),
         direction_(direction), local_info_(local_info), listener_metadata_(listener_metadata),
-        wasm_config_(std::make_unique<WasmConfig>(config)) {}
+        wasm_config_(std::make_unique<WasmConfig>(config, Stats::getCustomStatNamespaces())) {}
 
   envoy::config::core::v3::TrafficDirection& direction() { return direction_; }
   const LocalInfo::LocalInfo& localInfo() { return local_info_; }
@@ -70,9 +71,6 @@ private:
 };
 
 using PluginSharedPtr = std::shared_ptr<Plugin>;
-
-// Register the Wasm extension's custom stat namespace which prefixes all the user-defined metrics.
-void ensureCustomStatNamespaceRegistered(Stats::CustomStatNamespaces& custom_namespaces);
 
 } // namespace Wasm
 } // namespace Common

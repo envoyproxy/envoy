@@ -9,7 +9,13 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
-WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) : config_(config) {
+// The custom namespace prefix which prepends the user-defined metrics.
+// Note that the prefix is removed from the final output of /stats endpoints.
+constexpr absl::string_view CustomStatNamespace = "wasmcustom";
+
+WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
+                       Stats::CustomStatNamespaces& custom_namespaces)
+    : config_(config) {
   for (auto& capability : config_.capability_restriction_config().allowed_capabilities()) {
     // TODO(rapilado): Set the SanitizationConfig fields once sanitization is implemented.
     allowed_capabilities_[capability.first] = proxy_wasm::SanitizationConfig();
@@ -56,12 +62,7 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
   // Ensure that the Wasm extension's custom stat namespace is registered.
   // We do that here because this is the only code path of
   // all kinds of Wasm extension points.
-  ensureCustomStatNamespaceRegistered(Stats::getCustomStatNamespaces());
-}
-
-void ensureCustomStatNamespaceRegistered(Stats::CustomStatNamespaces& custom_namespaces) {
-  constexpr absl::string_view name = "wasmcustom";
-  custom_namespaces.registerStatNamespace(name);
+  custom_namespaces.registerStatNamespace(CustomStatNamespace);
 }
 
 } // namespace Wasm

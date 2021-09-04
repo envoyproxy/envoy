@@ -34,13 +34,13 @@ public:
   /**
    * Sanitizes the given stat name depending on whether or not it lives in a registered custom
    * stat namespace. If so, the custom stat namespace is trimmed from the input and
-   * returns the trimmed string. Otherwise return the empty string.
+   * returns the trimmed string. Otherwise return null.
    * @param stat_name is the view to modify. If it is not in any custom registered namespaces, it
    * will never be modified.
    * @return the sanitized string if stat_name has a registered custom stat namespace. Otherwise,
-   * return the empty string.
+   * return null.
    */
-  std::string trySanitizeStatName(const absl::string_view& stat_name) const;
+  absl::optional<std::string> trySanitizeStatName(const absl::string_view& stat_name) const;
 
 private:
   absl::flat_hash_set<std::string> namespaces_;
