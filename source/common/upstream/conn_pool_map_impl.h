@@ -100,7 +100,7 @@ void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addIdleCallback(const IdleCb& cb) {
 
 template <typename KEY_TYPE, typename POOL_TYPE>
 void ConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections(
-    ConnectionPool::DrainBehavior drain_behavior) {
+    Envoy::ConnectionPool::DrainBehavior drain_behavior) {
   // Copy the `active_pools_` so that it is safe for the call to result
   // in deletion, and avoid iteration through a mutating container.
   std::vector<POOL_TYPE*> pools;

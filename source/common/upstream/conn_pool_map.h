@@ -3,6 +3,7 @@
 #include <functional>
 #include <vector>
 
+#include "envoy/common/conn_pool.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -61,7 +62,7 @@ public:
   /**
    * See `Envoy::ConnectionPool::Instance::drainConnections()`.
    */
-  void drainConnections(ConnectionPool::DrainBehavior drain_behavior);
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior);
 
 private:
   /**
