@@ -9,7 +9,7 @@ on:
 jobs:
   iosbuild:
     name: ios_build
-    runs-on: macOS-latest
+    runs-on: macos-11
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v1
@@ -37,7 +37,7 @@ jobs:
   swifthelloworld:
     name: swift_helloworld
     needs: iosbuild
-    runs-on: macOS-latest
+    runs-on: macos-11
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v1
@@ -71,7 +71,7 @@ jobs:
   objchelloworld:
     name: objc_helloworld
     needs: iosbuild
-    runs-on: macOS-latest
+    runs-on: macos-11
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v1
