@@ -9,7 +9,7 @@ on:
 jobs:
   kotlintestsmac:
     name: kotlin_tests_mac
-    runs-on: macOS-latest
+    runs-on: macos-11
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v1
@@ -41,7 +41,7 @@ jobs:
           bazelisk test --test_output=all --build_tests_only //test/kotlin/...
   javatestsmac:
     name: java_tests_mac
-    runs-on: macOS-latest
+    runs-on: macos-11
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v1

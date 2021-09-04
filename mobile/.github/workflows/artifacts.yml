@@ -8,7 +8,7 @@ on:
 jobs:
   main_android_dist_ci:
     name: main_android_dist_ci
-    runs-on: macOS-latest
+    runs-on: macos-11
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
@@ -98,7 +98,7 @@ jobs:
 
   main_ios_dist:
     name: main_ios_dist
-    runs-on: macOS-latest
+    runs-on: macos-11
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
@@ -119,7 +119,7 @@ jobs:
 
   main_ios_cocoapods:
     name: main_ios_cocoapods
-    runs-on: macOS-latest
+    runs-on: macos-11
     timeout-minutes: 45
     needs: [main_ios_dist]
     steps:
