@@ -3482,9 +3482,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SslKeyExportEnable) {
   auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
-  EXPECT_EQ(ssl_socket->isSSLKeyLogEnabled(), true);
   ssl_socket->setSSLKeyLog(false);
-  EXPECT_EQ(ssl_socket->isSSLKeyLogEnabled(), false);
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferentSessionTicketKeys) {
