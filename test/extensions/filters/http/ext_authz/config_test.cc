@@ -44,7 +44,7 @@ public:
 class MultiThreadTest {
 public:
   MultiThreadTest(size_t num_threads) : num_threads_(num_threads), api_(Api::createApiForTest()) {}
-  virtual ~MultiThreadTest() {}
+  virtual ~MultiThreadTest() = default;
 
   void postWorkToAllWorkers(std::function<void()> work) {
 
