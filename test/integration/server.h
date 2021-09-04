@@ -281,6 +281,21 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.counterFromStatNameWithTags(name, tags);
   }
+  void forEachCounter(std::function<void(std::size_t)> f_size,
+                      std::function<void(Stats::Counter&)> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachCounter(f_size, f_stat);
+  }
+  void forEachGauge(std::function<void(std::size_t)> f_size,
+                    std::function<void(Stats::Gauge&)> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachGauge(f_size, f_stat);
+  }
+  void forEachTextReadout(std::function<void(std::size_t)> f_size,
+                          std::function<void(Stats::TextReadout&)> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachTextReadout(f_size, f_stat);
+  }
   Counter& counterFromString(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.counterFromString(name);
