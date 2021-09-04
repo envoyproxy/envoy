@@ -56,7 +56,6 @@ public:
       dispatcher->post([&, work]() {
         workers_should_fire.WaitForNotification();
         work();
-        std::cerr << "worker finish work\n" << std::endl;
         end_counter.DecrementCount();
       });
     }
@@ -67,7 +66,6 @@ public:
       // Notify all the worker to continue.
       workers_should_fire.Notify();
       end_counter.DecrementCount();
-      std::cerr << "notify them\n" << std::endl;
     });
     end_counter.Wait();
   }
@@ -126,7 +124,6 @@ private:
       tls().registerThread(*worker_dispatchers_[i], false);
       // i must be explicitly captured by value.
       worker_threads_.emplace_back(api_->threadFactory().createThread([this, i, &start_counter]() {
-        std::cerr << "start worker\n" << std::endl;
         start_counter.DecrementCount();
         worker_dispatchers_[i]->run(Event::Dispatcher::RunType::RunUntilExit);
       }));
@@ -159,7 +156,6 @@ public:
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService& config,
                                   Stats::Scope& scope, bool skip_cluster_check,
                                   Grpc::CacheOption cache_option) {
-          std::cerr << "testing filter\n" << std::endl;
           return async_client_manager_->getOrCreateRawAsyncClient(config, scope, skip_cluster_check,
                                                                   cache_option);
         }));
@@ -259,7 +255,6 @@ TEST_F(ExtAuthzFilterTest, ExtAuthzFilterFactoryTestHttp) {
   postWorkToMain([&]() { filter_factory = createFilterFactory(ext_authz_config_yaml); });
 
   postWorkToAllWorkers([&, filter_factory]() {
-    std::cerr << "before testing worker\n" << std::endl;
     Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
     EXPECT_NE(filter, nullptr);
   });
