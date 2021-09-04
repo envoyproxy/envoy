@@ -198,7 +198,7 @@ PrometheusStatsFormatter::metricName(const std::string& extracted_name,
       custom_namespaces.trySanitizeStatName(extracted_name);
   if (custom_namespace_sanitized.has_value()) {
     // This case the name has a custom namespace, and it is a custom metric.
-    const auto sanitized_name = sanitizeName(custom_namespace_sanitized.value());
+    const std::string sanitized_name = sanitizeName(custom_namespace_sanitized.value());
     // We expose these metrics without modifying (e.g. without "envoy_"),
     // so we have to check the "user-defined" stat name complies with the Prometheus naming
     // convention. Specifically the name must start with the "[a-zA-Z_]" pattern.
