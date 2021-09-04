@@ -246,7 +246,6 @@ message:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_sent", 1);
   test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_ack_received", 1);
   test_server_->waitForGaugeEq("access_logs.grpc_access_log.pending_critical_logs", 0);
   cleanup();
@@ -304,7 +303,6 @@ message:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_sent", 1);
   test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_nack_received", 1);
   test_server_->waitForGaugeEq("access_logs.grpc_access_log.pending_critical_logs", 1);
   cleanup();
@@ -344,7 +342,6 @@ message:
         response_headers_bytes: 54
 )EOF")));
 
-  test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_sent", 1);
   test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_message_timeout", 1);
   test_server_->waitForGaugeEq("access_logs.grpc_access_log.pending_critical_logs", 1);
   cleanup();

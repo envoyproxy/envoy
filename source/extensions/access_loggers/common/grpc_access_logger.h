@@ -150,25 +150,6 @@ struct GrpcAccessLoggerStats {
   ALL_GRPC_ACCESS_LOGGER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-template <class RequestType> class CriticalAccessLoggerGrpcClient {
-public:
-  virtual ~CriticalAccessLoggerGrpcClient() = default;
-
-  /**
-   * Flush critical messages.
-   */
-  virtual void flush(RequestType message) PURE;
-
-  /**
-   * Whether this client has active stream or not.
-   */
-  virtual bool isStreamStarted() PURE;
-};
-
-template <class RequestType>
-using CriticalAccessLoggerGrpcClientPtr =
-    std::unique_ptr<CriticalAccessLoggerGrpcClient<RequestType>>;
-
 /**
  * Base class for defining a gRPC logger with the `HttpLogProto` and `TcpLogProto` access log
  * entries and `LogRequest` and `LogResponse` gRPC messages.

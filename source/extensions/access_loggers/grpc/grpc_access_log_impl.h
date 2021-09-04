@@ -1,5 +1,9 @@
 #pragma once
 
+#include <absl/container/flat_hash_map.h>
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/descriptor.pb.h>
+
 #include <chrono>
 #include <memory>
 
@@ -12,6 +16,8 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/common/linked_object.h"
+#include "source/common/grpc/buffered_async_client_impl.h"
 #include "source/extensions/access_loggers/common/grpc_access_logger.h"
 
 namespace Envoy {
@@ -22,8 +28,6 @@ namespace GrpcCommon {
 static constexpr absl::string_view GRPC_LOG_STATS_PREFIX = "access_logs.grpc_access_log.";
 
 #define CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(COUNTER, GAUGE)                                   \
-  COUNTER(critical_logs_sent)                                                                      \
-  COUNTER(critical_logs_disposed)                                                                  \
   COUNTER(critical_logs_message_timeout)                                                           \
   COUNTER(critical_logs_nack_received)                                                             \
   COUNTER(critical_logs_ack_received)                                                              \
@@ -33,61 +37,13 @@ struct CriticalAccessLoggerGrpcClientStats {
   CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-template <typename RequestType>
-class CriticalAccessLoggerGrpcClientImpl
-    : public Common::CriticalAccessLoggerGrpcClient<RequestType> {
+class CriticalAccessLogger {
 public:
+  using RequestType = envoy::service::accesslog::v3::CriticalAccessLogsMessage;
   using ResponseType = envoy::service::accesslog::v3::CriticalAccessLogsResponse;
 
-  struct BufferedMessage;
-  using BufferedMessageRef = std::reference_wrapper<BufferedMessage>;
-
-  // Inflight messages which share same ACK timeout are managed with this timer.
-  // This avoids to create timers for per inflight messages.
-  class InflightMessageTimer {
-  public:
-    InflightMessageTimer(Event::Dispatcher& dispatcher,
-                         CriticalAccessLoggerGrpcClientStats& stats) {
-      timer_ = dispatcher.createTimer([this, &stats] {
-        for (auto&& message_ref : inflight_messages_) {
-          auto& message = message_ref.get();
-
-          if (message.state_ == BufferedMessage::State::Pending) {
-            stats.critical_logs_message_timeout_.inc();
-            message.state_ = BufferedMessage::State::Buffered;
-          }
-        }
-      });
-    }
-
-    ~InflightMessageTimer() { timer_->disableTimer(); }
-
-    void add(BufferedMessage& message) { inflight_messages_.push_back(message); }
-
-    void start(std::chrono::milliseconds message_ack_timeout) {
-      timer_->enableTimer(message_ack_timeout);
-    }
-
-  private:
-    std::vector<BufferedMessageRef> inflight_messages_;
-    Event::TimerPtr timer_;
-  };
-
-  using InflightMessageTimerPtr = std::shared_ptr<InflightMessageTimer>;
-
-  struct BufferedMessage {
-    enum class State {
-      Buffered,
-      Pending,
-    };
-
-    InflightMessageTimerPtr timer_;
-    State state_;
-    RequestType message_;
-  };
-
-  struct ActiveStream : public Grpc::AsyncStreamCallbacks<ResponseType> {
-    explicit ActiveStream(CriticalAccessLoggerGrpcClientImpl& parent) : parent_(parent) {}
+  struct CriticalLogStream : public Grpc::AsyncStreamCallbacks<ResponseType> {
+    explicit CriticalLogStream(CriticalAccessLogger& parent) : parent_(parent) {}
 
     // Grpc::AsyncStreamCallbacks
     void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
@@ -95,134 +51,74 @@ public:
     void onReceiveMessage(std::unique_ptr<ResponseType>&& message) override {
       const auto& id = message->id();
 
-      if (parent_.buffered_messages_.find(id) != parent_.buffered_messages_.end()) {
-        // After response wait time exceeded, the state should be Buffered.
-        if (parent_.buffered_messages_.at(id).state_ == BufferedMessage::State::Buffered) {
-          return;
-        }
-
-        switch (message->status()) {
-        case envoy::service::accesslog::v3::CriticalAccessLogsResponse::ACK:
-          parent_.stats_.critical_logs_ack_received_.inc();
-          parent_.stats_.pending_critical_logs_.dec();
-          parent_.current_pending_buffer_size_bytes_ -=
-              parent_.buffered_messages_.at(id).message_.ByteSizeLong();
-          ASSERT(parent_.current_pending_buffer_size_bytes_ >= 0);
-          parent_.buffered_messages_.erase(id);
-          break;
-        case envoy::service::accesslog::v3::CriticalAccessLogsResponse::NACK:
-          parent_.stats_.critical_logs_nack_received_.inc();
-          parent_.buffered_messages_.at(id).state_ = BufferedMessage::State::Buffered;
-          break;
-        default:
-          return;
-        }
-
+      switch (message->status()) {
+      case envoy::service::accesslog::v3::CriticalAccessLogsResponse::ACK:
+        parent_.stats_.critical_logs_ack_received_.inc();
+        parent_.stats_.pending_critical_logs_.dec();
+        parent_.client_->clearPendingMessage(id);
+        break;
+      case envoy::service::accesslog::v3::CriticalAccessLogsResponse::NACK:
+        parent_.stats_.critical_logs_nack_received_.inc();
+        parent_.client_->bufferMessage(id);
+        break;
+      default:
         return;
       }
     }
     void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
     void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {
-      if (stream_ != nullptr) {
-        stream_ = nullptr;
-      }
+      parent_.client_->resetStream();
     }
 
-    CriticalAccessLoggerGrpcClientImpl<RequestType>& parent_;
-    Grpc::AsyncStream<RequestType> stream_;
+    CriticalAccessLogger& parent_;
   };
 
-  CriticalAccessLoggerGrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& client,
-                                     const Protobuf::MethodDescriptor& method,
-                                     Event::Dispatcher& dispatcher, Stats::Scope& scope,
-                                     uint64_t message_ack_timeout,
-                                     uint64_t max_pending_buffer_size_bytes)
-      : client_(client), service_method_(method), dispatcher_(dispatcher),
-        message_ack_timeout_(message_ack_timeout),
-        stats_({CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(
-            POOL_COUNTER_PREFIX(scope, GRPC_LOG_STATS_PREFIX.data()),
-            POOL_GAUGE_PREFIX(scope, GRPC_LOG_STATS_PREFIX.data()))}),
-        max_pending_buffer_size_bytes_(max_pending_buffer_size_bytes),
-        active_stream_(std::make_unique<ActiveStream>(*this)) {}
+  // Inflight messages which share same ACK timeout are managed with this timer.
+  // This avoids to create timers for per inflight messages.
+  class InflightMessageTimer : public LinkedObject<InflightMessageTimer> {
+  public:
+    InflightMessageTimer(Event::Dispatcher& dispatcher, CriticalAccessLoggerGrpcClientStats& stats,
+                         Grpc::BufferedAsyncClient<RequestType, ResponseType>& client,
+                         const std::vector<uint32_t>& inflight_message_ids,
+                         std::chrono::milliseconds message_ack_timeout)
+        : inflight_message_ids_(inflight_message_ids) {
+      timer_ = dispatcher.createTimer([this, &stats, &client] {
+        for (auto&& id : inflight_message_ids_) {
+          client.bufferMessage(id);
+          stats.critical_logs_message_timeout_.inc();
+        }
+      });
 
-  // Copy messages in the buffer. Take care about memory pressure.
-  void flush(RequestType message) override {
-    if (active_stream_->stream_ == nullptr) {
-      active_stream_->stream_ =
-          client_.start(service_method_, *active_stream_, Http::AsyncClient::StreamOptions());
+      timer_->enableTimer(message_ack_timeout);
     }
 
-    if (active_stream_->stream_.isAboveWriteBufferHighWatermark()) {
-      stats_.critical_logs_disposed_.inc();
-      active_stream_.reset();
-      return;
-    }
+    ~InflightMessageTimer() { timer_->disableTimer(); }
 
-    uint32_t id = MessageUtil::hash(message);
-    const auto message_byte_size = message.ByteSizeLong();
+  private:
+    std::vector<uint32_t> inflight_message_ids_;
+    Event::TimerPtr timer_;
+  };
 
-    if (current_pending_buffer_size_bytes_ + message_byte_size > max_pending_buffer_size_bytes_) {
-      stats_.critical_logs_disposed_.inc();
-      return;
-    }
+  using InflightMessageTimerPtr = std::unique_ptr<InflightMessageTimer>;
 
-    buffered_messages_[id] = BufferedMessage{nullptr, BufferedMessage::State::Buffered, message};
-    current_pending_buffer_size_bytes_ += message_byte_size;
-    ASSERT(current_pending_buffer_size_bytes_ >= 0);
-    stats_.pending_critical_logs_.inc();
+  CriticalAccessLogger(const Grpc::RawAsyncClientSharedPtr& client,
+                       const Protobuf::MethodDescriptor& method, Event::Dispatcher& dispatcher,
+                       Stats::Scope& scope, uint64_t message_ack_timeout,
+                       uint64_t max_pending_buffer_size_bytes);
 
-    // Creates a timer for each message sent. For messages that failed to be sent in the previous
-    // transmission, replace the timer used for the previous transmission held by BufferedMessage
-    // with a　new one to ensure that the old timer is disabled.
-    InflightMessageTimerPtr inflight_timer =
-        std::make_shared<InflightMessageTimer>(dispatcher_, stats_);
+  void flush(RequestType& message);
 
-    for (auto&& buffered_message : buffered_messages_) {
-      if (buffered_message.second.state_ == BufferedMessage::State::Pending) {
-        continue;
-      }
-
-      const uint32_t id = buffered_message.first;
-      buffered_message.second.message_.set_id(id);
-      inflight_timer->add(buffered_message.second);
-      buffered_message.second.timer_ = inflight_timer;
-    }
-
-    sendMessageAll();
-  }
-
-  bool isStreamStarted() override {
-    return active_stream_ != nullptr && active_stream_->stream_ != nullptr;
-  }
+  bool shouldSetLogIdentifier() { return client_->hasActiveStream(); }
 
 private:
-  void sendMessageAll() {
-    ASSERT(buffered_messages_.size() != 0);
-    auto& inflight_message_timer = buffered_messages_.begin()->second.timer_;
+  friend CriticalLogStream;
 
-    for (auto&& buffered_message : buffered_messages_) {
-      if (buffered_message.second.state_ == BufferedMessage::State::Pending) {
-        continue;
-      }
-
-      buffered_message.second.state_ = BufferedMessage::State::Pending;
-      stats_.critical_logs_sent_.inc();
-      active_stream_->stream_->sendMessage(buffered_message.second.message_, false);
-    }
-    inflight_message_timer->start(message_ack_timeout_);
-  }
-
-  friend ActiveStream;
-
-  absl::flat_hash_map<uint32_t, BufferedMessage> buffered_messages_;
-  Grpc::AsyncClient<RequestType, ResponseType> client_;
-  const Protobuf::MethodDescriptor& service_method_;
+  std::list<InflightMessageTimerPtr> pending_message_timer_;
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds message_ack_timeout_;
   CriticalAccessLoggerGrpcClientStats stats_;
-  uint64_t current_pending_buffer_size_bytes_ = 0;
-  const uint64_t max_pending_buffer_size_bytes_;
-  std::unique_ptr<ActiveStream> active_stream_;
+  CriticalLogStream stream_callback_;
+  Grpc::BufferedAsyncClientPtr<RequestType, ResponseType> client_;
 };
 
 class GrpcAccessLoggerImpl
@@ -254,9 +150,7 @@ private:
 
   uint64_t approximate_critical_message_size_bytes_ = 0;
   uint64_t max_critical_message_size_bytes_ = 0;
-  Common::CriticalAccessLoggerGrpcClientPtr<
-      envoy::service::accesslog::v3::CriticalAccessLogsMessage>
-      critical_client_;
+  std::unique_ptr<CriticalAccessLogger> critical_logger_;
   envoy::service::accesslog::v3::CriticalAccessLogsMessage critical_message_;
   const std::string log_name_;
   const LocalInfo::LocalInfo& local_info_;
