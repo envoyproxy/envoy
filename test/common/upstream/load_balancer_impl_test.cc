@@ -38,30 +38,6 @@ static constexpr uint32_t UnhealthyStatus = 1u << static_cast<size_t>(Host::Heal
 static constexpr uint32_t DegradedStatus = 1u << static_cast<size_t>(Host::Health::Degraded);
 static constexpr uint32_t HealthyStatus = 1u << static_cast<size_t>(Host::Health::Healthy);
 
-LoadBalancerContext::OverrideHostStatus createOverrideHostStatus(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus>& statuses) {
-  LoadBalancerContext::OverrideHostStatus override_host_statuses = 0;
-  for (auto status : statuses) {
-    switch (status) {
-    case envoy::config::core::v3::HealthStatus::UNKNOWN:
-    case envoy::config::core::v3::HealthStatus::HEALTHY:
-      override_host_statuses |= HealthyStatus;
-      break;
-    case envoy::config::core::v3::HealthStatus::UNHEALTHY:
-    case envoy::config::core::v3::HealthStatus::DRAINING:
-    case envoy::config::core::v3::HealthStatus::TIMEOUT:
-      override_host_statuses |= UnhealthyStatus;
-      break;
-    case envoy::config::core::v3::HealthStatus::DEGRADED:
-      override_host_statuses |= DegradedStatus;
-      break;
-    default:
-      break;
-    }
-  }
-  return override_host_statuses;
-}
-
 class LoadBalancerTestBase : public Event::TestUsingSimulatedTime,
                              public testing::TestWithParam<bool> {
 protected:
@@ -2048,49 +2024,6 @@ TEST(LoadBalancerContextBaseTest, LoadBalancerContextBaseTest) {
     EXPECT_EQ(nullptr, context.upstreamSocketOptions());
     EXPECT_EQ(nullptr, context.upstreamTransportSocketOptions());
     EXPECT_EQ(absl::nullopt, context.overrideHostToSelect());
-  }
-  {
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus> statuses;
-    statuses.Add(envoy::config::core::v3::HealthStatus::UNKNOWN);
-    statuses.Add(envoy::config::core::v3::HealthStatus::HEALTHY);
-    EXPECT_EQ(createOverrideHostStatus(statuses), HealthyStatus);
-  }
-  {
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus> statuses;
-    statuses.Add(envoy::config::core::v3::HealthStatus::UNHEALTHY);
-    statuses.Add(envoy::config::core::v3::HealthStatus::DRAINING);
-    statuses.Add(envoy::config::core::v3::HealthStatus::TIMEOUT);
-
-    EXPECT_EQ(createOverrideHostStatus(statuses), UnhealthyStatus);
-  }
-  {
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus> statuses;
-    statuses.Add(envoy::config::core::v3::HealthStatus::DEGRADED);
-    EXPECT_EQ(createOverrideHostStatus(statuses), DegradedStatus);
-  }
-  {
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus> statuses;
-    EXPECT_EQ(createOverrideHostStatus(statuses), 0);
-  }
-  {
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus> statuses;
-    statuses.Add(envoy::config::core::v3::HealthStatus::UNHEALTHY);
-    statuses.Add(envoy::config::core::v3::HealthStatus::DRAINING);
-    statuses.Add(envoy::config::core::v3::HealthStatus::TIMEOUT);
-    statuses.Add(envoy::config::core::v3::HealthStatus::UNKNOWN);
-    statuses.Add(envoy::config::core::v3::HealthStatus::HEALTHY);
-    EXPECT_EQ(createOverrideHostStatus(statuses), 0b101u);
-  }
-
-  {
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus> statuses;
-    statuses.Add(envoy::config::core::v3::HealthStatus::UNHEALTHY);
-    statuses.Add(envoy::config::core::v3::HealthStatus::DRAINING);
-    statuses.Add(envoy::config::core::v3::HealthStatus::TIMEOUT);
-    statuses.Add(envoy::config::core::v3::HealthStatus::UNKNOWN);
-    statuses.Add(envoy::config::core::v3::HealthStatus::HEALTHY);
-    statuses.Add(envoy::config::core::v3::HealthStatus::DEGRADED);
-    EXPECT_EQ(createOverrideHostStatus(statuses), 0b111u);
   }
 
   EXPECT_TRUE(LoadBalancerContextBase::validateOverrideHostStatus(Host::Health::Unhealthy,
