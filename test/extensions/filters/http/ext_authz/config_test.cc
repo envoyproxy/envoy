@@ -1,5 +1,3 @@
-#include <memory>
-
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
@@ -47,13 +45,15 @@ public:
   virtual ~MultiThreadTest() = default;
 
   void postWorkToAllWorkers(std::function<void()> work) {
-
-    // absl::BlockingCounter start_counter(num_threads_);
-    absl::BlockingCounter end_counter(num_threads_ + 1);
+    absl::BlockingCounter start_counter(num_threads_);
+    absl::BlockingCounter end_counter(num_threads_);
     absl::Notification workers_should_fire;
+
     ASSERT(worker_dispatchers_.size() == num_threads_);
     for (Event::DispatcherPtr& dispatcher : worker_dispatchers_) {
       dispatcher->post([&, work]() {
+        start_counter.DecrementCount();
+        // Wait for signal from main thread.
         workers_should_fire.WaitForNotification();
         work();
         end_counter.DecrementCount();
@@ -62,10 +62,9 @@ public:
 
     main_dispatcher_->post([&]() {
       // Wait until all the workers start to execute the callback.
-      // start_counter.Wait();
+      start_counter.Wait();
       // Notify all the worker to continue.
       workers_should_fire.Notify();
-      end_counter.DecrementCount();
     });
     end_counter.Wait();
   }
@@ -254,10 +253,12 @@ TEST_F(ExtAuthzFilterTest, ExtAuthzFilterFactoryTestHttp) {
   Http::FilterFactoryCb filter_factory;
   postWorkToMain([&]() { filter_factory = createFilterFactory(ext_authz_config_yaml); });
 
-  postWorkToAllWorkers([&, filter_factory]() {
-    Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
-    EXPECT_NE(filter, nullptr);
-  });
+  for (int i = 0; i < 5; i++) {
+    postWorkToAllWorkers([&, filter_factory]() {
+      Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
+      EXPECT_NE(filter, nullptr);
+    });
+  }
   postWorkToMain([&]() { async_client_manager_.reset(); });
   cleanUpThreading();
 }
@@ -275,10 +276,12 @@ TEST_F(ExtAuthzFilterTest, ExtAuthzFilterFactoryTestEnvoyGrpc) {
   Http::FilterFactoryCb filter_factory;
   postWorkToMain([&]() { filter_factory = createFilterFactory(ext_authz_config_yaml); });
 
-  postWorkToAllWorkers([&, filter_factory]() {
-    Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
-    testExtAuthzFilter(filter);
-  });
+  for (int i = 0; i < 5; i++) {
+    postWorkToAllWorkers([&, filter_factory]() {
+      Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
+      testExtAuthzFilter(filter);
+    });
+  }
   postWorkToMain([&]() { async_client_manager_.reset(); });
   cleanUpThreading();
 }
@@ -296,11 +299,12 @@ TEST_F(ExtAuthzFilterTest, ExtAuthzFilterFactoryTestGoogleGrpc) {
   startThreading();
   Http::FilterFactoryCb filter_factory;
   postWorkToMain([&]() { filter_factory = createFilterFactory(ext_authz_config_yaml); });
-
-  postWorkToAllWorkers([&, filter_factory]() {
-    Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
-    testExtAuthzFilter(filter);
-  });
+  for (int i = 0; i < 5; i++) {
+    postWorkToAllWorkers([&, filter_factory]() {
+      Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
+      testExtAuthzFilter(filter);
+    });
+  }
   postWorkToMain([&]() { async_client_manager_.reset(); });
   cleanUpThreading();
 }
