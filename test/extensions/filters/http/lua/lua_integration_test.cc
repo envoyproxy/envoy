@@ -282,6 +282,14 @@ typed_config:
       else
         request_handle:headers():add("request_secure", "true")
       end
+      local authority = request_handle:headers():get(":authority")
+      local ok, error = request_handle:streamInfo():setSni(authority)
+      if ok then
+        request_handle:headers():add("sni_name_set", "true")
+      else
+        request_handle:logErr(error)
+        request_handle:headers():add("sni_name_set", "false")
+      end
       request_handle:headers():add("request_protocol", request_handle:streamInfo():protocol())
       request_handle:headers():add("request_dynamic_metadata_value", dynamic_metadata_value)
       request_handle:headers():add("request_downstream_local_address_value",
@@ -362,6 +370,11 @@ typed_config:
           ->value()
           .getStringView(),
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+
+  EXPECT_EQ("true", upstream_request_->headers()
+                        .get(Http::LowerCaseString("sni_name_set"))[0]
+                        ->value()
+                        .getStringView());
 
   EXPECT_EQ("", upstream_request_->headers()
                     .get(Http::LowerCaseString("request_requested_server_name"))[0]

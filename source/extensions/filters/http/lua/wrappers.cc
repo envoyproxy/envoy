@@ -2,6 +2,7 @@
 
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/upstream_server_name.h"
 #include "source/extensions/filters/common/lua/wrappers.h"
 
 namespace Envoy {
@@ -125,6 +126,16 @@ int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
   } else {
     lua_pushnil(state);
   }
+  return 1;
+}
+
+int StreamInfoWrapper::luaSetSni(lua_State* state) {
+  // Step 1: Get server name.
+  absl::string_view server_name = luaL_checkstring(state, 2);
+  // Step 2: Set SNI value.
+  stream_info_.filterState()->setData(Network::UpstreamServerName::key(),
+                                      std::make_unique<Network::UpstreamServerName>(server_name),
+                                      StreamInfo::FilterState::StateType::Mutable);
   return 1;
 }
 

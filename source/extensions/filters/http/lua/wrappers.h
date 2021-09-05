@@ -186,7 +186,8 @@ public:
             {"downstreamLocalAddress", static_luaDownstreamLocalAddress},
             {"downstreamDirectRemoteAddress", static_luaDownstreamDirectRemoteAddress},
             {"downstreamSslConnection", static_luaDownstreamSslConnection},
-            {"requestedServerName", static_luaRequestedServerName}};
+            {"requestedServerName", static_luaRequestedServerName},
+            {"setSni", static_luaSetSni}};
   }
 
 private:
@@ -226,6 +227,12 @@ private:
    * @return requested server name (e.g. SNI in TLS), if any.
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaRequestedServerName);
+
+  /**
+   * Sets transport socket SNI for the upstream connections.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaSetSni);
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override {

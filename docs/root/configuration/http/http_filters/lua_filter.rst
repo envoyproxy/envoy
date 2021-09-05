@@ -713,6 +713,15 @@ requestedServerName()
 Returns the string representation of :repo:`requested server name <envoy/stream_info/stream_info.h>`
 (e.g. SNI in TLS) for the current request if present.
 
+setSni()
+^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:setSni(serverName)
+
+Sets transport socket `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ for upstream connections from the given *serverName* string.
+
 Dynamic metadata object API
 ---------------------------
 

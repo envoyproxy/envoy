@@ -5,6 +5,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/network/upstream_server_name.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/http/lua/lua_filter.h"
 
@@ -1839,6 +1840,34 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
                                                 .struct_value();
   EXPECT_EQ("abcd", meta_complex.fields().at("x").string_value());
   EXPECT_EQ(1234.0, meta_complex.fields().at("y").number_value());
+}
+
+// Sets SNI on the upstream connection using streamInfo():setSni().
+TEST_F(LuaHttpFilterTest, SetsSni) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local ok, error = request_handle:streamInfo():setSni('foo.bar')
+      if ok then
+        request_handle:logInfo('setSni() Success')
+      else
+        request_handle:logErr(error)
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Event::SimulatedTimeSystem test_time;
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time.timeSystem(), nullptr);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::info, StrEq("setSni() Success")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ("foo.bar",
+            stream_info.filterState()
+                ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
+                .value());
 }
 
 // Check the connection.
