@@ -1,5 +1,9 @@
 workspace(name = "envoy")
 
+load("//bazel:repo.bzl", "envoy_repo_binding")
+
+envoy_repo_binding()
+
 load("//bazel:api_binding.bzl", "envoy_api_binding")
 
 envoy_api_binding()
