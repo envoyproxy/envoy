@@ -154,7 +154,7 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     stream_info.start_time_ = SystemTime(1h);
     stream_info.start_time_monotonic_ = MonotonicTime(1h);
     stream_info.last_downstream_tx_byte_sent_ = 2ms;
-    stream_info.downstream_address_provider_->setLocalAddress(
+    stream_info.downstream_connection_info_provider_->setLocalAddress(
         std::make_shared<Network::Address::PipeInstance>("/foo"));
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
     stream_info.filter_state_->setData("string_accessor",
@@ -391,8 +391,8 @@ response: {}
     const std::string tlsVersion = "TLSv1.3";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2CC0));
-    stream_info.downstream_address_provider_->setSslConnection(connection_info);
-    stream_info.downstream_address_provider_->setRequestedServerName("sni");
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -451,8 +451,8 @@ response: {}
     const std::string tlsVersion = "TLSv1.2";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.downstream_address_provider_->setSslConnection(connection_info);
-    stream_info.downstream_address_provider_->setRequestedServerName("sni");
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -501,8 +501,8 @@ response: {}
     const std::string tlsVersion = "TLSv1.1";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.downstream_address_provider_->setSslConnection(connection_info);
-    stream_info.downstream_address_provider_->setRequestedServerName("sni");
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -551,8 +551,8 @@ response: {}
     const std::string tlsVersion = "TLSv1";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.downstream_address_provider_->setSslConnection(connection_info);
-    stream_info.downstream_address_provider_->setRequestedServerName("sni");
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -601,8 +601,8 @@ response: {}
     const std::string tlsVersion = "TLSv1.4";
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.downstream_address_provider_->setSslConnection(connection_info);
-    stream_info.downstream_address_provider_->setRequestedServerName("sni");
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.downstream_connection_info_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},

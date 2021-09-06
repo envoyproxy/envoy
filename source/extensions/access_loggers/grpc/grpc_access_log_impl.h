@@ -83,22 +83,15 @@ public:
         : dispatcher_(dispatcher), message_ack_timeout_(message_ack_timeout) {
       timer_ = dispatcher_.createTimer([this, &client, &stats] {
         const auto now = dispatcher_.timeSource().monotonicTime();
-        timeToString(now);
         std::vector<MonotonicTime> expired_timepoints;
         std::set<uint32_t> expired_message_ids;
 
         auto it = deadline_.lower_bound(now);
-        std::cout << "current" << std::endl;
-        for (auto a : deadline_) {
-          timeToString(a.first);
-        }
-        std::cout << "expired" << std::endl;
         while (it != deadline_.end()) {
           for (auto&& id : it->second) {
             expired_message_ids.emplace(id);
           }
           expired_timepoints.push_back(it->first);
-          timeToString(it->first);
           ++it;
         }
 
@@ -112,12 +105,7 @@ public:
           auto& message = message_buffer.at(id);
           if (message.first == Grpc::BufferState::Pending) {
             client.onError(id, true);
-            // std::cout << stats.critical_logs_message_timeout_.value() << std::endl;
             stats.critical_logs_message_timeout_.inc();
-
-
-
-            std::cout << stats.critical_logs_message_timeout_.value() << std::endl;
           }
         }
 
@@ -126,29 +114,15 @@ public:
         }
 
         timer_->enableTimer(message_ack_timeout_);
-        std::cout << "==============" << std::endl;
       });
 
       timer_->enableTimer(message_ack_timeout_);
-    }
-
-    void timeToString(std::chrono::steady_clock::time_point t)
-    {
-      auto microsecondsUTC = std::chrono::duration_cast<std::chrono::milliseconds>(t.time_since_epoch()).count();
-
-        std::cout << "It took me " << microsecondsUTC << " msec." << std::endl;
     }
 
     ~InflightMessageTtlManager() { timer_->disableTimer(); }
 
     void setDeadline(std::set<uint32_t>&& ids) {
       auto expires_at = dispatcher_.timeSource().monotonicTime() + message_ack_timeout_;
-      std::cout << "set deadline: expires at ";
-      timeToString(expires_at);
-      for (const auto& id: ids) {
-        std::cout << id << std::endl;
-      }
-      std::cout << "==========" << std::endl;
       deadline_.emplace(expires_at, std::move(ids));
     }
 

@@ -523,7 +523,7 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
   initializeFilter();
 
   // Port 9999 is within the specified destination port range.
-  connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999));
 
   // Expect filter to try to open a connection to specified cluster.
@@ -583,9 +583,9 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
         return absl::nullopt;
       }));
 
-  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111));
-  connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("2.3.4.5", 2222));
 
   filter_->onNewConnection();

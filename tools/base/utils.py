@@ -9,7 +9,8 @@ import tarfile
 import tempfile
 from configparser import ConfigParser
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
-from typing import Callable, Iterator, List, Optional, Union
+from pathlib import Path
+from typing import Callable, ContextManager, Iterator, List, Optional, Union
 
 import yaml
 
@@ -128,3 +129,14 @@ def to_yaml(data: Union[dict, list, str, int], path: Union[pathlib.Path, str]) -
     path = pathlib.Path(path)
     path.write_text(yaml.dump(data))
     return path
+
+
+@contextmanager
+def cd_and_return(path: Union[pathlib.Path, str]) -> ContextManager[None]:
+    """Changes working directory to given path and returns to previous working directory on exit"""
+    prev_cwd = Path.cwd()
+    try:
+        os.chdir(path)
+        yield
+    finally:
+        os.chdir(prev_cwd)
