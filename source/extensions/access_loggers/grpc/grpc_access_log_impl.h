@@ -7,6 +7,7 @@
 #include <chrono>
 #include <memory>
 
+#include "envoy/common/time.h"
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
@@ -53,6 +54,7 @@ public:
 
       switch (message->status()) {
       case envoy::service::accesslog::v3::CriticalAccessLogsResponse::ACK:
+        parent_.inflight_message_ttl_->received(id);
         parent_.stats_.critical_logs_ack_received_.inc();
         parent_.stats_.pending_critical_logs_.dec();
         parent_.client_->clearPendingMessage(id);
@@ -67,39 +69,65 @@ public:
     }
     void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
     void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {
-      parent_.client_->resetStream();
+      parent_.client_->cleanup();
     }
 
     CriticalAccessLogger& parent_;
   };
 
-  // Inflight messages which share same ACK timeout are managed with this timer.
-  // This avoids to create timers for per inflight messages.
-  class InflightMessageTimer : public LinkedObject<InflightMessageTimer> {
+  class InflightMessageTtlManager {
   public:
-    InflightMessageTimer(Event::Dispatcher& dispatcher, CriticalAccessLoggerGrpcClientStats& stats,
-                         Grpc::BufferedAsyncClient<RequestType, ResponseType>& client,
-                         const std::vector<uint32_t>& inflight_message_ids,
-                         std::chrono::milliseconds message_ack_timeout)
-        : inflight_message_ids_(inflight_message_ids) {
-      timer_ = dispatcher.createTimer([this, &stats, &client] {
-        for (auto&& id : inflight_message_ids_) {
-          client.bufferMessage(id);
-          stats.critical_logs_message_timeout_.inc();
+    InflightMessageTtlManager(Event::Dispatcher& dispatcher,
+                              CriticalAccessLoggerGrpcClientStats& stats,
+                              Grpc::BufferedAsyncClient<RequestType, ResponseType>& client,
+                              std::chrono::milliseconds message_ack_timeout)
+        : dispatcher_(dispatcher), message_ack_timeout_(message_ack_timeout) {
+      timer_ = dispatcher_.createTimer([this, &client, &stats] {
+        const auto now = dispatcher_.timeSource().monotonicTime();
+
+        std::cout << "deadline expired" << std::endl;
+        auto it = deadline_.lower_bound(now);
+        while (it != deadline_.end()) {
+          for (auto&& id : it->second) {
+            if (received_ids_.find(id) != received_ids_.end()) {
+              received_ids_.erase(id);
+              continue;
+            }
+
+            client.bufferMessage(id);
+            stats.critical_logs_message_timeout_.inc();
+          }
+          ++it;
         }
+        timer_->enableTimer(message_ack_timeout_);
       });
 
-      timer_->enableTimer(message_ack_timeout);
+      timer_->enableTimer(message_ack_timeout_);
     }
 
-    ~InflightMessageTimer() { timer_->disableTimer(); }
+    void timeToString(std::chrono::steady_clock::time_point t)
+    {
+      auto microsecondsUTC = std::chrono::duration_cast<std::chrono::milliseconds>(t.time_since_epoch()).count();
+
+        std::cout << "It took me " << microsecondsUTC << " seconds." << std::endl;
+    }
+
+    ~InflightMessageTtlManager() { timer_->disableTimer(); }
+
+    void setDeadline(std::set<uint32_t>&& ids) {
+      auto expires_at = dispatcher_.timeSource().monotonicTime() + message_ack_timeout_;
+      deadline_.emplace(expires_at, std::move(ids));
+    }
+
+    void received(uint32_t id) { received_ids_.emplace(id); }
 
   private:
-    std::vector<uint32_t> inflight_message_ids_;
+    Event::Dispatcher& dispatcher_;
+    std::chrono::milliseconds message_ack_timeout_;
     Event::TimerPtr timer_;
+    std::map<MonotonicTime, std::set<uint32_t>, std::greater<>> deadline_;
+    std::set<uint32_t> received_ids_;
   };
-
-  using InflightMessageTimerPtr = std::unique_ptr<InflightMessageTimer>;
 
   CriticalAccessLogger(const Grpc::RawAsyncClientSharedPtr& client,
                        const Protobuf::MethodDescriptor& method, Event::Dispatcher& dispatcher,
@@ -113,12 +141,12 @@ public:
 private:
   friend CriticalLogStream;
 
-  std::list<InflightMessageTimerPtr> pending_message_timer_;
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds message_ack_timeout_;
   CriticalAccessLoggerGrpcClientStats stats_;
   CriticalLogStream stream_callback_;
   Grpc::BufferedAsyncClientPtr<RequestType, ResponseType> client_;
+  std::unique_ptr<InflightMessageTtlManager> inflight_message_ttl_;
 };
 
 class GrpcAccessLoggerImpl

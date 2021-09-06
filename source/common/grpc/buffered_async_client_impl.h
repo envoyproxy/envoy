@@ -16,11 +16,7 @@ public:
       : max_buffer_bytes_(max_buffer_bytes), service_method_(service_method), callbacks_(callbacks),
         client_(client) {}
 
-  ~BufferedAsyncClient() {
-    if (active_stream_ != nullptr) {
-      // active_stream_->resetStream();
-    }
-  }
+  ~BufferedAsyncClient() { cleanup(); }
 
   uint32_t publishId(RequestType& message) { return MessageUtil::hash(message); }
 
@@ -31,7 +27,7 @@ public:
     }
 
     message_buffer_[id] = std::make_pair(BufferState::Buffered, message);
-    current_buffer_bytes_ += max_buffer_bytes_;
+    current_buffer_bytes_ += buffer_size;
   }
 
   void bufferMessage(uint32_t id) {
@@ -41,15 +37,15 @@ public:
     message_buffer_.at(id).first = BufferState::Buffered;
   }
 
-  std::vector<uint32_t> sendBufferedMessages() {
+  std::set<uint32_t> sendBufferedMessages() {
     if (active_stream_ == nullptr) {
       active_stream_ =
           client_.start(service_method_, callbacks_, Http::AsyncClient::StreamOptions());
     }
-    std::vector<uint32_t> inflight_message_ids;
+    std::set<uint32_t> inflight_message_ids;
 
     if (active_stream_->isAboveWriteBufferHighWatermark()) {
-      resetStream();
+      cleanup();
       return inflight_message_ids;
     }
     for (auto&& it : message_buffer_) {
@@ -62,7 +58,7 @@ public:
       }
 
       state = BufferState::Pending;
-      inflight_message_ids.push_back(id);
+      inflight_message_ids.emplace(id);
       active_stream_->sendMessage(message, false);
     }
 
@@ -76,13 +72,14 @@ public:
     auto& buffer = message_buffer_.at(id);
 
     if (buffer.first == BufferState::Pending) {
+      std::cout << id << " cleared" << std::endl;
       const auto buffer_size = buffer.second.ByteSizeLong();
       current_buffer_bytes_ -= buffer_size;
       message_buffer_.erase(id);
     }
   }
 
-  void resetStream() {
+  void cleanup() {
     if (active_stream_ != nullptr) {
       active_stream_ = nullptr;
     }

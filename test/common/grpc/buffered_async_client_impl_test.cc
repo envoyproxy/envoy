@@ -17,6 +17,7 @@
 using testing::_;
 using testing::Eq;
 using testing::Invoke;
+using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -24,62 +25,90 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 
-// class EnvoyBufferedAsyncClientImplTest : public testing::Test {
-// public:
-//   EnvoyBufferedAsyncClientImplTest()
-//       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
+class BufferedAsyncClientTest : public testing::Test {
+public:
+  BufferedAsyncClientTest()
+      : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
+    config_.mutable_envoy_grpc()->set_cluster_name("test_cluster");
 
-//     config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+    cm_.initializeThreadLocalClusters({"test_cluster"});
+    ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(http_client_));
+  }
 
-//     auto& initial_metadata_entry = *config.mutable_initial_metadata()->Add();
-//     initial_metadata_entry.set_key("downstream-local-address");
-//     initial_metadata_entry.set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
+  const Protobuf::MethodDescriptor* method_descriptor_;
+  envoy::config::core::v3::GrpcService config_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<Http::MockAsyncClient> http_client_;
+};
 
-//     grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
-//     cm_.initializeThreadLocalClusters({"test_cluster"});
-//     ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(http_client_));
+TEST_F(BufferedAsyncClientTest, BasicSendFlow) {
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _)).WillOnce(Return(&http_stream));
+  EXPECT_CALL(http_stream, sendHeaders(_, _));
+  EXPECT_CALL(http_stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
+  EXPECT_CALL(http_stream, sendData(_, _));
+  EXPECT_CALL(http_stream, reset());
 
-//     buffered_grpc_client_ =
-//         std::make_unique<BufferedAsyncClient<helloworld::HelloRequest, helloworld::HelloReply>>(
-//             1000, *method_descriptor_, grpc_callbacks_,
-//             Grpc::AsyncClient<helloworld::HelloRequest, helloworld::HelloReply>(grpc_client_));
-//   }
+  DangerousDeprecatedTestTime test_time_;
+  auto raw_client = std::make_shared<AsyncClientImpl>(cm_, config_, test_time_.timeSystem());
+  AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> client(raw_client);
 
-//   envoy::config::core::v3::GrpcService config;
-//   const Protobuf::MethodDescriptor* method_descriptor_;
-//   NiceMock<Http::MockAsyncClient> http_client_;
-//   NiceMock<Upstream::MockClusterManager> cm_;
-//   AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
-//   std::unique_ptr<BufferedAsyncClient<helloworld::HelloRequest, helloworld::HelloReply>>
-//       buffered_grpc_client_;
-//   DangerousDeprecatedTestTime test_time_;
-//   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks_;
-// };
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> callback;
+  BufferedAsyncClient<helloworld::HelloRequest, helloworld::HelloReply> buffered_client(
+      100000, *method_descriptor_, callback, client);
 
-// TEST_F(EnvoyBufferedAsyncClientImplTest, BasicFlow) {
-//   helloworld::HelloRequest request_msg;
-//   const auto id = buffered_grpc_client_->publishId(request_msg);
-//   buffered_grpc_client_->bufferMessage(id, request_msg);
+  helloworld::HelloRequest request;
+  request.set_name("Alice");
+  auto id = buffered_client.publishId(request);
+  buffered_client.bufferMessage(id, request);
+  EXPECT_EQ(1, buffered_client.sendBufferedMessages().size());
 
-//   Http::AsyncClient::StreamCallbacks* http_callbacks;
-//   Http::MockAsyncClientStream http_stream;
-//   EXPECT_CALL(http_client_, start(_, _))
-//       .WillOnce(
-//           Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-//                                                  const Http::AsyncClient::StreamOptions&) {
-//             http_callbacks = &callbacks;
-//             return &http_stream;
-//           }));
+  // Re-buffer, and transport.
+  buffered_client.bufferMessage(id);
 
-//   EXPECT_CALL(grpc_callbacks_,
-//               onCreateInitialMetadata(testing::Truly([](Http::RequestHeaderMap& headers) {
-//                 return headers.Host()->value() == "test_cluster";
-//               })));
-//   EXPECT_CALL(http_stream, sendHeaders(_, _))
-//       .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset();
-//       }));
-//   buffered_grpc_client_->sendBufferedMessages();
-// }
+  EXPECT_CALL(http_stream, sendData(_, _)).Times(2);
+  EXPECT_CALL(http_stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
+
+  helloworld::HelloRequest request2;
+  request2.set_name("Bob");
+  auto id2 = buffered_client.publishId(request2);
+  buffered_client.bufferMessage(id2, request2);
+  auto ids2 = buffered_client.sendBufferedMessages();
+  EXPECT_EQ(2, ids2.size());
+
+  // Clear existing messages.
+  for (auto&& id : ids2) {
+    buffered_client.clearPendingMessage(id);
+  }
+
+  // Successfully cleared pending messages.
+  EXPECT_CALL(http_stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
+  auto ids3 = buffered_client.sendBufferedMessages();
+  EXPECT_EQ(0, ids3.size());
+}
+
+TEST_F(BufferedAsyncClientTest, BufferLimitExceeded) {
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _)).WillOnce(Return(&http_stream));
+  EXPECT_CALL(http_stream, sendHeaders(_, _));
+  EXPECT_CALL(http_stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
+  EXPECT_CALL(http_stream, reset());
+
+  DangerousDeprecatedTestTime test_time_;
+  auto raw_client = std::make_shared<AsyncClientImpl>(cm_, config_, test_time_.timeSystem());
+  AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> client(raw_client);
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> callback;
+  BufferedAsyncClient<helloworld::HelloRequest, helloworld::HelloReply> buffered_client(
+      0, *method_descriptor_, callback, client);
+
+  helloworld::HelloRequest request;
+  request.set_name("Alice");
+  auto id = buffered_client.publishId(request);
+  buffered_client.bufferMessage(id, request);
+
+  EXPECT_EQ(0, buffered_client.sendBufferedMessages().size());
+}
 
 } // namespace
 } // namespace Grpc

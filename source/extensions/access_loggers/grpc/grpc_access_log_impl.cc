@@ -112,15 +112,15 @@ CriticalAccessLogger::CriticalAccessLogger(const Grpc::RawAsyncClientSharedPtr& 
 }
 
 void CriticalAccessLogger::flush(CriticalAccessLogger::RequestType& message) {
+  if (inflight_message_ttl_ == nullptr) {
+    inflight_message_ttl_ =
+     std::make_unique<InflightMessageTtlManager>(dispatcher_, stats_, *client_, message_ack_timeout_);
+  }
   const uint32_t message_id = client_->publishId(message);
   message.set_id(message_id);
   client_->bufferMessage(message_id, message);
-  auto inflight_message_ids = client_->sendBufferedMessages();
   stats_.pending_critical_logs_.inc();
-  LinkedList::moveIntoList(std::make_unique<InflightMessageTimer>(dispatcher_, stats_, *client_,
-                                                                  inflight_message_ids,
-                                                                  message_ack_timeout_),
-                           pending_message_timer_);
+  inflight_message_ttl_->setDeadline(client_->sendBufferedMessages());
 }
 
 GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager,
