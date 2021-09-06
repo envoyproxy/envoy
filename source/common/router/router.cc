@@ -503,20 +503,39 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
 
   if (upstream_http_protocol_options.has_value()) {
-    const auto parsed_authority = Http::Utility::parseAuthority(headers.getHostValue());
-    if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options.value().auto_sni()) {
-      callbacks_->streamInfo().filterState()->setData(
-          Network::UpstreamServerName::key(),
-          std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
-          StreamInfo::FilterState::StateType::Mutable);
+    std::string sni_value;
+    bool should_set_sni = true;
+
+    // Check whether `alt_header_name` is specified.
+    const auto alt_header_name = upstream_http_protocol_options.value().alt_header_name();
+    if (alt_header_name.empty()) {
+      // Default the SNI value to the Host/Authority header.
+      const auto parsed_authority = Http::Utility::parseAuthority(headers.getHostValue());
+      should_set_sni = !parsed_authority.is_ip_address_;
+      sni_value = std::string(parsed_authority.host_);
+    } else {
+      // Use the header value from `alt_header_name` to set the SNI value.
+      const auto header_value = Http::HeaderUtility::getAllOfHeaderAsString(
+          headers, Http::LowerCaseString(alt_header_name));
+      if (header_value.result().has_value()) {
+        sni_value = std::string(header_value.result().value());
+      }
     }
 
-    if (upstream_http_protocol_options.value().auto_san_validation()) {
-      callbacks_->streamInfo().filterState()->setData(
-          Network::UpstreamSubjectAltNames::key(),
-          std::make_unique<Network::UpstreamSubjectAltNames>(
-              std::vector<std::string>{std::string(parsed_authority.host_)}),
-          StreamInfo::FilterState::StateType::Mutable);
+    if (!sni_value.empty()) {
+      if (should_set_sni && upstream_http_protocol_options.value().auto_sni()) {
+        callbacks_->streamInfo().filterState()->setData(
+            Network::UpstreamServerName::key(),
+            std::make_unique<Network::UpstreamServerName>(sni_value),
+            StreamInfo::FilterState::StateType::Mutable);
+      }
+
+      if (upstream_http_protocol_options.value().auto_san_validation()) {
+        callbacks_->streamInfo().filterState()->setData(
+            Network::UpstreamSubjectAltNames::key(),
+            std::make_unique<Network::UpstreamSubjectAltNames>(std::vector<std::string>{sni_value}),
+            StreamInfo::FilterState::StateType::Mutable);
+      }
     }
   }
 
