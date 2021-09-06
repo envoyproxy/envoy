@@ -238,7 +238,21 @@ TEST_F(CryptoMbConfigTest, CreateMissingPollDelay) {
         private_key: { "filename": "{{ test_rundir }}/contrib/cryptomb/private_key_providers/test/test_data/rsa-4096.pem" }
         )EOF";
 
-  EXPECT_NE(nullptr, createWithConfig(yaml));
+  EXPECT_THROW_WITH_REGEX(createWithConfig(yaml), EnvoyException,
+                          "Proto constraint validation failed");
+}
+
+TEST_F(CryptoMbConfigTest, CreateZeroPollDelay) {
+  const std::string yaml = R"EOF(
+      provider_name: cryptomb
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3alpha.CryptoMbPrivateKeyMethodConfig
+        poll_delay: 0s
+        private_key: { "filename": "{{ test_rundir }}/contrib/cryptomb/private_key_providers/test/test_data/rsa-4096.pem" }
+        )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createWithConfig(yaml), EnvoyException,
+                          "Proto constraint validation failed");
 }
 
 TEST_F(CryptoMbConfigTest, CreateNotSupportedInstructionSet) {
