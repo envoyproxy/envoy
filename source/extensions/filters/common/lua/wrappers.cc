@@ -67,7 +67,9 @@ int BufferWrapper::luaGetBytes(lua_State* state) {
 
 int BufferWrapper::luaSetBytes(lua_State* state) {
   data_.drain(data_.length());
-  absl::string_view bytes = luaL_checkstring(state, 2);
+  size_t input_size;
+  const char* input = luaL_checklstring(state, 2, &input_size);
+  absl::string_view bytes = absl::string_view(input, input_size);
   data_.add(bytes);
   lua_pushnumber(state, data_.length());
   return 1;
