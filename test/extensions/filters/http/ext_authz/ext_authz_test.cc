@@ -88,7 +88,7 @@ public:
 
     if (!add_me.empty()) {
       const Http::Utility::QueryParams query_parameters_to_add{};
-      for (const auto &[key, value] : add_me) {
+      for (const auto& [key, value] : add_me) {
         response.query_parameters_to_set[key] = value;
       }
     }
@@ -101,8 +101,8 @@ public:
 
     EXPECT_CALL(*client_, check(_, _, _, _))
         .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                            const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                            const StreamInfo::StreamInfo&) -> void {
+                             const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                             const StreamInfo::StreamInfo&) -> void {
           callbacks.onComplete(std::move(response_ptr));
         }));
     EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
@@ -157,7 +157,6 @@ class HttpFilterTestParam
     : public HttpFilterTestBase<testing::TestWithParam<CreateFilterConfigFunc*>> {
 public:
   void SetUp() override { initialize(""); }
-
 };
 
 template <bool failure_mode_allow_value, bool http_client>
@@ -1872,7 +1871,8 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithOverwrittenQueryParameters) {
 TEST_P(HttpFilterTestParam, ImmediateOkResponseWithManyModifiedQueryParameters) {
   const std::string original_path{"/users?remove-me=1&overwrite-me=2&leave-me=3"};
   const std::string expected_path{"/users?add-me=9&leave-me=3&overwrite-me=new"};
-  const std::vector<std::pair<std::string, std::string>> add_me{{"add-me", "9"}, {"overwrite-me", "new"}};
+  const std::vector<std::pair<std::string, std::string>> add_me{{"add-me", "9"},
+                                                                {"overwrite-me", "new"}};
   const std::string remove_me{"remove-me"};
   queryParameterTest(original_path, expected_path, add_me, remove_me);
 }
