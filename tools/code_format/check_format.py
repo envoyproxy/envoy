@@ -886,7 +886,7 @@ class FormatChecker:
                 "unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
         if (self.envoy_build_rule_check and not self.is_starlark_file(file_path)
-                and not self.is_workspace_file(file_path)
+                and not self.is_workspace_file(file_path) and not self.is_api_file(file_path)
                 and not self.is_external_build_file(file_path) and "@envoy//" in line):
             report_error("Superfluous '@envoy//' prefix")
         if not self.allow_listed_for_build_urls(file_path) and (" urls = " in line
@@ -895,7 +895,7 @@ class FormatChecker:
 
     def fix_build_line(self, file_path, line, line_number):
         if (self.envoy_build_rule_check and not self.is_starlark_file(file_path)
-                and not self.is_workspace_file(file_path)
+                and not self.is_workspace_file(file_path) and not self.is_api_file(file_path)
                 and not self.is_external_build_file(file_path)):
             line = line.replace("@envoy//", "//")
         return line

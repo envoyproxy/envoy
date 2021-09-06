@@ -1,4 +1,7 @@
 load("@io_bazel_rules_go//proto:compiler.bzl", "go_proto_compiler")
+load("@envoy//bazel:utils.bzl", "write_json")
+load("@envoy//tools/base:envoy_python.bzl", "py_data")
+load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
 
@@ -14,4 +17,15 @@ go_proto_compiler(
     suffix = ".pb.validate.go",
     valid_archive = False,
     visibility = ["//visibility:public"],
+)
+
+write_json(
+    name = "repository_locations",
+    data = REPOSITORY_LOCATIONS_SPEC,
+)
+
+py_data(
+    name = "repository_locations",
+    filters = ["@envoy//tools/dependency:interpolate_repository_locations"],
+    source = ":repository_locations.json",
 )

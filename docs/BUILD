@@ -3,6 +3,7 @@ load(
     "envoy_package",
 )
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("//tools/base:envoy_python.bzl", "py_data")
 
 licenses(["notice"])  # Apache 2
 
@@ -15,6 +16,17 @@ exports_files([
 ])
 
 envoy_package()
+
+py_data(
+    name = "protodoc_manifest",
+    format = "yaml",
+    source = ":protodoc_manifest.yaml",
+)
+
+py_data(
+    name = "v2_mapping",
+    source = ":v2_mapping.json",
+)
 
 filegroup(
     name = "configs",

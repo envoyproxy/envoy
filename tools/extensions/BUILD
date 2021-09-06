@@ -1,3 +1,4 @@
+load("@rules_python//python:defs.bzl", "py_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//tools/base:envoy_python.bzl", "envoy_py_binary")
@@ -19,4 +20,9 @@ envoy_py_binary(
         "//tools/base:checker",
         "//tools/base:utils",
     ],
+)
+
+py_library(
+    name = "build_categories",
+    srcs = ["build_categories.py"],
 )

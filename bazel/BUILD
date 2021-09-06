@@ -1,8 +1,11 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
+load("//bazel:utils.bzl", "write_json")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("//tools/base:envoy_python.bzl", "py_data")
+load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
 
@@ -590,4 +593,15 @@ alias(
 alias(
     name = "windows",
     actual = "@bazel_tools//src/conditions:windows",
+)
+
+write_json(
+    name = "repository_locations",
+    data = REPOSITORY_LOCATIONS_SPEC,
+)
+
+py_data(
+    name = "repository_locations",
+    filters = ["//tools/dependency:interpolate_repository_locations"],
+    source = ":repository_locations.json",
 )

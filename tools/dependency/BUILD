@@ -48,3 +48,8 @@ envoy_py_binary(
         "//tools/base:utils",
     ],
 )
+
+py_library(
+    name = "interpolate_repository_locations",
+    srcs = ["interpolate_repository_locations.py"],
+)

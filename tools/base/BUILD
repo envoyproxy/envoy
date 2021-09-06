@@ -8,6 +8,7 @@ envoy_package()
 
 exports_files([
     "base_command.py",
+    "base_load_data.py",
 ])
 
 envoy_py_library(
