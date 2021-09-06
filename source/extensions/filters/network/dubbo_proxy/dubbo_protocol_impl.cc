@@ -183,7 +183,9 @@ bool DubboProtocolImpl::encode(Buffer::Instance& buffer, const MessageMetadata& 
     buffer.writeByte(flag);
     buffer.writeByte(static_cast<uint8_t>(metadata.responseStatus()));
     buffer.writeBEInt<uint64_t>(metadata.requestId());
-    buffer.writeBEInt<uint32_t>(0);
+    // Body of heart beat response is null.
+    buffer.writeBEInt<uint32_t>(1u);
+    buffer.writeByte('N');
     return true;
   }
   case MessageType::Response: {

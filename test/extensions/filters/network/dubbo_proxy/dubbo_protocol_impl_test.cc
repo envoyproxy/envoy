@@ -151,6 +151,19 @@ TEST(DubboProtocolImplTest, encode) {
   EXPECT_TRUE(dubbo_protocol.decodeData(buffer, context, output_metadata));
 }
 
+TEST(DubboProtocolImplTest, HeartBeatResponseTest) {
+  MessageMetadata metadata;
+  metadata.setMessageType(MessageType::HeartbeatResponse);
+  metadata.setResponseStatus(ResponseStatus::Ok);
+  metadata.setSerializationType(SerializationType::Hessian2);
+  metadata.setRequestId(100);
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_TRUE(dubbo_protocol.encode(buffer, metadata, ""));
+  // 16 bytes header and one byte null object body.
+  EXPECT_EQ(17, buffer.length());
+}
+
 TEST(DubboProtocolImplTest, decode) {
   Buffer::OwnedImpl buffer;
   MessageMetadataSharedPtr metadata;
