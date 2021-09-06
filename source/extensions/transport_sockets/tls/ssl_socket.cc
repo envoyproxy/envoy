@@ -308,7 +308,7 @@ int SslSocket::setSSLKeyLog(bool enable) {
     bio_keylog_ = nullptr;
   }
 
-  SSL_CTX* ctx = SSL_get_SSL_CTX(rawSslForTest());
+  SSL_CTX* ctx = SSL_get_SSL_CTX(rawSsl());
   if (ctx == nullptr || keylog_file == nullptr) {
     return -1;
   }
