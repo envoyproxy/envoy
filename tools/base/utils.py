@@ -4,13 +4,19 @@
 
 import io
 import os
+import pathlib
 import tarfile
 import tempfile
 from configparser import ConfigParser
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
-from typing import Callable, Iterator, List, Optional, Union
+from pathlib import Path
+from typing import Callable, ContextManager, Iterator, List, Optional, Union
 
 import yaml
+
+
+class ExtractError(Exception):
+    pass
 
 
 # this is testing specific - consider moving to tools.testing.utils
@@ -74,14 +80,19 @@ def buffered(
         stderr.extend(mangle(_stderr.read().strip().split("\n")))
 
 
-def extract(tarball: str, path: str) -> str:
-    with tarfile.open(tarball) as tarfiles:
-        tarfiles.extractall(path=path)
-        return path
+def extract(path: Union[pathlib.Path, str], *tarballs: Union[pathlib.Path, str]) -> pathlib.Path:
+    if not tarballs:
+        raise ExtractError(f"No tarballs specified for extraction to {path}")
+    openers = nested(*tuple(tarfile.open(tarball) for tarball in tarballs))
+
+    with openers as tarfiles:
+        for tar in tarfiles:
+            tar.extractall(path=path)
+    return pathlib.Path(path)
 
 
 @contextmanager
-def untar(tarball: str) -> Iterator[str]:
+def untar(*tarballs: Union[pathlib.Path, str]) -> Iterator[pathlib.Path]:
     """Untar a tarball into a temporary directory
 
     for example to list the contents of a tarball:
@@ -102,20 +113,30 @@ def untar(tarball: str) -> Iterator[str]:
 
     """
     with tempfile.TemporaryDirectory() as tmpdir:
-        yield extract(tarball, tmpdir)
+        yield extract(tmpdir, *tarballs)
 
 
-def from_yaml(path: str) -> Union[dict, list, str, int]:
+def from_yaml(path: Union[pathlib.Path, str]) -> Union[dict, list, str, int]:
     """Returns the loaded python object from a yaml file given by `path`"""
-    with open(path) as f:
-        return yaml.safe_load(f.read())
+    return yaml.safe_load(pathlib.Path(path).read_text())
 
 
-def to_yaml(data: Union[dict, list, str, int], path: str) -> str:
+def to_yaml(data: Union[dict, list, str, int], path: Union[pathlib.Path, str]) -> pathlib.Path:
     """For given `data` dumps as yaml to provided `path`.
 
     Returns `path`
     """
-    with open(path, "w") as f:
-        f.write(yaml.dump(data))
+    path = pathlib.Path(path)
+    path.write_text(yaml.dump(data))
     return path
+
+
+@contextmanager
+def cd_and_return(path: Union[pathlib.Path, str]) -> ContextManager[None]:
+    """Changes working directory to given path and returns to previous working directory on exit"""
+    prev_cwd = Path.cwd()
+    try:
+        os.chdir(path)
+        yield
+    finally:
+        os.chdir(prev_cwd)

@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 
+#include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.grpc.pb.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
 
@@ -41,10 +42,10 @@ private:
 // use ASSERT_ and EXPECT_ macros to validate test results.
 class TestProcessor {
 public:
-  // Start the processor listening on an ephemeral port (port 0) on 127.0.0.1.
+  // Start the processor listening on an ephemeral port (port 0) on the local host.
   // All new streams will be delegated to the specified function. The function
   // will be invoked in a background thread controlled by the gRPC server.
-  void start(ProcessingFunc cb);
+  void start(const Network::Address::IpVersion ip_version, ProcessingFunc cb);
 
   // Stop the processor from listening once all streams are closed, and exit
   // the listening threads.

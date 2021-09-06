@@ -25,21 +25,16 @@
 namespace Envoy {
 namespace Quic {
 
-// Envoy specific provider of server connection id and decision maker of
-// accepting new connection or not.
+// Dummy implementation only used by Google Quic.
 class EnvoyQuicCryptoServerStreamHelper : public quic::QuicCryptoServerStreamBase::Helper {
 public:
-  ~EnvoyQuicCryptoServerStreamHelper() override = default;
-
   // quic::QuicCryptoServerStream::Helper
   bool CanAcceptClientHello(const quic::CryptoHandshakeMessage& /*message*/,
                             const quic::QuicSocketAddress& /*client_address*/,
                             const quic::QuicSocketAddress& /*peer_address*/,
                             const quic::QuicSocketAddress& /*self_address*/,
                             std::string* /*error_details*/) const override {
-    // TODO(danzh): decide to accept or not based on information from given handshake message, i.e.
-    // user agent and SNI.
-    return true;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 };
 

@@ -11,9 +11,9 @@
 #  ./tools/dependency/pip_check.py -h
 #
 
-import os
 import sys
 from functools import cached_property
+from typing import Iterable, Set
 
 from tools.base import checker, utils
 
@@ -23,6 +23,10 @@ REQUIREMENTS_FILENAME = "requirements.txt"
 # TODO(phlax): add checks for:
 #      - requirements can be installed together
 #      - pip-compile formatting
+
+
+class PipConfigurationError(Exception):
+    pass
 
 
 class PipChecker(checker.Checker):
@@ -41,19 +45,22 @@ class PipChecker(checker.Checker):
     @cached_property
     def dependabot_config(self) -> dict:
         """Parsed dependabot config"""
-        return utils.from_yaml(os.path.join(self.path, self.dependabot_config_path))
+        result = utils.from_yaml(self.path.joinpath(self.dependabot_config_path))
+        if not isinstance(result, dict):
+            raise PipConfigurationError(
+                f"Unable to parse dependabot config: {self.dependabot_config_path}")
+        return result
 
     @property
     def dependabot_config_path(self) -> str:
         return self._dependabot_config
 
     @cached_property
-    def requirements_dirs(self) -> set:
+    def requirements_dirs(self) -> Set[str]:
         """Set of found directories in the repo containing requirements.txt"""
         return set(
-            root[len(self.path):]
-            for root, dirs, files in os.walk(self.path)
-            if self.requirements_filename in files)
+            f"/{f.parent.relative_to(self.path)}" for f in self.path.glob("**/*")
+            if f.name == self.requirements_filename)
 
     @property
     def requirements_filename(self) -> str:
@@ -75,12 +82,12 @@ class PipChecker(checker.Checker):
                 missing_config,
                 f"Missing dependabot config for {self.requirements_filename} in dir")
 
-    def dependabot_success(self, correct: list) -> None:
+    def dependabot_success(self, correct: Iterable) -> None:
         self.succeed(
             "dependabot",
             ([f"{self.requirements_filename}: {dirname}" for dirname in sorted(correct)]))
 
-    def dependabot_errors(self, missing: list, msg: str) -> None:
+    def dependabot_errors(self, missing: Iterable, msg: str) -> None:
         for dirname in sorted(missing):
             self.error("dependabot", [f"{msg}: {dirname}"])
 

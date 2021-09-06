@@ -61,6 +61,11 @@ IGNORES_CVES = set([
     # False positive on the match heuristic, fixed in Curl 7.76.0.
     'CVE-2021-22876',
     'CVE-2021-22890',
+    # Node.js issues unrelated to http-parser.
+    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22918
+    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22921
+    'CVE-2021-22918',
+    'CVE-2021-22921',
 ])
 
 # Subset of CVE fields that are useful below.

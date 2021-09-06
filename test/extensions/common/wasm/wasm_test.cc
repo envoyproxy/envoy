@@ -119,28 +119,27 @@ TEST_P(WasmCommonTest, WasmFailState) {
   wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::RuntimeError);
   EXPECT_EQ(toWasmEvent(wasm_base), WasmEvent::RuntimeError);
 
-  auto root_context = static_cast<Context*>(wasm->wasm()->createRootContext(plugin));
-  uint32_t grpc_call_token1 = root_context->nextGrpcCallToken();
-  uint32_t grpc_call_token2 = root_context->nextGrpcCallToken();
+  uint32_t grpc_call_token1 = wasm->wasm()->nextGrpcCallId();
+  EXPECT_TRUE(wasm->wasm()->isGrpcCallId(grpc_call_token1));
+  uint32_t grpc_call_token2 = wasm->wasm()->nextGrpcCallId();
+  EXPECT_TRUE(wasm->wasm()->isGrpcCallId(grpc_call_token2));
   EXPECT_NE(grpc_call_token1, grpc_call_token2);
-  root_context->setNextGrpcTokenForTesting(0); // Rollover.
-  EXPECT_EQ(root_context->nextGrpcCallToken(), 1);
 
-  uint32_t grpc_stream_token1 = root_context->nextGrpcStreamToken();
-  uint32_t grpc_stream_token2 = root_context->nextGrpcStreamToken();
+  uint32_t grpc_stream_token1 = wasm->wasm()->nextGrpcStreamId();
+  EXPECT_TRUE(wasm->wasm()->isGrpcStreamId(grpc_stream_token1));
+  uint32_t grpc_stream_token2 = wasm->wasm()->nextGrpcStreamId();
+  EXPECT_TRUE(wasm->wasm()->isGrpcStreamId(grpc_stream_token2));
   EXPECT_NE(grpc_stream_token1, grpc_stream_token2);
-  root_context->setNextGrpcTokenForTesting(0xFFFFFFFF); // Rollover.
-  EXPECT_EQ(root_context->nextGrpcStreamToken(), 2);
 
-  uint32_t http_call_token1 = root_context->nextHttpCallToken();
-  uint32_t http_call_token2 = root_context->nextHttpCallToken();
+  uint32_t http_call_token1 = wasm->wasm()->nextHttpCallId();
+  EXPECT_TRUE(wasm->wasm()->isHttpCallId(http_call_token1));
+  uint32_t http_call_token2 = wasm->wasm()->nextHttpCallId();
+  EXPECT_TRUE(wasm->wasm()->isHttpCallId(http_call_token2));
   EXPECT_NE(http_call_token1, http_call_token2);
-  root_context->setNextHttpCallTokenForTesting(0); // Rollover.
-  EXPECT_EQ(root_context->nextHttpCallToken(), 1);
 
+  auto root_context = static_cast<Context*>(wasm->wasm()->createRootContext(plugin));
   EXPECT_EQ(root_context->getBuffer(WasmBufferType::HttpCallResponseBody), nullptr);
   EXPECT_EQ(root_context->getBuffer(WasmBufferType::PluginConfiguration), nullptr);
-
   delete root_context;
 
   Filters::Common::Expr::CelStatePrototype wasm_state_prototype(

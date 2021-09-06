@@ -35,8 +35,15 @@ public:
 
   // Prepend the gRPC frame into the buffer.
   // @param flags supplies the GRPC data frame flags.
-  // @param buffer the buffer with the message payload.
+  // @param buffer the full buffer with the message payload.
   void prependFrameHeader(uint8_t flags, Buffer::Instance& buffer);
+
+  // Prepend the gRPC frame into the buffer.
+  // @param flags supplies the GRPC data frame flags.
+  // @param buffer the buffer with the first part of the message payload.
+  // @param message_length the total length of the message, which may be longer
+  // than buffer.
+  void prependFrameHeader(uint8_t flags, Buffer::Instance& buffer, uint32_t message_length);
 };
 
 // Wire format (http://www.grpc.io/docs/guides/wire.html) of GRPC data frame

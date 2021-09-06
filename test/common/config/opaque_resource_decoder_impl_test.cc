@@ -68,30 +68,6 @@ TEST_F(OpaqueResourceDecoderImplTest, ValidateIgnored) {
   EXPECT_EQ("fare", resource_decoder_.resourceName(*decoded_resource));
 }
 
-// Handling of smuggled deprecated fields during Any conversion.
-TEST_F(OpaqueResourceDecoderImplTest, HiddenEnvoyDeprecatedFields) {
-  // This test is only valid in API-v3, and should be updated for API-v4, as
-  // the deprecated fields of API-v2 will be removed.
-  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
-      TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(R"EOF(
-      cluster_name: fare
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 1.2.3.4
-                port_value: 80
-      policy:
-        overprovisioning_factor: 100
-        hidden_envoy_deprecated_disable_overprovisioning: true
-    )EOF");
-  EXPECT_THROW_WITH_REGEX(decodeTypedResource(cluster_load_assignment), ProtoValidationException,
-                          "Illegal use of hidden_envoy_deprecated_ V2 field "
-                          "'envoy.config.endpoint.v3.ClusterLoadAssignment.Policy.hidden_envoy_"
-                          "deprecated_disable_overprovisioning'");
-}
-
 // Happy path.
 TEST_F(OpaqueResourceDecoderImplTest, Success) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_resource;

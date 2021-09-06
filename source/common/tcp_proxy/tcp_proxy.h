@@ -267,8 +267,8 @@ public:
     auto hash_policy = config_->hashPolicy();
     if (hash_policy) {
       return hash_policy->generateHash(
-          downstreamConnection()->addressProvider().remoteAddress().get(),
-          downstreamConnection()->addressProvider().localAddress().get());
+          downstreamConnection()->connectionInfoProvider().remoteAddress().get(),
+          downstreamConnection()->connectionInfoProvider().localAddress().get());
     }
 
     return {};

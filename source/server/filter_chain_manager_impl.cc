@@ -31,7 +31,9 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
-    : parent_context_(parent_context), init_manager_(init_manager) {}
+    : parent_context_(parent_context), scope_(parent_context_.scope().createScope("")),
+      filter_chain_scope_(parent_context_.listenerScope().createScope("")),
+      init_manager_(init_manager) {}
 
 bool PerFilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load() || parent_context_.drainDecision().drainClose();
@@ -101,7 +103,7 @@ Envoy::Runtime::Loader& PerFilterChainFactoryContextImpl::runtime() {
   return parent_context_.runtime();
 }
 
-Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return parent_context_.scope(); }
+Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return *scope_; }
 
 Singleton::Manager& PerFilterChainFactoryContextImpl::singletonManager() {
   return parent_context_.singletonManager();
@@ -135,8 +137,10 @@ PerFilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
   return parent_context_.getTransportSocketFactoryContext();
 }
 
-Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() {
-  return parent_context_.listenerScope();
+Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() { return *filter_chain_scope_; }
+
+bool PerFilterChainFactoryContextImpl::isQuicListener() const {
+  return parent_context_.isQuicListener();
 }
 
 FilterChainManagerImpl::FilterChainManagerImpl(
@@ -459,7 +463,7 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
 
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
-  const auto& address = socket.addressProvider().localAddress();
+  const auto& address = socket.connectionInfoProvider().localAddress();
 
   const Network::FilterChain* best_match_filter_chain = nullptr;
   // Match on destination port (only for IP addresses).
@@ -489,7 +493,7 @@ FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket)
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinationIP(
     const DestinationIPsTrie& destination_ips_trie, const Network::ConnectionSocket& socket) const {
-  auto address = socket.addressProvider().localAddress();
+  auto address = socket.connectionInfoProvider().localAddress();
   if (address->type() != Network::Address::Type::Ip) {
     address = fakeAddress();
   }
@@ -578,7 +582,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForApplicatio
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDirectSourceIP(
     const DirectSourceIPsTrie& direct_source_ips_trie,
     const Network::ConnectionSocket& socket) const {
-  auto address = socket.addressProvider().directRemoteAddress();
+  auto address = socket.connectionInfoProvider().directRemoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     address = fakeAddress();
   }
@@ -628,7 +632,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAndPort(
     const SourceIPsTrie& source_ips_trie, const Network::ConnectionSocket& socket) const {
-  auto address = socket.addressProvider().remoteAddress();
+  auto address = socket.connectionInfoProvider().remoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     address = fakeAddress();
   }
@@ -742,9 +746,10 @@ Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilter
 FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
                                        const envoy::config::listener::v3::Listener& config,
                                        Network::DrainDecision& drain_decision,
-                                       Stats::Scope& global_scope, Stats::Scope& listener_scope)
+                                       Stats::Scope& global_scope, Stats::Scope& listener_scope,
+                                       bool is_quic)
     : server_(server), config_(config), drain_decision_(drain_decision),
-      global_scope_(global_scope), listener_scope_(listener_scope) {}
+      global_scope_(global_scope), listener_scope_(listener_scope), is_quic_(is_quic) {}
 
 AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -791,5 +796,6 @@ envoy::config::core::v3::TrafficDirection FactoryContextImpl::direction() const 
 }
 Network::DrainDecision& FactoryContextImpl::drainDecision() { return drain_decision_; }
 Stats::Scope& FactoryContextImpl::listenerScope() { return listener_scope_; }
+bool FactoryContextImpl::isQuicListener() const { return is_quic_; }
 } // namespace Server
 } // namespace Envoy

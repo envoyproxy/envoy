@@ -306,7 +306,7 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
     return default_value_;
   }
   // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
-  const auto entry = ctx.trace_context->getTraceContext(name_);
+  const auto entry = ctx.trace_context->getByKey(name_);
   return entry.value_or(default_value_);
 }
 
@@ -355,8 +355,8 @@ MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRequest:
     return &info.dynamicMetadata();
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRoute: {
-    const Router::RouteEntry* route_entry = info.routeEntry();
-    return route_entry ? &route_entry->metadata() : nullptr;
+    Router::RouteConstSharedPtr route = info.route();
+    return route ? &route->metadata() : nullptr;
   }
   case envoy::type::metadata::v3::MetadataKind::KindCase::kCluster: {
     const auto& hostPtr = info.upstreamHost();

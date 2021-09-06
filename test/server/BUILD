@@ -322,6 +322,8 @@ envoy_cc_test(
     deps = [
         ":listener_manager_impl_test_lib",
         ":utility_lib",
+        "//source/extensions/filters/http/router:config",
+        "//source/extensions/request_id/uuid:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//test/test_common:threadsafe_singleton_injector_lib",
@@ -418,6 +420,7 @@ envoy_cc_test(
         "//source/server:server_lib",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/config:v2_link_hacks",
         "//test/integration:integration_lib",
         "//test/mocks/server:bootstrap_extension_factory_mocks",
         "//test/mocks/server:fatal_action_factory_mocks",
@@ -495,4 +498,23 @@ envoy_benchmark_test(
     name = "filter_chain_benchmark_test_benchmark_test",
     timeout = "long",
     benchmark_binary = "filter_chain_benchmark_test",
+)
+
+envoy_cc_benchmark_binary(
+    name = "server_stats_flush_benchmark",
+    srcs = ["server_stats_flush_benchmark_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//envoy/stats:stats_interface",
+        "//source/common/stats:thread_local_store_lib",
+        "//source/server:server_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "server_stats_flush_benchmark_test",
+    benchmark_binary = "server_stats_flush_benchmark",
 )

@@ -81,11 +81,16 @@ public:
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
+  bool isQuicListener() const override;
 
   void startDraining() override { is_draining_.store(true); }
 
 private:
   Configuration::FactoryContext& parent_context_;
+  // The scope that has empty prefix.
+  Stats::ScopePtr scope_;
+  // filter_chain_scope_ has the same prefix as listener owners scope.
+  Stats::ScopePtr filter_chain_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
 };
@@ -135,7 +140,7 @@ class FactoryContextImpl : public Configuration::FactoryContext {
 public:
   FactoryContextImpl(Server::Instance& server, const envoy::config::listener::v3::Listener& config,
                      Network::DrainDecision& drain_decision, Stats::Scope& global_scope,
-                     Stats::Scope& listener_scope);
+                     Stats::Scope& listener_scope, bool is_quic);
 
   // Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
@@ -166,6 +171,7 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override;
   Network::DrainDecision& drainDecision() override;
   Stats::Scope& listenerScope() override;
+  bool isQuicListener() const override;
 
 private:
   Server::Instance& server_;
@@ -173,6 +179,7 @@ private:
   Network::DrainDecision& drain_decision_;
   Stats::Scope& global_scope_;
   Stats::Scope& listener_scope_;
+  bool is_quic_;
 };
 
 /**
