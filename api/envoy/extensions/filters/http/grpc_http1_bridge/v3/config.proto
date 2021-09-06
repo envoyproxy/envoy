@@ -18,4 +18,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.grpc_http1_bridge.v2.Config";
+
+  // The Mapping from grpc status to http status
+  message StatusMapping {
+    uint32 grpc_status = 1;
+    uint32 http_status = 2;
+  }
+
+  // The Mapping form grpc status to http status for bad request.
+  repeated StatusMapping failure_mapping = 1; 
 }

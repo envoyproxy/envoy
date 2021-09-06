@@ -2,6 +2,7 @@
 
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.h"
 
 #include "source/common/grpc/context_impl.h"
 #include "source/common/runtime/runtime_features.h"
@@ -15,7 +16,8 @@ namespace GrpcHttp1Bridge {
  */
 class Http1BridgeFilter : public Http::StreamFilter {
 public:
-  explicit Http1BridgeFilter(Grpc::Context& context) : context_(context) {}
+  explicit Http1BridgeFilter(Grpc::Context& context, 
+    const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& config) : context_(context), config_(config) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -68,6 +70,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   absl::optional<Grpc::Context::RequestStatNames> request_stat_names_;
   Grpc::Context& context_;
+  const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& config_;
 };
 
 } // namespace GrpcHttp1Bridge

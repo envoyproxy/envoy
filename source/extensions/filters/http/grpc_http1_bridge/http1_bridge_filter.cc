@@ -98,9 +98,13 @@ void Http1BridgeFilter::setupHttp1Status(const Http::HeaderEntry* grpc_status,
   // of exception/error that the response was not complete.
   if (grpc_status) {
     uint64_t grpc_status_code;
-    if (!absl::SimpleAtoi(grpc_status->value().getStringView(), &grpc_status_code) ||
-        grpc_status_code != 0) {
-      response_headers_->setStatus(enumToInt(Http::Code::ServiceUnavailable));
+    if (absl::SimpleAtoi(grpc_status->value().getStringView(), &grpc_status_code)){
+      for (int i = 0; i < config_.failure_mapping_size(); i++) {
+        if (grpc_status_code == config_.failure_mapping(i).grpc_status()) {
+          response_headers_->setStatus(config_.failure_mapping(i).http_status()); 
+          break;
+        }
+      }
     }
     response_headers_->setGrpcStatus(grpc_status->value().getStringView());
   }
