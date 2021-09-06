@@ -5,6 +5,7 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.filters.http.squash":                                "//contrib/squash/filters/http/source:config",
+    "envoy.filters.http.sxg":                                   "//contrib/sxg/filters/http/source:config",
 
     #
     # Network filters

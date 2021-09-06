@@ -52,6 +52,9 @@ namespace CommonUtility = ::Envoy::Http2::Utility;
 
 class Http2CodecImplTestFixture {
 public:
+  static bool slowContainsStreamId(int id, ConnectionImpl& connection) {
+    return connection.slowContainsStreamId(id);
+  }
   // The Http::Connection::dispatch method does not throw (any more). However unit tests in this
   // file use codecs for sending test data through mock network connections to the codec under test.
   // It is infeasible to plumb error codes returned by the dispatch() method of the codecs under
@@ -406,6 +409,8 @@ TEST_P(Http2CodecImplTest, TrailerStatus) {
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  EXPECT_TRUE(Http2CodecImplTestFixture::slowContainsStreamId(1, *client_));
+  EXPECT_FALSE(Http2CodecImplTestFixture::slowContainsStreamId(100, *client_));
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
   EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));

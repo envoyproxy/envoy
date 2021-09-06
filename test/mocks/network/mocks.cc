@@ -133,7 +133,7 @@ MockFilterChainFactory::~MockFilterChainFactory() = default;
 
 MockListenSocket::MockListenSocket()
     : io_handle_(std::make_unique<NiceMock<MockIoHandle>>()),
-      address_provider_(std::make_shared<ConnectionInfoSetterImpl>(
+      connection_info_provider_(std::make_shared<ConnectionInfoSetterImpl>(
           std::make_shared<Address::Ipv4Instance>(80), nullptr)) {
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
@@ -143,7 +143,7 @@ MockListenSocket::MockListenSocket()
     return socket_is_open_;
   }));
   ON_CALL(*this, ipVersion())
-      .WillByDefault(Return(address_provider_->localAddress()->ip()->version()));
+      .WillByDefault(Return(connection_info_provider_->localAddress()->ip()->version()));
   ON_CALL(*this, duplicate()).WillByDefault(Invoke([]() {
     return std::make_unique<NiceMock<MockListenSocket>>();
   }));
@@ -157,13 +157,13 @@ MockSocketOption::~MockSocketOption() = default;
 
 MockConnectionSocket::MockConnectionSocket()
     : io_handle_(std::make_unique<IoSocketHandleImpl>()),
-      address_provider_(
+      connection_info_provider_(
           std::make_shared<ConnectionInfoSetterImpl>(std::make_shared<Address::Ipv4Instance>(80),
                                                      std::make_shared<Address::Ipv4Instance>(80))) {
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(*this, ipVersion())
-      .WillByDefault(Return(address_provider_->localAddress()->ip()->version()));
+      .WillByDefault(Return(connection_info_provider_->localAddress()->ip()->version()));
 }
 
 MockConnectionSocket::~MockConnectionSocket() = default;

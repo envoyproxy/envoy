@@ -9,7 +9,7 @@ from typing import (
     Any, AsyncGenerator, AsyncIterable, AsyncIterator, Awaitable, Iterable, Iterator, List,
     Optional, Union)
 
-from tools.base.functional import async_property
+from aio.functional import async_property
 
 
 class ConcurrentError(Exception):

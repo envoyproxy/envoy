@@ -416,6 +416,13 @@ public:
     EXPECT_EQ(FilterStatus::Continue, router_->setEnd());
   }
 
+  void sendPassthroughData() {
+    Buffer::OwnedImpl buffer;
+    buffer.add("hello");
+
+    EXPECT_EQ(FilterStatus::Continue, router_->passthroughData(buffer));
+  }
+
   void completeRequest() {
     for (auto& protocol : all_protocols_) {
       EXPECT_CALL(*protocol, writeMessageEnd(_));
@@ -1587,6 +1594,7 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
   sendTrivialMap();
   sendTrivialList();
   sendTrivialSet();
+  sendPassthroughData();
 
   completeRequest();
   returnResponse();
