@@ -173,8 +173,11 @@ AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::st
                                               std::chrono::milliseconds timeout,
                                               Event::Dispatcher* dispatcher) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
+  while (true) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (findCounter(store, name) != nullptr && findCounter(store, name)->value() == value) {
+      break;
+    }
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
       std::string current_value;
       if (findCounter(store, name)) {
@@ -196,8 +199,11 @@ AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::st
                                               uint64_t value, Event::TestTimeSystem& time_system,
                                               std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
+  while (true) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (findCounter(store, name) != nullptr && findCounter(store, name)->value() >= value) {
+      break;
+    }
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
       return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
     }
@@ -209,8 +215,11 @@ AssertionResult TestUtility::waitForGaugeGe(Stats::Store& store, const std::stri
                                             uint64_t value, Event::TestTimeSystem& time_system,
                                             std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
+  while (true) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (findGauge(store, name) != nullptr && findGauge(store, name)->value() >= value) {
+      break;
+    }
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
       return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
     }
@@ -222,8 +231,11 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
                                             uint64_t value, Event::TestTimeSystem& time_system,
                                             std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
+  while (true) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (findGauge(store, name) != nullptr && findGauge(store, name)->value() == value) {
+      break;
+    }
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
       std::string current_value;
       if (findGauge(store, name)) {
