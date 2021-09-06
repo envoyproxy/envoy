@@ -100,7 +100,8 @@ public:
 class ConnPoolImplDispatcherBaseTest : public testing::Test {
 public:
   ConnPoolImplDispatcherBaseTest()
-      : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher("test_thread")),
+      : api_(Api::createApiForTest(time_system_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")),
         pool_(host_, Upstream::ResourcePriority::Default, *dispatcher_, nullptr, nullptr, state_) {
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
@@ -134,11 +135,6 @@ public:
   AttachContext context_;
   std::vector<TestActiveClient*> clients_;
 };
-
-/*
-class ConnPoolImplSimulatedTimeBaseTest : public Event::TestUsingSimulatedTime, public ConnPoolImplBaseTest {
-};
-*/
 
 TEST_F(ConnPoolImplBaseTest, DumpState) {
   std::stringstream out;
@@ -325,8 +321,8 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationBusy) {
   EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
 
   // Verify that advancing to just before the lifetime timeout doesn't drain the connection.
-  time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ - 1), *dispatcher_,
-                                 Event::Dispatcher::RunType::Block);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ - 1),
+                                 *dispatcher_, Event::Dispatcher::RunType::Block);
   EXPECT_EQ(0,
             clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
   EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
@@ -368,8 +364,8 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationReady) {
   EXPECT_EQ(false, clients_.back()->closed_);
 
   // Verify that advancing to just before the lifetime timeout doesn't close the connection.
-  time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ - 1), *dispatcher_,
-                                 Event::Dispatcher::RunType::Block);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ - 1),
+                                 *dispatcher_, Event::Dispatcher::RunType::Block);
   EXPECT_EQ(0,
             clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
   EXPECT_EQ(false, clients_.back()->closed_);
@@ -408,8 +404,8 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyClosed) {
 
   // Verify that advancing past the lifetime timeout does nothing to an active client
   // that is already closed.
-  time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ + 1), *dispatcher_,
-                                 Event::Dispatcher::RunType::Block);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ + 1),
+                                 *dispatcher_, Event::Dispatcher::RunType::Block);
   EXPECT_EQ(0,
             clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
 }
@@ -435,8 +431,8 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyDraining) {
 
   // Verify that advancing past the lifetime timeout does nothing to an active client
   // that is already draining.
-  time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ + 1), *dispatcher_,
-                                 Event::Dispatcher::RunType::Block);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ + 1),
+                                 *dispatcher_, Event::Dispatcher::RunType::Block);
   EXPECT_EQ(0,
             clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
 
