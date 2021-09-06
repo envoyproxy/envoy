@@ -444,6 +444,8 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyDraining) {
 
 // Remote close simulates the peer closing the connection.
 TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredRemoteClose) {
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());
+
   // Create a new stream using the pool
   EXPECT_CALL(pool_, instantiateActiveClient);
   pool_.newStreamImpl(context_);
@@ -470,6 +472,8 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredRemoteClose) {
 
 // Local close simulates what would happen for an idle timeout on a connection.
 TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredLocalClose) {
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());
+
   // Create a new stream using the pool
   EXPECT_CALL(pool_, instantiateActiveClient);
   pool_.newStreamImpl(context_);
