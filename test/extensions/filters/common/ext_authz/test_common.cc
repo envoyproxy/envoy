@@ -82,8 +82,13 @@ Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_cod
   }
   if (!downstream_headers.empty()) {
     for (auto& header : downstream_headers) {
-      authz_response.response_headers_to_add.emplace_back(
-          Http::LowerCaseString(header.header().key()), header.header().value());
+      if (header.append().value()) {
+        authz_response.response_headers_to_add.emplace_back(
+            Http::LowerCaseString(header.header().key()), header.header().value());
+      } else {
+        authz_response.response_headers_to_set.emplace_back(
+            Http::LowerCaseString(header.header().key()), header.header().value());
+      }
     }
   }
   return authz_response;

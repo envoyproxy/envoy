@@ -50,9 +50,8 @@ message DeniedHttpResponse {
   // code to the downstream client other than 403 (Forbidden).
   type.v3.HttpStatus status = 1 [(validate.rules).message = {required: true}];
 
-  // This field allows the authorization service to send HTTP response headers
-  // to the downstream client. Note that the :ref:`append field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` defaults to
-  // false when used in this message.
+  // This field allows the authorization service to send HTTP response headers to the downstream
+  // client.
   repeated config.core.v3.HeaderValueOption headers = 2;
 
   // This field allows the authorization service to send a response body data
@@ -68,10 +67,9 @@ message OkHttpResponse {
 
   // HTTP entity headers in addition to the original request headers. This allows the authorization
   // service to append, to add or to override headers from the original request before
-  // dispatching it to the upstream. Note that the :ref:`append field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` defaults to
-  // false when used in this message. By setting the `append` field to `true`,
+  // dispatching it to the upstream. By leaving the `append` field to `true`,
   // the filter will append the correspondent header value to the matched request header.
-  // By leaving `append` as false, the filter will either add a new header, or override an existing
+  // By setting `append` as false, the filter will either add a new header, or override an existing
   // one if there is a match.
   repeated config.core.v3.HeaderValueOption headers = 2;
 
@@ -99,9 +97,8 @@ message OkHttpResponse {
   google.protobuf.Struct dynamic_metadata = 3
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // This field allows the authorization service to send HTTP response headers
-  // to the downstream client on success. Note that the :ref:`append field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>`
-  // defaults to false when used in this message.
+  // This field allows the authorization service to send HTTP response headers to the downstream
+  // client on success.
   repeated config.core.v3.HeaderValueOption response_headers_to_add = 6;
 }
 

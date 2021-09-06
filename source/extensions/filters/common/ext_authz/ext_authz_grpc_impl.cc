@@ -57,10 +57,17 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
           authz_response->headers_to_remove.push_back(Http::LowerCaseString(header));
         }
       }
+
+      // These two vectors hold header overrides of encoded response headers.
       if (response->ok_response().response_headers_to_add_size() > 0) {
         for (const auto& header : response->ok_response().response_headers_to_add()) {
-          authz_response->response_headers_to_add.emplace_back(
-              Http::LowerCaseString(header.header().key()), header.header().value());
+          if (header.append().value()) {
+            authz_response->response_headers_to_add.emplace_back(
+                Http::LowerCaseString(header.header().key()), header.header().value());
+          } else {
+            authz_response->response_headers_to_set.emplace_back(
+                Http::LowerCaseString(header.header().key()), header.header().value());
+          }
         }
       }
     }

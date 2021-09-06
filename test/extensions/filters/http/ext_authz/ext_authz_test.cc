@@ -1744,8 +1744,13 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   response.headers_to_append = Http::HeaderVector{{request_header_key, "bar"}};
   response.headers_to_set = Http::HeaderVector{{key_to_add, "foo"}, {key_to_override, "bar"}};
   response.headers_to_remove = std::vector<Http::LowerCaseString>{key_to_remove};
+  // This cookie will be appended to the encoded headers.
   response.response_headers_to_add =
-      Http::HeaderVector{{Http::LowerCaseString{"cookie"}, "flavor=gingerbread"}};
+      Http::HeaderVector{{Http::LowerCaseString{"set-cookie"}, "cookie2=gingerbread"}};
+  // This "should-be-overridden" header value from the auth server will override the
+  // "should-be-overridden" entry from the upstream server.
+  response.response_headers_to_set = Http::HeaderVector{
+      {Http::LowerCaseString{"should-be-overridden"}, "finally-set-by-auth-server"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -1766,14 +1771,22 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   EXPECT_EQ(request_headers_.has(key_to_remove), false);
 
   Buffer::OwnedImpl response_data{};
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"set-cookie", "cookie1=snickerdoodle"},
+      {"should-be-overridden", "originally-set-by-upstream"}};
   Http::TestResponseTrailerMapImpl response_trailers{};
   Http::MetadataMap response_metadata{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(response_metadata));
-  EXPECT_EQ(response_headers.get_("cookie"), "flavor=gingerbread");
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(response_headers,
+                                                        Http::LowerCaseString("set-cookie"))
+                .result()
+                .value(),
+            "cookie1=snickerdoodle,cookie2=gingerbread");
+  EXPECT_EQ(response_headers.get_("should-be-overridden"), "finally-set-by-auth-server");
 }
 
 // Test that an synchronous denied response from the authorization service, on the call stack,
