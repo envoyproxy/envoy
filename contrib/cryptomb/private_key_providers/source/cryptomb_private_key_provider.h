@@ -56,25 +56,7 @@ private:
   Event::SchedulableCallbackPtr schedulable_{};
 };
 
-// CryptoMbEcdsaContext is a CryptoMbContext which holds the extra EC parameters and has
-// custom initialization function.
-class CryptoMbEcdsaContext : public CryptoMbContext {
-public:
-  CryptoMbEcdsaContext(bssl::UniquePtr<EVP_PKEY> pkey, Event::Dispatcher& dispatcher,
-                       Ssl::PrivateKeyConnectionCallbacks& cb)
-      : CryptoMbContext(dispatcher, cb), ec_key_(EVP_PKEY_get1_EC_KEY(pkey.get())) {}
-  ~CryptoMbEcdsaContext() override { BN_free(&k_); }
-  bool ecdsaInit(const uint8_t* in, size_t in_len);
-
-  // ECDSA key.
-  bssl::UniquePtr<EC_KEY> ec_key_{};
-  // EC parameters.
-  BIGNUMConstPtr s_{}; // secret key
-  BIGNUM k_{};         // integer, chosen by HMAC of s and msg
-  size_t ecdsa_sig_size_{};
-};
-
-// CryptoMbEcdsaContext is a CryptoMbContext which holds the extra RSA parameters and has
+// CryptoMbRsaContext is a CryptoMbContext which holds the extra RSA parameters and has
 // custom initialization function. It also has a separate buffer for RSA result
 // verification.
 class CryptoMbRsaContext : public CryptoMbContext {
@@ -104,7 +86,6 @@ public:
 
 using CryptoMbContextSharedPtr = std::shared_ptr<CryptoMbContext>;
 using CryptoMbRsaContextSharedPtr = std::shared_ptr<CryptoMbRsaContext>;
-using CryptoMbEcdsaContextSharedPtr = std::shared_ptr<CryptoMbEcdsaContext>;
 
 // CryptoMbQueue maintains the request queue and is able to process it.
 class CryptoMbQueue : public Logger::Loggable<Logger::Id::connection> {
@@ -118,7 +99,6 @@ public:
 private:
   void processRequests();
   void processRsaRequests();
-  void processEcdsaRequests();
   void startTimer();
   void stopTimer();
 
