@@ -296,10 +296,6 @@ static void keylogCallback(const SSL* ssl, const char* line) {
   if (ssl == nullptr) {
     return;
   }
-  /*
-   * There might be concurrent writers to the key log file, so we must ensure
-   * that the given line is written at once.
-   */
   BIO* bio_keylog = static_cast<BIO*> SSL_get_app_data(ssl);
   BIO_printf(bio_keylog, "%s\n", line);
   (void)BIO_flush(bio_keylog);
@@ -307,7 +303,6 @@ static void keylogCallback(const SSL* ssl, const char* line) {
 
 int SslSocket::setSSLKeyLog(bool enable) {
   const char* keylog_file = "/tmp/tls.log";
-  /* Close any open files */
   if (bio_keylog_ != nullptr) {
     BIO_free_all(bio_keylog_);
     bio_keylog_ = nullptr;
@@ -315,8 +310,6 @@ int SslSocket::setSSLKeyLog(bool enable) {
 
   SSL_CTX* ctx = SSL_get_SSL_CTX(rawSslForTest());
   if (ctx == nullptr || keylog_file == nullptr) {
-    ENVOY_LOG(debug, "ctx or keylog file is null");
-    /* key log is disabled, OK. */
     return -1;
   }
   if (!enable) {
@@ -332,7 +325,6 @@ int SslSocket::setSSLKeyLog(bool enable) {
    */
   bio_keylog_ = BIO_new_file(keylog_file, "a");
   if (bio_keylog_ == nullptr) {
-    ENVOY_LOG(debug, "NO key log file, {}", Envoy::errorDetails(errno));
     return -1;
   }
 
