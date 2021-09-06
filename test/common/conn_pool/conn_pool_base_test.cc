@@ -4,6 +4,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -95,6 +96,49 @@ public:
   AttachContext context_;
   std::vector<TestActiveClient*> clients_;
 };
+
+class ConnPoolImplDispatcherBaseTest : public testing::Test {
+public:
+  ConnPoolImplDispatcherBaseTest()
+      : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher("test_thread")),
+        pool_(host_, Upstream::ResourcePriority::Default, *dispatcher_, nullptr, nullptr, state_) {
+    // Default connections to 1024 because the tests shouldn't be relying on the
+    // connection resource limit for most tests.
+    cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
+    ON_CALL(pool_, instantiateActiveClient).WillByDefault(Invoke([&]() -> ActiveClientPtr {
+      auto ret =
+          std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_, concurrent_streams_);
+      clients_.push_back(ret.get());
+      ret->real_host_description_ = descr_;
+      return ret;
+    }));
+    ON_CALL(pool_, onPoolReady(_, _))
+        .WillByDefault(Invoke([](ActiveClient& client, AttachContext&) -> void {
+          ++(reinterpret_cast<TestActiveClient*>(&client)->active_streams_);
+        }));
+  }
+
+  Event::SimulatedTimeSystemHelper time_system_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  uint32_t max_connection_duration_ = 5000;
+  uint32_t stream_limit_ = 100;
+  uint32_t concurrent_streams_ = 1;
+  Upstream::ClusterConnectivityState state_;
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> descr_{
+      new NiceMock<Upstream::MockHostDescription>()};
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
+  Upstream::HostSharedPtr host_{
+      Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", dispatcher_->timeSource())};
+  TestConnPoolImplBase pool_;
+  AttachContext context_;
+  std::vector<TestActiveClient*> clients_;
+};
+
+/*
+class ConnPoolImplSimulatedTimeBaseTest : public Event::TestUsingSimulatedTime, public ConnPoolImplBaseTest {
+};
+*/
 
 TEST_F(ConnPoolImplBaseTest, DumpState) {
   std::stringstream out;
@@ -206,9 +250,7 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPreconnectNotHealthy) {
   EXPECT_FALSE(pool_.maybePreconnectImpl(1));
 }
 
-TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationTimerNull) {
-  testing::InSequence s;
-
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerNull) {
   ON_CALL(*cluster_, maxConnectionDuration).WillByDefault(Return(absl::nullopt));
 
   // Create a new stream using the pool
@@ -237,11 +279,9 @@ TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationTimerNull) {
   pool_.startDrainImpl();
 }
 
-TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationTimerEnabled) {
-  testing::InSequence s;
-
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerEnabled) {
   ON_CALL(*cluster_, maxConnectionDuration)
-      .WillByDefault(Return(absl::optional<std::chrono::milliseconds>(900000)));
+      .WillByDefault(Return(absl::optional<std::chrono::milliseconds>(max_connection_duration_)));
 
   // Create a new stream using the pool
   EXPECT_CALL(pool_, instantiateActiveClient);
@@ -269,7 +309,10 @@ TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationTimerEnabled) {
   pool_.startDrainImpl();
 }
 
-TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationBusy) {
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationBusy) {
+  ON_CALL(*cluster_, maxConnectionDuration)
+      .WillByDefault(Return(absl::optional<std::chrono::milliseconds>(max_connection_duration_)));
+
   // Create a new stream using the pool
   EXPECT_CALL(pool_, instantiateActiveClient);
   pool_.newStreamImpl(context_);
@@ -281,8 +324,17 @@ TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationBusy) {
   clients_.back()->onEvent(Network::ConnectionEvent::Connected);
   EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
 
-  // Verify that the onLifetimeTimeout transitions a busy client to draining
-  clients_.back()->onLifetimeTimeout();
+  // Verify that advancing to just before the lifetime timeout doesn't drain the connection.
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ - 1), *dispatcher_,
+                                 Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(0,
+            clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
+  EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
+
+  // Verify that advancing past the lifetime timeout drains the connection,
+  // because there's a busy client.
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(2), *dispatcher_,
+                                 Event::Dispatcher::RunType::Block);
   EXPECT_EQ(1,
             clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
   EXPECT_EQ(ActiveClient::State::DRAINING, clients_.back()->state());
@@ -294,7 +346,10 @@ TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationBusy) {
   EXPECT_EQ(true, clients_.back()->closed_);
 }
 
-TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationReady) {
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationReady) {
+  ON_CALL(*cluster_, maxConnectionDuration)
+      .WillByDefault(Return(absl::optional<std::chrono::milliseconds>(max_connection_duration_)));
+
   // Create a new stream using the pool
   EXPECT_CALL(pool_, instantiateActiveClient);
   pool_.newStreamImpl(context_);
@@ -312,15 +367,26 @@ TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationReady) {
   EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
   EXPECT_EQ(false, clients_.back()->closed_);
 
-  // Verify that the onLifetimeTimeout transitions a ready client to closed,
-  // because there are no active streams.
-  clients_.back()->onLifetimeTimeout();
+  // Verify that advancing to just before the lifetime timeout doesn't close the connection.
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ - 1), *dispatcher_,
+                                 Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(0,
+            clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
+  EXPECT_EQ(false, clients_.back()->closed_);
+
+  // Verify that advancing past the lifetime timeout closes the connection,
+  // because there's nothing to drain.
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(2), *dispatcher_,
+                                 Event::Dispatcher::RunType::Block);
   EXPECT_EQ(1,
             clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
   EXPECT_EQ(true, clients_.back()->closed_);
 }
 
-TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationAlreadyClosed) {
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyClosed) {
+  ON_CALL(*cluster_, maxConnectionDuration)
+      .WillByDefault(Return(absl::optional<std::chrono::milliseconds>(max_connection_duration_)));
+
   // Use a stream limit of 1 to force draining.
   stream_limit_ = 1;
 
@@ -340,14 +406,19 @@ TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationAlreadyClosed) {
   pool_.onStreamClosed(*clients_.back(), false);
   EXPECT_EQ(true, clients_.back()->closed_);
 
-  // Verify that the onLifetimeTimeout does nothing to an active client
+  // Verify that advancing past the lifetime timeout does nothing to an active client
   // that is already closed.
-  clients_.back()->onLifetimeTimeout();
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ + 1), *dispatcher_,
+                                 Event::Dispatcher::RunType::Block);
   EXPECT_EQ(0,
             clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
 }
 
-TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationAlreadyDraining) {
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyDraining) {
+
+  ON_CALL(*cluster_, maxConnectionDuration)
+      .WillByDefault(Return(absl::optional<std::chrono::milliseconds>(max_connection_duration_)));
+
   // Use a stream limit of 1 to force draining.
   stream_limit_ = 1;
 
@@ -362,9 +433,10 @@ TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationAlreadyDraining) {
   clients_.back()->onEvent(Network::ConnectionEvent::Connected);
   EXPECT_EQ(ActiveClient::State::DRAINING, clients_.back()->state());
 
-  // Verify that the onLifetimeTimeout does nothing to an active client
+  // Verify that advancing past the lifetime timeout does nothing to an active client
   // that is already draining.
-  clients_.back()->onLifetimeTimeout();
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ + 1), *dispatcher_,
+                                 Event::Dispatcher::RunType::Block);
   EXPECT_EQ(0,
             clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
 
@@ -376,8 +448,6 @@ TEST_F(ConnPoolImplBaseTest, MaxConnectionDurationAlreadyDraining) {
 
 // Remote close simulates the peer closing the connection.
 TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredRemoteClose) {
-  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());
-
   // Create a new stream using the pool
   EXPECT_CALL(pool_, instantiateActiveClient);
   pool_.newStreamImpl(context_);
@@ -404,8 +474,6 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredRemoteClose) {
 
 // Local close simulates what would happen for an idle timeout on a connection.
 TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredLocalClose) {
-  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());
-
   // Create a new stream using the pool
   EXPECT_CALL(pool_, instantiateActiveClient);
   pool_.newStreamImpl(context_);
