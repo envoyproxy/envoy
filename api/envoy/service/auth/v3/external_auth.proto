@@ -62,10 +62,10 @@ message DeniedHttpResponse {
 
 // TODO: Should this be in the core API?
 message QueryParameterOption {
-  // The key of a the query parameter, should be non-empty.
-  string key = 1;
+  // The key of a the query parameter. Must be non-empty.
+  string key = 1 [(validate.rules).string = {min_len: 1}];
 
-  // The value of the query parameter, may be empty.
+  // The value of the query parameter. May be empty, e.g. for a query parameter such as `foo=`.
   string value = 2;
 
   // Whether to remove the query parameter with the above `key`.

@@ -286,7 +286,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       }
     }
 
-    if (!response->query_parameters_to_set.empty()) {
+    if (!response->query_parameters_to_remove.empty()) {
       if (!modified_query_parameters) {
         modified_query_parameters =
             Http::Utility::parseQueryString(request_headers_->Path()->value().getStringView());
@@ -309,7 +309,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       // Http::Utility::formatPathAndQueryParams
       const auto new_query_string =
           Http::Utility::queryParamsToString(modified_query_parameters.value());
-      absl::StrAppend(&new_path, path_without_query, "?", new_query_string);
+      absl::StrAppend(&new_path, path_without_query, new_query_string);
       ENVOY_STREAM_LOG(trace,
                        "ext_authz filter modified query parameter, using new path for request: {}",
                        *decoder_callbacks_, new_path);
