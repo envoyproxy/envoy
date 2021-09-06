@@ -441,7 +441,7 @@ public:
 
   Upstream::ClusterManager& clusterManager() { return config_->cluster_manager_; }
   void scriptError(const Filters::Common::Lua::LuaException& e);
-  virtual void scriptLog(spdlog::level::level_enum level, const char* message);
+  virtual void scriptLog(spdlog::level::level_enum level, absl::string_view message);
 
   // Http::StreamFilterBase
   void onDestroy() override;
