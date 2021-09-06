@@ -87,7 +87,6 @@ public:
     response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
 
     if (!add_me.empty()) {
-      const Http::Utility::QueryParams query_parameters_to_add{};
       for (const auto& [key, value] : add_me) {
         response.query_parameters_to_set[key] = value;
       }

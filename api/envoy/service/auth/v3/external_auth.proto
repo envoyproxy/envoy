@@ -116,9 +116,9 @@ message OkHttpResponse {
   // defaults to false when used in this message.
   repeated config.core.v3.HeaderValueOption response_headers_to_add = 6;
 
-  // This field allows the authorization service to set and potentially overwrite query
+  // This field allows the authorization service to set (and overwrite) query
   // string parameters on the original request before it is sent upstream.
-  repeated QueryParameterOption query_parameters_to_add = 7;
+  repeated QueryParameterOption query_parameters_to_set = 7;
 }
 
 // Intended for gRPC and Network Authorization servers `only`.
