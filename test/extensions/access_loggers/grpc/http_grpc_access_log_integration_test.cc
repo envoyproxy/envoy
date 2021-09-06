@@ -342,7 +342,7 @@ message:
         response_headers_bytes: 54
 )EOF")));
 
-  // test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_message_timeout", 1);
+  test_server_->waitForCounterEq("access_logs.grpc_access_log.critical_logs_message_timeout", 1);
   test_server_->waitForGaugeEq("access_logs.grpc_access_log.pending_critical_logs", 1);
   cleanup();
 }

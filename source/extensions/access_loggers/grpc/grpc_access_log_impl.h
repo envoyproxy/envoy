@@ -54,14 +54,13 @@ public:
 
       switch (message->status()) {
       case envoy::service::accesslog::v3::CriticalAccessLogsResponse::ACK:
-        parent_.inflight_message_ttl_->received(id);
         parent_.stats_.critical_logs_ack_received_.inc();
         parent_.stats_.pending_critical_logs_.dec();
-        parent_.client_->clearPendingMessage(id);
+        parent_.client_->onSuccess(id);
         break;
       case envoy::service::accesslog::v3::CriticalAccessLogsResponse::NACK:
         parent_.stats_.critical_logs_nack_received_.inc();
-        parent_.client_->bufferMessage(id);
+        parent_.client_->onError(id, true);
         break;
       default:
         return;
@@ -84,22 +83,50 @@ public:
         : dispatcher_(dispatcher), message_ack_timeout_(message_ack_timeout) {
       timer_ = dispatcher_.createTimer([this, &client, &stats] {
         const auto now = dispatcher_.timeSource().monotonicTime();
+        timeToString(now);
+        std::vector<MonotonicTime> expired_timepoints;
+        std::set<uint32_t> expired_message_ids;
 
-        std::cout << "deadline expired" << std::endl;
         auto it = deadline_.lower_bound(now);
+        std::cout << "current" << std::endl;
+        for (auto a : deadline_) {
+          timeToString(a.first);
+        }
+        std::cout << "expired" << std::endl;
         while (it != deadline_.end()) {
           for (auto&& id : it->second) {
-            if (received_ids_.find(id) != received_ids_.end()) {
-              received_ids_.erase(id);
-              continue;
-            }
-
-            client.bufferMessage(id);
-            stats.critical_logs_message_timeout_.inc();
+            expired_message_ids.emplace(id);
           }
+          expired_timepoints.push_back(it->first);
+          timeToString(it->first);
           ++it;
         }
+
+        for (auto&& id : expired_message_ids) {
+          const auto& message_buffer = client.messageBuffer();
+
+          if (message_buffer.find(id) == message_buffer.end()) {
+            continue;
+          }
+
+          auto& message = message_buffer.at(id);
+          if (message.first == Grpc::BufferState::Pending) {
+            client.onError(id, true);
+            // std::cout << stats.critical_logs_message_timeout_.value() << std::endl;
+            stats.critical_logs_message_timeout_.inc();
+
+
+
+            std::cout << stats.critical_logs_message_timeout_.value() << std::endl;
+          }
+        }
+
+        for (auto&& timepoint : expired_timepoints) {
+          deadline_.erase(timepoint);
+        }
+
         timer_->enableTimer(message_ack_timeout_);
+        std::cout << "==============" << std::endl;
       });
 
       timer_->enableTimer(message_ack_timeout_);
@@ -109,24 +136,27 @@ public:
     {
       auto microsecondsUTC = std::chrono::duration_cast<std::chrono::milliseconds>(t.time_since_epoch()).count();
 
-        std::cout << "It took me " << microsecondsUTC << " seconds." << std::endl;
+        std::cout << "It took me " << microsecondsUTC << " msec." << std::endl;
     }
 
     ~InflightMessageTtlManager() { timer_->disableTimer(); }
 
     void setDeadline(std::set<uint32_t>&& ids) {
       auto expires_at = dispatcher_.timeSource().monotonicTime() + message_ack_timeout_;
+      std::cout << "set deadline: expires at ";
+      timeToString(expires_at);
+      for (const auto& id: ids) {
+        std::cout << id << std::endl;
+      }
+      std::cout << "==========" << std::endl;
       deadline_.emplace(expires_at, std::move(ids));
     }
-
-    void received(uint32_t id) { received_ids_.emplace(id); }
 
   private:
     Event::Dispatcher& dispatcher_;
     std::chrono::milliseconds message_ack_timeout_;
     Event::TimerPtr timer_;
     std::map<MonotonicTime, std::set<uint32_t>, std::greater<>> deadline_;
-    std::set<uint32_t> received_ids_;
   };
 
   CriticalAccessLogger(const Grpc::RawAsyncClientSharedPtr& client,

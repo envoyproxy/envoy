@@ -30,13 +30,6 @@ public:
     current_buffer_bytes_ += buffer_size;
   }
 
-  void bufferMessage(uint32_t id) {
-    if (message_buffer_.find(id) == message_buffer_.end()) {
-      return;
-    }
-    message_buffer_.at(id).first = BufferState::Buffered;
-  }
-
   std::set<uint32_t> sendBufferedMessages() {
     if (active_stream_ == nullptr) {
       active_stream_ =
@@ -65,17 +58,28 @@ public:
     return inflight_message_ids;
   }
 
-  void clearPendingMessage(uint32_t id) {
-    if (message_buffer_.find(id) == message_buffer_.end()) {
+  void onSuccess(uint32_t message_id) {
+    if (message_buffer_.find(message_id) == message_buffer_.end()) {
       return;
     }
-    auto& buffer = message_buffer_.at(id);
+    auto& buffer = message_buffer_.at(message_id);
 
     if (buffer.first == BufferState::Pending) {
-      std::cout << id << " cleared" << std::endl;
       const auto buffer_size = buffer.second.ByteSizeLong();
       current_buffer_bytes_ -= buffer_size;
-      message_buffer_.erase(id);
+      message_buffer_.erase(message_id);
+    }
+  }
+
+  void onError(uint32_t message_id, bool rebuffer) {
+    if (message_buffer_.find(message_id) == message_buffer_.end()) {
+      return;
+    }
+
+    if (rebuffer) {
+      message_buffer_.at(message_id).first = BufferState::Buffered;
+    } else {
+      message_buffer_.erase(message_id);
     }
   }
 
@@ -86,6 +90,8 @@ public:
   }
 
   bool hasActiveStream() { return active_stream_ != nullptr; }
+
+  const absl::flat_hash_map<uint32_t, std::pair<BufferState, RequestType>>& messageBuffer() { return message_buffer_; }
 
 private:
   uint32_t max_buffer_bytes_ = 0;
