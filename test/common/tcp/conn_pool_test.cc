@@ -342,7 +342,7 @@ public:
     EXPECT_CALL(*connect_timer_, disableTimer());
     EXPECT_CALL(callbacks_->pool_ready_, ready());
     connection_->raiseEvent(Network::ConnectionEvent::Connected);
-    connection_->stream_info_.downstream_address_provider_->setSslConnection(ssl_);
+    connection_->stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_);
   }
 
   bool test_new_connection_pool_;

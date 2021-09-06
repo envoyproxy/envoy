@@ -207,6 +207,8 @@ void Router::onDestroy() {
   for (auto& shadow_router : shadow_routers_) {
     shadow_router.get().onRouterDestroy();
   }
+
+  shadow_routers_.clear();
 }
 
 void Router::setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) {

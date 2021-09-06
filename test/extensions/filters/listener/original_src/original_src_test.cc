@@ -38,7 +38,8 @@ public:
   }
 
   void setAddressToReturn(const std::string& address) {
-    callbacks_.socket_.address_provider_->setRemoteAddress(Network::Utility::resolveUrl(address));
+    callbacks_.socket_.connection_info_provider_->setRemoteAddress(
+        Network::Utility::resolveUrl(address));
   }
 
 protected:
@@ -81,8 +82,8 @@ TEST_F(OriginalSrcTest, OnNewConnectionIpv4AddressAddsOption) {
 
   NiceMock<Network::MockConnectionSocket> socket;
   options->at(0)->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
-  EXPECT_EQ(*socket.addressProvider().localAddress(),
-            *callbacks_.socket_.addressProvider().remoteAddress());
+  EXPECT_EQ(*socket.connectionInfoProvider().localAddress(),
+            *callbacks_.socket_.connectionInfoProvider().remoteAddress());
 }
 
 TEST_F(OriginalSrcTest, OnNewConnectionIpv4AddressUsesCorrectAddress) {
@@ -115,7 +116,7 @@ TEST_F(OriginalSrcTest, OnNewConnectionIpv4AddressBleachesPort) {
   // not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
   // for now.
   options->at(0)->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
-  EXPECT_EQ(*socket.addressProvider().localAddress(), *expected_address);
+  EXPECT_EQ(*socket.connectionInfoProvider().localAddress(), *expected_address);
 }
 
 TEST_F(OriginalSrcTest, FilterAddsTransparentOption) {

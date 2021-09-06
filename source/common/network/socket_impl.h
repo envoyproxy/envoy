@@ -72,10 +72,12 @@ public:
              const Address::InstanceConstSharedPtr& remote_address);
 
   // Network::Socket
-  ConnectionInfoSetter& addressProvider() override { return *address_provider_; }
-  const ConnectionInfoProvider& addressProvider() const override { return *address_provider_; }
-  ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
-    return address_provider_;
+  ConnectionInfoSetter& connectionInfoProvider() override { return *connection_info_provider_; }
+  const ConnectionInfoProvider& connectionInfoProvider() const override {
+    return *connection_info_provider_;
+  }
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return connection_info_provider_;
   }
   SocketPtr duplicate() override {
     // Implementing the functionality here for all sockets is tricky because it leads
@@ -128,7 +130,7 @@ protected:
              const Address::InstanceConstSharedPtr& remote_address);
 
   const IoHandlePtr io_handle_;
-  const std::shared_ptr<ConnectionInfoSetterImpl> address_provider_;
+  const std::shared_ptr<ConnectionInfoSetterImpl> connection_info_provider_;
   OptionsSharedPtr options_;
   Socket::Type sock_type_;
   Address::Type addr_type_;

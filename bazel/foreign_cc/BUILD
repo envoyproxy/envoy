@@ -37,6 +37,32 @@ cc_library(
     ],
 )
 
+# Kafka client dependency used by Kafka-mesh filter.
+# librdkafka build generates extra headers that need to be copied into source to get it to compile.
+configure_make(
+    name = "librdkafka_build",
+    configure_in_place = True,
+    configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd && cp Makefile.config src/.. && cp config.h src/.."],
+    lib_source = "@edenhill_librdkafka//:all",
+    make_commands = [
+        "make ARFLAGS='' libs install-subdirs",
+    ],
+    static_libraries = [
+        "librdkafka.a",
+        "librdkafka++.a",
+    ],
+    tags = ["skip_on_windows"],
+    alwayslink = True,
+)
+
+cc_library(
+    name = "librdkafka",
+    tags = ["skip_on_windows"],
+    deps = [
+        "librdkafka_build",
+    ],
+)
+
 configure_make(
     name = "luajit",
     configure_command = "build.py",
@@ -74,6 +100,24 @@ configure_make(
     out_include_dir = "include/moonjit-2.2",
     static_libraries = ["libluajit-5.1.a"],
     tags = ["skip_on_windows"],
+)
+
+envoy_cmake_external(
+    name = "libsxg",
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SXG_BUILD_EXECUTABLES": "off",
+        "SXG_BUILD_SHARED": "off",
+        "SXG_BUILD_STATIC": "on",
+        "SXG_WITH_CERT_CHAIN": "off",
+        "RUN_TEST": "off",
+        "CMAKE_INSTALL_LIBDIR": "lib",
+        "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
+    },
+    lib_source = "@com_github_google_libsxg//:all",
+    static_libraries = ["libsxg.a"],
+    tags = ["skip_on_windows"],
+    deps = ["@boringssl//:ssl"],
 )
 
 envoy_cmake_external(
