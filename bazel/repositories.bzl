@@ -77,10 +77,14 @@ def _envoy_repo_impl(repository_ctx):
     constraints of a `genquery`.
 
     """
+
     repo_path = repository_ctx.path(repository_ctx.attr.envoy_root).dirname
     version = repository_ctx.read(repo_path.get_child("VERSION")).strip()
     repository_ctx.file("version.bzl", "VERSION = '%s'" % version)
     repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'" % (repo_path, version))
+    data_root = repo_path.get_child("tools").get_child("data")
+    for child in data_root.readdir():
+        repository_ctx.symlink(child, child.basename)
     repository_ctx.file("WORKSPACE", "")
     repository_ctx.file("BUILD", """
 load("@rules_python//python:defs.bzl", "py_library")

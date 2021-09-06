@@ -280,6 +280,7 @@ class FormatChecker:
         self.operation_type = args.operation_type
         self.target_path = args.target_path
         self.api_prefix = args.api_prefix
+        self.data_prefix = args.data_prefix
         self.envoy_build_rule_check = not args.skip_envoy_build_rule_check
         self.namespace_check = args.namespace_check
         self.namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
@@ -490,6 +491,9 @@ class FormatChecker:
         if basename in {"BUILD", "BUILD.bazel"} or basename.endswith(".BUILD"):
             return True
         return False
+
+    def is_data_file(self, file_path):
+        return file_path.startswith(self.data_prefix)
 
     def is_external_build_file(self, file_path):
         return self.is_build_file(file_path) and (
@@ -884,6 +888,7 @@ class FormatChecker:
                 "//source/common/protobuf instead.")
         if (self.envoy_build_rule_check and not self.is_starlark_file(file_path)
                 and not self.is_workspace_file(file_path)
+                and not self.is_data_file(file_path)
                 and not self.is_external_build_file(file_path) and "@envoy//" in line):
             report_error("Superfluous '@envoy//' prefix")
         if not self.allow_listed_for_build_urls(file_path) and (" urls = " in line
@@ -893,6 +898,7 @@ class FormatChecker:
     def fix_build_line(self, file_path, line, line_number):
         if (self.envoy_build_rule_check and not self.is_starlark_file(file_path)
                 and not self.is_workspace_file(file_path)
+                and not self.is_data_file(file_path)
                 and not self.is_external_build_file(file_path)):
             line = line.replace("@envoy//", "//")
         return line
@@ -1123,6 +1129,7 @@ if __name__ == "__main__":
         default=multiprocessing.cpu_count(),
         help="number of worker processes to use; defaults to one per core.")
     parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
+    parser.add_argument("--data-prefix", type=str, default="./tools/data", help="path of the tools data tree.")
     parser.add_argument(
         "--skip_envoy_build_rule_check",
         action="store_true",

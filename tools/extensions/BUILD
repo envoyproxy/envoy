@@ -7,6 +7,10 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+exports_files([
+    "extension_security_postures_metadata.yaml",
+])
+
 envoy_py_binary(
     name = "tools.extensions.extensions_check",
     data = [
