@@ -266,3 +266,10 @@ filegroup(
     ],
     visibility = ["//visibility:public"],
 )
+
+genquery(
+    name = "v3_proto_srcs",
+    expression = "labels(srcs, labels(deps, @envoy_api//:v3_protos))",
+    scope = ["@envoy_api//:v3_protos"],
+    visibility = ["//visibility:public"],
+)

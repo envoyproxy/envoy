@@ -33,6 +33,7 @@ def envoy_py_library(
         name = None,
         deps = [],
         data = [],
+        srcs = [],
         visibility = ["//visibility:public"],
         envoy_prefix = "",
         test = True):
@@ -42,7 +43,7 @@ def envoy_py_library(
 
     py_library(
         name = name,
-        srcs = ["%s.py" % name],
+        srcs = srcs or ["%s.py" % name],
         deps = deps,
         data = data,
         visibility = visibility,
@@ -54,6 +55,8 @@ def envoy_py_binary(
         name = None,
         deps = [],
         data = [],
+        args = [],
+        srcs = [],
         visibility = ["//visibility:public"],
         envoy_prefix = "@envoy",
         test = True):
@@ -63,9 +66,10 @@ def envoy_py_binary(
 
     py_binary(
         name = name,
-        srcs = ["%s.py" % name],
+        srcs = ["%s.py" % name] + srcs,
         deps = deps,
         data = data,
+        args = args,
         visibility = visibility,
     )
 
