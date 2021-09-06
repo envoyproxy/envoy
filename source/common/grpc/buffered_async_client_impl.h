@@ -58,7 +58,34 @@ public:
     return inflight_message_ids;
   }
 
-  void onSuccess(uint32_t message_id) {
+  void onSuccess(uint32_t message_id) { eraseBuffer(message_id); }
+
+  void onError(uint32_t message_id, bool rebuffer) {
+    if (message_buffer_.find(message_id) == message_buffer_.end()) {
+      return;
+    }
+
+    if (rebuffer) {
+      message_buffer_.at(message_id).first = BufferState::Buffered;
+    } else {
+      eraseBuffer(message_id);
+    }
+  }
+
+  void cleanup() {
+    if (active_stream_ != nullptr) {
+      active_stream_ = nullptr;
+    }
+  }
+
+  bool hasActiveStream() { return active_stream_ != nullptr; }
+
+  const absl::flat_hash_map<uint32_t, std::pair<BufferState, RequestType>>& messageBuffer() {
+    return message_buffer_;
+  }
+
+private:
+  void eraseBuffer(uint32_t message_id) {
     if (message_buffer_.find(message_id) == message_buffer_.end()) {
       return;
     }
@@ -71,29 +98,6 @@ public:
     }
   }
 
-  void onError(uint32_t message_id, bool rebuffer) {
-    if (message_buffer_.find(message_id) == message_buffer_.end()) {
-      return;
-    }
-
-    if (rebuffer) {
-      message_buffer_.at(message_id).first = BufferState::Buffered;
-    } else {
-      message_buffer_.erase(message_id);
-    }
-  }
-
-  void cleanup() {
-    if (active_stream_ != nullptr) {
-      active_stream_ = nullptr;
-    }
-  }
-
-  bool hasActiveStream() { return active_stream_ != nullptr; }
-
-  const absl::flat_hash_map<uint32_t, std::pair<BufferState, RequestType>>& messageBuffer() { return message_buffer_; }
-
-private:
   uint32_t max_buffer_bytes_ = 0;
   const Protobuf::MethodDescriptor& service_method_;
   Grpc::AsyncStreamCallbacks<ResponseType>& callbacks_;

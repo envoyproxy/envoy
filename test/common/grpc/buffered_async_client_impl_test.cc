@@ -64,7 +64,7 @@ TEST_F(BufferedAsyncClientTest, BasicSendFlow) {
   EXPECT_EQ(1, buffered_client.sendBufferedMessages().size());
 
   // Re-buffer, and transport.
-  buffered_client.bufferMessage(id);
+  buffered_client.onError(id, true);
 
   EXPECT_CALL(http_stream, sendData(_, _)).Times(2);
   EXPECT_CALL(http_stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
@@ -78,7 +78,7 @@ TEST_F(BufferedAsyncClientTest, BasicSendFlow) {
 
   // Clear existing messages.
   for (auto&& id : ids2) {
-    buffered_client.clearPendingMessage(id);
+    buffered_client.onSuccess(id);
   }
 
   // Successfully cleared pending messages.
