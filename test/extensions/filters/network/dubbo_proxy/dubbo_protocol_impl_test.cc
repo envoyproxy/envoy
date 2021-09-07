@@ -160,6 +160,7 @@ TEST(DubboProtocolImplTest, HeartBeatResponseTest) {
 
   Buffer::OwnedImpl buffer;
   DubboProtocolImpl dubbo_protocol;
+  dubbo_protocol.initSerializer(SerializationType::Hessian2);
   EXPECT_TRUE(dubbo_protocol.encode(buffer, metadata, "", RpcResponseType::ResponseWithValue));
   // 16 bytes header and one byte null object body.
   EXPECT_EQ(17, buffer.length());
