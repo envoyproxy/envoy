@@ -159,6 +159,7 @@ TEST(DubboProtocolImplTest, HeartBeatResponseTest) {
   metadata.setRequestId(100);
 
   Buffer::OwnedImpl buffer;
+  DubboProtocolImpl dubbo_protocol;
   EXPECT_TRUE(dubbo_protocol.encode(buffer, metadata, ""));
   // 16 bytes header and one byte null object body.
   EXPECT_EQ(17, buffer.length());

@@ -184,6 +184,8 @@ bool DubboProtocolImpl::encode(Buffer::Instance& buffer, const MessageMetadata& 
     buffer.writeByte(static_cast<uint8_t>(metadata.responseStatus()));
     buffer.writeBEInt<uint64_t>(metadata.requestId());
     // Body of heart beat response is null.
+    // TODO(wbpcode): Currently we only support the Hessian2 serialization scheme, so here we
+    // directly use the 'N' for null object in Hessian2. This coupling should be unnecessary.
     buffer.writeBEInt<uint32_t>(1u);
     buffer.writeByte('N');
     return true;
