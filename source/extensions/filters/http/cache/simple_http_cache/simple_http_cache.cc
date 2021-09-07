@@ -127,9 +127,6 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
     return;
   }
 
-  // using CustomHeaderRegistryHandle =
-  //   Http::CustomInlineHeaderRegistry::Handle<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>;
-
   // Skip headers that we don't want to update because of specific reasons
   static const auto* headersNotToUpdate = new absl::flat_hash_set<Http::LowerCaseString>({
       // The age is calculated and set by the general cache_filter code logic.
@@ -154,7 +151,6 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
   // Race conditions would not be possible because we are always processing up-to-date data.
   // 2. No key collision for etag. Therefore, if etag matches it's the same resource.
   // 3. Backend is correct. etag is being used as a unique identifier to the resource
-  // TODO(tangsaidi) merge the header map instead of replacing it according to rfc7234
   response_headers.iterate(
       [&entry](const Http::HeaderEntry& response_header) -> Http::HeaderMap::Iterate {
         Http::LowerCaseString lower_case_key{response_header.key().getStringView()};
@@ -165,7 +161,6 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
         entry.response_headers_->addCopy(lower_case_key, response_header.value().getStringView());
         return Http::HeaderMap::Iterate::Continue;
       });
-  entry.response_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
   entry.metadata_ = metadata;
 }
 

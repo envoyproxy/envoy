@@ -37,7 +37,7 @@ protected:
   }
 
   // Updates the cache entry's header
-  void updateHeaders(LookupContextPtr lookup,
+  void updateHeaders(LookupContextPtr& lookup,
                      const Http::TestResponseHeaderMapImpl& response_headers,
                      const ResponseMetadata& metadata) {
     cache_.updateHeaders(*lookup, response_headers, metadata);
@@ -46,7 +46,9 @@ protected:
   void updateHeaders(absl::string_view request_path,
                      const Http::TestResponseHeaderMapImpl& response_headers,
                      const ResponseMetadata& metadata) {
-    updateHeaders(lookup(request_path), response_headers, metadata);
+    LookupRequest request = makeLookupRequest(request_path);
+    LookupContextPtr context = cache_.makeLookupContext(std::move(request));
+    updateHeaders(context, response_headers, metadata);
   }
 
   // Performs a cache lookup.
@@ -370,6 +372,30 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersDisabledForVaryHeaders) {
   updateHeaders(request_path_1, response_headers_2, {current_time_});
 
   EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
+}
+
+TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
+  const std::string request_path_1("/name");
+  Http::TestResponseHeaderMapImpl response_headers_1{{"date", formatter_.fromTime(current_time_)},
+                                                     {"cache-control", "public,max-age=3600"},
+                                                     {"etag", "0000-0000"}};
+  insert(request_path_1, response_headers_1, "body");
+  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
+
+  // Update the date field in the headers
+  time_source_.advanceTimeWait(Seconds(3601));
+  std::string time_now = formatter_.fromTime(current_time_);
+  Http::TestResponseHeaderMapImpl response_headers_2{{"date", time_now},
+                                                     {"cache-control", "public,max-age=3600"},
+                                                     {"etag", "1111-1111"}};
+  // The etag header should not be updated
+  Http::TestResponseHeaderMapImpl response_headers_3{{"date", time_now},
+                                                     {"cache-control", "public,max-age=3600"},
+                                                     {"etag", "0000-0000"}};
+
+  updateHeaders(request_path_1, response_headers_2, {current_time_});
+
+  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_3));
 }
 
 } // namespace
