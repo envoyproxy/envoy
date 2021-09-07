@@ -19,6 +19,7 @@ envoy_cc_extension(
         "upstream_port.h",
     ],
     deps = [
+        "//source/common/common:logger_lib",
         "//source/common/http:utility_lib",
         "//source/common/stream_info:set_filter_state_object_lib",
         "//source/extensions/filters/common/rbac:engine_lib",

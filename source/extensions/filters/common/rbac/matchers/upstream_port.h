@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/rbac/matchers/upstream/v3/upstream_port_matcher.pb.validate.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/network/cidr_range.h"
 #include "source/extensions/filters/common/rbac/matcher_extension.h"
 
@@ -15,7 +16,8 @@ namespace Matchers {
 // RBAC matcher extension for matching upstream's port number. It matches the port range provided by
 // the `envoy::extensions::rbac::matchers::upstream::v3::UpstreamPortMatcher`
 // configuration with the resolved upstream's port.
-class UpstreamPortMatcher : public Filters::Common::RBAC::Matcher {
+class UpstreamPortMatcher : public Filters::Common::RBAC::Matcher,
+                            public Logger::Loggable<Logger::Id::rbac> {
 public:
   UpstreamPortMatcher(
       const envoy::extensions::rbac::matchers::upstream::v3::UpstreamPortMatcher& proto)

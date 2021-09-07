@@ -21,8 +21,11 @@ bool UpstreamIpMatcher::matches(const Network::Connection&, const Envoy::Http::R
       StreamInfo::SetFilterStateObjectImpl<Network::Address::InstanceConstSharedPtr>;
 
   if (!info.filterState().hasDataWithName(AddressSetFilterStateObjectImpl::key())) {
-    ENVOY_LOG_MISC(warn, "Did not find dynamic forward proxy metadata. Do you have dynamic "
-                         "forward proxy in the filter chain before the RBAC filter ?");
+    ENVOY_LOG(warn,
+              "Did not find filter state with key: {}. Do you have a filter in the filter chain "
+              "before the RBAC filter which populates the filter state with upstream addresses ?",
+              AddressSetFilterStateObjectImpl::key());
+
     return false;
   }
 
@@ -35,15 +38,14 @@ bool UpstreamIpMatcher::matches(const Network::Connection&, const Envoy::Http::R
   address_set.iterate([&, this](const Network::Address::InstanceConstSharedPtr& address) {
     ipMatch = range_.isInRange(*address.get());
     if (ipMatch) {
-      ENVOY_LOG_MISC(debug, "Address {} matched range: {}", address->asString(), range_.asString());
+      ENVOY_LOG(debug, "Address {} matched range: {}", address->asString(), range_.asString());
       return false;
     }
 
     return true;
   });
 
-  ENVOY_LOG_MISC(debug, "UpstreamIp matcher for range: {} evaluated to: {}", range_.asString(),
-                 ipMatch);
+  ENVOY_LOG(debug, "UpstreamIp matcher for range: {} evaluated to: {}", range_.asString(), ipMatch);
   return ipMatch;
 }
 
