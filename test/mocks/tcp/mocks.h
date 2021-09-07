@@ -61,8 +61,7 @@ public:
   // Tcp::ConnectionPool::Instance
   MOCK_METHOD(void, addIdleCallback, (IdleCb cb));
   MOCK_METHOD(bool, isIdle, (), (const));
-  MOCK_METHOD(void, startDrain, ());
-  MOCK_METHOD(void, drainConnections, ());
+  MOCK_METHOD(void, drainConnections, (Envoy::ConnectionPool::DrainBehavior drain_behavior));
   MOCK_METHOD(void, closeConnections, ());
   MOCK_METHOD(Cancellable*, newConnection, (Tcp::ConnectionPool::Callbacks & callbacks));
   MOCK_METHOD(bool, maybePreconnect, (float), ());
