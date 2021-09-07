@@ -153,7 +153,7 @@ public:
     });
   }
 
-  ~ExtAuthzFilterTest() {
+  ~ExtAuthzFilterTest() override {
     // Reset the async client manager before shutdown threading.
     // Because its dtor will try to post to event loop to clear thread local slot.
     postWorkToMain([&]() { async_client_manager_.reset(); });
