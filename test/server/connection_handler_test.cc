@@ -216,13 +216,13 @@ public:
         *this, tag, bind_to_port, hand_off_restored_destination_connections, name, socket_type,
         listener_filters_timeout, continue_on_listener_filters_timeout, access_log_,
         overridden_filter_chain_manager, tcp_backlog_size, connection_balancer));
-    EXPECT_CALL(listeners_.back()->socket_factory_, socketType()).WillOnce(Return(socket_type));
 
     if (listener == nullptr) {
       // Expecting listener config in place update.
       // If so, dispatcher would not create new network listener.
       return listeners_.back().get();
     }
+    EXPECT_CALL(listeners_.back()->socket_factory_, socketType()).WillOnce(Return(socket_type));
     EXPECT_CALL(listeners_.back()->socket_factory_, getListenSocket(_))
         .WillOnce(Return(listeners_.back()->socket_));
     if (socket_type == Network::Socket::Type::Stream) {

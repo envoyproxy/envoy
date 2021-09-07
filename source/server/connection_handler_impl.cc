@@ -27,7 +27,9 @@ void ConnectionHandlerImpl::decNumConnections() {
 
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                                         Network::ListenerConfig& config) {
-  if (overridden_listener.has_value()) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place") &&
+      overridden_listener.has_value()) {
     ActiveListenerDetailsOptRef listener_detail =
         findActiveListenerByTag(overridden_listener.value());
     ASSERT(listener_detail.has_value());
@@ -37,6 +39,17 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
 
   ActiveListenerDetails details;
   if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place") &&
+        overridden_listener.has_value()) {
+      for (auto& listener : listeners_) {
+        if (listener.second.listener_->listenerTag() == overridden_listener) {
+          listener.second.tcpListener()->get().updateListenerConfig(config);
+          return;
+        }
+      }
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
     // worker_index_ doesn't have a value on the main thread for the admin server.
     auto tcp_listener = std::make_unique<ActiveTcpListener>(
         *this, config, worker_index_.has_value() ? *worker_index_ : 0);

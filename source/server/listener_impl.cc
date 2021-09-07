@@ -371,7 +371,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
-                           uint64_t hash, uint32_t /*concurrency*/)
+                           uint64_t hash)
     : parent_(parent), address_(origin.address_), bind_to_port_(shouldBindToPort(config)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
@@ -768,6 +768,16 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
     return false;
   }
 
+  ;
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place") &&
+      (Network::Utility::protobufAddressSocketType(config_.address()) !=
+           Network::Socket::Type::Stream ||
+       Network::Utility::protobufAddressSocketType(config.address()) !=
+           Network::Socket::Type::Stream)) {
+    return false;
+  }
+
   // Full listener update currently rejects tcp listener having 0 filter chain.
   // In place filter chain update could survive under zero filter chain but we should keep the same
   // behavior for now. This also guards the below filter chain access.
@@ -786,10 +796,10 @@ ListenerImplPtr
 ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
                                          bool workers_started, uint64_t hash) {
   // Use WrapUnique since the constructor is private.
-  return absl::WrapUnique(
-      new ListenerImpl(*this, config, version_info_, parent_, name_, added_via_api_,
-                       /* new new workers started state */ workers_started,
-                       /* use new hash */ hash, parent_.server_.options().concurrency()));
+  return absl::WrapUnique(new ListenerImpl(*this, config, version_info_, parent_, name_,
+                                           added_via_api_,
+                                           /* new new workers started state */ workers_started,
+                                           /* use new hash */ hash));
 }
 
 void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
