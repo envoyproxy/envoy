@@ -499,3 +499,22 @@ envoy_benchmark_test(
     timeout = "long",
     benchmark_binary = "filter_chain_benchmark_test",
 )
+
+envoy_cc_benchmark_binary(
+    name = "server_stats_flush_benchmark",
+    srcs = ["server_stats_flush_benchmark_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//envoy/stats:stats_interface",
+        "//source/common/stats:thread_local_store_lib",
+        "//source/server:server_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "server_stats_flush_benchmark_test",
+    benchmark_binary = "server_stats_flush_benchmark",
+)
