@@ -2409,7 +2409,8 @@ TEST_F(LuaHttpFilterTest, LuaBodyBufferSetBytesWithHex) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
 
   Buffer::OwnedImpl response_body("");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("G1111")));

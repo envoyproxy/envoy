@@ -70,7 +70,7 @@ namespace Lua {
   lua_settable(state, -3);
 
 /**
- * Check string from lua with length
+ * Check string from lua with length.
  */
 inline absl::string_view checkLuaStringWithLength(lua_State* state, int arg) {
   size_t input_size;
