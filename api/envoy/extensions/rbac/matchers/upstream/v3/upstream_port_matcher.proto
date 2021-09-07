@@ -17,8 +17,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This is configuration for matching upstream port.
 message UpstreamPortMatcher {
   // A Port range that will be used to match the upstream port.
-  // This matcher requires a filter in the chain to have saved the upstream address in the the
-  // filter state before the matcher is executed by RBAC filter. Otherwise the matcher will
-  // evaluate to `false`.
+  // This matcher requires a filter in the chain to have saved the upstream address(es) in the
+  // filter state before the matcher is executed by RBAC filter. The state should be saved with key
+  // `filter_state_key.set_object` (See
+  // :repo:`set_filter_state_object_impl.h<source/common/stream_info/set_filter_state_object_impl.h>`).
+  // Also, See :repo:`proxy_filter.cc<
+  // source/extensions/filters/http/dynamic_forward_proxy/proxy_filter.cc>` for an example of a
+  // filter which populates the FilterState. If the key is not found in the filter state, the
+  // matcher will evaluate to `false`.
   type.Int64Range port_range = 1;
 }
