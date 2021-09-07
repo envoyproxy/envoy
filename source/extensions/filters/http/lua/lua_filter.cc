@@ -552,49 +552,37 @@ int StreamHandleWrapper::luaConnection(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaLogTrace(lua_State* state) {
-  size_t size;
-  const char* bytes = luaL_checklstring(state, 2, &size);
-  absl::string_view message = absl::string_view(bytes, size);
+  absl::string_view message = Filters::Common::Lua::checkLuaStringWithLength(state, 2);
   filter_.scriptLog(spdlog::level::trace, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogDebug(lua_State* state) {
-  size_t size;
-  const char* bytes = luaL_checklstring(state, 2, &size);
-  absl::string_view message = absl::string_view(bytes, size);
+  absl::string_view message = Filters::Common::Lua::checkLuaStringWithLength(state, 2);
   filter_.scriptLog(spdlog::level::debug, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogInfo(lua_State* state) {
-  size_t size;
-  const char* bytes = luaL_checklstring(state, 2, &size);
-  absl::string_view message = absl::string_view(bytes, size);
+  absl::string_view message = Filters::Common::Lua::checkLuaStringWithLength(state, 2);
   filter_.scriptLog(spdlog::level::info, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogWarn(lua_State* state) {
-  size_t size;
-  const char* bytes = luaL_checklstring(state, 2, &size);
-  absl::string_view message = absl::string_view(bytes, size);
+  absl::string_view message = Filters::Common::Lua::checkLuaStringWithLength(state, 2);
   filter_.scriptLog(spdlog::level::warn, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogErr(lua_State* state) {
-  size_t size;
-  const char* bytes = luaL_checklstring(state, 2, &size);
-  absl::string_view message = absl::string_view(bytes, size);
+  absl::string_view message = Filters::Common::Lua::checkLuaStringWithLength(state, 2);
   filter_.scriptLog(spdlog::level::err, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogCritical(lua_State* state) {
-  size_t size;
-  const char* bytes = luaL_checklstring(state, 2, &size);
-  absl::string_view message = absl::string_view(bytes, size);
+  absl::string_view message = Filters::Common::Lua::checkLuaStringWithLength(state, 2);
   filter_.scriptLog(spdlog::level::critical, message);
   return 0;
 }
@@ -661,9 +649,8 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
-  size_t input_size;
-  const char* input = luaL_checklstring(state, 2, &input_size);
-  auto output = absl::Base64Escape(absl::string_view(input, input_size));
+  absl::string_view input = Filters::Common::Lua::checkLuaStringWithLength(state, 2);
+  auto output = absl::Base64Escape(input);
   lua_pushlstring(state, output.data(), output.length());
 
   return 1;

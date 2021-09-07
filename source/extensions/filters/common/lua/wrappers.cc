@@ -42,7 +42,6 @@ int64_t timestampInSeconds(const absl::optional<SystemTime>& system_time) {
                                        .count()
                                  : 0;
 }
-
 } // namespace
 
 int BufferWrapper::luaLength(lua_State* state) {
@@ -67,9 +66,7 @@ int BufferWrapper::luaGetBytes(lua_State* state) {
 
 int BufferWrapper::luaSetBytes(lua_State* state) {
   data_.drain(data_.length());
-  size_t input_size;
-  const char* input = luaL_checklstring(state, 2, &input_size);
-  absl::string_view bytes = absl::string_view(input, input_size);
+  absl::string_view bytes = checkLuaStringWithLength(state, 2);
   data_.add(bytes);
   lua_pushnumber(state, data_.length());
   return 1;

@@ -11,6 +11,7 @@ namespace Filters {
 namespace Common {
 namespace Lua {
 
+
 /**
  * A wrapper for a buffer.
  */

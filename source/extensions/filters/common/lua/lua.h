@@ -70,6 +70,15 @@ namespace Lua {
   lua_settable(state, -3);
 
 /**
+ * Check string from lua with length
+ */
+inline absl::string_view checkLuaStringWithLength(lua_State* state, int arg) {
+  size_t input_size;
+  const char* input = luaL_checklstring(state, arg, &input_size);
+  return absl::string_view(input, input_size);
+}
+
+/**
  * Calculate the maximum space needed to be aligned.
  */
 template <typename T> constexpr size_t maximumSpaceNeededToAlign() {

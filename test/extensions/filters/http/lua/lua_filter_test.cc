@@ -41,7 +41,7 @@ class TestFilter : public Filter {
 public:
   using Filter::Filter;
 
-  MOCK_METHOD(void, scriptLog, (spdlog::level::level_enum level, const char* message));
+  MOCK_METHOD(void, scriptLog, (spdlog::level::level_enum level, absl::string_view message));
 };
 
 class LuaHttpFilterTest : public testing::Test {
@@ -2390,6 +2390,31 @@ TEST_F(LuaHttpFilterTest, LuaFilterSetResponseBufferChunked) {
   Buffer::OwnedImpl response_body("1234567890");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("4")));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
+}
+
+TEST_F(LuaHttpFilterTest, LuaBodyBufferSetBytesWithHex) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local bodyBuffer = response_handle:body()
+      bodyBuffer:setBytes("\x471111")
+      local body_str = bodyBuffer:getBytes(0, bodyBuffer:length())
+      response_handle:logTrace(body_str)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers, false));
+
+  Buffer::OwnedImpl response_body("");
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("G1111")));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
+  EXPECT_EQ(5, encoder_callbacks_.buffer_->length());
 }
 
 } // namespace
