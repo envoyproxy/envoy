@@ -129,6 +129,9 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
 
   // Skip headers that we don't want to update because of specific reasons
   static const auto* headersNotToUpdate = new absl::flat_hash_set<Http::LowerCaseString>({
+      // Content range should not be changed upon validation
+      Http::Headers::get().ContentRange,
+
       // The age is calculated and set by the general cache_filter code logic.
       Http::CustomHeaders::get().Age,
 
@@ -148,9 +151,14 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
 
   // Assumptions:
   // 1. The internet is fast, i.e. we get the result as soon as the server sends it.
-  // Race conditions would not be possible because we are always processing up-to-date data.
+  //    Race conditions would not be possible because we are always processing up-to-date data.
   // 2. No key collision for etag. Therefore, if etag matches it's the same resource.
   // 3. Backend is correct. etag is being used as a unique identifier to the resource
+
+  // use other header fields provided in the new response to replace all instances 
+  // of the corresponding header fields in the stored response
+  // Note: Warning 1xx, 2xx are not handled as they are not commonly used despite 
+  // their presence the RFC specs
   response_headers.iterate(
       [&entry](const Http::HeaderEntry& response_header) -> Http::HeaderMap::Iterate {
         Http::LowerCaseString lower_case_key{response_header.key().getStringView()};
