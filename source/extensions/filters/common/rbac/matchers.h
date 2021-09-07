@@ -76,7 +76,8 @@ public:
 class AndMatcher : public Matcher {
 public:
   AndMatcher(const envoy::config::rbac::v3::Permission::Set& rules,
-             const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor);
+             const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor =
+                 absl::nullopt);
   AndMatcher(const envoy::config::rbac::v3::Principal::Set& ids);
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
@@ -92,8 +93,9 @@ private:
  */
 class OrMatcher : public Matcher {
 public:
-  OrMatcher(const envoy::config::rbac::v3::Permission::Set& set,
-            const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor)
+  OrMatcher(
+      const envoy::config::rbac::v3::Permission::Set& set,
+      const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor = absl::nullopt)
       : OrMatcher(set.rules(), validation_visitor) {}
   OrMatcher(const envoy::config::rbac::v3::Principal::Set& set) : OrMatcher(set.ids()) {}
   OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules,
@@ -109,8 +111,9 @@ private:
 
 class NotMatcher : public Matcher {
 public:
-  NotMatcher(const envoy::config::rbac::v3::Permission& permission,
-             const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor)
+  NotMatcher(
+      const envoy::config::rbac::v3::Permission& permission,
+      const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor = absl::nullopt)
       : matcher_(Matcher::create(permission, validation_visitor)) {}
   NotMatcher(const envoy::config::rbac::v3::Principal& principal)
       : matcher_(Matcher::create(principal)) {}
@@ -210,8 +213,9 @@ private:
  */
 class PolicyMatcher : public Matcher, NonCopyable {
 public:
-  PolicyMatcher(const envoy::config::rbac::v3::Policy& policy, Expr::Builder* builder,
-                const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor)
+  PolicyMatcher(
+      const envoy::config::rbac::v3::Policy& policy, Expr::Builder* builder,
+      const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor = absl::nullopt)
       : permissions_(policy.permissions(), validation_visitor), principals_(policy.principals()),
         condition_(policy.condition()) {
     if (policy.has_condition()) {
