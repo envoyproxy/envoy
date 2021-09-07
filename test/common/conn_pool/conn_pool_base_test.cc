@@ -21,17 +21,13 @@ using testing::Return;
 class TestActiveClient : public ActiveClient {
 public:
   using ActiveClient::ActiveClient;
-  void close() override {
-    onEvent(Network::ConnectionEvent::LocalClose);
-    closed_ = true;
-  }
+  void close() override { onEvent(Network::ConnectionEvent::LocalClose); }
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
   uint32_t numActiveStreams() const override { return active_streams_; }
   absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
 
   uint32_t active_streams_{};
-  bool closed_{};
 };
 
 class TestPendingStream : public PendingStream {
@@ -264,11 +260,10 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerNull) {
   EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
   EXPECT_EQ(nullptr, clients_.back()->lifetime_timer_);
 
-  // Close active stream and expect that the client goes back to ready
+  // Close the active stream and expect that the client goes back to ready
   clients_.back()->active_streams_ = 0;
   pool_.onStreamClosed(*clients_.back(), false);
   EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
-  EXPECT_EQ(false, clients_.back()->closed_);
 
   // We are only testing that the timer was never enabled. So, to clean up, just drain
   // this pool manually.
@@ -297,7 +292,6 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerEnabled) {
   clients_.back()->active_streams_ = 0;
   pool_.onStreamClosed(*clients_.back(), false);
   EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
-  EXPECT_EQ(false, clients_.back()->closed_);
 
   // We are only testing that the timer was enabled. So, to clean up, just disable
   // the timer and drain this pool manually.
@@ -324,7 +318,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationBusy) {
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ - 1),
                                  *dispatcher_, Event::Dispatcher::RunType::Block);
   EXPECT_EQ(0,
-            clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
+            pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
   EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
 
   // Verify that advancing past the lifetime timeout drains the connection,
@@ -332,14 +326,13 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationBusy) {
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(2), *dispatcher_,
                                  Event::Dispatcher::RunType::Block);
   EXPECT_EQ(1,
-            clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
+            pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
   EXPECT_EQ(ActiveClient::State::DRAINING, clients_.back()->state());
 
   // Close active stream and expect that the client closes, since it was previously
   // draining.
   clients_.back()->active_streams_ = 0;
   pool_.onStreamClosed(*clients_.back(), false);
-  EXPECT_EQ(true, clients_.back()->closed_);
 }
 
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationReady) {
@@ -361,22 +354,19 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationReady) {
   clients_.back()->active_streams_ = 0;
   pool_.onStreamClosed(*clients_.back(), false);
   EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
-  EXPECT_EQ(false, clients_.back()->closed_);
 
   // Verify that advancing to just before the lifetime timeout doesn't close the connection.
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ - 1),
                                  *dispatcher_, Event::Dispatcher::RunType::Block);
   EXPECT_EQ(0,
-            clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
-  EXPECT_EQ(false, clients_.back()->closed_);
+            pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
 
   // Verify that advancing past the lifetime timeout closes the connection,
   // because there's nothing to drain.
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(2), *dispatcher_,
                                  Event::Dispatcher::RunType::Block);
   EXPECT_EQ(1,
-            clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
-  EXPECT_EQ(true, clients_.back()->closed_);
+            pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
 }
 
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyClosed) {
@@ -397,17 +387,16 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyClosed) {
   clients_.back()->onEvent(Network::ConnectionEvent::Connected);
   EXPECT_EQ(ActiveClient::State::DRAINING, clients_.back()->state());
 
-  // Close active stream and expect that the client closes
+  // Close the active stream
   clients_.back()->active_streams_ = 0;
   pool_.onStreamClosed(*clients_.back(), false);
-  EXPECT_EQ(true, clients_.back()->closed_);
 
   // Verify that advancing past the lifetime timeout does nothing to an active client
   // that is already closed.
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ + 1),
                                  *dispatcher_, Event::Dispatcher::RunType::Block);
   EXPECT_EQ(0,
-            clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
+            pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
 }
 
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyDraining) {
@@ -434,12 +423,11 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyDraining) {
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ + 1),
                                  *dispatcher_, Event::Dispatcher::RunType::Block);
   EXPECT_EQ(0,
-            clients_.back()->parent_.host()->cluster().stats().upstream_cx_max_duration_.value());
+            pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
 
-  // Close active stream and expect that the client closes
+  // Close the active stream
   clients_.back()->active_streams_ = 0;
   pool_.onStreamClosed(*clients_.back(), false);
-  EXPECT_EQ(true, clients_.back()->closed_);
 }
 
 // Remote close simulates the peer closing the connection.
