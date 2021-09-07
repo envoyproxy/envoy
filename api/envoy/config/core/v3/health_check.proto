@@ -118,6 +118,14 @@ message HealthCheck {
     // range are required. Only statuses in the range [100, 600) are allowed.
     repeated type.v3.Int64Range expected_statuses = 9;
 
+    // Specifies a list of HTTP response statuses considered retriable. If provided, responses in this range
+    // will count towards the configured :ref:`unhealthy_threshold <envoy_v3_api_field_config.core.v3.HealthCheck.unhealthy_threshold>`.
+    // By default all responses not in :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`
+    // will result in the host being considered immediately unhealthy. Ranges follow half-open semantics of
+    // :ref:`Int64Range <envoy_v3_api_msg_type.v3.Int64Range>`. The start and end of each range are required.
+    // Only statuses in the range [100, 600) are allowed.
+    repeated type.v3.Int64Range retriable_statuses = 12;
+
     // Use specified application protocol for health checks.
     type.v3.CodecClientType codec_client_type = 10 [(validate.rules).enum = {defined_only: true}];
 
@@ -126,14 +134,6 @@ message HealthCheck {
     // <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`. See the :ref:`architecture overview
     // <arch_overview_health_checking_identity>` for more information.
     type.matcher.v3.StringMatcher service_name_matcher = 11;
-
-    // Specifies a list of HTTP response statuses considered retriable. If provided, responses in this range
-    // will count towards the configured :ref:`unhealthy_threshold <envoy_v3_api_field_config.core.v3.HealthCheck.unhealthy_threshold>`.
-    // By default all responses not in :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`
-    // will result in the host being considered immediately unhealthy. Ranges follow half-open semantics of
-    // :ref:`Int64Range <envoy_v3_api_msg_type.v3.Int64Range>`. The start and end of each range are required.
-    // Only statuses in the range [100, 600) are allowed.
-    repeated type.v3.Int64Range retriable_statuses = 12;
   }
 
   message TcpHealthCheck {
