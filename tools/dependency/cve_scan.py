@@ -121,7 +121,7 @@ def parse_cve_json(cve_json, cves, cpe_revmap):
             continue
 
         if not "baseMetricV3" in cve['impact']:
-            print(f"WARNING: ignoring v2 metric for {cve['cve']['CVE_data_meta']['ID'] }")
+            print(f"WARNING: ignoring v2 metric for {cve['cve']['CVE_data_meta']['ID']}")
             continue
 
         cvss_v3_score = cve['impact']['baseMetricV3']['cvssV3']['baseScore']
