@@ -359,9 +359,8 @@ initial_connection_window_size: 65535
 // Verify that values are pulled from the defaults profile.
 TEST(HttpUtility, TestDefaultsProfile) {
   {
-    std::unique_ptr<ScopedDefaultsProfileSingleton> dp =
-        std::make_unique<ScopedDefaultsProfileSingleton>(
-            std::make_unique<DefaultsProfile>(DefaultsProfile::Safe));
+    auto dp = std::make_unique<ScopedDefaultsProfileSingleton>(
+        std::make_unique<DefaultsProfile>(DefaultsProfile::Safe));
     DefaultsProfile::ConfigContext context = DefaultsProfile::ConfigContext(
         "envoy.extensions.filters.network.http_connection_manager.v3."
         "HttpConnectionManager.http2_protocol_options");
@@ -376,8 +375,7 @@ TEST(HttpUtility, TestDefaultsProfile) {
 
   {
     // invoke DefaultsProfile constructor with no args, creating a blank profile
-    std::unique_ptr<ScopedDefaultsProfileSingleton> dp =
-        std::make_unique<ScopedDefaultsProfileSingleton>(std::make_unique<DefaultsProfile>());
+    auto dp = std::make_unique<ScopedDefaultsProfileSingleton>(std::make_unique<DefaultsProfile>());
     DefaultsProfile::ConfigContext context = DefaultsProfile::ConfigContext(
         "envoy.extensions.filters.network.http_connection_manager.v3."
         "HttpConnectionManager.http2_protocol_options");

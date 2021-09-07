@@ -202,9 +202,8 @@ filter_chains:
  )EOF";
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
-  std::unique_ptr<ScopedDefaultsProfileSingleton> dp =
-      std::make_unique<ScopedDefaultsProfileSingleton>(
-          std::make_unique<DefaultsProfile>(DefaultsProfile::Safe));
+  auto dp = std::make_unique<ScopedDefaultsProfileSingleton>(
+      std::make_unique<DefaultsProfile>(DefaultsProfile::Safe));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
@@ -223,8 +222,7 @@ filter_chains:
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
   // invoke DefaultsProfile constructor with no args, creating a blank profile
-  std::unique_ptr<ScopedDefaultsProfileSingleton> dp =
-      std::make_unique<ScopedDefaultsProfileSingleton>(std::make_unique<DefaultsProfile>());
+  auto dp = std::make_unique<ScopedDefaultsProfileSingleton>(std::make_unique<DefaultsProfile>());
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);

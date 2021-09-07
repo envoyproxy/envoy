@@ -1,9 +1,8 @@
 #pragma once
 
+#include "source/common/common/manifest.pb.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/singleton/threadsafe_singleton.h"
-
-#include "tools/protodoc/manifest.pb.h"
 
 // These macros return the value associated with `field_name` in the protobuf `message` if it
 // exists. Otherwise, they return the value associated with `field_name` in the defaults profile if
@@ -121,7 +120,7 @@ private:
    * @param field the default value associated with this field is returned if present
    * in the defaults profile. E.g. "per_connection_buffer_limit_bytes"
    */
-  absl::optional<ProtobufWkt::Value> getProtoValue(const std::string config_name,
+  absl::optional<ProtobufWkt::Value> getProtoValue(const std::string& config_name,
                                                    const std::string& field) const;
   tools::protodoc::Manifest defaults_manifest_;
 };

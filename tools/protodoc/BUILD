@@ -1,6 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@protodoc_pip3//:requirements.bzl", "requirement")
-load("//bazel:envoy_build_system.bzl", "envoy_package", "envoy_proto_library")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
 
 licenses(["notice"])  # Apache 2
@@ -14,11 +14,6 @@ py_binary(
     deps = [":protodoc"],
 )
 
-envoy_proto_library(
-    name = "manifest_proto",
-    srcs = ["manifest.proto"],
-)
-
 py_binary(
     name = "protodoc",
     srcs = ["protodoc.py"],
@@ -30,7 +25,7 @@ py_binary(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        ":manifest_proto_py_proto",
+        "//source/common/common:manifest_proto_py_proto",
         "//tools/api_proto_plugin",
         "//tools/base:utils",
         "//tools/config_validation:validate_fragment",

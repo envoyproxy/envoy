@@ -1269,9 +1269,8 @@ TEST_F(HttpConnectionManagerConfigTest, TestDefaultsProfile) {
   )EOF";
 
   {
-    std::unique_ptr<ScopedDefaultsProfileSingleton> dp =
-        std::make_unique<ScopedDefaultsProfileSingleton>(
-            std::make_unique<DefaultsProfile>(DefaultsProfile::Safe));
+    auto dp = std::make_unique<ScopedDefaultsProfileSingleton>(
+        std::make_unique<DefaultsProfile>(DefaultsProfile::Safe));
     DefaultsProfile::ConfigContext context = DefaultsProfile::ConfigContext(
         "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager");
 
@@ -1286,8 +1285,7 @@ TEST_F(HttpConnectionManagerConfigTest, TestDefaultsProfile) {
 
   {
     // invoke DefaultsProfile constructor with no args, creating a blank profile
-    std::unique_ptr<ScopedDefaultsProfileSingleton> dp =
-        std::make_unique<ScopedDefaultsProfileSingleton>(std::make_unique<DefaultsProfile>());
+    auto dp = std::make_unique<ScopedDefaultsProfileSingleton>(std::make_unique<DefaultsProfile>());
 
     HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                        date_provider_, route_config_provider_manager_,

@@ -7,13 +7,10 @@ load(
     "envoy_cc_win32_library",
     "envoy_package",
     "envoy_pch_library",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
-
-exports_files([
-    "gen_sh_test_runner.sh",
-])
 
 envoy_package()
 
@@ -50,6 +47,11 @@ genrule(
     tools = ["//source/common/common:yaml_to_cc.sh"],
 )
 
+envoy_proto_library(
+    name = "manifest_proto",
+    srcs = ["manifest.proto"],
+)
+
 envoy_cc_library(
     name = "manifest_lib",
     srcs = [":manifest_to_cc"],
@@ -62,10 +64,10 @@ envoy_cc_library(
     hdrs = ["envoy_defaults.h"],
     deps = [
         ":manifest_lib",
+        ":manifest_proto_cc_proto",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/singleton:threadsafe_singleton",
-        "//tools/protodoc:manifest_proto_cc_proto",
     ],
 )
 
