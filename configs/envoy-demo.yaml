@@ -45,7 +45,8 @@ static_resources:
                 header_filter:
                   header:
                     name: ":method"
-                    exact_match: "GET"
+                    string_match:
+                      exact: "GET"
               body_format_override:
                 text_format_source:
                   inline_string: |
