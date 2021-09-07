@@ -1,5 +1,6 @@
 #include "source/common/stats/allocator_impl.h"
 
+#include <algorithm>
 #include <cstdint>
 
 #include "envoy/stats/stats.h"
@@ -25,6 +26,25 @@ const char AllocatorImpl::DecrementToZeroSyncPoint[] = "decrement-zero";
 AllocatorImpl::~AllocatorImpl() {
   ASSERT(counters_.empty());
   ASSERT(gauges_.empty());
+
+#ifndef NDEBUG
+  // Move deleted stats into the sets for the ASSERTs in removeFromSetLockHeld to function.
+  for (auto& counter : deleted_counters_) {
+    auto insertion = counters_.insert(counter.get());
+    // Assert that there were no duplicates.
+    ASSERT(insertion.second);
+  }
+  for (auto& gauge : deleted_gauges_) {
+    auto insertion = gauges_.insert(gauge.get());
+    // Assert that there were no duplicates.
+    ASSERT(insertion.second);
+  }
+  for (auto& text_readout : deleted_text_readouts_) {
+    auto insertion = text_readouts_.insert(text_readout.get());
+    // Assert that there were no duplicates.
+    ASSERT(insertion.second);
+  }
+#endif
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
@@ -314,6 +334,78 @@ bool AllocatorImpl::isMutexLockedForTest() {
 Counter* AllocatorImpl::makeCounterInternal(StatName name, StatName tag_extracted_name,
                                             const StatNameTagVector& stat_name_tags) {
   return new CounterImpl(name, *this, tag_extracted_name, stat_name_tags);
+}
+
+void AllocatorImpl::forEachCounter(std::function<void(std::size_t)> f_size,
+                                   std::function<void(Stats::Counter&)> f_stat) const {
+  Thread::LockGuard lock(mutex_);
+  if (f_size != nullptr) {
+    f_size(counters_.size());
+  }
+  for (auto& counter : counters_) {
+    f_stat(*counter);
+  }
+}
+
+void AllocatorImpl::forEachGauge(std::function<void(std::size_t)> f_size,
+                                 std::function<void(Stats::Gauge&)> f_stat) const {
+  Thread::LockGuard lock(mutex_);
+  if (f_size != nullptr) {
+    f_size(gauges_.size());
+  }
+  for (auto& gauge : gauges_) {
+    f_stat(*gauge);
+  }
+}
+
+void AllocatorImpl::forEachTextReadout(std::function<void(std::size_t)> f_size,
+                                       std::function<void(Stats::TextReadout&)> f_stat) const {
+  Thread::LockGuard lock(mutex_);
+  if (f_size != nullptr) {
+    f_size(text_readouts_.size());
+  }
+  for (auto& text_readout : text_readouts_) {
+    f_stat(*text_readout);
+  }
+}
+
+void AllocatorImpl::markCounterForDeletion(const CounterSharedPtr& counter) {
+  Thread::LockGuard lock(mutex_);
+  auto iter = counters_.find(counter->statName());
+  if (iter == counters_.end()) {
+    // This has already been marked for deletion.
+    return;
+  }
+  ASSERT(counter.get() == *iter);
+  // Duplicates are ASSERTed in ~AllocatorImpl.
+  deleted_counters_.emplace_back(*iter);
+  counters_.erase(iter);
+}
+
+void AllocatorImpl::markGaugeForDeletion(const GaugeSharedPtr& gauge) {
+  Thread::LockGuard lock(mutex_);
+  auto iter = gauges_.find(gauge->statName());
+  if (iter == gauges_.end()) {
+    // This has already been marked for deletion.
+    return;
+  }
+  ASSERT(gauge.get() == *iter);
+  // Duplicates are ASSERTed in ~AllocatorImpl.
+  deleted_gauges_.emplace_back(*iter);
+  gauges_.erase(iter);
+}
+
+void AllocatorImpl::markTextReadoutForDeletion(const TextReadoutSharedPtr& text_readout) {
+  Thread::LockGuard lock(mutex_);
+  auto iter = text_readouts_.find(text_readout->statName());
+  if (iter == text_readouts_.end()) {
+    // This has already been marked for deletion.
+    return;
+  }
+  ASSERT(text_readout.get() == *iter);
+  // Duplicates are ASSERTed in ~AllocatorImpl.
+  deleted_text_readouts_.emplace_back(*iter);
+  text_readouts_.erase(iter);
 }
 
 } // namespace Stats

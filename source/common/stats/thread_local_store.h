@@ -244,6 +244,15 @@ public:
   std::vector<TextReadoutSharedPtr> textReadouts() const override;
   std::vector<ParentHistogramSharedPtr> histograms() const override;
 
+  void forEachCounter(std::function<void(std::size_t)> f_size,
+                      std::function<void(Stats::Counter&)> f_stat) const override;
+
+  void forEachGauge(std::function<void(std::size_t)> f_size,
+                    std::function<void(Stats::Gauge&)> f_stat) const override;
+
+  void forEachTextReadout(std::function<void(std::size_t)> f_size,
+                          std::function<void(Stats::TextReadout&)> f_stat) const override;
+
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
   void setTagProducer(TagProducerPtr&& tag_producer) override {
@@ -483,6 +492,9 @@ private:
   bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
+  template <class StatSharedPtr>
+  void removeRejectedStats(StatNameHashMap<StatSharedPtr>& map,
+                           std::function<void(const StatSharedPtr&)> f_deletion);
   bool checkAndRememberRejection(StatName name, StatsMatcher::FastResult fast_reject_result,
                                  StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
@@ -527,10 +539,7 @@ private:
   // It seems like it would be better to have each client that expects a stat
   // to exist to hold it as (e.g.) a CounterSharedPtr rather than a Counter&
   // but that would be fairly complex to change.
-  std::vector<CounterSharedPtr> deleted_counters_ ABSL_GUARDED_BY(lock_);
-  std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(lock_);
   std::vector<HistogramSharedPtr> deleted_histograms_ ABSL_GUARDED_BY(lock_);
-  std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(lock_);
 
   // Scope IDs and central cache entries that are queued for cross-scope release.
   // Because there can be a large number of scopes, all of which are released at once,
