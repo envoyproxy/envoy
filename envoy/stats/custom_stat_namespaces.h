@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/common/pure.h"
+
 #include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
@@ -16,20 +18,19 @@ namespace Stats {
  */
 class CustomStatNamespaces {
 public:
-  CustomStatNamespaces() = default;
-  ~CustomStatNamespaces() = default;
+  virtual ~CustomStatNamespaces() = default;
 
   /**
    * @param name is the name to check.
    * @return true if the given name is registered as a custom stat namespace, false otherwise.
    */
-  bool registered(const absl::string_view& name) const;
+  virtual bool registered(const absl::string_view& name) const PURE;
 
   /**
    * Used to register a custom namespace by extensions.
    * @param name is the name to register.
    */
-  void registerStatNamespace(const absl::string_view& name);
+  virtual void registerStatNamespace(const absl::string_view& name) PURE;
 
   /**
    * Sanitizes the given stat name depending on whether or not it lives in a registered custom
@@ -40,18 +41,9 @@ public:
    * @return the sanitized string if stat_name has a registered custom stat namespace. Otherwise,
    * return null.
    */
-  absl::optional<std::string> trySanitizeStatName(const absl::string_view& stat_name) const;
-
-private:
-  absl::flat_hash_set<std::string> namespaces_;
+  virtual absl::optional<std::string>
+  trySanitizeStatName(const absl::string_view& stat_name) const PURE;
 };
-
-/**
- * Returns the global mutable singleton of CustomStatNamespaces.
- * Stat sinks and extensions must use CustomStatNamespaces via this getter
- * except unit tests.
- */
-CustomStatNamespaces& getCustomStatNamespaces();
 
 } // namespace Stats
 } // namespace Envoy

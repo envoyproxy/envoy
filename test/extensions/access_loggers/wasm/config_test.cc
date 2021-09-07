@@ -87,11 +87,15 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
   TestFactoryContext context(*api, stats_store);
+  ON_CALL(context, api()).WillByDefault(testing::ReturnRef(*api));
 
   AccessLog::InstanceSharedPtr instance =
       factory->createAccessLogInstance(config, std::move(filter), context);
   EXPECT_NE(nullptr, instance);
   EXPECT_NE(nullptr, dynamic_cast<WasmAccessLog*>(instance.get()));
+  // Check if the custom stat namespace is registered during the initialization.
+  EXPECT_TRUE(api->customStatNamespaces().registered("wasmcustom"));
+
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;

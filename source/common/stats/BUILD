@@ -25,10 +25,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "custom_namespace_lib",
-    srcs = ["custom_namespace.cc"],
-    hdrs = ["custom_namespace.h"],
+    name = "custom_stat_namespaces_lib",
+    srcs = ["custom_stat_namespaces_impl.cc"],
+    hdrs = ["custom_stat_namespaces_impl.h"],
     deps = [
+        "//envoy/stats:custom_stat_namespaces_interface",
         "//source/common/common:macros",
     ],
 )

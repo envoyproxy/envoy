@@ -48,6 +48,8 @@ AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
         fmt::format("Unable to create Wasm access log {}", plugin->name_));
   }
 
+  Extensions::Common::Wasm::ensureCustomStatNamespaceRegistered(
+      context.api().customStatNamespaces());
   return access_log;
 }
 

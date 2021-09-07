@@ -4,10 +4,9 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/stats/custom_stat_namespaces.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
-
-#include "source/common/stats/custom_namespace.h"
 
 namespace Envoy {
 namespace Server {

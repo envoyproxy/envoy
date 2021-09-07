@@ -38,7 +38,7 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/singleton:const_singleton",
-        "//source/common/stats:custom_namespace_lib",
+        "//source/common/stats:custom_stat_namespaces_lib",
         "//source/common/stats:stats_lib",
         "//source/common/version:version_includes",
         "//source/extensions/filters/common/expr:cel_state_lib",

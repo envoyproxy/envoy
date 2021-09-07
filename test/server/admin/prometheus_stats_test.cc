@@ -1,5 +1,6 @@
 #include <regex>
 
+#include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/server/admin/prometheus_stats.h"
 
 #include "test/mocks/stats/mocks.h"
@@ -102,7 +103,7 @@ protected:
 TEST_F(PrometheusStatsFormatterTest, MetricName) {
   std::string raw = "vulture.eats-liver";
   std::string expected = "envoy_vulture_eats_liver";
-  auto actual = PrometheusStatsFormatter::metricName(raw, Stats::CustomStatNamespaces{});
+  auto actual = PrometheusStatsFormatter::metricName(raw, Stats::CustomStatNamespacesImpl{});
   EXPECT_TRUE(actual.has_value());
   EXPECT_EQ(expected, actual.value());
 }
@@ -110,20 +111,20 @@ TEST_F(PrometheusStatsFormatterTest, MetricName) {
 TEST_F(PrometheusStatsFormatterTest, SanitizeMetricName) {
   std::string raw = "An.artist.plays-violin@019street";
   std::string expected = "envoy_An_artist_plays_violin_019street";
-  auto actual = PrometheusStatsFormatter::metricName(raw, Stats::CustomStatNamespaces{});
+  auto actual = PrometheusStatsFormatter::metricName(raw, Stats::CustomStatNamespacesImpl{});
   EXPECT_EQ(expected, actual.value());
 }
 
 TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
   std::string raw = "3.artists.play-violin@019street";
   std::string expected = "envoy_3_artists_play_violin_019street";
-  auto actual = PrometheusStatsFormatter::metricName(raw, Stats::CustomStatNamespaces{});
+  auto actual = PrometheusStatsFormatter::metricName(raw, Stats::CustomStatNamespacesImpl{});
   EXPECT_TRUE(actual.has_value());
   EXPECT_EQ(expected, actual.value());
 }
 
 TEST_F(PrometheusStatsFormatterTest, CustomNamespace) {
-  Stats::CustomStatNamespaces custom_namespaces;
+  Stats::CustomStatNamespacesImpl custom_namespaces;
   custom_namespaces.registerStatNamespace("promstattest");
   std::string raw = "promstattest.vulture.eats-liver";
   std::string expected = "vulture_eats_liver";
@@ -133,7 +134,7 @@ TEST_F(PrometheusStatsFormatterTest, CustomNamespace) {
 }
 
 TEST_F(PrometheusStatsFormatterTest, CustomNamespaceWithInvalidPromnamespace) {
-  Stats::CustomStatNamespaces custom_namespaces;
+  Stats::CustomStatNamespacesImpl custom_namespaces;
   custom_namespaces.registerStatNamespace("promstattest");
   std::string raw = "promstattest.1234abcd.eats-liver";
   auto actual = PrometheusStatsFormatter::metricName(raw, custom_namespaces);
@@ -169,7 +170,7 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
   Buffer::OwnedImpl response;
   auto size =
       PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false,
-                                                  absl::nullopt, Stats::CustomStatNamespaces{});
+                                                  absl::nullopt, Stats::CustomStatNamespacesImpl{});
   EXPECT_EQ(2UL, size);
 }
 
@@ -191,7 +192,7 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
   Buffer::OwnedImpl response;
   auto size =
       PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false,
-                                                  absl::nullopt, Stats::CustomStatNamespaces{});
+                                                  absl::nullopt, Stats::CustomStatNamespacesImpl{});
   EXPECT_EQ(4UL, size);
 }
 
@@ -208,7 +209,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
   Buffer::OwnedImpl response;
   auto size =
       PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false,
-                                                  absl::nullopt, Stats::CustomStatNamespaces{});
+                                                  absl::nullopt, Stats::CustomStatNamespacesImpl{});
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
@@ -254,7 +255,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNonDefaultBuckets) {
   Buffer::OwnedImpl response;
   auto size =
       PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false,
-                                                  absl::nullopt, Stats::CustomStatNamespaces{});
+                                                  absl::nullopt, Stats::CustomStatNamespacesImpl{});
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
@@ -289,7 +290,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
   Buffer::OwnedImpl response;
   auto size =
       PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false,
-                                                  absl::nullopt, Stats::CustomStatNamespaces{});
+                                                  absl::nullopt, Stats::CustomStatNamespacesImpl{});
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
@@ -322,7 +323,7 @@ envoy_histogram1_count{} 101100000
 }
 
 TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
-  Stats::CustomStatNamespaces custom_namespaces;
+  Stats::CustomStatNamespacesImpl custom_namespaces;
   custom_namespaces.registerStatNamespace("promtest");
 
   addCounter("cluster.test_1.upstream_cx_total",
@@ -434,7 +435,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputSortedByMetricName) {
   Buffer::OwnedImpl response;
   auto size =
       PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false,
-                                                  absl::nullopt, Stats::CustomStatNamespaces{});
+                                                  absl::nullopt, Stats::CustomStatNamespacesImpl{});
   EXPECT_EQ(6UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_upstream_cx_connect_fail counter
@@ -623,7 +624,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
   Buffer::OwnedImpl response;
   auto size =
       PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, true,
-                                                  absl::nullopt, Stats::CustomStatNamespaces{});
+                                                  absl::nullopt, Stats::CustomStatNamespacesImpl{});
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_rq_time histogram
@@ -675,7 +676,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
     Buffer::OwnedImpl response;
     auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
                                                             response, used_only, absl::nullopt,
-                                                            Stats::CustomStatNamespaces{});
+                                                            Stats::CustomStatNamespacesImpl{});
     EXPECT_EQ(0UL, size);
   }
 
@@ -686,7 +687,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
     Buffer::OwnedImpl response;
     auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
                                                             response, used_only, absl::nullopt,
-                                                            Stats::CustomStatNamespaces{});
+                                                            Stats::CustomStatNamespacesImpl{});
     EXPECT_EQ(1UL, size);
   }
 }
@@ -716,7 +717,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
   auto size = PrometheusStatsFormatter::statsAsPrometheus(
       counters_, gauges_, histograms_, response, false,
       absl::optional<std::regex>{std::regex("cluster.test_1.upstream_cx_total")},
-      Stats::CustomStatNamespaces{});
+      Stats::CustomStatNamespacesImpl{});
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output =

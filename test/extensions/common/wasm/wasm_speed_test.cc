@@ -31,10 +31,9 @@ void bmWasmSpeedTest(benchmark::State& state) {
   auto scope = Envoy::Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
 
-  Stats::CustomStatNamespaces custom_namespaces;
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   *plugin_config.mutable_vm_config()->mutable_runtime() = "envoy.wasm.runtime.null";
-  auto config = Envoy::Extensions::Common::Wasm::WasmConfig(plugin_config, custom_namespaces);
+  auto config = Envoy::Extensions::Common::Wasm::WasmConfig(plugin_config);
   auto wasm = std::make_unique<Envoy::Extensions::Common::Wasm::Wasm>(config, "", scope,
                                                                       cluster_manager, *dispatcher);
 

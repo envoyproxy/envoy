@@ -48,6 +48,8 @@ WasmSinkFactory::createStatsSink(const Protobuf::Message& proto_config,
         fmt::format("Unable to create Wasm Stat Sink {}", plugin->name_));
   }
 
+  Extensions::Common::Wasm::ensureCustomStatNamespaceRegistered(
+      context.api().customStatNamespaces());
   return wasm_sink;
 }
 

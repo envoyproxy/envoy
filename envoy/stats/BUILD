@@ -78,3 +78,8 @@ envoy_cc_library(
     hdrs = ["primitive_stats_macros.h"],
     deps = [":primitive_stats_interface"],
 )
+
+envoy_cc_library(
+    name = "custom_stat_namespaces_interface",
+    hdrs = ["custom_stat_namespaces.h"],
+)

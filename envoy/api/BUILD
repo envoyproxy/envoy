@@ -17,6 +17,7 @@ envoy_cc_library(
         "//envoy/event:scaled_range_timer_manager_interface",
         "//envoy/filesystem:filesystem_interface",
         "//envoy/server:process_context_interface",
+        "//envoy/stats:custom_stat_namespaces_interface",
         "//envoy/thread:thread_interface",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],

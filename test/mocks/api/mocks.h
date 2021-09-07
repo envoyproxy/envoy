@@ -50,6 +50,7 @@ public:
   MOCK_METHOD(Random::RandomGenerator&, randomGenerator, ());
   MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, bootstrap, (), (const));
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
+  MOCK_METHOD(Stats::CustomStatNamespaces&, customStatNamespaces, ());
 
   testing::NiceMock<Filesystem::MockInstance> file_system_;
   Event::GlobalTimeSystem time_system_;

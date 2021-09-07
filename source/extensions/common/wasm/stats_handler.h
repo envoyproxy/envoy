@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/server/lifecycle_notifier.h"
+#include "envoy/stats/custom_stat_namespaces.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -97,6 +98,11 @@ public:
 protected:
   LifecycleStats lifecycle_stats_;
 };
+
+// Ensure that the Wasm extension specific custom stat namespace is registered in the given
+// Stats::CustomStatNamespaces object. All wasm extension points must call this at least once
+// so that custom metrics defined byWasm programs are correctly handled by Stat sinks.
+void ensureCustomStatNamespaceRegistered(Stats::CustomStatNamespaces& custom_namespaces);
 
 } // namespace Wasm
 } // namespace Common

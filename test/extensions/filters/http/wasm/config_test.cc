@@ -151,6 +151,8 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasm) {
   // Check if the context still holds a valid Wasm even after the factory is destroyed.
   EXPECT_TRUE(context);
   EXPECT_TRUE(context->wasm());
+  // Check if the custom stat namespace is registered during the initialization.
+  EXPECT_TRUE(api_->customStatNamespaces().registered("wasmcustom"));
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmFailOpenOk) {

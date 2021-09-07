@@ -82,6 +82,14 @@ void LifecycleStatsHandler::onEvent(WasmEvent event) {
 
 int64_t LifecycleStatsHandler::getActiveVmCount() { return active_wasms; };
 
+// The custom namespace prefix which prepends the user-defined metrics.
+// Note that the prefix is removed from the final output of /stats endpoints.
+constexpr absl::string_view CustomStatNamespace = "wasmcustom";
+
+void ensureCustomStatNamespaceRegistered(Stats::CustomStatNamespaces& custom_namespaces) {
+  custom_namespaces.registerStatNamespace(CustomStatNamespace);
+};
+
 } // namespace Wasm
 } // namespace Common
 } // namespace Extensions
