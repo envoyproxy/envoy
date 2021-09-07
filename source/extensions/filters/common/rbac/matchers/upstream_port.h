@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/filters/common/rbac/matcher/upstream/v3/upstream_port_matcher.pb.validate.h"
+#include "envoy/extensions/rbac/matchers/upstream/v3/upstream_port_matcher.pb.validate.h"
 
 #include "source/common/network/cidr_range.h"
 #include "source/extensions/filters/common/rbac/matcher_extension.h"
@@ -13,13 +13,12 @@ namespace RBAC {
 namespace Matchers {
 
 // RBAC matcher extension for matching upstream's port number. It matches the port range provided by
-// the `envoy::extensions::filters::common::rbac::matcher::upstream::v3::UpstreamPortMatcher`
+// the `envoy::extensions::rbac::matchers::upstream::v3::UpstreamPortMatcher`
 // configuration with the resolved upstream's port.
 class UpstreamPortMatcher : public Filters::Common::RBAC::Matcher {
 public:
   UpstreamPortMatcher(
-      const envoy::extensions::filters::common::rbac::matcher::upstream::v3::UpstreamPortMatcher&
-          proto)
+      const envoy::extensions::rbac::matchers::upstream::v3::UpstreamPortMatcher& proto)
       : start_(proto.port_range().start()), end_(proto.port_range().end()) {}
 
   // Matcher interface.
@@ -35,7 +34,7 @@ private:
 class UpstreamPortMatcherFactory
     : public Filters::Common::RBAC::BaseMatcherExtensionFactory<
           UpstreamPortMatcher,
-          envoy::extensions::filters::common::rbac::matcher::upstream::v3::UpstreamPortMatcher> {
+          envoy::extensions::rbac::matchers::upstream::v3::UpstreamPortMatcher> {
 public:
   std::string name() const override { return "envoy.filters.common.rbac.upstream_port"; }
 };

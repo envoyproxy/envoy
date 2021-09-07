@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.extensions.rbac.matchers.upstream.v3;
+
+import "envoy/config/core/v3/address.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.rbac.matchers.upstream.v3";
+option java_outer_classname = "UpstreamIpMatcherProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: RBAC upstream ip matcher plugin]
+// [#extension: envoy.rbac.matchers.upstream]
+// [#alpha:]
+// This is configuration for matching upstream ip.
+message UpstreamIpMatcher {
+  // A CIDR block that will be used to match the upstream IP.
+  // This matcher requires a filter in the chain to have saved the upstream address in the
+  // filter state before the matcher is executed by RBAC filter. Otherwise the matcher will
+  // evaluate to `false`. Both Ipv4 and Ipv6 ranges can be matched.
+  config.core.v3.CidrRange upstream_ip = 1;
+}

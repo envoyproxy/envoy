@@ -1,19 +1,18 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.common.rbac.matcher.upstream.v3;
+package envoy.extensions.rbac.matchers.upstream.v3;
 
 import "envoy/type/range.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.common.rbac.matcher.upstream.v3";
+option java_package = "io.envoyproxy.envoy.extensions.rbac.matchers.upstream.v3";
 option java_outer_classname = "UpstreamPortMatcherProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: RBAC Upstream port range matcher plugin]
-// [#extension-category: envoy.filters.common.rbac.matcher.upstream]
+// [#protodoc-title: RBAC upstream port range matcher plugin]
+// [#extension: envoy.rbac.matchers.upstream]
 // [#alpha:]
 // This is configuration for matching upstream port.
 message UpstreamPortMatcher {

@@ -25,7 +25,7 @@ public:
                                        ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   // @brief the category of the matcher extension type for factory registration.
-  std::string category() const override { return "envoy.filters.common.rbac.matcher"; }
+  std::string category() const override { return "envoy.rbac.matchers"; }
 };
 
 // Base RBAC matcher extension factory. This facilitates easy creation of matcher extension

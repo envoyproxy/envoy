@@ -1,6 +1,6 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
-#include "envoy/extensions/filters/common/rbac/matcher/upstream/v3/upstream_ip_matcher.pb.h"
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/rbac/matchers/upstream/v3/upstream_ip_matcher.pb.h"
 
 #include "source/common/config/metadata.h"
 #include "source/common/network/utility.h"
@@ -294,7 +294,7 @@ void upstreamIpTestsBasicPolicySetup(RoleBasedAccessControlFilterTest& test,
   // Setup upstream ip to match.
 
   for (const auto& ip : upstream_ips) {
-    envoy::extensions::filters::common::rbac::matcher::upstream::v3::UpstreamIpMatcher matcher;
+    envoy::extensions::rbac::matchers::upstream::v3::UpstreamIpMatcher matcher;
     matcher.mutable_upstream_ip()->set_address_prefix(ip);
     matcher.mutable_upstream_ip()->mutable_prefix_len()->set_value(32);
 
