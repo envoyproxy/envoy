@@ -22,8 +22,9 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& request_header, bool) override {
     for (int i = TotalUpstreamClusterCount - TotalUpstreamClusterWithHeaderCount;
          i < TotalUpstreamClusterCount; ++i) {
-      request_header.addCopy(Envoy::Http::LowerCaseString(absl::StrFormat(ClusterHeaderName, i)),
-                             absl::StrFormat(ClusterName, i));
+      request_header.addCopy(
+          Envoy::Http::LowerCaseString(absl::StrFormat(ClusterHeaderNamePrefix, i)),
+          absl::StrFormat(ClusterNamePrefix, i));
     }
     decoder_callbacks_->clearRouteCache();
     return Http::FilterHeadersStatus::Continue;

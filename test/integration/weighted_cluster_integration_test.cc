@@ -25,8 +25,8 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, Network::Address::IpVersion::v6) {
     default_weights_.reserve(TotalUpstreamClusterCount);
     // For the simplicity of testing purpose, the default weighted cluster array
-    // starts with weights for clusters with `name` filed and followed by
-    // weights for clusters with `cluster_header` field.
+    // starts with weights for clusters with `name` and followed by
+    // weights for clusters with `cluster_header`.
     std::fill_n(std::back_inserter(default_weights_), TotalUpstreamClusterWithNameCount, 20);
     std::fill_n(std::back_inserter(default_weights_),
                 Envoy::RepickClusterFilter::TotalUpstreamClusterWithHeaderCount, 30);
@@ -54,12 +54,13 @@ public:
             ->mutable_address()
             ->mutable_socket_address()
             ->set_address(fake_upstreams_[i]->localAddress()->ip()->addressAsString());
-        cluster->set_name(absl::StrFormat(Envoy::RepickClusterFilter::ClusterName, i));
+        cluster->set_name(absl::StrFormat(Envoy::RepickClusterFilter::ClusterNamePrefix, i));
         ConfigHelper::setHttp2(*cluster);
       }
 
       auto* cluster_with_name = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      cluster_with_name->set_name(absl::StrFormat(Envoy::RepickClusterFilter::ClusterName, 0));
+      cluster_with_name->set_name(
+          absl::StrFormat(Envoy::RepickClusterFilter::ClusterNamePrefix, 0));
       ConfigHelper::setHttp2(*cluster_with_name);
 
       // Add the custom filter.
@@ -71,6 +72,7 @@ public:
         [&weights](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
+          // Add the clusters with `name` specified.
           for (int i = 0; i < TotalUpstreamClusterWithNameCount; ++i) {
             auto* cluster_with_name = hcm.mutable_route_config()
                                           ->mutable_virtual_hosts(0)
@@ -79,10 +81,11 @@ public:
                                           ->mutable_weighted_clusters()
                                           ->add_clusters();
             cluster_with_name->set_name(
-                absl::StrFormat(Envoy::RepickClusterFilter::ClusterName, i));
+                absl::StrFormat(Envoy::RepickClusterFilter::ClusterNamePrefix, i));
             cluster_with_name->mutable_weight()->set_value(weights[i]);
           }
 
+          // Add the clusters with `cluster_header` specified.
           for (int i = TotalUpstreamClusterWithNameCount;
                i < Envoy::RepickClusterFilter::TotalUpstreamClusterCount; ++i) {
             auto* cluster_with_header = hcm.mutable_route_config()
@@ -92,7 +95,7 @@ public:
                                             ->mutable_weighted_clusters()
                                             ->add_clusters();
             cluster_with_header->set_cluster_header(
-                absl::StrFormat(Envoy::RepickClusterFilter::ClusterHeaderName, i));
+                absl::StrFormat(Envoy::RepickClusterFilter::ClusterHeaderNamePrefix, i));
             cluster_with_header->mutable_weight()->set_value(weights[i]);
           }
 
@@ -142,39 +145,46 @@ private:
   std::vector<uint64_t> default_weights_;
 };
 
-// Steer the traffic (i.e. send the request) to the weighted cluster with `cluster_name` specified.
+// Steer the traffic (i.e. send the request) to the weighted cluster with `name` specified.
 TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithName) {
   setDeterministicValue();
   initializeConfig(getDefaultWeights());
 
   // The expected destination cluster upstream is index 0 since the selected
-  // value is set to 0 indirectly via `setDeterministicValue()`.
+  // value is set to 0 indirectly via `setDeterministicValue()` above to set the weight to 0.
   sendRequestAndValidateResponse({0});
 
   // Check that the expected upstream cluster has incoming request.
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 }
 
-// Steer the traffic (i.e. send the request) to the weighted cluster with `cluster_header_name`
+// Steer the traffic (i.e. send the request) to the weighted cluster with `cluster_header`
 // specified.
 TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithHeader) {
   const std::vector<uint64_t>& default_weights = getDefaultWeights();
+
+  // The index of first cluster with `name` specified is `TotalUpstreamClusterWithNameCount` because
+  // the pattern of clusters is clusters with `cluster_header` followed by clusters with
+  // `cluster_header`.
+  int destination_upstream_index = TotalUpstreamClusterWithNameCount;
+  // Set the deterministic value to the accumulation of the weights of all clusters with
+  // `name` so, based on weighted cluster selection logic, we can route the traffic to the first
+  // cluster with `cluster_header`
   uint64_t deterministric_value = std::accumulate(
-      default_weights.begin(), default_weights.begin() + TotalUpstreamClusterWithNameCount, 0UL);
+      default_weights.begin(), default_weights.begin() + destination_upstream_index, 0UL);
   setDeterministicValue(deterministric_value);
+
   initializeConfig(default_weights);
 
-  // The expected destination cluster upstream is index
-  // `TotalUpstreamClusterWithNameCount`.
-  sendRequestAndValidateResponse({static_cast<uint64_t>(TotalUpstreamClusterWithNameCount)});
+  sendRequestAndValidateResponse({static_cast<uint64_t>(destination_upstream_index)});
 
   // Check that the expected upstream cluster has incoming request.
   std::string target_name =
-      absl::StrFormat("cluster.cluster_%d.upstream_cx_total", TotalUpstreamClusterWithNameCount);
+      absl::StrFormat("cluster.cluster_%d.upstream_cx_total", destination_upstream_index);
   EXPECT_EQ(test_server_->counter(target_name)->value(), 1);
 }
 
-// Send the traffic (i.e. send the request) to the weighted clusters randomly based on weight.
+// Steer the traffic (i.e. send the request) to the weighted clusters randomly based on weight.
 TEST_F(WeightedClusterIntegrationTest, SplitTrafficRandomly) {
   std::vector<uint64_t> weights;
   weights.reserve(TotalUpstreamClusterCount);
