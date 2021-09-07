@@ -163,13 +163,13 @@ TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithName) {
 TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithHeader) {
   const std::vector<uint64_t>& default_weights = getDefaultWeights();
 
-  // The index of first cluster with `name` specified is `TotalUpstreamClusterWithNameCount` because
-  // the pattern of clusters is clusters with `cluster_header` followed by clusters with
-  // `cluster_header`.
+  // The index of first cluster with `cluster_header` specified is
+  // `TotalUpstreamClusterWithNameCount` because the pattern of clusters is clusters with `name`
+  // followed by clusters with `cluster_header`.
   int destination_upstream_index = TotalUpstreamClusterWithNameCount;
   // Set the deterministic value to the accumulation of the weights of all clusters with
-  // `name` so, based on weighted cluster selection logic, we can route the traffic to the first
-  // cluster with `cluster_header`
+  // `name`, so, we can route the traffic to the first cluster with `cluster_header` based on
+  // weighted cluster selection algorithm in `RouteEntryImplBase::pickWeightedCluster()`.
   uint64_t deterministric_value = std::accumulate(
       default_weights.begin(), default_weights.begin() + destination_upstream_index, 0UL);
   setDeterministicValue(deterministric_value);
