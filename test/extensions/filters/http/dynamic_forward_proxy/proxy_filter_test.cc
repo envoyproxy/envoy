@@ -347,7 +347,7 @@ public:
   using AddressSetFilterStateObjectImpl =
       StreamInfo::SetFilterStateObjectImpl<Network::Address::InstanceConstSharedPtr>;
 
-  virtual void setupFilter() override {
+  void setupFilter() override {
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
 
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;

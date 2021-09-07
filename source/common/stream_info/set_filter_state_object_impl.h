@@ -12,12 +12,12 @@ namespace StreamInfo {
  */
 template <typename T> class SetFilterStateObjectImpl : public SetFilterStateObject<T> {
 public:
-  void add(const T& address) override { values__.emplace(address); }
+  void add(const T& address) override { values_.emplace(address); }
 
-  void clear() override { values__.clear(); }
+  void clear() override { values_.clear(); }
 
   void iterate(const std::function<bool(const T& address)>& fn) const override {
-    for (const auto& address : values__) {
+    for (const auto& address : values_) {
       if (!fn(address)) {
         break;
       }
@@ -29,7 +29,7 @@ public:
   }
 
 private:
-  absl::flat_hash_set<T> values__;
+  absl::flat_hash_set<T> values_;
 };
 
 } // namespace StreamInfo
