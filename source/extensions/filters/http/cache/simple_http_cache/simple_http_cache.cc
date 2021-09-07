@@ -155,9 +155,9 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
   // 2. No key collision for etag. Therefore, if etag matches it's the same resource.
   // 3. Backend is correct. etag is being used as a unique identifier to the resource
 
-  // use other header fields provided in the new response to replace all instances 
+  // use other header fields provided in the new response to replace all instances
   // of the corresponding header fields in the stored response
-  // Note: Warning 1xx, 2xx are not handled as they are not commonly used despite 
+  // Note: Warning 1xx, 2xx are not handled as they are not commonly used despite
   // their presence the RFC specs
   response_headers.iterate(
       [&entry](const Http::HeaderEntry& response_header) -> Http::HeaderMap::Iterate {
