@@ -27,7 +27,7 @@ from tools.api_proto_plugin import visitor
 from tools.base import utils
 from tools.config_validation import validate_fragment
 
-from tools.protodoc import manifest_pb2
+from source.common.common import manifest_pb2
 from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2
 from validate import validate_pb2
