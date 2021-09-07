@@ -98,13 +98,14 @@ def write_revision_info(repo, sha):
 
 
 def sync_go_protobufs(output, repo):
-    # Sync generated content against repo and return true if there is a commit necessary
-    dst = os.path.join(repo, 'envoy')
-    # Remove subtree at envoy in repo
-    git(repo, 'rm', '-r', 'envoy')
-    # Copy subtree at envoy from output to repo
-    shutil.copytree(os.path.join(output, 'envoy'), dst)
-    git(repo, 'add', 'envoy')
+    for folder in ['envoy', 'contrib']:
+        # Sync generated content against repo and return true if there is a commit necessary
+        dst = os.path.join(repo, folder)
+        # Remove subtree in repo
+        git(repo, 'rm', '-r', '--ignore-unmatch', folder)
+        # Copy subtree from output to repo
+        shutil.copytree(os.path.join(output, folder), dst)
+        git(repo, 'add', folder)
 
 
 def publish_go_protobufs(repo, sha):
@@ -112,6 +113,7 @@ def publish_go_protobufs(repo, sha):
     git(repo, 'config', 'user.name', USER_NAME)
     git(repo, 'config', 'user.email', USER_EMAIL)
     git(repo, 'add', 'envoy')
+    git(repo, 'add', 'contrib')
     git(repo, 'commit', '--allow-empty', '-s', '-m', MIRROR_MSG + sha)
     git(repo, 'push', 'origin', BRANCH)
 
