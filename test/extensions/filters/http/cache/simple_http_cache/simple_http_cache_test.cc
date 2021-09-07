@@ -385,13 +385,11 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
   // Update the date field in the headers
   time_source_.advanceTimeWait(Seconds(3601));
   std::string time_now = formatter_.fromTime(current_time_);
-  Http::TestResponseHeaderMapImpl response_headers_2{{"date", time_now},
-                                                     {"cache-control", "public,max-age=3600"},
-                                                     {"etag", "1111-1111"}};
+  Http::TestResponseHeaderMapImpl response_headers_2{
+      {"date", time_now}, {"cache-control", "public,max-age=3600"}, {"etag", "1111-1111"}};
   // The etag header should not be updated
-  Http::TestResponseHeaderMapImpl response_headers_3{{"date", time_now},
-                                                     {"cache-control", "public,max-age=3600"},
-                                                     {"etag", "0000-0000"}};
+  Http::TestResponseHeaderMapImpl response_headers_3{
+      {"date", time_now}, {"cache-control", "public,max-age=3600"}, {"etag", "0000-0000"}};
 
   updateHeaders(request_path_1, response_headers_2, {current_time_});
 
