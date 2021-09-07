@@ -11,9 +11,10 @@ option java_outer_classname = "UpstreamIpMatcherProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: File Based Key Value Store storage plugin]
+// [#protodoc-title: RBAC upstream IP matcher plugin]
 // [#extension: envoy.rbac.matchers.upstream]
 // [#alpha:]
+
 // This is configuration for matching upstream ip.
 message UpstreamIpMatcher {
   // A CIDR block that will be used to match the upstream IP.
