@@ -267,7 +267,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerNull) {
 
   // We are only testing that the timer was never enabled. So, to clean up, just drain
   // this pool manually.
-  pool_.startDrainImpl();
+  pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 }
 
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerEnabled) {
@@ -296,7 +296,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerEnabled) {
   // We are only testing that the timer was enabled. So, to clean up, just disable
   // the timer and drain this pool manually.
   clients_.back()->lifetime_timer_->disableTimer();
-  pool_.startDrainImpl();
+  pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 }
 
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationBusy) {
