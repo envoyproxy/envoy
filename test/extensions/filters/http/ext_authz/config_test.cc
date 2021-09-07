@@ -159,9 +159,9 @@ public:
                                                                   cache_option);
         }));
     ExtAuthzFilterConfig factory;
-    ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-    TestUtility::loadFromYaml(ext_authz_config_yaml, *proto_config);
-    return factory.createFilterFactoryFromProto(*proto_config, "stats", context_);
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
+    TestUtility::loadFromYaml(ext_authz_config_yaml, proto_config);
+    return factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   }
 
   void initAddress() {
@@ -189,6 +189,15 @@ public:
               filter->decodeHeaders(request_headers, false));
     std::shared_ptr<Http::StreamDecoderFilter> decoder_filter = filter;
     decoder_filter->onDestroy();
+  }
+
+  void expectClientSentRequest(const std::string& ext_authz_config_yaml, int num_requests) {
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
+    TestUtility::loadFromYaml(ext_authz_config_yaml, proto_config);
+    RawAsyncClientSharedPtr async_client =  async_client_manager_->getOrCreateRawAsyncClient(proto_config.grpc_service(), context_.scope(), false,
+                                                                  Grpc::CacheOption::AlwaysCache);
+    Grpc::MockAsyncClient* mock_async_client = dynamic_cast<Grpc::MockAsyncClient*>(async_client.get());
+    EXPECT_NE(mock_async_client, nullptr);
   }
 
 private:
@@ -259,6 +268,9 @@ TEST_F(ExtAuthzFilterTest, ExtAuthzFilterFactoryTestHttp) {
       EXPECT_NE(filter, nullptr);
     });
   }
+    postWorkToAllWorkers([&, filter_factory]() {
+      expectClientSentRequest(ext_authz_config_yaml, 5);
+    });
   postWorkToMain([&]() { async_client_manager_.reset(); });
   cleanUpThreading();
 }
