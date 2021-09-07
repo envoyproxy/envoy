@@ -317,16 +317,14 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationBusy) {
   // Verify that advancing to just before the lifetime timeout doesn't drain the connection.
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ - 1),
                                  *dispatcher_, Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(0,
-            pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
+  EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
   EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
 
   // Verify that advancing past the lifetime timeout drains the connection,
   // because there's a busy client.
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(2), *dispatcher_,
                                  Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(1,
-            pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
+  EXPECT_EQ(1, pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
   EXPECT_EQ(ActiveClient::State::DRAINING, clients_.back()->state());
 
   // Close active stream and expect that the client closes, since it was previously
@@ -358,15 +356,13 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationReady) {
   // Verify that advancing to just before the lifetime timeout doesn't close the connection.
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ - 1),
                                  *dispatcher_, Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(0,
-            pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
+  EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
 
   // Verify that advancing past the lifetime timeout closes the connection,
   // because there's nothing to drain.
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(2), *dispatcher_,
                                  Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(1,
-            pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
+  EXPECT_EQ(1, pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
 }
 
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyClosed) {
@@ -395,8 +391,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyClosed) {
   // that is already closed.
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ + 1),
                                  *dispatcher_, Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(0,
-            pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
+  EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
 }
 
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyDraining) {
@@ -422,8 +417,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyDraining) {
   // that is already draining.
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(max_connection_duration_ + 1),
                                  *dispatcher_, Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(0,
-            pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
+  EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
 
   // Close the active stream
   clients_.back()->active_streams_ = 0;
