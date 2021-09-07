@@ -161,7 +161,7 @@ public class CronetUrlRequestTest {
     assertEquals(0, callback.mRedirectCount);
     assertEquals(callback.mResponseStep, ResponseStep.ON_SUCCEEDED);
     UrlResponseInfo urlResponseInfo =
-        createUrlResponseInfo(new String[] {url}, "OK", 200, 86, "connection", "close",
+        createUrlResponseInfo(new String[] {url}, "OK", 200, 86, "Connection", "close",
                               "Content-Length", "3", "Content-Type", "text/plain");
     mTestRule.assertResponseEquals(urlResponseInfo, callback.mResponseInfo);
     checkResponseInfo(callback.mResponseInfo, NativeTestServer.getEchoMethodURL(), 200, "OK");
@@ -268,8 +268,8 @@ public class CronetUrlRequestTest {
 
     UrlResponseInfo urlResponseInfo = createUrlResponseInfo(
         new String[] {NativeTestServer.getRedirectURL(), NativeTestServer.getSuccessURL()}, "OK",
-        200, 258, "content-length", "20", "content-type", "text/plain",
-        "access-control-allow-origin", "*", "header-name", "header-value", "multi-header-name",
+        200, 258, "Content-Length", "20", "Content-Type", "text/plain",
+        "Access-Control-Allow-Origin", "*", "header-name", "header-value", "multi-header-name",
         "header-value1", "multi-header-name", "header-value2");
 
     mTestRule.assertResponseEquals(urlResponseInfo, callback.mResponseInfo);

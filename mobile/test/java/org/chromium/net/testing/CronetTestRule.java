@@ -18,10 +18,6 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Field;
 import java.net.URL;
 import java.net.URLStreamHandlerFactory;
-import java.util.AbstractMap.SimpleEntry;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 import org.chromium.net.ApiVersion;
 import org.chromium.net.CronetEngine;
 import org.chromium.net.ExperimentalCronetEngine;
@@ -249,29 +245,8 @@ public final class CronetTestRule implements TestRule {
   }
 
   public void assertResponseEquals(UrlResponseInfo expected, UrlResponseInfo actual) {
-    // TODO(carloseltuerto): https://github.com/envoyproxy/envoy-mobile/issues/1558
-    // Revert to original code, the two commented lines below, once capitalization issue is solved.
-    // assertEquals(expected.getAllHeaders(), actual.getAllHeaders());
-    // assertEquals(expected.getAllHeadersAsList(), actual.getAllHeadersAsList());
-    Map<String, List<String>> hackedExpectedHeaders =
-        expected.getAllHeaders().entrySet().stream().collect(
-            Collectors.toMap(e -> e.getKey().toLowerCase(), Map.Entry::getValue));
-    Map<String, List<String>> hackedActualHeaders =
-        actual.getAllHeaders().entrySet().stream().collect(
-            Collectors.toMap(e -> e.getKey().toLowerCase(), Map.Entry::getValue));
-    assertEquals(hackedExpectedHeaders, hackedActualHeaders);
-    List<Map.Entry<String, String>> hackedExpectedHeadersAsList =
-        expected.getAllHeadersAsList()
-            .stream()
-            .map(e -> new SimpleEntry<>(e.getKey().toLowerCase(), e.getValue()))
-            .collect(Collectors.toList());
-    List<Map.Entry<String, String>> hackedActualHeadersAsList =
-        actual.getAllHeadersAsList()
-            .stream()
-            .map(e -> new SimpleEntry<>(e.getKey().toLowerCase(), e.getValue()))
-            .collect(Collectors.toList());
-    assertEquals(hackedExpectedHeadersAsList, hackedActualHeadersAsList);
-    // End of hack.
+    assertEquals(expected.getAllHeaders(), actual.getAllHeaders());
+    assertEquals(expected.getAllHeadersAsList(), actual.getAllHeadersAsList());
     assertEquals(expected.getHttpStatusCode(), actual.getHttpStatusCode());
     assertEquals(expected.getHttpStatusText(), actual.getHttpStatusText());
     assertEquals(expected.getUrlChain(), actual.getUrlChain());
