@@ -15,8 +15,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Eq;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
