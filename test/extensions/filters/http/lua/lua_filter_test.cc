@@ -2418,6 +2418,31 @@ TEST_F(LuaHttpFilterTest, LuaBodyBufferSetBytesWithHex) {
   EXPECT_EQ(5, encoder_callbacks_.buffer_->length());
 }
 
+TEST_F(LuaHttpFilterTest, LuaBodyBufferSetBytesWithEmpty) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local bodyBuffer = response_handle:body()
+      bodyBuffer:setBytes("")
+      local body_str = bodyBuffer:getBytes(0, bodyBuffer:length())
+      response_handle:logTrace(body_str)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
+
+  Buffer::OwnedImpl response_body("1111");
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("")));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
+  EXPECT_EQ(0, encoder_callbacks_.buffer_->length());
+}
 } // namespace
 } // namespace Lua
 } // namespace HttpFilters
