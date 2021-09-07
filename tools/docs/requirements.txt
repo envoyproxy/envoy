@@ -231,9 +231,9 @@ urllib3==1.26.6 \
     #   requests
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==57.0.0 \
-    --hash=sha256:401cbf33a7bf817d08014d51560fc003b895c4cdc1a5b521ad2969e928a07535 \
-    --hash=sha256:c8b9f1a457949002e358fea7d3f2a1e1b94ddc0354b2e40afc066bf95d21bf7b
+setuptools==58.0.2 \
+    --hash=sha256:779e428472026a7ab0f19eea04ff61c4e5ed253cb990a8b2fcdda5f566f58a09 \
+    --hash=sha256:19e48d0270a86c996bf09e5282584d3c0adf407f37f0aa6e3c762a349ff41811
     # via
     #   -r tools/docs/requirements.txt
     #   sphinx
