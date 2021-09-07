@@ -229,6 +229,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
 }
 
 ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& context) {
+  ASSERT(!is_draining_for_deletion_);
   ASSERT(!deferred_deleting_);
 
   ASSERT(static_cast<ssize_t>(connecting_stream_capacity_) ==
@@ -331,11 +332,6 @@ void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
 
 void ConnPoolImplBase::addIdleCallbackImpl(Instance::IdleCb cb) { idle_callbacks_.push_back(cb); }
 
-void ConnPoolImplBase::startDrainImpl() {
-  is_draining_ = true;
-  checkForIdleAndCloseIdleConnsIfDraining();
-}
-
 void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
   // Create a separate list of elements to close to avoid mutate-while-iterating problems.
   std::list<ActiveClient*> to_close;
@@ -353,17 +349,26 @@ void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
   }
 
   for (auto& entry : to_close) {
+    ENVOY_LOG_EVENT(debug, "closing_idle_client", "closing idle client {} for cluster {}",
+                    entry->id(), host_->cluster().name());
     entry->close();
   }
 }
 
-void ConnPoolImplBase::drainConnectionsImpl() {
+void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
+  if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
+    is_draining_for_deletion_ = true;
+    checkForIdleAndCloseIdleConnsIfDraining();
+    return;
+  }
   closeIdleConnectionsForDrainingPool();
 
   // closeIdleConnections() closes all connections in ready_clients_ with no active streams,
   // so all remaining entries in ready_clients_ are serving streams. Move them and all entries
   // in busy_clients_ to draining.
   while (!ready_clients_.empty()) {
+    ENVOY_LOG_EVENT(debug, "draining_ready_client", "draining active client {} for cluster {}",
+                    ready_clients_.front()->id(), host_->cluster().name());
     transitionActiveClientState(*ready_clients_.front(), ActiveClient::State::DRAINING);
   }
 
@@ -371,6 +376,8 @@ void ConnPoolImplBase::drainConnectionsImpl() {
   // so use a for-loop since the list is not mutated.
   ASSERT(&owningList(ActiveClient::State::DRAINING) == &busy_clients_);
   for (auto& busy_client : busy_clients_) {
+    ENVOY_LOG_EVENT(debug, "draining_busy_client", "draining busy client {} for cluster {}",
+                    busy_client->id(), host_->cluster().name());
     transitionActiveClientState(*busy_client, ActiveClient::State::DRAINING);
   }
 }
@@ -381,12 +388,13 @@ bool ConnPoolImplBase::isIdleImpl() const {
 }
 
 void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
-  if (is_draining_) {
+  if (is_draining_for_deletion_) {
     closeIdleConnectionsForDrainingPool();
   }
 
   if (isIdleImpl()) {
-    ENVOY_LOG(debug, "invoking idle callbacks - is_draining_={}", is_draining_);
+    ENVOY_LOG(debug, "invoking idle callbacks - is_draining_for_deletion_={}",
+              is_draining_for_deletion_);
     for (const Instance::IdleCb& cb : idle_callbacks_) {
       cb();
     }
