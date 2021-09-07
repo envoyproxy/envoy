@@ -31,8 +31,7 @@ using FilterConfigSubscriptionSharedPtr = std::shared_ptr<FilterConfigSubscripti
 /**
  * Base class for a filter config provider using discovery subscriptions.
  **/
-class DynamicFilterConfigProviderImplBase
-    : public Config::DynamicExtensionConfigProviderBase<Envoy::Http::FilterFactoryCb> {
+class DynamicFilterConfigProviderImplBase : public Config::DynamicExtensionConfigProviderBase {
 public:
   DynamicFilterConfigProviderImplBase(FilterConfigSubscriptionSharedPtr& subscription,
                                       const absl::flat_hash_set<std::string>& require_type_urls,
@@ -66,17 +65,17 @@ private:
 class DynamicFilterConfigProviderImpl : public DynamicFilterConfigProviderImplBase,
                                         public DynamicFilterConfigProvider {
 public:
-  DynamicFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
-                                  const absl::flat_hash_set<std::string>& require_type_urls,
-                                  Server::Configuration::FactoryContext& factory_context,
-                                  Envoy::Http::FilterFactoryCb default_config,
-                                  bool last_filter_in_filter_chain,
-                                  const std::string& filter_chain_type)
+  DynamicFilterConfigProviderImpl(
+      FilterConfigSubscriptionSharedPtr& subscription,
+      const absl::flat_hash_set<std::string>& require_type_urls,
+      Server::Configuration::FactoryContext& factory_context,
+      absl::optional<ProtobufWkt::Any> default_config, bool last_filter_in_filter_chain,
+      const std::string& filter_chain_type,
+      std::function<Envoy::Http::FilterFactoryCb(const ProtobufWkt::Any&)> factory_cb)
       : DynamicFilterConfigProviderImplBase(subscription, require_type_urls,
                                             last_filter_in_filter_chain, filter_chain_type),
-        default_configuration_(default_config ? absl::make_optional(default_config)
-                                              : absl::nullopt),
-        tls_(factory_context.threadLocal()) {
+        default_configuration_(default_config), tls_(factory_context.threadLocal()),
+        factory_cb_(factory_cb) {
     tls_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
   };
 
@@ -84,9 +83,10 @@ public:
   const std::string& name() override { return DynamicFilterConfigProviderImplBase::name(); }
   absl::optional<Envoy::Http::FilterFactoryCb> config() override { return tls_->config_; }
 
-  // Config::DynamicExtensionConfigProvider
-  void onConfigUpdate(Envoy::Http::FilterFactoryCb config, const std::string&,
+  // Config::DynamicExtensionConfigProviderBase
+  void onConfigUpdate(const ProtobufWkt::Any& proto_config, const std::string&,
                       Config::ConfigAppliedCb cb) override {
+    const Envoy::Http::FilterFactoryCb config = factory_cb_(proto_config);
     tls_.runOnAllThreads(
         [config, cb](OptRef<ThreadLocalConfig> tls) {
           tls->config_ = config;
@@ -102,16 +102,20 @@ public:
   }
 
   void onConfigRemoved(Config::ConfigAppliedCb applied_on_all_threads) override {
-    tls_.runOnAllThreads(
-        [config = default_configuration_](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
-        [this, applied_on_all_threads]() {
-          // This happens after all workers have discarded the previous config so it can be safely
-          // deleted on the main thread by an update with the new config.
-          this->current_config_ = default_configuration_;
-          if (applied_on_all_threads) {
-            applied_on_all_threads();
-          }
-        });
+    const absl::optional<Envoy::Http::FilterFactoryCb> default_config =
+        default_configuration_ ? absl::make_optional(factory_cb_(default_configuration_.value()))
+                               : absl::nullopt;
+    tls_.runOnAllThreads([config = default_config,
+                          default_config](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
+                         [this, default_config, applied_on_all_threads]() {
+                           // This happens after all workers have discarded the previous config so
+                           // it can be safely deleted on the main thread by an update with the new
+                           // config.
+                           this->current_config_ = default_config;
+                           if (applied_on_all_threads) {
+                             applied_on_all_threads();
+                           }
+                         });
   }
 
   void applyDefaultConfiguration() override {
@@ -129,8 +133,9 @@ private:
   // Currently applied configuration to ensure that the main thread deletes the last reference to
   // it.
   absl::optional<Envoy::Http::FilterFactoryCb> current_config_{absl::nullopt};
-  const absl::optional<Envoy::Http::FilterFactoryCb> default_configuration_;
+  const absl::optional<ProtobufWkt::Any> default_configuration_;
   ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
+  const std::function<Envoy::Http::FilterFactoryCb(const ProtobufWkt::Any&)> factory_cb_;
 };
 
 /**
@@ -168,7 +173,7 @@ public:
 
   const Init::SharedTargetImpl& initTarget() { return init_target_; }
   const std::string& name() { return filter_config_name_; }
-  const absl::optional<Envoy::Http::FilterFactoryCb>& lastConfig() { return last_config_; }
+  const absl::optional<ProtobufWkt::Any>& lastConfig() { return last_config_; }
   const std::string& lastTypeUrl() { return last_type_url_; }
   const std::string& lastVersionInfo() { return last_version_info_; }
   const std::string& lastFilterName() { return last_filter_name_; }
@@ -189,7 +194,7 @@ private:
 
   const std::string filter_config_name_;
   uint64_t last_config_hash_{0ul};
-  absl::optional<Envoy::Http::FilterFactoryCb> last_config_{absl::nullopt};
+  absl::optional<ProtobufWkt::Any> last_config_{absl::nullopt};
   std::string last_type_url_;
   std::string last_version_info_;
   std::string last_filter_name_;
@@ -271,22 +276,27 @@ public:
   }
 
 protected:
+  virtual void
+  validateDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
+                        Server::Configuration::FactoryContext& factory_context,
+                        bool last_filter_in_filter_chain, const std::string& filter_chain_type,
+                        const absl::flat_hash_set<std::string> require_type_urls) const PURE;
+
   virtual Http::FilterFactoryCb
-  getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
-                   Server::Configuration::FactoryContext& factory_context,
-                   const std::string& stat_prefix, bool last_filter_in_filter_chain,
-                   const std::string& filter_chain_type,
-                   const absl::flat_hash_set<std::string> require_type_urls) const PURE;
+  instantiateFilterFactory(const ProtobufWkt::Any& proto_config, const std::string& stat_prefix,
+                           Server::Configuration::FactoryContext& factory_context) const PURE;
 };
 
 class HttpFilterConfigProviderManagerImpl : public FilterConfigProviderManagerImpl {
 protected:
+  void
+  validateDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
+                        Server::Configuration::FactoryContext& factory_context,
+                        bool last_filter_in_filter_chain, const std::string& filter_chain_type,
+                        const absl::flat_hash_set<std::string> require_type_urls) const override;
   Http::FilterFactoryCb
-  getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
-                   Server::Configuration::FactoryContext& factory_context,
-                   const std::string& stat_prefix, bool last_filter_in_filter_chain,
-                   const std::string& filter_chain_type,
-                   const absl::flat_hash_set<std::string> require_type_urls) const override;
+  instantiateFilterFactory(const ProtobufWkt::Any& proto_config, const std::string& stat_prefix,
+                           Server::Configuration::FactoryContext& factory_context) const override;
 };
 
 } // namespace Filter

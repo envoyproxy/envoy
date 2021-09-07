@@ -35,17 +35,17 @@ public:
   virtual absl::optional<FactoryCallback> config() PURE;
 };
 
-template <class FactoryCallback> class DynamicExtensionConfigProviderBase {
+class DynamicExtensionConfigProviderBase {
 public:
   virtual ~DynamicExtensionConfigProviderBase() = default;
 
   /**
    * Update the provider with a new configuration.
-   * @param config is an extension factory callback to replace the existing configuration.
+   * @param proto_config is a candidate configuration update.
    * @param version_info is the version of the new extension configuration.
    * @param cb the continuation callback for a completed configuration application on all threads.
    */
-  virtual void onConfigUpdate(FactoryCallback config, const std::string& version_info,
+  virtual void onConfigUpdate(const ProtobufWkt::Any& proto_config, const std::string& version_info,
                               ConfigAppliedCb applied_on_all_threads) PURE;
 
   /**
@@ -61,7 +61,7 @@ public:
 };
 
 template <class Factory, class FactoryCallback>
-class DynamicExtensionConfigProvider : public DynamicExtensionConfigProviderBase<FactoryCallback>,
+class DynamicExtensionConfigProvider : public DynamicExtensionConfigProviderBase,
                                        public ExtensionConfigProvider<Factory, FactoryCallback> {};
 
 } // namespace Config
