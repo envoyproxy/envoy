@@ -487,6 +487,7 @@ TEST_P(AdsIntegrationTest, CdsEdsReplacementWarming) {
       {buildTlsCluster("cluster_0")}, {}, "2");
   // Inconsistent SotW and delta behaviors for warming, see
   // https://github.com/envoyproxy/envoy/issues/11477#issuecomment-657855029.
+  // TODO (dmitri-d) this should be remove when legacy mux implementations have been removed.
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
                                         {"cluster_0"}, {}, {}));
@@ -674,6 +675,7 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 
   // CDS is resumed and EDS response was acknowledged.
+  // TODO (dmitri-d) remove the conditional when legacy mux implementations are removed.
   if (sotw_or_delta_ != Grpc::SotwOrDelta::Sotw) {
     // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
     // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
@@ -756,6 +758,7 @@ TEST_P(AdsIntegrationTest, RemoveWarmingCluster) {
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
 
   // CDS is resumed and EDS response was acknowledged.
+  // TODO (dmitri-d) remove the conditional when legacy mux implementations are removed.
   if (sotw_or_delta_ != Grpc::SotwOrDelta::Sotw) {
     // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
     // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
