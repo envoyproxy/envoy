@@ -224,7 +224,9 @@ envoy_cc_mock(
     hdrs = ["cluster_manager_factory.h"],
     deps = [
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/singleton:manager_impl_lib",
         "//test/mocks/secret:secret_mocks",
+        "//test/test_common:thread_factory_for_test_lib",
     ],
 )
 
