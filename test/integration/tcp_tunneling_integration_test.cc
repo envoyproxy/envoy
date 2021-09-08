@@ -170,7 +170,7 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
   // Tear down by closing the upstream connection.
   ASSERT_TRUE(fake_raw_upstream_connection_->close());
   if (downstream_protocol_ == Http::CodecType::HTTP3) {
-    // In HTTP/3 the end stream will be sent when the connection is close, and
+    // In HTTP/3 end stream will be sent when the upstream connection is closed, and
     // STOP_SENDING frame sent instead of reset.
     ASSERT_TRUE(response_->waitForEndStream());
   } else {
