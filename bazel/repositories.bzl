@@ -148,6 +148,9 @@ def _rust_deps():
     external_http_archive("rules_rust")
 
 def envoy_dependencies(skip_targets = []):
+    # Add a binding for repository variables.
+    envoy_repo()
+
     # Setup Envoy developer tools.
     envoy_dev_binding()
 

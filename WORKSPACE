@@ -8,9 +8,7 @@ load("//bazel:api_repositories.bzl", "envoy_api_dependencies")
 
 envoy_api_dependencies()
 
-load("//bazel:repositories.bzl", "envoy_dependencies", "envoy_repo")
-
-envoy_repo()
+load("//bazel:repositories.bzl", "envoy_dependencies")
 
 envoy_dependencies()
 
