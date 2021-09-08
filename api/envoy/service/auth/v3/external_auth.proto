@@ -111,7 +111,7 @@ message CheckResponse {
       "envoy.service.auth.v2.CheckResponse";
 
   // Status `OK` allows the request. Any other status indicates the request should be denied, and
-  // for HTTP filter, if not overriden by :ref:`denied HTTP response status <envoy_v3_api_field_service.auth.v3.DeniedHttpResponse.status>`
+  // for HTTP filter, if not overridden by :ref:`denied HTTP response status <envoy_v3_api_field_service.auth.v3.DeniedHttpResponse.status>`
   // Envoy sends ``403 Forbidden`` HTTP status code by default.
   google.rpc.Status status = 1;
 
