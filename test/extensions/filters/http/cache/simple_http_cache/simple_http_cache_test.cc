@@ -299,6 +299,22 @@ TEST_F(SimpleHttpCacheTest, PutGetWithTrailers) {
   insert(move(name_lookup_context), response_headers, new_body1, response_trailers);
   EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(lookup(request_path1).get(), new_body1,
                                                      response_trailers));
+  EXPECT_TRUE(lookup_result_.has_trailers_);
+}
+
+TEST_F(SimpleHttpCacheTest, EmptyTrailers) {
+  const std::string request_path1("/name");
+  LookupContextPtr name_lookup_context = lookup(request_path1);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"cache-control", "public,max-age=3600"}};
+  const std::string body1("Value");
+  insert(move(name_lookup_context), response_headers, body1);
+  name_lookup_context = lookup(request_path1);
+  EXPECT_TRUE(
+      expectLookupSuccessWithBodyAndTrailers(name_lookup_context.get(), body1));
+  EXPECT_FALSE(lookup_result_.has_trailers_);
 }
 
 } // namespace
