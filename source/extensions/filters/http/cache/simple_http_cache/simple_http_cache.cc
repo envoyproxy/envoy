@@ -109,7 +109,6 @@ LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
   return std::make_unique<SimpleLookupContext>(*this, std::move(request));
 }
 
-
 const absl::flat_hash_set<Http::LowerCaseString> SimpleHttpCache::headersNotToUpdate =
     absl::flat_hash_set<Http::LowerCaseString>({
         // Content range should not be changed upon validation

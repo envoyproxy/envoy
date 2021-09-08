@@ -399,36 +399,39 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
   const std::string request_path_1("/name");
 
   // Vary not tested because we have separate tests that cover it
-  Http::TestResponseHeaderMapImpl response_headers_1{{"date", formatter_.fromTime(current_time_)},
-                                                     {"cache-control", "public,max-age=3600"},
-                                                     {"content-range", "bytes 200-1000/67589"},
-                                                     {"content-length","800"},
-                                                     {"content-type","text/html; charset=UTF-8"},
-                                                     {"etag", "0000-0000"},
-                                                     {"link", "<https://example.com>; rel=\"preconnect\""}};
+  Http::TestResponseHeaderMapImpl response_headers_1{
+      {"date", formatter_.fromTime(current_time_)},
+      {"cache-control", "public,max-age=3600"},
+      {"content-range", "bytes 200-1000/67589"},
+      {"content-length", "800"},
+      {"content-type", "text/html; charset=UTF-8"},
+      {"etag", "0000-0000"},
+      {"link", "<https://example.com>; rel=\"preconnect\""}};
   insert(request_path_1, response_headers_1, "body");
   EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
   time_source_.advanceTimeWait(Seconds(100));
 
-  Http::TestResponseHeaderMapImpl response_headers_2{{"date", formatter_.fromTime(current_time_)},
-                                                     {"cache-control", "public,max-age=3600"},
-                                                     {"content-range", "bytes 5-1000/67589"},
-                                                     {"content-length","995"},
-                                                     {"content-type","application/json; charset=UTF-8"},
-                                                     {"age","20"},
-                                                     {"etag", "1111-1111"},
-                                                     {"link", "<https://changed.com>; rel=\"preconnect\""}};
+  Http::TestResponseHeaderMapImpl response_headers_2{
+      {"date", formatter_.fromTime(current_time_)},
+      {"cache-control", "public,max-age=3600"},
+      {"content-range", "bytes 5-1000/67589"},
+      {"content-length", "995"},
+      {"content-type", "application/json; charset=UTF-8"},
+      {"age", "20"},
+      {"etag", "1111-1111"},
+      {"link", "<https://changed.com>; rel=\"preconnect\""}};
 
   // The skipped headers should not be updated
   // Except "age" should be come 0 because update_header updates the metadata as well
-  Http::TestResponseHeaderMapImpl response_headers_3{{"date", formatter_.fromTime(current_time_)},
-                                                     {"cache-control", "public,max-age=3600"},
-                                                     {"content-range", "bytes 200-1000/67589"},
-                                                     {"content-length","800"},
-                                                     {"content-type","text/html; charset=UTF-8"},
-                                                     {"age","0"},
-                                                     {"etag", "0000-0000"},
-                                                     {"link", "<https://changed.com>; rel=\"preconnect\""}};
+  Http::TestResponseHeaderMapImpl response_headers_3{
+      {"date", formatter_.fromTime(current_time_)},
+      {"cache-control", "public,max-age=3600"},
+      {"content-range", "bytes 200-1000/67589"},
+      {"content-length", "800"},
+      {"content-type", "text/html; charset=UTF-8"},
+      {"age", "0"},
+      {"etag", "0000-0000"},
+      {"link", "<https://changed.com>; rel=\"preconnect\""}};
 
   updateHeaders(request_path_1, response_headers_2, {current_time_});
 
