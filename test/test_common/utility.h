@@ -278,17 +278,6 @@ public:
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
-   * Wait for a gauge to be destroyed.
-   * @param store supplies the stats store.
-   * @param name gauge name.
-   * @param time_system the time system to use for waiting.
-   * @return AssertionSuccess() if the gauge was == to the value within the timeout, else
-   * AssertionFailure().
-   */
-  static AssertionResult waitForGaugeDestroyed(Stats::Store& store, const std::string& name,
-                                               Event::TestTimeSystem& time_system);
-
-  /**
    * Wait for a histogram to have samples.
    * @param store supplies the stats store.
    * @param name histogram name.
