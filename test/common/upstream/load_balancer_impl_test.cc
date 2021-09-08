@@ -2082,8 +2082,6 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {
   HostVector hosts_added;
   hosts_added.push_back(host2);
 
-  // hostSet().healthy_hosts_ = {host1, host2};
-  // hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks(hosts_added, {});
 
   latest_host_added_time =
@@ -2196,7 +2194,6 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWaitForPassingHC) {
 
   simTime().advanceTimeWait(std::chrono::seconds(3));
   host1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  hostSet().healthy_hosts_ = {host2};
   // Trigger callbacks to remove host1 from slow start mode.
   hostSet().runCallbacks({}, {});
 
@@ -2230,14 +2227,6 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWaitForPassingHC) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-
-  // Advance time, so there are no hosts in slow start.
-  simTime().advanceTimeWait(std::chrono::seconds(20));
-
-  hostSet().healthy_hosts_[0]->stats().rq_active_.set(2);
-  hostSet().healthy_hosts_[1]->stats().rq_active_.set(2);
-
-  hostSet().runCallbacks({}, {});
 }
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, LeastRequestLoadBalancerTest,
