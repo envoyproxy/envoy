@@ -103,6 +103,24 @@ configure_make(
 )
 
 envoy_cmake_external(
+    name = "libsxg",
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SXG_BUILD_EXECUTABLES": "off",
+        "SXG_BUILD_SHARED": "off",
+        "SXG_BUILD_STATIC": "on",
+        "SXG_WITH_CERT_CHAIN": "off",
+        "RUN_TEST": "off",
+        "CMAKE_INSTALL_LIBDIR": "lib",
+        "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
+    },
+    lib_source = "@com_github_google_libsxg//:all",
+    static_libraries = ["libsxg.a"],
+    tags = ["skip_on_windows"],
+    deps = ["@boringssl//:ssl"],
+)
+
+envoy_cmake_external(
     name = "ares",
     cache_entries = {
         "CARES_BUILD_TOOLS": "no",
