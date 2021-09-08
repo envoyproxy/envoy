@@ -32,9 +32,10 @@ public:
     cb(std::make_unique<Buffer::OwnedImpl>(&body_[range.begin()], range.length()));
   }
 
+  // The cache must call cb with the cached trailers.
   void getTrailers(LookupTrailersCallback&& cb) override {
-    cb(trailers_ ? Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*trailers_)
-                 : Http::ResponseTrailerMapPtr{});
+    ASSERT(trailers_);
+    cb(std::move(trailers_));
   }
 
   const LookupRequest& request() const { return request_; }

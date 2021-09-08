@@ -107,10 +107,12 @@ protected:
     if (body != actual_body) {
       return AssertionFailure() << "Expected body == " << body << "\n  Actual:  " << actual_body;
     }
-    const Http::TestResponseTrailerMapImpl actual_trailers = getTrailers(*lookup_context);
-    if (trailers != actual_trailers) {
-      return AssertionFailure() << "Expected trailers == " << trailers
-                                << "\n  Actual:  " << actual_trailers;
+    if (lookup_result_.has_trailers_) {
+      const Http::TestResponseTrailerMapImpl actual_trailers = getTrailers(*lookup_context);
+      if (trailers != actual_trailers) {
+        return AssertionFailure() << "Expected trailers == " << trailers
+                                  << "\n  Actual:  " << actual_trailers;
+      }
     }
     return AssertionSuccess();
   }
