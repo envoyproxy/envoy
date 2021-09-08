@@ -1236,6 +1236,9 @@ WasmResult Context::defineMetric(uint32_t metric_type, std::string_view name,
   auto type = static_cast<MetricType>(metric_type);
   // Prefix the given name with CustomStatNamespacePrefix so that these user-defined
   // custom metrics can be distinguished from native Envoy metrics.
+  // TODO(mathetake): Symbolize CustomStatNamespacePrefix beforehand, and pass it
+  // with the user provided StatName to Stats::Utility::*FromStatNames
+  // for less global lock time.
   const auto prefixed_name = absl::StrCat(CustomStatNamespacePrefix, std::string(name));
   // TODO: Consider rethinking the scoping policy as it does not help in this case.
   Stats::StatNameManagedStorage storage(prefixed_name, wasm()->scope_->symbolTable());
