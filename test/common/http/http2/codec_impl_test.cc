@@ -1015,7 +1015,7 @@ TEST_P(Http2CodecImplTest, IdlePing) {
   // Advance time past 1s. This time the ping should be sent, and the timeout
   // alarm enabled.
   RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
-  client_connection_.dispatcher_.time_system_.advanceTimeAsyncImpl(std::chrono::seconds(2));
+  client_connection_.dispatcher_.globalTimeSystem().advanceTimeAsyncImpl(std::chrono::seconds(2));
   EXPECT_CALL(*timeout_timer, enableTimer(_, _)).Times(0);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   EXPECT_TRUE(request_encoder2->encodeHeaders(request_headers, true).ok());

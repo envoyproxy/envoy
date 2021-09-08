@@ -38,6 +38,9 @@ public:
   // Dispatcher
   const std::string& name() override { return name_; }
   TimeSource& timeSource() override { return *time_system_; }
+  GlobalTimeSystem& globalTimeSystem() {
+    return *(dynamic_cast<GlobalTimeSystem*>(time_system_.get()));
+  }
   Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket,
