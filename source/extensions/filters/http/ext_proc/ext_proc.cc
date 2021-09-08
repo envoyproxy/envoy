@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
+#include "source/common/http/utility.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
 #include "absl/strings/str_format.h"
@@ -9,6 +10,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+using envoy::extensions::filters::http::ext_proc::v3alpha::ExtProcPerRoute;
 using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
 
 using envoy::service::ext_proc::v3alpha::ImmediateResponse;
@@ -23,8 +25,21 @@ using Http::RequestTrailerMap;
 using Http::ResponseHeaderMap;
 using Http::ResponseTrailerMap;
 
-static const std::string kErrorPrefix = "ext_proc error";
+static const std::string ErrorPrefix = "ext_proc error";
 static const int DefaultImmediateStatus = 200;
+static const std::string FilterName = "envoy.filters.http.ext_proc";
+
+FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
+    : disabled_(config.disabled()) {
+  if (config.has_overrides()) {
+    processing_mode_ = config.overrides().processing_mode();
+  }
+}
+
+void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
+  disabled_ = src.disabled_;
+  processing_mode_ = src.processing_mode_;
+}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -91,6 +106,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
 
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
+  mergePerRouteConfig();
   if (end_stream) {
     decoding_state_.setCompleteBodyAvailable(true);
   }
@@ -508,7 +524,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
     cleanUpTimers();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
-    errorResponse.set_details(absl::StrFormat("%s: gRPC error %i", kErrorPrefix, status));
+    errorResponse.set_details(absl::StrFormat("%s: gRPC error %i", ErrorPrefix, status));
     sendImmediateResponse(errorResponse);
   }
 }
@@ -541,7 +557,7 @@ void Filter::onMessageTimeout() {
     encoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
-    errorResponse.set_details(absl::StrFormat("%s: per-message timeout exceeded", kErrorPrefix));
+    errorResponse.set_details(absl::StrFormat("%s: per-message timeout exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);
   }
 }
@@ -580,6 +596,33 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   ENVOY_LOG(debug, "Sending local reply with status code {}", status_code);
   encoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), response.body(),
                                      mutate_headers, grpc_status, response.details());
+}
+
+static ProcessingMode allDisabledMode() {
+  ProcessingMode pm;
+  pm.set_request_header_mode(ProcessingMode::SKIP);
+  pm.set_response_header_mode(ProcessingMode::SKIP);
+  return pm;
+}
+
+void Filter::mergePerRouteConfig() {
+  auto&& merged_config = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
+      FilterName, decoder_callbacks_->route(),
+      [](FilterConfigPerRoute& dst, const FilterConfigPerRoute& src) { dst.merge(src); });
+  if (merged_config) {
+    if (merged_config->disabled()) {
+      // Rather than introduce yet another flag, use the processing mode
+      // structure to disable all the callbacks.
+      ENVOY_LOG(trace, "Disabling filter due to per-route configuration");
+      const auto all_disabled = allDisabledMode();
+      decoding_state_.setProcessingMode(all_disabled);
+      encoding_state_.setProcessingMode(all_disabled);
+    } else if (merged_config->processingMode()) {
+      ENVOY_LOG(trace, "Setting new processing mode from per-route configuration");
+      decoding_state_.setProcessingMode(*(merged_config->processingMode()));
+      encoding_state_.setProcessingMode(*(merged_config->processingMode()));
+    }
+  }
 }
 
 std::string responseCaseToString(const ProcessingResponse::ResponseCase response_case) {

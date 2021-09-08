@@ -249,7 +249,6 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
 }
 
 void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
-                                    const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
   static const std::string struct_type =
@@ -281,10 +280,6 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       MessageUtil::unpackTo(typed_config, struct_config);
       MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
     }
-  }
-
-  if (!config.fields().empty()) {
-    MessageUtil::jsonConvert(config, validation_visitor, out_proto);
   }
 }
 

@@ -58,6 +58,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//contrib/envoy/extensions/filters/http/squash/v3:pkg",
+        "//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/kafka_broker/v3:pkg",
         "//contrib/envoy/extensions/filters/network/mysql_proxy/v3:pkg",
         "//contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg",
@@ -255,4 +256,12 @@ proto_library(
         ":v2_protos",
         ":v3_protos",
     ],
+)
+
+filegroup(
+    name = "proto_breaking_change_detector_buf_config",
+    srcs = [
+        "buf.yaml",
+    ],
+    visibility = ["//visibility:public"],
 )

@@ -8,6 +8,7 @@ The most notable features that are not supported on Windows are:
 * :ref:`Tracers <http_tracers>`
 * :ref:`Original Src HTTP Filter <arch_overview_ip_transparency_original_src_http>`.
 * :ref:`Hot restart <arch_overview_hot_restart>`
+* :ref:`Signed Exchange Filter <config_http_filters_sxg>`
 
 There are certain Envoy features that require newer versions of Windows. These features explicitly document the required version.
 

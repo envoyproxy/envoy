@@ -6,6 +6,7 @@ namespace Envoy {
 namespace Router {
 
 using ::testing::AnyNumber;
+using ::testing::Eq;
 using ::testing::ReturnRef;
 
 RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
@@ -25,10 +26,10 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
       .WillByDefault(Return(host_address_));
   ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
       .WillByDefault(ReturnRef(upstream_locality_));
-  router_.downstream_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+  router_.downstream_connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       host_address_);
-  router_.downstream_connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
-      Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+  router_.downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
 
   // Make the "system time" non-zero, because 0 is considered invalid by DateUtil.
   test_time_.setMonotonicTime(std::chrono::milliseconds(50));
@@ -50,9 +51,9 @@ void RouterTestBase::expectPerTryTimerCreate() {
   EXPECT_CALL(*per_try_timeout_, disableTimer());
 }
 
-void RouterTestBase::expectMaxStreamDurationTimerCreate() {
+void RouterTestBase::expectMaxStreamDurationTimerCreate(std::chrono::milliseconds duration_msec) {
   max_stream_duration_timer_ = new Event::MockTimer(&callbacks_.dispatcher_);
-  EXPECT_CALL(*max_stream_duration_timer_, enableTimer(_, _));
+  EXPECT_CALL(*max_stream_duration_timer_, enableTimer(Eq(duration_msec), _));
   EXPECT_CALL(*max_stream_duration_timer_, disableTimer());
 }
 
