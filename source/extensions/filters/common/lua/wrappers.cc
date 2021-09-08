@@ -66,7 +66,7 @@ int BufferWrapper::luaGetBytes(lua_State* state) {
 
 int BufferWrapper::luaSetBytes(lua_State* state) {
   data_.drain(data_.length());
-  absl::string_view bytes = checkLuaStringWithLength(state, 2);
+  absl::string_view bytes = getStringViewFromLuaString(state, 2);
   data_.add(bytes);
   lua_pushnumber(state, data_.length());
   return 1;

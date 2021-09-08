@@ -70,9 +70,13 @@ namespace Lua {
   lua_settable(state, -3);
 
 /**
- * Check string from lua with length.
- */
-inline absl::string_view checkLuaStringWithLength(lua_State* state, int arg) {
+ * Get absl::string_view from Lua string. This checks if the argument at index is a string
+ * and build an absl::string_view from it.
+ * @param state the current Lua state.
+ * @param index the index of argument.
+ * @return absl::string_view of Lua string with proper string length.
+ **/
+inline absl::string_view getStringViewFromLuaString(lua_State* state, int arg) {
   size_t input_size;
   const char* input = luaL_checklstring(state, arg, &input_size);
   return absl::string_view(input, input_size);

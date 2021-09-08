@@ -552,37 +552,37 @@ int StreamHandleWrapper::luaConnection(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaLogTrace(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::checkLuaStringWithLength(state, 2);
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   filter_.scriptLog(spdlog::level::trace, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogDebug(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::checkLuaStringWithLength(state, 2);
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   filter_.scriptLog(spdlog::level::debug, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogInfo(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::checkLuaStringWithLength(state, 2);
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   filter_.scriptLog(spdlog::level::info, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogWarn(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::checkLuaStringWithLength(state, 2);
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   filter_.scriptLog(spdlog::level::warn, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogErr(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::checkLuaStringWithLength(state, 2);
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   filter_.scriptLog(spdlog::level::err, message);
   return 0;
 }
 
 int StreamHandleWrapper::luaLogCritical(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::checkLuaStringWithLength(state, 2);
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   filter_.scriptLog(spdlog::level::critical, message);
   return 0;
 }
@@ -649,7 +649,7 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
-  absl::string_view input = Filters::Common::Lua::checkLuaStringWithLength(state, 2);
+  absl::string_view input = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   auto output = absl::Base64Escape(input);
   lua_pushlstring(state, output.data(), output.length());
 
