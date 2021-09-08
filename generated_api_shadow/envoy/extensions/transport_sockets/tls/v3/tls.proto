@@ -23,6 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.transport_sockets.tls]
 // The TLS contexts below provide the transport socket configuration for upstream/downstream TLS.
 
+// [#next-free-field: 6]
 message UpstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.UpstreamTlsContext";
@@ -31,7 +32,11 @@ message UpstreamTlsContext {
   //
   // .. attention::
   //
-  //   Server certificate verification is not enabled by default. Configure
+  //   Server certificate verification is not enabled by default. In upcoming
+  //   Envoy releases, not enabling certificate verification will be disallowed unless
+  //   :ref:`allow_dangerous_tls_without_certificate_validation<envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.allow_dangerous_tls_without_certificate_validation>`
+  //   is set.
+  //   Configure
   //   :ref:`trusted_ca<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>` to enable
   //   verification.
   CommonTlsContext common_tls_context = 1;
@@ -51,6 +56,12 @@ message UpstreamTlsContext {
   //
   // Defaults to 1, setting this to 0 disables session resumption.
   google.protobuf.UInt32Value max_session_keys = 4;
+
+  // TLS is only as good as the certificates used.
+  // Without certificate validation, man in the middle attacks are trivial, undoing the value
+  // of encryption.
+  // While setting this true is inadvisable in production, it can make testing easier.
+  bool allow_dangerous_tls_without_certificate_validation = 5;
 }
 
 // [#next-free-field: 9]

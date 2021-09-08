@@ -906,6 +906,9 @@ TEST_P(SslSocketTest, GetCertDigest) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -930,6 +933,9 @@ TEST_P(SslSocketTest, GetCertDigestInvalidFiles) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1005,6 +1011,9 @@ TEST_P(SslSocketTest, GetCertDigestServerCertWithIntermediateCA) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1033,6 +1042,9 @@ TEST_P(SslSocketTest, GetCertDigestServerCertWithoutCommonName) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1061,6 +1073,9 @@ TEST_P(SslSocketTest, GetUriWithUriSan) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1091,6 +1106,9 @@ TEST_P(SslSocketTest, Ipv4San) {
         filename: "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem"
       match_subject_alt_names:
         exact: "127.0.0.1"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1115,6 +1133,9 @@ TEST_P(SslSocketTest, Ipv6San) {
         filename: "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem"
       match_subject_alt_names:
         exact: "::1"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1138,6 +1159,9 @@ TEST_P(SslSocketTest, GetNoUriWithDnsSan) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1169,6 +1193,9 @@ TEST_P(SslSocketTest, NoCert) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
@@ -1190,6 +1217,8 @@ TEST_P(SslSocketTest, MultiCertPreferEcdsa) {
         - ECDHE-ECDSA-AES128-GCM-SHA256
         - ECDHE-RSA-AES128-GCM-SHA256
       validation_context:
+        trusted_ca:
+          filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
         verify_certificate_hash: )EOF",
                                                    TEST_SELFSIGNED_ECDSA_P256_CERT_256_HASH);
 
@@ -1204,6 +1233,9 @@ TEST_P(SslSocketTest, MultiCertPreferEcdsa) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
@@ -1218,6 +1250,9 @@ TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1245,6 +1280,9 @@ TEST_P(SslSocketTest, GetSubjectsWithBothCerts) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1278,6 +1316,9 @@ TEST_P(SslSocketTest, GetPeerCert) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1315,6 +1356,9 @@ TEST_P(SslSocketTest, GetPeerCertAcceptUntrusted) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(

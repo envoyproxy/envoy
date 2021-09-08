@@ -51,6 +51,11 @@ static_resources:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: domain1.example.com
+        common_tls_context:
+          validation_context:
+            trusted_ca:
+              filename: certs/upstreamcacert.pem
+
 
   - name: proxy-client-domain2
     type: STRICT_DNS
@@ -69,6 +74,10 @@ static_resources:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: domain2.example.com
+        common_tls_context:
+          validation_context:
+            trusted_ca:
+              filename: certs/upstreamcacert.pem
 
   - name: proxy-client-domain3
     type: STRICT_DNS
@@ -87,3 +96,7 @@ static_resources:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: domain3.example.com
+        common_tls_context:
+          validation_context:
+            trusted_ca:
+              filename: certs/upstreamcacert.pem

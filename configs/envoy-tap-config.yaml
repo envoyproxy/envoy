@@ -65,4 +65,8 @@ static_resources:
             common_tls_context:
               tls_params:
                 tls_minimum_protocol_version: TLSv1_2
+              validation_context:
+                trusted_ca:
+                  filename: certs/upstreamcacert.pem
             sni: "service"
+

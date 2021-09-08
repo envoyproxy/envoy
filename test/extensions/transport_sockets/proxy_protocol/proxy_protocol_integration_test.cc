@@ -138,6 +138,7 @@ TEST_P(ProxyProtocolTcpIntegrationTest, TestV1ProxyProtocolMultipleConnections) 
 
 // Test header is sent unencrypted using a TLS inner socket
 TEST_P(ProxyProtocolTcpIntegrationTest, TestTLSSocket) {
+  upstream_tls_ = true;
   setup(envoy::config::core::v3::ProxyProtocolConfig::V1, false, "envoy.transport_sockets.tls");
   initialize();
 

@@ -61,3 +61,9 @@ static_resources:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
         upstream_tls_context:
           sni: www.google.com
+          common_tls_context:
+            validation_context:
+              trusted_ca:
+                filename: certs/upstreamcacert.pem
+
+

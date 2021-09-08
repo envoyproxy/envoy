@@ -40,10 +40,14 @@ typed_config:
     tls_certificates:
     - certificate_chain: { filename: "%s" }
       private_key: { filename: "%s" }
+    validation_context:
+      trusted_ca:
+        filename: "%s"
  )EOF",
           absl::StrJoin(configured_alpn_, ","),
           TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"),
-          TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"),
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
       auto* transport_socket = cluster->mutable_transport_socket();
       TestUtility::loadFromYaml(transport_socket_yaml, *transport_socket);
     });

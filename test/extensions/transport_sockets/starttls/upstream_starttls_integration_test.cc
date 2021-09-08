@@ -183,6 +183,10 @@ void StartTlsIntegrationTest::initialize() {
         TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+    tls_context->mutable_common_tls_context()
+        ->mutable_validation_context()
+        ->mutable_trusted_ca()
+        ->set_filename(TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.starttls");
     cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(starttls_config);
   });

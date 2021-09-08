@@ -55,3 +55,8 @@ static_resources:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: www.envoyproxy.io
+        common_tls_context:
+          validation_context:
+            trusted_ca:
+              filename: certs/upstreamcacert.pem
+

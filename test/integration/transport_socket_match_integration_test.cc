@@ -38,9 +38,12 @@ transport_socket:
       tls_certificates:
       - certificate_chain: { filename: "%s" }
         private_key: { filename: "%s" }
+      validation_context:
+        trusted_ca: { filename: "%s" }
  )EOF",
             TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"),
-            TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+            TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"),
+            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
         auto* transport_socket_match = cluster->add_transport_socket_matches();
         TestUtility::loadFromYaml(match_yaml, *transport_socket_match);
       }

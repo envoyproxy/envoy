@@ -22,6 +22,24 @@ namespace Tls {
 
 namespace {
 
+absl::optional<const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
+getValidationContext(
+    const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config) {
+  switch (config.validation_context_type_case()) {
+  case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
+      kValidationContext:
+    return config.validation_context();
+  case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
+      kCombinedValidationContext:
+    return config.combined_validation_context().default_validation_context();
+  case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
+            kValidationContextSdsSecretConfig:
+      return {};
+  default:
+    return envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext().default_instance();
+  }
+}
+
 std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConfigProviders(
     const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
@@ -351,6 +369,14 @@ ClientContextConfigImpl::ClientContextConfigImpl(
   if ((config.common_tls_context().tls_certificates().size() +
        config.common_tls_context().tls_certificate_sds_secret_configs().size()) > 1) {
     throw EnvoyException("Multiple TLS certificates are not supported for client contexts");
+  }
+  auto optional_validation_context = getValidationContext(config.common_tls_context());
+  if (optional_validation_context.has_value()) {
+    if (!optional_validation_context.value().has_trusted_ca() &&
+        !config.allow_dangerous_tls_without_certificate_validation()) {
+      // FIXME warn for today.
+      throw EnvoyException("Upstream TLS should do certificate validation by default.");
+    }
   }
 }
 

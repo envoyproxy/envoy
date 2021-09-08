@@ -259,8 +259,10 @@ protected:
   Http::RequestEncoder* request_encoder_{nullptr};
   // The response headers sent by sendRequestAndWaitForResponse() by default.
   Http::TestResponseHeaderMapImpl default_response_headers_{{":status", "200"}};
-  Http::TestRequestHeaderMapImpl default_request_headers_{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl default_request_headers_{{":method", "GET"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "lyft.com"}};
   // The codec type for the client-to-Envoy connection
   Http::CodecType downstream_protocol_{Http::CodecType::HTTP1};
   std::string access_log_name_;
