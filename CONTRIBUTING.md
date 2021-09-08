@@ -253,7 +253,7 @@ Extension configuration should be located in a directory structure like
 The code for the extension should be located under the equivalent
 `source/extensions/area/plugin`, and include an *envoy_cc_extension* with the
 configuration and tagged with the appropriate security posture, and an
-*envoy_cc_library* with the code. 
+*envoy_cc_library* with the code.
 
 More details on how to add a new extension API can be found [here](api/STYLE.md#adding-an-extension-configuration-to-the-api):
 
