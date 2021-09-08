@@ -339,11 +339,17 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Host.get()));
     }
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_connect") &&
-        headers.Path() && !headers.Protocol()) {
-      // Path header should only be present for CONNECT for upgrade style CONNECT.
-      return absl::InvalidArgumentError(
-          absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Protocol.get()));
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_connect")) {
+      if (headers.Path() && !headers.Protocol()) {
+        // Path and Protocol header should only be present for CONNECT for upgrade style CONNECT.
+        return absl::InvalidArgumentError(
+            absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Protocol.get()));
+      }
+      if (!headers.Path() && headers.Protocol()) {
+        // Path and Protocol header should only be present for CONNECT for upgrade style CONNECT.
+        return absl::InvalidArgumentError(
+            absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Path.get()));
+      }
     }
   } else {
     if (!headers.Path()) {

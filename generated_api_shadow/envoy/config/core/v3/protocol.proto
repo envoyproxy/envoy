@@ -487,7 +487,7 @@ message Http3ProtocolOptions {
 
   // Allows proxying Websocket and other upgrades over HTTP/3 CONNECT using
   // the header mechanisms from the `HTTP/2 extended connect RFC
-  // <https://datatracker.ietf.org/doc/html/rfc8841>`_
+  // <https://datatracker.ietf.org/doc/html/rfc8441>`_
   // and settings `proposed for HTTP/3
   // <https://github.com/RyanTheOptimist/httpbis-h3-websockets/blob/main/draft-hamilton-httpbis-h3-websockets.md>`_
   // [#alpha:] as HTTP/3 CONNECT is not yet an RFC.

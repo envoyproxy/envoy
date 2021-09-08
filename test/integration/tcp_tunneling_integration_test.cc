@@ -71,6 +71,25 @@ public:
     connect_headers_.removePath();
   }
 
+  void sendBidirectionalDataAndCleanShutdown() {
+    sendBidirectionalData("hello", "hello", "there!", "there!");
+    // Send a second set of data to make sure for example headers are only sent once.
+    sendBidirectionalData(",bye", "hello,bye", "ack", "there!ack");
+
+    // Send an end stream. This should result in half close upstream.
+    codec_client_->sendData(*request_encoder_, "", true);
+    ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
+
+    // Now send a FIN from upstream. This should result in clean shutdown downstream.
+    ASSERT_TRUE(fake_raw_upstream_connection_->close());
+    if (downstream_protocol_ == Http::CodecType::HTTP1) {
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
+    } else {
+      ASSERT_TRUE(response_->waitForEndStream());
+      ASSERT_FALSE(response_->reset());
+    }
+  }
+
   FakeRawConnectionPtr fake_raw_upstream_connection_;
   IntegrationStreamDecoderPtr response_;
   bool enable_timeout_{};
@@ -83,44 +102,14 @@ TEST_P(ConnectTerminationIntegrationTest, OriginalStyle) {
   clearExtendedConnectHeaders();
 
   setUpConnection();
-  sendBidirectionalData("hello", "hello", "there!", "there!");
-  // Send a second set of data to make sure for example headers are only sent once.
-  sendBidirectionalData(",bye", "hello,bye", "ack", "there!ack");
-
-  // Send an end stream. This should result in half close upstream.
-  codec_client_->sendData(*request_encoder_, "", true);
-  ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
-
-  // Now send a FIN from upstream. This should result in clean shutdown downstream.
-  ASSERT_TRUE(fake_raw_upstream_connection_->close());
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-  } else {
-    ASSERT_TRUE(response_->waitForEndStream());
-    ASSERT_FALSE(response_->reset());
-  }
+  sendBidirectionalDataAndCleanShutdown();
 }
 
 TEST_P(ConnectTerminationIntegrationTest, Basic) {
   initialize();
 
   setUpConnection();
-  sendBidirectionalData("hello", "hello", "there!", "there!");
-  // Send a second set of data to make sure for example headers are only sent once.
-  sendBidirectionalData(",bye", "hello,bye", "ack", "there!ack");
-
-  // Send an end stream. This should result in half close upstream.
-  codec_client_->sendData(*request_encoder_, "", true);
-  ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
-
-  // Now send a FIN from upstream. This should result in clean shutdown downstream.
-  ASSERT_TRUE(fake_raw_upstream_connection_->close());
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-  } else {
-    ASSERT_TRUE(response_->waitForEndStream());
-    ASSERT_FALSE(response_->reset());
-  }
+  sendBidirectionalDataAndCleanShutdown();
 }
 
 TEST_P(ConnectTerminationIntegrationTest, BasicAllowPost) {
@@ -132,18 +121,7 @@ TEST_P(ConnectTerminationIntegrationTest, BasicAllowPost) {
   connect_headers_.removeProtocol();
 
   setUpConnection();
-  sendBidirectionalData("hello", "hello", "there!", "there!");
-  // Send a second set of data to make sure for example headers are only sent once.
-  sendBidirectionalData(",bye", "hello,bye", "ack", "there!ack");
-
-  // Send an end stream. This should result in half close upstream.
-  codec_client_->sendData(*request_encoder_, "", true);
-  ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
-
-  // Now send a FIN from upstream. This should result in clean shutdown downstream.
-  ASSERT_TRUE(fake_raw_upstream_connection_->close());
-  ASSERT_TRUE(response_->waitForEndStream());
-  ASSERT_FALSE(response_->reset());
+  sendBidirectionalDataAndCleanShutdown();
 }
 
 TEST_P(ConnectTerminationIntegrationTest, UsingHostMatch) {
@@ -151,24 +129,10 @@ TEST_P(ConnectTerminationIntegrationTest, UsingHostMatch) {
   initialize();
 
   connect_headers_.removePath();
+  connect_headers_.removeProtocol();
 
   setUpConnection();
-  sendBidirectionalData("hello", "hello", "there!", "there!");
-  // Send a second set of data to make sure for example headers are only sent once.
-  sendBidirectionalData(",bye", "hello,bye", "ack", "there!ack");
-
-  // Send an end stream. This should result in half close upstream.
-  codec_client_->sendData(*request_encoder_, "", true);
-  ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
-
-  // Now send a FIN from upstream. This should result in clean shutdown downstream.
-  ASSERT_TRUE(fake_raw_upstream_connection_->close());
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-  } else {
-    ASSERT_TRUE(response_->waitForEndStream());
-    ASSERT_FALSE(response_->reset());
-  }
+  sendBidirectionalDataAndCleanShutdown();
 }
 
 TEST_P(ConnectTerminationIntegrationTest, DownstreamClose) {
