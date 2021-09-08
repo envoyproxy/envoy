@@ -14,7 +14,7 @@ void CustomStatNamespacesImpl::registerStatNamespace(const absl::string_view nam
 };
 
 absl::optional<std::string>
-CustomStatNamespacesImpl::stripRegisteredPrefix(const absl::string_view& stat_name) const {
+CustomStatNamespacesImpl::stripRegisteredPrefix(const absl::string_view stat_name) const {
   const auto pos = stat_name.find_first_of('.');
   if (pos != std::string::npos && registered(stat_name.substr(0, pos))) {
     // Trim the custom namespace.

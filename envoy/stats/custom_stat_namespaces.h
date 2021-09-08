@@ -15,6 +15,8 @@ namespace Stats {
  * This is mainly for distinguishing these "custom metrics" defined outside Envoy codebase from
  * the native metrics defined by Envoy codebase, and this way stat sinks are able to determine
  * how to expose these two kinds of metrics.
+ * Note that the implementation will not be thread-safe so users of this class must be in the main
+ * thread.
  */
 class CustomStatNamespaces {
 public:
@@ -42,7 +44,7 @@ public:
    * return nullopt.
    */
   virtual absl::optional<std::string>
-  stripRegisteredPrefix(const absl::string_view& stat_name) const PURE;
+  stripRegisteredPrefix(const absl::string_view stat_name) const PURE;
 };
 
 } // namespace Stats
