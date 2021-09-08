@@ -3,7 +3,6 @@
 #include <chrono>
 #include <memory>
 
-#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/message.h"
@@ -11,7 +10,6 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/protobuf/utility.h"
 
 #include "absl/types/optional.h"
 
