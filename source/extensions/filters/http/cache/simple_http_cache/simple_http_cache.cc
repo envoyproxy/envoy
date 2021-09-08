@@ -109,21 +109,21 @@ LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
   return std::make_unique<SimpleLookupContext>(*this, std::move(request));
 }
 
+
 const absl::flat_hash_set<Http::LowerCaseString> SimpleHttpCache::headersNotToUpdate =
     absl::flat_hash_set<Http::LowerCaseString>({
         // Content range should not be changed upon validation
         Http::Headers::get().ContentRange,
 
-        // The age is calculated and set by the general cache_filter code logic.
-        Http::CustomHeaders::get().Age,
-
         // Headers that describe the body content should never be updated.
         Http::Headers::get().ContentLength,
         Http::Headers::get().ContentType,
 
+        // The age is calculated and set by the general cache_filter code logic.
+        Http::CustomHeaders::get().Age,
+
         // It does not make sense for this level of the code to be updating the ETag, when
-        // presumably
-        // the cached_response_headers reflect this specific ETag.
+        // presumably the cached_response_headers reflect this specific ETag.
         Http::CustomHeaders::get().Etag,
 
         // We don't update the cached response on a Vary; we just delete it

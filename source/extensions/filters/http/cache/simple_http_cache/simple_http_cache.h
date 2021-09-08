@@ -28,6 +28,8 @@ private:
   Entry varyLookup(const LookupRequest& request,
                    const Http::ResponseHeaderMapPtr& response_headers);
 
+  // A list of headers that we do not want to update upon validation
+  // https://www.ietf.org/archive/id/draft-ietf-httpbis-cache-18.html s3.2
   static const absl::flat_hash_set<Http::LowerCaseString> headersNotToUpdate;
 
 public:
