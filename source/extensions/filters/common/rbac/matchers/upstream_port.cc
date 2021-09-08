@@ -16,6 +16,14 @@ using namespace Filters::Common::RBAC;
 
 bool UpstreamPortMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                                   const StreamInfo::StreamInfo& info) const {
+  if (start_ > end_) {
+    ENVOY_LOG(error,
+              "Upstream port matcher is misconfigured. Port range start: {} is greater than port "
+              "range end: {}",
+              start_, end_);
+
+    return false;
+  }
 
   using AddressSetFilterStateObjectImpl =
       StreamInfo::SetFilterStateObjectImpl<Network::Address::InstanceConstSharedPtr>;
