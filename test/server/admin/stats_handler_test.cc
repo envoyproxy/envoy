@@ -3,6 +3,8 @@
 #include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/stats_handler.h"
 
+#include "test/mocks/server/admin_stream.h"
+#include "test/mocks/server/instance.h"
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -49,6 +51,188 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
+  const std::string url = "/stats?format=blergh";
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl data;
+  MockAdminStream admin_stream;
+  Configuration::MockStatsConfig stats_config;
+  EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
+  MockInstance instance;
+  EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
+  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
+  StatsHandler handler(instance);
+  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  EXPECT_EQ(Http::Code::NotFound, code);
+  EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", data.toString());
+}
+
+TEST_P(AdminStatsTest, HandlerStatsPlainText) {
+  const std::string url = "/stats";
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl data;
+  MockAdminStream admin_stream;
+  Configuration::MockStatsConfig stats_config;
+  EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
+  MockInstance instance;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
+  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
+  StatsHandler handler(instance);
+
+  Stats::Counter& c1 = store_->counterFromString("c1");
+  Stats::Counter& c2 = store_->counterFromString("c2");
+
+  c1.add(10);
+  c2.add(20);
+
+  Stats::TextReadout& t = store_->textReadoutFromString("t");
+  t.set("hello world");
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+  h1.recordValue(200);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 100));
+  h2.recordValue(100);
+
+  store_->mergeHistograms([]() -> void {});
+
+  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+  EXPECT_EQ("t: \"hello world\"\n"
+            "c1: 10\n"
+            "c2: 20\n"
+            "h1: P0(200.0,200.0) P25(202.5,202.5) P50(205.0,205.0) P75(207.5,207.5) "
+            "P90(209.0,209.0) P95(209.5,209.5) P99(209.9,209.9) P99.5(209.95,209.95) "
+            "P99.9(209.99,209.99) P100(210.0,210.0)\n"
+            "h2: P0(100.0,100.0) P25(102.5,102.5) P50(105.0,105.0) P75(107.5,107.5) "
+            "P90(109.0,109.0) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
+            "P99.9(109.99,109.99) P100(110.0,110.0)\n",
+            data.toString());
+
+  shutdownThreading();
+}
+
+TEST_P(AdminStatsTest, HandlerStatsJson) {
+  const std::string url = "/stats?format=json";
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl data;
+  MockAdminStream admin_stream;
+  Configuration::MockStatsConfig stats_config;
+  EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
+  MockInstance instance;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
+  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
+  StatsHandler handler(instance);
+
+  Stats::Counter& c1 = store_->counterFromString("c1");
+  Stats::Counter& c2 = store_->counterFromString("c2");
+
+  c1.add(10);
+  c2.add(20);
+
+  Stats::TextReadout& t = store_->textReadoutFromString("t");
+  t.set("hello world");
+
+  Stats::Histogram& h = store_->histogramFromString("h", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h), 200));
+  h.recordValue(200);
+
+  store_->mergeHistograms([]() -> void {});
+
+  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+
+  const std::string expected_json_old = R"EOF({
+    "stats": [
+        {
+            "name":"t",
+            "value":"hello world"
+        },
+        {
+            "name":"c1",
+            "value":10,
+        },
+        {
+            "name":"c2",
+            "value":20
+        },
+        {
+            "histograms": {
+                "supported_quantiles": [
+                    0.0,
+                    25.0,
+                    50.0,
+                    75.0,
+                    90.0,
+                    95.0,
+                    99.0,
+                    99.5,
+                    99.9,
+                    100.0
+                ],
+                "computed_quantiles": [
+                    {
+                        "name":"h",
+                        "values": [
+                            {
+                                "cumulative":200,
+                                "interval":200
+                            },
+                            {
+                                "cumulative":202.5,
+                                "interval":202.5
+                            },
+                            {
+                                "cumulative":205,
+                                "interval":205
+                            },
+                            {
+                                "cumulative":207.5,
+                                "interval":207.5
+                            },
+                            {
+                                "cumulative":209,
+                                "interval":209
+                            },
+                            {
+                                "cumulative":209.5,
+                                "interval":209.5
+                            },
+                            {
+                                "cumulative":209.9,
+                                "interval":209.9
+                            },
+                            {
+                                "cumulative":209.95,
+                                "interval":209.95
+                            },
+                            {
+                                "cumulative":209.99,
+                                "interval":209.99
+                            },
+                            {
+                                "cumulative":210,
+                                "interval":210
+                            }
+                        ]
+                    },
+                ]
+            }
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json_old, JsonStringEq(data.toString()));
+
+  shutdownThreading();
+}
 
 TEST_P(AdminStatsTest, StatsAsJson) {
   InSequence s;

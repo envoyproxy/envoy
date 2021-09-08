@@ -69,10 +69,19 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   Thread::LockGuard lock(lock_);
   const uint32_t first_histogram_index = deleted_histograms_.size();
   for (ScopeImpl* scope : scopes_) {
-    removeRejectedStats(scope->central_cache_->counters_, deleted_counters_);
-    removeRejectedStats(scope->central_cache_->gauges_, deleted_gauges_);
+    removeRejectedStats<CounterSharedPtr>(scope->central_cache_->counters_,
+                                          [this](const CounterSharedPtr& counter) mutable {
+                                            alloc_.markCounterForDeletion(counter);
+                                          });
+    removeRejectedStats<GaugeSharedPtr>(
+        scope->central_cache_->gauges_,
+        [this](const GaugeSharedPtr& gauge) mutable { alloc_.markGaugeForDeletion(gauge); });
     removeRejectedStats(scope->central_cache_->histograms_, deleted_histograms_);
-    removeRejectedStats(scope->central_cache_->text_readouts_, deleted_text_readouts_);
+    removeRejectedStats<TextReadoutSharedPtr>(
+        scope->central_cache_->text_readouts_,
+        [this](const TextReadoutSharedPtr& text_readout) mutable {
+          alloc_.markTextReadoutForDeletion(text_readout);
+        });
   }
 
   // Remove any newly rejected histograms from histogram_set_.
@@ -101,33 +110,38 @@ void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass&
   }
 }
 
-bool ThreadLocalStoreImpl::rejects(StatName stat_name) const {
-  ASSERT(!stats_matcher_->acceptsAll());
+template <class StatSharedPtr>
+void ThreadLocalStoreImpl::removeRejectedStats(
+    StatNameHashMap<StatSharedPtr>& map, std::function<void(const StatSharedPtr&)> f_deletion) {
+  StatNameVec remove_list;
+  for (auto& stat : map) {
+    if (rejects(stat.first)) {
+      remove_list.push_back(stat.first);
+    }
+  }
+  for (StatName stat_name : remove_list) {
+    auto iter = map.find(stat_name);
+    ASSERT(iter != map.end());
+    f_deletion(iter->second);
+    map.erase(iter);
+  }
+}
 
-  // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the
-  // hot path) could become prohibitively expensive. Revisit this usage in the
-  // future.
-  //
-  // Also note that the elaboration of the stat-name into a string is expensive,
-  // so I think it might be better to move the matcher test until after caching,
-  // unless its acceptsAll/rejectsAll.
-  return stats_matcher_->rejectsAll() ||
-         stats_matcher_->rejects(constSymbolTable().toString(stat_name));
+StatsMatcher::FastResult ThreadLocalStoreImpl::fastRejects(StatName stat_name) const {
+  return stats_matcher_->fastRejects(stat_name);
+}
+
+bool ThreadLocalStoreImpl::slowRejects(StatsMatcher::FastResult fast_reject_result,
+                                       StatName stat_name) const {
+  return stats_matcher_->slowRejects(fast_reject_result, stat_name);
 }
 
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
-  StatNameHashSet names;
-  Thread::LockGuard lock(lock_);
-  for (ScopeImpl* scope : scopes_) {
-    for (auto& counter : scope->central_cache_->counters_) {
-      if (names.insert(counter.first).second) {
-        ret.push_back(counter.second);
-      }
-    }
-  }
-
+  forEachCounter(
+      [&ret](std::size_t size) mutable { ret.reserve(size); },
+      [&ret](Counter& counter) mutable { ret.emplace_back(CounterSharedPtr(&counter)); });
   return ret;
 }
 
@@ -146,34 +160,22 @@ ScopePtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
-  StatNameHashSet names;
-  Thread::LockGuard lock(lock_);
-  for (ScopeImpl* scope : scopes_) {
-    for (auto& gauge_iter : scope->central_cache_->gauges_) {
-      const GaugeSharedPtr& gauge = gauge_iter.second;
-      if (gauge->importMode() != Gauge::ImportMode::Uninitialized &&
-          names.insert(gauge_iter.first).second) {
-        ret.push_back(gauge);
-      }
-    }
-  }
-
+  forEachGauge([&ret](std::size_t size) mutable { ret.reserve(size); },
+               [&ret](Gauge& gauge) mutable {
+                 if (gauge.importMode() != Gauge::ImportMode::Uninitialized) {
+                   ret.emplace_back(GaugeSharedPtr(&gauge));
+                 }
+               });
   return ret;
 }
 
 std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<TextReadoutSharedPtr> ret;
-  StatNameHashSet names;
-  Thread::LockGuard lock(lock_);
-  for (ScopeImpl* scope : scopes_) {
-    for (auto& text_readout : scope->central_cache_->text_readouts_) {
-      if (names.insert(text_readout.first).second) {
-        ret.push_back(text_readout.second);
-      }
-    }
-  }
-
+  forEachTextReadout([&ret](std::size_t size) mutable { ret.reserve(size); },
+                     [&ret](TextReadout& text_readout) mutable {
+                       ret.emplace_back(TextReadoutSharedPtr(&text_readout));
+                     });
   return ret;
 }
 
@@ -437,6 +439,7 @@ private:
 };
 
 bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
+                                                     StatsMatcher::FastResult fast_reject_result,
                                                      StatNameStorageSet& central_rejected_stats,
                                                      StatNameHashSet* tls_rejected_stats) {
   if (stats_matcher_->acceptsAll()) {
@@ -448,7 +451,7 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
   if (iter != central_rejected_stats.end()) {
     rejected_name = &(*iter);
   } else {
-    if (rejects(name)) {
+    if (slowRejects(fast_reject_result, name)) {
       auto insertion = central_rejected_stats.insert(StatNameStorage(name, symbolTable()));
       const StatNameStorage& rejected_name_ref = *(insertion.first);
       rejected_name = &rejected_name_ref;
@@ -468,8 +471,9 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatName full_stat_name, StatName name_no_tags,
     const absl::optional<StatNameTagVector>& stat_name_tags,
     StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
-    StatNameStorageSet& central_rejected_stats, MakeStatFn<StatType> make_stat,
-    StatRefMap<StatType>* tls_cache, StatNameHashSet* tls_rejected_stats, StatType& null_stat) {
+    StatsMatcher::FastResult fast_reject_result, StatNameStorageSet& central_rejected_stats,
+    MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
+    StatNameHashSet* tls_rejected_stats, StatType& null_stat) {
 
   if (tls_rejected_stats != nullptr &&
       tls_rejected_stats->find(full_stat_name) != tls_rejected_stats->end()) {
@@ -491,8 +495,8 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   RefcountPtr<StatType>* central_ref = nullptr;
   if (iter != central_cache_map.end()) {
     central_ref = &(iter->second);
-  } else if (parent_.checkAndRememberRejection(full_stat_name, central_rejected_stats,
-                                               tls_rejected_stats)) {
+  } else if (parent_.checkAndRememberRejection(full_stat_name, fast_reject_result,
+                                               central_rejected_stats, tls_rejected_stats)) {
     return null_stat;
   } else {
     StatNameTagHelper tag_helper(parent_, name_no_tags, stat_name_tags);
@@ -546,6 +550,11 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   Stats::StatName final_stat_name = joiner.nameWithTags();
 
+  StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
+  if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
+    return parent_.null_counter_;
+  }
+
   // We now find the TLS cache. This might remain null if we don't have TLS
   // initialized currently.
   StatRefMap<Counter>* tls_cache = nullptr;
@@ -558,7 +567,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
 
   return safeMakeStat<Counter>(
       final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->counters_,
-      central_cache_->rejected_stats_,
+      fast_reject_result, central_cache_->rejected_stats_,
       [](Allocator& allocator, StatName name, StatName tag_extracted_name,
          const StatNameTagVector& tags) -> CounterSharedPtr {
         return allocator.makeCounter(name, tag_extracted_name, tags);
@@ -600,6 +609,11 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   StatName final_stat_name = joiner.nameWithTags();
 
+  StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
+  if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
+    return parent_.null_gauge_;
+  }
+
   StatRefMap<Gauge>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_cache_) {
@@ -610,7 +624,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
 
   Gauge& gauge = safeMakeStat<Gauge>(
       final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->gauges_,
-      central_cache_->rejected_stats_,
+      fast_reject_result, central_cache_->rejected_stats_,
       [import_mode](Allocator& allocator, StatName name, StatName tag_extracted_name,
                     const StatNameTagVector& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, tag_extracted_name, tags, import_mode);
@@ -638,6 +652,11 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   StatName final_stat_name = joiner.nameWithTags();
 
+  StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
+  if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
+    return parent_.null_histogram_;
+  }
+
   StatNameHashMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_cache_) {
@@ -658,7 +677,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
   ParentHistogramImplSharedPtr* central_ref = nullptr;
   if (iter != central_cache_->histograms_.end()) {
     central_ref = &iter->second;
-  } else if (parent_.checkAndRememberRejection(final_stat_name, central_cache_->rejected_stats_,
+  } else if (parent_.checkAndRememberRejection(final_stat_name, fast_reject_result,
+                                               central_cache_->rejected_stats_,
                                                tls_rejected_stats)) {
     return parent_.null_histogram_;
   } else {
@@ -711,6 +731,11 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   Stats::StatName final_stat_name = joiner.nameWithTags();
 
+  StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
+  if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
+    return parent_.null_text_readout_;
+  }
+
   // We now find the TLS cache. This might remain null if we don't have TLS
   // initialized currently.
   StatRefMap<TextReadout>* tls_cache = nullptr;
@@ -723,7 +748,7 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
 
   return safeMakeStat<TextReadout>(
       final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->text_readouts_,
-      central_cache_->rejected_stats_,
+      fast_reject_result, central_cache_->rejected_stats_,
       [](Allocator& allocator, StatName name, StatName tag_extracted_name,
          const StatNameTagVector& tags) -> TextReadoutSharedPtr {
         return allocator.makeTextReadout(name, tag_extracted_name, tags);
@@ -955,6 +980,25 @@ bool ParentHistogramImpl::usedLockHeld() const {
     }
   }
   return false;
+}
+
+void ThreadLocalStoreImpl::forEachCounter(std::function<void(std::size_t)> f_size,
+                                          std::function<void(Stats::Counter&)> f_stat) const {
+  Thread::LockGuard lock(lock_);
+  alloc_.forEachCounter(f_size, f_stat);
+}
+
+void ThreadLocalStoreImpl::forEachGauge(std::function<void(std::size_t)> f_size,
+                                        std::function<void(Stats::Gauge&)> f_stat) const {
+  Thread::LockGuard lock(lock_);
+  alloc_.forEachGauge(f_size, f_stat);
+}
+
+void ThreadLocalStoreImpl::forEachTextReadout(
+    std::function<void(std::size_t)> f_size,
+    std::function<void(Stats::TextReadout&)> f_stat) const {
+  Thread::LockGuard lock(lock_);
+  alloc_.forEachTextReadout(f_size, f_stat);
 }
 
 } // namespace Stats

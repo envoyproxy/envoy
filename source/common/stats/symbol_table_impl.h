@@ -456,6 +456,16 @@ public:
    */
   bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
 
+  /**
+   * Determines whether this starts with the prefix. Note: dynamic segments
+   * are not supported in the current implementation; this matching only works
+   * for symbolic segments. However it OK for this to include dynamic segments
+   * following the prefix.
+   *
+   * @param symbolic_prefix the prefix, which must not contain dynamic segments.
+   */
+  bool startsWith(StatName symbolic_prefix) const;
+
 private:
   /**
    * Casts the raw data as a string_view. Note that this string_view will not

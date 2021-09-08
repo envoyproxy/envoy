@@ -61,6 +61,11 @@ IGNORES_CVES = set([
     # False positive on the match heuristic, fixed in Curl 7.76.0.
     'CVE-2021-22876',
     'CVE-2021-22890',
+    # Node.js issues unrelated to http-parser.
+    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22918
+    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22921
+    'CVE-2021-22918',
+    'CVE-2021-22921',
 ])
 
 # Subset of CVE fields that are useful below.
@@ -114,6 +119,11 @@ def parse_cve_json(cve_json, cves, cpe_revmap):
         gather_cpes(cve['configurations']['nodes'], cpe_set)
         if len(cpe_set) == 0:
             continue
+
+        if not "baseMetricV3" in cve['impact']:
+            print(f"WARNING: ignoring v2 metric for {cve['cve']['CVE_data_meta']['ID']}")
+            continue
+
         cvss_v3_score = cve['impact']['baseMetricV3']['cvssV3']['baseScore']
         cvss_v3_severity = cve['impact']['baseMetricV3']['cvssV3']['baseSeverity']
 

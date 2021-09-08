@@ -68,9 +68,9 @@ TEST_F(TcpConnPoolTest, OnPoolFailure) {
   EXPECT_CALL(mock_pool_, newConnection(_)).WillOnce(Return(&cancellable_));
   conn_pool_->newStream(&mock_generic_callbacks_);
 
-  EXPECT_CALL(mock_generic_callbacks_, onPoolFailure(_, _, _));
+  EXPECT_CALL(mock_generic_callbacks_, onPoolFailure(_, "foo", _));
   conn_pool_->onPoolFailure(Envoy::Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure,
-                            host_);
+                            "foo", host_);
 
   // Make sure that the pool failure nulled out the pending request.
   EXPECT_FALSE(conn_pool_->cancelAnyPendingStream());
@@ -148,10 +148,10 @@ TEST_F(TcpUpstreamTest, V1Header) {
   envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
       mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
   proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V1);
-  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_
+  mock_router_filter_.client_connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5));
-  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
-      std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8));
+  mock_router_filter_.client_connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8));
 
   Buffer::OwnedImpl expected_data;
   Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
@@ -171,10 +171,10 @@ TEST_F(TcpUpstreamTest, V2Header) {
   envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
       mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
   proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
-  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_
+  mock_router_filter_.client_connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5));
-  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
-      std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8));
+  mock_router_filter_.client_connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8));
 
   Buffer::OwnedImpl expected_data;
   Extensions::Common::ProxyProtocol::generateProxyProtoHeader(

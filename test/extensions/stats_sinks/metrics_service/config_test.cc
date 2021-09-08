@@ -14,10 +14,8 @@ namespace {
 
 // Test that the deprecated extension name still functions.
 TEST(MetricsServiceConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.metrics_service";
-
   ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
-                         deprecated_name));
+                         MetricsServiceName));
 }
 
 } // namespace

@@ -10,7 +10,9 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/random_generator.h"
+#include "source/common/http/codes.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/tracing/common_values.h"
 #include "source/extensions/tracers/xray/daemon_broker.h"
 #include "source/extensions/tracers/xray/sampling_strategy.h"
 #include "source/extensions/tracers/xray/xray_configuration.h"
@@ -36,7 +38,8 @@ public:
    */
   Span(TimeSource& time_source, Random::RandomGenerator& random, DaemonBroker& broker)
       : time_source_(time_source), random_(random), broker_(broker),
-        id_(Hex::uint64ToHex(random_.random())), sampled_(true) {}
+        id_(Hex::uint64ToHex(random_.random())), server_error_(false), response_status_code_(0),
+        sampled_(true) {}
 
   /**
    * Sets the Span's trace ID.
@@ -100,14 +103,6 @@ public:
   }
 
   /**
-   * Gets the AWS metadata
-   * field of the Span.
-   */
-  const absl::flat_hash_map<std::string, ProtobufWkt::Value>& awsMetadata() {
-    return aws_metadata_;
-  }
-
-  /**
    * Sets the recording start time of the traced operation/request.
    */
   void setStartTime(Envoy::SystemTime start_time) { start_time_ = start_time; }
@@ -121,9 +116,19 @@ public:
   void setSampled(bool sampled) override { sampled_ = sampled; };
 
   /**
+   * Sets the server error as true for the traced operation/request.
+   */
+  void setServerError() { server_error_ = true; };
+
+  /**
+   * Sets the http response status code for the traced operation/request.
+   */
+  void setResponseStatusCode(uint64_t status_code) { response_status_code_ = status_code; };
+
+  /**
    * Adds X-Ray trace header to the set of outgoing headers.
    */
-  void injectContext(Http::RequestHeaderMap& request_headers) override;
+  void injectContext(Tracing::TraceContext& trace_context) override;
 
   /**
    * Gets the start time of this Span.
@@ -146,6 +151,23 @@ public:
    * Determines whether this span is sampled.
    */
   bool sampled() const { return sampled_; }
+
+  /**
+   * Determines if a server error occurred (response status code was 5XX Server Error).
+   */
+  bool serverError() const { return server_error_; }
+
+  /**
+   * Determines if a client error occurred (response status code was 4XX Client Error).
+   */
+  bool clientError() const { return Http::CodeUtility::is4xx(response_status_code_); }
+
+  /**
+   * Determines if a request was throttled (response status code was 429 Too Many Requests).
+   */
+  bool isThrottled() const {
+    return Http::Code::TooManyRequests == static_cast<Http::Code>(response_status_code_);
+  }
 
   /**
    * Not used by X-Ray because the Spans are "logged" (serialized) to the X-Ray daemon.
@@ -183,6 +205,8 @@ private:
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_request_annotations_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_response_annotations_;
   absl::flat_hash_map<std::string, std::string> custom_annotations_;
+  bool server_error_;
+  uint64_t response_status_code_;
   bool sampled_;
 };
 

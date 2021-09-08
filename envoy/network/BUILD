@@ -66,6 +66,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "drain_decision_interface",
     hdrs = ["drain_decision.h"],
+    external_deps = ["abseil_base"],
+    deps = ["//envoy/common:callback"],
 )
 
 envoy_cc_library(
@@ -114,6 +116,7 @@ envoy_cc_library(
     deps = [
         ":address_interface",
         ":io_handle_interface",
+        "//envoy/ssl:connection_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

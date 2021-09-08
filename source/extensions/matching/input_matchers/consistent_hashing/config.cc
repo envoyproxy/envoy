@@ -7,7 +7,7 @@ namespace InputMatchers {
 namespace ConsistentHashing {
 
 Envoy::Matcher::InputMatcherFactoryCb ConsistentHashingConfig::createInputMatcherFactoryCb(
-    const Protobuf::Message& config, Server::Configuration::FactoryContext& factory_context) {
+    const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& factory_context) {
   const auto& consistent_hashing_config =
       MessageUtil::downcastAndValidate<const envoy::extensions::matching::input_matchers::
                                            consistent_hashing::v3::ConsistentHashing&>(

@@ -82,7 +82,7 @@ public:
                    const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                        alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    TimeSource&, ClusterConnectivityState& state) override {
     return Http::ConnectionPool::InstancePtr{allocateConnPool_(
         host, alternate_protocol_options, options, transport_socket_options, state)};
@@ -91,7 +91,7 @@ public:
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
                       const Network::ConnectionSocket::OptionsSharedPtr&,
-                      Network::TransportSocketOptionsSharedPtr,
+                      Network::TransportSocketOptionsConstSharedPtr,
                       Upstream::ClusterConnectivityState&) override {
     return Tcp::ConnectionPool::InstancePtr{allocateTcpConnPool_(host)};
   }
@@ -123,7 +123,7 @@ public:
                const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                    alternate_protocol_options,
                Network::ConnectionSocket::OptionsSharedPtr,
-               Network::TransportSocketOptionsSharedPtr, ClusterConnectivityState&));
+               Network::TransportSocketOptionsConstSharedPtr, ClusterConnectivityState&));
   MOCK_METHOD(Tcp::ConnectionPool::Instance*, allocateTcpConnPool_, (HostConstSharedPtr host));
   MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>), clusterFromProto_,
               (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
@@ -215,7 +215,7 @@ protected:
     }
   }
 
-  void postThreadLocalDrainConnections(const Cluster&, const HostVector& hosts_removed) override {
+  void postThreadLocalRemoveHosts(const Cluster&, const HostVector& hosts_removed) override {
     local_hosts_removed_.post(hosts_removed);
   }
 

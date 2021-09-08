@@ -47,9 +47,6 @@ public:
   const std::string& certificateRevocationListPath() const final {
     CONSTRUCT_ON_FIRST_USE(std::string, "");
   }
-  const std::vector<std::string>& verifySubjectAltNameList() const override {
-    CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, {});
-  }
   const std::vector<envoy::type::matcher::v3::StringMatcher>&
   subjectAltNameMatchers() const override {
     return san_matchers_;

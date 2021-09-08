@@ -45,7 +45,8 @@ public:
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
                          QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
-                         EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
+                         EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+                         OptRef<const Network::TransportSocketFactory> transport_socket_factory);
 
   ~EnvoyQuicServerSession() override;
 
@@ -69,12 +70,6 @@ public:
   void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicRstStreamErrorCode error,
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
-  // quic::QuicSpdySession
-  void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
-  size_t WriteHeadersOnHeadersStream(
-      quic::QuicStreamId id, spdy::SpdyHeaderBlock headers, bool fin,
-      const spdy::SpdyStreamPrecedence& precedence,
-      quic::QuicReferenceCountedPointer<quic::QuicAckListenerInterface> ack_listener) override;
 
   void setHeadersWithUnderscoreAction(
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -118,6 +113,7 @@ private:
   Stats::Scope& listener_scope_;
 
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
+  OptRef<const Network::TransportSocketFactory> transport_socket_factory_;
 };
 
 } // namespace Quic

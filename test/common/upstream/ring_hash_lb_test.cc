@@ -14,7 +14,9 @@
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -95,6 +97,28 @@ TEST_P(RingHashLoadBalancerTest, NoHost) {
   init();
   EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
 };
+
+TEST_P(RingHashLoadBalancerTest, SelectOverrideHost) {
+  init();
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+
+  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Degraded));
+
+  LoadBalancerContext::OverrideHost expected_host{
+      "1.2.3.4", 1u << static_cast<size_t>(Host::Health::Healthy) |
+                     1u << static_cast<size_t>(Host::Health::Degraded)};
+  EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::make_optional(expected_host)));
+
+  // Mock membership update and update host map shared pointer in the lb.
+  auto host_map = std::make_shared<HostMap>();
+  host_map->insert({"1.2.3.4", mock_host});
+  priority_set_.cross_priority_host_map_ = host_map;
+  host_set_.runCallbacks({}, {});
+
+  EXPECT_EQ(mock_host, lb_->factory()->create()->chooseHost(&context));
+}
 
 // Given minimum_ring_size > maximum_ring_size, expect an exception.
 TEST_P(RingHashLoadBalancerTest, BadRingSizeBounds) {

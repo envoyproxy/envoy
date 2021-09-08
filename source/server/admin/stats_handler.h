@@ -60,9 +60,14 @@ private:
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::map<std::string, std::string>& text_readouts,
                                  const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                 bool used_only,
-                                 const absl::optional<std::regex> regex = absl::nullopt,
+                                 bool used_only, const absl::optional<std::regex>& regex,
                                  bool pretty_print = false);
+
+  void statsAsText(const std::map<std::string, uint64_t>& all_stats,
+                   const std::map<std::string, std::string>& text_readouts,
+                   const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
+                   bool used_only, const absl::optional<std::regex>& regex,
+                   Buffer::Instance& response);
 };
 
 } // namespace Server

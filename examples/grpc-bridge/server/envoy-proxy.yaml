@@ -29,7 +29,6 @@ static_resources:
                   cluster: backend_grpc_service
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
   clusters:
   - name: backend_grpc_service
     type: STRICT_DNS

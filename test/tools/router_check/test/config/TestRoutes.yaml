@@ -61,12 +61,12 @@ virtual_hosts:
       prefix: /host/rewrite/me
     route:
       cluster: ats
-      host_rewrite: new_host
+      host_rewrite_literal: new_host
   - match:
       prefix: /oldhost/rewrite/me
     route:
       cluster: ats
-      host_rewrite: new_oldhost
+      host_rewrite_literal: new_oldhost
   - match:
       path: /foo
       case_sensitive: true
@@ -84,7 +84,7 @@ virtual_hosts:
       case_sensitive: false
     route:
       cluster: ats
-      host_rewrite: new_host
+      host_rewrite_literal: new_host
   - match:
       path: /FOOD
       case_sensitive: false
@@ -101,7 +101,7 @@ virtual_hosts:
       prefix: /customheaders
     route:
       cluster: ats
-      host_rewrite: new_host
+      host_rewrite_literal: new_host
     request_headers_to_add:
     - header:
         key: X-Client-IP
@@ -115,59 +115,73 @@ virtual_hosts:
   virtual_clusters:
   - headers:
     - name: :path
-      safe_regex_match:
-        google_re2: {}
-        regex: ^/rides$
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: ^/rides$
     - name: :method
-      exact_match: POST
+      string_match:
+        exact: POST
     name: ride_request
   - headers:
     - name: :path
-      safe_regex_match:
-        google_re2: {}
-        regex: ^/rides/\d+$
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: ^/rides/\d+$
     - name: :method
-      exact_match: PUT
+      string_match:
+        exact: PUT
     name: update_ride
   - headers:
     - name: :path
-      safe_regex_match:
-        google_re2: {}
-        regex: ^/users/\d+/chargeaccounts$
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: ^/users/\d+/chargeaccounts$
     - name: :method
-      exact_match: POST
+      string_match:
+        exact: POST
     name: cc_add
   - headers:
     - name: :path
-      safe_regex_match:
-        google_re2: {}
-        regex: ^/users/\d+/chargeaccounts/[^validate]\w+$
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: ^/users/\d+/chargeaccounts/[^validate]\w+$
     - name: :method
-      exact_match: PUT
+      string_match:
+        exact: PUT
     name: cc_add
   - headers:
     - name: :path
-      safe_regex_match:
-        google_re2: {}
-        regex: ^/users$
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: ^/users$
     - name: :method
-      exact_match: POST
+      string_match:
+        exact: POST
     name: create_user_login
   - headers:
     - name: :path
-      safe_regex_match:
-        google_re2: {}
-        regex: ^/users/\d+$
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: ^/users/\d+$
     - name: :method
-      exact_match: PUT
+      string_match:
+        exact: PUT
     name: update_user
   - headers:
     - name: :path
-      safe_regex_match:
-        google_re2: {}
-        regex: ^/users/\d+/location$
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: ^/users/\d+/location$
     - name: :method
-      exact_match: POST
+      string_match:
+        exact: POST
     name: ulu
 internal_only_headers:
 - x-lyft-user-id

@@ -45,7 +45,7 @@ public:
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr /*options*/) const override {
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr /*options*/) const override {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   bool implementsSecureTransport() const override { return true; }
@@ -104,7 +104,7 @@ public:
   // is needed. In this case the QuicClientTransportSocketFactory falls over to
   // using the fallback factory.
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override {
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override {
     return fallback_factory_->createTransportSocket(options);
   }
 

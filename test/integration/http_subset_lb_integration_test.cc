@@ -15,7 +15,8 @@ class HttpSubsetLbIntegrationTest
     : public testing::TestWithParam<envoy::config::cluster::v3::Cluster::LbPolicy>,
       public HttpIntegrationTest {
 public:
-  // Returns all load balancer types except ORIGINAL_DST_LB and CLUSTER_PROVIDED.
+  // Returns all load balancer types except ORIGINAL_DST_LB, CLUSTER_PROVIDED
+  // and LOAD_BALANCING_POLICY_CONFIG.
   static std::vector<envoy::config::cluster::v3::Cluster::LbPolicy> getSubsetLbTestParams() {
     int first = static_cast<int>(envoy::config::cluster::v3::Cluster::LbPolicy_MIN);
     int last = static_cast<int>(envoy::config::cluster::v3::Cluster::LbPolicy_MAX);
@@ -120,7 +121,7 @@ public:
     // Match the x-type header against the given host_type (a/b).
     auto* match_header = match->add_headers();
     match_header->set_name(type_header_);
-    match_header->set_exact_match(host_type);
+    match_header->mutable_string_match()->set_exact(host_type);
 
     // Route to cluster_0, selecting metadata type=a or type=b.
     auto* action = route->mutable_route();

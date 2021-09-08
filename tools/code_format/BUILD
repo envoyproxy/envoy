@@ -15,6 +15,7 @@ exports_files([
 envoy_py_binary(
     name = "tools.code_format.python_check",
     deps = [
+        "//tools/base:aio",
         "//tools/base:checker",
         "//tools/base:utils",
         requirement("flake8"),

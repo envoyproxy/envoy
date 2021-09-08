@@ -12,10 +12,10 @@ namespace EnvironmentVariable {
 
 Envoy::Matcher::CommonProtocolInputFactoryCb
 Config::createCommonProtocolInputFactoryCb(const Protobuf::Message& config,
-                                           Server::Configuration::FactoryContext& factory_context) {
+                                           ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& environment_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::matching::common_inputs::environment_variable::v3::Config&>(
-      config, factory_context.messageValidationVisitor());
+      config, validation_visitor);
 
   // We read the env variable at construction time to avoid repeat lookups.
   // This assumes that the environment remains stable during the process lifetime.

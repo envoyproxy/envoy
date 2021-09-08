@@ -19,10 +19,8 @@ public:
   /**
    * Completion called when a listener has been added on a worker and is listening for new
    * connections.
-   * @param success supplies whether the addition was successful or not. FALSE can be returned
-   *                when there is a race condition between bind() and listen().
    */
-  using AddListenerCompletion = std::function<void(bool success)>;
+  using AddListenerCompletion = std::function<void()>;
 
   /**
    * Add a listener to the worker and replace the previous listener if any. If the previous listener

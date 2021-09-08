@@ -1,0 +1,19 @@
+version: v1beta1
+deps:
+    - buf.build/googleapis/googleapis
+    - buf.build/beta/opencensus
+    - buf.build/beta/prometheus
+    - buf.build/beta/opentelemetry
+    - buf.build/gogo/protobuf
+    - buf.build/beta/xds
+breaking:
+  ignore_unstable_packages: true
+  use:
+    - FIELD_SAME_ONEOF
+    - FIELD_SAME_JSON_NAME
+    - FIELD_SAME_NAME
+    - FIELD_SAME_TYPE
+    - FIELD_SAME_LABEL
+    - FILE_SAME_PACKAGE
+    - FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED
+    - FIELD_NO_DELETE_UNLESS_NAME_RESERVED

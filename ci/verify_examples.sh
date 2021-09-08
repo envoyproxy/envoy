@@ -30,7 +30,10 @@ run_examples () {
     local examples example
     cd "${SRCDIR}/examples" || exit 1
 
-    examples=$(find . -mindepth 1 -maxdepth 1 -type d -name "$TESTFILTER" ! -iname "_*" | grep -Ev "$TESTEXCLUDES" | sort)
+    examples=$(find . -mindepth 1 -maxdepth 1 -type d -name "$TESTFILTER" ! -iname "_*" | sort)
+    if [[ -n "$TESTEXCLUDES" ]]; then
+        examples=$(echo "$examples" | grep -Ev "$TESTEXCLUDES")
+    fi
     for example in $examples; do
         pushd "$example" > /dev/null || return 1
         ./verify.sh

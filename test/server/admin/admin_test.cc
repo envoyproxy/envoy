@@ -51,13 +51,14 @@ TEST_P(AdminInstanceTest, Getters) {
   EXPECT_EQ(false, admin_.preserveExternalRequestId());
   EXPECT_EQ(nullptr, admin_.tracer());
   EXPECT_EQ(false, admin_.streamErrorOnInvalidHttpMessaging());
+  EXPECT_EQ(false, admin_.schemeToSet().has_value());
 }
 
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
   std::ifstream address_file(address_out_path_);
   std::string address_from_file;
   std::getline(address_file, address_from_file);
-  EXPECT_EQ(admin_.socket().addressProvider().localAddress()->asString(), address_from_file);
+  EXPECT_EQ(admin_.socket().connectionInfoProvider().localAddress()->asString(), address_from_file);
 }
 
 TEST_P(AdminInstanceTest, AdminAddress) {

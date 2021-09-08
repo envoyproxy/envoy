@@ -20,7 +20,7 @@ class UpstreamProxyProtocolSocket : public TransportSockets::PassthroughSocket,
                                     public Logger::Loggable<Logger::Id::connection> {
 public:
   UpstreamProxyProtocolSocket(Network::TransportSocketPtr&& transport_socket,
-                              Network::TransportSocketOptionsSharedPtr options,
+                              Network::TransportSocketOptionsConstSharedPtr options,
                               ProxyProtocolConfig_Version version);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -33,7 +33,7 @@ private:
   void generateHeaderV2();
   Network::IoResult writeHeader();
 
-  Network::TransportSocketOptionsSharedPtr options_;
+  Network::TransportSocketOptionsConstSharedPtr options_;
   Network::TransportSocketCallbacks* callbacks_{};
   Buffer::OwnedImpl header_buffer_{};
   ProxyProtocolConfig_Version version_{ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1};
@@ -46,7 +46,7 @@ public:
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return true; }
 

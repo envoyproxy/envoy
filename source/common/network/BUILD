@@ -18,6 +18,8 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:safe_memcpy_lib",
+        "//source/common/common:statusor_lib",
+        "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
     ],
 )
@@ -93,6 +95,16 @@ envoy_cc_library(
         "//source/common/network:listen_socket_lib",
         "//source/common/stream_info:stream_info_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "happy_eyeballs_connection_impl_lib",
+    srcs = ["happy_eyeballs_connection_impl.cc"],
+    hdrs = ["happy_eyeballs_connection_impl.h"],
+    deps = [
+        ":connection_base_lib",
+        ":connection_lib",
     ],
 )
 

@@ -33,8 +33,9 @@ public:
   WorkerImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("worker_test")),
         no_exit_timer_(dispatcher_->createTimer([]() -> void {})),
+        stat_names_(api_->rootScope().symbolTable()),
         worker_(tls_, hooks_, std::move(dispatcher_), Network::ConnectionHandlerPtr{handler_},
-                overload_manager_, *api_) {
+                overload_manager_, *api_, stat_names_) {
     // In the real worker the watchdog has timers that prevent exit. Here we need to prevent event
     // loop exit since we use mock timers.
     no_exit_timer_->enableTimer(std::chrono::hours(1));
@@ -55,6 +56,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   DefaultListenerHooks hooks_;
   Event::TimerPtr no_exit_timer_;
+  WorkerStatNames stat_names_;
   WorkerImpl worker_;
 };
 
@@ -73,10 +75,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
             EXPECT_EQ(config.listenerTag(), 1UL);
             EXPECT_NE(current_thread_id, std::this_thread::get_id());
           }));
-  worker_.addListener(absl::nullopt, listener, [&ci](bool success) -> void {
-    EXPECT_TRUE(success);
-    ci.setReady();
-  });
+  worker_.addListener(absl::nullopt, listener, [&ci]() -> void { ci.setReady(); });
 
   NiceMock<Stats::MockStore> store;
   worker_.start(guard_dog_, emptyCallback);
@@ -92,10 +91,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
             EXPECT_EQ(config.listenerTag(), 2UL);
             EXPECT_NE(current_thread_id, std::this_thread::get_id());
           }));
-  worker_.addListener(absl::nullopt, listener2, [&ci](bool success) -> void {
-    EXPECT_TRUE(success);
-    ci.setReady();
-  });
+  worker_.addListener(absl::nullopt, listener2, [&ci]() -> void { ci.setReady(); });
   ci.waitReady();
 
   EXPECT_CALL(*handler_, stopListeners(2))
@@ -132,10 +128,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
             EXPECT_EQ(config.listenerTag(), 3UL);
             EXPECT_NE(current_thread_id, std::this_thread::get_id());
           }));
-  worker_.addListener(absl::nullopt, listener3, [&ci](bool success) -> void {
-    EXPECT_TRUE(success);
-    ci.setReady();
-  });
+  worker_.addListener(absl::nullopt, listener3, [&ci]() -> void { ci.setReady(); });
   ci.waitReady();
 
   EXPECT_CALL(*handler_, removeListeners(3))
@@ -146,19 +139,6 @@ TEST_F(WorkerImplTest, BasicFlow) {
     EXPECT_NE(current_thread_id, std::this_thread::get_id());
   });
 
-  worker_.stop();
-}
-
-TEST_F(WorkerImplTest, ListenerException) {
-  InSequence s;
-
-  NiceMock<Network::MockListenerConfig> listener;
-  ON_CALL(listener, listenerTag()).WillByDefault(Return(1UL));
-  EXPECT_CALL(*handler_, addListener(_, _))
-      .WillOnce(Throw(Network::CreateListenerException("failed")));
-  worker_.addListener(absl::nullopt, listener, [](bool success) -> void { EXPECT_FALSE(success); });
-
-  worker_.start(guard_dog_, emptyCallback);
   worker_.stop();
 }
 

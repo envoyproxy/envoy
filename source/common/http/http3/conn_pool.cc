@@ -32,7 +32,7 @@ void Http3ConnPoolImpl::setQuicConfigFromClusterConfig(const Upstream::ClusterIn
 Http3ConnPoolImpl::Http3ConnPoolImpl(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
     CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
     TimeSource& time_source)
@@ -58,11 +58,13 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                 Upstream::ClusterConnectivityState& state, TimeSource& time_source) {
+                 const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+                 Upstream::ClusterConnectivityState& state, TimeSource& time_source,
+                 Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
-      [](HttpConnPoolImplBase* pool) -> ::Envoy::ConnectionPool::ActiveClientPtr {
+      [&quic_stat_names,
+       &scope](HttpConnPoolImplBase* pool) -> ::Envoy::ConnectionPool::ActiveClientPtr {
         // If there's no ssl context, the secrets are not loaded. Fast-fail by returning null.
         auto factory = &pool->host()->transportSocketFactory();
         ASSERT(dynamic_cast<Quic::QuicClientTransportSocketFactory*>(factory) != nullptr);
@@ -77,8 +79,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         if (!source_address.get()) {
           source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
         }
-        data.connection_ = Quic::createQuicNetworkConnection(
-            h3_pool->quicInfo(), pool->dispatcher(), host_address, source_address);
+        data.connection_ =
+            Quic::createQuicNetworkConnection(h3_pool->quicInfo(), pool->dispatcher(), host_address,
+                                              source_address, quic_stat_names, scope);
         return std::make_unique<ActiveClient>(*pool, data);
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {

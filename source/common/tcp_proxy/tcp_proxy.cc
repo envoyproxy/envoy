@@ -58,24 +58,24 @@ Config::RouteImpl::RouteImpl(
 
 bool Config::RouteImpl::matches(Network::Connection& connection) const {
   if (!source_port_ranges_.empty() &&
-      !Network::Utility::portInRangeList(*connection.addressProvider().remoteAddress(),
+      !Network::Utility::portInRangeList(*connection.connectionInfoProvider().remoteAddress(),
                                          source_port_ranges_)) {
     return false;
   }
 
   if (!source_ips_.empty() &&
-      !source_ips_.contains(*connection.addressProvider().remoteAddress())) {
+      !source_ips_.contains(*connection.connectionInfoProvider().remoteAddress())) {
     return false;
   }
 
   if (!destination_port_ranges_.empty() &&
-      !Network::Utility::portInRangeList(*connection.addressProvider().localAddress(),
+      !Network::Utility::portInRangeList(*connection.connectionInfoProvider().localAddress(),
                                          destination_port_ranges_)) {
     return false;
   }
 
   if (!destination_ips_.empty() &&
-      !destination_ips_.contains(*connection.addressProvider().localAddress())) {
+      !destination_ips_.contains(*connection.connectionInfoProvider().localAddress())) {
     return false;
   }
 
@@ -137,13 +137,6 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
         std::make_shared<UpstreamDrainManager>();
     return drain_manager;
   });
-
-  if (config.has_hidden_envoy_deprecated_deprecated_v1()) {
-    for (const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute&
-             route_desc : config.hidden_envoy_deprecated_deprecated_v1().routes()) {
-      routes_.emplace_back(std::make_shared<const RouteImpl>(*this, route_desc));
-    }
-  }
 
   if (!config.cluster().empty()) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute
@@ -431,9 +424,9 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
                  Network::ProxyProtocolFilterState::key())) {
       read_callbacks_->connection().streamInfo().filterState()->setData(
           Network::ProxyProtocolFilterState::key(),
-          std::make_unique<Network::ProxyProtocolFilterState>(
-              Network::ProxyProtocolData{downstreamConnection()->addressProvider().remoteAddress(),
-                                         downstreamConnection()->addressProvider().localAddress()}),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+              downstreamConnection()->connectionInfoProvider().remoteAddress(),
+              downstreamConnection()->connectionInfoProvider().localAddress()}),
           StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
@@ -485,6 +478,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
+    getStreamInfo().setAttemptCount(connect_attempts_);
     generic_conn_pool_->newStream(*this);
     // Because we never return open connections to the pool, this either has a handle waiting on
     // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.
@@ -655,9 +649,9 @@ void Filter::onUpstreamConnection() {
   read_callbacks_->upstreamHost()->outlierDetector().putResult(
       Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
 
-  getStreamInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
   ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
-                 read_callbacks_->connection(), getStreamInfo().requestedServerName());
+                 read_callbacks_->connection(),
+                 getStreamInfo().downstreamAddressProvider().requestedServerName());
 
   if (config_->idleTimeout()) {
     // The idle_timer_ can be moved to a Drainer, so related callbacks call into
@@ -711,14 +705,22 @@ void Filter::disableIdleTimer() {
 UpstreamDrainManager::~UpstreamDrainManager() {
   // If connections aren't closed before they are destructed an ASSERT fires,
   // so cancel all pending drains, which causes the connections to be closed.
-  while (!drainers_.empty()) {
-    auto begin = drainers_.begin();
-    Drainer* key = begin->first;
-    begin->second->cancelDrain();
+  if (!drainers_.empty()) {
+    auto& dispatcher = drainers_.begin()->second->dispatcher();
+    while (!drainers_.empty()) {
+      auto begin = drainers_.begin();
+      Drainer* key = begin->first;
+      begin->second->cancelDrain();
 
-    // cancelDrain() should cause that drainer to be removed from drainers_.
-    // ASSERT so that we don't end up in an infinite loop.
-    ASSERT(drainers_.find(key) == drainers_.end());
+      // cancelDrain() should cause that drainer to be removed from drainers_.
+      // ASSERT so that we don't end up in an infinite loop.
+      ASSERT(drainers_.find(key) == drainers_.end());
+    }
+
+    // This destructor is run when shutting down `ThreadLocal`. The destructor of some objects use
+    // earlier `ThreadLocal` slots (for accessing the runtime snapshot) so they must run before that
+    // slot is destructed. Clear the list to enforce that ordering.
+    dispatcher.clearDeferredDeleteList();
   }
 }
 
@@ -789,6 +791,8 @@ void Drainer::cancelDrain() {
   // This sends onEvent(LocalClose).
   upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
+
+Event::Dispatcher& Drainer::dispatcher() { return upstream_conn_data_->connection().dispatcher(); }
 
 } // namespace TcpProxy
 } // namespace Envoy

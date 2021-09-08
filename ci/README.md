@@ -135,8 +135,6 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.clang_tidy <files>` &mdash; build and run clang-tidy specified source files, if no files specified, runs against the diff with the last GitHub commit.
 * `check_format`&mdash; run `clang-format` and `buildifier` on entire source tree.
 * `fix_format`&mdash; run and enforce `clang-format` and `buildifier` on entire source tree.
-* `check_spelling`&mdash; run `misspell` on entire project.
-* `fix_spelling`&mdash; run and enforce `misspell` on entire project.
 * `check_spelling_pedantic`&mdash; run `aspell` on C++ and proto comments.
 * `docs`&mdash; build documentation tree in `generated/docs`.
 

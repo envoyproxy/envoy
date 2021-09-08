@@ -11,6 +11,9 @@ namespace Extensions {
 namespace StatSinks {
 namespace Hystrix {
 
+// Hystrix sink
+constexpr char HystrixName[] = "envoy.stat_sinks.hystrix";
+
 class HystrixSinkFactory : Logger::Loggable<Logger::Id::config>,
                            public Server::Configuration::StatsSinkFactory {
 public:

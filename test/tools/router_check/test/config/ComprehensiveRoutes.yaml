@@ -19,9 +19,11 @@ virtual_hosts:
   virtual_clusters:
   - headers:
     - name: :path
-      safe_regex_match:
-        google_re2: {}
-        regex: ^/users/\d+$
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: ^/users/\d+$
     - name: :method
-      exact_match: PUT
+      string_match:
+        exact: PUT
     name: update_user

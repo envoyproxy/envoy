@@ -22,7 +22,8 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
 
 void Filter::callCheck() {
   Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(filter_callbacks_, check_request_,
-                                                               config_->includePeerCertificate());
+                                                               config_->includePeerCertificate(),
+                                                               config_->destinationLabels());
 
   status_ = Status::Calling;
   config_->stats().active_.inc();
@@ -82,6 +83,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     break;
   }
 
+  if (!response->dynamic_metadata.fields().empty()) {
+    filter_callbacks_->connection().streamInfo().setDynamicMetadata(
+        NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
+  }
+
   // Fail open only if configured to do so and if the check status was a error.
   if (response->status == Filters::Common::ExtAuthz::CheckStatus::Denied ||
       (response->status == Filters::Common::ExtAuthz::CheckStatus::Error &&
@@ -95,11 +101,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         response->status == Filters::Common::ExtAuthz::CheckStatus::Error) {
       // Status is Error and yet we are configured to allow traffic. Click a counter.
       config_->stats().failure_mode_allowed_.inc();
-    }
-
-    if (!response->dynamic_metadata.fields().empty()) {
-      filter_callbacks_->connection().streamInfo().setDynamicMetadata(
-          NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
     }
 
     // We can get completion inline, so only call continue if that isn't happening.

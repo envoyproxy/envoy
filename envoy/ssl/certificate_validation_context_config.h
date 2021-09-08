@@ -41,11 +41,6 @@ public:
   virtual const std::string& certificateRevocationListPath() const PURE;
 
   /**
-   * @return The subject alt names to be verified, if enabled.
-   */
-  virtual const std::vector<std::string>& verifySubjectAltNameList() const PURE;
-
-  /**
    * @return The subject alt name matchers to be verified, if enabled.
    */
   virtual const std::vector<envoy::type::matcher::v3::StringMatcher>&

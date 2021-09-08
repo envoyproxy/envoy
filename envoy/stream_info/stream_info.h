@@ -25,7 +25,8 @@
 namespace Envoy {
 
 namespace Router {
-class RouteEntry;
+class Route;
+using RouteConstSharedPtr = std::shared_ptr<const Route>;
 } // namespace Router
 
 namespace Upstream {
@@ -86,8 +87,10 @@ enum ResponseFlag {
   UpstreamProtocolError = 0x800000,
   // No cluster found for a given request.
   NoClusterFound = 0x1000000,
+  // Overload Manager terminated the stream.
+  OverloadManager = 0x2000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = NoClusterFound,
+  LastFlag = OverloadManager,
 };
 
 /**
@@ -461,21 +464,9 @@ public:
   virtual void healthCheck(bool is_health_check) PURE;
 
   /**
-   * @return the downstream address provider.
+   * @return the downstream connection info provider.
    */
-  virtual const Network::SocketAddressProvider& downstreamAddressProvider() const PURE;
-
-  /**
-   * @param connection_info sets the downstream ssl connection.
-   */
-  virtual void
-  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
-
-  /**
-   * @return the downstream SSL connection. This will be nullptr if the downstream
-   * connection does not use SSL.
-   */
-  virtual Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const PURE;
+  virtual const Network::ConnectionInfoProvider& downstreamAddressProvider() const PURE;
 
   /**
    * @param connection_info sets the upstream ssl connection.
@@ -490,10 +481,9 @@ public:
   virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
 
   /**
-   * @return const Router::RouteEntry* Get the route entry selected for this request. Note: this
-   * will be nullptr if no route was selected.
+   * @return const Router::RouteConstSharedPtr Get the route selected for this request.
    */
-  virtual const Router::RouteEntry* routeEntry() const PURE;
+  virtual Router::RouteConstSharedPtr route() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
@@ -526,16 +516,6 @@ public:
    */
   virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
   virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
-
-  /**
-   * @param SNI value requested.
-   */
-  virtual void setRequestedServerName(const absl::string_view requested_server_name) PURE;
-
-  /**
-   * @return SNI value for downstream host.
-   */
-  virtual const std::string& requestedServerName() const PURE;
 
   /**
    * @param failure_reason the upstream transport failure reason.
@@ -593,16 +573,6 @@ public:
   virtual Tracing::Reason traceReason() const PURE;
 
   /**
-   * @return Connection ID of the downstream connection, or unset if not available.
-   **/
-  virtual absl::optional<uint64_t> connectionID() const PURE;
-
-  /**
-   * @param id Connection ID of the downstream connection.
-   **/
-  virtual void setConnectionID(uint64_t id) PURE;
-
-  /**
    * @param filter_chain_name Network filter chain name of the downstream connection.
    */
   virtual void setFilterChainName(absl::string_view filter_chain_name) PURE;
@@ -611,6 +581,27 @@ public:
    * @return Network filter chain name of the downstream connection.
    */
   virtual const std::string& filterChainName() const PURE;
+
+  /**
+   * @param connection ID of the upstream connection.
+   */
+  virtual void setUpstreamConnectionId(uint64_t id) PURE;
+
+  /**
+   * @return the ID of the upstream connection, or absl::nullopt if not available.
+   */
+  virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
+
+  /**
+   * @param attempt_count, the number of times the request was attempted upstream.
+   */
+  virtual void setAttemptCount(uint32_t attempt_count) PURE;
+
+  /**
+   * @return the number of times the request was attempted upstream, absl::nullopt if the request
+   * was never attempted upstream.
+   */
+  virtual absl::optional<uint32_t> attemptCount() const PURE;
 };
 
 } // namespace StreamInfo

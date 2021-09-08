@@ -256,6 +256,23 @@ std::string stripQueryString(const HeaderString& path);
 std::string parseCookieValue(const HeaderMap& headers, const std::string& key);
 
 /**
+ * Parse cookies from header into a map.
+ * @param headers supplies the headers to get cookies from.
+ * @param key_filter predicate that returns true for every cookie key to be included.
+ * @return absl::flat_hash_map cookie map.
+ **/
+absl::flat_hash_map<std::string, std::string>
+parseCookies(const RequestHeaderMap& headers,
+             const std::function<bool(absl::string_view)>& key_filter);
+
+/**
+ * Parse cookies from header into a map.
+ * @param headers supplies the headers to get cookies from.
+ * @return absl::flat_hash_map cookie map.
+ **/
+absl::flat_hash_map<std::string, std::string> parseCookies(const RequestHeaderMap& headers);
+
+/**
  * Parse a particular value out of a set-cookie
  * @param headers supplies the headers to get the set-cookie from.
  * @param key the key for the particular set-cookie value to return
@@ -396,6 +413,24 @@ bool sanitizeConnectionHeader(Http::RequestHeaderMap& headers);
 const std::string& getProtocolString(const Protocol p);
 
 /**
+ * Return the scheme of the request.
+ * For legacy code (envoy.reloadable_features.correct_scheme_and_xfp == false) this
+ * will be the value of the X-Forwarded-Proto header value. By default it will
+ * return the scheme if present, otherwise the value of X-Forwarded-Proto if
+ * present.
+ */
+absl::string_view getScheme(const RequestHeaderMap& headers);
+
+/**
+ * Constructs the original URI sent from the client from
+ * the request headers.
+ * @param request headers from the original request
+ * @param length to truncate the constructed URI's path
+ */
+std::string buildOriginalUri(const Http::RequestHeaderMap& request_headers,
+                             absl::optional<uint32_t> max_path_length);
+
+/**
  * Extract host and path from a URI. The host may contain port.
  * This function doesn't validate if the URI is valid. It only parses the URI with following
  * format: scheme://host/path.
@@ -494,40 +529,10 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const std::string& filter_n
                                                      const Router::RouteConstSharedPtr& route) {
   static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
                 "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
-  if (!route || !route->routeEntry()) {
+  if (!route) {
     return nullptr;
   }
-  return route->routeEntry()->mostSpecificPerFilterConfigTyped<ConfigType>(filter_name);
-}
-
-/**
- * The non template implementation of traversePerFilterConfig. see
- * traversePerFilterConfig for docs.
- */
-void traversePerFilterConfigGeneric(
-    const std::string& filter_name, const Router::RouteConstSharedPtr& route,
-    std::function<void(const Router::RouteSpecificFilterConfig&)> cb);
-
-/**
- * Fold all the available per route filter configs, invoking the callback with each config (if
- * it is present). Iteration of the configs is in order of specificity. That means that the callback
- * will be called first for a config on a Virtual host, then a route, and finally a route entry
- * (weighted cluster). If a config is not present, the callback will not be invoked.
- */
-template <class ConfigType>
-void traversePerFilterConfig(const std::string& filter_name,
-                             const Router::RouteConstSharedPtr& route,
-                             std::function<void(const ConfigType&)> cb) {
-  static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
-                "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
-
-  traversePerFilterConfigGeneric(
-      filter_name, route, [&cb](const Router::RouteSpecificFilterConfig& cfg) {
-        const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
-        if (typed_cfg != nullptr) {
-          cb(*typed_cfg);
-        }
-      });
+  return dynamic_cast<const ConfigType*>(route->mostSpecificPerFilterConfig(filter_name));
 }
 
 /**
@@ -549,14 +554,17 @@ getMergedPerFilterConfig(const std::string& filter_name, const Router::RouteCons
 
   absl::optional<ConfigType> merged;
 
-  traversePerFilterConfig<ConfigType>(filter_name, route,
-                                      [&reduce, &merged](const ConfigType& cfg) {
-                                        if (!merged) {
-                                          merged.emplace(cfg);
-                                        } else {
-                                          reduce(merged.value(), cfg);
-                                        }
-                                      });
+  if (route) {
+    route->traversePerFilterConfig(
+        filter_name, [&reduce, &merged](const Router::RouteSpecificFilterConfig& cfg) {
+          const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
+          if (!merged) {
+            merged.emplace(*typed_cfg);
+          } else {
+            reduce(merged.value(), *typed_cfg);
+          }
+        });
+  }
 
   return merged;
 }

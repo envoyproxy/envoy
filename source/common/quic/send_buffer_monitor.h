@@ -32,7 +32,6 @@ public:
     ~ScopedWatermarkBufferUpdater();
 
   private:
-    bool count_bytes_{false};
     quic::QuicStream* quic_stream_{nullptr};
     uint64_t old_buffered_bytes_{0};
     SendBufferMonitor* send_buffer_monitor_{nullptr};

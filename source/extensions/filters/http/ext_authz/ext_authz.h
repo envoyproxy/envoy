@@ -50,10 +50,12 @@ struct ExtAuthzFilterStats {
  * Configuration for the External Authorization (ext_authz) filter.
  */
 class FilterConfig {
+  using LabelsMap = Protobuf::Map<std::string, std::string>;
+
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                Stats::Scope& scope, Runtime::Loader& runtime, Http::Context& http_context,
-               const std::string& stats_prefix)
+               const std::string& stats_prefix, envoy::config::bootstrap::v3::Bootstrap& bootstrap)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
@@ -82,7 +84,15 @@ public:
         ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
         ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
         ext_authz_failure_mode_allowed_(
-            pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {}
+            pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {
+    auto labels_key_it =
+        bootstrap.node().metadata().fields().find(config.bootstrap_metadata_labels_key());
+    if (labels_key_it != bootstrap.node().metadata().fields().end()) {
+      for (const auto& labels_it : labels_key_it->second.struct_value().fields()) {
+        destination_labels_[labels_it.first] = labels_it.second.string_value();
+      }
+    }
+  }
 
   bool allowPartialMessage() const { return allow_partial_message_; }
 
@@ -124,6 +134,7 @@ public:
   }
 
   bool includePeerCertificate() const { return include_peer_certificate_; }
+  const LabelsMap& destinationLabels() const { return destination_labels_; }
 
 private:
   static Http::Code toErrorCode(uint64_t status) {
@@ -159,6 +170,7 @@ private:
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
+  LabelsMap destination_labels_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;

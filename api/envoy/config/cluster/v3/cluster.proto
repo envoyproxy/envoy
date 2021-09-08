@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 54]
+// [#next-free-field: 56]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -110,7 +110,7 @@ message Cluster {
     // this option or not.
     CLUSTER_PROVIDED = 6;
 
-    // [#not-implemented-hide:] Use the new :ref:`load_balancing_policy
+    // Use the new :ref:`load_balancing_policy
     // <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` field to determine the LB policy.
     // [#next-major-version: In the v3 API, we should consider deprecating the lb_policy field
     // and instead using the new load_balancing_policy field as the one and only mechanism for
@@ -413,8 +413,8 @@ message Cluster {
     // The table size for Maglev hashing. The Maglev aims for ‘minimal disruption’ rather than an absolute guarantee.
     // Minimal disruption means that when the set of upstreams changes, a connection will likely be sent to the same
     // upstream as it was before. Increasing the table size reduces the amount of disruption.
-    // The table size must be prime number. If it is not specified, the default is 65537.
-    google.protobuf.UInt64Value table_size = 1;
+    // The table size must be prime number limited to 5000011. If it is not specified, the default is 65537.
+    google.protobuf.UInt64Value table_size = 1 [(validate.rules).uint64 = {lte: 5000011}];
   }
 
   // Specific configuration for the
@@ -720,8 +720,7 @@ message Cluster {
 
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
-  // [#comment:TODO: Remove enum constraint :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>` when implemented.]
-  LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true not_in: 7}];
+  LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true}];
 
   // Setting this is required for specifying members of
   // :ref:`STATIC<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STATIC>`,
@@ -746,7 +745,11 @@ message Cluster {
   // is respected by both the HTTP/1.1 and HTTP/2 connection pool
   // implementations. If not specified, there is no limit. Setting this
   // parameter to 1 will effectively disable keep alive.
-  google.protobuf.UInt32Value max_requests_per_connection = 9;
+  //
+  // .. attention::
+  //   This field has been deprecated in favor of the :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>` field.
+  google.protobuf.UInt32Value max_requests_per_connection = 9
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   CircuitBreakers circuit_breakers = 10;
@@ -778,7 +781,7 @@ message Cluster {
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Additional options when handling HTTP1 requests.
-  // This has been deprecated in favor of http_protocol_options fields in the in the
+  // This has been deprecated in favor of http_protocol_options fields in the
   // :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
   // http_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
@@ -794,7 +797,7 @@ message Cluster {
   // supports prior knowledge for upstream connections. Even if TLS is used
   // with ALPN, `http2_protocol_options` must be specified. As an aside this allows HTTP/2
   // connections to happen over plain text.
-  // This has been deprecated in favor of http2_protocol_options fields in the in the
+  // This has been deprecated in favor of http2_protocol_options fields in the
   // :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`
   // message. http2_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
@@ -874,7 +877,31 @@ message Cluster {
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // DNS resolution configuration which includes the underlying dns resolver addresses and options.
+  // *dns_resolution_config* will be deprecated once
+  // :ref:'typed_dns_resolver_config <envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>'
+  // is fully supported.
   core.v3.DnsResolutionConfig dns_resolution_config = 53;
+
+  // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
+  // or any other DNS resolver types and the related parameters.
+  // For example, an object of :ref:`DnsResolutionConfig <envoy_v3_api_msg_config.core.v3.DnsResolutionConfig>`
+  // can be packed into this *typed_dns_resolver_config*. This configuration will replace the
+  // :ref:'dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>'
+  // configuration eventually.
+  // TODO(yanjunxiang): Investigate the deprecation plan for *dns_resolution_config*.
+  // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
+  // this configuration is optional.
+  // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
+  // When *typed_dns_resolver_config* is missing, the default behavior is in place.
+  // [#not-implemented-hide:]
+  core.v3.TypedExtensionConfig typed_dns_resolver_config = 55;
+
+  // Optional configuration for having cluster readiness block on warm-up. Currently, only applicable for
+  // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
+  // or :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`.
+  // If true, cluster readiness blocks on warm-up. If false, the cluster will complete
+  // initialization whether or not warm-up has completed. Defaults to true.
+  google.protobuf.BoolValue wait_for_warm_on_init = 54;
 
   // If specified, outlier detection will be enabled for this upstream cluster.
   // Each of the configuration values can be overridden via
@@ -930,7 +957,7 @@ message Cluster {
   CommonLbConfig common_lb_config = 27;
 
   // Optional custom transport socket implementation to use for upstream connections.
-  // To setup TLS, set a transport socket with name `tls` and
+  // To setup TLS, set a transport socket with name `envoy.transport_sockets.tls` and
   // :ref:`UpstreamTlsContexts <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>` in the `typed_config`.
   // If no transport socket configuration is specified, new connections
   // will be set up with plaintext.
@@ -980,7 +1007,7 @@ message Cluster {
   // servers of this cluster.
   repeated Filter filters = 40;
 
-  // [#not-implemented-hide:] New mechanism for LB policy configuration. Used only if the
+  // New mechanism for LB policy configuration. Used only if the
   // :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>` field has the value
   // :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>`.
   LoadBalancingPolicy load_balancing_policy = 41;
@@ -1045,7 +1072,7 @@ message Cluster {
   bool connection_pool_per_downstream_connection = 51;
 }
 
-// [#not-implemented-hide:] Extensible load balancing policy configuration.
+// Extensible load balancing policy configuration.
 //
 // Every LB policy defined via this mechanism will be identified via a unique name using reverse
 // DNS notation. If the policy needs configuration parameters, it must define a message for its
@@ -1071,14 +1098,11 @@ message LoadBalancingPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.LoadBalancingPolicy.Policy";
 
-    reserved 2;
+    reserved 2, 1, 3;
 
-    reserved "config";
+    reserved "config", "name", "typed_config";
 
-    // Required. The name of the LB policy.
-    string name = 1;
-
-    google.protobuf.Any typed_config = 3;
+    core.v3.TypedExtensionConfig typed_extension_config = 4;
   }
 
   // Each client will iterate over the list in order and stop at the first policy that it

@@ -15,7 +15,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.http.rbac",
+    extension_names = ["envoy.filters.http.rbac"],
     deps = [
         "//source/extensions/filters/http/rbac:config",
         "//test/mocks/server:factory_context_mocks",
@@ -28,7 +28,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "rbac_filter_test",
     srcs = ["rbac_filter_test.cc"],
-    extension_name = "envoy.filters.http.rbac",
+    extension_names = ["envoy.filters.http.rbac"],
     deps = [
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
@@ -44,7 +44,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "rbac_filter_integration_test",
     srcs = ["rbac_filter_integration_test.cc"],
-    extension_name = "envoy.filters.http.rbac",
+    extension_names = ["envoy.filters.http.rbac"],
     deps = [
         "//source/extensions/filters/http/rbac:config",
         "//test/config:utility_lib",
@@ -57,7 +57,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_mock(
     name = "route_config_mocks",
     hdrs = ["mocks.h"],
-    extension_name = "envoy.filters.http.rbac",
+    extension_names = ["envoy.filters.http.rbac"],
     deps = [
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",

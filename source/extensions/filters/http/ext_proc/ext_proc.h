@@ -72,6 +72,25 @@ private:
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  explicit FilterConfigPerRoute(
+      const envoy::extensions::filters::http::ext_proc::v3alpha::ExtProcPerRoute& config);
+
+  void merge(const FilterConfigPerRoute& other);
+
+  bool disabled() const { return disabled_; }
+  const absl::optional<envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode>&
+  processingMode() const {
+    return processing_mode_;
+  }
+
+private:
+  bool disabled_;
+  absl::optional<envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode>
+      processing_mode_;
+};
+
 class Filter : public Logger::Loggable<Logger::Id::filter>,
                public Http::PassThroughFilter,
                public ExternalProcessorCallbacks {
@@ -118,19 +137,22 @@ public:
 
   void onMessageTimeout();
 
-  void sendBufferedData(ProcessorState& state, bool end_stream) {
-    sendBodyChunk(state, *state.bufferedData(), end_stream);
+  void sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
+                        bool end_stream) {
+    sendBodyChunk(state, *state.bufferedData(), new_state, end_stream);
   }
+  void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
+                     ProcessorState::CallbackState new_state, bool end_stream);
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
 
 private:
+  void mergePerRouteConfig();
   StreamOpenState openStream();
 
   void cleanUpTimers();
   void clearAsyncState();
   void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
-  void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);
 
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream);
@@ -158,6 +180,9 @@ private:
   // know what response to return from certain failures.
   bool sent_immediate_response_ = false;
 };
+
+extern std::string responseCaseToString(
+    const envoy::service::ext_proc::v3alpha::ProcessingResponse::ResponseCase response_case);
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters

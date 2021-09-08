@@ -107,6 +107,12 @@ std::string encodeResourceList(const Protobuf::RepeatedPtrField<std::string>& re
 void setBearerToken(Http::RequestHeaderMap& headers, const std::string& token) {
   headers.setInline(authorization_handle.handle(), absl::StrCat("Bearer ", token));
 }
+
+std::string findValue(const absl::flat_hash_map<std::string, std::string>& map,
+                      const std::string& key) {
+  const auto value_it = map.find(key);
+  return value_it != map.end() ? value_it->second : EMPTY_STRING;
+}
 } // namespace
 
 FilterConfig::FilterConfig(
@@ -138,9 +144,13 @@ FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope&
 
 void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
                                       const std::string& secret) {
-  expires_ = Http::Utility::parseCookieValue(headers, "OauthExpires");
-  token_ = Http::Utility::parseCookieValue(headers, "BearerToken");
-  hmac_ = Http::Utility::parseCookieValue(headers, "OauthHMAC");
+  const auto& cookies = Http::Utility::parseCookies(headers, [](absl::string_view key) -> bool {
+    return key == "OauthExpires" || key == "BearerToken" || key == "OauthHMAC";
+  });
+
+  expires_ = findValue(cookies, "OauthExpires");
+  token_ = findValue(cookies, "BearerToken");
+  hmac_ = findValue(cookies, "OauthHMAC");
   host_ = headers.Host()->value().getStringView();
 
   secret_.assign(secret.begin(), secret.end());
@@ -386,8 +396,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
 
-  const std::string new_path =
-      absl::StrCat(headers.ForwardedProto()->value().getStringView(), "://", host_, "/");
+  const std::string new_path = absl::StrCat(Http::Utility::getScheme(headers), "://", host_, "/");
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutCookieValue);
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutBearerTokenValue);
   response_headers->setLocation(new_path);

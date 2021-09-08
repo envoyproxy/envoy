@@ -68,7 +68,8 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
     : ActiveRawUdpListener(worker_index, concurrency, parent,
-                           config.listenSocketFactory().getListenSocket(), dispatcher, config) {}
+                           config.listenSocketFactory().getListenSocket(worker_index), dispatcher,
+                           config) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                                            Network::UdpConnectionHandler& parent,
@@ -96,16 +97,14 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
                                            Network::UdpListenerPtr&& listener,
                                            Network::ListenerConfig& config)
     : ActiveUdpListenerBase(worker_index, concurrency, parent, listen_socket, std::move(listener),
-                            &config),
-      read_filter_(nullptr) {
-  // Create the filter chain on creating a new udp listener
+                            &config) {
+  // Create the filter chain on creating a new udp listener.
   config_->filterChainFactory().createUdpListenerFilterChain(*this, *this);
 
-  // If filter is nullptr, fail the creation of the listener
+  // If filter is nullptr warn that we will be dropping packets. This is an edge case and should
+  // only happen due to a bad factory. It's not worth adding per-worker error handling for this.
   if (read_filter_ == nullptr) {
-    throw Network::CreateListenerException(
-        fmt::format("Cannot create listener as no read filter registered for the udp listener: {} ",
-                    config_->name()));
+    ENVOY_LOG(warn, "UDP listener has no filters. Packets will be dropped.");
   }
 
   // Create udp_packet_writer
@@ -113,7 +112,11 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
       listen_socket_.ioHandle(), config.listenerScope());
 }
 
-void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) { read_filter_->onData(data); }
+void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {
+  if (read_filter_ != nullptr) {
+    read_filter_->onData(data);
+  }
+}
 
 void ActiveRawUdpListener::onReadReady() {}
 
@@ -127,7 +130,9 @@ void ActiveRawUdpListener::onWriteReady(const Network::Socket&) {
 }
 
 void ActiveRawUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {
-  read_filter_->onReceiveError(error_code);
+  if (read_filter_ != nullptr) {
+    read_filter_->onReceiveError(error_code);
+  }
 }
 
 void ActiveRawUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& filter) {

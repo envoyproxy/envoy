@@ -21,7 +21,7 @@
 #include "source/common/version/version.h"
 #include "source/extensions/common/wasm/context.h"
 #include "source/extensions/common/wasm/plugin.h"
-#include "source/extensions/common/wasm/wasm_extension.h"
+#include "source/extensions/common/wasm/stats_handler.h"
 #include "source/extensions/common/wasm/wasm_vm.h"
 
 #include "include/proxy-wasm/exports.h"
@@ -32,15 +32,10 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
-#define ALL_WASM_STATS(COUNTER, GAUGE)                                                             \
-  COUNTER(created)                                                                                 \
-  GAUGE(active, NeverImport)
+using CreateContextFn =
+    std::function<ContextBase*(Wasm* wasm, const std::shared_ptr<Plugin>& plugin)>;
 
 class WasmHandle;
-
-struct WasmStats {
-  ALL_WASM_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
-};
 
 // Wasm execution instance. Manages the Envoy side of the Wasm interface.
 class Wasm : public WasmBase, Logger::Loggable<Logger::Id::wasm> {
@@ -109,10 +104,10 @@ protected:
   absl::flat_hash_map<uint32_t, Event::TimerPtr> timer_; // per root_id.
   TimeSource& time_source_;
 
-  // Host Stats/Metrics
-  WasmStats wasm_stats_;
+  // Lifecycle stats
+  LifecycleStatsHandler lifecycle_stats_handler_;
 
-  // Plugin Stats/Metrics
+  // Plugin stats
   absl::flat_hash_map<uint32_t, Stats::Counter*> counters_;
   absl::flat_hash_map<uint32_t, Stats::Gauge*> gauges_;
   absl::flat_hash_map<uint32_t, Stats::Histogram*> histograms_;
@@ -137,24 +132,31 @@ private:
 
 using WasmHandleSharedPtr = std::shared_ptr<WasmHandle>;
 
-class PluginHandle : public PluginHandleBase, public ThreadLocal::ThreadLocalObject {
+class PluginHandle : public PluginHandleBase {
 public:
   explicit PluginHandle(const WasmHandleSharedPtr& wasm_handle, const PluginSharedPtr& plugin)
       : PluginHandleBase(std::static_pointer_cast<WasmHandleBase>(wasm_handle),
                          std::static_pointer_cast<PluginBase>(plugin)),
-        wasm_handle_(wasm_handle),
-        root_context_id_(wasm_handle->wasm()->getRootContext(plugin, false)->id()) {}
+        plugin_(plugin), wasm_handle_(wasm_handle) {}
 
-  WasmSharedPtr& wasm() { return wasm_handle_->wasm(); }
-  WasmHandleSharedPtr& wasmHandleForTest() { return wasm_handle_; }
-  uint32_t rootContextId() { return root_context_id_; }
+  WasmHandleSharedPtr& wasmHandle() { return wasm_handle_; }
+  uint32_t rootContextId() { return wasm_handle_->wasm()->getRootContext(plugin_, false)->id(); }
 
 private:
+  PluginSharedPtr plugin_;
   WasmHandleSharedPtr wasm_handle_;
-  const uint32_t root_context_id_;
 };
 
 using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
+
+class PluginHandleSharedPtrThreadLocal : public ThreadLocal::ThreadLocalObject {
+public:
+  PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr handle) : handle_(handle){};
+  PluginHandleSharedPtr& handle() { return handle_; }
+
+private:
+  PluginHandleSharedPtr handle_;
+};
 
 using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 
@@ -177,7 +179,7 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
 
 void clearCodeCacheForTesting();
 void setTimeOffsetForCodeCacheForTesting(MonotonicTime::duration d);
-EnvoyWasm::WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm);
+WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm);
 
 } // namespace Wasm
 } // namespace Common

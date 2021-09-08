@@ -15,12 +15,13 @@ namespace Upstream {
  */
 class LogicalHost : public HostImpl {
 public:
-  LogicalHost(const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
-              const Network::Address::InstanceConstSharedPtr& address,
-              const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-              const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
-              const Network::TransportSocketOptionsSharedPtr& override_transport_socket_options,
-              TimeSource& time_source)
+  LogicalHost(
+      const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
+      const Network::Address::InstanceConstSharedPtr& address,
+      const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
+      const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
+      const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
+      TimeSource& time_source)
       : HostImpl(cluster, hostname, address,
                  // TODO(zyfjeff): Created through metadata shared pool
                  std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
@@ -47,7 +48,7 @@ public:
   // Upstream::Host
   CreateConnectionData createConnection(
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-      Network::TransportSocketOptionsSharedPtr transport_socket_options) const override;
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const override;
 
   // Upstream::HostDescription
   Network::Address::InstanceConstSharedPtr address() const override {
@@ -60,7 +61,7 @@ public:
   }
 
 private:
-  const Network::TransportSocketOptionsSharedPtr override_transport_socket_options_;
+  const Network::TransportSocketOptionsConstSharedPtr override_transport_socket_options_;
   mutable absl::Mutex address_lock_;
 };
 

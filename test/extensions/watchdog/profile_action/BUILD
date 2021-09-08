@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "profile_action_test",
     srcs = ["profile_action_test.cc"],
-    extension_name = "envoy.watchdog.profile_action",
+    extension_names = ["envoy.watchdog.profile_action"],
     external_deps = [
         "abseil_synchronization",
     ],
@@ -39,7 +39,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.watchdog.profile_action",
+    extension_names = ["envoy.watchdog.profile_action"],
     deps = [
         "//envoy/registry",
         "//envoy/server:guarddog_config_interface",

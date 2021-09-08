@@ -28,7 +28,6 @@ static_resources:
                   cluster: generic_service
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
   clusters:
   - name: generic_service
     type: STRICT_DNS

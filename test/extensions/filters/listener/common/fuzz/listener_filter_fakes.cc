@@ -9,15 +9,16 @@ Network::IoHandle& FakeConnectionSocket::ioHandle() { return *io_handle_; }
 const Network::IoHandle& FakeConnectionSocket::ioHandle() const { return *io_handle_; }
 
 Network::Address::Type FakeConnectionSocket::addressType() const {
-  return address_provider_->localAddress()->type();
+  return connection_info_provider_->localAddress()->type();
 }
 
 absl::optional<Network::Address::IpVersion> FakeConnectionSocket::ipVersion() const {
-  if (address_provider_->localAddress() == nullptr || addressType() != Network::Address::Type::Ip) {
+  if (connection_info_provider_->localAddress() == nullptr ||
+      addressType() != Network::Address::Type::Ip) {
     return absl::nullopt;
   }
 
-  return address_provider_->localAddress()->ip()->version();
+  return connection_info_provider_->localAddress()->ip()->version();
 }
 
 void FakeConnectionSocket::setDetectedTransportProtocol(absl::string_view protocol) {
