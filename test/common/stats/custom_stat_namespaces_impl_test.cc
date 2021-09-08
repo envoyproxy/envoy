@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Stats {
 
-TEST(CustomStatNamespacesImpl, Registeration) {
+TEST(CustomStatNamespacesImpl, Registration) {
   CustomStatNamespacesImpl namespaces;
   const auto name = "foo";
   EXPECT_FALSE(namespaces.registered(name));
