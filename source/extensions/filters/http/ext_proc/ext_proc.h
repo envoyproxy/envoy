@@ -72,6 +72,25 @@ private:
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  explicit FilterConfigPerRoute(
+      const envoy::extensions::filters::http::ext_proc::v3alpha::ExtProcPerRoute& config);
+
+  void merge(const FilterConfigPerRoute& other);
+
+  bool disabled() const { return disabled_; }
+  const absl::optional<envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode>&
+  processingMode() const {
+    return processing_mode_;
+  }
+
+private:
+  bool disabled_;
+  absl::optional<envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode>
+      processing_mode_;
+};
+
 class Filter : public Logger::Loggable<Logger::Id::filter>,
                public Http::PassThroughFilter,
                public ExternalProcessorCallbacks {
@@ -128,6 +147,7 @@ public:
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
 
 private:
+  void mergePerRouteConfig();
   StreamOpenState openStream();
 
   void cleanUpTimers();
