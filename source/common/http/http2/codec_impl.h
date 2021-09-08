@@ -39,6 +39,8 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+class Http2CodecImplTestFixture;
+
 // This is not the full client magic, but it's the smallest size that should be able to
 // differentiate between HTTP/1 and HTTP/2.
 const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
@@ -537,6 +539,8 @@ protected:
   const MonotonicTime& lastReceivedDataTime() { return last_received_data_time_; }
 
 private:
+  friend class Http2CodecImplTestFixture;
+
   virtual ConnectionCallbacks& callbacks() PURE;
   virtual Status onBeginHeaders(const nghttp2_frame* frame) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);

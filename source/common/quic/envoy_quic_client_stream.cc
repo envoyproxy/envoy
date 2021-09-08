@@ -9,7 +9,6 @@
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/spdy/core/spdy_header_block.h"
-#include "source/common/quic/platform/quic_mem_slice_span_impl.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -81,8 +80,20 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
+  Buffer::RawSliceVector raw_slices = data.getRawSlices();
+  absl::InlinedVector<quic::QuicMemSlice, 4> quic_slices;
+  quic_slices.reserve(raw_slices.size());
+  for (auto& slice : raw_slices) {
+    ASSERT(slice.len_ != 0);
+    // Move each slice into a stand-alone buffer.
+    // TODO(danzh): investigate the cost of allocating one buffer per slice.
+    // If it turns out to be expensive, add a new function to free data in the middle in buffer
+    // interface and re-design QuicMemSliceImpl.
+    quic_slices.emplace_back(quic::QuicMemSliceImpl(data, slice.len_));
+  }
+  absl::Span<quic::QuicMemSlice> span(quic_slices);
   // QUIC stream must take all.
-  WriteBodySlices(quic::QuicMemSliceSpan(quic::QuicMemSliceSpanImpl(data)), end_stream);
+  WriteBodySlices(span, end_stream);
   if (data.length() > 0) {
     // Send buffer didn't take all the data, threshold needs to be adjusted.
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);

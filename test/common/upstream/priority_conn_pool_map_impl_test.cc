@@ -156,10 +156,12 @@ TEST_F(PriorityConnPoolMapImplTest, TestDrainConnectionsProxiedThrough) {
   test_map->getPool(ResourcePriority::High, 0, getBasicFactory());
   test_map->getPool(ResourcePriority::Default, 0, getBasicFactory());
 
-  EXPECT_CALL(*mock_pools_[0], drainConnections());
-  EXPECT_CALL(*mock_pools_[1], drainConnections());
+  EXPECT_CALL(*mock_pools_[0],
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*mock_pools_[1],
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
 
-  test_map->drainConnections();
+  test_map->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 }
 
 } // namespace

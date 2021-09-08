@@ -58,6 +58,31 @@ public:
   virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 
+  /**
+   * Mark rejected stats as deleted by moving them to a different vector, so they don't show up
+   * when iterating over stats, but prevent crashes when trying to access references to them.
+   * Note that allocating a stat with the same name after calling this will
+   * return a new stat. Hence callers should seek to avoid this situation, as is
+   * done in ThreadLocalStore.
+   */
+  virtual void markCounterForDeletion(const CounterSharedPtr& counter) PURE;
+  virtual void markGaugeForDeletion(const GaugeSharedPtr& gauge) PURE;
+  virtual void markTextReadoutForDeletion(const TextReadoutSharedPtr& text_readout) PURE;
+
+  /**
+   * Iterate over all stats that need to be sinked. Note, that implementations can potentially hold
+   * on to a mutex that will deadlock if the passed in functors try to create or delete a stat.
+   * @param f_size functor that is provided the number of all sinked stats. Note this is called
+   *        only once, prior to any calls to f_stat.
+   * @param f_stat functor that is provided one sinked stat at a time.
+   */
+  virtual void forEachCounter(std::function<void(std::size_t)> f_size,
+                              std::function<void(Stats::Counter&)> f_stat) const PURE;
+  virtual void forEachGauge(std::function<void(std::size_t)> f_size,
+                            std::function<void(Stats::Gauge&)> f_stat) const PURE;
+  virtual void forEachTextReadout(std::function<void(std::size_t)> f_size,
+                                  std::function<void(Stats::TextReadout&)> f_stat) const PURE;
+
   // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At
   // the moment, histograms don't fit the same pattern of counters and gauges
   // as they are not actually created in the context of a stats allocator.
