@@ -8,6 +8,8 @@ def _default_envoy_api_impl(ctx):
         "test",
         "tools",
         "versioning",
+        "contrib",
+        "buf.yaml",
     ]
     for d in api_dirs:
         ctx.symlink(ctx.path(ctx.attr.envoy_root).dirname.get_child(ctx.attr.reldir).get_child(d), d)

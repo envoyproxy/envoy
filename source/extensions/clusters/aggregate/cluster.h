@@ -102,11 +102,6 @@ private:
       return nullptr;
     }
 
-    // Upstream::LoadBalancerBase
-    Upstream::HostConstSharedPtr chooseHostOnce(Upstream::LoadBalancerContext*) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
-
     absl::optional<uint32_t> hostToLinearizedPriority(const Upstream::HostDescription& host) const;
 
   private:

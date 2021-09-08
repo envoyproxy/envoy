@@ -6,6 +6,7 @@ import "envoy/config/cluster/v3/cluster.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/resolver.proto";
+import "envoy/extensions/common/key_value/v3/config.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -31,7 +32,7 @@ message DnsCacheCircuitBreakers {
 
 // Configuration for the dynamic forward proxy DNS cache. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message DnsCacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig";
@@ -138,4 +139,8 @@ message DnsCacheConfig {
   // Setting this timeout will ensure that queries succeed or fail within the specified time frame
   // and are then retried using the standard refresh rates. Defaults to 5s if not set.
   google.protobuf.Duration dns_query_timeout = 11 [(validate.rules).duration = {gt {}}];
+
+  // [#not-implemented-hide:]
+  // Configuration to flush the DNS cache to long term storage.
+  key_value.v3.KeyValueStoreConfig key_value_config = 13;
 }

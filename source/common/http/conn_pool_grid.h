@@ -148,8 +148,7 @@ public:
                                          ConnectionPool::Callbacks& callbacks) override;
   void addIdleCallback(IdleCb cb) override;
   bool isIdle() const override;
-  void startDrain() override;
-  void drainConnections() override;
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override;
   Upstream::HostDescriptionConstSharedPtr host() const override;
   bool maybePreconnect(float preconnect_ratio) override;
   absl::string_view protocolDescription() const override { return "connection grid"; }

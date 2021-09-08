@@ -150,9 +150,11 @@ public:
 
   void addIdleCallback(IdleCb cb) override { addIdleCallbackImpl(cb); }
   bool isIdle() const override { return isIdleImpl(); }
-  void startDrain() override { startDrainImpl(); }
-  void drainConnections() override {
-    drainConnectionsImpl();
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override {
+    drainConnectionsImpl(drain_behavior);
+    if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
+      return;
+    }
     // Legacy behavior for the TCP connection pool marks all connecting clients
     // as draining.
     for (auto& connecting_client : connecting_clients_) {
@@ -176,10 +178,10 @@ public:
   }
   ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
     TcpAttachContext context(&callbacks);
-    return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
+    return newStreamImpl(context);
   }
   bool maybePreconnect(float preconnect_ratio) override {
-    return Envoy::ConnectionPool::ConnPoolImplBase::maybePreconnect(preconnect_ratio);
+    return maybePreconnectImpl(preconnect_ratio);
   }
 
   ConnectionPool::Cancellable*
