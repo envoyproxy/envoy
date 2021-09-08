@@ -503,7 +503,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
 
   if (upstream_http_protocol_options.has_value()) {
-    std::string sni_value;
+    absl::string_view sni_value;
     bool should_set_sni = true;
 
     // Check whether `alt_header_name` is specified.
@@ -533,7 +533,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       if (upstream_http_protocol_options.value().auto_san_validation()) {
         callbacks_->streamInfo().filterState()->setData(
             Network::UpstreamSubjectAltNames::key(),
-            std::make_unique<Network::UpstreamSubjectAltNames>(std::vector<std::string>{sni_value}),
+            std::make_unique<Network::UpstreamSubjectAltNames>(
+                std::vector<std::string>{std::string(sni_value).c_str()}),
             StreamInfo::FilterState::StateType::Mutable);
       }
     }

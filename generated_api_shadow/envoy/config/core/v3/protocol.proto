@@ -76,7 +76,7 @@ message UpstreamHttpProtocolOptions {
   // :ref:`router filter <config_http_filters_router>`.
   // If unset, host/authority header will be used for populating the SNI.
   // This field is intended to be set with `auto_sni` field.
-  string alt_header_name = 3;
+  string alt_header_name = 3 [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME}];
 }
 
 // Configures the alternate protocols cache which tracks alternate protocols that can be used to
