@@ -33,7 +33,6 @@ envoy_cc_library(
         "//envoy/tracing:http_tracer_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
