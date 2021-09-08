@@ -312,8 +312,7 @@ TEST_F(SimpleHttpCacheTest, EmptyTrailers) {
   const std::string body1("Value");
   insert(move(name_lookup_context), response_headers, body1);
   name_lookup_context = lookup(request_path1);
-  EXPECT_TRUE(
-      expectLookupSuccessWithBodyAndTrailers(name_lookup_context.get(), body1));
+  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(name_lookup_context.get(), body1));
   EXPECT_FALSE(lookup_result_.has_trailers_);
 }
 
