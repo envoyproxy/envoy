@@ -196,7 +196,7 @@ absl::optional<std::string>
 PrometheusStatsFormatter::metricName(const std::string& extracted_name,
                                      const Stats::CustomStatNamespaces& custom_namespaces) {
   const absl::optional<std::string> custom_namespace_sanitized =
-      custom_namespaces.trySanitizeStatName(extracted_name);
+      custom_namespaces.stripRegisteredPrefix(extracted_name);
   if (custom_namespace_sanitized.has_value()) {
     // This case the name has a custom namespace, and it is a custom metric.
     const std::string sanitized_name = sanitizeName(custom_namespace_sanitized.value());
@@ -206,7 +206,7 @@ PrometheusStatsFormatter::metricName(const std::string& extracted_name,
     // All the characters in sanitized_name are already in "[a-zA-Z0-9_]" pattern
     // thanks to sanitizeName above, so the only thing we have to do is check
     // if it does not start with digits.
-    if ('0' <= sanitized_name.front() && sanitized_name.front() <= '9') {
+    if (sanitized_name.empty() || absl::ascii_isdigit(sanitized_name.front())) {
       return absl::nullopt;
     }
     return sanitized_name;

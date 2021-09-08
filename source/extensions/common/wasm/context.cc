@@ -55,10 +55,6 @@ namespace Wasm {
 
 namespace {
 
-// The custom namespace prefix which prepends the user-defined metrics.
-// Note that the prefix is removed from the final output of /stats endpoints.
-constexpr absl::string_view CustomStatNamespacePrefix = "wasmcustom.";
-
 // FilterState prefix for CelState values.
 constexpr absl::string_view CelStateKeyPrefix = "wasm.";
 

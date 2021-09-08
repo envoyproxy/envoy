@@ -16,6 +16,11 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
+// The custom stat namespace which prepends all the user-defined metrics.
+// Note that the prefix is removed from the final output of /stats endpoints.
+constexpr absl::string_view CustomStatNamespace = "wasmcustom";
+constexpr absl::string_view CustomStatNamespacePrefix = "wasmcustom.";
+
 #define CREATE_WASM_STATS(COUNTER, GAUGE)                                                          \
   COUNTER(remote_load_cache_hits)                                                                  \
   COUNTER(remote_load_cache_negative_hits)                                                         \
@@ -98,11 +103,6 @@ public:
 protected:
   LifecycleStats lifecycle_stats_;
 };
-
-// Ensure that the Wasm extension specific custom stat namespace is registered in the given
-// Stats::CustomStatNamespaces object. All wasm extension points must call this at least once
-// so that custom metrics defined byWasm programs are correctly handled by Stat sinks.
-void ensureCustomStatNamespaceRegistered(Stats::CustomStatNamespaces& custom_namespaces);
 
 } // namespace Wasm
 } // namespace Common
