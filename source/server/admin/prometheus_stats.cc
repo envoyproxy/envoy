@@ -1,7 +1,5 @@
 #include "source/server/admin/prometheus_stats.h"
 
-#include "envoy/stats/custom_stat_namespaces.h"
-
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
 #include "source/common/stats/histogram_impl.h"
@@ -195,11 +193,11 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
 absl::optional<std::string>
 PrometheusStatsFormatter::metricName(const std::string& extracted_name,
                                      const Stats::CustomStatNamespaces& custom_namespaces) {
-  const absl::optional<std::string> custom_namespace_sanitized =
+  const absl::optional<std::string> custom_namespace_stripped =
       custom_namespaces.stripRegisteredPrefix(extracted_name);
-  if (custom_namespace_sanitized.has_value()) {
+  if (custom_namespace_stripped.has_value()) {
     // This case the name has a custom namespace, and it is a custom metric.
-    const std::string sanitized_name = sanitizeName(custom_namespace_sanitized.value());
+    const std::string sanitized_name = sanitizeName(custom_namespace_stripped.value());
     // We expose these metrics without modifying (e.g. without "envoy_"),
     // so we have to check the "user-defined" stat name complies with the Prometheus naming
     // convention. Specifically the name must start with the "[a-zA-Z_]" pattern.

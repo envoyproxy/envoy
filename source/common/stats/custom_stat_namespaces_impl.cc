@@ -1,7 +1,5 @@
 #include "source/common/stats/custom_stat_namespaces_impl.h"
 
-#include <string>
-
 namespace Envoy {
 namespace Stats {
 

@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/server/lifecycle_notifier.h"
-#include "envoy/stats/custom_stat_namespaces.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
