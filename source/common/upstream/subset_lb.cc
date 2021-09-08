@@ -727,7 +727,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
                                                            HostPredicate predicate,
                                                            bool locality_weight_aware,
                                                            bool scale_locality_weight,
-                                                          Random::RandomGenerator& random)
+                                                           Random::RandomGenerator& random)
     : original_priority_set_(subset_lb.original_priority_set_), predicate_(predicate),
       locality_weight_aware_(locality_weight_aware), scale_locality_weight_(scale_locality_weight),
       random_(random) {

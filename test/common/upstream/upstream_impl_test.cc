@@ -261,9 +261,10 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
-   auto factory_context = std::make_unique<Envoy::Server::Configuration::TransportSocketFactoryContextImpl>(
-      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
-      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+  auto factory_context =
+      std::make_unique<Envoy::Server::Configuration::TransportSocketFactoryContextImpl>(
+          admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+          singleton_manager_, tls_, validation_visitor_, *api_, options_);
   StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, *factory_context,
                                std::move(scope), false);
   cluster.setTransportFactoryContext(std::move(factory_context));
@@ -600,9 +601,10 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
-  auto factory_context = std::make_unique<Envoy::Server::Configuration::TransportSocketFactoryContextImpl>(
-      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
-      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+  auto factory_context =
+      std::make_unique<Envoy::Server::Configuration::TransportSocketFactoryContextImpl>(
+          admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+          singleton_manager_, tls_, validation_visitor_, *api_, options_);
   StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, *factory_context,
                                std::move(scope), false);
   cluster.setTransportFactoryContext(std::move(factory_context));
@@ -1821,10 +1823,11 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
-  auto factory_context = std::make_unique<Envoy::Server::Configuration::TransportSocketFactoryContextImpl>(
+  auto factory_context =
+      std::make_unique<Envoy::Server::Configuration::TransportSocketFactoryContextImpl>(
 
-      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
-      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+          admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+          singleton_manager_, tls_, validation_visitor_, *api_, options_);
   StaticClusterImpl cluster(cluster_config, runtime_, *factory_context, std::move(scope), false);
   cluster.setTransportFactoryContext(std::move(factory_context));
 
@@ -1882,9 +1885,10 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
 
-  auto factory_context = std::make_unique<Envoy::Server::Configuration::TransportSocketFactoryContextImpl>(
-      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
-      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+  auto factory_context =
+      std::make_unique<Envoy::Server::Configuration::TransportSocketFactoryContextImpl>(
+          admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+          singleton_manager_, tls_, validation_visitor_, *api_, options_);
   StaticClusterImpl cluster(cluster_config, runtime_, *factory_context, std::move(scope), false);
   cluster.setTransportFactoryContext(std::move(factory_context));
 
@@ -3683,7 +3687,8 @@ public:
                     makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
                     makeTestHost(info_, "tcp://127.0.0.1:84", simTime()),
                     makeTestHost(info_, "tcp://127.0.0.1:85", simTime())};
- protected:
+
+protected:
   NiceMock<Random::MockRandomGenerator> random_;
 };
 
@@ -3888,7 +3893,8 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
   NiceMock<Random::MockRandomGenerator> random;
   const uint32_t iters = WRSQScheduler<int>::accuracy();
   auto setUpHostSetWithOPFAndTestPicks = [&random, iters](const uint32_t overprovisioning_factor,
-                                            const uint32_t pick_0, const uint32_t pick_1) {
+                                                          const uint32_t pick_0,
+                                                          const uint32_t pick_1) {
     HostSetImpl host_set(0, overprovisioning_factor);
     std::shared_ptr<MockClusterInfo> cluster_info{new NiceMock<MockClusterInfo>()};
     auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();

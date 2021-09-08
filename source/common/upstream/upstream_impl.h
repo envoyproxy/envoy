@@ -387,8 +387,7 @@ public:
 
   void updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed,
-                  Random::RandomGenerator& random,
+                   const HostVector& hosts_removed, Random::RandomGenerator& random,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
 protected:
@@ -443,14 +442,15 @@ private:
   // @param overprovisioning_factor the overprovisioning factor to use when computing the effective
   // weight of a locality.
   // @param random a random generator
-  static void rebuildLocalityScheduler(
-      std::unique_ptr<Scheduler<LocalityEntry>>& locality_scheduler,
-      std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
-      const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
-      HostsPerLocalityConstSharedPtr all_hosts_per_locality,
-      HostsPerLocalityConstSharedPtr excluded_hosts_per_locality,
-      LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor,
-      Random::RandomGenerator& random);
+  static void
+  rebuildLocalityScheduler(std::unique_ptr<Scheduler<LocalityEntry>>& locality_scheduler,
+                           std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
+                           const HostsPerLocality& eligible_hosts_per_locality,
+                           const HostVector& eligible_hosts,
+                           HostsPerLocalityConstSharedPtr all_hosts_per_locality,
+                           HostsPerLocalityConstSharedPtr excluded_hosts_per_locality,
+                           LocalityWeightsConstSharedPtr locality_weights,
+                           uint32_t overprovisioning_factor, Random::RandomGenerator& random);
 
   static absl::optional<uint32_t> chooseLocality(Scheduler<LocalityEntry>* locality_scheduler);
 
@@ -487,8 +487,7 @@ public:
 
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed,
-                  Random::RandomGenerator& random,
+                   const HostVector& hosts_removed, Random::RandomGenerator& random,
                    absl::optional<uint32_t> overprovisioning_factor,
                    HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
 
@@ -544,8 +543,7 @@ private:
 
     void updateHosts(uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
                      LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                     const HostVector& hosts_removed,
-                     Random::RandomGenerator& random,
+                     const HostVector& hosts_removed, Random::RandomGenerator& random,
                      absl::optional<uint32_t> overprovisioning_factor) override;
 
     absl::node_hash_set<HostSharedPtr> all_hosts_added_;
@@ -566,8 +564,7 @@ public:
   // PrioritySet
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed,
-                  Random::RandomGenerator& random,
+                   const HostVector& hosts_removed, Random::RandomGenerator& random,
                    absl::optional<uint32_t> overprovisioning_factor,
                    HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
   HostMapConstSharedPtr crossPriorityHostMap() const override;
@@ -956,8 +953,7 @@ using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;
 class PriorityStateManager : protected Logger::Loggable<Logger::Id::upstream> {
 public:
   PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info,
-                       PrioritySet::HostUpdateCb* update_cb,
-                       Random::RandomGenerator& random);
+                       PrioritySet::HostUpdateCb* update_cb, Random::RandomGenerator& random);
 
   // Initializes the PriorityState vector based on the priority specified in locality_lb_endpoint.
   void initializePriorityFor(

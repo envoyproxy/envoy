@@ -346,8 +346,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
     : runtime_(runtime), cluster_(std::move(cluster)), bind_config_(bind_config), stats_(stats),
       ssl_context_manager_(ssl_context_manager), options_(options), added_via_api_(added_via_api),
       hosts_(new HostVector()), validation_visitor_(validation_visitor),
-      time_source_(dispatcher.timeSource()),
-      random_(api.randomGenerator()) {
+      time_source_(dispatcher.timeSource()), random_(api.randomGenerator()) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
   // Set initial hashes for possible delta updates.
@@ -521,7 +520,7 @@ void HdsCluster::updateHosts(
   hosts_per_locality_ =
       std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
   priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
-                            hosts_added, hosts_removed, random_,  absl::nullopt);
+                            hosts_added, hosts_removed, random_, absl::nullopt);
 }
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

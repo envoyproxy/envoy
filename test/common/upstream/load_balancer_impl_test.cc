@@ -923,16 +923,16 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   // Initial weights respected.
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, {});
   run_selections(runs);
-  EXPECT_NEAR(counts[0] / runs, 1.0/3, tolerance);
-  EXPECT_NEAR(counts[1] / runs, 2.0/3, tolerance);
+  EXPECT_NEAR(counts[0] / runs, 1.0 / 3, tolerance);
+  EXPECT_NEAR(counts[1] / runs, 2.0 / 3, tolerance);
 
   // Modify weights, we converge on new weighting after one pick cycle.
   hostSet().healthy_hosts_[0]->weight(2);
   hostSet().healthy_hosts_[1]->weight(1);
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, {});
   run_selections(runs);
-  EXPECT_NEAR(counts[0] / runs, 2.0/3, tolerance);
-  EXPECT_NEAR(counts[1] / runs, 1.0/3, tolerance);
+  EXPECT_NEAR(counts[0] / runs, 2.0 / 3, tolerance);
+  EXPECT_NEAR(counts[1] / runs, 1.0 / 3, tolerance);
 
   // Add a host, it should participate in next round of scheduling.
   hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), 3));
@@ -940,8 +940,8 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, {});
   run_selections(runs);
   EXPECT_NEAR(counts[0] / runs, 2.0 / 6, tolerance);
-  EXPECT_NEAR(counts[1] / runs, 1.0/6, tolerance);
-  EXPECT_NEAR(counts[2] / runs, 3.0/6, tolerance);
+  EXPECT_NEAR(counts[1] / runs, 1.0 / 6, tolerance);
+  EXPECT_NEAR(counts[2] / runs, 3.0 / 6, tolerance);
 
   // Remove last two hosts, add a new one with different weights.
   HostVector removed_hosts = {hostSet().hosts_[1], hostSet().hosts_[2]};
@@ -954,8 +954,8 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   hostSet().healthy_hosts_[0]->weight(1);
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, removed_hosts);
   run_selections(runs);
-  EXPECT_NEAR(counts[0] / runs, 1.0/5, tolerance);
-  EXPECT_NEAR(counts[1] / runs, 4.0/5, tolerance);
+  EXPECT_NEAR(counts[0] / runs, 1.0 / 5, tolerance);
+  EXPECT_NEAR(counts[1] / runs, 4.0 / 5, tolerance);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {

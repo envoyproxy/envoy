@@ -77,7 +77,8 @@ private:
   class PrioritySubsetImpl : public PrioritySetImpl {
   public:
     PrioritySubsetImpl(const SubsetLoadBalancer& subset_lb, HostPredicate predicate,
-                       bool locality_weight_aware, bool scale_locality_weight, Random::RandomGenerator& random);
+                       bool locality_weight_aware, bool scale_locality_weight,
+                       Random::RandomGenerator& random);
 
     void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
 

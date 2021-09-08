@@ -1955,13 +1955,13 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
   // first.
   // The localities are split 50/50, but because of the scaling we expect to see 66/33 instead.
   const size_t iters = WRSQScheduler<int>::accuracy();
-  std::vector<size_t> counts({0,0});
+  std::vector<size_t> counts({0, 0});
   for (size_t i = 0; i < iters; ++i) {
     EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
     auto h = lb_->chooseHost(&context);
     if (h == host_set_.healthy_hosts_per_locality_->get()[0][1]) {
       counts[0]++;
-    } else if (h == host_set_.healthy_hosts_per_locality_->get()[1][3]){
+    } else if (h == host_set_.healthy_hosts_per_locality_->get()[1][3]) {
       counts[1]++;
     }
   }
@@ -2000,7 +2000,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
   TestLoadBalancerContext context({{"version", "1.0"}});
 
   // We expect to see a 33/66 split because 2 * 1 / 2 = 1 and 2 * 3 / 4 = 1.5 -> 2
-  std::vector<size_t> counts({0,0});
+  std::vector<size_t> counts({0, 0});
   const size_t iters = WRSQScheduler<int>::accuracy();
   for (size_t i = 0; i < iters; ++i) {
     EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
@@ -2009,7 +2009,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
       counts[0]++;
     } else if (h == host_set_.healthy_hosts_per_locality_->get()[1][0] ||
                h == host_set_.healthy_hosts_per_locality_->get()[1][1] ||
-               h == host_set_.healthy_hosts_per_locality_->get()[1][2]){
+               h == host_set_.healthy_hosts_per_locality_->get()[1][2]) {
       counts[1]++;
     } else {
       FAIL() << "wrong host returned: " << h->address()->asString();

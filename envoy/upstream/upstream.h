@@ -462,7 +462,7 @@ public:
   virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
-                  Random::RandomGenerator& random,
+                           Random::RandomGenerator& random,
                            absl::optional<uint32_t> overprovisioning_factor,
                            HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
@@ -486,7 +486,7 @@ public:
     virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
-                     Random::RandomGenerator& random,
+                             Random::RandomGenerator& random,
                              absl::optional<uint32_t> overprovisioning_factor) PURE;
   };
 

@@ -48,7 +48,8 @@ void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
 
 void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
   absl::flat_hash_set<std::string> all_new_hosts;
-  PriorityStateManager priority_state_manager(parent_, parent_.local_info_, &host_update_cb, parent_.random_);
+  PriorityStateManager priority_state_manager(parent_, parent_.local_info_, &host_update_cb,
+                                              parent_.random_);
   for (const auto& locality_lb_endpoint : cluster_load_assignment_.endpoints()) {
     parent_.validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
 
@@ -230,9 +231,9 @@ void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().filter(
         {[&host_to_exclude](const Host& host) { return &host != host_to_exclude.get(); }})[0];
 
-    prioritySet().updateHosts(priority,
-                              HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
-                              host_set->localityWeights(), {}, hosts_to_remove, random_, absl::nullopt);
+    prioritySet().updateHosts(
+        priority, HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
+        host_set->localityWeights(), {}, hosts_to_remove, random_, absl::nullopt);
   }
 }
 

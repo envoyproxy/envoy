@@ -70,8 +70,8 @@ TEST(WRSQSchedulerTest, ProbabilityVerification) {
   }
 
   for (uint32_t i = 0; i < num_entries; ++i) {
-    EXPECT_NEAR((i + 1) / weight_sum, pick_count[i] / static_cast<double>(iters), 0.001) 
-      << fmt::format("weight_sum={}, pick_count={}, i={}\n", weight_sum, pick_count[i], i);
+    EXPECT_NEAR((i + 1) / weight_sum, pick_count[i] / static_cast<double>(iters), 0.001)
+        << fmt::format("weight_sum={}, pick_count={}, i={}\n", weight_sum, pick_count[i], i);
   }
 }
 

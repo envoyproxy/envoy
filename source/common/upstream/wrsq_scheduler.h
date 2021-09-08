@@ -124,7 +124,7 @@ private:
     const double weight_sum = cumulative_weights_.back().cumulative_weight;
 
     // It's possible that the weight sum can be fractional, so we need a random double.
-    const double r = static_cast<double>(random_.random()  % accuracy()) / accuracy();
+    const double r = static_cast<double>(random_.random() % accuracy()) / accuracy();
     const double rnum = r * weight_sum;
 
     auto it = std::upper_bound(cumulative_weights_.begin(), cumulative_weights_.end(), rnum,

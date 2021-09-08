@@ -412,7 +412,8 @@ void HostSetImpl::rebuildLocalityScheduler(
     const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
     HostsPerLocalityConstSharedPtr all_hosts_per_locality,
     HostsPerLocalityConstSharedPtr excluded_hosts_per_locality,
-    LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor, Random::RandomGenerator& random) {
+    LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor,
+    Random::RandomGenerator& random) {
   // Rebuild the locality scheduler by computing the effective weight of each
   // locality in this priority. The scheduler is reset by default, and is rebuilt only if we have
   // locality weights (i.e. using EDS) and there is at least one eligible host in this priority.
@@ -424,10 +425,9 @@ void HostSetImpl::rebuildLocalityScheduler(
   // scheduler.
   //
   // TODO(htuch): if the underlying locality index ->
-  // envoy::config::core::v3::Locality hasn't changed in host/ras_/healthy_hosts_/degraded_hosts_, we
-  // could just update locality_weight_ without rebuilding. Similar to how host
-  // level WRR works, we would age out the existing entries via picks and lazily
-  // apply the new weights.
+  // envoy::config::core::v3::Locality hasn't changed in host/ras_/healthy_hosts_/degraded_hosts_,
+  // we could just update locality_weight_ without rebuilding. Similar to how host level WRR works,
+  // we would age out the existing entries via picks and lazily apply the new weights.
   locality_scheduler = nullptr;
   if (all_hosts_per_locality != nullptr && locality_weights != nullptr &&
       !locality_weights->empty() && !eligible_hosts.empty()) {
@@ -594,8 +594,7 @@ void PrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
 void PrioritySetImpl::BatchUpdateScope::updateHosts(
     uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, 
-    Random::RandomGenerator& random,
+    const HostVector& hosts_removed, Random::RandomGenerator& random,
     absl::optional<uint32_t> overprovisioning_factor) {
   // We assume that each call updates a different priority.
   ASSERT(priorities_.find(priority) == priorities_.end());
@@ -1256,7 +1255,8 @@ void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
     prioritySet().updateHosts(priority,
                               HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
-                              host_set->localityWeights(), {}, {}, transport_factory_context_->api().randomGenerator(), absl::nullopt);
+                              host_set->localityWeights(), {}, {},
+                              transport_factory_context_->api().randomGenerator(), absl::nullopt);
   }
 }
 
@@ -1429,7 +1429,8 @@ PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
                                            const LocalInfo::LocalInfo& local_info,
                                            PrioritySet::HostUpdateCb* update_cb,
                                            Random::RandomGenerator& random)
-    : parent_(cluster), local_info_node_(local_info.node()), update_cb_(update_cb), random_(random) {}
+    : parent_(cluster), local_info_node_(local_info.node()), update_cb_(update_cb),
+      random_(random) {}
 
 void PriorityStateManager::initializePriorityFor(
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) {
@@ -1539,14 +1540,13 @@ void PriorityStateManager::updateClusterPrioritySet(
   if (update_cb_ != nullptr) {
     update_cb_->updateHosts(priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
                             std::move(locality_weights), hosts_added.value_or(*hosts),
-                            hosts_removed.value_or<HostVector>({}), random_, overprovisioning_factor);
+                            hosts_removed.value_or<HostVector>({}), random_,
+                            overprovisioning_factor);
   } else {
     parent_.prioritySet().updateHosts(
         priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
         std::move(locality_weights), hosts_added.value_or(*hosts),
-        hosts_removed.value_or<HostVector>({}), 
-        random_,
-        overprovisioning_factor);
+        hosts_removed.value_or<HostVector>({}), random_, overprovisioning_factor);
   }
 }
 
