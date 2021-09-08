@@ -18,7 +18,10 @@
 #pragma GCC diagnostic ignored "-Wsuggest-override"
 #endif
 
+#if defined(__linux__)
 #include "quiche/quic/core/batch_writer/quic_gso_batch_writer.h"
+
+#endif
 
 #ifdef __clang__
 #pragma clang diagnostic pop
