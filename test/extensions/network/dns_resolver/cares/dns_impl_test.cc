@@ -552,7 +552,7 @@ public:
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
     auto dns_resolvers = envoy::config::core::v3::Address();
 
-    // setup and address
+    // Setup the DNS resolver address.
     for (const auto& resolver : resolver_inst) {
       if (resolver->ip() != nullptr) {
         dns_resolvers.Clear();
@@ -561,7 +561,7 @@ public:
         cares.add_resolvers()->MergeFrom(dns_resolvers);
       }
     }
-    // copy over dns_resolver_options_
+    // Copy over the dns_resolver_options_.
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
     // setup the typed config
     typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
@@ -580,15 +580,13 @@ public:
 
     // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
     envoy::config::core::v3::DnsResolverOptions dns_resolver_options = dns_resolver_options_;
-    auto typed_dns_resolver_config_in_construct = getTypedDnsResolverConfig(
-        {socket_->connectionInfoProvider().localAddress()}, dns_resolver_options);
-    auto typed_dns_resolver_config_not_in_construct =
-        getTypedDnsResolverConfig({}, dns_resolver_options);
 
     if (setResolverInConstructor()) {
-      resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config_in_construct);
+      resolver_ = dispatcher_->createDnsResolver(getTypedDnsResolverConfig(
+          {socket_->connectionInfoProvider().localAddress()}, dns_resolver_options));
     } else {
-      resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config_not_in_construct);
+      resolver_ =
+          dispatcher_->createDnsResolver(getTypedDnsResolverConfig({}, dns_resolver_options));
     }
 
     // Point c-ares at the listener with no search domains and TCP-only.

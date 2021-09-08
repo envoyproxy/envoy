@@ -274,63 +274,6 @@ server_config:
     filename: {}
 )EOF";
 
-  const std::string dns_resolution_config_exit = R"EOF(
-stat_prefix: "my_prefix"
-client_config:
-  resolver_timeout: 1s
-  dns_resolution_config:
-    dns_resolver_options:
-      use_tcp_for_dns_lookups: false
-      no_default_search_domain: false
-    resolvers:
-    - socket_address:
-        address: "1.1.1.1"
-        port_value: 53
-  max_pending_lookups: 256
-server_config:
-  external_dns_table:
-    filename: {}
-)EOF";
-
-  const std::string typed_dns_resolver_config_exit = R"EOF(
-stat_prefix: "my_prefix"
-client_config:
-  resolver_timeout: 1s
-  dns_resolution_config:
-    dns_resolver_options:
-      use_tcp_for_dns_lookups: false
-      no_default_search_domain: false
-    resolvers:
-    - socket_address:
-        address: "1.1.1.1"
-        port_value: 53
-  typed_dns_resolver_config:
-    name: envoy.network.dns_resolver.cares
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
-      resolvers:
-      - socket_address:
-          address: "1.2.3.4"
-          port_value: 80
-      dns_resolver_options:
-        use_tcp_for_dns_lookups: true
-        no_default_search_domain: true
-  max_pending_lookups: 256
-server_config:
-  external_dns_table:
-    filename: {}
-)EOF";
-
-  const std::string no_dns_config_exit = R"EOF(
-stat_prefix: "my_prefix"
-client_config:
-  resolver_timeout: 1s
-  max_pending_lookups: 256
-server_config:
-  external_dns_table:
-    filename: {}
-)EOF";
-
   const std::string external_dns_table_json = R"EOF(
 {
   "external_retry_count": 3,
@@ -2207,12 +2150,30 @@ TEST_F(DnsFilterTest, DnsResolverOptionsSetFalse) {
   EXPECT_EQ(false, dns_resolver_options_.no_default_search_domain());
 }
 
-TEST_F(DnsFilterTest, DnsResolutionConfigExit) {
+TEST_F(DnsFilterTest, DnsResolutionConfigExist) {
+  const std::string dns_resolution_config_exist = R"EOF(
+stat_prefix: "my_prefix"
+client_config:
+  resolver_timeout: 1s
+  dns_resolution_config:
+    dns_resolver_options:
+      use_tcp_for_dns_lookups: false
+      no_default_search_domain: false
+    resolvers:
+    - socket_address:
+        address: "1.1.1.1"
+        port_value: 53
+  max_pending_lookups: 256
+server_config:
+  external_dns_table:
+    filename: {}
+)EOF";
+
   InSequence s;
 
   std::string temp_path =
       TestEnvironment::writeStringToFileForTest("dns_table.yaml", max_records_table_yaml);
-  std::string config_to_use = fmt::format(dns_resolution_config_exit, temp_path);
+  std::string config_to_use = fmt::format(dns_resolution_config_exist, temp_path);
   setup(config_to_use);
 
   // `true` here means use_tcp_for_dns_lookups is set true
@@ -2229,12 +2190,41 @@ TEST_F(DnsFilterTest, DnsResolutionConfigExit) {
 }
 
 // test typed_dns_resolver_config exits which overrides dns_resolution_config.
-TEST_F(DnsFilterTest, TypedDnsResolverConfigExit) {
+TEST_F(DnsFilterTest, TypedDnsResolverConfigExist) {
+  const std::string typed_dns_resolver_config_exist = R"EOF(
+stat_prefix: "my_prefix"
+client_config:
+  resolver_timeout: 1s
+  dns_resolution_config:
+    dns_resolver_options:
+      use_tcp_for_dns_lookups: false
+      no_default_search_domain: false
+    resolvers:
+    - socket_address:
+        address: "1.1.1.1"
+        port_value: 53
+  typed_dns_resolver_config:
+    name: envoy.network.dns_resolver.cares
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+      resolvers:
+      - socket_address:
+          address: "1.2.3.4"
+          port_value: 80
+      dns_resolver_options:
+        use_tcp_for_dns_lookups: true
+        no_default_search_domain: true
+  max_pending_lookups: 256
+server_config:
+  external_dns_table:
+    filename: {}
+)EOF";
+
   InSequence s;
 
   std::string temp_path =
       TestEnvironment::writeStringToFileForTest("dns_table.yaml", max_records_table_yaml);
-  std::string config_to_use = fmt::format(typed_dns_resolver_config_exit, temp_path);
+  std::string config_to_use = fmt::format(typed_dns_resolver_config_exist, temp_path);
   setup(config_to_use);
 
   // `true` here means use_tcp_for_dns_lookups is set true
@@ -2250,12 +2240,22 @@ TEST_F(DnsFilterTest, TypedDnsResolverConfigExit) {
 }
 
 // test when no DNS related config exists, an empty typed_dns_resolver_config is the parameter.
-TEST_F(DnsFilterTest, NoDnsConfigExit) {
+TEST_F(DnsFilterTest, NoDnsConfigExist) {
+  const std::string no_dns_config_exist = R"EOF(
+stat_prefix: "my_prefix"
+client_config:
+  resolver_timeout: 1s
+  max_pending_lookups: 256
+server_config:
+  external_dns_table:
+    filename: {}
+)EOF";
+
   InSequence s;
 
   std::string temp_path =
       TestEnvironment::writeStringToFileForTest("dns_table.yaml", max_records_table_yaml);
-  std::string config_to_use = fmt::format(no_dns_config_exit, temp_path);
+  std::string config_to_use = fmt::format(no_dns_config_exist, temp_path);
   setup(config_to_use);
 
   // `true` here means use_tcp_for_dns_lookups is set true
