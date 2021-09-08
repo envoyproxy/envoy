@@ -28,6 +28,8 @@ private:
   Entry varyLookup(const LookupRequest& request,
                    const Http::ResponseHeaderMapPtr& response_headers);
 
+  static const absl::flat_hash_set<Http::LowerCaseString> headersNotToUpdate;
+
 public:
   // HttpCache
   LookupContextPtr makeLookupContext(LookupRequest&& request) override;

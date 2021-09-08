@@ -109,6 +109,28 @@ LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
   return std::make_unique<SimpleLookupContext>(*this, std::move(request));
 }
 
+const absl::flat_hash_set<Http::LowerCaseString> SimpleHttpCache::headersNotToUpdate =
+    absl::flat_hash_set<Http::LowerCaseString>({
+        // Content range should not be changed upon validation
+        Http::Headers::get().ContentRange,
+
+        // The age is calculated and set by the general cache_filter code logic.
+        Http::CustomHeaders::get().Age,
+
+        // Headers that describe the body content should never be updated.
+        Http::Headers::get().ContentLength,
+        Http::Headers::get().ContentType,
+
+        // It does not make sense for this level of the code to be updating the ETag, when
+        // presumably
+        // the cached_response_headers reflect this specific ETag.
+        Http::CustomHeaders::get().Etag,
+
+        // We don't update the cached response on a Vary; we just delete it
+        // entirely. So don't bother copying over the Vary header.
+        Http::CustomHeaders::get().Vary,
+    });
+
 void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
                                     const Http::ResponseHeaderMap& response_headers,
                                     const ResponseMetadata& metadata) {
@@ -127,28 +149,6 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
     return;
   }
 
-  // Skip headers that we don't want to update because of specific reasons
-  static const auto* headersNotToUpdate = new absl::flat_hash_set<Http::LowerCaseString>({
-      // Content range should not be changed upon validation
-      Http::Headers::get().ContentRange,
-
-      // The age is calculated and set by the general cache_filter code logic.
-      Http::CustomHeaders::get().Age,
-
-      // Headers that describe the body content should never be updated.
-      Http::Headers::get().ContentLength,
-      Http::Headers::get().ContentType,
-
-      // It does not make sense for this level of the code to be updating the ETag, when presumably
-      // the
-      // cached_response_headers reflect this specific ETag.
-      Http::CustomHeaders::get().Etag,
-
-      // We don't update the cached response on a Vary; we just delete it
-      // entirely. So don't bother copying over the Vary header.
-      Http::CustomHeaders::get().Vary,
-  });
-
   // Assumptions:
   // 1. The internet is fast, i.e. we get the result as soon as the server sends it.
   //    Race conditions would not be possible because we are always processing up-to-date data.
@@ -157,12 +157,10 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
 
   // use other header fields provided in the new response to replace all instances
   // of the corresponding header fields in the stored response
-  // Note: Warning 1xx, 2xx are not handled as they are not commonly used despite
-  // their presence the RFC specs
   response_headers.iterate(
       [&entry](const Http::HeaderEntry& response_header) -> Http::HeaderMap::Iterate {
         Http::LowerCaseString lower_case_key{response_header.key().getStringView()};
-        if (headersNotToUpdate->contains(lower_case_key)) {
+        if (headersNotToUpdate.contains(lower_case_key)) {
           return Http::HeaderMap::Iterate::Continue;
         }
         entry.response_headers_->remove(lower_case_key);

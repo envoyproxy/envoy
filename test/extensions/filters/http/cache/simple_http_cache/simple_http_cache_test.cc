@@ -37,10 +37,9 @@ protected:
   }
 
   // Updates the cache entry's header
-  void updateHeaders(LookupContextPtr& lookup,
-                     const Http::TestResponseHeaderMapImpl& response_headers,
+  void updateHeaders(LookupContext& lookup, const Http::TestResponseHeaderMapImpl& response_headers,
                      const ResponseMetadata& metadata) {
-    cache_.updateHeaders(*lookup, response_headers, metadata);
+    cache_.updateHeaders(lookup, response_headers, metadata);
   }
 
   void updateHeaders(absl::string_view request_path,
@@ -48,7 +47,7 @@ protected:
                      const ResponseMetadata& metadata) {
     LookupRequest request = makeLookupRequest(request_path);
     LookupContextPtr context = cache_.makeLookupContext(std::move(request));
-    updateHeaders(context, response_headers, metadata);
+    updateHeaders(*context, response_headers, metadata);
   }
 
   // Performs a cache lookup.
