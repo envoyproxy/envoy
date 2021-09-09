@@ -100,7 +100,8 @@ private:
   class DnsHostInfoImpl : public DnsHostInfo {
   public:
     DnsHostInfoImpl(TimeSource& time_source, absl::string_view resolved_host, bool is_ip_address)
-        : time_source_(time_source), resolved_host_(resolved_host), is_ip_address_(is_ip_address) {
+        : time_source_(time_source), resolved_host_(resolved_host), is_ip_address_(is_ip_address),
+          stale_at_time_(time_source.monotonicTime()) {
       touch();
     }
 
