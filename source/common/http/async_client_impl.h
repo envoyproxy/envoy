@@ -129,6 +129,9 @@ private:
     std::chrono::milliseconds perTryTimeout() const override {
       return std::chrono::milliseconds(0);
     }
+    std::chrono::milliseconds perTryIdleTimeout() const override {
+      return std::chrono::milliseconds(0);
+    }
     std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override {
       return {};
     }

@@ -204,9 +204,14 @@ public:
   virtual ~RetryPolicy() = default;
 
   /**
-   * @return std::chrono::milliseconds timeout per retry attempt.
+   * @return std::chrono::milliseconds timeout per retry attempt. 0 is disabled.
    */
   virtual std::chrono::milliseconds perTryTimeout() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the optional per try idle timeout. 0 is disabled.
+   */
+  virtual std::chrono::milliseconds perTryIdleTimeout() const PURE;
 
   /**
    * @return uint32_t the number of retries to allow against the route.

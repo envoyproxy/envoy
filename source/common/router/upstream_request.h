@@ -46,7 +46,6 @@ public:
 
   void resetStream();
   void setupPerTryTimeout();
-  void onPerTryTimeout();
   void maybeEndDecode(bool end_stream);
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
 
@@ -132,11 +131,15 @@ private:
   void addResponseHeadersSize(uint64_t size) {
     response_headers_size_ = response_headers_size_.value_or(0) + size;
   }
+  void resetPerTryIdleTimer();
+  void onPerTryTimeout();
+  void onPerTryIdleTimeout();
 
   RouterFilterInterface& parent_;
   std::unique_ptr<GenericConnPool> conn_pool_;
   bool grpc_rq_success_deferred_;
   Event::TimerPtr per_try_timeout_;
+  Event::TimerPtr per_try_idle_timeout_;
   std::unique_ptr<GenericUpstream> upstream_;
   absl::optional<Http::StreamResetReason> deferred_reset_reason_;
   Buffer::InstancePtr buffered_request_body_;

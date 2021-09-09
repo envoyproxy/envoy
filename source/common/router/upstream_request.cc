@@ -80,6 +80,10 @@ UpstreamRequest::~UpstreamRequest() {
     // Allows for testing.
     per_try_timeout_->disableTimer();
   }
+  if (per_try_idle_timeout_ != nullptr) {
+    // Allows for testing.
+    per_try_idle_timeout_->disableTimer();
+  }
   if (max_stream_duration_timer_ != nullptr) {
     max_stream_duration_timer_->disableTimer();
   }
@@ -136,6 +140,7 @@ void UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& head
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
+  resetPerTryIdleTimer();
   addResponseHeadersSize(headers->byteSize());
 
   // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client as
@@ -177,6 +182,7 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
 void UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
+  resetPerTryIdleTimer();
   maybeEndDecode(end_stream);
   stream_info_.addBytesReceived(data.length());
   parent_.onUpstreamData(data, *this, end_stream);
@@ -331,6 +337,12 @@ void UpstreamRequest::resetStream() {
   }
 }
 
+void UpstreamRequest::resetPerTryIdleTimer() {
+  if (per_try_idle_timeout_ != nullptr) {
+    per_try_idle_timeout_->enableTimer(parent_.timeout().per_try_idle_timeout_);
+  }
+}
+
 void UpstreamRequest::setupPerTryTimeout() {
   ASSERT(!per_try_timeout_);
   if (parent_.timeout().per_try_timeout_.count() > 0) {
@@ -338,6 +350,19 @@ void UpstreamRequest::setupPerTryTimeout() {
         parent_.callbacks()->dispatcher().createTimer([this]() -> void { onPerTryTimeout(); });
     per_try_timeout_->enableTimer(parent_.timeout().per_try_timeout_);
   }
+
+  ASSERT(!per_try_idle_timeout_);
+  if (parent_.timeout().per_try_idle_timeout_.count() > 0) {
+    per_try_idle_timeout_ =
+        parent_.callbacks()->dispatcher().createTimer([this]() -> void { onPerTryIdleTimeout(); });
+    resetPerTryIdleTimer();
+  }
+}
+
+void UpstreamRequest::onPerTryIdleTimeout() {
+  ENVOY_STREAM_LOG(debug, "upstream per try idle timeout", *parent_.callbacks());
+  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
+  parent_.onPerTryIdleTimeout(*this);
 }
 
 void UpstreamRequest::onPerTryTimeout() {
