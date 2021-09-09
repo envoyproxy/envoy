@@ -18,7 +18,6 @@ namespace Wasm {
 // The custom stat namespace which prepends all the user-defined metrics.
 // Note that the prefix is removed from the final output of /stats endpoints.
 constexpr absl::string_view CustomStatNamespace = "wasmcustom";
-constexpr absl::string_view CustomStatNamespacePrefix = "wasmcustom.";
 
 #define CREATE_WASM_STATS(COUNTER, GAUGE)                                                          \
   COUNTER(remote_load_cache_hits)                                                                  \

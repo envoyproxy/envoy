@@ -7,7 +7,7 @@ namespace Stats {
 
 TEST(CustomStatNamespacesImpl, Registration) {
   CustomStatNamespacesImpl namespaces;
-  const auto name = "foo";
+  const std::string name = "foo";
   EXPECT_FALSE(namespaces.registered(name));
   namespaces.registerStatNamespace(name);
   EXPECT_TRUE(namespaces.registered(name));

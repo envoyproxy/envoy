@@ -87,7 +87,6 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
   TestFactoryContext context(*api, stats_store);
-  ON_CALL(context, api()).WillByDefault(testing::ReturnRef(*api));
 
   AccessLog::InstanceSharedPtr instance =
       factory->createAccessLogInstance(config, std::move(filter), context);
