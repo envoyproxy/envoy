@@ -106,6 +106,7 @@ message RateLimit {
   bool disable_x_envoy_ratelimited_header = 9;
 }
 
+// [#next-free-field: 3]
 message RateLimitPerRoute {
   enum VhRateLimitsOptions {
     // Use the virtual host rate limits unless the route has a rate limit policy.
@@ -121,7 +122,7 @@ message RateLimitPerRoute {
   // Specifies if the rate limit filter should include the virtual host rate limits.
   VhRateLimitsOptions vh_rate_limits = 1 [(validate.rules).enum = {defined_only: true}];
 
-  // [#not-implemented-hide:]
   // Specifies a set of rate limit configurations that can be applied to typed filter config.
+  // [#not-implemented-hide:]
   repeated config.route.v3.RateLimit rate_limits = 2;
 }
