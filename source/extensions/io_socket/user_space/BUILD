@@ -68,8 +68,11 @@ envoy_cc_library(
         "client_connection_factory.h",
     ],
     deps = [
+        ":io_handle_impl_lib",
         "//envoy/network:client_connection_manager",
         "//envoy/network:connection_interface",
         "//envoy/registry",
+        "//source/common/network:connection_lib",
+        "//source/common/network:listen_socket_lib",
     ],
 )

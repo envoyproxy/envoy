@@ -17,9 +17,7 @@ namespace UserSpace {
 class InternalClientConnectionFactory : public Network::ClientConnectionFactory {
 public:
   std::string name() override { return "EnvoyInternal"; }
-  Network::ClientConnectionPtr createClientConnection(const Network::CCContext&) override {
-    return nullptr;
-  }
+  Network::ClientConnectionPtr createClientConnection(const Network::CCContext&) override;
 };
 
 } // namespace UserSpace
