@@ -86,8 +86,6 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
       requested_resource_state_.erase(r);
     }
     ASSERT(!requested_resource_state_.contains(r));
-    // This function shouldn't ever be called for resources that came from wildcard subscription.
-    ASSERT(!wildcard_resource_state_.contains(r));
     // Ideally, when interest in a resource is added-then-removed in between requests,
     // we would avoid putting a superfluous "unsubscribe [resource that was never subscribed]"
     // in the request. However, the removed-then-added case *does* need to go in the request,
