@@ -77,7 +77,7 @@ namespace Lua {
  * @return absl::string_view of Lua string with proper string length.
  **/
 inline absl::string_view getStringViewFromLuaString(lua_State* state, int arg) {
-  size_t input_size;
+  size_t input_size = 0;
   const char* input = luaL_checklstring(state, arg, &input_size);
   return absl::string_view(input, input_size);
 }
