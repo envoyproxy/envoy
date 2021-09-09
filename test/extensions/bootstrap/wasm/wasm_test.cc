@@ -106,7 +106,11 @@ public:
     EXPECT_FALSE(code.empty());
     EXPECT_TRUE(wasm_->load(code, false));
     EXPECT_TRUE(wasm_->initialize());
+    stat_name_set_ = scope_->symbolTable().makeSet("wasm");
+    custom_stat_name_ = stat_name_set_->add("wasmcustom");
   }
+  Stats::StatNameSetPtr stat_name_set_;
+  Stats::StatName custom_stat_name_;
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNullTest, Envoy::Extensions::Common::Wasm::runtime_values);
@@ -285,8 +289,9 @@ TEST_P(WasmNullTest, Stats) {
   EXPECT_CALL(*context, log_(spdlog::level::err, Eq("get histogram = Unsupported")));
 
   EXPECT_TRUE(wasm_->configure(context, plugin_));
-  EXPECT_EQ(scope_->counterFromString("wasmcustom.test_counter").value(), 5);
-  EXPECT_EQ(scope_->gaugeFromString("wasmcustom.test_gauge", Stats::Gauge::ImportMode::Accumulate)
+  EXPECT_EQ(Stats::Utility::gaugeFromElements(*scope_,
+                                              {custom_stat_name_, Stats::DynamicName("test_gauge")},
+                                              Stats::Gauge::ImportMode::Accumulate)
                 .value(),
             2);
 }
@@ -314,10 +319,14 @@ TEST_P(WasmNullTest, StatsHigherLevel) {
 
   wasm_->setTimerPeriod(1, std::chrono::milliseconds(10));
   wasm_->tickHandler(1);
-  EXPECT_EQ(scope_->counterFromString("wasmcustom.counter_tag.test_tag.test_counter").value(), 5);
-  EXPECT_EQ(scope_
-                ->gaugeFromString("wasmcustom.gauge_int_tag.9.test_gauge",
-                                  Stats::Gauge::ImportMode::Accumulate)
+  EXPECT_EQ(
+      Stats::Utility::counterFromElements(
+          *scope_, {custom_stat_name_, Stats::DynamicName("counter_tag.test_tag.test_counter")})
+          .value(),
+      5);
+  EXPECT_EQ(Stats::Utility::gaugeFromElements(
+                *scope_, {custom_stat_name_, Stats::DynamicName("gauge_int_tag.9.test_gauge")},
+                Stats::Gauge::ImportMode::Accumulate)
                 .value(),
             2);
 }
@@ -349,16 +358,18 @@ TEST_P(WasmNullTest, StatsHighLevel) {
   // EXPECT_CALL(*context, log_(spdlog::level::err, Eq("stack_h = 3")));
   context->onLog();
   EXPECT_EQ(
-      scope_
-          ->counterFromString("wasmcustom.string_tag.test_tag.int_tag.7.bool_tag.true.test_counter")
+      Stats::Utility::counterFromElements(
+          *scope_, {custom_stat_name_,
+                    Stats::DynamicName("string_tag.test_tag.int_tag.7.bool_tag.true.test_counter")})
           .value(),
       5);
-  EXPECT_EQ(
-      scope_
-          ->gaugeFromString("wasmcustom.string_tag1.test_tag1.string_tag2.test_tag2.test_gauge",
-                            Stats::Gauge::ImportMode::Accumulate)
-          .value(),
-      2);
+  EXPECT_EQ(Stats::Utility::gaugeFromElements(
+                *scope_,
+                {custom_stat_name_,
+                 Stats::DynamicName("string_tag1.test_tag1.string_tag2.test_tag2.test_gauge")},
+                Stats::Gauge::ImportMode::Accumulate)
+                .value(),
+            2);
 }
 
 } // namespace Wasm

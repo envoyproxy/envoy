@@ -1233,34 +1233,32 @@ WasmResult Context::defineMetric(uint32_t metric_type, std::string_view name,
   if (metric_type > static_cast<uint32_t>(MetricType::Max)) {
     return WasmResult::BadArgument;
   }
-  auto type = static_cast<MetricType>(metric_type);
-  // TODO: Consider rethinking the scoping policy as it does not help in this case.
-  Stats::StatNameManagedStorage storage(std::string(name), wasm()->scope_->symbolTable());
-  Stats::StatName stat_name = storage.statName();
+  const auto type = static_cast<MetricType>(metric_type);
+  const Stats::DynamicName dynamic_name = Stats::DynamicName(toAbslStringView(name));
   // We prefix the given name with custom_stat_name_ so that these user-defined
   // custom metrics can be distinguished from native Envoy metrics.
   if (type == MetricType::Counter) {
     auto id = wasm()->nextCounterMetricId();
-    auto c = &Stats::Utility::counterFromElements(*wasm()->scope_,
-                                                  {wasm()->custom_stat_namespace_, stat_name});
+    Stats::Counter* c = &Stats::Utility::counterFromElements(
+        *wasm()->scope_, {wasm()->custom_stat_namespace_, dynamic_name});
     wasm()->counters_.emplace(id, c);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
   if (type == MetricType::Gauge) {
     auto id = wasm()->nextGaugeMetricId();
-    auto g = &Stats::Utility::gaugeFromStatNames(*wasm()->scope_,
-                                                 {wasm()->custom_stat_namespace_, stat_name},
-                                                 Stats::Gauge::ImportMode::Accumulate);
+    Stats::Gauge* g = &Stats::Utility::gaugeFromElements(
+        *wasm()->scope_, {wasm()->custom_stat_namespace_, dynamic_name},
+        Stats::Gauge::ImportMode::Accumulate);
     wasm()->gauges_.emplace(id, g);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
   // (type == MetricType::Histogram) {
   auto id = wasm()->nextHistogramMetricId();
-  auto h = &Stats::Utility::histogramFromStatNames(*wasm()->scope_,
-                                                   {wasm()->custom_stat_namespace_, stat_name},
-                                                   Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram* h = &Stats::Utility::histogramFromElements(
+      *wasm()->scope_, {wasm()->custom_stat_namespace_, dynamic_name},
+      Stats::Histogram::Unit::Unspecified);
   wasm()->histograms_.emplace(id, h);
   *metric_id_ptr = id;
   return WasmResult::Ok;
