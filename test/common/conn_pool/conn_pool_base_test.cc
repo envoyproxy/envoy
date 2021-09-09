@@ -227,7 +227,7 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredRemoteClose) {
   clients_.back()->onEvent(Network::ConnectionEvent::RemoteClose);
 
   EXPECT_CALL(idle_pool_callback, Call());
-  pool_.startDrainImpl();
+  pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 }
 
 // Local close simulates what would happen for an idle timeout on a connection.
@@ -255,7 +255,7 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredLocalClose) {
   clients_.back()->onEvent(Network::ConnectionEvent::LocalClose);
 
   EXPECT_CALL(idle_pool_callback, Call());
-  pool_.startDrainImpl();
+  pool_.drainConnectionsImpl(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 }
 
 } // namespace ConnectionPool

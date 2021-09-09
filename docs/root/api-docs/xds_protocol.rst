@@ -851,13 +851,32 @@ names, which the server thought the client was already not subscribed
 to. The server must cleanly process such a request; it can simply ignore
 these phantom unsubscriptions.
 
+In most cases (see below for exception), a server does not need to send any response if a request
+does nothing except unsubscribe from a resource; in particular, servers are not generally required
+to send a response with the unsubscribed resource name in the
+:ref:`removed_resources <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryResponse.removed_resources>`
+field.
+
+However, there is one exception to the above: When a client has a wildcard subscription ("*") *and*
+a subscription to another specific resource name, it is possible that the specific resource name is
+also included in the wildcard subscription, so if the client unsubscribes from that specific
+resource name, it does not know whether or not to continue to cache the resource. To address this,
+the server must send a response that includes the specific resource in either the
+:ref:`removed_resources
+<envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryResponse.removed_resources>`
+field (if it is not included in the wildcard) or in the
+:ref:`resources <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryResponse.resources>`
+field (if it *is* included in the wildcard).
+
 Knowing When a Requested Resource Does Not Exist
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-When a resource subscribed to by a client does not exist, the server will send a :ref:`Resource
-<envoy_v3_api_msg_service.discovery.v3.Resource>` whose :ref:`name <envoy_v3_api_field_service.discovery.v3.Resource.name>` field matches the
-name that the client subscribed to and whose :ref:`resource <envoy_v3_api_msg_service.discovery.v3.Resource>`
-field is unset. This allows the client to quickly determine when a resource does not exist without
+When a resource subscribed to by a client does not exist, the server
+will send a
+:ref:`DeltaDiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DeltaDiscoveryResponse>`
+message that contains that resource's name in the
+:ref:`removed_resources <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryResponse.removed_resources>`
+field. This allows the client to quickly determine when a resource does not exist without
 waiting for a timeout, as would be done in the SotW protocol variants. However, clients are still
 encouraged to use a timeout to protect against the case where the management server fails to send
 a response in a timely manner.
