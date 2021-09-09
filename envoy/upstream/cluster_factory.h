@@ -18,6 +18,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context.h"
@@ -35,7 +36,7 @@ namespace Upstream {
  * Context passed to cluster factory to access envoy resources. Cluster factory should only access
  * the rest of the server through this context object.
  */
-class ClusterFactoryContext {
+class ClusterFactoryContext : public Server::Configuration::FactoryContextBase {
 public:
   virtual ~ClusterFactoryContext() = default;
 
@@ -45,55 +46,14 @@ public:
   virtual bool addedViaApi() PURE;
 
   /**
-   * @return Server::Admin& the server's admin interface.
-   */
-  virtual Server::Admin& admin() PURE;
-
-  /**
-   * @return Api::Api& a reference to the api object.
-   */
-  virtual Api::Api& api() PURE;
-
-  /**
-   * @return Upstream::ClusterManager& singleton for use by the entire server.
-   */
-  virtual ClusterManager& clusterManager() PURE;
-
-  /**
-   * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used
-   *         for all singleton processing.
-   */
-  virtual Event::Dispatcher& dispatcher() PURE;
-
-  /**
    * @return Network::DnsResolverSharedPtr the dns resolver for the server.
    */
   virtual Network::DnsResolverSharedPtr dnsResolver() PURE;
 
   /**
-   * @return information about the local environment the server is running in.
-   */
-  virtual const LocalInfo::LocalInfo& localInfo() PURE;
-
-  /**
-   * @return Server::Options& the command-line options that Envoy was started with.
-   */
-  virtual const Server::Options& options() PURE;
-
-  /**
    * @return AccessLogManager for use by the entire server.
    */
   virtual AccessLog::AccessLogManager& logManager() PURE;
-
-  /**
-   * @return Runtime::Loader& the singleton runtime loader for the server.
-   */
-  virtual Runtime::Loader& runtime() PURE;
-
-  /**
-   * @return Singleton::Manager& the server-wide singleton manager.
-   */
-  virtual Singleton::Manager& singletonManager() PURE;
 
   /**
    * @return Ssl::ContextManager& the SSL context manager.
@@ -115,11 +75,8 @@ public:
    */
   virtual Outlier::EventLoggerSharedPtr outlierEventLogger() PURE;
 
-  /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
-   *         messages.
-   */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+  // FactoryContextBase
+  virtual Stats::Scope& scope() override { return stats(); }
 };
 
 /**
