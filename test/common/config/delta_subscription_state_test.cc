@@ -362,6 +362,14 @@ TEST_P(DeltaSubscriptionStateTestBlank, LegacyWildcardInitialRequests) {
   EXPECT_TRUE(req->resource_names_unsubscribe().empty());
   deliverSimpleDiscoveryResponse({{"wild1", "1"}}, {}, "d1");
 
+  // unsubscribing from unknown resource should keep the legacy
+  // wildcard mode
+  updateSubscriptionInterest({}, {"unknown"});
+  markStreamFresh();
+  req = getNextRequestAckless();
+  EXPECT_TRUE(req->resource_names_subscribe().empty());
+  EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+
   updateSubscriptionInterest({"foo"}, {});
   req = getNextRequestAckless();
   EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("foo"));

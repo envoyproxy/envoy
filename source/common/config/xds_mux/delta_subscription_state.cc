@@ -50,7 +50,7 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     names_added_.insert(a);
   }
   for (const auto& r : cur_removed) {
-    in_initial_legacy_wildcard_ = false;
+    auto actually_erased = false;
     // The resource we are interested in could also come from a wildcard subscription. Instead of
     // removing it outright, mark the resource as not interesting to us any more. The server could
     // later send us an update. If we don't have a wildcard subscription, just drop it.
@@ -63,9 +63,10 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
           ambiguous_resource_state_.insert({it->first, it->second.version()});
         }
         requested_resource_state_.erase(it);
+        actually_erased = true;
       }
     } else {
-      requested_resource_state_.erase(r);
+      actually_erased = (requested_resource_state_.erase(r) > 0);
     }
     ASSERT(!requested_resource_state_.contains(r));
     // Ideally, when interest in a resource is added-then-removed in between requests,
@@ -74,7 +75,10 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     // and due to how we accomplish that, it's difficult to distinguish remove-add-remove from
     // add-remove (because "remove-add" has to be treated as equivalent to just "add").
     names_added_.erase(r);
-    names_removed_.insert(r);
+    if (actually_erased) {
+      names_removed_.insert(r);
+      in_initial_legacy_wildcard_ = false;
+    }
   }
   // If we unsubscribe from wildcard resource, drop all the resources that came from wildcard from
   // cache.
