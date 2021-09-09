@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.ratelimit.v3;
 
 import "envoy/config/ratelimit/v3/rls.proto";
+import "envoy/config/route/v3/route_components.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -119,4 +120,8 @@ message RateLimitPerRoute {
 
   // Specifies if the rate limit filter should include the virtual host rate limits.
   VhRateLimitsOptions vh_rate_limits = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // [#not-implemented-hide:]
+  // Specifies a set of rate limit configurations that can be applied to typed filter config.
+  repeated config.route.v3.RateLimit rate_limits = 2;
 }
