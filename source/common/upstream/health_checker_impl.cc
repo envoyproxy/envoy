@@ -1,7 +1,5 @@
 #include "source/common/upstream/health_checker_impl.h"
 
-#include <bits/stdint-uintn.h>
-
 #include <memory>
 
 #include "envoy/config/core/v3/health_check.pb.h"
