@@ -18,17 +18,17 @@ class AutoSniIntegrationTest : public testing::TestWithParam<Network::Address::I
 public:
   AutoSniIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
-  void setup(const std::string& alt_header_name = "") {
+  void setup(const std::string& override_auto_sni_header = "") {
     setUpstreamProtocol(Http::CodecType::HTTP1);
 
     config_helper_.addConfigModifier(
-        [alt_header_name](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        [override_auto_sni_header](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
           auto& cluster_config = bootstrap.mutable_static_resources()->mutable_clusters()->at(0);
           ConfigHelper::HttpProtocolOptions protocol_options;
           protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
-          if (!alt_header_name.empty()) {
-            protocol_options.mutable_upstream_http_protocol_options()->set_alt_header_name(
-                alt_header_name);
+          if (!override_auto_sni_header.empty()) {
+            protocol_options.mutable_upstream_http_protocol_options()->set_override_auto_sni_header(
+                override_auto_sni_header);
           }
           ConfigHelper::setProtocolOptions(
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);

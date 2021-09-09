@@ -147,7 +147,7 @@ TEST_F(RouterTest, UpdateServerNameFilterState) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
-  dummy_option.value().set_alt_header_name(":authority");
+  dummy_option.value().set_override_auto_sni_header(":authority");
   ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
       .WillByDefault(ReturnRef(dummy_option));
   ON_CALL(callbacks_.stream_info_, filterState())
@@ -179,7 +179,7 @@ TEST_F(RouterTest, UpdateServerNameFilterState) {
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterState) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
-  dummy_option.value().set_alt_header_name(":authority");
+  dummy_option.value().set_override_auto_sni_header(":authority");
   dummy_option.value().set_auto_san_validation(true);
   ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
       .WillByDefault(ReturnRef(dummy_option));
