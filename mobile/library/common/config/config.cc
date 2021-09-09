@@ -248,6 +248,13 @@ R"(
 )"              // TODO: Support IPV6 https://github.com/lyft/envoy-mobile/issues/1022
 R"(
                 dns_lookup_family: V4_ONLY
+)"              // On mobile, backgrounding might cause the host to be past its TTL without good
+                // reason. Given the host would be deleted, and new streams for a given domain
+                // would have to wait for resolution, it is better to not delete existing hosts;
+                // especially since deletion only happens when re-resolving is already in progress.
+                // There is no way to disable so the value below is equivalent to 24 hours.
+R"(
+                host_ttl: 86400s
                 dns_refresh_rate: *dns_refresh_rate
                 dns_failure_refresh_rate:
                   base_interval: *dns_fail_base_interval
