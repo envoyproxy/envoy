@@ -1,5 +1,7 @@
 #include "source/common/upstream/health_checker_impl.h"
 
+#include <bits/stdint-uintn.h>
+
 #include <memory>
 
 #include "envoy/config/core/v3/health_check.pb.h"
@@ -206,18 +208,9 @@ HttpHealthCheckerImpl::HttpStatusChecker::HttpStatusChecker(
   }
 }
 
-bool HttpHealthCheckerImpl::HttpStatusChecker::inExpectedRange(uint64_t http_status) const {
-  for (const auto& range : expected_ranges_) {
-    if (http_status >= range.first && http_status < range.second) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-bool HttpHealthCheckerImpl::HttpStatusChecker::inRetriableRange(uint64_t http_status) const {
-  for (const auto& range : retriable_ranges_) {
+bool HttpHealthCheckerImpl::HttpStatusChecker::inRanges(
+    uint64_t http_status, std::vector<std::pair<uint64_t, uint64_t>> ranges) const {
+  for (const auto& range : ranges) {
     if (http_status >= range.first && http_status < range.second) {
       return true;
     }
@@ -370,7 +363,8 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   ENVOY_CONN_LOG(debug, "hc response={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
-  if (!parent_.http_status_checker_.inExpectedRange(response_code)) {
+  if (!parent_.http_status_checker_.inRanges(response_code,
+                                             parent_.http_status_checker_.expected_ranges_)) {
     // If the HTTP response code would indicate failure AND the immediate health check
     // failure header is set, exclude the host from LB.
     // TODO(mattklein123): We could consider doing this check for any HTTP response code, but this
@@ -381,7 +375,8 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
       host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
     }
 
-    if (parent_.http_status_checker_.inRetriableRange(response_code)) {
+    if (parent_.http_status_checker_.inRanges(response_code,
+                                              parent_.http_status_checker_.expected_ranges_)) {
       return HealthCheckResult::Retriable;
     } else {
       return HealthCheckResult::Failed;
