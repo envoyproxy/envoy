@@ -66,16 +66,17 @@ public:
       // Notify all the worker to continue.
       workers_should_fire.Notify();
     });
+    // Wait for all workers to finish the job.
     end_counter.Wait();
   }
 
   void postWorkToMain(std::function<void()> work) {
-    absl::BlockingCounter end_counter(1);
-    main_dispatcher_->post([work, &end_counter]() {
+    absl::Notification block_until_job_finish;
+    main_dispatcher_->post([work, &block_until_job_finish]() {
       work();
-      end_counter.DecrementCount();
+      block_until_job_finish.Notify();
     });
-    end_counter.Wait();
+    block_until_job_finish.WaitForNotification();
   }
 
 protected:
@@ -87,7 +88,7 @@ protected:
   void cleanUpThreading() {
     main_dispatcher_->post([&]() {
       tls_->shutdownGlobalThreading();
-      // Post exit signals and wait for thread to end.
+      // Post exit signals and wait for workers to end.
       for (Event::DispatcherPtr& dispatcher : worker_dispatchers_) {
         dispatcher->post([&dispatcher]() { dispatcher->exit(); });
       }
@@ -192,8 +193,7 @@ private:
 protected:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::unique_ptr<TestAsyncClientManagerImpl> async_client_manager_;
-
-}; // namespace ExtAuthz
+};
 
 class ExtAuthzFilterHttpTest : public ExtAuthzFilterTest {
 public:
