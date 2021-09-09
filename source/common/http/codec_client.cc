@@ -118,9 +118,8 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
         }
       }
     } else {
-      ENVOY_BUG(false,
-                fmt::format("Connection is closed by {} during connecting.",
-                            (event == Network::ConnectionEvent::RemoteClose ? "peer" : "self")));
+      ENVOY_CONN_LOG(warn, "Connection is closed by {} during connecting.", *connection_,
+                     (event == Network::ConnectionEvent::RemoteClose ? "peer" : "self"));
     }
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.

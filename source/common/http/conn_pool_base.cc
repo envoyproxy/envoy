@@ -89,6 +89,31 @@ void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& clie
                         http_client->codec_client_->protocol());
 }
 
+void HttpConnPoolImplBase::addLog(Logger::Logger::Levels level, const std::string& message) {
+  switch (level) {
+  case Logger::Logger::debug:
+    ENVOY_LOG(debug, message);
+    break;
+  case Logger::Logger::trace:
+    ENVOY_LOG(trace, message);
+    break;
+  case Logger::Logger::info:
+    ENVOY_LOG(info, message);
+    break;
+  case Logger::Logger::warn:
+    ENVOY_LOG(warn, message);
+    break;
+  case Logger::Logger::error:
+    ENVOY_LOG(error, message);
+    break;
+  case Logger::Logger::critical:
+    ENVOY_LOG(critical, message);
+    break;
+  case Logger::Logger::off:
+    ENVOY_LOG(off, message);
+  }
+}
+
 // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
 // side we do 2^29.
 static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);

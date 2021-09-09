@@ -84,6 +84,8 @@ public:
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
 
+  void addLog(Logger::Logger::Levels level, const std::string& message);
+
 protected:
   friend class ActiveClient;
   Random::RandomGenerator& random_generator_;
