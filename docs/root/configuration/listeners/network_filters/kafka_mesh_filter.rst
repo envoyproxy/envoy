@@ -8,6 +8,13 @@ producers. Produce requests sent to this filter insance can be forwarded to one 
 clusters, depending on configured forwarding rules. Corresponding message versions from
 Kafka 2.4.0 are supported.
 
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh>`
+* This filter should be configured with the name *envoy.filters.network.kafka_mesh*.
+
+.. attention::
+
+   The Kafka mesh filter is only included in :ref:`contrib images <install_contrib>`
+
 .. attention::
 
    The kafka_mesh filter is experimental and is currently under active development.

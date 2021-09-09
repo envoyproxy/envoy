@@ -19,7 +19,7 @@ using KafkaMeshProtoConfig = envoy::extensions::filters::network::kafka_mesh::v3
  */
 class KafkaMeshConfigFactory : public Common::FactoryBase<KafkaMeshProtoConfig> {
 public:
-  KafkaMeshConfigFactory() : FactoryBase(NetworkFilterNames::get().KafkaMesh, true) {}
+  KafkaMeshConfigFactory() : FactoryBase("envoy.filters.network.kafka_mesh", true) {}
 
 private:
   Network::FilterFactoryCb
