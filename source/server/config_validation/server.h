@@ -15,6 +15,7 @@
 #include "source/common/access_log/access_log_manager_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/random_generator.h"
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/quic/quic_stat_names.h"
@@ -76,7 +77,9 @@ public:
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
-    return dispatcher().createDnsResolver(envoy::config::core::v3::TypedExtensionConfig());
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    Network::makeEmptyCaresDnsResolverConfig(typed_dns_resolver_config);
+    return dispatcher().createDnsResolver(typed_dns_resolver_config);
   }
   void drainListeners() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   DrainManager& drainManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
