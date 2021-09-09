@@ -43,7 +43,7 @@ size_t PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::size() const {
 template <typename KEY_TYPE, typename POOL_TYPE>
 bool PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::empty() const {
   for (const auto& pool_map : conn_pool_maps_) {
-    if (!pool_map.empty()) {
+    if (!pool_map->empty()) {
       return false;
     }
   }
