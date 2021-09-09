@@ -76,7 +76,8 @@ namespace Logger {
   FUNCTION(tracing)                                                                                \
   FUNCTION(upstream)                                                                               \
   FUNCTION(udp)                                                                                    \
-  FUNCTION(wasm)
+  FUNCTION(wasm)                                                                                   \
+  FUNCTION(sip)
 
 // clang-format off
 enum class Id {
