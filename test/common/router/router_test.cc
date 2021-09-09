@@ -145,7 +145,7 @@ public:
   void testAutoSniOptions(
       absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> dummy_option,
       Envoy::Http::TestRequestHeaderMapImpl* headers, std::string server_name = "host",
-      bool should_validate_san = false) {
+      bool should_validate_san = false, std::string alt_server_name = "host") {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
         .WillByDefault(ReturnRef(dummy_option));
@@ -165,10 +165,10 @@ public:
                   ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
                   .value());
     if (should_validate_san) {
-      EXPECT_EQ(server_name, stream_info.filterState()
-                                 ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
-                                     Network::UpstreamSubjectAltNames::key())
-                                 .value()[0]);
+      EXPECT_EQ(alt_server_name, stream_info.filterState()
+                                     ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
+                                         Network::UpstreamSubjectAltNames::key())
+                                     .value()[0]);
     }
     EXPECT_CALL(cancellable_, cancel(_));
     router_.onDestroy();
@@ -243,7 +243,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHeaderOverride) {
 
   const auto server_name = "foo.bar";
   auto headers = new Http::TestRequestHeaderMapImpl{{"x-host", server_name}};
-  testAutoSniOptions(dummy_option, headers, server_name, true);
+  testAutoSniOptions(dummy_option, headers, server_name, true, server_name);
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithEmptyValueHeaderOverride) {
@@ -254,6 +254,17 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithEmptyValueHeaderOverride)
 
   auto headers = new Http::TestRequestHeaderMapImpl{{"x-host", ""}};
   testAutoSniOptions(dummy_option, headers, "host", true);
+}
+
+TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithIpHeaderOverride) {
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+  dummy_option.value().set_auto_san_validation(true);
+  dummy_option.value().set_override_auto_sni_header("x-host");
+
+  const auto server_name = "127.0.0.1";
+  auto headers = new Http::TestRequestHeaderMapImpl{{"x-host", server_name}};
+  testAutoSniOptions(dummy_option, headers, "dummy", true, server_name);
 }
 
 TEST_F(RouterTest, RouteNotFound) {
