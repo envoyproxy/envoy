@@ -106,7 +106,6 @@ message RateLimit {
   bool disable_x_envoy_ratelimited_header = 9;
 }
 
-// [#next-free-field: 3]
 message RateLimitPerRoute {
   enum VhRateLimitsOptions {
     // Use the virtual host rate limits unless the route has a rate limit policy.

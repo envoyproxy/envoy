@@ -121,7 +121,7 @@ message RateLimitPerRoute {
   // Specifies if the rate limit filter should include the virtual host rate limits.
   VhRateLimitsOptions vh_rate_limits = 1 [(validate.rules).enum = {defined_only: true}];
 
-  // [#not-implemented-hide:]
   // Specifies a set of rate limit configurations that can be applied to typed filter config.
+  // [#not-implemented-hide:]
   repeated config.route.v3.RateLimit rate_limits = 2;
 }
