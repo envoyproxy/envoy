@@ -39,7 +39,7 @@ public:
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
-  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Return(true));
+  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Return());
   async_client_manager_.factoryForGrpcService(grpc_service, scope_, false);
 }
 
@@ -85,10 +85,12 @@ TEST_F(AsyncClientManagerImplTest, EnableRawAsyncClientCache) {
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
-  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Return(false));
+  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Invoke([](const std::string&) {
+    throw EnvoyException("fake exception");
+  }));
   EXPECT_THROW_WITH_MESSAGE(
       async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "Cluster 'foo' is unknown or not static");
+      "fake exception");
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {

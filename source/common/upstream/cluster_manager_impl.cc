@@ -971,9 +971,14 @@ void ClusterManagerImpl::drainConnections() {
   });
 }
 
-bool ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
+void ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
   const auto& it = active_clusters_.find(cluster);
-  return it != active_clusters_.end() && !it->second->added_via_api_;
+  if (it == active_clusters_.end()) {
+    throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster));
+  }
+  if (it->second->added_via_api_) {
+    throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster));
+  }
 }
 
 void ClusterManagerImpl::postThreadLocalRemoveHosts(const Cluster& cluster,

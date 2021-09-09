@@ -33,9 +33,13 @@ public:
   }
 
   void run(const std::string cluster_name) {
-    const auto fake_static = "fake_static";
+    const auto good_cluster = "good_cluster";
     EXPECT_CALL(context_.cluster_manager_, checkActiveStaticCluster(cluster_name))
-        .WillOnce(Return(fake_static == cluster_name));
+        .WillOnce(Invoke([good_cluster](const std::string& cluster_name) {
+          if (cluster_name != good_cluster) {
+            throw EnvoyException("fake");
+          }
+        }));
 
     auto* common_config = http_grpc_access_log_.mutable_common_config();
     common_config->set_log_name("foo");
@@ -43,7 +47,7 @@ public:
     common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
     TestUtility::jsonConvert(http_grpc_access_log_, *message_);
 
-    if (cluster_name == fake_static) {
+    if (cluster_name == good_cluster) {
       EXPECT_CALL(context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
           .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
             return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
@@ -55,7 +59,7 @@ public:
     } else {
       EXPECT_THROW_WITH_MESSAGE(
           factory_->createAccessLogInstance(*message_, std::move(filter_), context_),
-          EnvoyException, fmt::format("Cluster '{}' is unknown or not static", cluster_name));
+          EnvoyException, "fake");
     }
   }
 
@@ -67,7 +71,7 @@ public:
 };
 
 // Normal OK configuration.
-TEST_F(HttpGrpcAccessLogConfigTest, Ok) { run("fake_static"); }
+TEST_F(HttpGrpcAccessLogConfigTest, Ok) { run("good_cluster"); }
 
 // Wrong configuration with invalid clusters.
 TEST_F(HttpGrpcAccessLogConfigTest, InvalidCluster) { run("invalid"); }

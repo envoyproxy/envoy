@@ -319,7 +319,7 @@ public:
 
   void drainConnections() override;
 
-  bool checkActiveStaticCluster(const std::string& cluster) override;
+  void checkActiveStaticCluster(const std::string& cluster) override;
 
 protected:
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);

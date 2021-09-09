@@ -323,10 +323,10 @@ public:
   virtual void drainConnections() PURE;
 
   /**
+   * Check if the cluster is active and statically configured, and if not, throw excetion.
    * @param cluster, the cluster to check.
-   * @return true if the cluster is active and static, false otherwise.
    */
-  virtual bool checkActiveStaticCluster(const std::string& cluster) PURE;
+  virtual void checkActiveStaticCluster(const std::string& cluster) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
