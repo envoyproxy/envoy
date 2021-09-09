@@ -125,12 +125,15 @@ bool TestCommon::compareVectorOfHeaderName(const std::vector<Http::LowerCaseStri
          std::set<Http::LowerCaseString>(rhs.begin(), rhs.end());
 }
 
-bool TestCommon::compareVectorOfUnorderedStrings(const std::vector<std::string>& lhs, const std::vector<std::string>& rhs) {
-  return std::set<std::string>(lhs.begin(), lhs.end()) == std::set<std::string>(rhs.begin(), rhs.end());
+bool TestCommon::compareVectorOfUnorderedStrings(const std::vector<std::string>& lhs,
+                                                 const std::vector<std::string>& rhs) {
+  return std::set<std::string>(lhs.begin(), lhs.end()) ==
+         std::set<std::string>(rhs.begin(), rhs.end());
 }
 
 // TODO(esmet): This belongs in a QueryParams class
-bool TestCommon::compareQueryParams(const Http::Utility::QueryParams& lhs, const Http::Utility::QueryParams& rhs) {
+bool TestCommon::compareQueryParams(const Http::Utility::QueryParams& lhs,
+                                    const Http::Utility::QueryParams& rhs) {
   return lhs == rhs;
 }
 

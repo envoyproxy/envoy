@@ -293,7 +293,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
 
   const std::vector<std::tuple<std::string, std::string, bool>> query_parameters_to_set = {
       {"add-me", "yes", false}, {"remove-me", "", true}};
-  for (const auto& [key, value, remove]: query_parameters_to_set) {
+  for (const auto& [key, value, remove] : query_parameters_to_set) {
     auto* query_parameter = check_response->mutable_ok_response()->add_query_parameters_to_set();
     query_parameter->set_key(key);
     query_parameter->set_value(value);
@@ -314,8 +314,8 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
   client_->onCreateInitialMetadata(headers);
 
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
-  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
-                                      AuthzOkResponse(authz_response))));
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
   client_->onSuccess(std::move(check_response), span_);
 }
 
