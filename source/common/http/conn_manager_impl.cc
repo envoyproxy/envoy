@@ -164,6 +164,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
       start_drain_cb_.reset();
 
       // create timer to _begin_ draining
+      stats_.named_.downstream_cx_drain_close_.inc();
       createStartDrainTimer(drain_delay);
     });
     ASSERT(start_drain_cb_ != nullptr);
@@ -519,7 +520,6 @@ void ConnectionManagerImpl::doConnectionClose(
 
 void ConnectionManagerImpl::createStartDrainTimer(std::chrono::milliseconds drain_delay) {
   if (!codec_) {
-    stats_.named_.downstream_cx_drain_close_.inc();
     doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt, "");
     return;
   }
@@ -528,7 +528,6 @@ void ConnectionManagerImpl::createStartDrainTimer(std::chrono::milliseconds drai
     if (drain_state_ != DrainState::NotDraining) {
       return;
     }
-    stats_.named_.downstream_cx_drain_close_.inc();
     startDrainSequence();
   });
   start_drain_timer_->enableTimer(drain_delay);
@@ -1203,9 +1202,7 @@ void ConnectionManagerImpl::startDrainSequence() {
   ASSERT(drain_state_ == DrainState::NotDraining);
   drain_state_ = DrainState::Draining;
 
-  for (const auto& stream : streams_) {
-    ENVOY_STREAM_LOG(debug, "drain closing connection", *stream);
-  }
+  ENVOY_CONN_LOG(debug, "drain close start", read_callbacks_->connection());
 
   codec_->shutdownNotice();
   drain_timer_ = read_callbacks_->connection().dispatcher().createTimer(

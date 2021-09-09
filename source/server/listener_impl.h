@@ -147,7 +147,7 @@ private:
   Stats::ScopePtr global_scope_;
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  Server::DrainManagerPtr drain_manager_;
+  const Server::DrainManagerPtr drain_manager_;
   bool is_quic_;
 };
 
