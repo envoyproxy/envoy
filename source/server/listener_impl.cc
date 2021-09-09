@@ -37,7 +37,7 @@
 
 #ifdef UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
 #include "source/common/quic/udp_gso_batch_writer.h"
-#endif // UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
+#endif
 
 namespace Envoy {
 namespace Server {
