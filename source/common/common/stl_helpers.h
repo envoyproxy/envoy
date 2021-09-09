@@ -28,7 +28,8 @@ std::string accumulateToString(const ContainerT& source,
   if (source.empty()) {
     return "[]";
   }
-  return std::accumulate(std::next(source.begin()), source.end(), "[" + string_func(source.front()),
+  return std::accumulate(std::next(source.begin()), source.end(),
+                         "[" + string_func(*source.begin()),
                          [string_func](std::string acc, const T& element) {
                            return acc + ", " + string_func(element);
                          }) +
