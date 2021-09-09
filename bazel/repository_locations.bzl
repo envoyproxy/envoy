@@ -826,7 +826,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2021-09-08",
+        release_date = "2021-09-09",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
