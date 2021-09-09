@@ -348,8 +348,10 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     resolution_time = main_thread_dispatcher_.timeSource().monotonicTime();
   }
   if (new_address) {
-    // Always update the cache entry and staleness.
-    addCacheEntry(host, new_address, response.front().ttl_);
+    // Update the cache entry and staleness any time the ttl changes.
+    if (!from_cache) {
+      addCacheEntry(host, new_address, response.front().ttl_);
+    }
     primary_host_info->host_info_->updateStale(resolution_time.value(), response.front().ttl_);
   }
 
