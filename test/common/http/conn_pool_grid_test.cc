@@ -673,7 +673,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   ASSERT_FALSE(optional_it3.has_value());
 }
 
-TEST_F(ConnectivityGridTest, newStreamFail) {
+TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
 
   testing::InSequence s;

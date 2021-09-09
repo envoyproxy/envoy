@@ -59,7 +59,7 @@ Api::IoError::IoErrorCode IoSocketError::errorCodeFromErrno(int sys_errno) {
   case SOCKET_ERROR_CONNRESET:
     return IoErrorCode::ConnectionReset;
   case SOCKET_ERROR_NETUNREACH:
-    return IoErrorCode::NetUnreach;
+    return IoErrorCode::NetworkUnreachable;
   default:
     ENVOY_LOG_MISC(debug, "Unknown error code {} details {}", sys_errno, errorDetails(sys_errno));
     return IoErrorCode::UnknownError;

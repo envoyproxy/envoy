@@ -36,7 +36,7 @@ public:
     // An existing connection was forcibly closed by the remote host.
     ConnectionReset,
     // Network is unreachable due to network settings.
-    NetUnreach,
+    NetworkUnreachable,
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };
