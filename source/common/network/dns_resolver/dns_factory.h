@@ -43,6 +43,10 @@ void makeEmptyCaresDnsResolverConfig(
 void makeEmptyAppleDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
+// Create an empty DNS resolver typed config based on build system and configuration.
+void makeEmptyDnsResolverConfig(
+    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
+
 // If it is MacOS and the run time flag: envoy.restart_features.use_apple_api_for_dns_lookups
 // is enabled, create an AppleDnsResolverConfig typed config.
 bool checkUseAppleApiForDnsLookups(

@@ -19,6 +19,17 @@ void makeEmptyAppleDnsResolverConfig(
   typed_dns_resolver_config.set_name(std::string(AppleDnsResolver));
 }
 
+// Create an empty DNS resolver typed config based on build system and configuration.
+void makeEmptyDnsResolverConfig(
+    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+  // If use apple API for DNS lookups, create an AppleDnsResolverConfig typed config.
+  if (checkUseAppleApiForDnsLookups(typed_dns_resolver_config)) {
+    return;
+  }
+  // Otherwise, create an CaresDnsResolverConfig typed config.
+  makeEmptyCaresDnsResolverConfig(typed_dns_resolver_config);
+}
+
 // If it is MacOS and the run time flag: envoy.restart_features.use_apple_api_for_dns_lookups
 // is enabled, create an AppleDnsResolverConfig typed config.
 bool checkUseAppleApiForDnsLookups(

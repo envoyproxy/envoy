@@ -153,6 +153,18 @@ TEST_F(AppleDnsImplTest, TypedAppleDnsResolverConfigExist) {
       "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
 }
 
+// Test empty DNS resolver typed config creation based on build system and configuration is
+// expected.
+TEST_F(AppleDnsImplTest, MakeEmptyDnsResolverTestInApple) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Envoy::Network::makeEmptyDnsResolverConfig(typed_dns_resolver_config);
+  // In this test case, makeEmptyDnsResolverConfig() creates an empty apple DNS typed config.
+  EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::AppleDnsResolver));
+  EXPECT_EQ(
+      typed_dns_resolver_config.typed_config().type_url(),
+      "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
+}
+
 // Validate that when AppleDnsResolverImpl is destructed with outstanding requests,
 // that we don't invoke any callbacks if the query was cancelled. This is a regression test from
 // development, where segfaults were encountered due to callback invocations on

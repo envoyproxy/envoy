@@ -47,6 +47,17 @@ TEST_F(DnsFactoryTest, MakeEmptyAppleDnsResolverTest) {
       "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
 }
 
+// Test empty DNS resolver typed config creation based on build system and configuration is
+// expected.
+TEST_F(DnsFactoryTest, MakeEmptyDnsResolverTest) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  makeEmptyDnsResolverConfig(typed_dns_resolver_config);
+  // In this test case, makeEmptyDnsResolverConfig() creates an empty c-ares DNS typed config.
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  verifyCaresDnsConfigEmpty(cares);
+}
+
 // Test handleLegacyDnsResolverData() function with DnsFilterConfig type.
 TEST_F(DnsFactoryTest, LegacyDnsResolverDataDnsFilterConfig) {
   envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig::ClientContextConfig

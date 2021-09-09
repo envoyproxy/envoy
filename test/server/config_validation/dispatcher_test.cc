@@ -65,7 +65,7 @@ TEST_P(ConfigValidation, CreateScaledTimer) {
 // DNS resolver returns the same shared_ptr.
 TEST_F(ConfigValidation, SharedDnsResolver) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  Network::makeEmptyCaresDnsResolverConfig(typed_dns_resolver_config);
+  Network::makeEmptyDnsResolverConfig(typed_dns_resolver_config);
   Network::DnsResolverSharedPtr dns1 = dispatcher_->createDnsResolver(typed_dns_resolver_config);
   long use_count = dns1.use_count();
   Network::DnsResolverSharedPtr dns2 = dispatcher_->createDnsResolver(typed_dns_resolver_config);
