@@ -1,10 +1,6 @@
 #pragma once
 
-#if !defined(__linux__)
-#define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 0
-#else
-#define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 1
-
+#if defined(__linux__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
@@ -18,10 +14,9 @@
 #pragma GCC diagnostic ignored "-Wsuggest-override"
 #endif
 
-#if defined(__linux__)
-#include "quiche/quic/core/batch_writer/quic_gso_batch_writer.h"
+#include "source/common/quic/gso_defines.h"
 
-#endif
+#include "quiche/quic/core/batch_writer/quic_gso_batch_writer.h"
 
 #ifdef __clang__
 #pragma clang diagnostic pop
