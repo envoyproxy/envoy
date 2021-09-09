@@ -38,7 +38,8 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
 std::unique_ptr<quic::QuicSelfIssuedConnectionIdManager>
 EnvoyQuicServerConnection::MakeSelfIssuedConnectionIdManager() {
   return std::make_unique<EnvoyQuicSelfIssuedConnectionIdManager>(
-      quic::kMinNumOfActiveConnectionIds, connection_id(), clock(), alarm_factory(), this);
+      quic::kMinNumOfActiveConnectionIds, connection_id(), clock(), alarm_factory(), this,
+      context());
 }
 
 quic::QuicConnectionId EnvoyQuicSelfIssuedConnectionIdManager::GenerateNewConnectionId(

@@ -1266,6 +1266,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_core_arena_scoped_ptr_lib",
+        ":quic_core_connection_context_lib",
         ":quic_core_time_lib",
     ],
 )
