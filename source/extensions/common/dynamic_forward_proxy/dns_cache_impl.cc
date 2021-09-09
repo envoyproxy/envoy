@@ -290,7 +290,8 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                                  Network::DnsResolver::ResolutionStatus status,
                                  std::list<Network::DnsResponse>&& response, bool from_cache) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
-  ENVOY_LOG_EVENT(debug, "main thread resolve complete for host '{}': {}", host,
+  ENVOY_LOG_EVENT(debug, "dns_cache_finish_resolve",
+                  "main thread resolve complete for host '{}': {}", host,
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
                     return dns_response.address_->asString();
                   }));
