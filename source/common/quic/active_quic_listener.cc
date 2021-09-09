@@ -230,10 +230,9 @@ void ActiveQuicListener::updateListenerConfig(Network::ListenerConfig& config) {
 
 void ActiveQuicListener::onFilterChainDraining(
     const std::list<const Network::FilterChain*>& draining_filter_chains) {
-  std::for_each(draining_filter_chains.begin(), draining_filter_chains.end(),
-                [this](const Network::FilterChain* filter_chain) {
-                  closeConnectionsWithFilterChain(filter_chain);
-                });
+  for (auto* filter_chain : draining_filter_chains) {
+    closeConnectionsWithFilterChain(filter_chain);
+  }
 }
 
 void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterChain* filter_chain) {
