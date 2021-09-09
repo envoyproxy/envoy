@@ -157,7 +157,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
        stats_.named_.downstream_cx_tx_bytes_total_, stats_.named_.downstream_cx_tx_bytes_buffered_,
        nullptr, &stats_.named_.downstream_cx_delayed_close_timeout_});
 
-  // register callback for drain-close events
+  // Register callback for drain-close events.
   if (use_proactive_draining_) {
     start_drain_cb_ = drain_close_.addOnDrainCloseCb([this](std::chrono::milliseconds drain_delay) {
       // de-register callback since we only want this to fire once
@@ -166,6 +166,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
       // create timer to _begin_ draining
       createStartDrainTimer(drain_delay);
     });
+    ASSERT(start_drain_cb_ != nullptr);
   }
 }
 
@@ -480,9 +481,7 @@ void ConnectionManagerImpl::doConnectionClose(
     connection_duration_timer_.reset();
   }
 
-  if (start_drain_cb_) {
-    start_drain_cb_.reset();
-  }
+  start_drain_cb_.reset();
 
   if (start_drain_timer_) {
     start_drain_timer_->disableTimer();
