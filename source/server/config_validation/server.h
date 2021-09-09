@@ -156,9 +156,6 @@ public:
     // convoluted than it needs to be. Fix this to return a mock in a follow up.
     return nullptr;
   }
-  DrainManagerPtr createDrainManager(envoy::config::listener::v3::Listener::DrainType) override {
-    return nullptr;
-  }
   uint64_t nextListenerTag() override { return 0; }
 
   // Server::WorkerFactory

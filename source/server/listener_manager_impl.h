@@ -96,8 +96,6 @@ public:
                                               const Network::Socket::OptionsSharedPtr& options,
                                               BindType bind_type, uint32_t worker_index) override;
 
-  DrainManagerPtr
-  createDrainManager(envoy::config::listener::v3::Listener::DrainType drain_type) override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
 
 private:

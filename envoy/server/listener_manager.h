@@ -104,13 +104,6 @@ public:
       Configuration::ListenerFactoryContext& context) PURE;
 
   /**
-   * @return DrainManagerPtr a new drain manager.
-   * @param drain_type supplies the type of draining to do for the owning listener.
-   */
-  virtual DrainManagerPtr
-  createDrainManager(envoy::config::listener::v3::Listener::DrainType drain_type) PURE;
-
-  /**
    * @return uint64_t a listener tag usable for connection handler tracking.
    */
   virtual uint64_t nextListenerTag() PURE;
