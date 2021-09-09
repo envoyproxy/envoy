@@ -1037,8 +1037,8 @@ envoy::config::route::v3::RetryPolicy
 Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy,
                                        const std::string& retry_on) {
   envoy::config::route::v3::RetryPolicy route_retry_policy;
-  uint64_t base_interval_ms = 1000;
-  uint64_t max_interval_ms = 10 * base_interval_ms;
+  constexpr uint64_t base_interval_ms = 1000;
+  constexpr uint64_t max_interval_ms = 10 * base_interval_ms;
 
   if (retry_policy.has_retry_back_off()) {
     const auto& core_back_off = retry_policy.retry_back_off();
