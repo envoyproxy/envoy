@@ -19,7 +19,6 @@ envoy_cc_contrib_extension(
     hdrs = ["config.h"],
     deps = [
         "//envoy/registry",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha:pkg_cc_proto",
     ] + select({
