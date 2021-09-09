@@ -19,7 +19,7 @@ protected:
   // Utility function to add filters.
   void addFilters(std::vector<std::string> filters) {
     for (const auto& filter : filters) {
-      config_helper_.addFilter(filter);
+      config_helper_.prependFilter(filter);
     }
   }
 };

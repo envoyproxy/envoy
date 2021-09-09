@@ -30,7 +30,7 @@ public:
 
   void initializeFilter(const std::string& config) {
     setUpstreamProtocol(Http::CodecType::HTTP2);
-    config_helper_.addFilter(config);
+    config_helper_.prependFilter(config);
     HttpIntegrationTest::initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
   }

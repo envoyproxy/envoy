@@ -74,7 +74,7 @@ resources:
         inline_string: "hmac_secret_1")EOF",
                                               false);
 
-    config_helper_.addFilter(TestEnvironment::substitute(R"EOF(
+    config_helper_.prependFilter(TestEnvironment::substitute(R"EOF(
 name: oauth
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3alpha.OAuth2

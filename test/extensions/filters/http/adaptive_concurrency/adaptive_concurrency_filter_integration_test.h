@@ -41,7 +41,7 @@ public:
   void customInit() {
     setDownstreamProtocol(Http::CodecType::HTTP2);
     setUpstreamProtocol(Http::CodecType::HTTP2);
-    config_helper_.addFilter(ADAPTIVE_CONCURRENCY_CONFIG);
+    config_helper_.prependFilter(ADAPTIVE_CONCURRENCY_CONFIG);
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
   }

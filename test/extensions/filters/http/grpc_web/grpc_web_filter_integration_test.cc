@@ -27,7 +27,7 @@ public:
 
   void SetUp() override {
     setUpstreamProtocol(Http::CodecType::HTTP2);
-    config_helper_.addFilter("name: envoy.filters.http.grpc_web");
+    config_helper_.prependFilter("name: envoy.filters.http.grpc_web");
   }
 
   void initialize() override {

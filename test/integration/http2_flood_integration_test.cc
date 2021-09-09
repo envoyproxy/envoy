@@ -577,7 +577,7 @@ TEST_P(Http2FloodMitigationTest, Trailers) {
 // Verify flood detection by the WINDOW_UPDATE frame when a decoder filter is resuming reading from
 // the downstream via DecoderFilterBelowWriteBufferLowWatermark.
 TEST_P(Http2FloodMitigationTest, WindowUpdateOnLowWatermarkFlood) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: backpressure-filter
   )EOF");
   config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);

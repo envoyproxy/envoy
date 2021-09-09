@@ -57,7 +57,7 @@ or
 
 ```c++
 // Add a buffering filter on the request path
-config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+config_helper_.prependFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
 ```
 
 For other edits which are less likely reusable, one can add config modifiers. Config modifiers

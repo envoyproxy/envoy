@@ -25,7 +25,7 @@ typed_config:
   alternate_protocols_cache_options:
     name: default_alternate_protocols_cache
 )EOF";
-    config_helper_.addFilter(filter);
+    config_helper_.prependFilter(filter);
 
     upstream_tls_ = true;
     config_helper_.configureUpstreamTls(/*use_alpn=*/true, /*http3=*/true,

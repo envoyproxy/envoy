@@ -334,7 +334,7 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBacku
     // receiving flow control window updates.
     return;
   }
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(R"EOF(
   name: pause-filter{}
   typed_config:
@@ -432,8 +432,8 @@ typed_config:
   // As with ProtocolIntegrationTest.HittingEncoderFilterLimit use a filter
   // which buffers response data but in this case, make sure the sendLocalReply
   // is gRPC.
-  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
