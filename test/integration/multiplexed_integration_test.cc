@@ -408,7 +408,7 @@ void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string
 }
 
 TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
-  addFilters({response_metadata_filter});
+  prependFilters({response_metadata_filter});
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
@@ -652,7 +652,7 @@ typed_config:
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
-  addFilters({request_metadata_filter});
+  prependFilters({request_metadata_filter});
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
@@ -799,7 +799,7 @@ void Http2MetadataIntegrationTest::verifyHeadersOnlyTest() {
 }
 
 TEST_P(Http2MetadataIntegrationTest, HeadersOnlyRequestWithRequestMetadata) {
-  addFilters({request_metadata_filter});
+  prependFilters({request_metadata_filter});
   // Send a headers only request.
   runHeaderOnlyTest(false, 0);
   verifyHeadersOnlyTest();
@@ -842,12 +842,12 @@ typed_config:
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, RequestMetadataWithStopAllFilterBeforeMetadataFilter) {
-  addFilters({request_metadata_filter, metadata_stop_all_filter});
+  prependFilters({request_metadata_filter, metadata_stop_all_filter});
   testRequestMetadataWithStopAllFilter();
 }
 
 TEST_P(Http2MetadataIntegrationTest, RequestMetadataWithStopAllFilterAfterMetadataFilter) {
-  addFilters({metadata_stop_all_filter, request_metadata_filter});
+  prependFilters({metadata_stop_all_filter, request_metadata_filter});
   testRequestMetadataWithStopAllFilter();
 }
 
