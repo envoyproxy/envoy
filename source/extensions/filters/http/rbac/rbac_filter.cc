@@ -37,10 +37,14 @@ RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr rou
 
 RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpecificFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& per_route_config,
-    ProtobufMessage::ValidationVisitor& validation_visitor)
-    : engine_(Filters::Common::RBAC::createEngine(per_route_config.rbac(), validation_visitor)),
-      shadow_engine_(
-          Filters::Common::RBAC::createShadowEngine(per_route_config.rbac(), validation_visitor)) {}
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
+  // Moved from member initializer to ctor body to overcome clang false warning about memory
+  // leak (clang-analyzer-cplusplus.NewDeleteLeaks,-warnings-as-errors).
+  // Potentially https://lists.llvm.org/pipermail/llvm-bugs/2018-July/066769.html
+  engine_ = Filters::Common::RBAC::createEngine(per_route_config.rbac(), validation_visitor);
+  shadow_engine_ =
+      Filters::Common::RBAC::createShadowEngine(per_route_config.rbac(), validation_visitor);
+}
 
 Http::FilterHeadersStatus
 RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {

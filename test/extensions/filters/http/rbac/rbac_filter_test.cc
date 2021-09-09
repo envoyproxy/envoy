@@ -574,6 +574,18 @@ TEST_F(RoleBasedAccessControlFilterTest, UpstreamMultiplePortInRangeAllow) {
   EXPECT_EQ(0, config_->stats().denied_.value());
 }
 
+// Tests simple permission policy with no upstream metadata in the filter state.
+TEST_F(RoleBasedAccessControlFilterTest, UpstreamPortNoFilterStateMetadata) {
+  // Setup policy config.
+  upstreamPortTestsBasicPolicySetup(*this, {{0, 80}}, envoy::config::rbac::v3::RBAC::ALLOW);
+
+  // Filter iteration should be stopped as there is no filter state metadata.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers_, false));
+
+  // Expect `denied` stats to be incremented.
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
 } // namespace
 } // namespace RBACFilter
 } // namespace HttpFilters
