@@ -45,11 +45,3 @@ envoy_cc_library(
         ":filter_state_interface",
     ],
 )
-
-envoy_cc_library(
-    name = "set_filter_state_object_interface",
-    hdrs = ["set_filter_state_object.h"],
-    deps = [
-        ":filter_state_interface",
-    ],
-)

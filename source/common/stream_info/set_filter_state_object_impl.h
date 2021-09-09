@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/stream_info/set_filter_state_object.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -10,13 +10,13 @@ namespace StreamInfo {
 /**
  * Implementation of SetFilterStateObject.
  */
-template <typename T> class SetFilterStateObjectImpl : public SetFilterStateObject<T> {
+template <typename T> class SetFilterStateObjectImpl : public FilterState::Object {
 public:
-  void add(const T& address) override { values_.emplace(address); }
+  void add(const T& address) { values_.emplace(address); }
 
-  void clear() override { values_.clear(); }
+  void clear() { values_.clear(); }
 
-  void iterate(const std::function<bool(const T& address)>& fn) const override {
+  void iterate(const std::function<bool(const T& address)>& fn) const {
     for (const auto& address : values_) {
       if (!fn(address)) {
         break;

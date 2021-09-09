@@ -54,6 +54,6 @@ envoy_cc_library(
     name = "set_filter_state_object_lib",
     hdrs = ["set_filter_state_object_impl.h"],
     deps = [
-        "//envoy/stream_info:set_filter_state_object_interface",
+        "//envoy/stream_info:filter_state_interface",
     ],
 )

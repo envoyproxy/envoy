@@ -220,7 +220,7 @@ message Permission {
     // setup SNI.
     type.matcher.v3.StringMatcher requested_server_name = 9;
 
-    // Optional extension for configuring custom matchers for RBAC.
+    // Extension for configuring custom matchers for RBAC.
     // [#extension-category: envoy.rbac.matchers]
     core.v3.TypedExtensionConfig matcher = 12;
   }
