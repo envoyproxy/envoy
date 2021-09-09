@@ -12,9 +12,8 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-MatcherConstSharedPtr
-Matcher::create(const envoy::config::rbac::v3::Permission& permission,
-                const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor) {
+MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission& permission,
+                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
   switch (permission.rule_case()) {
   case envoy::config::rbac::v3::Permission::RuleCase::kAndRules:
     return std::make_shared<const AndMatcher>(permission.and_rules(), validation_visitor);
@@ -40,10 +39,9 @@ Matcher::create(const envoy::config::rbac::v3::Permission& permission,
   case envoy::config::rbac::v3::Permission::RuleCase::kUrlPath:
     return std::make_shared<const PathMatcher>(permission.url_path());
   case envoy::config::rbac::v3::Permission::RuleCase::kMatcher: {
-    ASSERT(validation_visitor.has_value());
     auto& factory =
         Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(permission.matcher());
-    return factory.create(permission.matcher(), *validation_visitor.value());
+    return factory.create(permission.matcher(), validation_visitor);
   }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -82,9 +80,8 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
   }
 }
 
-AndMatcher::AndMatcher(
-    const envoy::config::rbac::v3::Permission::Set& set,
-    const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor) {
+AndMatcher::AndMatcher(const envoy::config::rbac::v3::Permission::Set& set,
+                       ProtobufMessage::ValidationVisitor& validation_visitor) {
   for (const auto& rule : set.rules()) {
     matchers_.push_back(Matcher::create(rule, validation_visitor));
   }
@@ -108,9 +105,8 @@ bool AndMatcher::matches(const Network::Connection& connection,
   return true;
 }
 
-OrMatcher::OrMatcher(
-    const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules,
-    const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor) {
+OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules,
+                     ProtobufMessage::ValidationVisitor& validation_visitor) {
   for (const auto& rule : rules) {
     matchers_.push_back(Matcher::create(rule, validation_visitor));
   }

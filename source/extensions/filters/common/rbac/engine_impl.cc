@@ -11,8 +11,8 @@ namespace Common {
 namespace RBAC {
 
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
-    const envoy::config::rbac::v3::RBAC& rules, const EnforcementMode mode,
-    const absl::optional<ProtobufMessage::ValidationVisitor*>& validation_visitor)
+    const envoy::config::rbac::v3::RBAC& rules,
+    ProtobufMessage::ValidationVisitor& validation_visitor, const EnforcementMode mode)
     : action_(rules.action()), mode_(mode) {
   // guard expression builder by presence of a condition in policies
   for (const auto& policy : rules.policies()) {

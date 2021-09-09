@@ -41,7 +41,7 @@ template <class ConfigType>
 std::unique_ptr<RoleBasedAccessControlEngineImpl>
 createEngine(const ConfigType& config, ProtobufMessage::ValidationVisitor& validation_visitor) {
   return config.has_rules() ? std::make_unique<RoleBasedAccessControlEngineImpl>(
-                                  config.rules(), EnforcementMode::Enforced, &validation_visitor)
+                                  config.rules(), validation_visitor, EnforcementMode::Enforced)
                             : nullptr;
 }
 
@@ -51,7 +51,7 @@ createShadowEngine(const ConfigType& config,
                    ProtobufMessage::ValidationVisitor& validation_visitor) {
   return config.has_shadow_rules()
              ? std::make_unique<RoleBasedAccessControlEngineImpl>(
-                   config.shadow_rules(), EnforcementMode::Shadow, &validation_visitor)
+                   config.shadow_rules(), validation_visitor, EnforcementMode::Shadow)
              : nullptr;
 }
 
