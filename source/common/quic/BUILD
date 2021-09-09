@@ -445,35 +445,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_quic_gso_defines_lib",
-    hdrs = ["gso_defines.h"],
-    tags = ["nofips"],
-)
-
-envoy_cc_library(
     name = "udp_gso_batch_writer_lib",
     srcs = select({
         "//bazel:linux": ["udp_gso_batch_writer.cc"],
         "//conditions:default": [],
     }),
-    hdrs = select({
-        "//bazel:linux": ["udp_gso_batch_writer.h"],
-        "//conditions:default": [],
-    }),
+    hdrs = ["udp_gso_batch_writer.h"],
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
-    deps = select({
-        "//bazel:linux": [
-            ":envoy_quic_utils_lib",
-            ":envoy_quic_gso_defines_lib",
-            "//envoy/network:udp_packet_writer_handler_interface",
-            "//source/common/network:io_socket_error_lib",
-            "//source/common/protobuf:utility_lib",
-            "//source/common/runtime:runtime_lib",
-            "@com_github_google_quiche//:quic_core_batch_writer_gso_batch_writer_lib",
-        ],
-        "//conditions:default": [],
-    }),
+    deps = [
+        ":envoy_quic_utils_lib",
+        "//envoy/network:udp_packet_writer_handler_interface",
+        "//source/common/network:io_socket_error_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_lib",
+        "@com_github_google_quiche//:quic_core_batch_writer_gso_batch_writer_lib",
+    ],
 )
 
 envoy_cc_library(

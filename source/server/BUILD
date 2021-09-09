@@ -490,7 +490,6 @@ envoy_cc_library(
         "//source/common/quic:client_connection_factory_lib",
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
-        "//source/common/quic:envoy_quic_gso_defines_lib",
         "//source/common/quic:udp_gso_batch_writer_lib",
     ]),
 )

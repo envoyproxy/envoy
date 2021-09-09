@@ -1,6 +1,10 @@
 #pragma once
 
-#if defined(__linux__)
+#if !defined(__linux__) || defined(__ANDROID_API__)
+#define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 0
+#else
+#define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 1
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
@@ -13,8 +17,6 @@
 #elif defined(__GNUC__) && __GNUC__ >= 5
 #pragma GCC diagnostic ignored "-Wsuggest-override"
 #endif
-
-#include "source/common/quic/gso_defines.h"
 
 #include "quiche/quic/core/batch_writer/quic_gso_batch_writer.h"
 

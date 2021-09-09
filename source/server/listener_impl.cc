@@ -32,13 +32,8 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/active_quic_listener.h"
-#include "source/common/quic/gso_defines.h"
-#endif // ENVOY_ENABLE_QUIC
-
-#if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
 #include "source/common/quic/udp_gso_batch_writer.h"
 #endif
-
 
 namespace Envoy {
 namespace Server {
