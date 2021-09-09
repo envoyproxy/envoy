@@ -292,11 +292,22 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   void setUpstreamBytesMeterer(const BytesMetererSharedPtr& upstream_bytes_meterer) override {
+    // Accumulate the byte measurement from previous upstream request during a retry.
+    if (upstream_bytes_meterer_) {
+      upstream_bytes_meterer->addWireBytesSent(upstream_bytes_meterer_->wireBytesSent());
+      upstream_bytes_meterer->addWireBytesReceived(upstream_bytes_meterer_->wireBytesReceived());
+      upstream_bytes_meterer->addBodyBytesSent(upstream_bytes_meterer_->bodyBytesSent());
+      upstream_bytes_meterer->addBodyBytesReceived(upstream_bytes_meterer_->bodyBytesReceived());
+    }
     upstream_bytes_meterer_ = upstream_bytes_meterer;
   }
 
   void setDownstreamBytesMeterer(const BytesMetererSharedPtr& downstream_bytes_meterer) override {
-    downstream_bytes_meterer_ = downstream_bytes_meterer;
+    // Downstream bytes meterer don't reset during a retry.
+    if (downstream_bytes_meterer_ == nullptr) {
+      downstream_bytes_meterer_ = downstream_bytes_meterer;
+    }
+    ASSERT(downstream_bytes_meterer_.get() == downstream_bytes_meterer.get());
   }
 
   TimeSource& time_source_;

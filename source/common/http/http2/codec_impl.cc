@@ -816,15 +816,6 @@ Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
          connection_.state() == Network::Connection::State::Open);
 
   current_stream_id_ = hd->stream_id;
-  StreamImpl* stream = getStream(hd->stream_id);
-  if (stream != nullptr) {
-    if (hd->type != METADATA_FRAME_TYPE) {
-      stream->bytes_meterer_->addWireBytesReceived(hd->length + H2_FRAME_HEADER_SIZE);
-    }
-    if (hd->type == NGHTTP2_DATA) {
-      stream->bytes_meterer_->addBodyBytesReceived(hd->length + H2_FRAME_HEADER_SIZE);
-    }
-  }
   // Track all the frames without padding here, since this is the only callback we receive
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
   // HEADERS frame is tracked in onBeginHeaders(), DATA frame is tracked in onFrameReceived().
@@ -889,6 +880,14 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   StreamImpl* stream = getStream(frame->hd.stream_id);
   if (!stream) {
     return okStatus();
+  }
+
+  // Track bytes sent and received.
+  if (frame->hd.type != METADATA_FRAME_TYPE) {
+    stream->bytes_meterer_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
+  }
+  if (frame->hd.type == NGHTTP2_DATA) {
+    stream->bytes_meterer_->addBodyBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
   }
 
   switch (frame->hd.type) {

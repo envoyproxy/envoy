@@ -280,10 +280,10 @@ public:
   Tracing::Reason trace_reason_{Tracing::Reason::NotTraceable};
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
-  Envoy::StreamInfo::BytesMetererSharedPtr upstream_bytes_meterer_ =
-      std::make_shared<Envoy::StreamInfo::BytesMeterer>();
-  Envoy::StreamInfo::BytesMetererSharedPtr downstream_bytes_meterer_ =
-      std::make_shared<Envoy::StreamInfo::BytesMeterer>();
+  Envoy::StreamInfo::BytesMetererSharedPtr upstream_bytes_meterer_{
+      std::make_shared<Envoy::StreamInfo::BytesMeterer>()};
+  Envoy::StreamInfo::BytesMetererSharedPtr downstream_bytes_meterer_{
+      std::make_shared<Envoy::StreamInfo::BytesMeterer>()};
 };
 
 } // namespace Envoy

@@ -141,6 +141,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
 
 // Add a route which redirects HTTP to HTTPS, and verify Envoy sends a 301
 TEST_P(DownstreamProtocolIntegrationTest, RouterRedirect) {
+  useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+               "%DOWNSTREAM_BODY_BYTES_SENT% %DOWNSTREAM_BODY_BYTES_RECEIVED%");
   auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
   host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
@@ -152,6 +154,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirect) {
   EXPECT_EQ("301", response->headers().getStatusValue());
   EXPECT_EQ("https://www.redirect.com/foo",
             response->headers().get(Http::Headers::get().Location)[0]->value().getStringView());
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 0, 0),
+                                       BytesCountExpectation(0, 30, 0, 0));
 }
 
 TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
@@ -664,7 +668,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyBytesCount) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 80, 0, 0),
-                                       BytesCountExpectation(0, 0, 0, 0));
+                                       BytesCountExpectation(0, 58, 0, 0));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
@@ -710,7 +714,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBodyBytesC
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   expectDownstreamBytesSentAndReceived(BytesCountExpectation(109, 1144, 0, 0),
-                                       BytesCountExpectation(0, 0, 0, 0));
+                                       BytesCountExpectation(0, 58, 0, 0));
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10270
@@ -812,6 +816,52 @@ TEST_P(ProtocolIntegrationTest, Retry) {
 
   EXPECT_EQ(find_histo_sample_count("cluster.cluster_0.upstream_rq_headers_size"), 2);
   EXPECT_EQ(find_histo_sample_count("cluster.cluster_0.upstream_rs_headers_size"), 2);
+}
+
+TEST_P(ProtocolIntegrationTest, RetryBytesCount) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+    auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster.mutable_track_cluster_stats()->set_request_response_sizes(true);
+  });
+  useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
+               "%UPSTREAM_BODY_BYTES_SENT% %UPSTREAM_BODY_BYTES_RECEIVED%\n");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
+                                                          std::chrono::milliseconds(500)));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(512U, response->body().size());
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(2550, 635, 2062, 519),
+                                     BytesCountExpectation(2262, 548, 2066, 521));
 }
 
 TEST_P(ProtocolIntegrationTest, RetryStreaming) {
@@ -3116,7 +3166,7 @@ TEST_P(ProtocolIntegrationTest, HeaderOnlyBytesCountDownstream) {
                "%DOWNSTREAM_BODY_BYTES_SENT% %DOWNSTREAM_BODY_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(0, 0, false);
   expectDownstreamBytesSentAndReceived(BytesCountExpectation(124, 111, 0, 0),
-                                       BytesCountExpectation(68, 0, 0, 0));
+                                       BytesCountExpectation(68, 64, 0, 0));
 }
 
 TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountUpstream) {
@@ -3140,7 +3190,7 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountDownstream) {
                "%DOWNSTREAM_BODY_BYTES_SENT% %DOWNSTREAM_BODY_BYTES_RECEIVED%\n");
   testRouterRequestAndResponseWithBody(100, 100, false);
   expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 231, 106, 110),
-                                       BytesCountExpectation(177, 109, 100, 100));
+                                       BytesCountExpectation(177, 173, 100, 100));
 }
 
 TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUpstream) {
@@ -3172,7 +3222,7 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountDownstream) {
   testTrailers(10, 20, true, true);
 
   expectDownstreamBytesSentAndReceived(BytesCountExpectation(206, 132, 26, 19),
-                                       BytesCountExpectation(136, 58, 29, 19));
+                                       BytesCountExpectation(136, 86, 29, 19));
 }
 
 TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireBytesCountUpstream) {
