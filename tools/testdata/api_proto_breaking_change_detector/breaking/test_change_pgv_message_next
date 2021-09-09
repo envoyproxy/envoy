@@ -1,8 +1,0 @@
-syntax = "proto3";
-package test.protos.breaking;
-
-message SampleMessage {
-    option (validate.disabled) = false;
-
-    SampleMessage q = 543;
-}

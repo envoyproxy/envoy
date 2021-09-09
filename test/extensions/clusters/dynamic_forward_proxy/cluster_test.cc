@@ -37,7 +37,6 @@ public:
         Upstream::parseClusterFromV3Yaml(yaml_config);
     envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     Stats::ScopePtr scope = stats_store_.createScope("cluster.name.");
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
