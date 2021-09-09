@@ -99,9 +99,9 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.upstream_http2_flood_checks",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
     "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
+    "envoy.reloadable_features.http_conn_manager_proactive_drain",
     "envoy.reloadable_features.sanitize_http_header_referer",
     "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection",
-    "envoy.reloadable_features.http_conn_manager_proactive_drain",
 };
 
 // This is a section for officially sanctioned runtime features which are too
