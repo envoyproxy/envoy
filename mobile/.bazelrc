@@ -79,7 +79,8 @@ build:release-ios --copt=-fembed-bitcode
 build:release-ios --compilation_mode=opt
 
 # Flags for release builds targeting Android or the JVM
-build:release-android --config=android
+# Release does not use the option --define=logger=android
+build:release-android --define=include_ifaddrs=true
 build:release-android --config=release-common
 build:release-android --compilation_mode=opt
 
