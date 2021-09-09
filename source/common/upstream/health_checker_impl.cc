@@ -376,7 +376,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
     }
 
     if (parent_.http_status_checker_.inRanges(response_code,
-                                              parent_.http_status_checker_.expected_ranges_)) {
+                                              parent_.http_status_checker_.retriable_ranges_)) {
       return HealthCheckResult::Retriable;
     } else {
       return HealthCheckResult::Failed;
