@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <list>
 #include <string>
 
@@ -147,14 +148,6 @@ public:
   bool used_;
   uint64_t value_;
   uint64_t latch_;
-
-  // RefcountInterface
-  void incRefCount() override { refcount_helper_.incRefCount(); }
-  bool decRefCount() override { return refcount_helper_.decRefCount(); }
-  uint32_t use_count() const override { return refcount_helper_.use_count(); }
-
-private:
-  RefcountHelper refcount_helper_;
 };
 
 class MockGauge : public MockStatWithRefcount<Gauge> {
@@ -177,14 +170,6 @@ public:
   bool used_;
   uint64_t value_;
   ImportMode import_mode_;
-
-  // RefcountInterface
-  void incRefCount() override { refcount_helper_.incRefCount(); }
-  bool decRefCount() override { return refcount_helper_.decRefCount(); }
-  uint32_t use_count() const override { return refcount_helper_.use_count(); }
-
-private:
-  RefcountHelper refcount_helper_;
 };
 
 class MockHistogram : public MockMetric<Histogram> {
@@ -301,6 +286,13 @@ public:
   MOCK_METHOD(Histogram&, histogramFromString, (const std::string& name, Histogram::Unit unit));
   MOCK_METHOD(TextReadout&, textReadout, (const std::string&));
   MOCK_METHOD(std::vector<TextReadoutSharedPtr>, text_readouts, (), (const));
+  MOCK_METHOD(void, forEachCounter,
+              (std::function<void(std::size_t)>, std::function<void(Stats::Counter&)>), (const));
+  MOCK_METHOD(void, forEachGauge,
+              (std::function<void(std::size_t)>, std::function<void(Stats::Gauge&)>), (const));
+  MOCK_METHOD(void, forEachTextReadout,
+              (std::function<void(std::size_t)>, std::function<void(Stats::TextReadout&)>),
+              (const));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));

@@ -263,11 +263,6 @@ envoy.filters.http.set_metadata:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
-envoy.filters.http.squash:
-  categories:
-  - envoy.filters.http
-  security_posture: requires_trusted_downstream_and_upstream
-  status: stable
 envoy.filters.http.tap:
   categories:
   - envoy.filters.http
@@ -343,27 +338,12 @@ envoy.filters.network.envoy_mobile_http_connection_manager:
   - envoy.filters.network
   security_posture: robust_to_untrusted_downstream
   status: stable
-envoy.filters.network.kafka_broker:
-  categories:
-  - envoy.filters.network
-  security_posture: requires_trusted_downstream_and_upstream
-  status: wip
 envoy.filters.network.local_ratelimit:
   categories:
   - envoy.filters.network
   security_posture: robust_to_untrusted_downstream
   status: stable
 envoy.filters.network.mongo_proxy:
-  categories:
-  - envoy.filters.network
-  security_posture: requires_trusted_downstream_and_upstream
-  status: stable
-envoy.filters.network.mysql_proxy:
-  categories:
-  - envoy.filters.network
-  security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
-envoy.filters.network.postgres_proxy:
   categories:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
@@ -383,11 +363,6 @@ envoy.filters.network.redis_proxy:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: stable
-envoy.filters.network.rocketmq_proxy:
-  categories:
-  - envoy.filters.network
-  security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
 envoy.filters.network.sni_cluster:
   categories:
   - envoy.filters.network
@@ -597,8 +572,8 @@ envoy.stat_sinks.wasm:
 envoy.tls.cert_validator.spiffe:
   categories:
   - envoy.tls.cert_validator
-  security_posture: unknown
-  status: wip
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.tracers.datadog:
   categories:
   - envoy.tracers
@@ -722,5 +697,10 @@ envoy.wasm.runtime.wavm:
 envoy.watchdog.profile_action:
   categories:
   - envoy.guarddog_actions
+  security_posture: data_plane_agnostic
+  status: alpha
+envoy.key_value.file_based:
+  categories:
+  - envoy.common.key_value
   security_posture: data_plane_agnostic
   status: alpha

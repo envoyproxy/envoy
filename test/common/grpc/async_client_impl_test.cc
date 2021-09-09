@@ -27,7 +27,7 @@ class EnvoyAsyncClientImplTest : public testing::Test {
 public:
   EnvoyAsyncClientImplTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
-    envoy::config::core::v3::GrpcService config;
+
     config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
 
     auto& initial_metadata_entry = *config.mutable_initial_metadata()->Add();
@@ -39,12 +39,25 @@ public:
     ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(http_client_));
   }
 
+  envoy::config::core::v3::GrpcService config;
   const Protobuf::MethodDescriptor* method_descriptor_;
   NiceMock<Http::MockAsyncClient> http_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
   AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
   DangerousDeprecatedTestTime test_time_;
 };
+
+TEST_F(EnvoyAsyncClientImplTest, ThreadSafe) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+
+  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([&]() {
+    // Verify that using the grpc client in a different thread cause assertion failure.
+    EXPECT_DEBUG_DEATH(grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                                           Http::AsyncClient::StreamOptions()),
+                       "isThreadSafe");
+  });
+  thread->join();
+}
 
 // Validate that the host header is the cluster name in grpc config.
 TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
@@ -129,9 +142,9 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
       .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
 
   // Prepare the parent context of this call.
-  auto address_provider = std::make_shared<Network::SocketAddressSetterImpl>(
+  auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), address_provider};
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), connection_info_provider};
   Http::AsyncClient::ParentContext parent_context{&stream_info};
 
   Http::AsyncClient::StreamOptions stream_options;

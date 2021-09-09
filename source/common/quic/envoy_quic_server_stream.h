@@ -45,9 +45,6 @@ public:
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
-  void setFlushTimeout(std::chrono::milliseconds) override {
-    // TODO(mattklein123): Actually implement this for HTTP/3 similar to HTTP/2.
-  }
 
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
@@ -79,6 +76,10 @@ protected:
                                  const quic::QuicHeaderList& header_list) override;
   void OnHeadersTooLarge() override;
 
+  // Http::MultiplexedStreamImplBase
+  void onPendingFlushTimer() override;
+  bool hasPendingData() override;
+
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();
 
@@ -87,7 +88,8 @@ private:
 
   // Either reset the stream or close the connection according to
   // should_close_connection and configured http3 options.
-  void onStreamError(absl::optional<bool> should_close_connection);
+  void onStreamError(absl::optional<bool> should_close_connection,
+                     quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD);
 
   Http::RequestDecoder* request_decoder_{nullptr};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction

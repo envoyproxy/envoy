@@ -131,8 +131,8 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     read_callbacks_->connection().streamInfo().filterState()->setData(
         Network::ProxyProtocolFilterState::key(),
         std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-            read_callbacks_->connection().addressProvider().remoteAddress(),
-            read_callbacks_->connection().addressProvider().localAddress()}),
+            read_callbacks_->connection().connectionInfoProvider().remoteAddress(),
+            read_callbacks_->connection().connectionInfoProvider().localAddress()}),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
@@ -166,6 +166,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
       // create timer to _begin_ draining
       createStartDrainTimer(drain_delay);
     });
+    ASSERT(start_drain_cb_ != nullptr);
   }
 }
 
@@ -286,16 +287,12 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
 
   ENVOY_CONN_LOG(debug, "new stream", read_callbacks_->connection());
 
-  // Set the account to start accounting if enabled. This is still a
-  // work-in-progress, and will be removed when other features using the
-  // accounting are implemented.
-  Buffer::BufferMemoryAccountSharedPtr downstream_stream_account;
-  if (Runtime::runtimeFeatureEnabled("envoy.test_only.per_stream_buffer_accounting")) {
-    // Create account, wiring the stream to use it.
-    auto& buffer_factory = read_callbacks_->connection().dispatcher().getWatermarkFactory();
-    downstream_stream_account = buffer_factory.createAccount(response_encoder.getStream());
-    response_encoder.getStream().setAccount(downstream_stream_account);
-  }
+  // Create account, wiring the stream to use it for tracking bytes.
+  // If tracking is disabled, the wiring becomes a NOP.
+  auto& buffer_factory = read_callbacks_->connection().dispatcher().getWatermarkFactory();
+  Buffer::BufferMemoryAccountSharedPtr downstream_stream_account =
+      buffer_factory.createAccount(response_encoder.getStream());
+  response_encoder.getStream().setAccount(downstream_stream_account);
   ActiveStreamPtr new_stream(new ActiveStream(*this, response_encoder.getStream().bufferLimit(),
                                               std::move(downstream_stream_account)));
 
@@ -484,9 +481,7 @@ void ConnectionManagerImpl::doConnectionClose(
     connection_duration_timer_.reset();
   }
 
-  if (start_drain_cb_) {
-    start_drain_cb_.reset();
-  }
+  start_drain_cb_.reset();
 
   if (start_drain_timer_) {
     start_drain_timer_->disableTimer();
@@ -860,7 +855,7 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 }
 
 uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
-  auto ip = connection()->addressProvider().localAddress()->ip();
+  auto ip = connection()->connectionInfoProvider().localAddress()->ip();
   if (ip == nullptr) {
     return 0;
   }

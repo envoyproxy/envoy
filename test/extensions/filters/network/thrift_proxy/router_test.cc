@@ -115,8 +115,8 @@ public:
       router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
                                          context_.runtime(), shadow_writer_);
     } else {
-      shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(context_.clusterManager(), "test",
-                                                               context_.scope(), dispatcher_);
+      shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(
+          context_.clusterManager(), "test", context_.scope(), dispatcher_, context_.threadLocal());
       router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
                                          context_.runtime(), *shadow_writer_impl_);
     }
@@ -414,6 +414,13 @@ public:
       EXPECT_CALL(*protocol, writeSetEnd(_));
     }
     EXPECT_EQ(FilterStatus::Continue, router_->setEnd());
+  }
+
+  void sendPassthroughData() {
+    Buffer::OwnedImpl buffer;
+    buffer.add("hello");
+
+    EXPECT_EQ(FilterStatus::Continue, router_->passthroughData(buffer));
   }
 
   void completeRequest() {
@@ -1587,6 +1594,7 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
   sendTrivialMap();
   sendTrivialList();
   sendTrivialSet();
+  sendPassthroughData();
 
   completeRequest();
   returnResponse();

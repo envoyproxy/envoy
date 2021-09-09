@@ -82,6 +82,9 @@ SubsetLoadBalancer::SubsetLoadBalancer(
         // performed.
         rebuildSingle();
 
+        // Update cross priority host map.
+        cross_priority_host_map_ = original_priority_set_.crossPriorityHostMap();
+
         if (hosts_added.empty() && hosts_removed.empty()) {
           // It's possible that metadata changed, without hosts being added nor removed.
           // If so we need to add any new subsets, remove unused ones, and regroup hosts into
@@ -276,6 +279,12 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
 }
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
+  HostConstSharedPtr override_host =
+      LoadBalancerContextBase::selectOverrideHost(cross_priority_host_map_.get(), context);
+  if (override_host != nullptr) {
+    return override_host;
+  }
+
   if (context) {
     bool host_chosen;
     HostConstSharedPtr host = tryChooseHostFromContext(context, host_chosen);
@@ -781,8 +790,8 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
 
   case LoadBalancerType::OriginalDst:
   case LoadBalancerType::ClusterProvided:
-    // LoadBalancerType::OriginalDst is blocked in the factory. LoadBalancerType::ClusterProvided
-    // is impossible because the subset LB returns a null load balancer from its factory.
+  case LoadBalancerType::LoadBalancingPolicyConfig:
+    // These load balancer types can only be created when there is no subset configuration.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 

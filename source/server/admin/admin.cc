@@ -131,14 +131,15 @@ void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&
                  "listen() failed on admin listener");
   socket_factory_ = std::make_unique<AdminListenSocketFactory>(socket_);
   listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
-  ENVOY_LOG(info, "admin address: {}", socket().addressProvider().localAddress()->asString());
+  ENVOY_LOG(info, "admin address: {}",
+            socket().connectionInfoProvider().localAddress()->asString());
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
     if (!address_out_file) {
       ENVOY_LOG(critical, "cannot open admin address output file {} for writing.",
                 address_out_path);
     } else {
-      address_out_file << socket_->addressProvider().localAddress()->asString();
+      address_out_file << socket_->connectionInfoProvider().localAddress()->asString();
     }
   }
 }
@@ -237,6 +238,8 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
                                          const std::vector<Network::FilterFactoryCb>&) {
   // Pass in the null overload manager so that the admin interface is accessible even when Envoy
   // is overloaded.
+  // TODO: Pass in a new drain-manager (and remove proactive-draining flag from HCM) to avoid
+  //       draining (admin server should not drain).
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.api().randomGenerator(), server_.httpContext(),
       server_.runtime(), server_.localInfo(), server_.clusterManager(), null_overload_manager_,

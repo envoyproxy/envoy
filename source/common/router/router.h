@@ -146,7 +146,22 @@ public:
                                   bool per_try_timeout_hedging_enabled,
                                   bool respect_expected_rq_timeout);
 
-  static bool trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_entry,
+  /**
+   * Try to parse a header entry that may have a timeout field
+   *
+   * @param header_timeout_entry header entry which may contain a timeout value.
+   * @return result timeout value from header. It will return nullopt if parse failed.
+   */
+  static absl::optional<std::chrono::milliseconds>
+  tryParseHeaderTimeout(const Http::HeaderEntry& header_timeout_entry);
+
+  /**
+   * Try to set global timeout.
+   *
+   * @param header_timeout_entry header entry which may contain a timeout value.
+   * @param timeout timeout data to set from header timeout entry.
+   */
+  static void trySetGlobalTimeout(const Http::HeaderEntry& header_timeout_entry,
                                   TimeoutData& timeout);
 
   /**
@@ -262,6 +277,7 @@ public:
   virtual Upstream::ClusterInfoConstSharedPtr cluster() PURE;
   virtual FilterConfig& config() PURE;
   virtual FilterUtility::TimeoutData timeout() PURE;
+  virtual absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const PURE;
   virtual Http::RequestHeaderMap* downstreamHeaders() PURE;
   virtual Http::RequestTrailerMap* downstreamTrailers() PURE;
   virtual bool downstreamResponseStarted() const PURE;
@@ -285,9 +301,7 @@ public:
   Filter(FilterConfig& config)
       : config_(config), final_upstream_request_(nullptr),
         downstream_100_continue_headers_encoded_(false), downstream_response_started_(false),
-        downstream_end_stream_(false), is_retry_(false),
-        attempting_internal_redirect_with_complete_stream_(false),
-        request_buffer_overflowed_(false) {}
+        downstream_end_stream_(false), is_retry_(false), request_buffer_overflowed_(false) {}
 
   ~Filter() override;
 
@@ -408,8 +422,8 @@ public:
     std::string value;
     const Network::Connection* conn = downstreamConnection();
     // Need to check for null conn if this is ever used by Http::AsyncClient in the future.
-    value = conn->addressProvider().remoteAddress()->asString() +
-            conn->addressProvider().localAddress()->asString();
+    value = conn->connectionInfoProvider().remoteAddress()->asString() +
+            conn->connectionInfoProvider().localAddress()->asString();
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
     downstream_set_cookies_.emplace_back(
@@ -436,6 +450,9 @@ public:
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
   FilterConfig& config() override { return config_; }
   FilterUtility::TimeoutData timeout() override { return timeout_; }
+  absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const override {
+    return dynamic_max_stream_duration_;
+  }
   Http::RequestHeaderMap* downstreamHeaders() override { return downstream_headers_; }
   Http::RequestTrailerMap* downstreamTrailers() override { return downstream_trailers_; }
   bool downstreamResponseStarted() const override { return downstream_response_started_; }
@@ -497,7 +514,7 @@ private:
   // for the remaining upstream requests to return.
   void resetOtherUpstreams(UpstreamRequest& upstream_request);
   void sendNoHealthyUpstreamResponse();
-  bool setupRedirect(const Http::ResponseHeaderMap& headers, UpstreamRequest& upstream_request);
+  bool setupRedirect(const Http::ResponseHeaderMap& headers);
   bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
                                                 const Http::HeaderEntry& internal_redirect,
                                                 uint64_t status_code);
@@ -535,7 +552,8 @@ private:
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
-
+  // The stream lifetime configured by request header.
+  absl::optional<std::chrono::milliseconds> dynamic_max_stream_duration_;
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;
 
@@ -544,7 +562,6 @@ private:
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;
   bool include_attempt_count_in_request_ : 1;
-  bool attempting_internal_redirect_with_complete_stream_ : 1;
   bool request_buffer_overflowed_ : 1;
   bool internal_redirects_with_body_enabled_ : 1;
   uint32_t attempt_count_{1};

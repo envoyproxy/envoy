@@ -14,10 +14,12 @@ namespace DynamicForwardProxy {
 class DnsCacheManagerImpl : public DnsCacheManager, public Singleton::Instance {
 public:
   DnsCacheManagerImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-                      Random::RandomGenerator& random, Runtime::Loader& loader,
-                      Stats::Scope& root_scope)
+                      Random::RandomGenerator& random, Filesystem::Instance& file_system,
+                      Runtime::Loader& loader, Stats::Scope& root_scope,
+                      ProtobufMessage::ValidationVisitor& validation_visitor)
       : main_thread_dispatcher_(main_thread_dispatcher), tls_(tls), random_(random),
-        loader_(loader), root_scope_(root_scope) {}
+        file_system_(file_system), loader_(loader), root_scope_(root_scope),
+        validation_visitor_(validation_visitor) {}
 
   // DnsCacheManager
   DnsCacheSharedPtr getCache(
@@ -36,18 +38,23 @@ private:
   Event::Dispatcher& main_thread_dispatcher_;
   ThreadLocal::SlotAllocator& tls_;
   Random::RandomGenerator& random_;
+  Filesystem::Instance& file_system_;
   Runtime::Loader& loader_;
   Stats::Scope& root_scope_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+
   absl::flat_hash_map<std::string, ActiveCache> caches_;
 };
 
 class DnsCacheManagerFactoryImpl : public DnsCacheManagerFactory {
 public:
   DnsCacheManagerFactoryImpl(Singleton::Manager& singleton_manager, Event::Dispatcher& dispatcher,
-                             ThreadLocal::SlotAllocator& tls, Random::RandomGenerator& random,
-                             Runtime::Loader& loader, Stats::Scope& root_scope)
-      : singleton_manager_(singleton_manager), dispatcher_(dispatcher), tls_(tls), random_(random),
-        loader_(loader), root_scope_(root_scope) {}
+                             ThreadLocal::SlotAllocator& tls, Api::Api& api,
+                             Runtime::Loader& loader, Stats::Scope& root_scope,
+                             ProtobufMessage::ValidationVisitor& validation_visitor)
+      : singleton_manager_(singleton_manager), dispatcher_(dispatcher), tls_(tls),
+        random_(api.randomGenerator()), file_system_(api.fileSystem()), loader_(loader),
+        root_scope_(root_scope), validation_visitor_(validation_visitor) {}
 
   DnsCacheManagerSharedPtr get() override;
 
@@ -56,8 +63,10 @@ private:
   Event::Dispatcher& dispatcher_;
   ThreadLocal::SlotAllocator& tls_;
   Random::RandomGenerator& random_;
+  Filesystem::Instance& file_system_;
   Runtime::Loader& loader_;
   Stats::Scope& root_scope_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 } // namespace DynamicForwardProxy

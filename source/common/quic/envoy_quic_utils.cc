@@ -148,7 +148,7 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
   }
   connection_socket->bind(local_addr);
   ASSERT(local_addr->ip());
-  local_addr = connection_socket->addressProvider().localAddress();
+  local_addr = connection_socket->connectionInfoProvider().localAddress();
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");

@@ -68,7 +68,7 @@ public:
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
                         Server::OverloadManager& overload_manager, TimeSource& time_system,
-                        bool use_proactive_draining = true);
+                        bool use_proactive_draining);
   ~ConnectionManagerImpl() override;
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
