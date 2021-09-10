@@ -885,6 +885,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.rbac",
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
+            "envoy.rbac.matchers.upstream_ip",
+            "envoy.rbac.matchers.upstream_port",
         ],
         release_date = "2020-04-02",
         cpe = "N/A",
