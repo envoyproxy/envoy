@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Tests for cve_scan."""
 
-from collections import defaultdict
 import datetime as dt
 import unittest
+from collections import defaultdict
+from unittest.mock import MagicMock
 
 import cve_scan
 
@@ -281,8 +282,8 @@ class CveScanTest(unittest.TestCase):
             'foo': self.build_dep('cpe:2.3:a:foo:*:*', version='1.2.3'),
             'blah': self.build_dep('N/A'),
         }
-        possible_cves, cve_deps = cve_scan.cve_scan(
-            cves, cpe_revmap, cve_allowlist, repository_locations)
+        cve_scan.repository_locations = MagicMock(return_value=repository_locations)
+        possible_cves, cve_deps = cve_scan.cve_scan(cves, cpe_revmap, cve_allowlist)
         self.assertListEqual(sorted(possible_cves.keys()), ['CVE-2020-1234', 'CVE-2020-1236'])
         self.assertDictEqual(
             cve_deps, {

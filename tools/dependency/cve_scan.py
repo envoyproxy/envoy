@@ -12,7 +12,7 @@ import sys
 import textwrap
 import urllib.request
 
-import utils as dep_utils
+from tools.dependency.utils import repository_locations
 
 # These CVEs are false positives for the match heuristics. An explanation is
 # required when adding a new entry to this list as a comment.
@@ -285,22 +285,21 @@ def cve_match(cve, dep_metadata):
     return False
 
 
-def cve_scan(cves, cpe_revmap, cve_allowlist, repository_locations):
+def cve_scan(cves, cpe_revmap, cve_allowlist):
     """Scan for CVEs in a parsed NIST CVE database.
 
     Args:
         cves: CVE dictionary as provided by download_cve_data().
         cve_revmap: CPE-CVE reverse map as provided by download_cve_data().
         cve_allowlist: an allowlist of CVE IDs to ignore.
-        repository_locations: a dictionary of dependency metadata in the format
-           described in api/bazel/external_deps.bzl.
     Returns:
         possible_cves: a dictionary mapping CVE IDs to Cve objects.
         cve_deps: a dictionary mapping CVE IDs to dependency names.
     """
     possible_cves = {}
     cve_deps = defaultdict(list)
-    for dep, metadata in repository_locations.items():
+
+    for dep, metadata in repository_locations().items():
         cpe = metadata.get('cpe', 'N/A')
         if cpe == 'N/A':
             continue
@@ -317,7 +316,7 @@ def cve_scan(cves, cpe_revmap, cve_allowlist, repository_locations):
 
 if __name__ == '__main__':
     # Allow local overrides for NIST CVE database URLs via args.
-    urls = sys.argv[1:]
+    urls = sys.argv[2:]
     if not urls:
         # We only look back a few years, since we shouldn't have any ancient deps.
         current_year = dt.datetime.now().year
@@ -327,8 +326,7 @@ if __name__ == '__main__':
             for year in scan_years
         ]
     cves, cpe_revmap = download_cve_data(urls)
-    possible_cves, cve_deps = cve_scan(
-        cves, cpe_revmap, IGNORES_CVES, dep_utils.repository_locations())
+    possible_cves, cve_deps = cve_scan(cves, cpe_revmap, IGNORES_CVES)
     if possible_cves:
         print(
             '\nBased on heuristic matching with the NIST CVE database, Envoy may be vulnerable to:')

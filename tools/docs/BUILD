@@ -21,7 +21,6 @@ py_binary(
         "generate_external_deps_rst.py",
     ],
     deps = [
-        "//tools/dependency:exports",
         "//tools/dependency:utils",
     ],
 )
