@@ -198,7 +198,6 @@ proto_library(
         "//envoy/extensions/quic/crypto_stream/v3:pkg",
         "//envoy/extensions/quic/proof_source/v3:pkg",
         "//envoy/extensions/rate_limit_descriptors/expr/v3:pkg",
-        "//envoy/extensions/rbac/matchers/upstream/v3:pkg",
         "//envoy/extensions/rbac/matchers/upstream_ip/v3:pkg",
         "//envoy/extensions/rbac/matchers/upstream_port/v3:pkg",
         "//envoy/extensions/request_id/uuid/v3:pkg",
