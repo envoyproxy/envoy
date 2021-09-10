@@ -1200,7 +1200,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
   pools->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   container.do_not_delete_ = false;
 
-  if (container.pools_->size() == 0) {
+  if (container.pools_->empty()) {
     host_http_conn_pool_map_.erase(old_host);
   }
 }
@@ -1393,7 +1393,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainAllConnPoolsWorker(
           Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
       container->do_not_delete_ = false;
 
-      if (container->pools_->size() == 0) {
+      if (container->pools_->empty()) {
         host_http_conn_pool_map_.erase(host);
       }
     }
@@ -1539,7 +1539,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
     // Guard deletion of the container with `do_not_delete_` to avoid deletion while
     // iterating through the container in `container->pools_->startDrain()`. See
     // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
-    if (!container->do_not_delete_ && container->pools_->size() == 0) {
+    if (!container->do_not_delete_ && container->pools_->empty()) {
       ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
       host_http_conn_pool_map_.erase(
           host); // NOTE: `container` is erased after this point in the lambda.
