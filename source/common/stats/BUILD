@@ -30,7 +30,9 @@ envoy_cc_library(
     hdrs = ["custom_stat_namespaces_impl.h"],
     deps = [
         "//envoy/stats:custom_stat_namespaces_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:macros",
+        "//source/common/common:thread_lib",
     ],
 )
 
