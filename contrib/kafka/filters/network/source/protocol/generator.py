@@ -107,8 +107,8 @@ class StatefulProcessor:
 
     def parse_messages(self, input_files):
         """
-    Parse request/response structures from provided input files.
-    """
+        Parse request/response structures from provided input files.
+        """
         import re
         import json
 
@@ -123,7 +123,9 @@ class StatefulProcessor:
                     without_comments = re.sub(r'\s*//.*\n', '\n', raw_contents)
                     without_empty_newlines = re.sub(
                         r'^\s*$', '', without_comments, flags=re.MULTILINE)
-                    message_spec = json.loads(without_empty_newlines)
+                    # Windows support: see PR 10542 for details.
+                    amended = re.sub(r'-2147483648', 'INT32_MIN', without_empty_newlines)
+                    message_spec = json.loads(amended)
                     message = self.parse_top_level_element(message_spec)
                     messages.append(message)
             except Exception as e:
