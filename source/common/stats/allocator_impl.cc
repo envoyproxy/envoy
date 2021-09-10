@@ -110,7 +110,7 @@ protected:
   // However, we must hold alloc_.mutex_ when decrementing ref_count_ so that
   // when it hits zero we can atomically remove it from alloc_.counters_ or
   // alloc_.gauges_. We leave it atomic to avoid taking the lock on increment.
-  std::atomic<uint32_t> ref_count_{0};
+  std::atomic<uint16_t> ref_count_{0};
 
   std::atomic<uint16_t> flags_{0};
 };

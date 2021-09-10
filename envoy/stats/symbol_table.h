@@ -56,7 +56,7 @@ public:
    * into the SymbolTable, which will not be optimal, but in practice appears
    * to be pretty good.
    *
-   * This is exposed in the interface for the benefit of join(), which which is
+   * This is exposed in the interface for the benefit of join(), which is
    * used in the hot-path to append two stat-names into a temp without taking
    * locks. This is used then in thread-local cache lookup, so that once warm,
    * no locks are taken when looking up stats.
@@ -128,7 +128,7 @@ public:
    *
    * @param names A pointer to the first name in an array, allocated by the caller.
    * @param num_names The number of names.
-   * @param symbol_table The symbol table in which to encode the names.
+   * @param list The StatNameList representing the stat names.
    */
   virtual void populateList(const StatName* names, uint32_t num_names, StatNameList& list) PURE;
 
