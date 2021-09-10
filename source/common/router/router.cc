@@ -1624,7 +1624,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
 
 void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
   for (const auto& options_predicate : route_entry_->retryPolicy().retryOptionsPredicates()) {
-    Upstream::RetryOptionsPredicate::UpdateOptionsParameters parameters{
+    const Upstream::RetryOptionsPredicate::UpdateOptionsParameters parameters{
         retriable_request.streamInfo(), upstreamSocketOptions()};
     auto ret = options_predicate->updateOptions(parameters);
     if (ret.new_upstream_socket_options_.has_value()) {
