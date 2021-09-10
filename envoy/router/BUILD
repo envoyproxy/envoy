@@ -19,6 +19,7 @@ envoy_cc_library(
     deps = [
         ":router_interface",
         "//envoy/http:filter_interface",
+        "//envoy/router:rds_template_interface",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -127,5 +128,13 @@ envoy_cc_library(
         "//envoy/config:typed_config_interface",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "rds_template_interface",
+    hdrs = [
+        "rds/route_config_provider.h",
+        "rds/route_config_update_receiver.h",
     ],
 )

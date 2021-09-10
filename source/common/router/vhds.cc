@@ -20,7 +20,7 @@ namespace Envoy {
 namespace Router {
 
 // Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
-VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
+VhdsSubscription::VhdsSubscription(RouteConfigUpdateReceiver* config_update_info,
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    const std::string& stat_prefix,
                                    absl::optional<RouteConfigProvider*>& route_config_provider_opt)

@@ -125,6 +125,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:rds_template_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -185,6 +186,7 @@ envoy_cc_library(
         "//source/common/init:target_lib",
         "//source/common/init:watcher_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:rds_template_lib",
         "//source/common/router:route_config_update_impl_lib",
         "//source/common/router:vhds_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -419,5 +421,23 @@ envoy_cc_library(
     hdrs = ["delegating_route_impl.h"],
     deps = [
         "//envoy/router:router_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "rds_template_lib",
+    hdrs = [
+        "rds/config_factory.h",
+        "rds/rds_route_config_provider_impl.h",
+        "rds/rds_route_config_subscription.h",
+        "rds/route_config_provider_manager.h",
+        "rds/route_config_provider_manager_impl.h",
+        "rds/route_config_update_receiver_impl.h",
+        "rds/static_route_config_provider_impl.h",
+    ],
+    deps = [
+        "//envoy/router:rds_template_interface",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

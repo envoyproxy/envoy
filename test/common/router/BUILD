@@ -115,6 +115,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "rds_template_test",
+    srcs = ["rds_template_test.cc"],
+    deps = [
+        "//source/common/router:rds_template_lib",
+        "//test/mocks/server:instance_mocks",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "scoped_config_impl_test",
     srcs = ["scoped_config_impl_test.cc"],
     external_deps = [

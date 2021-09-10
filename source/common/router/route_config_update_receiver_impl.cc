@@ -16,23 +16,19 @@ namespace Router {
 
 bool RouteConfigUpdateReceiverImpl::onRdsUpdate(
     const envoy::config::route::v3::RouteConfiguration& rc, const std::string& version_info) {
-  const uint64_t new_hash = MessageUtil::hash(rc);
-  if (new_hash == last_config_hash_) {
+  if (!base_.updateHash(rc)) {
     return false;
   }
-  route_config_proto_ = std::make_unique<envoy::config::route::v3::RouteConfiguration>(rc);
-  last_config_hash_ = new_hash;
   const uint64_t new_vhds_config_hash = rc.has_vhds() ? MessageUtil::hash(rc.vhds()) : 0ul;
   vhds_configuration_changed_ = new_vhds_config_hash != last_vhds_config_hash_;
   last_vhds_config_hash_ = new_vhds_config_hash;
-  initializeRdsVhosts(*route_config_proto_);
+  initializeRdsVhosts(rc);
 
-  rebuildRouteConfig(rds_virtual_hosts_, *vhds_virtual_hosts_, *route_config_proto_);
-  config_ = std::make_shared<ConfigImpl>(
-      *route_config_proto_, optional_http_filters_, factory_context_,
-      factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
+  auto route_config_proto = std::make_unique<envoy::config::route::v3::RouteConfiguration>(rc);
+  rebuildRouteConfig(rds_virtual_hosts_, *vhds_virtual_hosts_, *route_config_proto);
+  base_.updateConfig(std::move(route_config_proto));
 
-  onUpdateCommon(version_info);
+  base_.onUpdateCommon(version_info);
   return true;
 }
 
@@ -49,28 +45,17 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
 
   auto route_config_after_this_update =
       std::make_unique<envoy::config::route::v3::RouteConfiguration>();
-  route_config_after_this_update->CopyFrom(*route_config_proto_);
+  route_config_after_this_update->CopyFrom(base_.protobufConfiguration());
   rebuildRouteConfig(rds_virtual_hosts_, *vhosts_after_this_update,
                      *route_config_after_this_update);
 
-  auto new_config = std::make_shared<ConfigImpl>(
-      *route_config_after_this_update, optional_http_filters_, factory_context_,
-      factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
-
   // No exception, route_config_after_this_update is valid, can update the state.
   vhds_virtual_hosts_ = std::move(vhosts_after_this_update);
-  route_config_proto_ = std::move(route_config_after_this_update);
-  config_ = new_config;
+  base_.updateConfig(std::move(route_config_after_this_update));
   resource_ids_in_last_update_ = added_resource_ids;
-  onUpdateCommon(version_info);
+  base_.onUpdateCommon(version_info);
 
   return removed || updated || !resource_ids_in_last_update_.empty();
-}
-
-void RouteConfigUpdateReceiverImpl::onUpdateCommon(const std::string& version_info) {
-  last_config_version_ = version_info;
-  last_updated_ = time_source_.systemTime();
-  config_info_.emplace(RouteConfigProvider::ConfigInfo{*route_config_proto_, last_config_version_});
 }
 
 void RouteConfigUpdateReceiverImpl::initializeRdsVhosts(
@@ -121,6 +106,17 @@ void RouteConfigUpdateReceiverImpl::rebuildRouteConfig(
   for (const auto& vhost : vhds_vhosts) {
     route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
   }
+}
+
+ConfigConstSharedPtr RouteConfigUpdateReceiverImpl::createConfig(
+    const envoy::config::route::v3::RouteConfiguration& rc) const {
+  return std::make_shared<ConfigImpl>(
+      rc, optional_http_filters_, factory_context_,
+      factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
+}
+
+ConfigConstSharedPtr RouteConfigUpdateReceiverImpl::createConfig() const {
+  return std::make_shared<NullConfigImpl>();
 }
 
 } // namespace Router

@@ -11,6 +11,7 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/common/router/rds/rds_route_config_provider_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/router/rds_impl.h"
 
 #include "test/mocks/init/mocks.h"
@@ -41,13 +42,6 @@ namespace {
 
 using ::Envoy::Matchers::MockStringMatcher;
 using ::Envoy::Matchers::UniversalStringMatcher;
-
-envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy
-parseThriftProxyFromYaml(const std::string& yaml_string) {
-  envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy thrift_proxy;
-  TestUtility::loadFromYaml(yaml_string, thrift_proxy);
-  return thrift_proxy;
-}
 
 class RdsTestBase : public testing::Test {
 public:
@@ -80,177 +74,8 @@ public:
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
 };
 
-class RdsImplTest : public RdsTestBase {
-public:
-  RdsImplTest() {
-    EXPECT_CALL(server_factory_context_.admin_.config_tracker_, add_("routes", _));
-    route_config_provider_manager_ =
-        std::make_unique<RouteConfigProviderManagerImpl>(server_factory_context_.admin_);
-  }
-  ~RdsImplTest() override { server_factory_context_.thread_local_.shutdownThread(); }
-
-  void setup() {
-    std::string config_yaml = R"EOF(
-rds:
-  config_source:
-    api_config_source:
-      api_type: REST
-      cluster_names:
-      - foo_cluster
-      refresh_delay: 1s
-  route_config_name: foo_route_config
-    )EOF";
-
-    EXPECT_CALL(outer_init_manager_, add(_));
-    rds_ = route_config_provider_manager_->createRdsRouteConfigProvider(
-        parseThriftProxyFromYaml(config_yaml).rds(), server_factory_context_, "foo.",
-        outer_init_manager_);
-    rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
-    EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-                start(_));
-    outer_init_manager_.initialize(init_watcher_);
-  }
-
-  RouteConstSharedPtr route(const MessageMetadata& metadata) {
-    return rds_->config()->route(metadata, 12345);
-  }
-
-  RouteConfigProviderManagerImplPtr route_config_provider_manager_;
-  RouteConfigProviderSharedPtr rds_;
-};
-
-TEST_F(RdsImplTest, DestroyDuringInitialize) {
-  InSequence s;
-  setup();
-  EXPECT_CALL(init_watcher_, ready());
-  rds_.reset();
-}
-
-TEST_F(RdsImplTest, Basic) {
-  InSequence s;
-  Buffer::OwnedImpl empty;
-  Buffer::OwnedImpl data;
-
-  setup();
-
-  // Make sure the initial empty route table works.
-  MessageMetadata md;
-  md.setMethodName("foo");
-  EXPECT_EQ(nullptr, route(md));
-
-  // Initial request.
-  const std::string response1_json = R"EOF(
-{
-  "version_info": "1",
-  "resources": [
-    {
-      "@type": "type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.RouteConfiguration",
-      "name": "foo_route_config",
-      "routes": null
-    }
-  ]
-}
-)EOF";
-  auto response1 =
-      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
-  const auto decoded_resources = TestUtility::decodeResources<
-      envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>(response1);
-
-  EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
-  md.setMethodName("bar");
-  EXPECT_EQ(nullptr, route(md));
-
-  // 2nd request with same response. Based on hash should not reload config.
-  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
-  EXPECT_EQ(nullptr, route(md));
-
-  // Load the config and verified shared count.
-  // ConfigConstSharedPtr is shared between: RouteConfigUpdateReceiverImpl, rds_ (via tls_), and
-  // config local var below.
-  ConfigConstSharedPtr config = rds_->config();
-  EXPECT_EQ(3, config.use_count());
-
-  // Third request.
-  const std::string response2_json = R"EOF(
-{
-  "version_info": "2",
-  "resources": [
-    {
-      "@type": "type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.RouteConfiguration",
-      "name": "foo_route_config",
-      "routes": [
-        {
-          "match":
-          {
-            "method_name": "bar"
-          },
-          "route":
-          {
-            "cluster": "foo"
-          }
-        }
-      ]
-    }
-  ]
-}
-  )EOF";
-  auto response2 =
-      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_json);
-  const auto decoded_resources_2 = TestUtility::decodeResources<
-      envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>(response2);
-
-  // Make sure we don't lookup/verify clusters.
-  EXPECT_CALL(server_factory_context_.cluster_manager_, getThreadLocalCluster(Eq("bar"))).Times(0);
-  rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info());
-  EXPECT_EQ("foo", route(md)->routeEntry()->clusterName());
-
-  // Old config use count should be 1 now.
-  EXPECT_EQ(1, config.use_count());
-  EXPECT_EQ(2UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
-  EXPECT_TRUE(scope_.findGaugeByString("foo.rds.foo_route_config.config_reload_time_ms"));
-}
-
-// Validate behavior when the config is delivered but it fails PGV validation.
-TEST_F(RdsImplTest, FailureInvalidConfig) {
-  InSequence s;
-
-  setup();
-
-  const std::string response1_json = R"EOF(
-{
-  "version_info": "1",
-  "resources": [
-    {
-      "@type": "type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.RouteConfiguration",
-      "name": "INVALID_NAME_FOR_route_config",
-      "routes": null
-    }
-  ]
-}
-)EOF";
-  auto response1 =
-      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
-  const auto decoded_resources = TestUtility::decodeResources<
-      envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>(response1);
-
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_THROW_WITH_MESSAGE(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
-      EnvoyException,
-      "Unexpected RDS configuration (expecting foo_route_config): INVALID_NAME_FOR_route_config");
-}
-
-// Validate behavior when the config fails delivery at the subscription level.
-TEST_F(RdsImplTest, FailureSubscription) {
-  InSequence s;
-
-  setup();
-
-  EXPECT_CALL(init_watcher_, ready());
-  // onConfigUpdateFailed() should not be called for gRPC stream connection failure
-  rds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, {});
-}
+using RdsRouteConfigProviderImpl = Envoy::Router::Rds::RdsRouteConfigProviderImpl<
+    envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration, Config>;
 
 class RouteConfigProviderManagerImplTest : public RdsTestBase {
 public:
@@ -549,29 +374,6 @@ routes:
     EXPECT_TRUE(provider2->configInfo().has_value());
     EXPECT_EQ(Init::Manager::State::Initialized, real_init_manager.state());
   }
-}
-
-TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateEmpty) {
-  setup();
-  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(_));
-  outer_init_manager_.initialize(init_watcher_);
-  EXPECT_CALL(init_watcher_, ready());
-  server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate({}, "");
-}
-
-TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateWrongSize) {
-  setup();
-  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(_));
-  outer_init_manager_.initialize(init_watcher_);
-  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration route_config;
-  const auto decoded_resources = TestUtility::decodeResources({route_config, route_config});
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_THROW_WITH_MESSAGE(
-      server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-          decoded_resources.refvec_, ""),
-      EnvoyException, "Unexpected RDS resource length: 2");
 }
 
 } // namespace
