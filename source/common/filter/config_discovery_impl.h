@@ -105,17 +105,17 @@ public:
     const absl::optional<Envoy::Http::FilterFactoryCb> default_config =
         default_configuration_ ? absl::make_optional(factory_cb_(default_configuration_.value()))
                                : absl::nullopt;
-    tls_.runOnAllThreads([config = default_config,
-                          default_config](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
-                         [this, default_config, applied_on_all_threads]() {
-                           // This happens after all workers have discarded the previous config so
-                           // it can be safely deleted on the main thread by an update with the new
-                           // config.
-                           this->current_config_ = default_config;
-                           if (applied_on_all_threads) {
-                             applied_on_all_threads();
-                           }
-                         });
+    tls_.runOnAllThreads(
+        [config = default_config](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
+        [this, default_config, applied_on_all_threads]() {
+          // This happens after all workers have discarded the previous config so
+          // it can be safely deleted on the main thread by an update with the new
+          // config.
+          this->current_config_ = default_config;
+          if (applied_on_all_threads) {
+            applied_on_all_threads();
+          }
+        });
   }
 
   void applyDefaultConfiguration() override {
