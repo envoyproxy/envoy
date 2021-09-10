@@ -67,7 +67,7 @@ public:
   /**
    * @return information about the local environment the server is running in.
    */
-  virtual const LocalInfo::LocalInfo& localInfo() PURE;
+  virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
    * @return Server::Admin& the server's global admin HTTP endpoint.
@@ -85,8 +85,7 @@ public:
   virtual Singleton::Manager& singletonManager() PURE;
 
   /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
-   *         messages.
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration messages.
    */
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 
@@ -94,6 +93,12 @@ public:
    * @return Stats::Scope& the context's stats scope.
    */
   virtual Stats::Scope& scope() PURE;
+
+  /**
+   * @return ThreadLocal::SlotAllocator& the thread local storage engine for the server. This is
+   *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
+   */
+  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
 };
 
 /**
@@ -108,12 +113,6 @@ public:
    *         messages.
    */
   virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
-
-  /**
-   * @return ThreadLocal::SlotAllocator& the thread local storage engine for the server. This is
-   *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
-   */
-  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
 
   /**
    * @return TimeSource& a reference to the time source.

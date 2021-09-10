@@ -66,16 +66,9 @@ public:
   virtual Stats::Store& stats() PURE;
 
   /**
-   * @return the server's TLS slot allocator.
-   */
-  virtual ThreadLocal::SlotAllocator& tls() PURE;
-
-  /**
    * @return Outlier::EventLoggerSharedPtr sink for outlier detection event logs.
    */
   virtual Outlier::EventLoggerSharedPtr outlierEventLogger() PURE;
-
-  // FactoryContextBase
   virtual Stats::Scope& scope() override { return stats(); }
 };
 
