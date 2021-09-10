@@ -604,6 +604,9 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
   ScopeTrackerScopeState scope(&*this, dispatcher_);
   filter_manager_callbacks_.resetIdleTimer();
 
+  const bool fix_added_trailers =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_added_trailers");
+
   // If a response is complete or a reset has been sent, filters do not care about further body
   // data. Just drop it.
   if (state_.local_complete_) {
@@ -690,6 +693,9 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
 
     if (!trailers_exists_at_start && filter_manager_callbacks_.requestTrailers() &&
         trailers_added_entry == decoder_filters_.end()) {
+      if (fix_added_trailers) {
+        end_stream = false;
+      }
       trailers_added_entry = entry;
     }
 
@@ -698,7 +704,11 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
       // a previous filter has added trailers.
-      return;
+      if (fix_added_trailers) {
+        break;
+      } else {
+        return;
+      }
     }
   }
 
