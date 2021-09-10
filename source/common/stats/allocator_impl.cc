@@ -45,8 +45,8 @@ void AllocatorImpl::debugPrint() {
 // which we need in order to clean up the counter and gauge maps in that class
 // when they are destroyed.
 //
-// We implement the RefcountInterface API, using 16 bits that would otherwise be
-// wasted in the alignment padding next to flags_.
+// We implement the RefcountInterface API to avoid weak counter and destructor overhead in
+// shared_ptr.
 template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> {
 public:
   StatsSharedImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
@@ -110,7 +110,7 @@ protected:
   // However, we must hold alloc_.mutex_ when decrementing ref_count_ so that
   // when it hits zero we can atomically remove it from alloc_.counters_ or
   // alloc_.gauges_. We leave it atomic to avoid taking the lock on increment.
-  std::atomic<uint16_t> ref_count_{0};
+  std::atomic<uint32_t> ref_count_{0};
 
   std::atomic<uint16_t> flags_{0};
 };
