@@ -11,7 +11,7 @@ namespace Server {
 
 namespace {
 
-// TODO(mathetake) replace with re2 for safety.
+// TODO(mathetake) replace with re2 for safety and safety.
 const std::regex& promRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "[^a-zA-Z0-9_]"); }
 
 /**
