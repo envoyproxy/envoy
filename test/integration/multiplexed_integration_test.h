@@ -16,7 +16,8 @@ public:
   void simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes);
 
 protected:
-  // Utility function to prepend filters.
+  // Utility function to prepend filters. Note that the filters
+  // are added in reverse order.
   void prependFilters(std::vector<std::string> filters) {
     for (const auto& filter : filters) {
       config_helper_.prependFilter(filter);

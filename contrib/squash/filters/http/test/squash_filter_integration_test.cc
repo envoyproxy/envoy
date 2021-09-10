@@ -82,7 +82,7 @@ public:
 
     autonomous_upstream_ = true;
 
-    config_helper_.addFilter(ConfigHelper::defaultSquashFilter());
+    config_helper_.prependFilter(ConfigHelper::defaultSquashFilter());
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* squash_cluster = bootstrap.mutable_static_resources()->add_clusters();
