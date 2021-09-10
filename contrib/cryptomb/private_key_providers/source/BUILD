@@ -2,12 +2,28 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_contrib_extension",
     "envoy_cc_library",
+    "envoy_cmake_external",
     "envoy_contrib_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
+
+envoy_cmake_external(
+    name = "ipp-crypto",
+    cache_entries = {
+        "BORINGSSL": "on",
+    },
+    defines = [
+        "OPENSSL_USE_STATIC_LIBS=TRUE",
+    ],
+    lib_source = "@com_github_intel_ipp_crypto_crypto_mb//:all",
+    static_libraries = ["libcrypto_mb.a"],
+    tags = ["skip_on_windows"],
+    working_directory = "sources/ippcp/crypto_mb",
+    deps = ["@boringssl//:ssl"],
+)
 
 envoy_cc_library(
     name = "ipp_crypto_wrapper_lib",
@@ -28,7 +44,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = select({
         "//bazel:linux_x86_64": [
-            "//bazel/foreign_cc:ipp-crypto",
+            ":ipp-crypto",
         ],
         "//conditions:default": [],
     }),
