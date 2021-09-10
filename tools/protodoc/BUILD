@@ -1,6 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@base_pip3//:requirements.bzl", "requirement")
-load("//bazel:envoy_build_system.bzl", "envoy_package", "envoy_proto_library")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
 
 licenses(["notice"])  # Apache 2

@@ -365,8 +365,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_concurrency(concurrency());
   command_line_options->set_config_path(configPath());
   command_line_options->set_config_yaml(configYaml());
-  command_line_options->set_defaults_profile(defaultsProfile() ==
-                                                     DefaultsProfile::Profile::Default
+  command_line_options->set_defaults_profile(defaultsProfile() == DefaultsProfile::Profile::Default
                                                  ? envoy::admin::v3::CommandLineOptions::Default
                                                  : envoy::admin::v3::CommandLineOptions::Safe);
   command_line_options->set_allow_unknown_static_fields(allow_unknown_static_fields_);
