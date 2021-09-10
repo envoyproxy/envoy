@@ -120,7 +120,9 @@ class BufWrapper(ProtoBreakingChangeDetector):
         final_out, final_err = '\n'.join(final_out), '\n'.join(final_err)
 
         if final_err != "":
-            raise ChangeDetectorError(f"Error from buf: {final_err}")
+            # TODO(adisuissa): remove the final_out print before making the PR
+            # non-draft
+            raise ChangeDetectorError(f"Error from buf: {final_err} \n final_out: {final_out}")
 
         if final_code != 0:
             return True
