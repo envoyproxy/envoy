@@ -101,24 +101,27 @@ protected:
 };
 
 TEST_F(PrometheusStatsFormatterTest, MetricName) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
   std::string raw = "vulture.eats-liver";
   std::string expected = "envoy_vulture_eats_liver";
-  auto actual = PrometheusStatsFormatter::metricName(raw, Stats::CustomStatNamespacesImpl{});
+  auto actual = PrometheusStatsFormatter::metricName(raw, custom_namespaces);
   EXPECT_TRUE(actual.has_value());
   EXPECT_EQ(expected, actual.value());
 }
 
 TEST_F(PrometheusStatsFormatterTest, SanitizeMetricName) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
   std::string raw = "An.artist.plays-violin@019street";
   std::string expected = "envoy_An_artist_plays_violin_019street";
-  auto actual = PrometheusStatsFormatter::metricName(raw, Stats::CustomStatNamespacesImpl{});
+  auto actual = PrometheusStatsFormatter::metricName(raw, custom_namespaces);
   EXPECT_EQ(expected, actual.value());
 }
 
 TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
   std::string raw = "3.artists.play-violin@019street";
   std::string expected = "envoy_3_artists_play_violin_019street";
-  auto actual = PrometheusStatsFormatter::metricName(raw, Stats::CustomStatNamespacesImpl{});
+  auto actual = PrometheusStatsFormatter::metricName(raw, custom_namespaces);
   EXPECT_TRUE(actual.has_value());
   EXPECT_EQ(expected, actual.value());
 }
@@ -153,6 +156,7 @@ TEST_F(PrometheusStatsFormatterTest, FormattedTags) {
 }
 
 TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
 
   // Create two counters and two gauges with each pair having the same name,
   // but having different tag names and values.
@@ -168,13 +172,13 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
            {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
 
   Buffer::OwnedImpl response;
-  const auto size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false,
-                                                  absl::nullopt, Stats::CustomStatNamespacesImpl{});
+  const auto size = PrometheusStatsFormatter::statsAsPrometheus(
+      counters_, gauges_, histograms_, response, false, absl::nullopt, custom_namespaces);
   EXPECT_EQ(2UL, size);
 }
 
 TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
 
   // Create two counters and two gauges, all with unique names.
   // statsAsPrometheus() should return four implying it found
@@ -190,9 +194,8 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
            {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
 
   Buffer::OwnedImpl response;
-  auto size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false,
-                                                  absl::nullopt, Stats::CustomStatNamespacesImpl{});
+  const auto size = PrometheusStatsFormatter::statsAsPrometheus(
+      counters_, gauges_, histograms_, response, false, absl::nullopt, custom_namespaces);
   EXPECT_EQ(4UL, size);
 }
 
