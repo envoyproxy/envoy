@@ -1,7 +1,7 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
-#include "envoy/extensions/rbac/matchers/upstream/v3/upstream_ip_matcher.pb.h"
-#include "envoy/extensions/rbac/matchers/upstream/v3/upstream_port_matcher.pb.h"
+#include "envoy/extensions/rbac/matchers/upstream_ip/v3/upstream_ip_matcher.pb.h"
+#include "envoy/extensions/rbac/matchers/upstream_port/v3/upstream_port_matcher.pb.h"
 
 #include "source/common/config/metadata.h"
 #include "source/common/network/utility.h"
@@ -295,7 +295,7 @@ void upstreamIpTestsBasicPolicySetup(RoleBasedAccessControlFilterTest& test,
   // Setup upstream ip to match.
 
   for (const auto& ip : upstream_ips) {
-    envoy::extensions::rbac::matchers::upstream::v3::UpstreamIpMatcher matcher;
+    envoy::extensions::rbac::matchers::upstream_ip::v3::UpstreamIpMatcher matcher;
     matcher.mutable_upstream_ip()->set_address_prefix(ip);
     matcher.mutable_upstream_ip()->mutable_prefix_len()->set_value(32);
 
@@ -476,9 +476,9 @@ void upstreamPortTestsBasicPolicySetup(
 
   // Setup upstream port to match.
   for (const auto& port_range : port_ranges) {
-    envoy::extensions::rbac::matchers::upstream::v3::UpstreamPortMatcher matcher;
-    matcher.mutable_port_range()->set_start(port_range.first);
-    matcher.mutable_port_range()->set_end(port_range.second);
+    envoy::extensions::rbac::matchers::upstream_port::v3::UpstreamPortMatcher matcher;
+    matcher.mutable_upstream_port_range()->set_start(port_range.first);
+    matcher.mutable_upstream_port_range()->set_end(port_range.second);
 
     auto* matcher_ext_config = policy_rules->add_rules()->mutable_matcher();
 

@@ -302,7 +302,8 @@ EXTENSIONS = {
     # RBAC matchers
     #
 
-    "envoy.rbac.matchers.upstream":     "//source/extensions/filters/common/rbac/matchers:upstream_matchers_lib"
+    "envoy.rbac.matchers.upstream_ip":     "//source/extensions/filters/common/rbac/matchers:upstream_ip_lib",
+    "envoy.rbac.matchers.upstream_port":   "//source/extensions/filters/common/rbac/matchers:upstream_port_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

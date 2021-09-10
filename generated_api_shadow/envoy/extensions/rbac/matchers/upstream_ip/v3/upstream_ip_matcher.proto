@@ -1,22 +1,22 @@
 syntax = "proto3";
 
-package envoy.extensions.rbac.matchers.upstream.v3;
+package envoy.extensions.rbac.matchers.upstream_ip.v3;
 
-import "envoy/type/v3/range.proto";
+import "envoy/config/core/v3/address.proto";
 
 import "udpa/annotations/status.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.rbac.matchers.upstream.v3";
-option java_outer_classname = "UpstreamPortMatcherProto";
+option java_package = "io.envoyproxy.envoy.extensions.rbac.matchers.upstream_ip.v3";
+option java_outer_classname = "UpstreamIpMatcherProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: RBAC upstream port range matcher plugin]
-// [#extension: envoy.rbac.matchers.upstream]
+// [#protodoc-title: RBAC upstream IP matcher plugin]
+// [#extension: envoy.rbac.matchers.upstream_ip]
 
-// This is configuration for matching upstream port.
-message UpstreamPortMatcher {
-  // A Port range that will be used to match the upstream port.
+// This is configuration for matching upstream ip.
+message UpstreamIpMatcher {
+  // A CIDR block that will be used to match the upstream IP.
   // This matcher requires a filter in the chain to have saved the upstream address(es) in the
   // filter state before the matcher is executed by RBAC filter. The state should be saved with key
   // `filter_state_key.set_object` (See
@@ -24,6 +24,6 @@ message UpstreamPortMatcher {
   // Also, See :repo:`proxy_filter.cc<
   // source/extensions/filters/http/dynamic_forward_proxy/proxy_filter.cc>` for an example of a
   // filter which populates the FilterState. If the key is not found in the filter state, the
-  // matcher will evaluate to `false`.
-  type.v3.Int64Range port_range = 1;
+  // matcher will evaluate to `false`. Both Ipv4 and Ipv6 ranges can be matched.
+  config.core.v3.CidrRange upstream_ip = 1;
 }
