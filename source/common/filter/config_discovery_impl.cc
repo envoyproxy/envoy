@@ -273,7 +273,7 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
   auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(
       subscription, require_type_urls, factory_context, default_config, last_filter_in_filter_chain,
       filter_chain_type,
-      [this, &stat_prefix,
+      [this, stat_prefix,
        &factory_context](const ProtobufWkt::Any& proto_config) -> Envoy::Http::FilterFactoryCb {
         return instantiateFilterFactory(proto_config, stat_prefix, factory_context);
       });
