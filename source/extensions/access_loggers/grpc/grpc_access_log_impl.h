@@ -54,7 +54,7 @@ private:
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
                const Grpc::RawAsyncClientSharedPtr& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
-               Event::Dispatcher& dispatcher, Stats::Scope& scope) override;
+               Event::Dispatcher& dispatcher) override;
 
   const LocalInfo::LocalInfo& local_info_;
 };

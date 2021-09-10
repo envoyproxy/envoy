@@ -35,15 +35,14 @@ AccessLog::ThreadLocalLogger::ThreadLocalLogger(GrpcAccessLoggerSharedPtr logger
 AccessLog::AccessLog(
     ::Envoy::AccessLog::FilterPtr&& filter,
     envoy::extensions::access_loggers::open_telemetry::v3alpha::OpenTelemetryAccessLogConfig config,
-    ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-    Stats::Scope& scope)
-    : Common::ImplBase(std::move(filter)), scope_(scope), tls_slot_(tls.allocateSlot()),
+    ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache)
+    : Common::ImplBase(std::move(filter)), tls_slot_(tls.allocateSlot()),
       access_logger_cache_(std::move(access_logger_cache)) {
 
   Envoy::Config::Utility::checkTransportVersion(config.common_config());
   tls_slot_->set([this, config](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
-        config.common_config(), Common::GrpcAccessLoggerType::HTTP, scope_));
+        config.common_config(), Common::GrpcAccessLoggerType::HTTP));
   });
 
   ProtobufWkt::Struct body_format;

@@ -28,8 +28,7 @@ AccessLog::InstanceSharedPtr TcpGrpcAccessLogFactory::createAccessLogInstance(
       config, context.messageValidationVisitor());
 
   return std::make_shared<TcpGrpcAccessLog>(std::move(filter), proto_config, context.threadLocal(),
-                                            GrpcCommon::getGrpcAccessLoggerCacheSingleton(context),
-                                            context.scope());
+                                            GrpcCommon::getGrpcAccessLoggerCacheSingleton(context));
 }
 
 ProtobufTypes::MessagePtr TcpGrpcAccessLogFactory::createEmptyConfigProto() {
