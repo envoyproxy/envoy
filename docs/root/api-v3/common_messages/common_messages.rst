@@ -23,8 +23,6 @@ Common messages
   ../extensions/common/key_value/v3/config.proto
   ../extensions/common/ratelimit/v3/ratelimit.proto
   ../extensions/filters/common/fault/v3/fault.proto
-  ../extensions/rbac/matchers/upstream/v3/upstream_ip_matcher.proto
-  ../extensions/rbac/matchers/upstream/v3/upstream_port_matcher.proto
   ../extensions/network/socket_interface/v3/default_socket_interface.proto
   ../extensions/common/matching/v3/extension_matcher.proto
   ../extensions/filters/common/dependency/v3/dependency.proto
