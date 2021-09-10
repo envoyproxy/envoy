@@ -33,26 +33,26 @@ Below simulation demonstrates how various values for aggression affect traffic r
    :width: 60%
    :align: center
 
-Whenever a slow start window duration elapses, upstream endpoint exits slow start mode and gets regular amount of traffic acccording to load balanacing algorithm.
+Whenever a slow start window duration elapses, upstream endpoint exits slow start mode and gets regular amount of traffic according to load balancing algorithm.
 Its load balancing weight will no longer be scaled with runtime bias and aggression. Endpoint could also exit slow start mode in case it leaves the cluster.
 
 To reiterate, endpoint enters slow start mode:
   * If no active healthcheck is configured per cluster, immediately if its cluster membership duration is within slow start window.
   * In case an active healthcheck is configured per cluster, when its cluster membership duration is within slow start window and endpoint has passed an active healthcheck.
-    If endpoint does not pass an active healcheck during entire slow start window (since it has been added to upstream cluster), then it never enters slow start mode.
+    If endpoint does not pass an active healthcheck during entire slow start window (since it has been added to upstream cluster), then it never enters slow start mode.
 
 Endpoint exits slow start mode when:
   * It leaves the cluster.
   * Its cluster membership duration is greater than slow start window.
-  * It does not pass an active healcheck configured per cluster.
-    Endpoint could further re-enter slow start, if it passes an active healtcheck and its creation time is within slow start window.
+  * It does not pass an active healthcheck configured per cluster.
+    Endpoint could further re-enter slow start, if it passes an active healthcheck and its creation time is within slow start window.
 
 It is not recommended to enable slow start mode in low traffic or high number of endpoints scenarios, potential drawbacks would be:
  * Endpoint starvation, where endpoint has low probability to receive a request either due to low traffic or high number of total endpoints.
  * Spurious (non-gradual) increase of traffic per endpoint, whenever a starving endpoint receives a request and sufficient time has passed within slow start window,
    its load balancing weight will increase non linearly due to time factor.
 
-Below is an example of how result load balancing weight would look like for endpoints in same priority with Round Robin Loadbalancer type, slow start window of 60 seconds, no active healcheck and 1.0 aggression.
+Below is an example of how result load balancing weight would look like for endpoints in same priority with Round Robin Loadbalancer type, slow start window of 60 seconds, no active healthcheck and 1.0 aggression.
 Once endpoints E1 and E2 exit slow start mode, their load balancing weight remains constant:
 
 .. image:: /_static/slow_start_example.svg
