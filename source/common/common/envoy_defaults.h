@@ -37,7 +37,7 @@ namespace Envoy {
 class DefaultsProfile {
 public:
   enum Profile {
-    Performant,
+    Default,
     Safe,
   };
 
@@ -66,7 +66,7 @@ public:
    * values can be accessed globally.
    * @param profile enum value specifying which profile to load
    */
-  DefaultsProfile(Profile profile = Performant);
+  DefaultsProfile(Profile profile = Default);
   /**
    * Returns a reference to DefaultsProfile inside singleton if it exists, otherwise returns
    * blank DefaultsProfile.

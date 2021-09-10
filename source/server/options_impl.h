@@ -185,7 +185,7 @@ private:
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
   std::string config_yaml_;
-  DefaultsProfile::Profile defaults_profile_{DefaultsProfile::Profile::Performant};
+  DefaultsProfile::Profile defaults_profile_{DefaultsProfile::Profile::Default};
   bool allow_unknown_static_fields_{false};
   bool reject_unknown_dynamic_fields_{false};
   bool ignore_unknown_dynamic_fields_{false};

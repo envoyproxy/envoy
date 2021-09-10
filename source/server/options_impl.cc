@@ -74,8 +74,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<std::string> defaults_profile(
       "", "defaults-profile",
       "choose a profile to run envoy with default settings tailored to a specific use case. One of "
-      "'performant' (default) or 'safe'.",
-      false, "performant", "string", cmd);
+      "'default' (default) or 'safe'.",
+      false, "default", "string", cmd);
 
   TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
                                         "allow unknown fields in static configuration (DEPRECATED)",
@@ -242,8 +242,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
 
-  if (defaults_profile.getValue() == "performant") {
-    defaults_profile_ = DefaultsProfile::Profile::Performant;
+  if (defaults_profile.getValue() == "default") {
+    defaults_profile_ = DefaultsProfile::Profile::Default;
   } else if (defaults_profile.getValue() == "safe") {
     defaults_profile_ = DefaultsProfile::Profile::Safe;
   } else {
@@ -366,8 +366,8 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_config_path(configPath());
   command_line_options->set_config_yaml(configYaml());
   command_line_options->set_defaults_profile(defaultsProfile() ==
-                                                     DefaultsProfile::Profile::Performant
-                                                 ? envoy::admin::v3::CommandLineOptions::Performant
+                                                     DefaultsProfile::Profile::Default
+                                                 ? envoy::admin::v3::CommandLineOptions::Default
                                                  : envoy::admin::v3::CommandLineOptions::Safe);
   command_line_options->set_allow_unknown_static_fields(allow_unknown_static_fields_);
   command_line_options->set_reject_unknown_dynamic_fields(reject_unknown_dynamic_fields_);

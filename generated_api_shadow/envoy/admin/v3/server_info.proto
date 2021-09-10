@@ -81,8 +81,8 @@ message CommandLineOptions {
   }
 
   enum DefaultsProfile {
-    // Default option: run with settings optimized for performance.
-    Performant = 0;
+    // Run with default settings
+    Default = 0;
 
     // Run in a less resource intensive manner, safer against resource exhaustion DoS attacks.
     Safe = 1;

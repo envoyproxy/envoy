@@ -252,7 +252,7 @@ TEST_F(OptionsImplTest, SetAll) {
 
 TEST_F(OptionsImplTest, DefaultParams) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
-  EXPECT_EQ(DefaultsProfile::Profile::Performant, options->defaultsProfile());
+  EXPECT_EQ(DefaultsProfile::Profile::Default, options->defaultsProfile());
   EXPECT_EQ(std::chrono::seconds(600), options->drainTime());
   EXPECT_EQ(Server::DrainStrategy::Gradual, options->drainStrategy());
   EXPECT_EQ(std::chrono::seconds(900), options->parentShutdownTime());
