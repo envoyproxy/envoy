@@ -2393,6 +2393,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterSetResponseBufferChunked) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
 }
 
+// bodyBuffer should not truncated when bodyBuffer set hex character
 TEST_F(LuaHttpFilterTest, LuaBodyBufferSetBytesWithHex) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
@@ -2419,6 +2420,7 @@ TEST_F(LuaHttpFilterTest, LuaBodyBufferSetBytesWithHex) {
   EXPECT_EQ(5, encoder_callbacks_.buffer_->length());
 }
 
+// bodyBuffer should not truncated when bodyBuffer set zero
 TEST_F(LuaHttpFilterTest, LuaBodyBufferSetBytesWithZero) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
