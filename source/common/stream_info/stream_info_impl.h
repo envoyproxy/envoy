@@ -303,7 +303,7 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   void setDownstreamBytesMeterer(const BytesMetererSharedPtr& downstream_bytes_meterer) override {
-    // Downstream bytes meterer don't reset during a retry.
+    // downstream_bytes_meterer don't reset during a retry.
     if (downstream_bytes_meterer_ == nullptr) {
       downstream_bytes_meterer_ = downstream_bytes_meterer;
     }
