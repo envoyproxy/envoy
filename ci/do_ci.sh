@@ -150,7 +150,7 @@ function bazel_contrib_binary_build() {
 function run_process_test_result() {
   if [[ -z "$CI_SKIP_PROCESS_TEST_RESULTS" ]] && [[ $(find "$TEST_TMPDIR" -name "*_attempt.xml" 2> /dev/null) ]]; then
       echo "running flaky test reporting script"
-      "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
+      bazel run "${BAZEL_BUILD_OPTIONS[@]}" //ci/flaky_test:run_process_xml "$CI_TARGET"
   else
       echo "no flaky test results found"
   fi
@@ -459,7 +459,7 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   # Validate repository metadata.
   echo "check repositories..."
   "${ENVOY_SRCDIR}"/tools/check_repositories.sh
-  "${ENVOY_SRCDIR}"/ci/check_repository_locations.sh
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/ci/check_repository_locations.sh
 
   # Run pip requirements tests
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check "${ENVOY_SRCDIR}"

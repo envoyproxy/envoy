@@ -2,8 +2,8 @@
 
 from collections import namedtuple
 
-from tools.dependency.exports import (
-    api_repository_locations, envoy_repository_locations, repository_locations_utils)
+# from tools.dependency.exports import (
+#     api_repository_locations, envoy_repository_locations, repository_locations_utils)
 
 
 # All repository location metadata in the Envoy repository.

@@ -140,7 +140,7 @@ New Features
 Deprecated
 ----------
 ```
-* Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh`)
+* Run the deprecate_versions.py script (e.g. `bazel run //tools/deprecate_version:deprecate_version`)
   to file tracking issues for runtime guarded code which can be removed.
 * Check source/common/runtime/runtime_features.cc and see if any runtime guards in
   disabled_runtime_features should be reassessed, and ping on the relevant issues.

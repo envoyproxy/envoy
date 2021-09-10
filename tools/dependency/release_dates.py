@@ -5,19 +5,20 @@
 #   dependency version in the .bzl.
 #
 # Usage:
-#   tools/dependency/release_dates.sh <path to repository_locations.bzl>
+#   bazel run //tools/dependency:release_dates <path to repository_locations.bzl>
 #
 # You will need to set a GitHub access token in the GITHUB_TOKEN environment
 # variable. You can generate personal access tokens under developer settings on
 # GitHub. You should restrict the scope of the token to "repo: public_repo".
 
+import json
 import os
+import pathlib
 import sys
 
 import github
 
-import exports
-import utils
+from tools.dependency import utils
 
 from colorama import Fore, Style
 from packaging import version
@@ -105,9 +106,21 @@ def get_untagged_release_date(repo, metadata_version, github_release):
     return commit.commit.committer.date
 
 
+def interpolate_metadata(metadata):
+    metadata["strip_prefix"] = metadata.get("strip_prefix", "").format(
+        version=metadata["version"],
+        underscore_version=metadata["version"].replace(".", "_"))
+    metadata["urls"] = [
+        url.format(
+            version=metadata["version"],
+            underscore_version=metadata["version"].replace(".", "_"))
+        for url in metadata.get("urls", [])]
+
+
 # Verify release dates in metadata against GitHub API.
 def verify_and_print_release_dates(repository_locations, github_instance):
     for dep, metadata in sorted(repository_locations.items()):
+        interpolate_metadata(metadata)
         release_date = None
         # Obtain release information from GitHub API.
         github_release = utils.get_github_release_from_urls(metadata['urls'])
@@ -131,22 +144,33 @@ def verify_and_print_release_dates(repository_locations, github_instance):
                 f'{dep} is a GitHub repository with no no inferrable release date')
 
 
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print('Usage: %s <path to repository_locations.bzl>' % sys.argv[0])
-        sys.exit(1)
+def load_repository_locations_spec(repository_locations_spec):
+    locations = {}
+    for key, location in repository_locations_spec.items():
+        mutable_location = dict(location)
+        locations[key] = mutable_location
+
+        # Fixup with version information.
+        if "version" in location:
+            if "strip_prefix" in location:
+                mutable_location["strip_prefix"] = _format_version(location["strip_prefix"], location["version"])
+            mutable_location["urls"] = [_format_version(url, location["version"]) for url in location["urls"]]
+    return locations
+
+
+def main():
     access_token = os.getenv('GITHUB_TOKEN')
-    if not access_token:
+    if not access_token and False:
         print('Missing GITHUB_TOKEN')
         sys.exit(1)
-    path = sys.argv[1]
-    spec_loader = exports.repository_locations_utils.load_repository_locations_spec
-    path_module = exports.load_module('repository_locations', path)
     try:
-        verify_and_print_release_dates(
-            spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC), github.Github(access_token))
+        verify_and_print_release_dates(json.loads(pathlib.Path(sys.argv[1]).read_text()), github.Github(access_token))
     except ReleaseDateVersionError as e:
         print(
             f'{Fore.RED}An error occurred while processing {path}, please verify the correctness of the '
             f'metadata: {e}{Style.RESET_ALL}')
         sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

@@ -225,7 +225,7 @@ def get_git_info(CI_TARGET):
     return ret
 
 
-if __name__ == "__main__":
+def main():
     CI_TARGET = ""
     if len(sys.argv) == 2:
         CI_TARGET = sys.argv[1]
@@ -286,3 +286,10 @@ if __name__ == "__main__":
         print('No flaky tests found.\n')
 
     os.remove(os.environ["TMP_OUTPUT_PROCESS_XML"])
+
+
+if __name__ == "__main__":
+    if os.getenv("ENVOY_BUILD_ARCH") == "aarch64":
+        os.environ["MULTIDICT_NO_EXTENSIONS"] = 1
+        os.environ["YARL_NO_EXTENSIONS"] = 1
+    main()

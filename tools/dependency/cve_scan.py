@@ -7,12 +7,13 @@ from collections import defaultdict, namedtuple
 import datetime as dt
 import gzip
 import json
+import pathlib
 import re
 import sys
 import textwrap
 import urllib.request
 
-import utils as dep_utils
+# import utils as dep_utils
 
 # These CVEs are false positives for the match heuristics. An explanation is
 # required when adding a new entry to this list as a comment.
@@ -307,8 +308,9 @@ def cve_scan(cves, cpe_revmap, cve_allowlist, repository_locations):
 
 
 if __name__ == '__main__':
+    repository_locations = json.loads(pathlib.Path(sys.argv[1]).read_text())
     # Allow local overrides for NIST CVE database URLs via args.
-    urls = sys.argv[1:]
+    urls = sys.argv[2:]
     if not urls:
         # We only look back a few years, since we shouldn't have any ancient deps.
         current_year = dt.datetime.now().year
@@ -319,7 +321,7 @@ if __name__ == '__main__':
         ]
     cves, cpe_revmap = download_cve_data(urls)
     possible_cves, cve_deps = cve_scan(
-        cves, cpe_revmap, IGNORES_CVES, dep_utils.repository_locations())
+        cves, cpe_revmap, IGNORES_CVES, repository_locations)
     if possible_cves:
         print(
             '\nBased on heuristic matching with the NIST CVE database, Envoy may be vulnerable to:')
