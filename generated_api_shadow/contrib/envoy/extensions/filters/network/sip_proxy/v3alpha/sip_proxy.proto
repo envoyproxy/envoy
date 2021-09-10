@@ -17,9 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message SipProxy {
   message SipSettings {
-    // |---------|-------------------------|----------|------------------------------------------------------------------------------|
     // | Timer   | Default value           | Section  | Meaning                                                                      |
-    // |---------|-------------------------|----------|------------------------------------------------------------------------------|
     // | T1      | 500 ms                  | 17.1.1.1 | Round-trip time (RTT) estimate                                               |
     // | T2      | 4 sec                   | 17.1.2.2 | Maximum re-transmission interval for non-INVITE requests and INVITE responses|
     // | T4      | 5 sec                   | 17.1.2.2 | Maximum duration that a message can remain in the network                    |
@@ -37,7 +35,6 @@ message SipProxy {
     // |         | 0 sec. for TCP and SCTP |          |                                                                              |
     // | Timer K | T4 for UDP              | 17.1.2.2 | Wait time for response re-transmissions                                      |
     // |         | 0 sec. for TCP and SCTP |          |                                                                              |
-    // |---------|-------------------------|----------|------------------------------------------------------------------------------|
     //
     // transaction timeout timer [Timer B] unit is milliseconds, default value 64*T1.
     google.protobuf.Duration transaction_timeout = 1;

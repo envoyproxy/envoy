@@ -5,5 +5,5 @@ Sip filters
   :glob:
   :maxdepth: 2
 
-  ../../../contrib/extensions/filters/network/sip_proxy/**/v3alpha/*
+  ../../../../contrib/envoy/extensions/filters/network/sip_proxy/**/v3alpha/*
 
