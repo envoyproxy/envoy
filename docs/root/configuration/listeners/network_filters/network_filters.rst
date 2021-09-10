@@ -17,6 +17,7 @@ filters.
   direct_response_filter
   ext_authz_filter
   kafka_broker_filter
+  kafka_mesh_filter
   local_rate_limit_filter
   mongo_proxy_filter
   mysql_proxy_filter
