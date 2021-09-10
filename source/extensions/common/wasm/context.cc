@@ -1235,7 +1235,7 @@ WasmResult Context::defineMetric(uint32_t metric_type, std::string_view name,
   }
   auto type = static_cast<MetricType>(metric_type);
   // TODO: Consider rethinking the scoping policy as it does not help in this case.
-  Stats::StatNameManagedStorage storage(std::string(name), wasm()->scope_->symbolTable());
+  Stats::StatNameManagedStorage storage(toAbslStringView(name), wasm()->scope_->symbolTable());
   Stats::StatName stat_name = storage.statName();
   // We prefix the given name with custom_stat_name_ so that these user-defined
   // custom metrics can be distinguished from native Envoy metrics.
