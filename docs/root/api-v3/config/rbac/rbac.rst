@@ -5,5 +5,4 @@ RBAC
   :glob:
   :maxdepth: 2
 
-  matchers/matchers
   v3/*
