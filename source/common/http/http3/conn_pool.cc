@@ -86,6 +86,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         data.connection_ =
             Quic::createQuicNetworkConnection(h3_pool->quicInfo(), pool->dispatcher(), host_address,
                                               source_address, quic_stat_names, scope);
+        // Store a handle to connection as it will be moved during client construction.
         Network::Connection& connection = *data.connection_;
         auto client = std::make_unique<ActiveClient>(*pool, data);
         if (connection.state() == Network::Connection::State::Closed) {
