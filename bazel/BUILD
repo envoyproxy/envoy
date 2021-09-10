@@ -1,7 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
-load("//bazel:utils.bzl", "write_json")
+load("//bazel:utils.bzl", "json_data")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("//tools/base:envoy_python.bzl", "py_data")
@@ -595,7 +595,7 @@ alias(
     actual = "@bazel_tools//src/conditions:windows",
 )
 
-write_json(
+json_data(
     name = "repository_locations",
     data = REPOSITORY_LOCATIONS_SPEC,
 )

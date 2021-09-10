@@ -1,4 +1,4 @@
-load("//bazel:utils.bzl", "write_json")
+load("//bazel:utils.bzl", "json_data")
 load("//tools/base:envoy_python.bzl", "py_data")
 load(":extensions_build_config.bzl", "EXTENSIONS")
 
@@ -22,7 +22,7 @@ py_data(
     source = ":extensions_metadata.yaml",
 )
 
-write_json(
+json_data(
     name = "extensions_build_config",
     data = EXTENSIONS,
 )

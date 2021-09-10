@@ -1,5 +1,5 @@
 load("@io_bazel_rules_go//proto:compiler.bzl", "go_proto_compiler")
-load("@envoy//bazel:utils.bzl", "write_json")
+load("@envoy//bazel:utils.bzl", "json_data")
 load("@envoy//tools/base:envoy_python.bzl", "py_data")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
@@ -19,7 +19,7 @@ go_proto_compiler(
     visibility = ["//visibility:public"],
 )
 
-write_json(
+json_data(
     name = "repository_locations",
     data = REPOSITORY_LOCATIONS_SPEC,
 )

@@ -1,6 +1,6 @@
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 
-def write_json(
+def json_data(
         name,
         data,
         visibility = ["//visibility:public"],
