@@ -70,11 +70,12 @@ public:
   virtual void markTextReadoutForDeletion(const TextReadoutSharedPtr& text_readout) PURE;
 
   /**
-   * Iterate over all stats that need to be sinked. Note, that implementations can potentially hold
-   * on to a mutex that will deadlock if the passed in functors try to create or delete a stat.
-   * @param f_size functor that is provided the number of all sinked stats. Note this is called
-   *        only once, prior to any calls to f_stat.
-   * @param f_stat functor that is provided one sinked stat at a time.
+   * Iterate over all stats that need to be added to a sink. Note, that implementations can
+   * potentially hold on to a mutex that will deadlock if the passed in functors try to create
+   * or delete a stat.
+   * @param f_size functor that is provided the number of all stats in the sink. Note this is
+   *        called only once, prior to any calls to f_stat.
+   * @param f_stat functor that is provided one stat in the sink at a time.
    */
   virtual void forEachCounter(std::function<void(std::size_t)> f_size,
                               std::function<void(Stats::Counter&)> f_stat) const PURE;

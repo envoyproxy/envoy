@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.kafka_mesh.v3alpha;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.kafka_mesh.v3alpha";
+option java_outer_classname = "KafkaMeshProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Kafka Mesh]
+// Kafka Mesh :ref:`configuration overview <config_network_filters_kafka_mesh>`.
+// [#extension: envoy.filters.network.kafka_mesh]
+
+message KafkaMesh {
+  // Envoy's host that's advertised to clients.
+  // Has the same meaning as corresponding Kafka broker properties.
+  // Usually equal to filter chain's listener config, but needs to be reachable by clients
+  // (so 0.0.0.0 will not work).
+  string advertised_host = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Envoy's port that's advertised to clients.
+  int32 advertised_port = 2 [(validate.rules).int32 = {gt: 0}];
+
+  // Upstream clusters this filter will connect to.
+  repeated KafkaClusterDefinition upstream_clusters = 3;
+
+  // Rules that will decide which cluster gets which request.
+  repeated ForwardingRule forwarding_rules = 4;
+}
+
+message KafkaClusterDefinition {
+  // Cluster name.
+  string cluster_name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Kafka cluster address.
+  string bootstrap_servers = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Default number of partitions present in this cluster.
+  // This is especially important for clients that do not specify partition in their payloads and depend on this value for hashing.
+  int32 partition_count = 3 [(validate.rules).int32 = {gt: 0}];
+
+  // Custom configuration passed to Kafka producer.
+  map<string, string> producer_config = 4;
+}
+
+message ForwardingRule {
+  // Cluster name.
+  string target_cluster = 1;
+
+  oneof trigger {
+    // Intended place for future types of forwarding rules.
+    string topic_prefix = 2;
+  }
+}
