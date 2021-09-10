@@ -139,7 +139,7 @@ sip_filters:
 settings:
   transaction_timeout: 32s
   own_domain: pcsf-cfed.cncs.svc.cluster.local
-  domain_match_parameter_name: x-suri  
+  domain_match_parameter_name: x-suri
 )EOF";
 
   SipFilters::MockFilterConfigFactory factory;

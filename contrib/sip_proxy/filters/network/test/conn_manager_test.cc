@@ -108,7 +108,7 @@ route_config:
 settings:
   transaction_timeout: 32s
   own_domain: pcsf-cfed.cncs.svc.cluster.local
-  domain_match_parameter_name: x-suri  
+  domain_match_parameter_name: x-suri
 )EOF";
     initializeFilter(yaml);
     MessageMetadata metadata;
@@ -130,7 +130,7 @@ route_config:
 settings:
   transaction_timeout: 32s
   own_domain: pcsf-cfed.cncs.svc.cluster.local
-  domain_match_parameter_name: x-suri  
+  domain_match_parameter_name: x-suri
 )EOF";
     initializeFilter(yaml);
 
@@ -288,7 +288,7 @@ route_config:
 settings:
   transaction_timeout: 32s
   own_domain: pcsf-cfed.cncs.svc.cluster.local
-  domain_match_parameter_name: x-suri  
+  domain_match_parameter_name: x-suri
 )EOF";
     initializeFilter(yaml);
 
@@ -337,7 +337,7 @@ route_config:
 settings:
   transaction_timeout: 32s
   own_domain: pcsf-cfed.cncs.svc.cluster.local
-  domain_match_parameter_name: x-suri  
+  domain_match_parameter_name: x-suri
 )EOF";
     initializeFilter(yaml);
 
@@ -432,7 +432,7 @@ route_config:
 settings:
   transaction_timeout: 32s
   own_domain: pcsf-cfed.cncs.svc.cluster.local
-  domain_match_parameter_name: x-suri  
+  domain_match_parameter_name: x-suri
 )EOF";
   initializeFilter(yaml);
 
@@ -480,7 +480,7 @@ route_config:
 settings:
   transaction_timeout: 32s
   own_domain: pcsf-cfed.cncs.svc.cluster.local
-  domain_match_parameter_name: x-suri  
+  domain_match_parameter_name: x-suri
 )EOF";
   initializeFilter(yaml);
 
