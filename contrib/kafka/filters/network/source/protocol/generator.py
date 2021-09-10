@@ -125,9 +125,15 @@ class StatefulProcessor:
                         r'^\s*$', '', without_comments, flags=re.MULTILINE)
                     # Windows support: see PR 10542 for details.
                     amended = re.sub(r'-2147483648', 'INT32_MIN', without_empty_newlines)
+                    # FIXME - use 2.8.1-rc0
+                    if input_file == 'external/kafka_source/DescribeProducersRequest.json':
+                        amended = amended[:-6]
                     message_spec = json.loads(amended)
-                    message = self.parse_top_level_element(message_spec)
-                    messages.append(message)
+                    # Adopt publicly available messages only: https://kafka.apache.org/28/protocol.html#protocol_api_keys
+                    api_key = message_spec['apiKey']
+                    if api_key <= 51 or api_key in [56, 57, 60, 61]:
+                        message = self.parse_top_level_element(message_spec)
+                        messages.append(message)
             except Exception as e:
                 print('could not process %s' % input_file)
                 raise
@@ -381,7 +387,7 @@ class FieldSpec:
             return str(self.type.default_value())
 
     def example_value_for_test(self, version):
-        if self.is_nullable():
+        if self.is_nullable_in_version(version):
             return 'absl::make_optional<%s>(%s)' % (
                 self.type.name, self.type.example_value_for_test(version))
         else:
@@ -472,7 +478,7 @@ class Primitive(TypeSpecification):
   Represents a Kafka primitive value.
   """
 
-    USABLE_PRIMITIVE_TYPE_NAMES = ['bool', 'int8', 'int16', 'int32', 'int64', 'string', 'bytes']
+    USABLE_PRIMITIVE_TYPE_NAMES = ['bool', 'int8', 'int16', 'int32', 'int64', 'uint16', 'float64', 'string', 'bytes', 'records', 'uuid']
 
     KAFKA_TYPE_TO_ENVOY_TYPE = {
         'string': 'std::string',
@@ -481,7 +487,11 @@ class Primitive(TypeSpecification):
         'int16': 'int16_t',
         'int32': 'int32_t',
         'int64': 'int64_t',
+        'uint16': 'uint16_t',
+        'float64': 'double',
         'bytes': 'Bytes',
+        'records': 'Bytes',
+        'uuid': 'Uuid',
         'tagged_fields': 'TaggedFields',
     }
 
@@ -492,7 +502,11 @@ class Primitive(TypeSpecification):
         'int16': 'Int16Deserializer',
         'int32': 'Int32Deserializer',
         'int64': 'Int64Deserializer',
+        'uint16': 'UInt16Deserializer',
+        'float64': 'Float64Deserializer',
         'bytes': 'BytesDeserializer',
+        'records': 'BytesDeserializer',
+        'uuid': 'UuidDeserializer',
         'tagged_fields': 'TaggedFieldsDeserializer',
     }
 
@@ -510,6 +524,7 @@ class Primitive(TypeSpecification):
         'int32': '0',
         'int64': '0',
         'bytes': '{}',
+        'uuid': 'Uuid{0, 0}',
         'tagged_fields': 'TaggedFields({})',
     }
 
@@ -527,8 +542,14 @@ class Primitive(TypeSpecification):
             'static_cast<int32_t>(32)',
         'int64':
             'static_cast<int64_t>(64)',
+        'float64':
+            'static_cast<double>(13.125)',
         'bytes':
             'Bytes({0, 1, 2, 3})',
+        'records':
+            'Bytes({0, 1, 2, 3})',
+        'uuid':
+            'Uuid{13, 42}',
         'tagged_fields':
             'TaggedFields{std::vector<TaggedField>{{10, Bytes({1, 2, 3})}, {20, Bytes({4, 5, 6})}}}',
     }

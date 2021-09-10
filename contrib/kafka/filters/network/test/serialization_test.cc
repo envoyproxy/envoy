@@ -23,9 +23,11 @@ namespace SerializationTest {
 
 TEST_EmptyDeserializerShouldNotBeReady(Int8Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(Int16Deserializer);
+TEST_EmptyDeserializerShouldNotBeReady(UInt16Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(Int32Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(UInt32Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(Int64Deserializer);
+TEST_EmptyDeserializerShouldNotBeReady(Float64Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(BooleanDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(VarUInt32Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(VarInt32Deserializer);
@@ -77,9 +79,11 @@ TEST(NullableCompactArrayDeserializer, EmptyBufferShouldNotBeReady) {
 
 TEST_DeserializerShouldDeserialize(Int8Deserializer, int8_t, 42);
 TEST_DeserializerShouldDeserialize(Int16Deserializer, int16_t, 42);
+TEST_DeserializerShouldDeserialize(UInt16Deserializer, uint16_t, 42);
 TEST_DeserializerShouldDeserialize(Int32Deserializer, int32_t, 42);
 TEST_DeserializerShouldDeserialize(UInt32Deserializer, uint32_t, 42);
 TEST_DeserializerShouldDeserialize(Int64Deserializer, int64_t, 42);
+TEST_DeserializerShouldDeserialize(Int64Deserializer, double, 13.25);
 TEST_DeserializerShouldDeserialize(BooleanDeserializer, bool, true);
 
 EncodingContext encoder{-1}; // Provided api_version does not matter for primitive types.

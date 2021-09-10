@@ -113,6 +113,18 @@ public:
 };
 
 /**
+ * Integer deserializer for uint16_t.
+ */
+class UInt16Deserializer : public IntDeserializer<uint16_t> {
+public:
+  uint16_t get() const override {
+    uint16_t result;
+    safeMemcpyUnsafeSrc(&result, buf_);
+    return be16toh(result);
+  }
+};
+
+/**
  * Integer deserializer for int32_t.
  */
 class Int32Deserializer : public IntDeserializer<int32_t> {
@@ -145,6 +157,21 @@ public:
     int64_t result;
     safeMemcpyUnsafeSrc(&result, buf_);
     return be64toh(result);
+  }
+};
+
+/**
+ * Deserializer for Kafka Float64 type.
+ * Reference: https://kafka.apache.org/28/protocol.html#protocol_types
+ * Represents a double-precision 64-bit format IEEE 754 value. The values are encoded using eight bytes in network byte order (big-endian).
+ */
+class Float64Deserializer : public IntDeserializer<double> {
+public:
+  double get() const override {
+    uint64_t in_network_order;
+    safeMemcpyUnsafeSrc(&in_network_order, buf_);
+    uint64_t in_host_order = be64toh(in_network_order);
+    return *reinterpret_cast<double*>(&in_host_order);
   }
 };
 
@@ -852,6 +879,30 @@ private:
 };
 
 /**
+ * Kafka UUID is basically two longs, so we are going to keep model them the same way.
+ * Reference: https://github.com/apache/kafka/blob/2.8.0/clients/src/main/java/org/apache/kafka/common/Uuid.java#L38
+ */
+class UuidDeserializer : public Deserializer<Uuid> {
+public:
+  uint32_t feed(absl::string_view& data) override {
+    uint32_t consumed = 0;
+    consumed += high_bytes_deserializer_.feed(data);
+    consumed += low_bytes_deserializer_.feed(data);
+    return consumed;
+  }
+
+  bool ready() const override { return low_bytes_deserializer_.ready(); }
+
+  Uuid get() const override {
+    return {high_bytes_deserializer_.get(), low_bytes_deserializer_.get()};
+  }
+
+private:
+  Int64Deserializer high_bytes_deserializer_;
+  Int64Deserializer low_bytes_deserializer_;
+};
+
+/**
  * Encodes provided argument in Kafka format.
  * In case of primitive types, this is done explicitly as per specification.
  * In case of composite types, this is done by calling 'encode' on provided argument.
@@ -964,6 +1015,7 @@ COMPUTE_SIZE_OF_NUMERIC_TYPE(int16_t)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(int32_t)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(uint32_t)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(int64_t)
+COMPUTE_SIZE_OF_NUMERIC_TYPE(double)
 
 /**
  * Template overload for string.
@@ -1017,6 +1069,11 @@ inline uint32_t EncodingContext::computeSize(const std::vector<T>& arg) const {
 template <typename T>
 inline uint32_t EncodingContext::computeSize(const NullableArray<T>& arg) const {
   return arg ? computeSize(*arg) : sizeof(int32_t);
+}
+
+// FIXME
+template <> inline uint32_t EncodingContext::computeSize(const Uuid&) const {
+  return 2 * sizeof(uint64_t);
 }
 
 /**
@@ -1136,6 +1193,20 @@ ENCODE_NUMERIC_TYPE(uint32_t, htobe32);
 ENCODE_NUMERIC_TYPE(int64_t, htobe64);
 
 /**
+ * Template overload for double.
+ * Encodes 8 bytes.
+ */
+template <> inline uint32_t EncodingContext::encode(const double& arg, Buffer::Instance& dst) {
+  static_assert(sizeof(double) == sizeof(uint64_t));
+
+  double tmp = arg;
+  const uint64_t as_long = *reinterpret_cast<uint64_t*>(&tmp);
+  const uint64_t in_network_order = htobe64(as_long);
+  dst.add(&in_network_order, sizeof(uint64_t));
+  return sizeof(uint64_t);
+}
+
+/**
  * Template overload for bool.
  * Encode boolean as a single byte.
  */
@@ -1225,6 +1296,13 @@ uint32_t EncodingContext::encode(const NullableArray<T>& arg, Buffer::Instance& 
     const int32_t len = -1;
     return encode(len, dst);
   }
+}
+
+template <> inline uint32_t EncodingContext::encode(const Uuid& arg, Buffer::Instance& dst) {
+  uint32_t result = 0;
+  result += encode(arg.msb_, dst);
+  result += encode(arg.lsb_, dst);
+  return result;
 }
 
 /**
