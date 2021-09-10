@@ -5,7 +5,7 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "source/common/http/utility.h"
-#include "source/common/stream_info/set_filter_state_object_impl.h"
+#include "source/common/stream_info/upstream_address_set.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
@@ -151,9 +151,6 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
 void ProxyFilter::addHostAddressToFilterState(
     const Network::Address::InstanceConstSharedPtr& address) {
-  using AddressSetFilterStateObjectImpl =
-      StreamInfo::SetFilterStateObjectImpl<Network::Address::InstanceConstSharedPtr>;
-
   if (!decoder_callbacks_ || !address) {
     ENVOY_LOG_MISC(warn, "Bad parameter - decoder callbacks or address");
     return;
@@ -165,21 +162,21 @@ void ProxyFilter::addHostAddressToFilterState(
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
 
-  if (!filter_state->hasData<AddressSetFilterStateObjectImpl>(
-          AddressSetFilterStateObjectImpl::key())) {
-    auto address_set = std::make_unique<AddressSetFilterStateObjectImpl>();
-    address_set->add(address);
+  if (!filter_state->hasData<StreamInfo::UpstreamAddressSet>(
+          StreamInfo::UpstreamAddressSet::key())) {
+    auto address_set = std::make_unique<StreamInfo::UpstreamAddressSet>();
+    address_set->addresses_.emplace(address);
 
-    filter_state->setData(AddressSetFilterStateObjectImpl::key(), std::move(address_set),
+    filter_state->setData(StreamInfo::UpstreamAddressSet::key(), std::move(address_set),
                           StreamInfo::FilterState::StateType::Mutable,
                           StreamInfo::FilterState::LifeSpan::Request);
 
   } else {
-    AddressSetFilterStateObjectImpl& address_set =
-        filter_state->getDataMutable<AddressSetFilterStateObjectImpl>(
-            AddressSetFilterStateObjectImpl::key());
-    address_set.clear();
-    address_set.add(address);
+    StreamInfo::UpstreamAddressSet& address_set =
+        filter_state->getDataMutable<StreamInfo::UpstreamAddressSet>(
+            StreamInfo::UpstreamAddressSet::key());
+    address_set.addresses_.clear();
+    address_set.addresses_.emplace(address);
   }
 }
 

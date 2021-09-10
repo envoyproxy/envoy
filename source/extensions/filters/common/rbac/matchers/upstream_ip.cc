@@ -3,7 +3,7 @@
 #include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "source/common/stream_info/set_filter_state_object_impl.h"
+#include "source/common/stream_info/upstream_address_set.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,23 +17,20 @@ using namespace Filters::Common::RBAC;
 bool UpstreamIpMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                                 const StreamInfo::StreamInfo& info) const {
 
-  using AddressSetFilterStateObjectImpl =
-      StreamInfo::SetFilterStateObjectImpl<Network::Address::InstanceConstSharedPtr>;
-
-  if (!info.filterState().hasDataWithName(AddressSetFilterStateObjectImpl::key())) {
+  if (!info.filterState().hasDataWithName(StreamInfo::UpstreamAddressSet::key())) {
     ENVOY_LOG(warn,
               "Did not find filter state with key: {}. Do you have a filter in the filter chain "
               "before the RBAC filter which populates the filter state with upstream addresses ?",
-              AddressSetFilterStateObjectImpl::key());
+              StreamInfo::UpstreamAddressSet::key());
 
     return false;
   }
 
   bool ipMatch = false;
 
-  const AddressSetFilterStateObjectImpl& address_set =
-      info.filterState().getDataReadOnly<AddressSetFilterStateObjectImpl>(
-          AddressSetFilterStateObjectImpl::key());
+  const StreamInfo::UpstreamAddressSet& address_set =
+      info.filterState().getDataReadOnly<StreamInfo::UpstreamAddressSet>(
+          StreamInfo::UpstreamAddressSet::key());
 
   address_set.iterate([&, this](const Network::Address::InstanceConstSharedPtr& address) {
     ipMatch = range_.isInRange(*address.get());
