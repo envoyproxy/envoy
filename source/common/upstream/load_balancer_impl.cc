@@ -752,7 +752,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // Nuke existing scheduler if it exists.
     auto& scheduler = scheduler_[source] = Scheduler{};
     refreshHostSource(source);
-    if (!noHostsAreInSlowStart()) {
+    if (slow_start_enabled_) {
       recalculateHostsInSlowStart(hosts);
     }
 
