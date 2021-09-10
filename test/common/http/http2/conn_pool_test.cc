@@ -47,7 +47,9 @@ public:
       : FixedHttpConnPoolImpl(
             std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
             random_generator, state,
-            [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
+            [](HttpConnPoolImplBase* pool, spdlog::logger& /*logger*/) {
+              return std::make_unique<ActiveClient>(*pool);
+            },
             [](Upstream::Host::CreateConnectionData&, HttpConnPoolImplBase*) { return nullptr; },
             std::vector<Protocol>{Protocol::Http2}) {}
 
