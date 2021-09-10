@@ -1,4 +1,4 @@
-FROM gcr.io/distroless/base-debian10:nonroot
+FROM gcr.io/distroless/base-debian11:nonroot
 
 ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
 
