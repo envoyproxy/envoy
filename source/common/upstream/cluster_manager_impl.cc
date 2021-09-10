@@ -1197,7 +1197,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
   // guarding deletion with `do_not_delete_` in the registered idle callback, and then checking
   // afterwards whether it is empty and deleting it if necessary.
   container.do_not_delete_ = true;
-  pools->startDrain();
+  pools->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   container.do_not_delete_ = false;
 
   if (container.pools_->size() == 0) {
@@ -1217,7 +1217,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainTcpConnPools(
 
   container.draining_ = true;
   for (auto pool : pools) {
-    pool->startDrain();
+    pool->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   }
 }
 
@@ -1389,7 +1389,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainAllConnPoolsWorker(
     const auto container = getHttpConnPoolsContainer(host);
     if (container != nullptr) {
       container->do_not_delete_ = true;
-      container->pools_->drainConnections();
+      container->pools_->drainConnections(
+          Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
       container->do_not_delete_ = false;
 
       if (container->pools_->size() == 0) {
@@ -1417,7 +1418,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainAllConnPoolsWorker(
             ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
           pool->closeConnections();
         } else {
-          pool->drainConnections();
+          pool->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
         }
       }
     }

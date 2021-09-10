@@ -16,6 +16,9 @@ namespace {
 // Effectively disables tracking as this should zero out all reasonable account
 // balances when shifted by this amount.
 constexpr uint32_t kEffectivelyDisableTrackingBitshift = 63;
+// 50 is an arbitrary limit, and is meant to both limit the number of streams
+// Envoy ends up resetting and avoid triggering the Watchdog system.
+constexpr uint32_t kMaxNumberOfStreamsToResetPerInvocation = 50;
 } // end namespace
 
 void WatermarkBuffer::add(const void* data, uint64_t size) {
@@ -194,19 +197,23 @@ uint64_t WatermarkBufferFactory::resetAccountsGivenPressure(float pressure) {
   // Compute buckets to clear
   const uint32_t buckets_to_clear = std::min<uint32_t>(
       std::floor(pressure * BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_) + 1, 8);
-  uint32_t bucket_idx = BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - buckets_to_clear;
 
-  ENVOY_LOG_MISC(warn, "resetting streams in buckets >= {}", bucket_idx);
-  uint64_t num_streams_reset = 0;
-  // TODO(kbaichoo): Add a limit to the number of streams we reset
-  // per-invocation of this function.
-  // Clear buckets
-  while (bucket_idx < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_) {
+  uint32_t last_bucket_to_clear = BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - buckets_to_clear;
+  ENVOY_LOG_MISC(warn, "resetting streams in buckets >= {}", last_bucket_to_clear);
+
+  // Clear buckets, prioritizing the buckets with larger streams.
+  uint32_t num_streams_reset = 0;
+  for (uint32_t buckets_cleared = 0; buckets_cleared < buckets_to_clear; ++buckets_cleared) {
+    const uint32_t bucket_to_clear =
+        BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - buckets_cleared - 1;
     ENVOY_LOG_MISC(warn, "resetting {} streams in bucket {}.",
-                   size_class_account_sets_[bucket_idx].size(), bucket_idx);
+                   size_class_account_sets_[bucket_to_clear].size(), bucket_to_clear);
 
-    auto it = size_class_account_sets_[bucket_idx].begin();
-    while (it != size_class_account_sets_[bucket_idx].end()) {
+    auto it = size_class_account_sets_[bucket_to_clear].begin();
+    while (it != size_class_account_sets_[bucket_to_clear].end()) {
+      if (num_streams_reset >= kMaxNumberOfStreamsToResetPerInvocation) {
+        return num_streams_reset;
+      }
       auto next = std::next(it);
       // This will trigger an erase, which avoids rehashing and invalidates the
       // iterator *it*. *next* is still valid.
@@ -214,8 +221,6 @@ uint64_t WatermarkBufferFactory::resetAccountsGivenPressure(float pressure) {
       it = next;
       ++num_streams_reset;
     }
-
-    ++bucket_idx;
   }
 
   return num_streams_reset;

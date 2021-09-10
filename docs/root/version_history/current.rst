@@ -17,6 +17,15 @@ Incompatible Behavior Changes
   :ref:`contrib images <install_contrib>`.
 * contrib: the :ref:`MySQL proxy filter <config_network_filters_mysql_proxy>` has been moved to
   :ref:`contrib images <install_contrib>`.
+* dns_filter: :ref:`dns_filter <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>`
+  protobuf fields have been renumbered to restore compatibility with Envoy
+  1.18, breaking compatibility with Envoy 1.19.0 and 1.19.1. The new field
+  numbering allows control planes supporting Envoy 1.18 to gracefully upgrade to
+  :ref:`dns_resolution_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolution_config>`,
+  provided they skip over Envoy 1.19.0 and 1.19.1.
+  Control planes upgrading from Envoy 1.19.0 and 1.19.1 will need to
+  vendor the corresponding protobuf definitions to ensure that the
+  renumbered fields have the types expected by those releases.
 * ext_authz: fixed skipping authentication when returning either a direct response or a redirect. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect`` runtime guard to false.
 
 Minor Behavior Changes
