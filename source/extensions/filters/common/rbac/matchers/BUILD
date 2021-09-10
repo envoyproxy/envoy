@@ -18,9 +18,7 @@ envoy_cc_extension(
     ],
     deps = [
         "//source/common/common:logger_lib",
-        "//source/common/http:utility_lib",
         "//source/common/stream_info:upstream_address_set_lib",
-        "//source/extensions/filters/common/rbac:engine_lib",
         "//source/extensions/filters/common/rbac:matchers_lib",
         "//source/extensions/filters/common/rbac:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -38,9 +36,7 @@ envoy_cc_extension(
     ],
     deps = [
         "//source/common/common:logger_lib",
-        "//source/common/http:utility_lib",
         "//source/common/stream_info:upstream_address_set_lib",
-        "//source/extensions/filters/common/rbac:engine_lib",
         "//source/extensions/filters/common/rbac:matchers_lib",
         "//source/extensions/filters/common/rbac:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
