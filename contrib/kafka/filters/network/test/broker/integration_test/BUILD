@@ -3,7 +3,7 @@ load(
     "envoy_contrib_package",
     "envoy_py_test",
 )
-load("@kafka_pip3//:requirements.bzl", "requirement")
+load("@base_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
