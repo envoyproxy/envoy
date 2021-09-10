@@ -47,6 +47,9 @@ IGNORES_CVES = set([
     'CVE-2020-8169',
     'CVE-2020-8177',
     'CVE-2020-8284',
+    # Low severity Curl issue with incorrect re-use of connections due to case
+    # in/sensitivity
+    'CVE-2021-22924',
     # Node.js issue unrelated to http-parser (Node TLS).
     'CVE-2020-8265',
     # Node.js request smuggling.
@@ -64,8 +67,14 @@ IGNORES_CVES = set([
     # Node.js issues unrelated to http-parser.
     # See https://nvd.nist.gov/vuln/detail/CVE-2021-22918
     # See https://nvd.nist.gov/vuln/detail/CVE-2021-22921
+    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22931
+    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22939
+    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22940
     'CVE-2021-22918',
     'CVE-2021-22921',
+    'CVE-2021-22931',
+    'CVE-2021-22939',
+    'CVE-2021-22940',
 ])
 
 # Subset of CVE fields that are useful below.
