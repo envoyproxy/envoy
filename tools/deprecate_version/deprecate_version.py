@@ -1,6 +1,6 @@
-# Script for automating cleanup PR creation for deprecated runtime features
+# Bazel usage
 #
-# sh tools/deprecate_version/deprecate_version.sh
+# bazel run //tools/deprecate_version:deprecate_version
 #
 # Direct usage (not recommended):
 #
