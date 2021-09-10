@@ -65,6 +65,10 @@ public:
         const Protobuf::RepeatedPtrField<envoy::type::v3::Int64Range>& retriable_statuses,
         uint64_t default_expected_status);
 
+    bool inRetriableRanges(uint64_t http_status) const;
+    bool inExpectedRanges(uint64_t http_status) const;
+
+  private:
     bool inRanges(uint64_t http_status, std::vector<std::pair<uint64_t, uint64_t>>) const;
 
     std::vector<std::pair<uint64_t, uint64_t>> expected_ranges_;

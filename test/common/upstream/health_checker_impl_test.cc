@@ -3140,9 +3140,9 @@ TEST(HttpStatusChecker, Default) {
       conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
       200);
 
-  EXPECT_TRUE(http_status_checker.inRanges(200, http_status_checker.expected_ranges_));
-  EXPECT_FALSE(http_status_checker.inRanges(204, http_status_checker.expected_ranges_));
-  EXPECT_FALSE(http_status_checker.inRanges(200, http_status_checker.retriable_ranges_));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(200));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(204));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(200));
 }
 
 TEST(HttpStatusChecker, SingleExpected100) {
@@ -3165,11 +3165,11 @@ TEST(HttpStatusChecker, SingleExpected100) {
       conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
       200);
 
-  EXPECT_FALSE(http_status_checker.inRanges(200, http_status_checker.expected_ranges_));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(200));
 
-  EXPECT_FALSE(http_status_checker.inRanges(99, http_status_checker.expected_ranges_));
-  EXPECT_TRUE(http_status_checker.inRanges(100, http_status_checker.expected_ranges_));
-  EXPECT_FALSE(http_status_checker.inRanges(101, http_status_checker.expected_ranges_));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(99));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(100));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(101));
 }
 
 TEST(HttpStatusChecker, SingleRetriable100) {
@@ -3192,9 +3192,9 @@ TEST(HttpStatusChecker, SingleRetriable100) {
       conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
       200);
 
-  EXPECT_FALSE(http_status_checker.inRanges(99, http_status_checker.retriable_ranges_));
-  EXPECT_TRUE(http_status_checker.inRanges(100, http_status_checker.retriable_ranges_));
-  EXPECT_FALSE(http_status_checker.inRanges(101, http_status_checker.retriable_ranges_));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(99));
+  EXPECT_TRUE(http_status_checker.inRetriableRanges(100));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(101));
 }
 
 TEST(HttpStatusChecker, SingleExpected599) {
@@ -3217,11 +3217,11 @@ TEST(HttpStatusChecker, SingleExpected599) {
       conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
       200);
 
-  EXPECT_FALSE(http_status_checker.inRanges(200, http_status_checker.expected_ranges_));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(200));
 
-  EXPECT_FALSE(http_status_checker.inRanges(598, http_status_checker.expected_ranges_));
-  EXPECT_TRUE(http_status_checker.inRanges(599, http_status_checker.expected_ranges_));
-  EXPECT_FALSE(http_status_checker.inRanges(600, http_status_checker.expected_ranges_));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(598));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(599));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(600));
 }
 
 TEST(HttpStatusChecker, SingleRetriable599) {
@@ -3244,9 +3244,9 @@ TEST(HttpStatusChecker, SingleRetriable599) {
       conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
       200);
 
-  EXPECT_FALSE(http_status_checker.inRanges(598, http_status_checker.retriable_ranges_));
-  EXPECT_TRUE(http_status_checker.inRanges(599, http_status_checker.retriable_ranges_));
-  EXPECT_FALSE(http_status_checker.inRanges(600, http_status_checker.retriable_ranges_));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(598));
+  EXPECT_TRUE(http_status_checker.inRetriableRanges(599));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(600));
 }
 
 TEST(HttpStatusChecker, ExpectedRanges_204_304) {
@@ -3271,14 +3271,14 @@ TEST(HttpStatusChecker, ExpectedRanges_204_304) {
       conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
       200);
 
-  EXPECT_FALSE(http_status_checker.inRanges(200, http_status_checker.expected_ranges_));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(200));
 
-  EXPECT_FALSE(http_status_checker.inRanges(203, http_status_checker.expected_ranges_));
-  EXPECT_TRUE(http_status_checker.inRanges(204, http_status_checker.expected_ranges_));
-  EXPECT_FALSE(http_status_checker.inRanges(205, http_status_checker.expected_ranges_));
-  EXPECT_FALSE(http_status_checker.inRanges(303, http_status_checker.expected_ranges_));
-  EXPECT_TRUE(http_status_checker.inRanges(304, http_status_checker.expected_ranges_));
-  EXPECT_FALSE(http_status_checker.inRanges(305, http_status_checker.expected_ranges_));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(203));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(204));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(205));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(303));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(304));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(305));
 }
 
 TEST(HttpStatusChecker, RetriableRanges_304_404) {
@@ -3303,12 +3303,12 @@ TEST(HttpStatusChecker, RetriableRanges_304_404) {
       conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
       200);
 
-  EXPECT_FALSE(http_status_checker.inRanges(303, http_status_checker.retriable_ranges_));
-  EXPECT_TRUE(http_status_checker.inRanges(304, http_status_checker.retriable_ranges_));
-  EXPECT_FALSE(http_status_checker.inRanges(305, http_status_checker.retriable_ranges_));
-  EXPECT_FALSE(http_status_checker.inRanges(403, http_status_checker.retriable_ranges_));
-  EXPECT_TRUE(http_status_checker.inRanges(404, http_status_checker.retriable_ranges_));
-  EXPECT_FALSE(http_status_checker.inRanges(405, http_status_checker.retriable_ranges_));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(303));
+  EXPECT_TRUE(http_status_checker.inRetriableRanges(304));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(305));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(403));
+  EXPECT_TRUE(http_status_checker.inRetriableRanges(404));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(405));
 }
 
 TEST(HttpStatusChecker, ExpectedBelow100) {

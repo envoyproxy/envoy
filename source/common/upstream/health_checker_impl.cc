@@ -206,6 +206,14 @@ HttpHealthCheckerImpl::HttpStatusChecker::HttpStatusChecker(
   }
 }
 
+bool HttpHealthCheckerImpl::HttpStatusChecker::inRetriableRanges(uint64_t http_status) const {
+  return inRanges(http_status, retriable_ranges_);
+}
+
+bool HttpHealthCheckerImpl::HttpStatusChecker::inExpectedRanges(uint64_t http_status) const {
+  return inRanges(http_status, expected_ranges_);
+}
+
 bool HttpHealthCheckerImpl::HttpStatusChecker::inRanges(
     uint64_t http_status, std::vector<std::pair<uint64_t, uint64_t>> ranges) const {
   for (const auto& range : ranges) {
@@ -361,8 +369,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   ENVOY_CONN_LOG(debug, "hc response={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
-  if (!parent_.http_status_checker_.inRanges(response_code,
-                                             parent_.http_status_checker_.expected_ranges_)) {
+  if (!parent_.http_status_checker_.inExpectedRanges(response_code)) {
     // If the HTTP response code would indicate failure AND the immediate health check
     // failure header is set, exclude the host from LB.
     // TODO(mattklein123): We could consider doing this check for any HTTP response code, but this
@@ -373,8 +380,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
       host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
     }
 
-    if (parent_.http_status_checker_.inRanges(response_code,
-                                              parent_.http_status_checker_.retriable_ranges_)) {
+    if (parent_.http_status_checker_.inRetriableRanges(response_code)) {
       return HealthCheckResult::Retriable;
     } else {
       return HealthCheckResult::Failed;
@@ -411,10 +417,10 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     handleSuccess(true);
     break;
   case HealthCheckResult::Failed:
-    handleFailure(envoy::data::core::v3::ACTIVE, false);
+    handleFailure(envoy::data::core::v3::ACTIVE, /*retriable=*/false);
     break;
   case HealthCheckResult::Retriable:
-    handleFailure(envoy::data::core::v3::ACTIVE, true);
+    handleFailure(envoy::data::core::v3::ACTIVE, /*retriable=*/true);
     break;
   }
 
