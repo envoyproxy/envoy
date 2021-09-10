@@ -14,7 +14,7 @@ public:
   // CustomStatNamespaces
   bool registered(const absl::string_view name) const override;
   void registerStatNamespace(const absl::string_view name) override;
-  absl::optional<std::string>
+  absl::optional<absl::string_view>
   stripRegisteredPrefix(const absl::string_view stat_name) const override;
 
 private:

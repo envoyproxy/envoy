@@ -43,7 +43,7 @@ public:
    * @return the stripped string if stat_name has a registered custom stat namespace. Otherwise,
    * return nullopt.
    */
-  virtual absl::optional<std::string>
+  virtual absl::optional<absl::string_view>
   stripRegisteredPrefix(const absl::string_view stat_name) const PURE;
 };
 

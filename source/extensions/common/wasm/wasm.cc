@@ -78,8 +78,8 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
           createWasmVm(config.config().vm_config().runtime()), config.config().vm_config().vm_id(),
           MessageUtil::anyToBytes(config.config().vm_config().configuration()),
           toStdStringView(vm_key), config.environmentVariables(), config.allowedCapabilities()),
-      scope_(scope), stat_name_set_(scope_->symbolTable().makeSet("wasm")),
-      custom_stat_namespace_(stat_name_set_->add(CustomStatNamespace)),
+      scope_(scope), stat_name_pool_(scope_->symbolTable()),
+      custom_stat_namespace_(stat_name_pool_.value().add(CustomStatNamespace)),
       cluster_manager_(cluster_manager), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()), lifecycle_stats_handler_(LifecycleStatsHandler(
                                                  scope, config.config().vm_config().runtime())) {

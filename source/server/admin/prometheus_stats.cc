@@ -11,6 +11,7 @@ namespace Server {
 
 namespace {
 
+// TODO(mathetake) replace with re2 for safety.
 const std::regex& promRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "[^a-zA-Z0-9_]"); }
 
 /**
@@ -193,11 +194,11 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
 absl::optional<std::string>
 PrometheusStatsFormatter::metricName(const std::string& extracted_name,
                                      const Stats::CustomStatNamespaces& custom_namespaces) {
-  const absl::optional<std::string> custom_namespace_stripped =
+  const absl::optional<absl::string_view> custom_namespace_stripped =
       custom_namespaces.stripRegisteredPrefix(extracted_name);
   if (custom_namespace_stripped.has_value()) {
     // This case the name has a custom namespace, and it is a custom metric.
-    const std::string sanitized_name = sanitizeName(custom_namespace_stripped.value());
+    const std::string sanitized_name = sanitizeName(std::string(custom_namespace_stripped.value()));
     // We expose these metrics without modifying (e.g. without "envoy_"),
     // so we have to check the "user-defined" stat name complies with the Prometheus naming
     // convention. Specifically the name must start with the "[a-zA-Z_]" pattern.

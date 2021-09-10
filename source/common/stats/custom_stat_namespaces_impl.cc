@@ -11,12 +11,12 @@ void CustomStatNamespacesImpl::registerStatNamespace(const absl::string_view nam
   namespaces_.insert(std::string(name));
 };
 
-absl::optional<std::string>
+absl::optional<absl::string_view>
 CustomStatNamespacesImpl::stripRegisteredPrefix(const absl::string_view stat_name) const {
   const auto pos = stat_name.find_first_of('.');
   if (pos != std::string::npos && registered(stat_name.substr(0, pos))) {
     // Trim the custom namespace.
-    return std::string(stat_name.substr(pos + 1));
+    return stat_name.substr(pos + 1);
   }
   return absl::nullopt;
 };

@@ -98,7 +98,7 @@ protected:
   proxy_wasm::WasmCallVoid<2> on_stats_update_;
 
   Stats::ScopeSharedPtr scope_;
-  const Stats::StatNameSetPtr stat_name_set_;
+  absl::optional<Stats::StatNamePool> stat_name_pool_;
   const Stats::StatName custom_stat_namespace_;
   Upstream::ClusterManager& cluster_manager_;
   Event::Dispatcher& dispatcher_;
