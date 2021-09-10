@@ -13,15 +13,11 @@ namespace Extensions {
 namespace IoSocket {
 namespace UserSpace {
 
-Network::ClientConnectionPtr
-InternalClientConnectionFactory::createClientConnection(const Network::CCContext&) {
-  // TODO: fetch from arg
-
-  Network::Address::InstanceConstSharedPtr address;
-  Network::Address::InstanceConstSharedPtr source_address;
-  Network::TransportSocketPtr transport_socket;
-  const Network::ConnectionSocket::OptionsSharedPtr options;
-  Event::Dispatcher& dispatcher = *reinterpret_cast<Event::Dispatcher*>(1);
+Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnection(
+    Event::Dispatcher& dispatcher, Network::Address::InstanceConstSharedPtr address,
+    Network::Address::InstanceConstSharedPtr source_address,
+    Network::TransportSocketPtr&& transport_socket,
+    const Network::ConnectionSocket::OptionsSharedPtr& options) {
 
   Network::IoHandlePtr io_handle_client;
   Network::IoHandlePtr io_handle_server;

@@ -175,7 +175,8 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
     return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
                                                            std::move(transport_socket), options);
   }
-  return factory->createClientConnection(Network::CCContext());
+  return factory->createClientConnection(*this, address, source_address,
+                                         std::move(transport_socket), options);
 }
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
