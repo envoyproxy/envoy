@@ -1241,26 +1241,26 @@ WasmResult Context::defineMetric(uint32_t metric_type, std::string_view name,
   // custom metrics can be distinguished from native Envoy metrics.
   if (type == MetricType::Counter) {
     auto id = wasm()->nextCounterMetricId();
-    auto c = &Stats::Utility::counterFromElements(*wasm()->scope_,
-                                                  {wasm()->custom_stat_namespace_, stat_name});
+    Stats::Counter* c = &Stats::Utility::counterFromElements(
+        *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name});
     wasm()->counters_.emplace(id, c);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
   if (type == MetricType::Gauge) {
     auto id = wasm()->nextGaugeMetricId();
-    auto g = &Stats::Utility::gaugeFromStatNames(*wasm()->scope_,
-                                                 {wasm()->custom_stat_namespace_, stat_name},
-                                                 Stats::Gauge::ImportMode::Accumulate);
+    Stats::Gauge* g = &Stats::Utility::gaugeFromStatNames(
+        *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name},
+        Stats::Gauge::ImportMode::Accumulate);
     wasm()->gauges_.emplace(id, g);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
   // (type == MetricType::Histogram) {
   auto id = wasm()->nextHistogramMetricId();
-  auto h = &Stats::Utility::histogramFromStatNames(*wasm()->scope_,
-                                                   {wasm()->custom_stat_namespace_, stat_name},
-                                                   Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram* h = &Stats::Utility::histogramFromStatNames(
+      *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name},
+      Stats::Histogram::Unit::Unspecified);
   wasm()->histograms_.emplace(id, h);
   *metric_id_ptr = id;
   return WasmResult::Ok;
