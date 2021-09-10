@@ -5,7 +5,7 @@
 
 #include "source/common/config/metadata.h"
 #include "source/common/network/utility.h"
-#include "source/common/stream_info/set_filter_state_object_impl.h"
+#include "source/common/stream_info/upstream_address_set.h"
 #include "source/extensions/filters/common/rbac/utility.h"
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
 
@@ -321,21 +321,18 @@ void upstreamIpTestsBasicPolicySetup(RoleBasedAccessControlFilterTest& test,
 
 void upstreamIpTestsFilterStateSetup(NiceMock<Http::MockStreamDecoderFilterCallbacks>& callback,
                                      const std::vector<std::string>& upstream_ips) {
-  using AddressSetFilterStateObjectImpl =
-      StreamInfo::SetFilterStateObjectImpl<Network::Address::InstanceConstSharedPtr>;
-
-  auto address_set = std::make_unique<AddressSetFilterStateObjectImpl>();
+  auto address_set = std::make_unique<StreamInfo::UpstreamAddressSet>();
 
   for (const auto& ip : upstream_ips) {
     Network::Address::InstanceConstSharedPtr address =
         Envoy::Network::Utility::parseInternetAddressAndPort(ip, false);
 
-    address_set->add(address);
+    address_set->addresses_.emplace(address);
   }
 
   // Set the filter state data.
   callback.streamInfo().filterState()->setData(
-      AddressSetFilterStateObjectImpl::key(), std::move(address_set),
+      StreamInfo::UpstreamAddressSet::key(), std::move(address_set),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
 }
 
