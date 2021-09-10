@@ -144,7 +144,7 @@ public:
 
   void testAutoSniOptions(
       absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> dummy_option,
-      Envoy::Http::TestRequestHeaderMapImpl* headers, std::string server_name = "host",
+      Envoy::Http::TestRequestHeaderMapImpl headers, std::string server_name = "host",
       bool should_validate_san = false, std::string alt_server_name = "host") {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
@@ -158,8 +158,8 @@ public:
                                        StreamInfo::FilterState::StateType::Mutable);
     expectResponseTimerCreate();
 
-    HttpTestUtility::addDefaultHeaders(*headers);
-    router_.decodeHeaders(*headers, true);
+    HttpTestUtility::addDefaultHeaders(headers);
+    router_.decodeHeaders(headers, true);
     EXPECT_EQ(server_name,
               stream_info.filterState()
                   ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
@@ -184,7 +184,7 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithoutHeaderOverride) {
   auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
 
-  auto headers = new Http::TestRequestHeaderMapImpl{};
+  Http::TestRequestHeaderMapImpl headers{};
   testAutoSniOptions(dummy_option, headers);
 }
 
@@ -193,7 +193,7 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithHostHeaderOverride) {
   dummy_option.value().set_auto_sni(true);
   dummy_option.value().set_override_auto_sni_header(":authority");
 
-  auto headers = new Http::TestRequestHeaderMapImpl{};
+  Http::TestRequestHeaderMapImpl headers{};
   testAutoSniOptions(dummy_option, headers);
 }
 
@@ -203,7 +203,7 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithHeaderOverride) {
   dummy_option.value().set_override_auto_sni_header("x-host");
 
   const auto server_name = "foo.bar";
-  auto headers = new Http::TestRequestHeaderMapImpl{{"x-host", server_name}};
+  Http::TestRequestHeaderMapImpl headers{{"x-host", server_name}};
   testAutoSniOptions(dummy_option, headers, server_name);
 }
 
@@ -212,7 +212,7 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithEmptyValueHeaderOverride) {
   dummy_option.value().set_auto_sni(true);
   dummy_option.value().set_override_auto_sni_header("x-host");
 
-  auto headers = new Http::TestRequestHeaderMapImpl{{"x-host", ""}};
+  Http::TestRequestHeaderMapImpl headers{{"x-host", ""}};
   testAutoSniOptions(dummy_option, headers);
 }
 
@@ -221,7 +221,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithoutHeaderOverride) {
   dummy_option.value().set_auto_sni(true);
   dummy_option.value().set_auto_san_validation(true);
 
-  auto headers = new Http::TestRequestHeaderMapImpl{};
+  Http::TestRequestHeaderMapImpl headers{};
   testAutoSniOptions(dummy_option, headers, "host", true);
 }
 
@@ -231,7 +231,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHostHeaderOverride) {
   dummy_option.value().set_auto_san_validation(true);
   dummy_option.value().set_override_auto_sni_header(":authority");
 
-  auto headers = new Http::TestRequestHeaderMapImpl{};
+  Http::TestRequestHeaderMapImpl headers{};
   testAutoSniOptions(dummy_option, headers, "host", true);
 }
 
@@ -242,7 +242,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHeaderOverride) {
   dummy_option.value().set_override_auto_sni_header("x-host");
 
   const auto server_name = "foo.bar";
-  auto headers = new Http::TestRequestHeaderMapImpl{{"x-host", server_name}};
+  Http::TestRequestHeaderMapImpl headers{{"x-host", server_name}};
   testAutoSniOptions(dummy_option, headers, server_name, true, server_name);
 }
 
@@ -252,7 +252,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithEmptyValueHeaderOverride)
   dummy_option.value().set_auto_san_validation(true);
   dummy_option.value().set_override_auto_sni_header("x-host");
 
-  auto headers = new Http::TestRequestHeaderMapImpl{{"x-host", ""}};
+  Http::TestRequestHeaderMapImpl headers{{"x-host", ""}};
   testAutoSniOptions(dummy_option, headers, "host", true);
 }
 
@@ -263,7 +263,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithIpHeaderOverride) {
   dummy_option.value().set_override_auto_sni_header("x-host");
 
   const auto server_name = "127.0.0.1";
-  auto headers = new Http::TestRequestHeaderMapImpl{{"x-host", server_name}};
+  Http::TestRequestHeaderMapImpl headers{{"x-host", server_name}};
   testAutoSniOptions(dummy_option, headers, "dummy", true, server_name);
 }
 

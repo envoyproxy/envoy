@@ -315,35 +315,6 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithAltHeaderSni) {
   checkSimpleRequestSuccess(0, 0, response.get());
 }
 
-// Verify that if `override_auto_sni_header` point to an IP address then we don't
-// populate the SNI but set the SAN.
-TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithNoSniAndAltHeader) {
-  upstream_tls_ = true;
-  initializeWithArgs(1024, 1024, "custom-header");
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("{}:{}", fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
-                   fake_upstreams_[0]->localAddress()->ip()->port())},
-      {"custom-header",
-       fmt::format("{}", fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str())}};
-
-  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  waitForNextUpstreamRequest();
-
-  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
-      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
-          fake_upstream_connection_->connection().ssl().get());
-  EXPECT_STREQ(nullptr, SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
-
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  checkSimpleRequestSuccess(0, 0, response.get());
-}
-
 TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
   upstream_tls_ = true;
   initializeWithArgs();
