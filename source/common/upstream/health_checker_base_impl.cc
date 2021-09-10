@@ -219,7 +219,7 @@ void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host,
       return;
     }
 
-    session->second->setUnhealthy(envoy::data::core::v3::PASSIVE, false);
+    session->second->setUnhealthy(envoy::data::core::v3::PASSIVE, /*retriable=*/false);
   });
 }
 
