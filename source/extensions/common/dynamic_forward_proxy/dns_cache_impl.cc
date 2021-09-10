@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
+#include "source/common/common/stl_helpers.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/resolver_impl.h"
@@ -289,7 +290,11 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                                  Network::DnsResolver::ResolutionStatus status,
                                  std::list<Network::DnsResponse>&& response, bool from_cache) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
-  ENVOY_LOG(debug, "main thread resolve complete for host '{}'. {} results", host, response.size());
+  ENVOY_LOG_EVENT(debug, "dns_cache_finish_resolve",
+                  "main thread resolve complete for host '{}': {}", host,
+                  accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
+                    return dns_response.address_->asString();
+                  }));
 
   // Functions like this one that modify primary_hosts_ are only called in the main thread so we
   // know it is safe to use the PrimaryHostInfo pointers outside of the lock.
