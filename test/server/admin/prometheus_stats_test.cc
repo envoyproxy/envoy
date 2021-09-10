@@ -274,6 +274,7 @@ envoy_histogram1_count{} 0
 }
 
 TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
   HistogramWrapper h1_cumulative;
 
   // Force large counts to prove that the +Inf bucket doesn't overflow to scientific notation.
@@ -291,9 +292,8 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  auto size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false,
-                                                  absl::nullopt, Stats::CustomStatNamespacesImpl{});
+  const auto size = PrometheusStatsFormatter::statsAsPrometheus(
+      counters_, gauges_, histograms_, response, false, absl::nullopt, custom_namespaces);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
