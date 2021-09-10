@@ -9,6 +9,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/overload/v3/overload.pb.h"
+#include "envoy/network/client_connection_manager.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
@@ -16,6 +17,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
+#include "source/common/config/utility.h"
 #include "source/common/event/file_event_impl.h"
 #include "source/common/event/libevent_scheduler.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
@@ -27,9 +29,6 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/runtime/runtime_features.h"
-
-#include "source/common/config/utility.h"
-#include "envoy/network/client_connection_manager.h"
 
 #include "event2/event.h"
 

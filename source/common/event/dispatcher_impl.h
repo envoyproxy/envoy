@@ -66,6 +66,17 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+
+  void registerInternalListenerManager(
+      Network::InternalListenerManager& internal_listener_manager) override {
+    ASSERT(!internal_listener_manager_.has_value());
+    internal_listener_manager_ = internal_listener_manager;
+  }
+
+  Network::InternalListenerManagerOptRef getInternalListenerManager() override {
+    return internal_listener_manager_;
+  }
+
   Network::DnsResolverSharedPtr createDnsResolver(
       const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
       const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) override;
@@ -175,6 +186,7 @@ private:
   MonotonicTime approximate_monotonic_time_;
   WatchdogRegistrationPtr watchdog_registration_;
   const ScaledRangeTimerManagerPtr scaled_timer_manager_;
+  Network::InternalListenerManagerOptRef internal_listener_manager_;
 };
 
 } // namespace Event

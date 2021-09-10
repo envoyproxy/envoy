@@ -2,10 +2,10 @@
 
 #include "envoy/registry/registry.h"
 
-#include "source/extensions/io_socket/user_space/io_handle_impl.h"
-#include "source/common/network/connection_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/connection_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
 namespace Envoy {
 
@@ -30,8 +30,10 @@ InternalClientConnectionFactory::createClientConnection(const Network::CCContext
       Extensions::IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
 
   auto client_conn = std::make_unique<Network::ClientConnectionImpl>(
-      *this, std::move(io_handle_client), address, source_address, std::move(transport_socket),
-      options);
+      dispatcher,
+      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_client), source_address,
+                                                      address),
+      source_address, std::move(transport_socket), options);
   // TODO(lambdai): refactor nested if.
   auto internal_listener_manager = dispatcher.getInternalListenerManager();
   if (internal_listener_manager.has_value()) {
@@ -57,16 +59,16 @@ InternalClientConnectionFactory::createClientConnection(const Network::CCContext
       // injected error into client_conn;
       io_handle_server->close();
     }
-    return client_conn;
   } else {
-    // TODO(lambdai): return closed connection.
-    return nullptr;
+    FANCY_LOG(debug, "lambdai: cannot find internal listener {} ", address->asStringView());
+    // injected error into client_conn;
+    io_handle_server->close();
   }
+  return client_conn;
 }
 REGISTER_FACTORY(InternalClientConnectionFactory, Network::ClientConnectionFactory);
 
 } // namespace UserSpace
 } // namespace IoSocket
 } // namespace Extensions
-} // namespace Envoy
 } // namespace Envoy

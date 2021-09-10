@@ -4,9 +4,8 @@
 #include <string>
 
 #include "envoy/common/pure.h"
-
-#include "envoy/network/connection.h"
 #include "envoy/network/client_connection_manager.h"
+#include "envoy/network/connection.h"
 
 namespace Envoy {
 

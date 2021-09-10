@@ -313,6 +313,9 @@ public:
     return udp_listener_config_ != nullptr ? *udp_listener_config_
                                            : Network::UdpListenerConfigOptRef();
   }
+  Network::InternalListenerConfigOptRef internalListenerConfig() override {
+    return Network::InternalListenerConfigOptRef();
+  }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
   ResourceLimit& openConnections() override { return *open_connections_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
