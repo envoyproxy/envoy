@@ -24,7 +24,7 @@ TEST(CustomStatNamespacesImpl, StripRegisteredPrefix) {
   EXPECT_FALSE(namespaces.stripRegisteredPrefix("foo").has_value());
   EXPECT_FALSE(namespaces.stripRegisteredPrefix("bar").has_value());
   // Should be stripped.
-  const absl::optional<std::string> actual =
+  const absl::optional<absl::string_view> actual =
       namespaces.stripRegisteredPrefix("foo.my.extension.metric");
   EXPECT_TRUE(actual.has_value());
   EXPECT_EQ(actual.value(), "my.extension.metric");
