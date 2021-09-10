@@ -796,7 +796,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
         request_handle:logTrace(key .. " " .. value)
       end
       request_handle:logTrace(string.len(body))
-      request_handle:logTrace(string.sub(body, 1, 4) .. string.byte(body, 5) .. string.sub(body, 6, 8))
+      request_handle:logTrace(body)
       request_handle:logTrace(string.byte(body, 5))
       request_handle:logTrace(string.sub(body, 6, 8))
     end
@@ -842,7 +842,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   response_message->body().add(response, 8);
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("8")));
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("resp0nse")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(std::string("resp\0nse", 8))));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("0")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("nse")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
