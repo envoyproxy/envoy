@@ -26,8 +26,8 @@ TcpGrpcAccessLog::TcpGrpcAccessLog(AccessLog::FilterPtr&& filter,
       config_(std::make_shared<const TcpGrpcAccessLogConfig>(std::move(config))),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
   Config::Utility::checkTransportVersion(config_->common_config());
-  // Note that &scope might have died by the time when this callbak is called on each thread.
-  // This is suposed to be fixed by https://github.com/envoyproxy/envoy/issues/18066.
+  // Note that &scope might have died by the time when this callback is called on each thread.
+  // This is supposed to be fixed by https://github.com/envoyproxy/envoy/issues/18066.
   tls_slot_->set([config = config_, access_logger_cache = access_logger_cache_,
                   &scope = scope_](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalLogger>(access_logger_cache->getOrCreateLogger(
