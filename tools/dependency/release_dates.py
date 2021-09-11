@@ -184,7 +184,7 @@ def verify_and_print_release_dates(repository_locations, github_instance, create
 
 if __name__ == '__main__':
     # github action will have 3 args and CI will have 2 args
-    if len(sys.argv) < 1 or len(sys.argv) > 3 :
+    if len(sys.argv) < 1 or len(sys.argv) > 3:
         print('Usage: %s <path to repository_locations.bzl>' % sys.argv[0])
         sys.exit(1)
     # parsing location and github_action flag with argparse
