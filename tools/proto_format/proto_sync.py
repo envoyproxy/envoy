@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 
 # 1. Take protoxform artifacts from Bazel cache and pretty-print with protoprint.py.
-# 2. In the case where we are generating an Envoy internal shadow, it may be
-#    necessary to combine the current active proto, subject to hand editing, with
-#    shadow artifacts from the previous version; this is done via
-#    merge_active_shadow.py.
 # 3. Diff or copy resulting artifacts to the source tree.
 
 import argparse
@@ -218,30 +214,8 @@ def proto_print(src, dst):
     ])
 
 
-def merge_active_shadow(active_src, shadow_src, dst):
-    """Merge active/shadow FileDescriptorProto to a destination file.
-
-    Args:
-        active_src: source path for active FileDescriptorProto.
-        shadow_src: source path for active FileDescriptorProto.
-        dst: destination path for FileDescriptorProto.
-    """
-    print('merge_active_shadow %s' % dst)
-    subprocess.check_output([
-        'bazel-bin/tools/protoxform/merge_active_shadow',
-        active_src,
-        shadow_src,
-        dst,
-    ])
-
-
 def sync_proto_file(dst_srcs):
     """Pretty-print a proto descriptor from protoxform.py Bazel cache artifacts."
-
-    In the case where we are generating an Envoy internal shadow, it may be
-    necessary to combine the current active proto, subject to hand editing, with
-    shadow artifacts from the previous verion; this is done via
-    merge_active_shadow().
 
     Args:
         dst_srcs: destination/sources path tuple.
@@ -256,19 +230,8 @@ def sync_proto_file(dst_srcs):
         # We should only see an active and next major version candidate from
         # previous version today.
         assert (len(srcs) == 2)
-        shadow_srcs = [
-            s for s in srcs if s.endswith('.next_major_version_candidate.envoy_internal.proto')
-        ]
         active_src = [s for s in srcs if s.endswith('active_or_frozen.proto')][0]
-        # If we're building the shadow, we need to combine the next major version
-        # candidate shadow with the potentially hand edited active version.
-        if len(shadow_srcs) > 0:
-            assert (len(shadow_srcs) == 1)
-            with tempfile.NamedTemporaryFile() as f:
-                merge_active_shadow(active_src, shadow_srcs[0], f.name)
-                proto_print(f.name, dst)
-        else:
-            proto_print(active_src, dst)
+        proto_print(active_src, dst)
         src = active_src
     rel_dst_path = get_destination_path(src)
     return ['//%s:pkg' % str(rel_dst_path.parent)]
@@ -477,7 +440,7 @@ def should_sync(path, api_proto_modified_files, py_tools_modified_files):
     return False
 
 
-def sync(api_root, mode, is_ci, labels, shadow):
+def sync(api_root, mode, is_ci, labels):
     api_proto_modified_files = git_modified_files('api', 'proto')
     py_tools_modified_files = git_modified_files('tools', 'py')
     with tempfile.TemporaryDirectory() as tmp:
@@ -487,8 +450,7 @@ def sync(api_root, mode, is_ci, labels, shadow):
             paths.append(utils.bazel_bin_path_for_output_artifact(label, '.active_or_frozen.proto'))
             paths.append(
                 utils.bazel_bin_path_for_output_artifact(
-                    label, '.next_major_version_candidate.envoy_internal.proto'
-                    if shadow else '.next_major_version_candidate.proto'))
+                    label, '.next_major_version_candidate.proto'))
         dst_src_paths = defaultdict(list)
         for path in paths:
             if os.path.exists(path) and os.stat(path).st_size > 0:
@@ -556,10 +518,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['check', 'fix'])
     parser.add_argument('--api_root', default='./api')
-    parser.add_argument('--api_shadow_root', default='./generated_api_shadow')
     parser.add_argument('--ci', action="store_true", default=False)
     parser.add_argument('labels', nargs='*')
     args = parser.parse_args()
 
-    sync(args.api_root, args.mode, args.ci, args.labels, False)
-    sync(args.api_shadow_root, args.mode, args.ci, args.labels, True)
+    sync(args.api_root, args.mode, args.ci, args.labels)
