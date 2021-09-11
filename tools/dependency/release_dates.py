@@ -24,7 +24,7 @@ from colorama import Fore, Style
 from packaging import version
 
 # Tag issues created with these labels.
-LABELS = ['dependencies', 'area/build', 'deps', 'no stalebot']
+LABELS = ['dependencies', 'area/build', 'no stalebot']
 
 
 # Thrown on errors related to release date or version.
@@ -79,13 +79,12 @@ def create_issues(dep, repo, metadata_version, release_date, latest_release):
     """
     access_token = os.getenv('GITHUB_TOKEN')
     git = github.Github(access_token)
-    repo = git.get_repo('envoyproxy/envoy')
-
+    repo = git.get_repo('ME-ON1/envoy')
     # Find GitHub label objects for LABELS.
     labels = []
     for label in repo.get_labels():
         if label.name in LABELS:
-            labels.append(label)
+            labels.append(label.name)
     if len(labels) != len(LABELS):
         raise DependencyUpdateError('Unknown labels (expected %s, got %s)' % (LABELS, labels))
     body = f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>:{latest_release.tag_name}@<{latest_release.created_at}>'
@@ -94,12 +93,11 @@ def create_issues(dep, repo, metadata_version, release_date, latest_release):
     # TODO(htuch): Figure out how to do this without legacy and faster.
     if exists:
         print("Issue with %s already exists" % title)
-        print(exists)
         print('  >> Issue already exists, not posting!')
         return
     print('Creating issues...')
     try:
-        repo.create_issue(title, body=body, labels=labels)
+        repo.create_issue(title, body=body, labels=LABELS)
     except github.GithubException as e:
         print(f'unable to create issue, Getting Error: {e}. Add them to the Envoy proxy org')
         raise
@@ -185,20 +183,21 @@ def verify_and_print_release_dates(repository_locations, github_instance, create
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
+    # github action will have 3 args and CI will have 2 args
+    if len(sys.argv) < 1 or len(sys.argv) > 3 :
         print('Usage: %s <path to repository_locations.bzl>' % sys.argv[0])
         sys.exit(1)
     # parsing location and github_action flag with argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('location', type=str)
-    parser.add_argument('cron', default=False)
+    parser.add_argument('--cron', action='store_true')
     args = parser.parse_args()
     access_token = os.getenv('GITHUB_TOKEN')
     if not access_token:
         print('Missing GITHUB_TOKEN')
         sys.exit(1)
     path = args.location
-    cron_action = args.cron == 'True'
+    cron_action = args.cron
     spec_loader = exports.repository_locations_utils.load_repository_locations_spec
     path_module = exports.load_module('repository_locations', path)
     try:
