@@ -11,6 +11,7 @@ abstracts==0.0.12 \
     #   envoy.abstract.command
     #   envoy.base.utils
     #   envoy.code-format.python-check
+    #   envoy.dependency.pip-check
     #   envoy.github.abstract
     #   envoy.github.release
 aio.functional==0.0.9 \
@@ -269,6 +270,7 @@ envoy.base.checker==0.0.2 \
     --hash=sha256:2ac81efa20fd01fff644ff7dc7fadeac1c3e4dbb6210881ac7a7919ec0e048d8
     # via
     #   envoy.code-format.python-check
+    #   envoy.dependency.pip-check
     #   envoy.distribution.distrotest
     #   envoy.distribution.verify
 envoy.base.runner==0.0.4 \
@@ -283,11 +285,15 @@ envoy.base.utils==0.0.8 \
     # via
     #   -r requirements.in
     #   envoy.code-format.python-check
+    #   envoy.dependency.pip-check
     #   envoy.distribution.distrotest
     #   envoy.github.release
     #   envoy.gpg.sign
 envoy.code-format.python-check==0.0.4 \
     --hash=sha256:5e166102d1f873f0c14640bcef87b46147cbad1cb68888c977acfde7fce96e04
+    # via -r requirements.in
+envoy.dependency.pip-check==0.0.4 \
+    --hash=sha256:3213d77959f65c3c97e9b5d74cb14c02bc02dae64bac2e7c3cb829a2f4e5e40e
     # via -r requirements.in
 envoy.distribution.distrotest==0.0.3 \
     --hash=sha256:c094adbd959eb1336f93afc00aedb7ee4e68e8252e2365be816a6f9ede8a3de7
