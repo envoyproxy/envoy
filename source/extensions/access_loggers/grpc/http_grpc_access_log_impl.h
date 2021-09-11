@@ -51,7 +51,7 @@ private:
                const StreamInfo::StreamInfo& stream_info) override;
 
   Stats::Scope& scope_;
-  HttpGrpcAccessLogConfigConstSharedPtr config_;
+  const HttpGrpcAccessLogConfigConstSharedPtr config_;
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
   std::vector<Http::LowerCaseString> request_headers_to_log_;

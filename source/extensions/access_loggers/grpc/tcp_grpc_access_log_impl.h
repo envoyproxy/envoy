@@ -50,7 +50,7 @@ private:
                const StreamInfo::StreamInfo& stream_info) override;
 
   Stats::Scope& scope_;
-  TcpGrpcAccessLogConfigConstSharedPtr config_;
+  const TcpGrpcAccessLogConfigConstSharedPtr config_;
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
 };
