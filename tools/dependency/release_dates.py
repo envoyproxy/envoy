@@ -79,7 +79,7 @@ def create_issues(dep, repo, metadata_version, release_date, latest_release):
     """
     access_token = os.getenv('GITHUB_TOKEN')
     git = github.Github(access_token)
-    repo = git.get_repo('ME-ON1/envoy')
+    repo = git.get_repo('envoyproxy/envoy')
     # Find GitHub label objects for LABELS.
     labels = []
     for label in repo.get_labels():
