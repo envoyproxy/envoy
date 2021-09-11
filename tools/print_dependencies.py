@@ -2,14 +2,15 @@
 
 # Quick-and-dirty python to fetch dependency information
 
-import imp
+import importlib
 import json
 import re
 import subprocess
 import sys
 
-API_DEPS = imp.load_source('api', 'api/bazel/repository_locations.bzl')
-DEPS = imp.load_source('deps', 'bazel/repository_locations.bzl')
+API_DEPS = importlib.machinery.SourceFileLoader('api',
+                                                'api/bazel/repository_locations.bzl').load_module()
+DEPS = importlib.machinery.SourceFileLoader('deps', 'bazel/repository_locations.bzl').load_module()
 
 
 def print_deps(deps):
@@ -19,14 +20,14 @@ def print_deps(deps):
 if __name__ == '__main__':
     deps = []
 
-    DEPS.REPOSITORY_LOCATIONS.update(API_DEPS.REPOSITORY_LOCATIONS)
+    DEPS.REPOSITORY_LOCATIONS_SPEC.update(API_DEPS.REPOSITORY_LOCATIONS_SPEC)
 
-    for key, loc in DEPS.REPOSITORY_LOCATIONS.items():
+    for key, loc in DEPS.REPOSITORY_LOCATIONS_SPEC.items():
         deps.append({
             'identifier': key,
-            'file-sha256': loc.get('sha256'),
-            'file-url': loc.get('urls')[0],
-            'file-prefix': loc.get('strip_prefix', ''),
+            'description': loc.get('project_desc'),
+            'project': loc.get('project_url'),
+            'version': loc.get("version"),
         })
 
     deps = sorted(deps, key=lambda k: k['identifier'])
