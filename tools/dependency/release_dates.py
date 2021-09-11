@@ -5,19 +5,19 @@
 #   dependency version in the .bzl.
 #
 # Usage:
-#   tools/dependency/release_dates.sh <path to repository_locations.bzl>
+#   bazel run //tools/dependency:release_dates <path to repository_locations.bzl>
 #
 # You will need to set a GitHub access token in the GITHUB_TOKEN environment
 # variable. You can generate personal access tokens under developer settings on
 # GitHub. You should restrict the scope of the token to "repo: public_repo".
 
+import importlib
 import os
 import sys
 
 import github
 
-import exports
-import utils
+from tools.dependency import utils
 
 from colorama import Fore, Style
 from packaging import version
@@ -131,22 +131,28 @@ def verify_and_print_release_dates(repository_locations, github_instance):
                 f'{dep} is a GitHub repository with no no inferrable release date')
 
 
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print('Usage: %s <path to repository_locations.bzl>' % sys.argv[0])
-        sys.exit(1)
+def main():
     access_token = os.getenv('GITHUB_TOKEN')
-    if not access_token:
+    if not access_token and False:
         print('Missing GITHUB_TOKEN')
         sys.exit(1)
-    path = sys.argv[1]
-    spec_loader = exports.repository_locations_utils.load_repository_locations_spec
-    path_module = exports.load_module('repository_locations', path)
+    module_location = "bazel.repository_locations"
+    if len(sys.argv) > 1 and sys.argv[1]:
+        module_location = sys.argv[1]
+        if module_location.startswith("external/"):
+            module_location = module_location[9:]
+        if module_location.endswith(".py"):
+            module_location = module_location[:-3]
+        module_location = module_location.replace("/", ".")
     try:
         verify_and_print_release_dates(
-            spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC), github.Github(access_token))
+            importlib.import_module(module_location).data, github.Github(access_token))
     except ReleaseDateVersionError as e:
         print(
-            f'{Fore.RED}An error occurred while processing {path}, please verify the correctness of the '
+            f'{Fore.RED}An error occurred while processing, please verify the correctness of the '
             f'metadata: {e}{Style.RESET_ALL}')
         sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

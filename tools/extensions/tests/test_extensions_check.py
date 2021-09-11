@@ -1,6 +1,5 @@
 import types
-from importlib.machinery import ModuleSpec
-from unittest.mock import patch, PropertyMock, call
+from unittest.mock import patch, PropertyMock
 
 import pytest
 
@@ -35,51 +34,18 @@ def test_extensions_checker_all_extensions():
 def test_extensions_checker_configured_extensions(patches, is_module, is_loader):
     checker = extensions_check.ExtensionsChecker()
     patched = patches(
-        "isinstance",
-        "spec_from_loader",
-        "SourceFileLoader",
-        "module_from_spec",
+        "extensions_build_config",
         prefix="tools.extensions.extensions_check")
 
-    def _is_instance(obj, types):
-        if types == ModuleSpec:
-            return is_module
-        return is_loader
-
-    with patched as (m_inst, m_spec, m_loader, m_module):
-        m_inst.side_effect = _is_instance
-
-        if is_module and is_loader:
-            assert (
-                checker.configured_extensions
-                == m_module.return_value.EXTENSIONS)
-        else:
-            with pytest.raises(extensions_check.ExtensionsConfigurationError) as e:
-                checker.configured_extensions
+    with patched as (m_config,):
+        assert (
+            checker.configured_extensions
+            == m_config.data.copy.return_value)
 
     assert (
-        list(m_spec.call_args)
-        == [('extensions_build_config', m_loader.return_value), {}])
-    assert (
-        list(m_loader.call_args)
-        == [('extensions_build_config', extensions_check.BUILD_CONFIG_PATH), {}])
+        list(m_config.data.copy.call_args)
+        == [(), {}])
 
-    if not is_module:
-        assert not m_module.called
-        assert not m_spec.return_value.loader.exec_module.called
-        return
-
-    assert (
-        list(m_module.call_args)
-        == [(m_spec.return_value,), {}])
-
-    if not is_loader:
-        assert not m_spec.return_value.loader.exec_module.called
-        return
-
-    assert (
-        list(m_spec.return_value.loader.exec_module.call_args)
-        == [(m_module.return_value,), {}])
     assert "configured_extensions" in checker.__dict__
 
 
@@ -119,28 +85,33 @@ def test_extensions_metadata(patches, is_dict):
     checker = extensions_check.ExtensionsChecker()
     patched = patches(
         "isinstance",
-        "utils",
+        "contrib_extensions_metadata",
+        "extensions_metadata",
         prefix="tools.extensions.extensions_check")
 
-    with patched as (m_inst, m_utils):
+    with patched as (m_inst, m_contrib, m_exts):
         m_inst.return_value = is_dict
 
         if is_dict:
             assert (
                 checker.metadata
-                == m_utils.from_yaml.return_value)
+                == m_exts.data.copy.return_value)
         else:
             with pytest.raises(extensions_check.ExtensionsConfigurationError) as e:
                 checker.metadata
 
     assert (
-        list(m_utils.from_yaml.call_args_list)
-        == [call(extensions_check.METADATA_PATH), call(extensions_check.CONTRIB_METADATA_PATH)])
+        list(m_exts.data.copy.call_args)
+        == [(), {}])
+
+    assert (
+        list(m_exts.data.copy.return_value.update.call_args)
+        == [(m_contrib.data, ), {}])
 
     if not is_dict:
         assert (
             e.value.args[0]
-            == f'Unable to parse metadata: {extensions_check.METADATA_PATH} {extensions_check.CONTRIB_METADATA_PATH}')
+            == f'Unable to parse metadata')
         return
     assert "metadata" in checker.__dict__
 

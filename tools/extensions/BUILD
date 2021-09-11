@@ -14,14 +14,14 @@ exports_files([
 envoy_py_binary(
     name = "tools.extensions.extensions_check",
     data = [
-        "//contrib:contrib_build_config.bzl",
-        "//contrib:extensions_metadata.yaml",
-        "//source/extensions:extensions_metadata.yaml",
-        "//source/extensions:extensions_build_config.bzl",
         "//test/extensions/filters/network/common/fuzz:uber_per_readfilter.cc",
     ] + envoy_all_extensions(),
     deps = [
         requirement("envoy.base.checker"),
         requirement("envoy.base.utils"),
+        "//contrib:contrib_extensions_build_config_py",
+        "//contrib:extensions_metadata_py",
+        "//source/extensions:extensions_build_config_py",
+        "//source/extensions:extensions_metadata_py",
     ],
 )

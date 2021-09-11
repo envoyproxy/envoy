@@ -9,6 +9,8 @@ import sys
 import tarfile
 
 from envoy.base import utils
+from contrib import extensions_metadata as contrib_extensions_metadata
+from source.extensions import extensions_metadata
 
 
 def format_item(extension, metadata):
@@ -24,14 +26,12 @@ def format_item(extension, metadata):
 
 
 def main():
-    metadata_filepath = sys.argv[1]
-    contrib_metadata_filepath = sys.argv[2]
-    output_filename = sys.argv[3]
+    output_filename = sys.argv[1]
     generated_rst_dir = os.path.dirname(output_filename)
     security_rst_root = os.path.join(generated_rst_dir, "intro/arch_overview/security")
-    extension_db = utils.from_yaml(metadata_filepath)
+    extension_db = extensions_metadata.data
 
-    contrib_extension_db = utils.from_yaml(contrib_metadata_filepath)
+    contrib_extension_db = contrib_extensions_metadata.data
     for contrib_extension in contrib_extension_db.keys():
         contrib_extension_db[contrib_extension]['contrib'] = True
     extension_db.update(contrib_extension_db)

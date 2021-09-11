@@ -12,6 +12,8 @@ py_binary(
     srcs = ["generate_extensions_security_rst.py"],
     deps = [
         requirement("envoy.base.utils"),
+        "//contrib:extensions_metadata_py",
+        "//source/extensions:extensions_metadata_py",
     ],
 )
 
@@ -21,7 +23,6 @@ py_binary(
         "generate_external_deps_rst.py",
     ],
     deps = [
-        "//tools/dependency:exports",
         "//tools/dependency:utils",
     ],
 )

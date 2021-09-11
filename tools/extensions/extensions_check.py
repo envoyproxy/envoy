@@ -6,15 +6,12 @@ import pathlib
 import re
 import sys
 from functools import cached_property
-from importlib.abc import Loader
-from importlib.util import spec_from_loader, module_from_spec
-from importlib.machinery import ModuleSpec, SourceFileLoader
 from typing import Iterator
 
 from envoy.base import checker, utils
 
-BUILD_CONFIG_PATH = "source/extensions/extensions_build_config.bzl"
-CONTRIB_BUILD_CONFIG_PATH = "contrib/contrib_build_config.bzl"
+from contrib import contrib_extensions_build_config, extensions_metadata as contrib_extensions_metadata
+from source.extensions import extensions_build_config, extensions_metadata
 
 BUILTIN_EXTENSIONS = (
     "envoy.request_id.uuid", "envoy.upstreams.tcp.generic", "envoy.transport_sockets.tls",
@@ -70,9 +67,6 @@ FILTER_NAMES_PATTERN = "NetworkFilterNames::get()"
 
 FUZZ_TEST_PATH = "test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc"
 
-METADATA_PATH = "source/extensions/extensions_metadata.yaml"
-CONTRIB_METADATA_PATH = "contrib/extensions_metadata.yaml"
-
 
 class ExtensionsConfigurationError(Exception):
     pass
@@ -91,13 +85,11 @@ class ExtensionsChecker(checker.Checker):
 
     @cached_property
     def configured_extensions(self) -> dict:
-        return ExtensionsChecker._load_build_config(
-            "extensions_build_config", BUILD_CONFIG_PATH, "EXTENSIONS")
+        return extensions_build_config.data.copy()
 
     @cached_property
     def configured_contrib_extensions(self) -> dict:
-        return ExtensionsChecker._load_build_config(
-            "contrib_build_config", CONTRIB_BUILD_CONFIG_PATH, "CONTRIB_EXTENSIONS")
+        return contrib_extensions_build_config.data.copy()
 
     @property
     def fuzzed_count(self) -> int:
@@ -108,11 +100,10 @@ class ExtensionsChecker(checker.Checker):
 
     @cached_property
     def metadata(self) -> dict:
-        result = utils.from_yaml(METADATA_PATH)
-        result.update(utils.from_yaml(CONTRIB_METADATA_PATH))
+        result = extensions_metadata.data.copy()
+        result.update(contrib_extensions_metadata.data)
         if not isinstance(result, dict):
-            raise ExtensionsConfigurationError(
-                f"Unable to parse metadata: {METADATA_PATH} {CONTRIB_METADATA_PATH}")
+            raise ExtensionsConfigurationError(f"Unable to parse metadata")
         return result
 
     @property
@@ -122,23 +113,6 @@ class ExtensionsChecker(checker.Checker):
             ext for ext, data in self.metadata.items()
             if "network" in ext and data["security_posture"] == "robust_to_untrusted_downstream"
         ])
-
-    @staticmethod
-    def _load_build_config(name, build_config_path, dictionary_name) -> dict:
-        # build configs must have a .bzl suffix for Starlark import, so we are forced to do this
-        # workaround.
-        _extensions_build_config_spec = spec_from_loader(
-            name, SourceFileLoader(name, build_config_path))
-
-        if not isinstance(_extensions_build_config_spec, ModuleSpec):
-            raise ExtensionsConfigurationError(f"Unable to parse build config {build_config_path}")
-        extensions_build_config = module_from_spec(_extensions_build_config_spec)
-
-        if not isinstance(_extensions_build_config_spec.loader, Loader):
-            raise ExtensionsConfigurationError(f"Unable to parse build config {build_config_path}")
-
-        _extensions_build_config_spec.loader.exec_module(extensions_build_config)
-        return getattr(extensions_build_config, dictionary_name)
 
     def check_fuzzed(self) -> None:
         if self.robust_to_downstream_count == self.fuzzed_count:

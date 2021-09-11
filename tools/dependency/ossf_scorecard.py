@@ -25,8 +25,9 @@ import os
 import subprocess as sp
 import sys
 
-import exports
-import utils
+from tools.dependency import utils
+
+from bazel import repository_locations
 
 Scorecard = namedtuple(
     'Scorecard', [
@@ -56,9 +57,9 @@ def is_scored_use_category(use_category):
         ])) > 0
 
 
-def score(scorecard_path, repository_locations):
+def score(scorecard_path):
     results = {}
-    for dep, metadata in sorted(repository_locations.items()):
+    for dep, metadata in sorted(repository_locations.data.items()):
         if not is_scored_use_category(metadata['use_category']):
             continue
         results_key = metadata['project_name']
@@ -136,15 +137,13 @@ if __name__ == '__main__':
     if not access_token:
         print('Missing GITHUB_AUTH_TOKEN')
         sys.exit(1)
-    path = sys.argv[1]
-    scorecard_path = sys.argv[2]
-    csv_output_path = sys.argv[3]
-    spec_loader = exports.repository_locations_utils.load_repository_locations_spec
-    path_module = exports.load_module('repository_locations', path)
+
+    scorecard_path = sys.argv[1]
+    csv_output_path = sys.argv[2]
     try:
-        results = score(scorecard_path, spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC))
+        results = score(scorecard_path)
         print_csv_results(csv_output_path, results)
     except OssfScorecardError as e:
         print(
-            f'An error occurred while processing {path}, please verify the correctness of the '
+            f'An error occurred while processing, please verify the correctness of the '
             f'metadata: {e}')

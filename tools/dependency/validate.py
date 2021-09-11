@@ -6,31 +6,15 @@ the use_category metadata in bazel/repository_locations.bzl.
 """
 
 import re
-import subprocess
 import sys
+from functools import lru_cache
 
-from importlib.machinery import SourceFileLoader
-from importlib.util import spec_from_loader, module_from_spec
+from envoy.base.utils import BazelQueryError
 
+from tools.base.bazel_query import query
+from tools.dependency.utils import get_repository_locations
 
-# Shared Starlark/Python files must have a .bzl suffix for Starlark import, so
-# we are forced to do this workaround.
-def load_module(name, path):
-    spec = spec_from_loader(name, SourceFileLoader(name, path))
-    module = module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-envoy_repository_locations = load_module(
-    'envoy_repository_locations', 'bazel/repository_locations.bzl')
-api_repository_locations = load_module(
-    'api_repository_locations', 'api/bazel/repository_locations.bzl')
-extensions_build_config = load_module(
-    'extensions_build_config', 'source/extensions/extensions_build_config.bzl')
-
-REPOSITORY_LOCATIONS_SPEC = dict(envoy_repository_locations.REPOSITORY_LOCATIONS_SPEC)
-REPOSITORY_LOCATIONS_SPEC.update(api_repository_locations.REPOSITORY_LOCATIONS_SPEC)
+from source.extensions import extensions_build_config
 
 BAZEL_QUERY_EXTERNAL_DEP_RE = re.compile('@(\w+)//')
 EXTENSION_LABEL_RE = re.compile('(//source/extensions/.*):')
@@ -70,8 +54,11 @@ class DependencyError(Exception):
     pass
 
 
-class DependencyInfo(object):
+class DependencyInfo:
     """Models dependency info in bazel/repositories.bzl."""
+
+    def __init__(self, repository_locations):
+        self.repository_locations = repository_locations
 
     def deps_by_use_category(self, use_category):
         """Find the set of external dependencies in a given use_category.
@@ -83,7 +70,7 @@ class DependencyInfo(object):
           Set of dependency identifiers that match use_category.
         """
         return set(
-            name for name, metadata in REPOSITORY_LOCATIONS_SPEC.items()
+            name for name, metadata in self.repository_locations.items()
             if use_category in metadata['use_category'])
 
     def get_metadata(self, dependency):
@@ -94,26 +81,24 @@ class DependencyInfo(object):
 
         Returns:
           A dictionary with the repository metadata as defined in
-          bazel/repository_locations.bzl.
+            bazel/repository_locations.bzl.
         """
-        return REPOSITORY_LOCATIONS_SPEC.get(dependency)
+        return self.repository_locations.get(dependency)
 
 
-class BuildGraph(object):
+class BuildGraph:
     """Models the Bazel build graph."""
 
-    def __init__(
-            self, ignore_deps=IGNORE_DEPS, repository_locations_spec=REPOSITORY_LOCATIONS_SPEC):
+    def __init__(self, ignore_deps=IGNORE_DEPS, repository_locations=None):
         self._ignore_deps = ignore_deps
         # Reverse map from untracked dependencies implied by other deps back to the dep.
         self._implied_untracked_deps_revmap = {}
-        for dep, metadata in repository_locations_spec.items():
+        for dep, metadata in repository_locations.items():
             implied_untracked_deps = metadata.get('implied_untracked_deps', [])
             for untracked_dep in implied_untracked_deps:
-                assert (untracked_dep not in self._implied_untracked_deps_revmap)
                 self._implied_untracked_deps_revmap[untracked_dep] = dep
 
-    def query_external_deps(self, *targets):
+    def query_external_deps(self, *targets, exclude=None):
         """Query the build graph for transitive external dependencies.
 
         Args:
@@ -122,28 +107,47 @@ class BuildGraph(object):
         Returns:
           A set of dependency identifiers that are reachable from targets.
         """
-        deps_query = 'deps(set({}))'.format(' '.join(targets))
+        # Get the smallest sets possible to fulfill the query!
+        deps_query = self._filtered_deps_query(targets)
+        exclude_deps = set()
+        if exclude:
+            exclude_query = self._filtered_deps_query(exclude)
+            deps_query = f'{deps_query} - {exclude_query}'
         try:
-            deps = subprocess.check_output(['bazel', 'query', deps_query],
-                                           stderr=subprocess.PIPE).decode().splitlines()
-        except subprocess.CalledProcessError as exc:
-            print(
-                f'Bazel query failed with error code {exc.returncode} and std error: {exc.stderr.decode()}'
-            )
-            raise exc
+            deps = self._deps_query(deps_query)
+            if deps and exclude:
+                # although the deps set is pre-filtered to exclude
+                # the excluded deps, we still need to fetch the exclude set
+                # again and remove any further matches, due to rev dep mangling.
+                # The exclude set could be pre-filtered further (ie only members
+                # of the revmap.values) at the cost of some additional complexity.
+                exclude_deps = self._deps_query(exclude_query)
+        except BazelQueryError as e:
+            print(f'Bazel query failed with error {e}')
+            raise e
+        return deps - exclude_deps
+
+    @lru_cache(maxsize=5)
+    def _deps_query(self, query_string):
+        return self._mangle_deps_set(query(query_string))
+
+    def _filtered_deps_query(self, targets):
+        return f'filter("^@.*//", deps(set({" ".join(targets)})))'
+
+    def _mangle_deps_set(self, deps):
         ext_deps = set()
         implied_untracked_deps = set()
         for d in deps:
-            match = BAZEL_QUERY_EXTERNAL_DEP_RE.match(d)
-            if match:
-                ext_dep = match.group(1)
-                if ext_dep in self._ignore_deps:
-                    continue
-                # If the dependency is untracked, add the source dependency that loaded
-                # it transitively.
-                if ext_dep in self._implied_untracked_deps_revmap:
-                    ext_dep = self._implied_untracked_deps_revmap[ext_dep]
-                ext_deps.add(ext_dep)
+            if not d:
+                continue
+            ext_dep = BAZEL_QUERY_EXTERNAL_DEP_RE.match(d).group(1)
+            if ext_dep in self._ignore_deps:
+                continue
+            # If the dependency is untracked, add the source dependency that loaded
+            # it transitively.
+            if ext_dep in self._implied_untracked_deps_revmap:
+                ext_dep = self._implied_untracked_deps_revmap[ext_dep]
+            ext_deps.add(ext_dep)
         return set(ext_deps)
 
     def list_extensions(self):
@@ -152,17 +156,16 @@ class BuildGraph(object):
         Returns:
           Dictionary items from source/extensions/extensions_build_config.bzl.
         """
-        return extensions_build_config.EXTENSIONS.items()
+        return extensions_build_config.data.items()
 
 
 class Validator(object):
     """Collection of validation methods."""
+    _core_rule_label = '//source/exe:envoy_main_common_with_core_extensions_lib'
 
     def __init__(self, dep_info, build_graph):
         self._dep_info = dep_info
         self._build_graph = build_graph
-        self._queried_core_deps = build_graph.query_external_deps(
-            '//source/exe:envoy_main_common_with_core_extensions_lib')
 
     def validate_build_graph_structure(self):
         """Validate basic assumptions about dependency relationship in the build graph.
@@ -172,9 +175,10 @@ class Validator(object):
         """
         print('Validating build dependency structure...')
         queried_core_ext_deps = self._build_graph.query_external_deps(
-            '//source/exe:envoy_main_common_with_core_extensions_lib', '//source/extensions/...')
-        queried_all_deps = self._build_graph.query_external_deps('//source/...')
-        if queried_all_deps != queried_core_ext_deps:
+            self._core_rule_label, '//source/extensions/...', exclude=['//source/...'])
+        queried_all_deps = self._build_graph.query_external_deps(
+            '//source/...', exclude=[self._core_rule_label, '//source/extensions/...'])
+        if queried_all_deps or queried_core_ext_deps:
             raise DependencyError(
                 'Invalid build graph structure. deps(//source/...) != '
                 'deps(//source/exe:envoy_main_common_with_core_extensions_lib) '
@@ -196,9 +200,8 @@ class Validator(object):
                 f'//source depends on test-only dependencies: {bad_test_only_deps}')
         # Validate that //test deps additional to those of //source are captured in
         # test_only.
-        test_only_deps = self._build_graph.query_external_deps('//test/...')
-        source_deps = self._build_graph.query_external_deps('//source/...')
-        marginal_test_deps = test_only_deps.difference(source_deps)
+        marginal_test_deps = self._build_graph.query_external_deps(
+            '//test/...', exclude=['//source/...'])
         bad_test_deps = marginal_test_deps.difference(expected_test_only_deps)
         unknown_bad_test_deps = [dep for dep in bad_test_deps if not test_only_ignore(dep)]
         if len(unknown_bad_test_deps) > 0:
@@ -272,8 +275,8 @@ class Validator(object):
           DependencyError: on a dependency validation error.
         """
         print(f'Validating extension {name} dependencies...')
-        queried_deps = self._build_graph.query_external_deps(target)
-        marginal_deps = queried_deps.difference(self._queried_core_deps)
+        marginal_deps = self._build_graph.query_external_deps(
+            target, exclude=['//source/exe:envoy_main_common_with_core_extensions_lib'])
         expected_deps = []
         for d in marginal_deps:
             metadata = self._dep_info.get_metadata(d)
@@ -310,8 +313,9 @@ class Validator(object):
 
 
 if __name__ == '__main__':
-    dep_info = DependencyInfo()
-    build_graph = BuildGraph()
+    repository_locations = get_repository_locations()
+    dep_info = DependencyInfo(repository_locations=repository_locations)
+    build_graph = BuildGraph(repository_locations=repository_locations)
     validator = Validator(dep_info, build_graph)
     try:
         validator.validate_all()

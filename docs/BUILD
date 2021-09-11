@@ -116,16 +116,16 @@ pkg_tar(
 genrule(
     name = "extensions_security_rst",
     srcs = [
-        "//source/extensions:extensions_metadata.yaml",
-        "//contrib:extensions_metadata.yaml",
     ],
     outs = ["extensions_security_rst.tar"],
     cmd = """
-    $(location //tools/docs:generate_extensions_security_rst) \\
-        $(location //source/extensions:extensions_metadata.yaml) \\
-        $(location //contrib:extensions_metadata.yaml) $@
+    $(location //tools/docs:generate_extensions_security_rst) $@
     """,
-    tools = ["//tools/docs:generate_extensions_security_rst"],
+    tools = [
+        "//tools/docs:generate_extensions_security_rst",
+        "//source/extensions:extensions_metadata_py",
+        "//contrib:extensions_metadata_py",
+    ],
 )
 
 genrule(

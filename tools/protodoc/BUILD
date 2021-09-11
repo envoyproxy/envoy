@@ -22,12 +22,6 @@ envoy_proto_library(
 py_binary(
     name = "protodoc",
     srcs = ["protodoc.py"],
-    data = [
-        "//contrib:extensions_metadata.yaml",
-        "//docs:protodoc_manifest.yaml",
-        "//docs:v2_mapping.json",
-        "//source/extensions:extensions_metadata.yaml",
-    ],
     visibility = ["//visibility:public"],
     deps = [
         ":manifest_proto_py_proto",
@@ -38,6 +32,12 @@ py_binary(
         "@com_google_protobuf//:protobuf_python",
         requirement("envoy.base.utils"),
         requirement("Jinja2"),
+        "//contrib:extensions_categories_py",
+        "//contrib:extensions_metadata_py",
+        "//docs:protodoc_manifest_py",
+        "//docs:v2_mapping_py",
+        "//source/extensions:extensions_categories_py",
+        "//source/extensions:extensions_metadata_py",
     ],
 )
 

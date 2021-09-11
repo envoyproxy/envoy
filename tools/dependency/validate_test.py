@@ -26,8 +26,11 @@ class FakeBuildGraph(object):
         self._reachable_deps = reachable_deps
         self._extensions = extensions
 
-    def query_external_deps(self, *targets):
-        return set(sum((self._reachable_deps.get(t, []) for t in targets), []))
+    def query_external_deps(self, *targets, exclude=None):
+        result = set(sum((self._reachable_deps.get(t, []) for t in targets), []))
+        if exclude:
+            result = result - self.query_external_deps(*exclude)
+        return result
 
     def list_extensions(self):
         return self._extensions

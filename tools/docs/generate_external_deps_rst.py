@@ -82,7 +82,7 @@ def main():
     Dep = namedtuple('Dep', ['name', 'sort_name', 'version', 'cpe', 'release_date'])
     use_categories = defaultdict(lambda: defaultdict(list))
     # Bin rendered dependencies into per-use category lists.
-    for k, v in dep_utils.repository_locations().items():
+    for k, v in dep_utils.get_repository_locations().items():
         cpe = v.get('cpe', '')
         if cpe == 'N/A':
             cpe = ''
