@@ -3,6 +3,7 @@ colorama
 coloredlogs
 coverage
 envoy.base.utils
+envoy.code_format.python_check>=0.0.4
 envoy.distribution.release
 envoy.distribution.verify
 envoy.gpg.sign
