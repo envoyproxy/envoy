@@ -303,7 +303,7 @@ TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
 }
 
 TEST_P(IntegrationTest, ConnectionClose) {
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -419,7 +419,7 @@ TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10923.
 TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
     "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
@@ -433,7 +433,7 @@ TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
   concurrency_ = 2;
   config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
 
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: matcher
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -500,7 +500,7 @@ TEST_P(IntegrationTest, MatchingHttpFilterConstructionNewProto) {
   concurrency_ = 2;
   config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
 
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: matcher
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -625,7 +625,7 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a local error reply.
 TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       "{ name: grpc_http1_bridge, typed_config: { \"@type\": "
       "type.googleapis.com/envoy.extensions.filters.http.grpc_http1_bridge.v3.Config } }");
   config_helper_.setBufferLimits(1024, 1024);
@@ -1480,8 +1480,8 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
   // This test will trigger an early 413 Payload Too Large response due to buffer limits being
   // exceeded. The following filter is needed since the router filter will never trigger a 413.
-  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -1513,8 +1513,8 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
 // Test configuration of the delayed close timeout on downstream HTTP/1.1 connections. A value of 0
 // disables delayed close processing.
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
-  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1547,8 +1547,8 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
 
 // Test that if the route cache is cleared, it doesn't cause problems.
 TEST_P(IntegrationTest, TestClearingRouteCacheFilter) {
-  config_helper_.addFilter("{ name: clear-route-cache, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: clear-route-cache, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
@@ -1585,8 +1585,8 @@ TEST_P(IntegrationTest, NoConnectionPoolsFree) {
 }
 
 TEST_P(IntegrationTest, ProcessObjectHealthy) {
-  config_helper_.addFilter("{ name: process-context-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: process-context-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
 
   ProcessObjectForFilter healthy_object(true);
   process_object_ = healthy_object;
@@ -1606,8 +1606,8 @@ TEST_P(IntegrationTest, ProcessObjectHealthy) {
 }
 
 TEST_P(IntegrationTest, ProcessObjectUnealthy) {
-  config_helper_.addFilter("{ name: process-context-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: process-context-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
 
   ProcessObjectForFilter unhealthy_object(false);
   process_object_ = unhealthy_object;
@@ -2103,7 +2103,7 @@ TEST_P(IntegrationTest, RandomPreconnect) {
 TEST_P(IntegrationTest, SetRouteToDelegatingRouteWithClusterOverride) {
   useAccessLog("%UPSTREAM_CLUSTER%\n");
 
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
     name: set-route-filter
     )EOF");
 

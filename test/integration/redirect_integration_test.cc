@@ -535,7 +535,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithResponseBody) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: pause-filter
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty

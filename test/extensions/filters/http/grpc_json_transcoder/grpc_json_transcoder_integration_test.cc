@@ -40,7 +40,7 @@ public:
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
             )EOF";
-    config_helper_.addFilter(
+    config_helper_.prependFilter(
         fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   }
 
@@ -509,7 +509,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
               services : "bookstore.Bookstore"
               ignore_unknown_query_parameters : true
             )EOF";
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
@@ -533,7 +533,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
               services: "bookstore.Bookstore"
               convert_grpc_status: true
             )EOF";
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
@@ -558,7 +558,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
               services: "bookstore.Bookstore"
               convert_grpc_status: true
             )EOF";
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
@@ -583,7 +583,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingErrorConvertedToJson) {
               services: "bookstore.Bookstore"
               convert_grpc_status: true
             )EOF";
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::ListBooksRequest, bookstore::Shelf>(
@@ -977,7 +977,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownMethod) {
               request_validation_options:
                 reject_unknown_method: true
             )EOF";
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
 
@@ -1030,7 +1030,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownQueryParam) {
               request_validation_options:
                 reject_unknown_query_parameters: true
             )EOF";
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
 
@@ -1086,7 +1086,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableRequestValidationIgnoreQueryPara
                 reject_unknown_method: true
                 reject_unknown_query_parameters: true
             )EOF";
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
 
@@ -1258,7 +1258,7 @@ public:
               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               "proto_descriptor": ""
             )EOF";
-    config_helper_.addFilter(filter);
+    config_helper_.prependFilter(filter);
   }
 };
 INSTANTIATE_TEST_SUITE_P(IpVersions, OverrideConfigGrpcJsonTranscoderIntegrationTest,
@@ -1306,7 +1306,7 @@ public:
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
             )EOF";
-    config_helper_.addFilter(
+    config_helper_.prependFilter(
         fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
 
     // Disable runtime feature.

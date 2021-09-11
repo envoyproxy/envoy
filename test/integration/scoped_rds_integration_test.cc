@@ -648,7 +648,7 @@ key:
 
 // Test that a scoped route config update is performed on demand and http request will succeed.
 TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateSuccess) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
   const std::string scope_route1 = R"EOF(
@@ -700,7 +700,7 @@ key:
 // With on demand update filter configured, scope not match should still return 404
 TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateScopeNotMatch) {
 
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
 
@@ -750,7 +750,7 @@ key:
 // return 404
 TEST_P(ScopedRdsIntegrationTest, OnDemandUpdatePrimaryVirtualHostNotMatch) {
 
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
 
@@ -800,7 +800,7 @@ key:
 // return 404
 TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateVirtualHostNotMatch) {
 
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
 
@@ -854,7 +854,7 @@ key:
 
 // Eager and lazy scopes share the same route configuration
 TEST_P(ScopedRdsIntegrationTest, DifferentPriorityScopeShareRoute) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
 
@@ -910,7 +910,7 @@ key:
 }
 
 TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateAfterActiveStreamDestroyed) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
   const std::string scope_route1 = R"EOF(

@@ -15,32 +15,32 @@ INSTANTIATE_TEST_SUITE_P(Protocols, BufferIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(BufferIntegrationTest, RouterNotFoundBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultBufferFilter());
   testRouterNotFoundWithBody();
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultBufferFilter());
   testRouterRequestAndResponseWithBody(4 * 1024 * 1024, 4 * 1024 * 1024, false);
 }
 
 TEST_P(BufferIntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
-  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultBufferFilter());
   testRouterHeaderOnlyRequestAndResponse();
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultBufferFilter());
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithZeroByteBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultBufferFilter());
   testRouterRequestAndResponseWithBody(0, 0, false);
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
-  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultBufferFilter());
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -67,7 +67,7 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLengthOnTrailers) {
-  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultBufferFilter());
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -103,7 +103,7 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(2000 * 1000); });
-  config_helper_.addFilter(ConfigHelper::smallBufferFilter());
+  config_helper_.prependFilter(ConfigHelper::smallBufferFilter());
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -142,7 +142,7 @@ ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config
 TEST_P(BufferIntegrationTest, RouteDisabled) {
   ConfigHelper::HttpModifierFunction mod = overrideConfig(R"EOF({"disabled": true})EOF");
   config_helper_.addConfigModifier(mod);
-  config_helper_.addFilter(ConfigHelper::smallBufferFilter());
+  config_helper_.prependFilter(ConfigHelper::smallBufferFilter());
   config_helper_.setBufferLimits(1024, 1024);
 
   initialize();
@@ -169,7 +169,7 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
     "max_request_bytes": 5242880
   }})EOF");
   config_helper_.addConfigModifier(mod);
-  config_helper_.addFilter(ConfigHelper::smallBufferFilter());
+  config_helper_.prependFilter(ConfigHelper::smallBufferFilter());
 
   initialize();
 
