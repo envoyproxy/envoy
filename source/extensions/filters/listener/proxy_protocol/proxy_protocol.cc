@@ -130,7 +130,7 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   return Network::FilterStatus::Continue;
 }
 
-absl::optional<size_t> Filter::lenV2Address(char* buf) {
+absl::optional<size_t> Filter::lenV2Address(const char* buf) {
   const uint8_t proto_family = buf[PROXY_PROTO_V2_SIGNATURE_LEN + 1];
   const int ver_cmd = buf[PROXY_PROTO_V2_SIGNATURE_LEN];
   size_t len;
@@ -154,7 +154,7 @@ absl::optional<size_t> Filter::lenV2Address(char* buf) {
   return len;
 }
 
-bool Filter::parseV2Header(char* buf) {
+bool Filter::parseV2Header(const char* buf) {
   const int ver_cmd = buf[PROXY_PROTO_V2_SIGNATURE_LEN];
   uint8_t upper_byte = buf[PROXY_PROTO_V2_HEADER_LEN - 2];
   uint8_t lower_byte = buf[PROXY_PROTO_V2_HEADER_LEN - 1];
@@ -180,8 +180,8 @@ bool Filter::parseV2Header(char* buf) {
           uint16_t src_port;
           uint16_t dst_port;
         });
-        pp_ipv4_addr* v4;
-        v4 = reinterpret_cast<pp_ipv4_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
+        const pp_ipv4_addr* v4 =
+            reinterpret_cast<const pp_ipv4_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
         sockaddr_in ra4, la4;
         memset(&ra4, 0, sizeof(ra4));
         memset(&la4, 0, sizeof(la4));
@@ -204,8 +204,8 @@ bool Filter::parseV2Header(char* buf) {
           uint16_t src_port;
           uint16_t dst_port;
         });
-        pp_ipv6_addr* v6;
-        v6 = reinterpret_cast<pp_ipv6_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
+        const pp_ipv6_addr* v6 =
+            reinterpret_cast<const pp_ipv6_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
         sockaddr_in6 ra6, la6;
         memset(&ra6, 0, sizeof(ra6));
         memset(&la6, 0, sizeof(la6));
@@ -229,7 +229,7 @@ bool Filter::parseV2Header(char* buf) {
   return false;
 }
 
-bool Filter::parseV1Header(char* buf, size_t len) {
+bool Filter::parseV1Header(const char* buf, size_t len) {
   std::string proxy_line;
   proxy_line.assign(buf, len);
   const auto trimmed_proxy_line = StringUtil::rtrim(proxy_line);
@@ -288,7 +288,7 @@ bool Filter::parseV1Header(char* buf, size_t len) {
   return true;
 }
 
-ReadOrParseState Filter::parseExtensions(Network::ListenerFilterBuffer& buffer, uint8_t* buf,
+ReadOrParseState Filter::parseExtensions(Network::ListenerFilterBuffer& buffer, const uint8_t* buf,
                                          size_t buf_size, size_t* buf_off) {
   // If we ever implement extensions elsewhere, be sure to
   // continue to skip and ignore those for LOCAL.
@@ -372,12 +372,13 @@ bool Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
 }
 
 ReadOrParseState Filter::readExtensions(Network::ListenerFilterBuffer& buffer) {
+  auto raw_slice = buffer.rawSlice();
   // Parse and discard the extensions if this is a local command or there's no TLV needs to be saved
   // to metadata.
   if (proxy_protocol_header_.value().local_command_ || 0 == config_->numberOfNeededTlvTypes()) {
     // buf_ is no longer in use so we re-use it to read/discard.
-    return parseExtensions(buffer, reinterpret_cast<uint8_t*>(buffer_->frontSlice().mem_),
-                           sizeof(buffer_->frontSlice().len_), nullptr);
+    return parseExtensions(buffer, reinterpret_cast<const uint8_t*>(raw_slice.mem_),
+                           sizeof(raw_slice.len_), nullptr);
   }
 
   // Initialize the buf_tlv_ only when we need to read the TLVs.
@@ -400,9 +401,10 @@ ReadOrParseState Filter::readExtensions(Network::ListenerFilterBuffer& buffer) {
 }
 
 ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) {
+  auto raw_slice = buffer.rawSlice();
   while (buf_off_ < MAX_PROXY_PROTO_LEN_V2) {
-    const auto rc = buffer.copyOut(*buffer_, MAX_PROXY_PROTO_LEN_V2);
-    char* raw_buffer = static_cast<char*>(buffer_->linearize(buffer_->length()));
+    const auto rc = raw_slice.len_;
+    const char* raw_buffer = static_cast<const char*>(raw_slice.mem_);
     ssize_t nread = rc;
 
     if (nread < 1) {

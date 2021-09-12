@@ -109,7 +109,7 @@ private:
   /**
    * Parse (and discard unknown) header extensions (until hdr.extensions_length == 0)
    */
-  ReadOrParseState parseExtensions(Network::ListenerFilterBuffer& buffer, uint8_t* buf,
+  ReadOrParseState parseExtensions(Network::ListenerFilterBuffer& buffer, const uint8_t* buf,
                                    size_t buf_size, size_t* buf_off = nullptr);
   bool parseTlvs(const std::vector<uint8_t>& tlvs);
   ReadOrParseState readExtensions(Network::ListenerFilterBuffer& buffer);
@@ -118,9 +118,9 @@ private:
    * Given a char * & len, parse the header as per spec.
    * @return bool true if parsing succeeded, false if parsing failed.
    */
-  bool parseV1Header(char* buf, size_t len);
-  bool parseV2Header(char* buf);
-  absl::optional<size_t> lenV2Address(char* buf);
+  bool parseV1Header(const char* buf, size_t len);
+  bool parseV2Header(const char* buf);
+  absl::optional<size_t> lenV2Address(const char* buf);
 
   Network::ListenerFilterCallbacks* cb_{};
 
