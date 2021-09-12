@@ -13,17 +13,6 @@ const Buffer::ConstRawSlice ListenerFilterBufferImpl::rawSlice() const {
   return slice;
 }
 
-uint64_t ListenerFilterBufferImpl::copyOut(Buffer::Instance& buffer, uint64_t length) {
-  auto size = std::min(length, data_size_);
-  if (size == 0) {
-    return 0;
-  }
-  buffer.drain(buffer.length());
-  uint8_t* raw_mem = static_cast<uint8_t*>(buffer_->frontSlice().mem_);
-  buffer.add(raw_mem + drained_size_, size);
-  return size;
-}
-
 uint64_t ListenerFilterBufferImpl::drain(uint64_t length) {
   auto size_to_drain = std::min(length, data_size_);
   // It doesn't drain the data from buffer directly until drain the data
