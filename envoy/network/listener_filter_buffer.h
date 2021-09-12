@@ -26,6 +26,12 @@ public:
   virtual uint64_t copyOut(Buffer::Instance& buffer, uint64_t length) PURE;
 
   /**
+   * Return a single const raw slice to the buffer of the data.
+   * @return a Buffer::ConstRawSlice pointed to raw buffer.
+   */
+  virtual const Buffer::ConstRawSlice rawSlice() const PURE;
+
+  /**
    * Drain the data from the beginning of the buffer.
    * @param length the length of data to drain.
    * @return the actual length of data drained.

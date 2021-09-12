@@ -5,6 +5,14 @@
 namespace Envoy {
 namespace Network {
 
+const Buffer::ConstRawSlice ListenerFilterBufferImpl::rawSlice() const {
+  Buffer::ConstRawSlice slice;
+  auto front_slice = buffer_->frontSlice();
+  slice.mem_ = static_cast<uint8_t*>(front_slice.mem_) + drained_size_;
+  slice.len_ = data_size_;
+  return slice;
+}
+
 uint64_t ListenerFilterBufferImpl::copyOut(Buffer::Instance& buffer, uint64_t length) {
   auto size = std::min(length, data_size_);
   if (size == 0) {
