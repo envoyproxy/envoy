@@ -11,7 +11,8 @@ namespace Server {
 
 namespace {
 
-// TODO(mathetake) replace with re2 for speed and safety.
+// TODO(mathetake) replace with re2 for speed and safety,
+// and change the signature of sanitizeName so it accepts string_view.
 const std::regex& promRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "[^a-zA-Z0-9_]"); }
 
 /**
