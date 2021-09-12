@@ -65,8 +65,6 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
 
 bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_ctx_.get())}; }
 
-thread_local Buffer::InstancePtr Filter::buffer_(new Buffer::OwnedImpl());
-
 Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->newSsl()) {
   SSL_set_app_data(ssl_.get(), this);
   SSL_set_accept_state(ssl_.get());
@@ -113,16 +111,15 @@ void Filter::onServername(absl::string_view name) {
 }
 
 Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
-  auto rc = buffer.copyOut(*buffer_, config_->maxClientHelloSize());
-  ENVOY_LOG(trace, "tls inspector: recv: {}", rc);
+  auto raw_slice = buffer.rawSlice();
+  ENVOY_LOG(trace, "tls inspector: recv: {}", raw_slice.len_);
 
   // Because we're doing a MSG_PEEK, data we've seen before gets returned every time, so
   // skip over what we've already processed.
-  if (static_cast<uint64_t>(rc) > read_) {
-    uint8_t* buf = static_cast<uint8_t*>(buffer_->linearize(buffer_->length()));
-    const uint8_t* data = buf + read_;
-    const size_t len = rc - read_;
-    read_ = rc;
+  if (static_cast<uint64_t>(raw_slice.len_) > read_) {
+    const uint8_t* data = static_cast<const uint8_t*>(raw_slice.mem_) + read_;
+    const size_t len = raw_slice.len_ - read_;
+    read_ = raw_slice.len_;
     ParseState parse_state = parseClientHello(data, len);
     switch (parse_state) {
     case ParseState::Error:
