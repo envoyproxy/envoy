@@ -6215,7 +6215,7 @@ TEST_F(RouterTest, NotSetDynamicMaxStreamDurationIfZero) {
         return nullptr;
       }));
 
-  // The timer will not be created.over
+  // The timer will not be created.
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_).Times(0);
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-stream-duration-ms", "0"}};
