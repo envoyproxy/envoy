@@ -356,6 +356,48 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   cleanupUpstreamAndDownstream();
 }
 
+TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
+  concurrency_ = 2;
+  initialize();
+  uint32_t old_port = lookupPort("http");
+  codec_client_ = makeHttpConnection(old_port);
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder_, 1024u, false);
+
+  // Change to a new port by switching socket, and connection should still continue.
+  Network::Address::InstanceConstSharedPtr local_addr =
+      Network::Test::getCanonicalLoopbackAddress(version_);
+  std::cout << "original port " << local_addr->ip()->port() << std::endl;
+  quic_connection_->switchConnectionSocket(
+      createConnectionSocket(server_addr_, local_addr, nullptr));
+  std::cout << "new port " << local_addr->ip()->port() << std::endl;
+  std::cout << "old port " << old_port << std::endl;
+  Network::Address::InstanceConstSharedPtr local_addr2;
+  auto socket = createConnectionSocket(server_addr_, local_addr2, nullptr);
+  std::cout << "another port " << local_addr2->ip()->port() << std::endl;
+  EXPECT_NE(old_port, local_addr->ip()->port());
+  // Send the rest data.
+  codec_client_->sendData(*request_encoder_, 1024u, true);
+  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
+  // Send response headers, and end_stream if there is no response body.
+  const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  size_t response_size{5u};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(response_size, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
+}
+
 TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {
   testAdminDrain(Http::CodecType::HTTP1);
 }

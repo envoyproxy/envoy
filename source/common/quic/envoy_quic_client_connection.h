@@ -28,6 +28,36 @@ public:
   virtual size_t numPacketsExpectedPerEventLoop() PURE;
 };
 
+class EnvoyQuicPathValidationContext : public quic::QuicPathValidationContext {
+public:
+  EnvoyQuicPathValidationContext(quic::QuicSocketAddress& self_address, quic::QuicSocketAddress& peer_address, 
+    Network::ConnectionSocketPtr connectionSocket, std::unique_ptr<EnvoyQuicPacketWriter> writer);
+
+  ~EnvoyQuicPathValidationContext() override;
+
+  quic::QuicPacketWriter* WriterToUse() override;
+
+  std::unique_ptr<EnvoyQuicPacketWriter> ReleaseWriter();
+  Network::ConnectionSocketPtr ReleaseSocket();
+
+
+private:
+  Network::ConnectionSocketPtr socket_;
+  std::unique_ptr<EnvoyQuicPacketWriter> writer_;
+};
+
+class EnvoyPathValidationResultDelegate : public quic::QuicPathValidator::ResultDelegate {
+public:
+  explicit EnvoyPathValidationResultDelegate(EnvoyQuicClientConnection& connection);
+
+  void OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context) override;
+
+  void OnPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context) override;
+
+private:
+  EnvoyQuicClientConnection& connection_;
+};
+
 // A client QuicConnection instance managing its own file events.
 class EnvoyQuicClientConnection : public quic::QuicConnection,
                                   public QuicNetworkConnection,
@@ -68,13 +98,17 @@ public:
   }
 
   // Register file event and apply socket options.
-  void setUpConnectionSocket(OptRef<PacketsToReadDelegate> delegate);
+  void setUpConnectionSocket(Network::ConnectionSocketPtr&& connection_socket, OptRef<PacketsToReadDelegate> delegate);
 
   // Switch underlying socket with the given one. This is used in connection migration.
   void switchConnectionSocket(Network::ConnectionSocketPtr&& connection_socket);
 
   // Potentially trigger migration.
   void OnPathDegradingDetected() override;
+
+  void OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context);
+
+  void OnPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context);
 
 private:
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
