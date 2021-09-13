@@ -18,7 +18,7 @@ jobs:
       - id: check_context
         name: 'Check whether to run'
         run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e java/ -e kotlin/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ ; then
+          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e java/ -e kotlin/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/android_tests.yml$ ; then
             echo "Tests will run."
             echo "::set-output name=run_tests::true"
           else
@@ -37,8 +37,15 @@ jobs:
         run: ./ci/mac_ci_setup.sh
       - name: 'Run Kotlin library tests'
         if: steps.check_context.outputs.run_tests == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazelisk test --test_output=all --build_tests_only //test/kotlin/...
+          bazel test \
+            --test_output=all \
+            --build_tests_only \
+            --config=remote-ci-macos \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            //test/kotlin/...
   javatestsmac:
     name: java_tests_mac
     runs-on: macos-11
@@ -50,7 +57,7 @@ jobs:
       - id: check_context
         name: 'Check whether to run'
         run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e java/ -e kotlin/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ ; then
+          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e java/ -e kotlin/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/android_tests.yml$ ; then
             echo "Tests will run."
             echo "::set-output name=run_tests::true"
           else
@@ -69,8 +76,16 @@ jobs:
         run: ./ci/mac_ci_setup.sh
       - name: 'Run Java library tests'
         if: steps.check_context.outputs.run_tests == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazelisk test --test_output=all --build_tests_only --define=signal_trace=disabled //test/java/...
+          bazel test \
+            --test_output=all \
+            --build_tests_only \
+            --config=remote-ci-macos \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            --define=signal_trace=disabled \
+            //test/java/...
   kotlintestslinux:
     # Only kotlin tests are executed since with linux:
     # https://github.com/envoyproxy/envoy-mobile/issues/1418.
@@ -89,7 +104,7 @@ jobs:
       - id: check_context
         name: 'Check whether to run'
         run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e java/ -e kotlin/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ ; then
+          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e java/ -e kotlin/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/android_tests.yml$ ; then
             echo "Tests will run."
             echo "::set-output name=run_tests::true"
           else
