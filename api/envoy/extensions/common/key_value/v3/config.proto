@@ -4,9 +4,6 @@ package envoy.extensions.common.key_value.v3;
 
 import "envoy/config/core/v3/extension.proto";
 
-import "google/protobuf/any.proto";
-import "google/protobuf/duration.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 

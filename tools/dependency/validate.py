@@ -39,7 +39,7 @@ EXTENSION_LABEL_RE = re.compile('(//source/extensions/.*):')
 IGNORE_DEPS = set([
     'envoy',
     'envoy_api',
-    'envoy_api_canonical',
+    'envoy_api',
     'platforms',
     'bazel_tools',
     'local_config_cc',

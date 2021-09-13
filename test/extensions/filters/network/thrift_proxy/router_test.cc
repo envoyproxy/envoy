@@ -1122,7 +1122,7 @@ TEST_F(ThriftRouterTest, PoolTimeoutUpstreamTimeMeasurement) {
 
   startRequest(MessageType::Call);
 
-  dispatcher_.time_system_.advanceTimeWait(std::chrono::milliseconds(500));
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(500));
   EXPECT_CALL(cluster_scope,
               histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds))
       .Times(0);
@@ -1219,7 +1219,7 @@ TEST_P(ThriftRouterFieldTypeTest, CallWithUpstreamRqTime) {
   sendTrivialStruct(field_type);
   completeRequest();
 
-  dispatcher_.time_system_.advanceTimeWait(std::chrono::milliseconds(500));
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(500));
   EXPECT_CALL(cluster_scope,
               histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
   EXPECT_CALL(cluster_scope,
