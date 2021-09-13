@@ -83,6 +83,7 @@ inline absl::string_view getStringViewFromLuaString(lua_State* state, int index)
   // following: "[string \"...\"]:3: bad argument #1 to 'logTrace' (string expected, got table)".
   // However,`luaL_checklstring` accepts a number as its argument and implicitly converts it to a
   // string, since Lua provides automatic conversion between string and number values at run time
+  // (https://www.lua.org/manual/5.1/manual.html#2.2.1).
   const char* input = luaL_checklstring(state, index, &input_size);
   return absl::string_view(input, input_size);
 }
