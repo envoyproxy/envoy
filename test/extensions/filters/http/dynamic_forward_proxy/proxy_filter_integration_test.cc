@@ -122,7 +122,8 @@ typed_config:
     if (write_cache_file_) {
       std::string host =
           fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port());
-      std::string value = fake_upstreams_[0]->localAddress()->asString();
+      std::string value =
+          absl::StrCat(fake_upstreams_[0]->localAddress()->asString(), "|1000000|0");
       TestEnvironment::writeStringToFileForTest(
           "dns_cache.txt", absl::StrCat(host.length(), "\n", host, value.length(), "\n", value));
     }
@@ -359,7 +360,6 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFile) {
       sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
   checkSimpleRequestSuccess(1024, 1024, response.get());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
-  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }
 #endif
