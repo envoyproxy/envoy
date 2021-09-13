@@ -16,7 +16,10 @@ namespace Quic {
 quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
 EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address,
                                    const quic::QuicSocketAddress& client_address,
-                                   const std::string& hostname) {
+                                   const std::string& hostname, bool* cert_matched_sni) {
+  // TODO(DavidSchinazi) parse the certificate to correctly fill in |cert_matched_sni|.
+  *cert_matched_sni = false;
+
   CertConfigWithFilterChain res =
       getTlsCertConfigAndFilterChain(server_address, client_address, hostname);
   absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_ref =
