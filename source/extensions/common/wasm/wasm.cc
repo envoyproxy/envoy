@@ -78,7 +78,9 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
           createWasmVm(config.config().vm_config().runtime()), config.config().vm_config().vm_id(),
           MessageUtil::anyToBytes(config.config().vm_config().configuration()),
           toStdStringView(vm_key), config.environmentVariables(), config.allowedCapabilities()),
-      scope_(scope), cluster_manager_(cluster_manager), dispatcher_(dispatcher),
+      scope_(scope), stat_name_pool_(scope_->symbolTable()),
+      custom_stat_namespace_(stat_name_pool_.add(CustomStatNamespace)),
+      cluster_manager_(cluster_manager), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()), lifecycle_stats_handler_(LifecycleStatsHandler(
                                                  scope, config.config().vm_config().runtime())) {
   lifecycle_stats_handler_.onEvent(WasmEvent::VmCreated);
@@ -92,7 +94,8 @@ Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
                      "envoy.wasm.runtime.",
                      toAbslStringView(base_wasm_handle->wasm()->wasm_vm()->runtime())));
                }),
-      scope_(getWasm(base_wasm_handle)->scope_),
+      scope_(getWasm(base_wasm_handle)->scope_), stat_name_pool_(scope_->symbolTable()),
+      custom_stat_namespace_(stat_name_pool_.add(CustomStatNamespace)),
       cluster_manager_(getWasm(base_wasm_handle)->clusterManager()), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
       lifecycle_stats_handler_(getWasm(base_wasm_handle)->lifecycle_stats_handler_) {
