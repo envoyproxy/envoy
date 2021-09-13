@@ -263,7 +263,7 @@ TEST_F(Http1ConnPoolImplTest, DrainConnections) {
   r1.completeResponse(false);
 
   // This will destroy the ready client and set requests remaining to 1 on the busy client.
-  conn_pool_->drainConnections();
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   EXPECT_CALL(*conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
   conn_pool_->expectAndRunUpstreamReady();
@@ -953,7 +953,7 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
   ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Pending);
 
   conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  conn_pool_->startDrain();
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 
   r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_total_.value());
@@ -980,7 +980,7 @@ TEST_F(Http1ConnPoolImplTest, DrainWhileConnecting) {
   EXPECT_NE(nullptr, handle);
 
   conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  conn_pool_->startDrain();
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   EXPECT_CALL(*conn_pool_->test_clients_[0].connection_,
               close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(drained, ready()).Times(AtLeast(1));
@@ -1048,7 +1048,7 @@ TEST_F(Http1ConnPoolImplTest, ActiveRequestHasActiveConnectionsTrue) {
   // cleanup
   conn_pool_->expectEnableUpstreamReady();
   r1.completeResponse(false);
-  conn_pool_->drainConnections();
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   EXPECT_CALL(*conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
   conn_pool_->expectAndRunUpstreamReady();
@@ -1062,7 +1062,7 @@ TEST_F(Http1ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnection
 
   EXPECT_FALSE(conn_pool_->hasActiveConnections());
 
-  conn_pool_->drainConnections();
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   EXPECT_CALL(*conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
   conn_pool_->expectAndRunUpstreamReady();
@@ -1077,7 +1077,7 @@ TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
   EXPECT_CALL(*conn_pool_, onClientDestroy());
   r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   EXPECT_EQ(0U, cluster_->stats_.upstream_rq_total_.value());
-  conn_pool_->drainConnections();
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 

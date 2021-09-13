@@ -20,6 +20,7 @@
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/api/api_impl.h"
@@ -165,18 +166,16 @@ void InstanceImpl::failHealthcheck(bool fail) {
 }
 
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
-  snapped_counters_ = store.counters();
-  counters_.reserve(snapped_counters_.size());
-  for (const auto& counter : snapped_counters_) {
-    counters_.push_back({counter->latch(), *counter});
-  }
+  store.forEachCounter([this](std::size_t size) mutable { counters_.reserve(size); },
+                       [this](Stats::Counter& counter) mutable {
+                         counters_.push_back({counter.latch(), counter});
+                       });
 
-  snapped_gauges_ = store.gauges();
-  gauges_.reserve(snapped_gauges_.size());
-  for (const auto& gauge : snapped_gauges_) {
-    ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
-    gauges_.push_back(*gauge);
-  }
+  store.forEachGauge([this](std::size_t size) mutable { gauges_.reserve(size); },
+                     [this](Stats::Gauge& gauge) mutable {
+                       ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
+                       gauges_.push_back(gauge);
+                     });
 
   snapped_histograms_ = store.histograms();
   histograms_.reserve(snapped_histograms_.size());
@@ -184,11 +183,9 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
     histograms_.push_back(*histogram);
   }
 
-  snapped_text_readouts_ = store.textReadouts();
-  text_readouts_.reserve(snapped_text_readouts_.size());
-  for (const auto& text_readout : snapped_text_readouts_) {
-    text_readouts_.push_back(*text_readout);
-  }
+  store.forEachTextReadout(
+      [this](std::size_t size) mutable { text_readouts_.reserve(size); },
+      [this](Stats::TextReadout& text_readout) { text_readouts_.push_back(text_readout); });
 
   snapshot_time_ = time_source.systemTime();
 }

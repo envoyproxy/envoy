@@ -238,14 +238,6 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
   return AssertionSuccess();
 }
 
-AssertionResult TestUtility::waitForGaugeDestroyed(Stats::Store& store, const std::string& name,
-                                                   Event::TestTimeSystem& time_system) {
-  while (findGauge(store, name) == nullptr) {
-    time_system.advanceTimeWait(std::chrono::milliseconds(10));
-  }
-  return AssertionSuccess();
-}
-
 AssertionResult TestUtility::waitUntilHistogramHasSamples(Stats::Store& store,
                                                           const std::string& name,
                                                           Event::TestTimeSystem& time_system,

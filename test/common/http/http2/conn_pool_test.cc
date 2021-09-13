@@ -322,7 +322,7 @@ TEST_F(Http2ConnPoolImplTest, DrainConnectionIdle) {
   completeRequest(r);
 
   EXPECT_CALL(*this, onClientDestroy());
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 }
 
 /**
@@ -391,7 +391,7 @@ TEST_F(Http2ConnPoolImplTest, DrainConnectionReadyWithRequest) {
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
 
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 
   EXPECT_CALL(r.decoder_, decodeHeaders_(_, true));
   EXPECT_CALL(*this, onClientDestroy());
@@ -416,7 +416,7 @@ TEST_F(Http2ConnPoolImplTest, DrainConnectionBusy) {
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
 
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 
   EXPECT_CALL(r.decoder_, decodeHeaders_(_, true));
   EXPECT_CALL(*this, onClientDestroy());
@@ -436,12 +436,12 @@ TEST_F(Http2ConnPoolImplTest, DrainConnectionConnecting) {
   ActiveTestRequest r(*this, 0, false);
 
   // Pending request prevents the connection from being drained
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 
   // Cancel the pending request, and then the connection can be closed.
   r.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   EXPECT_CALL(*this, onClientDestroy());
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 }
 
 /**
@@ -454,7 +454,7 @@ TEST_F(Http2ConnPoolImplTest, CloseExcess) {
   ActiveTestRequest r(*this, 0, false);
 
   // Pending request prevents the connection from being drained
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 
   EXPECT_CALL(*this, onClientDestroy());
   r.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
@@ -595,7 +595,7 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
   cluster_->max_requests_per_connection_ = 1;
 
   // Test drain connections call prior to any connections being created.
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
@@ -618,7 +618,7 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
           .ok());
 
   // This will move the second connection to draining.
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 
   // This will destroy the 2 draining connections.
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -1093,7 +1093,7 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
           .ok());
   ReadyWatcher drained;
   pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  pool_->startDrain();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(drained, ready());
@@ -1130,7 +1130,7 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectDrainingWithActiveRequest) {
 
   ReadyWatcher drained;
   pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  pool_->startDrain();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
@@ -1174,7 +1174,7 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
 
   ReadyWatcher drained;
   pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  pool_->startDrain();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
@@ -1230,7 +1230,7 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready());
   pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  pool_->startDrain();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
@@ -1384,7 +1384,7 @@ TEST_F(Http2ConnPoolImplTest, DrainingConnectionsConsideredActive) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 
   EXPECT_TRUE(pool_->hasActiveConnections());
 
@@ -1398,7 +1398,7 @@ TEST_F(Http2ConnPoolImplTest, DrainedConnectionsNotActive) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   completeRequest(r1);
 
   EXPECT_FALSE(pool_->hasActiveConnections());
@@ -1431,7 +1431,7 @@ TEST_F(Http2ConnPoolImplTest, PreconnectWithoutMultiplexing) {
   r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
   r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
   r3.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 
   closeAllClients();
 }
@@ -1485,7 +1485,7 @@ TEST_F(Http2ConnPoolImplTest, PreconnectWithMultiplexing) {
   // Clean up.
   r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
   r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   closeAllClients();
 }
 
@@ -1529,7 +1529,7 @@ TEST_F(Http2ConnPoolImplTest, PreconnectWithSettings) {
   CHECK_STATE(2 /*active*/, 0 /*pending*/, 0 /*capacity*/);
 
   // Clean up.
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   closeAllClients();
 }
 
@@ -1555,7 +1555,7 @@ TEST_F(Http2ConnPoolImplTest, PreconnectWithGoaway) {
   CHECK_STATE(1 /*active*/, 0 /*pending*/, 0 /*capacity*/);
 
   // Clean up.
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   closeAllClients();
 }
 
@@ -1581,7 +1581,7 @@ TEST_F(Http2ConnPoolImplTest, PreconnectEvenWhenReady) {
   // Clean up.
   completeRequest(r1);
   completeRequest(r2);
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   closeAllClients();
 }
 
@@ -1602,7 +1602,7 @@ TEST_F(Http2ConnPoolImplTest, PreconnectAfterTimeout) {
 
   // Clean up.
   completeRequest(r1);
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   closeAllClients();
 }
 
@@ -1627,7 +1627,7 @@ TEST_F(Http2ConnPoolImplTest, CloseExcessWithPreconnect) {
 
   // Clean up.
   r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   closeAllClients();
 }
 
@@ -1640,7 +1640,7 @@ TEST_F(Http2ConnPoolImplTest, MaybePreconnect) {
   expectClientsCreate(1);
   EXPECT_TRUE(pool_->maybePreconnect(2));
 
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   closeAllClients();
 }
 
@@ -1677,7 +1677,7 @@ TEST_F(Http2ConnPoolImplTest, TestStateWithMultiplexing) {
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 1 /*capacity*/);
 
   // Clean up with an outstanding stream.
-  pool_->drainConnections();
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   closeAllClients();
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
 }

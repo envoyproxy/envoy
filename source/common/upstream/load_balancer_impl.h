@@ -40,24 +40,7 @@ public:
   choosePriority(uint64_t hash, const HealthyLoad& healthy_per_priority_load,
                  const DegradedLoad& degraded_per_priority_load);
 
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
-
 protected:
-  /**
-   * By implementing this method instead of chooseHost, host selection will
-   * be subject to host filters specified by LoadBalancerContext.
-   *
-   * Host selection will be retried up to the number specified by
-   * hostSelectionRetryCount on LoadBalancerContext, and if no hosts are found
-   * within the allowed attempts, the host that was selected during the last
-   * attempt will be returned.
-   *
-   * If host selection is idempotent (i.e. retrying will not change the outcome),
-   * sub classes should override chooseHost to avoid the unnecessary overhead of
-   * retrying host selection.
-   */
-  virtual HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) PURE;
-
   /**
    * For the given host_set @return if we should be in a panic mode or not. For example, if the
    * majority of hosts are unhealthy we'll be likely in a panic mode. In this case we'll route
@@ -147,6 +130,7 @@ protected:
 
     return std::min<uint32_t>(health + degraded, 100);
   }
+
   // The percentage load (0-100) for each priority level when targeting healthy hosts and
   // the percentage load (0-100) for each priority level when targeting degraded hosts.
   HealthyAndDegradedLoad per_priority_load_;
@@ -165,6 +149,11 @@ private:
 
 class LoadBalancerContextBase : public LoadBalancerContext {
 public:
+  static bool validateOverrideHostStatus(Host::Health health, OverrideHostStatus status);
+
+  static HostConstSharedPtr selectOverrideHost(const HostMap* host_map,
+                                               LoadBalancerContext* context);
+
   absl::optional<uint64_t> computeHashKey() override { return {}; }
 
   const Network::Connection* downstreamConnection() const override { return nullptr; }
@@ -188,12 +177,17 @@ public:
   Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
     return nullptr;
   }
+
+  absl::optional<OverrideHost> overrideHostToSelect() const override { return {}; }
 };
 
 /**
  * Base class for zone aware load balancers
  */
 class ZoneAwareLoadBalancerBase : public LoadBalancerBase {
+public:
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+
 protected:
   // Both priority_set and local_priority_set if non-null must have at least one host set.
   ZoneAwareLoadBalancerBase(
@@ -259,6 +253,21 @@ protected:
   };
 
   /**
+   * By implementing this method instead of chooseHost, host selection will
+   * be subject to host filters specified by LoadBalancerContext.
+   *
+   * Host selection will be retried up to the number specified by
+   * hostSelectionRetryCount on LoadBalancerContext, and if no hosts are found
+   * within the allowed attempts, the host that was selected during the last
+   * attempt will be returned.
+   *
+   * If host selection is idempotent (i.e. retrying will not change the outcome),
+   * sub classes should override chooseHost to avoid the unnecessary overhead of
+   * retrying host selection.
+   */
+  virtual HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) PURE;
+
+  /**
    * Pick the host source to use, doing zone aware routing when the hosts are sufficiently healthy.
    * If no host is chosen (due to fail_traffic_on_panic being set), return absl::nullopt.
    */
@@ -268,6 +277,10 @@ protected:
    * Index into priority_set via hosts source descriptor.
    */
   const HostVector& hostSourceToHosts(HostsSource hosts_source) const;
+
+  // Cross priority host map for fast cross priority host searching. When the priority update
+  // callback is executed, the host map will also be updated.
+  HostMapConstSharedPtr cross_priority_host_map_;
 
 private:
   enum class LocalityRoutingState {
@@ -381,7 +394,7 @@ public:
                       Random::RandomGenerator& random,
                       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
-  // Upstream::LoadBalancerBase
+  // Upstream::ZoneAwareLoadBalancerBase
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
 
@@ -579,7 +592,7 @@ public:
       : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                   common_config) {}
 
-  // Upstream::LoadBalancerBase
+  // Upstream::ZoneAwareLoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
 
