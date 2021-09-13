@@ -164,7 +164,7 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
     case Network::Address::Type::Pipe:
       return "does-not-exist";
     case Network::Address::Type::EnvoyInternal:
-      return "envoy-internal";
+      return "EnvoyInternal";
     }
   };
   // TODO: register and find by address type instead of name.

@@ -50,6 +50,15 @@ public:
                                         std::move(transport_socket), options);
   }
 
+  void registerInternalListenerManager(
+      Network::InternalListenerManager& internal_listener_manager) override {
+    impl_.registerInternalListenerManager(internal_listener_manager);
+  }
+
+  Network::InternalListenerManagerOptRef getInternalListenerManager() override {
+    return impl_.getInternalListenerManager();
+  }
+
   Network::DnsResolverSharedPtr createDnsResolver(
       const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
       const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) override {

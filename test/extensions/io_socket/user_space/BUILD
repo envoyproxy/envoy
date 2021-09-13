@@ -66,6 +66,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+        "//source/extensions/io_socket/user_space:client_connection_factory",
         "//source/extensions/io_socket/user_space:io_handle_impl_lib",
         "//test/mocks/event:event_mocks",
     ],
