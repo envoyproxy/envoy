@@ -46,7 +46,7 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
-    config_helper_.addFilter(ADMISSION_CONTROL_CONFIG);
+    config_helper_.prependFilter(ADMISSION_CONTROL_CONFIG);
     HttpIntegrationTest::initialize();
   }
 
