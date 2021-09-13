@@ -41,7 +41,7 @@ typed_config:
 )EOF",
                                            Network::Test::ipVersionToDnsFamily(GetParam()),
                                            max_hosts, max_pending_requests, filename);
-    config_helper_.addFilter(filter);
+    config_helper_.prependFilter(filter);
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.

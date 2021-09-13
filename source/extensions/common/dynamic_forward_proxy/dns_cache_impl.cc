@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
+#include "source/common/common/stl_helpers.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/resolver_impl.h"
@@ -293,7 +294,11 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                                  std::list<Network::DnsResponse>&& response,
                                  absl::optional<MonotonicTime> resolution_time) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
-  ENVOY_LOG(debug, "main thread resolve complete for host '{}'. {} results", host, response.size());
+  ENVOY_LOG_EVENT(debug, "dns_cache_finish_resolve",
+                  "main thread resolve complete for host '{}': {}", host,
+                  accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
+                    return dns_response.address_->asString();
+                  }));
   const bool from_cache = resolution_time.has_value();
 
   // Functions like this one that modify primary_hosts_ are only called in the main thread so we
