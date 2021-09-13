@@ -84,7 +84,8 @@ private:
 
   struct PendingResolution : public ActiveDnsQuery {
     PendingResolution(AppleDnsResolverImpl& parent, ResolveCb callback,
-                      Event::Dispatcher& dispatcher, const std::string& dns_name, DnsLookupFamily dns_lookup_family);
+                      Event::Dispatcher& dispatcher, const std::string& dns_name,
+                      DnsLookupFamily dns_lookup_family);
 
     ~PendingResolution();
 

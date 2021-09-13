@@ -801,8 +801,8 @@ TEST_P(DnsImplTest, AutoOnlyV6IfBothV6andV4) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success,
-                                             {{"1::2"}}, {}, absl::nullopt));
+                                             DnsResolver::ResolutionStatus::Success, {{"1::2"}}, {},
+                                             absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -810,8 +810,8 @@ TEST_P(DnsImplTest, AutoV6IfOnlyV6) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success,
-                                             {{"1::2"}}, {}, absl::nullopt));
+                                             DnsResolver::ResolutionStatus::Success, {{"1::2"}}, {},
+                                             absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -837,8 +837,8 @@ TEST_P(DnsImplTest, V4PreferredV6IfOnlyV6) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
-                                             DnsResolver::ResolutionStatus::Success,
-                                             {{"1::2"}}, {}, absl::nullopt));
+                                             DnsResolver::ResolutionStatus::Success, {{"1::2"}}, {},
+                                             absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 

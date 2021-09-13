@@ -40,7 +40,8 @@ private:
   struct PendingResolution : public ActiveDnsQuery {
     // Network::ActiveDnsQuery
     PendingResolution(DnsResolverImpl& parent, ResolveCb callback, Event::Dispatcher& dispatcher,
-                      ares_channel channel, const std::string& dns_name, DnsLookupFamily dns_lookup_family)
+                      ares_channel channel, const std::string& dns_name,
+                      DnsLookupFamily dns_lookup_family)
         : parent_(parent), callback_(callback), dispatcher_(dispatcher), channel_(channel),
           dns_name_(dns_name), dns_lookup_family_(dns_lookup_family) {}
 

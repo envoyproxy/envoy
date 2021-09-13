@@ -211,7 +211,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     fallback_if_failed_ = false;
 
     if (dns_lookup_family_ == DnsLookupFamily::Auto) {
-    getAddrInfo(AF_INET);
+      getAddrInfo(AF_INET);
     } else {
       ASSERT(dns_lookup_family_ == DnsLookupFamily::V4Preferred);
       getAddrInfo(AF_INET6);
@@ -280,13 +280,15 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     initializeChannel(&options.options_, options.optmask_);
   }
 
-  auto pending_resolution =
-      std::make_unique<PendingResolution>(*this, callback, dispatcher_, channel_, dns_name, dns_lookup_family);
-  if (dns_lookup_family == DnsLookupFamily::Auto || dns_lookup_family == DnsLookupFamily::V4Preferred) {
+  auto pending_resolution = std::make_unique<PendingResolution>(
+      *this, callback, dispatcher_, channel_, dns_name, dns_lookup_family);
+  if (dns_lookup_family == DnsLookupFamily::Auto ||
+      dns_lookup_family == DnsLookupFamily::V4Preferred) {
     pending_resolution->fallback_if_failed_ = true;
   }
 
-  if (dns_lookup_family == DnsLookupFamily::V4Only || dns_lookup_family == DnsLookupFamily::V4Preferred) {
+  if (dns_lookup_family == DnsLookupFamily::V4Only ||
+      dns_lookup_family == DnsLookupFamily::V4Preferred) {
     pending_resolution->getAddrInfo(AF_INET);
   } else {
     pending_resolution->getAddrInfo(AF_INET6);

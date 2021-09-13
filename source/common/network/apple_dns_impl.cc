@@ -73,8 +73,8 @@ AppleDnsResolverImpl::startResolution(const std::string& dns_name,
   }
 
   ENVOY_LOG(trace, "Performing DNS resolution via Apple APIs");
-  auto pending_resolution =
-      std::make_unique<PendingResolution>(*this, callback, dispatcher_, dns_name, dns_lookup_family);
+  auto pending_resolution = std::make_unique<PendingResolution>(*this, callback, dispatcher_,
+                                                                dns_name, dns_lookup_family);
 
   DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo();
   if (error != kDNSServiceErr_NoError) {
@@ -136,7 +136,8 @@ void AppleDnsResolverImpl::chargeGetAddrInfoErrorStats(DNSServiceErrorType error
 AppleDnsResolverImpl::PendingResolution::PendingResolution(AppleDnsResolverImpl& parent,
                                                            ResolveCb callback,
                                                            Event::Dispatcher& dispatcher,
-                                                           const std::string& dns_name, DnsLookupFamily dns_lookup_family)
+                                                           const std::string& dns_name,
+                                                           DnsLookupFamily dns_lookup_family)
     : parent_(parent), callback_(callback), dispatcher_(dispatcher), dns_name_(dns_name),
       pending_cb_({ResolutionStatus::Success, {}, {}}), dns_lookup_family_(dns_lookup_family) {}
 
@@ -186,8 +187,7 @@ void AppleDnsResolverImpl::PendingResolution::onEventCallback(uint32_t events) {
 }
 
 std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalAddressList() {
-  switch (dns_lookup_family_)
-  {
+  switch (dns_lookup_family_) {
   case DnsLookupFamily::V4Only:
     return pending_cb_.v4_responses_;
   case DnsLookupFamily::V6Only:
@@ -223,8 +223,7 @@ void AppleDnsResolverImpl::PendingResolution::finishResolve() {
   }
 }
 
-DNSServiceErrorType
-AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrInfo() {
+DNSServiceErrorType AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrInfo() {
   DNSServiceProtocol protocol;
   switch (dns_lookup_family_) {
   case DnsLookupFamily::V4Only:
