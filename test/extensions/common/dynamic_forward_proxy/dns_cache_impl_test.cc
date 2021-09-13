@@ -372,7 +372,7 @@ TEST_F(DnsCacheImplTest, TTL) {
              1 /* added */, 1 /* removed */, 0 /* num hosts */);
 
   // Make sure we don't get a cache hit the next time the host is requested.
-  resolve_timer = new Event::MockTimer(&context_.dispatcher_);
+  new Event::MockTimer(&context_.dispatcher_); // resolve_timer
   timeout_timer = new Event::MockTimer(&context_.dispatcher_);
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))

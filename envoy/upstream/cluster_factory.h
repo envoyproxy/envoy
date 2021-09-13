@@ -38,12 +38,15 @@ namespace Upstream {
  */
 class ClusterFactoryContext : public Server::Configuration::FactoryContextBase {
 public:
-  virtual ~ClusterFactoryContext() = default;
-
   /**
    * @return bool flag indicating whether the cluster is added via api.
    */
   virtual bool addedViaApi() PURE;
+
+  /**
+   * @return Upstream::ClusterManager& singleton for use by the entire server.
+   */
+  virtual Upstream::ClusterManager& clusterManager() PURE;
 
   /**
    * @return Network::DnsResolverSharedPtr the dns resolver for the server.
@@ -69,7 +72,9 @@ public:
    * @return Outlier::EventLoggerSharedPtr sink for outlier detection event logs.
    */
   virtual Outlier::EventLoggerSharedPtr outlierEventLogger() PURE;
-  virtual Stats::Scope& scope() override { return stats(); }
+
+  // Server::Configuration::FactoryContextBase
+  Stats::Scope& scope() override { return stats(); }
 };
 
 /**

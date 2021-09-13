@@ -60,11 +60,6 @@ public:
   virtual Api::Api& api() PURE;
 
   /**
-   * @return Upstream::ClusterManager& singleton for use by the entire server.
-   */
-  virtual Upstream::ClusterManager& clusterManager() PURE;
-
-  /**
    * @return information about the local environment the server is running in.
    */
   virtual const LocalInfo::LocalInfo& localInfo() const PURE;
@@ -106,7 +101,10 @@ public:
  */
 class CommonFactoryContext : public FactoryContextBase {
 public:
-  virtual ~CommonFactoryContext() = default;
+  /**
+   * @return Upstream::ClusterManager& singleton for use by the entire server.
+   */
+  virtual Upstream::ClusterManager& clusterManager() PURE;
 
   /**
    * @return ProtobufMessage::ValidationContext& validation visitor for xDS and static configuration
