@@ -113,9 +113,13 @@ void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
   auto iter = connections_by_filter_chain_.find(filter_chain);
   if (iter != connections_by_filter_chain_.end()) {
     std::list<std::reference_wrapper<Network::Connection>>& connections = iter->second;
-    while (!connections.empty()) {
+    // Retain the number of connections in the list early because closing the connection will change
+    // the size.
+    const size_t num_connections = connections.size();
+    for (size_t i = 0; i < num_connections; ++i) {
       Network::Connection& connection = connections.front().get();
-      // This will remove the connection from the list.
+      // This will remove the connection from the list. And the last removal will remove connections
+      // from the map as well.
       connection.close(Network::ConnectionCloseType::NoFlush);
     }
     ASSERT(connections_by_filter_chain_.find(filter_chain) == connections_by_filter_chain_.end());
