@@ -75,7 +75,6 @@ Bug Fixes
 * access log: fix ``%UPSTREAM_CLUSTER%`` when used in http upstream access logs. Previously, it was always logging as an unset value.
 * aws request signer: fix the AWS Request Signer extension to correctly normalize the path and query string to be signed according to AWS' guidelines, so that the hash on the server side matches. See `AWS SigV4 documentaion <https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html>`_.
 * cluster: delete pools when they're idle to fix unbounded memory use when using PROXY protocol upstream with tcp_proxy. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.conn_pool_delete_when_idle`` runtime guard to false.
-* lua: fix ``BodyBuffer`` setting a Lua string and printing Lua string containing hex characters. Previously, ``BodyBuffer`` setting a Lua string or printing strings with hex characters will be truncated.
 * cluster: finish cluster warming even if hosts are removed before health check initialization. This only affected clusters with :ref:`ignore_health_on_host_removal <envoy_v3_api_field_config.cluster.v3.Cluster.ignore_health_on_host_removal>`.
 * compressor: fix a bug where if trailers were added and a subsequent filter paused the filter chain, the request could be stalled. This behavior can be reverted by setting ``envoy.reloadable_features.fix_added_trailers`` to false.
 * dynamic forward proxy: fixing a validation bug where san and sni checks were not applied setting :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` via :ref:`typed_extension_protocol_options <envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
@@ -84,6 +83,7 @@ Bug Fixes
 * hcm: remove deprecation for :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>` and forbid mixing ip detection extensions with old related knobs.
 * http: limit use of deferred resets in the http2 codec to server-side connections. Use of deferred reset for client connections can result in incorrect behavior and performance problems.
 * listener: fixed an issue on Windows where connections are not handled by all worker threads.
+* lua: fix ``BodyBuffer`` setting a Lua string and printing Lua string containing hex characters. Previously, ``BodyBuffer`` setting a Lua string or printing strings with hex characters will be truncated.
 * xray: fix the AWS X-Ray tracer bug where span's error, fault and throttle information was not reported properly as per the `AWS X-Ray documentation <https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html>`_. Before this fix, server error was reported under 'annotations' section of the segment data.
 
 Removed Config or Runtime
