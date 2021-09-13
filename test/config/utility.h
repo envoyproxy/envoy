@@ -215,10 +215,6 @@ public:
   // Add an HTTP filter prior to existing filters.
   void prependFilter(const std::string& filter_yaml);
 
-  // Add an HTTP filter prior to existing filters.
-  // TODO(rgs1): remove once envoy-filter-example has been updated.
-  void addFilter(const std::string& filter_yaml);
-
   // Add a network filter prior to existing filters.
   void addNetworkFilter(const std::string& filter_yaml);
 

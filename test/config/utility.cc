@@ -1037,8 +1037,6 @@ void ConfigHelper::addVirtualHost(const envoy::config::route::v3::VirtualHost& v
   storeHttpConnectionManager(hcm_config);
 }
 
-void ConfigHelper::addFilter(const std::string& config) { prependFilter(config); }
-
 void ConfigHelper::prependFilter(const std::string& config) {
   RELEASE_ASSERT(!finalized_, "");
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
