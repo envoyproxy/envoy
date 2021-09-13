@@ -113,7 +113,7 @@ private:
     const std::string& resolvedHost() const override { return resolved_host_; }
     bool isIpAddress() const override { return is_ip_address_; }
     void touch() final { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
-    void updateStale(MonotonicTime resolution_time, const std::chrono::seconds ttl) {
+    void updateStale(MonotonicTime resolution_time, std::chrono::seconds ttl) {
       stale_at_time_ = resolution_time + ttl;
     }
 
@@ -193,7 +193,7 @@ private:
 
   void addCacheEntry(const std::string& host,
                      const Network::Address::InstanceConstSharedPtr& address,
-                     const std::chrono::seconds& ttl);
+                     const std::chrono::seconds ttl);
   void removeCacheEntry(const std::string& host);
   void loadCacheEntries(
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);

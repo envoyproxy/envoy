@@ -445,7 +445,7 @@ DnsCacheImpl::PrimaryHostInfo::~PrimaryHostInfo() {
 
 void DnsCacheImpl::addCacheEntry(const std::string& host,
                                  const Network::Address::InstanceConstSharedPtr& address,
-                                 const std::chrono::seconds& ttl) {
+                                 const std::chrono::seconds ttl) {
   if (!key_value_store_) {
     return;
   }
