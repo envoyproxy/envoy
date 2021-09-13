@@ -127,13 +127,13 @@ public:
   static std::string httpProxyConfig(bool downstream_use_quic = false);
   // A basic configuration for L7 proxying with QUIC transport.
   static std::string quicHttpProxyConfig();
-  // A string for a basic buffer filter, which can be used with addFilter()
+  // A string for a basic buffer filter, which can be used with prependFilter()
   static std::string defaultBufferFilter();
-  // A string for a small buffer filter, which can be used with addFilter()
+  // A string for a small buffer filter, which can be used with prependFilter()
   static std::string smallBufferFilter();
-  // A string for a health check filter which can be used with addFilter()
+  // A string for a health check filter which can be used with prependFilter()
   static std::string defaultHealthCheckFilter();
-  // A string for a squash filter which can be used with addFilter()
+  // A string for a squash filter which can be used with prependFilter()
   static std::string defaultSquashFilter();
   // A string for startTls transport socket config.
   static std::string startTlsConfig();
@@ -213,6 +213,10 @@ public:
   void addVirtualHost(const envoy::config::route::v3::VirtualHost& vhost);
 
   // Add an HTTP filter prior to existing filters.
+  void prependFilter(const std::string& filter_yaml);
+
+  // Add an HTTP filter prior to existing filters.
+  // TODO(rgs1): remove once envoy-filter-example has been updated.
   void addFilter(const std::string& filter_yaml);
 
   // Add a network filter prior to existing filters.

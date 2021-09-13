@@ -1269,7 +1269,6 @@ VirtualHostImpl::VirtualHostImpl(
           new PathRouteEntryImpl(*this, route, optional_http_filters, factory_context, validator));
       break;
     }
-    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex:
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex: {
       routes_.emplace_back(
           new RegexRouteEntryImpl(*this, route, optional_http_filters, factory_context, validator));

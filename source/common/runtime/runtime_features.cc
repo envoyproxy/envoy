@@ -64,6 +64,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     "envoy.reloadable_features.enable_compression_without_content_length_header",
+    "envoy.reloadable_features.fix_added_trailers",
     "envoy.reloadable_features.grpc_bridge_stats_disabled",
     "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling",
     "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
