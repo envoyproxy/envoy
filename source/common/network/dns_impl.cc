@@ -209,7 +209,14 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
 
   if (!completed_ && fallback_if_failed_) {
     fallback_if_failed_ = false;
+
+    if (dns_lookup_family_ == DnsLookupFamily::Auto) {
     getAddrInfo(AF_INET);
+    } else {
+      ASSERT(dns_lookup_family_ == DnsLookupFamily::V4Preferred);
+      getAddrInfo(AF_INET6);
+    }
+
     // Note: Nothing can follow this call to getAddrInfo due to deletion of this
     // object upon synchronous resolution.
     return;
@@ -274,12 +281,12 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   }
 
   auto pending_resolution =
-      std::make_unique<PendingResolution>(*this, callback, dispatcher_, channel_, dns_name);
-  if (dns_lookup_family == DnsLookupFamily::Auto) {
+      std::make_unique<PendingResolution>(*this, callback, dispatcher_, channel_, dns_name, dns_lookup_family);
+  if (dns_lookup_family == DnsLookupFamily::Auto || dns_lookup_family == DnsLookupFamily::V4Preferred) {
     pending_resolution->fallback_if_failed_ = true;
   }
 
-  if (dns_lookup_family == DnsLookupFamily::V4Only) {
+  if (dns_lookup_family == DnsLookupFamily::V4Only || dns_lookup_family == DnsLookupFamily::V4Preferred) {
     pending_resolution->getAddrInfo(AF_INET);
   } else {
     pending_resolution->getAddrInfo(AF_INET6);
