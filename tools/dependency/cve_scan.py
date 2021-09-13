@@ -119,6 +119,11 @@ def parse_cve_json(cve_json, cves, cpe_revmap):
         gather_cpes(cve['configurations']['nodes'], cpe_set)
         if len(cpe_set) == 0:
             continue
+
+        if not "baseMetricV3" in cve['impact']:
+            print(f"WARNING: ignoring v2 metric for {cve['cve']['CVE_data_meta']['ID']}")
+            continue
+
         cvss_v3_score = cve['impact']['baseMetricV3']['cvssV3']['baseScore']
         cvss_v3_severity = cve['impact']['baseMetricV3']['cvssV3']['baseSeverity']
 

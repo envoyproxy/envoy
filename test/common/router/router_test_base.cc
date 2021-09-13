@@ -6,6 +6,7 @@ namespace Envoy {
 namespace Router {
 
 using ::testing::AnyNumber;
+using ::testing::Eq;
 using ::testing::ReturnRef;
 
 RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
@@ -50,9 +51,9 @@ void RouterTestBase::expectPerTryTimerCreate() {
   EXPECT_CALL(*per_try_timeout_, disableTimer());
 }
 
-void RouterTestBase::expectMaxStreamDurationTimerCreate() {
+void RouterTestBase::expectMaxStreamDurationTimerCreate(std::chrono::milliseconds duration_msec) {
   max_stream_duration_timer_ = new Event::MockTimer(&callbacks_.dispatcher_);
-  EXPECT_CALL(*max_stream_duration_timer_, enableTimer(_, _));
+  EXPECT_CALL(*max_stream_duration_timer_, enableTimer(Eq(duration_msec), _));
   EXPECT_CALL(*max_stream_duration_timer_, disableTimer());
 }
 

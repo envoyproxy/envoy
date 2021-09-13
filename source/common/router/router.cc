@@ -171,18 +171,21 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
     const Http::HeaderEntry* header_expected_timeout_entry =
         request_headers.EnvoyExpectedRequestTimeoutMs();
     if (header_expected_timeout_entry) {
-      trySetGlobalTimeout(header_expected_timeout_entry, timeout);
+      trySetGlobalTimeout(*header_expected_timeout_entry, timeout);
     } else {
       const Http::HeaderEntry* header_timeout_entry =
           request_headers.EnvoyUpstreamRequestTimeoutMs();
 
-      if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
+      if (header_timeout_entry) {
+        trySetGlobalTimeout(*header_timeout_entry, timeout);
         request_headers.removeEnvoyUpstreamRequestTimeoutMs();
       }
     }
   } else {
     const Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
-    if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
+
+    if (header_timeout_entry) {
+      trySetGlobalTimeout(*header_timeout_entry, timeout);
       request_headers.removeEnvoyUpstreamRequestTimeoutMs();
     }
   }
@@ -226,16 +229,21 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
   return timeout;
 }
 
-bool FilterUtility::trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_entry,
-                                        TimeoutData& timeout) {
-  if (header_timeout_entry) {
-    uint64_t header_timeout;
-    if (absl::SimpleAtoi(header_timeout_entry->value().getStringView(), &header_timeout)) {
-      timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
-    }
-    return true;
+absl::optional<std::chrono::milliseconds>
+FilterUtility::tryParseHeaderTimeout(const Http::HeaderEntry& header_timeout_entry) {
+  uint64_t header_timeout;
+  if (absl::SimpleAtoi(header_timeout_entry.value().getStringView(), &header_timeout)) {
+    return std::chrono::milliseconds(header_timeout);
   }
-  return false;
+  return absl::nullopt;
+}
+
+void FilterUtility::trySetGlobalTimeout(const Http::HeaderEntry& header_timeout_entry,
+                                        TimeoutData& timeout) {
+  const auto timeout_ms = tryParseHeaderTimeout(header_timeout_entry);
+  if (timeout_ms.has_value()) {
+    timeout.global_timeout_ = timeout_ms.value();
+  }
 }
 
 FilterUtility::HedgingParams
@@ -578,6 +586,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_.suppress_envoy_headers_,
                                          grpc_request_, hedging_params_.hedge_on_per_try_timeout_,
                                          config_.respect_expected_rq_timeout_);
+
+  const Http::HeaderEntry* header_max_stream_duration_entry =
+      headers.EnvoyUpstreamStreamDurationMs();
+  if (header_max_stream_duration_entry) {
+    dynamic_max_stream_duration_ =
+        FilterUtility::tryParseHeaderTimeout(*header_max_stream_duration_entry);
+    headers.removeEnvoyUpstreamStreamDurationMs();
+  }
 
   // If this header is set with any value, use an alternate response code on timeout
   if (headers.EnvoyUpstreamRequestTimeoutAltResponse()) {
@@ -1299,7 +1315,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   if (route_entry_->internalRedirectPolicy().enabled() &&
       route_entry_->internalRedirectPolicy().shouldRedirectForResponseCode(
           static_cast<Http::Code>(response_code)) &&
-      setupRedirect(*headers, upstream_request)) {
+      setupRedirect(*headers)) {
     return;
     // If the redirect could not be handled, fail open and let it pass to the
     // next downstream.
@@ -1471,23 +1487,9 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   cleanup();
 }
 
-bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
-                           UpstreamRequest& upstream_request) {
+bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   ENVOY_STREAM_LOG(debug, "attempting internal redirect", *callbacks_);
   const Http::HeaderEntry* location = headers.Location();
-
-  // If the internal redirect succeeds, callbacks_->recreateStream() will result in the
-  // destruction of this filter before the stream is marked as complete, and onDestroy will reset
-  // the stream.
-  //
-  // Normally when a stream is complete we signal this by resetting the upstream but this cannot
-  // be done in this case because if recreateStream fails, the "failure" path continues to call
-  // code in onUpstreamHeaders which requires the upstream *not* be reset. To avoid onDestroy
-  // performing a spurious stream reset in the case recreateStream() succeeds, we explicitly track
-  // stream completion here and check it in onDestroy. This is annoyingly complicated but is
-  // better than needlessly resetting streams.
-  attempting_internal_redirect_with_complete_stream_ =
-      upstream_request.upstreamTiming().last_upstream_rx_byte_received_ && downstream_end_stream_;
 
   const uint64_t status_code = Http::Utility::getResponseStatus(headers);
 
@@ -1501,8 +1503,6 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return true;
   }
-
-  attempting_internal_redirect_with_complete_stream_ = false;
 
   ENVOY_STREAM_LOG(debug, "Internal redirect failed", *callbacks_);
   cluster_->stats().upstream_internal_redirect_failed_total_.inc();

@@ -202,3 +202,4 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui @lizan
 /contrib/mysql_proxy/ @rshriram @venilnoronha
 /contrib/postgres_proxy/ @fabriziomello @cpakulski @dio
+/contrib/sxg/ @cpapazian @rgs1 @alyssawilk

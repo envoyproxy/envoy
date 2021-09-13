@@ -3,6 +3,7 @@
 #include <functional>
 #include <vector>
 
+#include "envoy/common/conn_pool.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -59,14 +60,9 @@ public:
   void addIdleCallback(const IdleCb& cb);
 
   /**
-   * See `Envoy::ConnectionPool::Instance::startDrain()`.
-   */
-  void startDrain();
-
-  /**
    * See `Envoy::ConnectionPool::Instance::drainConnections()`.
    */
-  void drainConnections();
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior);
 
 private:
   /**

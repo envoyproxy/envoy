@@ -52,14 +52,9 @@ public:
   void addIdleCallback(const IdleCb& cb);
 
   /**
-   * See `Envoy::ConnectionPool::Instance::startDrain()`.
-   */
-  void startDrain();
-
-  /**
    * See `Envoy::ConnectionPool::Instance::drainConnections()`.
    */
-  void drainConnections();
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior);
 
 private:
   size_t getPriorityIndex(ResourcePriority priority) const;

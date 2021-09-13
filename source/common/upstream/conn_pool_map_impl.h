@@ -99,7 +99,8 @@ void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addIdleCallback(const IdleCb& cb) {
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
-void ConnPoolMap<KEY_TYPE, POOL_TYPE>::startDrain() {
+void ConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections(
+    Envoy::ConnectionPool::DrainBehavior drain_behavior) {
   // Copy the `active_pools_` so that it is safe for the call to result
   // in deletion, and avoid iteration through a mutating container.
   std::vector<POOL_TYPE*> pools;
@@ -109,22 +110,7 @@ void ConnPoolMap<KEY_TYPE, POOL_TYPE>::startDrain() {
   }
 
   for (auto* pool : pools) {
-    pool->startDrain();
-  }
-}
-
-template <typename KEY_TYPE, typename POOL_TYPE>
-void ConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections() {
-  // Copy the `active_pools_` so that it is safe for the call to result
-  // in deletion, and avoid iteration through a mutating container.
-  std::vector<POOL_TYPE*> pools;
-  pools.reserve(active_pools_.size());
-  for (auto& pool_pair : active_pools_) {
-    pools.push_back(pool_pair.second.get());
-  }
-
-  for (auto* pool : pools) {
-    pool->drainConnections();
+    pool->drainConnections(drain_behavior);
   }
 }
 

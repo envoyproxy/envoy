@@ -64,7 +64,7 @@ REAL_TIME_ALLOWLIST = (
 # perform temporary registrations.
 REGISTER_FACTORY_TEST_ALLOWLIST = (
     "./test/common/config/registry_test.cc", "./test/integration/clusters/",
-    "./test/integration/filters/")
+    "./test/integration/filters/", "./test/integration/load_balancers/")
 
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_ALLOWLIST = (
@@ -257,6 +257,8 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/redis_proxy",
   "extensions/filters/network/kafka",
   "extensions/filters/network/kafka/broker",
+  "extensions/filters/network/kafka/mesh",
+  "extensions/filters/network/kafka/mesh/command_handlers",
   "extensions/filters/network/kafka/protocol",
   "extensions/filters/network/kafka/serialization",
   "extensions/filters/network/mongo_proxy",
