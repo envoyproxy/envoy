@@ -539,14 +539,6 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
   }
 
   // Determine the final name based on the prefix and the passed name.
-  //
-  // Note that we can do map.find(final_name.c_str()), but we cannot do
-  // map[final_name.c_str()] as the char*-keyed maps would then save the pointer
-  // to a temporary, and address sanitization errors would follow. Instead we
-  // must do a find() first, using the value if it succeeds. If it fails, then
-  // after we construct the stat we can insert it into the required maps. This
-  // strategy costs an extra hash lookup for each miss, but saves time
-  // re-copying the string and significant memory overhead.
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   Stats::StatName final_stat_name = joiner.nameWithTags();
 
@@ -600,12 +592,6 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
 
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
-  //
-  // Note that we can do map.find(final_name.c_str()), but we cannot do
-  // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
-  // a temporary, and address sanitization errors would follow. Instead we must
-  // do a find() first, using that if it succeeds. If it fails, then after we
-  // construct the stat we can insert it into the required maps.
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   StatName final_stat_name = joiner.nameWithTags();
 
@@ -617,7 +603,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   StatRefMap<Gauge>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_cache_) {
-    TlsCacheEntry& entry = parent_.tlsCache().scope_cache_[this->scope_id_];
+    TlsCacheEntry& entry = parent_.tlsCache().insertScope(this->scope_id_);
     tls_cache = &entry.gauges_;
     tls_rejected_stats = &entry.rejected_stats_;
   }
@@ -642,13 +628,6 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
 
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
-  //
-  // Note that we can do map.find(final_name.c_str()), but we cannot do
-  // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
-  // a temporary, and address sanitization errors would follow. Instead we must
-  // do a find() first, using that if it succeeds. If it fails, then after we
-  // construct the stat we can insert it into the required maps.
-
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   StatName final_stat_name = joiner.nameWithTags();
 
@@ -660,7 +639,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
   StatNameHashMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_cache_) {
-    TlsCacheEntry& entry = parent_.tlsCache().scope_cache_[this->scope_id_];
+    TlsCacheEntry& entry = parent_.tlsCache().insertScope(this->scope_id_);
     tls_cache = &entry.parent_histograms_;
     auto iter = tls_cache->find(final_stat_name);
     if (iter != tls_cache->end()) {
@@ -720,14 +699,6 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
   }
 
   // Determine the final name based on the prefix and the passed name.
-  //
-  // Note that we can do map.find(final_name.c_str()), but we cannot do
-  // map[final_name.c_str()] as the char*-keyed maps would then save the pointer
-  // to a temporary, and address sanitization errors would follow. Instead we
-  // must do a find() first, using the value if it succeeds. If it fails, then
-  // after we construct the stat we can insert it into the required maps. This
-  // strategy costs an extra hash lookup for each miss, but saves time
-  // re-copying the string and significant memory overhead.
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   Stats::StatName final_stat_name = joiner.nameWithTags();
 
