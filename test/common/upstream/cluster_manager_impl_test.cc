@@ -524,10 +524,7 @@ public:
     for (int i = first; i <= last; i++) {
       if (envoy::config::cluster::v3::Cluster::LbPolicy_IsValid(i)) {
         auto policy = static_cast<envoy::config::cluster::v3::Cluster::LbPolicy>(i);
-        if (policy !=
-            envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB) {
-          policies.push_back(policy);
-        }
+        policies.push_back(policy);
       }
     }
     return policies;

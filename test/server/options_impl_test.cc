@@ -292,8 +292,8 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // 5. hot restart version - print the hot restart version and exit.
   const uint32_t options_not_in_proto = 5;
 
-  // There are two deprecated options: "max_stats" and "max_obj_name_len".
-  const uint32_t deprecated_options = 2;
+  // There are no deprecated options currently, add here as needed.
+  const uint32_t deprecated_options = 0;
 
   EXPECT_EQ(options->count() - options_not_in_proto,
             command_line_options->GetDescriptor()->field_count() - deprecated_options);
