@@ -43,5 +43,5 @@ py_binary(
 
 protodoc_rule(
     name = "api_v3_protodoc",
-    deps = ["@envoy_api_canonical//:v3_protos"],
+    deps = ["@envoy_api//:v3_protos"],
 )
