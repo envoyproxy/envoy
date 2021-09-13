@@ -63,14 +63,15 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
-      [&quic_stat_names, &scope](HttpConnPoolImplBase* pool, spdlog::logger& logger)
-          -> ::Envoy::ConnectionPool::ActiveClientPtr {
-        ENVOY_LOG_TO_LOGGER(logger, debug, "Creating Http/3 client");
+      [&quic_stat_names,
+       &scope](HttpConnPoolImplBase* pool) -> ::Envoy::ConnectionPool::ActiveClientPtr {
+        ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), debug,
+                            "Creating Http/3 client");
         // If there's no ssl context, the secrets are not loaded. Fast-fail by returning null.
         auto factory = &pool->host()->transportSocketFactory();
         ASSERT(dynamic_cast<Quic::QuicClientTransportSocketFactory*>(factory) != nullptr);
         if (static_cast<Quic::QuicClientTransportSocketFactory*>(factory)->sslCtx() == nullptr) {
-          ENVOY_LOG_TO_LOGGER(logger, warn,
+          ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), warn,
                               "Failed to create Http/3 client. Transport socket "
                               "factory is not configured correctly.");
           return nullptr;

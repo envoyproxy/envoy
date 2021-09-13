@@ -141,8 +141,8 @@ public:
  */
 class FixedHttpConnPoolImpl : public HttpConnPoolImplBase {
 public:
-  using CreateClientFn = std::function<Envoy::ConnectionPool::ActiveClientPtr(
-      HttpConnPoolImplBase* pool, spdlog::logger& logger)>;
+  using CreateClientFn =
+      std::function<Envoy::ConnectionPool::ActiveClientPtr(HttpConnPoolImplBase* pool)>;
   using CreateCodecFn = std::function<CodecClientPtr(Upstream::Host::CreateConnectionData& data,
                                                      HttpConnPoolImplBase* pool)>;
 
@@ -163,7 +163,7 @@ public:
   }
 
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override {
-    return client_fn_(this, ENVOY_LOGGER());
+    return client_fn_(this);
   }
 
   absl::string_view protocolDescription() const override {

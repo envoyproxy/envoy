@@ -31,9 +31,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::ClusterConnectivityState& state) {
   return std::make_unique<FixedHttpConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
-      [](HttpConnPoolImplBase* pool, spdlog::logger& /*logger*/) {
-        return std::make_unique<ActiveClient>(*pool);
-      },
+      [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
         CodecClientPtr codec{new CodecClientProd(CodecType::HTTP2, std::move(data.connection_),
                                                  data.host_description_, pool->dispatcher(),
