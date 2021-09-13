@@ -2456,7 +2456,11 @@ TEST_F(LuaHttpFilterTest, LogTableInsteadOfString) {
   setup(LOG_TABLE);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::err, StrEq("[string \"...\"]:3: bad argument #1 to 'logTrace' (string expected, got table)")));
+  EXPECT_CALL(
+      *filter_,
+      scriptLog(
+          spdlog::level::err,
+          StrEq("[string \"...\"]:3: bad argument #1 to 'logTrace' (string expected, got table)")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
