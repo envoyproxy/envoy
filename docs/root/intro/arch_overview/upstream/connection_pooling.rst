@@ -74,8 +74,12 @@ then HTTP/3 connections will only be attempted to servers which
 advertise HTTP/3 support either via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`, (eventually
 the `HTTPS DNS resource record<https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>` or "QUIC hints"
 which will be manually configured).
-If no such advertisement exists, then HTTP/2 or HTTP/1 will be used instead. Further,
-HTTP/3 runs over QUIC (which uses UDP) and not over TCP (which HTTP/1 and HTTP/2 use).
+If no such advertisement exists, then HTTP/2 or HTTP/1 will be used instead.
+
+If no alternate protocol cache is configured, then HTTP/3 connections will be attempted to
+all servers, even though which do not advertise HTTP/3.
+
+Further, HTTP/3 runs over QUIC (which uses UDP) and not over TCP (which HTTP/1 and HTTP/2 use).
 It is not uncommon for network devices to block UDP traffic, and hence block HTTP/3. This
 means that upstream HTTP/3 connection attempts might be blocked by the network and will fall
 back to using HTTP/2 or HTTP/1.  This path is alpha and rapidly undergoing improvements with the goal of having
