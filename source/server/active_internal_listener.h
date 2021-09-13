@@ -38,8 +38,10 @@ public:
   class NetworkInternalListener : public Network::Listener {
 
     void disable() override {
-      // TODO(lambdai): think about how to elegantly disable internal listener. (Queue socket or
-      // close socket immediately?)
+      // Similar to the listeners that does not bind to port. Accept is not driven by OS io event so
+      // the disable is not working.
+      // TODO(lambdai): Explore the approach to elegantly disable internal listener. Maybe an user
+      // space accept queue should be put here.
       ENVOY_LOG(debug, "Warning: the internal listener cannot be disabled.");
     }
 
