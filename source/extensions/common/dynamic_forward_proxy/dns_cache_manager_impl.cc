@@ -26,10 +26,7 @@ DnsCacheSharedPtr DnsCacheManagerImpl::getCache(
     return existing_cache->second.cache_;
   }
 
-  DnsCacheSharedPtr new_cache = std::make_shared<DnsCacheImpl>(
-      context_.dispatcher(), context_.threadLocal(), context_.api().randomGenerator(),
-      context_.api().fileSystem(), context_.runtime(), context_.scope(),
-      context_.messageValidationVisitor(), config);
+  DnsCacheSharedPtr new_cache = std::make_shared<DnsCacheImpl>(context_, config);
   caches_.emplace(config.name(), ActiveCache{config, new_cache});
   return new_cache;
 }
