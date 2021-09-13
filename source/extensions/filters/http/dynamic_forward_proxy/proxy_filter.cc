@@ -125,11 +125,9 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     ASSERT(cache_load_handle_ == nullptr);
     ENVOY_STREAM_LOG(debug, "DNS cache entry already loaded, continuing", *decoder_callbacks_);
 
-    if (config_->saveUpstreamAddress()) {
-      auto const& host = config_->cache().getHost(headers.Host()->value().getStringView());
-      if (host.has_value()) {
-        addHostAddressToFilterState(host.value()->address());
-      }
+    auto const& host = config_->cache().getHost(headers.Host()->value().getStringView());
+    if (host.has_value()) {
+      addHostAddressToFilterState(host.value()->address());
     }
 
     return Http::FilterHeadersStatus::Continue;
@@ -151,6 +149,11 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
 void ProxyFilter::addHostAddressToFilterState(
     const Network::Address::InstanceConstSharedPtr& address) {
+
+  if (!config_->saveUpstreamAddress()) {
+    return;
+  }
+
   if (!decoder_callbacks_ || !address) {
     ENVOY_LOG_MISC(warn, "Bad parameter - decoder callbacks or address");
     return;
@@ -187,9 +190,7 @@ void ProxyFilter::onLoadDnsCacheComplete(
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();
 
-  if (config_->saveUpstreamAddress()) {
-    addHostAddressToFilterState(host_info->address());
-  }
+  addHostAddressToFilterState(host_info->address());
 
   decoder_callbacks_->continueDecoding();
 }
