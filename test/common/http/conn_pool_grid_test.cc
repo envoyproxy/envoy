@@ -708,9 +708,14 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{1, 0}));
+#if defined(__APPLE__) || defined(WIN32)
+  EXPECT_CALL(os_sys_calls, setsocketblocking(1, false))
+      .WillOnce(Return(Api::SysCallIntResult{1, 0}));
+#endif
   EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));
+
   EXPECT_CALL(os_sys_calls, close(1)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   ConnectionPool::Cancellable* cancel = (**optional_it1)->newStream(decoder_, callbacks_);
   EXPECT_EQ(nullptr, cancel);
