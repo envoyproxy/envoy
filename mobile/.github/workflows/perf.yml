@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-18.04
     timeout-minutes: 90
     container:
-      image: envoyproxy/envoy-build-ubuntu:e33c93e6d79804bf95ff80426d10bdcc9096c785
+      image: envoyproxy/envoy-build-ubuntu:b51ac7a0f2cb5dd729984a379a301ce029ac765d
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-18.04
     timeout-minutes: 90
     container:
-      image: envoyproxy/envoy-build-ubuntu:e33c93e6d79804bf95ff80426d10bdcc9096c785
+      image: envoyproxy/envoy-build-ubuntu:b51ac7a0f2cb5dd729984a379a301ce029ac765d
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-18.04
     timeout-minutes: 30
     container:
-      image: envoyproxy/envoy-build-ubuntu:e33c93e6d79804bf95ff80426d10bdcc9096c785
+      image: envoyproxy/envoy-build-ubuntu:b51ac7a0f2cb5dd729984a379a301ce029ac765d
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v2
