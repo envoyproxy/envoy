@@ -92,7 +92,7 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
   Network::FilterStatus onData(Network::ListenerFilterBuffer&) override;
-  uint64_t inspectSize() const override { return MAX_PROXY_PROTO_LEN_V2; }
+  uint64_t maxReadBytes() const override { return MAX_PROXY_PROTO_LEN_V2; }
 
 private:
   static const size_t MAX_PROXY_PROTO_LEN_V2 =

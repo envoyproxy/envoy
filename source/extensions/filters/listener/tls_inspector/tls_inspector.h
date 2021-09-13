@@ -77,7 +77,7 @@ public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
   Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
-  uint64_t inspectSize() const override { return Config::TLS_MAX_CLIENT_HELLO; }
+  uint64_t maxReadBytes() const override { return Config::TLS_MAX_CLIENT_HELLO; }
 
 private:
   ParseState parseClientHello(const void* data, size_t len);

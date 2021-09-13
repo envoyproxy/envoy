@@ -108,7 +108,7 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
           break;
         } else {
           // There may already have data peeked due to previous filter.
-          if ((*iter_)->inspectSize() > 0 && listener_filter_buffer_->length() > 0) {
+          if ((*iter_)->maxReadBytes() > 0 && listener_filter_buffer_->length() > 0) {
             Network::FilterStatus status = (*iter_)->onData(*listener_filter_buffer_);
             // The filter needn't to inspect more data, then go to next filter.
             if (status == Network::FilterStatus::Continue) {
