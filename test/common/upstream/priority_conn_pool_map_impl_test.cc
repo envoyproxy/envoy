@@ -108,7 +108,7 @@ TEST_F(PriorityConnPoolMapImplTest, TestClearEmptiesOut) {
   test_map->getPool(ResourcePriority::Default, 2, getBasicFactory());
   test_map->clear();
 
-  EXPECT_EQ(test_map->size(), 0);
+  EXPECT_TRUE(test_map->empty());
 }
 
 TEST_F(PriorityConnPoolMapImplTest, TestErase) {
@@ -124,7 +124,7 @@ TEST_F(PriorityConnPoolMapImplTest, TestErase) {
   EXPECT_EQ(2, test_map->size());
   EXPECT_TRUE(test_map->erasePool(ResourcePriority::Default, 1));
   EXPECT_TRUE(test_map->erasePool(ResourcePriority::High, 1));
-  EXPECT_EQ(0, test_map->size());
+  EXPECT_TRUE(test_map->empty());
   EXPECT_NE(pool_ptr,
             &test_map->getPool(ResourcePriority::High, 1, getBasicFactory()).value().get());
 }

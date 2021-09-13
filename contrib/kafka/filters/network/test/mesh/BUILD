@@ -14,6 +14,16 @@ licenses(["notice"])  # Apache 2
 envoy_contrib_package()
 
 envoy_cc_test(
+    name = "config_unit_test",
+    srcs = ["config_unit_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//contrib/kafka/filters/network/source/mesh:config_lib",
+        "//test/mocks/server:factory_context_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "filter_unit_test",
     srcs = ["filter_unit_test.cc"],
     tags = ["skip_on_windows"],
@@ -71,5 +81,14 @@ envoy_cc_test_library(
     tags = ["skip_on_windows"],
     deps = [
         envoy_external_dep_path("librdkafka"),
+    ],
+)
+
+envoy_cc_test(
+    name = "upstream_config_unit_test",
+    srcs = ["upstream_config_unit_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//contrib/kafka/filters/network/source/mesh:upstream_config_lib",
     ],
 )

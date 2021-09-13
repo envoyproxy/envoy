@@ -30,8 +30,7 @@ public:
 
       auto policy = static_cast<envoy::config::cluster::v3::Cluster::LbPolicy>(i);
 
-      if (policy == envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB ||
-          policy == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED ||
+      if (policy == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED ||
           policy == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
         continue;
       }
