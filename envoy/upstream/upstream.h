@@ -197,6 +197,8 @@ using HealthyHostVector = Phantom<HostVector, Healthy>;
 using DegradedHostVector = Phantom<HostVector, Degraded>;
 using ExcludedHostVector = Phantom<HostVector, Excluded>;
 using HostMap = absl::flat_hash_map<std::string, Upstream::HostSharedPtr>;
+using HostMapSharedPtr = std::shared_ptr<HostMap>;
+using HostMapConstSharedPtr = std::shared_ptr<const HostMap>;
 using HostVectorSharedPtr = std::shared_ptr<HostVector>;
 using HostVectorConstSharedPtr = std::shared_ptr<const HostVector>;
 
@@ -425,6 +427,12 @@ public:
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
 
   /**
+   * @return HostMapConstSharedPtr read only cross priority host map that indexed by host address
+   * string.
+   */
+  virtual HostMapConstSharedPtr crossPriorityHostMap() const PURE;
+
+  /**
    * Parameter class for updateHosts.
    */
   struct UpdateHostsParams {
@@ -447,11 +455,14 @@ public:
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
    * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+   * @param cross_priority_host_map read only cross-priority host map which is created in the main
+   * thread and shared by all the worker threads.
    */
-  virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
+  virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
-                           absl::optional<uint32_t> overprovisioning_factor) PURE;
+                           absl::optional<uint32_t> overprovisioning_factor,
+                           HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
   /**
    * Callback provided during batch updates that can be used to update hosts.
@@ -469,7 +480,7 @@ public:
      * @param hosts_removed supplies the hosts removed since the last update.
      * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
      */
-    virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
+    virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
                              absl::optional<uint32_t> overprovisioning_factor) PURE;
@@ -692,6 +703,8 @@ using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOption
  */
 class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
+class TypedLoadBalancerFactory;
+
 /**
  * Information about a given upstream cluster.
  */
@@ -785,6 +798,19 @@ public:
   std::shared_ptr<const Derived> extensionProtocolOptionsTyped(const std::string& name) const {
     return std::dynamic_pointer_cast<const Derived>(extensionProtocolOptions(name));
   }
+
+  /**
+   * @return const envoy::config::cluster::v3::LoadBalancingPolicy_Policy& the load balancing policy
+   * to use for this cluster.
+   */
+  virtual const envoy::config::cluster::v3::LoadBalancingPolicy_Policy&
+  loadBalancingPolicy() const PURE;
+
+  /**
+   * @return the load balancer factory for this cluster if the load balancing type is
+   * LOAD_BALANCING_POLICY_CONFIG.
+   */
+  virtual TypedLoadBalancerFactory* loadBalancerFactory() const PURE;
 
   /**
    * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for

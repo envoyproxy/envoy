@@ -141,7 +141,7 @@ private:
     Http::ResponseHeaderMapPtr response_headers_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
-    Network::SocketAddressProviderSharedPtr local_address_provider_;
+    Network::ConnectionInfoProviderSharedPtr local_connection_info_provider_;
     bool expect_reset_{};
     bool reuse_connection_ = false;
     bool request_in_flight_ = false;
@@ -163,7 +163,8 @@ private:
 
   const std::string path_;
   const std::string host_value_;
-  absl::optional<Matchers::StringMatcherImpl> service_name_matcher_;
+  absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
+      service_name_matcher_;
   Router::HeaderParserPtr request_headers_parser_;
   const HttpStatusChecker http_status_checker_;
 

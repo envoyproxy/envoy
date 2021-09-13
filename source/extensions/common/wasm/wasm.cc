@@ -11,10 +11,6 @@
 
 #include "absl/strings/str_cat.h"
 
-#define WASM_CONTEXT(_c)                                                                           \
-  static_cast<Context*>(proxy_wasm::exports::ContextOrEffectiveContext(                            \
-      static_cast<proxy_wasm::ContextBase*>((void)_c, proxy_wasm::current_context_)))
-
 using proxy_wasm::FailState;
 using proxy_wasm::Word;
 
@@ -152,8 +148,8 @@ Wasm::~Wasm() {
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-Word resolve_dns(void* raw_context, Word dns_address_ptr, Word dns_address_size, Word token_ptr) {
-  auto context = WASM_CONTEXT(raw_context);
+Word resolve_dns(Word dns_address_ptr, Word dns_address_size, Word token_ptr) {
+  auto context = static_cast<Context*>(proxy_wasm::contextOrEffectiveContext());
   auto root_context = context->isRootContext() ? context : context->rootContext();
   auto address = context->wasmVm()->getMemory(dns_address_ptr, dns_address_size);
   if (!address) {

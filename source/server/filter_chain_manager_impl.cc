@@ -463,7 +463,7 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
 
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
-  const auto& address = socket.addressProvider().localAddress();
+  const auto& address = socket.connectionInfoProvider().localAddress();
 
   const Network::FilterChain* best_match_filter_chain = nullptr;
   // Match on destination port (only for IP addresses).
@@ -493,7 +493,7 @@ FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket)
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinationIP(
     const DestinationIPsTrie& destination_ips_trie, const Network::ConnectionSocket& socket) const {
-  auto address = socket.addressProvider().localAddress();
+  auto address = socket.connectionInfoProvider().localAddress();
   if (address->type() != Network::Address::Type::Ip) {
     address = fakeAddress();
   }
@@ -582,7 +582,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForApplicatio
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDirectSourceIP(
     const DirectSourceIPsTrie& direct_source_ips_trie,
     const Network::ConnectionSocket& socket) const {
-  auto address = socket.addressProvider().directRemoteAddress();
+  auto address = socket.connectionInfoProvider().directRemoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     address = fakeAddress();
   }
@@ -632,7 +632,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAndPort(
     const SourceIPsTrie& source_ips_trie, const Network::ConnectionSocket& socket) const {
-  auto address = socket.addressProvider().remoteAddress();
+  auto address = socket.connectionInfoProvider().remoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     address = fakeAddress();
   }

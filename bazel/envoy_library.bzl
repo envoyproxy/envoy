@@ -71,6 +71,14 @@ def envoy_cc_extension(
         visibility = visibility,
     )
 
+def envoy_cc_contrib_extension(
+        name,
+        tags = [],
+        extra_visibility = [],
+        visibility = ["//:contrib_library"],
+        **kwargs):
+    envoy_cc_extension(name, tags, extra_visibility, visibility, **kwargs)
+
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(
         name,

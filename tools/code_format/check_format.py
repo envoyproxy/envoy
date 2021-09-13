@@ -23,6 +23,7 @@ EXCLUDED_PREFIXES = (
     "./bazel-",
     "./.cache",
     "./source/extensions/extensions_build_config.bzl",
+    "./contrib/contrib_build_config.bzl",
     "./bazel/toolchains/configs/",
     "./tools/testdata/check_format/",
     "./tools/pyformat/",
@@ -63,15 +64,13 @@ REAL_TIME_ALLOWLIST = (
 # perform temporary registrations.
 REGISTER_FACTORY_TEST_ALLOWLIST = (
     "./test/common/config/registry_test.cc", "./test/integration/clusters/",
-    "./test/integration/filters/")
+    "./test/integration/filters/", "./test/integration/load_balancers/")
 
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_ALLOWLIST = (
-    "./source/common/config/version_converter.cc",
     "./source/common/protobuf/utility.cc",
     "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
     "./test/common/protobuf/utility_test.cc",
-    "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
     "./test/extensions/filters/common/expr/context_test.cc",
@@ -97,8 +96,8 @@ STD_REGEX_ALLOWLIST = (
     "./source/common/common/regex.cc", "./source/common/stats/tag_extractor_impl.h",
     "./source/common/stats/tag_extractor_impl.cc",
     "./source/common/formatter/substitution_formatter.cc",
-    "./source/extensions/filters/http/squash/squash_filter.h",
-    "./source/extensions/filters/http/squash/squash_filter.cc", "./source/server/admin/utils.h",
+    "./contrib/squash/filters/http/source/squash_filter.h",
+    "./contrib/squash/filters/http/source/squash_filter.cc", "./source/server/admin/utils.h",
     "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
     "./source/server/admin/stats_handler.cc", "./source/server/admin/prometheus_stats.h",
     "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
@@ -176,6 +175,7 @@ MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*
 HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
 TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
 EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
+CONTRIB_CODEOWNERS_REGEX = re.compile(r'(/contrib/[^@]*\s+)(@.*)')
 COMMENT_REGEX = re.compile(r"//|\*")
 DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
@@ -257,6 +257,8 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/redis_proxy",
   "extensions/filters/network/kafka",
   "extensions/filters/network/kafka/broker",
+  "extensions/filters/network/kafka/mesh",
+  "extensions/filters/network/kafka/mesh/command_handlers",
   "extensions/filters/network/kafka/protocol",
   "extensions/filters/network/kafka/serialization",
   "extensions/filters/network/mongo_proxy",
@@ -1086,12 +1088,19 @@ class FormatChecker:
         # Sanity check CODEOWNERS.  This doesn't need to be done in a multi-threaded
         # manner as it is a small and limited list.
         source_prefix = './source/'
-        full_prefix = './source/extensions/'
+        core_extensions_full_prefix = './source/extensions/'
         # Check to see if this directory is a subdir under /source/extensions
         # Also ignore top level directories under /source/extensions since we don't
         # need owners for source/extensions/access_loggers etc, just the subdirectories.
-        if dir_name.startswith(full_prefix) and '/' in dir_name[len(full_prefix):]:
+        if dir_name.startswith(
+                core_extensions_full_prefix) and '/' in dir_name[len(core_extensions_full_prefix):]:
             self.check_owners(dir_name[len(source_prefix):], owned_directories, error_messages)
+
+        # For contrib extensions we track ownership at the top level only.
+        contrib_prefix = './contrib/'
+        if dir_name.startswith(contrib_prefix):
+            top_level = pathlib.PurePath('/', *pathlib.PurePath(dir_name).parts[:2], '/')
+            self.check_owners(str(top_level), owned_directories, error_messages)
 
         for file_name in names:
             if dir_name.startswith("./api") and self.is_starlark_file(file_name):
@@ -1214,6 +1223,30 @@ if __name__ == "__main__":
                                 "Extensions require at least one maintainer OWNER:\n"
                                 "    {}".format(line))
 
+                    m = CONTRIB_CODEOWNERS_REGEX.search(line)
+                    if m is not None and not line.startswith('#'):
+                        stripped_path = m.group(1).strip()
+                        if not stripped_path.endswith('/'):
+                            error_messages.append(
+                                "Contrib CODEOWNERS entry '{}' must end in '/'".format(
+                                    stripped_path))
+                            continue
+
+                        if not (stripped_path.count('/') == 3 or
+                                (stripped_path.count('/') == 4
+                                 and stripped_path.startswith('/contrib/common/'))):
+                            error_messages.append(
+                                "Contrib CODEOWNERS entry '{}' must be 2 directories deep unless in /contrib/common/ and then it can be 3 directories deep"
+                                .format(stripped_path))
+                            continue
+
+                        owned.append(stripped_path)
+                        owners = re.findall('@\S+', m.group(2).strip())
+                        if len(owners) < 2:
+                            error_messages.append(
+                                "Contrib extensions require at least 2 owners in CODEOWNERS:\n"
+                                "    {}".format(line))
+
             return owned
         except IOError:
             return []  # for the check format tests.
@@ -1222,9 +1255,15 @@ if __name__ == "__main__":
     error_messages = []
     owned_directories = owned_directories(error_messages)
     if os.path.isfile(args.target_path):
-        if not args.target_path.startswith(EXCLUDED_PREFIXES) and args.target_path.endswith(
-                SUFFIXES):
-            error_messages += format_checker.check_format("./" + args.target_path)
+        # All of our EXCLUDED_PREFIXES start with "./", but the provided
+        # target path argument might not. Add it here if it is missing,
+        # and use that normalized path for both lookup and `check_format`.
+        normalized_target_path = args.target_path
+        if not normalized_target_path.startswith("./"):
+            normalized_target_path = "./" + normalized_target_path
+        if not normalized_target_path.startswith(
+                EXCLUDED_PREFIXES) and normalized_target_path.endswith(SUFFIXES):
+            error_messages += format_checker.check_format(normalized_target_path)
     else:
         results = []
 

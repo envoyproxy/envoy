@@ -6,7 +6,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/matcher/matcher.h"
 
@@ -83,7 +82,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     // Fallback to use the deprecated match_config field and upgrade (wire cast) it to the new
     // MatchPredicate which is backward compatible with the old MatchPredicate originally
     // introduced in the Tap filter.
-    Config::VersionConverter::upgrade(proto_config.match_config(), match);
+    MessageUtil::wireCast(proto_config.match_config(), match);
   } else {
     throw EnvoyException(fmt::format("Neither match nor match_config is set in TapConfig: {}",
                                      proto_config.DebugString()));

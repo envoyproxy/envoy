@@ -18,7 +18,7 @@ public:
 
   typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
-    ENVOY_LOG(debug, "Attempting to match {}", input);
+    ENVOY_LOG(trace, "Attempting to match {}", input);
     if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
       return {MatchState::UnableToMatch, absl::nullopt};
     }

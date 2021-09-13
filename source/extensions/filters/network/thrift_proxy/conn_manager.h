@@ -154,7 +154,7 @@ private:
                                parent_.stats_.request_time_ms_, parent_.time_source_)),
           stream_id_(parent_.random_generator_.random()),
           stream_info_(parent_.time_source_,
-                       parent_.read_callbacks_->connection().addressProviderSharedPtr()),
+                       parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr()),
           local_response_sent_{false}, pending_transport_end_{false} {
       parent_.stats_.request_active_.inc();
     }

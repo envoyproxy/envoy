@@ -271,13 +271,17 @@ public:
     EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, _, _, _, _, _, _))
         .WillOnce(Return(error_code));
 
-    EXPECT_EQ(nullptr, resolver_->resolve(
-                           "foo.com", Network::DnsLookupFamily::Auto,
-                           [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) -> void {
-                             // This callback should never be executed.
-                             FAIL();
-                           }));
+    bool callback_called = false;
+    EXPECT_EQ(nullptr, resolver_->resolve("foo.com", Network::DnsLookupFamily::Auto,
+                                          [&](DnsResolver::ResolutionStatus status,
+                                              std::list<DnsResponse>&& responses) -> void {
+                                            EXPECT_EQ(DnsResolver::ResolutionStatus::Failure,
+                                                      status);
+                                            EXPECT_TRUE(responses.empty());
+                                            callback_called = true;
+                                          }));
 
+    EXPECT_TRUE(callback_called);
     checkErrorStat(error_code);
   }
 

@@ -41,7 +41,7 @@ public:
 
   HttpSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints")),
+            "envoy.service.endpoint.v3.EndpointDiscoveryService.FetchEndpoints")),
         timer_(new Event::MockTimer()), http_request_(&cm_.thread_local_cluster_.async_client_) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
@@ -54,8 +54,8 @@ public:
     subscription_ = std::make_unique<HttpSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
         std::chrono::milliseconds(1000), *method_descriptor_,
-        Config::TypeUrl::get().ClusterLoadAssignment, envoy::config::core::v3::ApiVersion::AUTO,
-        callbacks_, resource_decoder_, stats_, init_fetch_timeout, validation_visitor_);
+        Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, resource_decoder_, stats_,
+        init_fetch_timeout, validation_visitor_);
   }
 
   ~HttpSubscriptionTestHarness() override {
@@ -78,7 +78,7 @@ public:
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
                     request->headers().getContentTypeValue());
           EXPECT_EQ("eds_cluster", request->headers().getHostValue());
-          EXPECT_EQ("/v2/discovery:endpoints", request->headers().getPathValue());
+          EXPECT_EQ("/v3/discovery:endpoints", request->headers().getPathValue());
           std::string expected_request = "{";
           if (!version_.empty()) {
             expected_request += "\"version_info\":\"" + version + "\",";

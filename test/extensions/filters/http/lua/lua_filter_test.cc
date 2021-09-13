@@ -1795,7 +1795,7 @@ TEST_F(LuaHttpFilterTest, GetRequestedServerName) {
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
   absl::string_view server_name = "foo.example.com";
-  stream_info_.downstream_address_provider_->setRequestedServerName(server_name);
+  stream_info_.downstream_connection_info_provider_->setRequestedServerName(server_name);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo.example.com")));
@@ -1913,7 +1913,7 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
 
   const auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(connection_info);
 
   EXPECT_CALL(*connection_info, peerCertificatePresented()).WillOnce(Return(true));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("peerCertificatePresented")));
@@ -2011,7 +2011,7 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnectionOnPlainConnecti
   setup(SCRIPT);
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(nullptr);
 
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("downstreamSslConnection is nil")));
 
@@ -2034,7 +2034,7 @@ TEST_F(LuaHttpFilterTest, SurviveMultipleDownstreamSslConnectionCalls) {
 
   const auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(connection_info);
 
   for (uint64_t i = 0; i < 200; i++) {
     EXPECT_CALL(*filter_,

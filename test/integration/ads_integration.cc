@@ -21,17 +21,14 @@ using testing::AssertionResult;
 
 namespace Envoy {
 
-AdsIntegrationTest::AdsIntegrationTest(envoy::config::core::v3::ApiVersion resource_api_version,
-                                       envoy::config::core::v3::ApiVersion transport_api_version)
+AdsIntegrationTest::AdsIntegrationTest()
     : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
                           ConfigHelper::adsBootstrap(
-                              sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
-                              resource_api_version, transport_api_version)) {
+                              sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
-  api_version_ = resource_api_version;
   setUpstreamProtocol(Http::CodecType::HTTP2);
 }
 
@@ -39,36 +36,35 @@ void AdsIntegrationTest::TearDown() { cleanUpXdsConnection(); }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::string& name,
                                                                      const std::string& lb_policy) {
-  return ConfigHelper::buildCluster(name, lb_policy, api_version_);
+  return ConfigHelper::buildCluster(name, lb_policy);
 }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildTlsCluster(const std::string& name) {
-  return ConfigHelper::buildTlsCluster(name, "ROUND_ROBIN", api_version_);
+  return ConfigHelper::buildTlsCluster(name, "ROUND_ROBIN");
 }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildRedisCluster(const std::string& name) {
-  return ConfigHelper::buildCluster(name, "MAGLEV", api_version_);
+  return ConfigHelper::buildCluster(name, "MAGLEV");
 }
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
 AdsIntegrationTest::buildClusterLoadAssignment(const std::string& name) {
   return ConfigHelper::buildClusterLoadAssignment(
       name, Network::Test::getLoopbackAddressString(ipVersion()),
-      fake_upstreams_[0]->localAddress()->ip()->port(), api_version_);
+      fake_upstreams_[0]->localAddress()->ip()->port());
 }
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
 AdsIntegrationTest::buildTlsClusterLoadAssignment(const std::string& name) {
   return ConfigHelper::buildClusterLoadAssignment(
-      name, Network::Test::getLoopbackAddressString(ipVersion()), 8443, api_version_);
+      name, Network::Test::getLoopbackAddressString(ipVersion()), 8443);
 }
 
 envoy::config::listener::v3::Listener
 AdsIntegrationTest::buildListener(const std::string& name, const std::string& route_config,
                                   const std::string& stat_prefix) {
-  return ConfigHelper::buildListener(name, route_config,
-                                     Network::Test::getLoopbackAddressString(ipVersion()),
-                                     stat_prefix, api_version_);
+  return ConfigHelper::buildListener(
+      name, route_config, Network::Test::getLoopbackAddressString(ipVersion()), stat_prefix);
 }
 
 envoy::config::listener::v3::Listener
@@ -88,12 +84,12 @@ AdsIntegrationTest::buildRedisListener(const std::string& name, const std::strin
     )EOF",
       name, cluster);
   return ConfigHelper::buildBaseListener(name, Network::Test::getLoopbackAddressString(ipVersion()),
-                                         redis, api_version_);
+                                         redis);
 }
 
 envoy::config::route::v3::RouteConfiguration
 AdsIntegrationTest::buildRouteConfig(const std::string& name, const std::string& cluster) {
-  return ConfigHelper::buildRouteConfig(name, cluster, api_version_);
+  return ConfigHelper::buildRouteConfig(name, cluster);
 }
 
 void AdsIntegrationTest::makeSingleRequest() {
@@ -130,9 +126,6 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
     ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
     ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
   });
-  if (api_version_ == envoy::config::core::v3::ApiVersion::V2 && !fatal_by_default_v2_override_) {
-    config_helper_.enableDeprecatedV2Api();
-  }
   HttpIntegrationTest::initialize();
   if (xds_stream_ == nullptr) {
     createXdsConnection();

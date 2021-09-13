@@ -22,7 +22,7 @@ from sphinx.directives.code import CodeBlock
 import sphinx_rtd_theme
 
 
-class SphinxConfigException(Exception):
+class SphinxConfigError(Exception):
     pass
 
 
@@ -60,7 +60,7 @@ missing_config = (
     or not os.path.exists(os.environ["ENVOY_DOCS_BUILD_CONFIG"]))
 
 if missing_config:
-    raise SphinxConfigException(
+    raise SphinxConfigError(
         "`ENVOY_DOCS_BUILD_CONFIG` env var must be defined, "
         "and point to a valid yaml file")
 
@@ -70,7 +70,7 @@ with open(os.environ["ENVOY_DOCS_BUILD_CONFIG"]) as f:
 
 def _config(key):
     if not configs.get(key):
-        raise SphinxConfigException(f"`{key}` config var must be defined")
+        raise SphinxConfigError(f"`{key}` config var must be defined")
     return configs[key]
 
 
@@ -338,10 +338,21 @@ intersphinx_mapping = {
     'v1.14.7': ('https://www.envoyproxy.io/docs/envoy/v1.14.7', None),
     'v1.15.0': ('https://www.envoyproxy.io/docs/envoy/v1.15.0', None),
     'v1.15.4': ('https://www.envoyproxy.io/docs/envoy/v1.15.4', None),
+    'v1.15.5': ('https://www.envoyproxy.io/docs/envoy/v1.15.5', None),
     'v1.16.0': ('https://www.envoyproxy.io/docs/envoy/v1.16.0', None),
+    'v1.16.1': ('https://www.envoyproxy.io/docs/envoy/v1.16.1', None),
+    'v1.16.2': ('https://www.envoyproxy.io/docs/envoy/v1.16.2', None),
     'v1.16.3': ('https://www.envoyproxy.io/docs/envoy/v1.16.3', None),
+    'v1.16.4': ('https://www.envoyproxy.io/docs/envoy/v1.16.4', None),
+    'v1.16.5': ('https://www.envoyproxy.io/docs/envoy/v1.16.5', None),
     'v1.17.0': ('https://www.envoyproxy.io/docs/envoy/v1.17.0', None),
     'v1.17.1': ('https://www.envoyproxy.io/docs/envoy/v1.17.1', None),
     'v1.17.2': ('https://www.envoyproxy.io/docs/envoy/v1.17.2', None),
-    'v1.18.0': ('https://www.envoyproxy.io/docs/envoy/v1.18.2', None)
+    'v1.17.3': ('https://www.envoyproxy.io/docs/envoy/v1.17.3', None),
+    'v1.17.4': ('https://www.envoyproxy.io/docs/envoy/v1.17.4', None),
+    'v1.18.0': ('https://www.envoyproxy.io/docs/envoy/v1.18.2', None),
+    'v1.18.3': ('https://www.envoyproxy.io/docs/envoy/v1.18.3', None),
+    'v1.18.4': ('https://www.envoyproxy.io/docs/envoy/v1.18.4', None),
+    'v1.19.0': ('https://www.envoyproxy.io/docs/envoy/v1.19.0', None),
+    'v1.19.1': ('https://www.envoyproxy.io/docs/envoy/v1.19.1', None),
 }

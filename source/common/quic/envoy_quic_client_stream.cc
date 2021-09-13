@@ -9,7 +9,6 @@
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/spdy/core/spdy_header_block.h"
-#include "source/common/quic/platform/quic_mem_slice_span_impl.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -44,16 +43,6 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
          "Send buffer limit should be larger than 8KB.");
 }
 
-EnvoyQuicClientStream::EnvoyQuicClientStream(
-    quic::PendingStream* pending, quic::QuicSpdyClientSession* client_session,
-    quic::StreamType type, Http::Http3::CodecStats& stats,
-    const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
-    : quic::QuicSpdyClientStream(pending, client_session, type),
-      EnvoyQuicStream(
-          static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
-          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
-          stats, http3_options) {}
-
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
                                                   bool end_stream) {
   // Required headers must be present. This can only happen by some erroneous processing after the
@@ -76,6 +65,9 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
     }
   }
   WriteHeaders(std::move(spdy_headers), end_stream, nullptr);
+  if (local_end_stream_) {
+    onLocalEndStream();
+  }
   return Http::okStatus();
 }
 
@@ -88,12 +80,27 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
+  Buffer::RawSliceVector raw_slices = data.getRawSlices();
+  absl::InlinedVector<quic::QuicMemSlice, 4> quic_slices;
+  quic_slices.reserve(raw_slices.size());
+  for (auto& slice : raw_slices) {
+    ASSERT(slice.len_ != 0);
+    // Move each slice into a stand-alone buffer.
+    // TODO(danzh): investigate the cost of allocating one buffer per slice.
+    // If it turns out to be expensive, add a new function to free data in the middle in buffer
+    // interface and re-design QuicMemSliceImpl.
+    quic_slices.emplace_back(quic::QuicMemSliceImpl(data, slice.len_));
+  }
+  absl::Span<quic::QuicMemSlice> span(quic_slices);
   // QUIC stream must take all.
-  WriteBodySlices(quic::QuicMemSliceSpan(quic::QuicMemSliceSpanImpl(data)), end_stream);
+  WriteBodySlices(span, end_stream);
   if (data.length() > 0) {
     // Send buffer didn't take all the data, threshold needs to be adjusted.
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
+  }
+  if (local_end_stream_) {
+    onLocalEndStream();
   }
 }
 
@@ -103,6 +110,7 @@ void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& traile
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
   ScopedWatermarkBufferUpdater updater(this, this);
   WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+  onLocalEndStream();
 }
 
 void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
@@ -145,11 +153,14 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (fin) {
     end_stream_decoded_ = true;
   }
+
+  quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(
-          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_);
+          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_,
+          transform_rst);
   if (headers == nullptr) {
-    onStreamError(close_connection_upon_invalid_header_, quic::QUIC_STREAM_EXCESSIVE_LOAD);
+    onStreamError(close_connection_upon_invalid_header_, transform_rst);
     return;
   }
   const absl::optional<uint64_t> optional_status =
@@ -244,10 +255,12 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
+    quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
     auto trailers = spdyHeaderBlockToEnvoyTrailers<Http::ResponseTrailerMapImpl>(
-        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_);
+        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
+        transform_rst);
     if (trailers == nullptr) {
-      onStreamError(close_connection_upon_invalid_header_, quic::QUIC_STREAM_EXCESSIVE_LOAD);
+      onStreamError(close_connection_upon_invalid_header_, transform_rst);
       return;
     }
     response_decoder_->decodeTrailers(std::move(trailers));
@@ -281,6 +294,7 @@ void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
 }
 
 void EnvoyQuicClientStream::OnClose() {
+  destroy();
   quic::QuicSpdyClientStream::OnClose();
   if (isDoingWatermarkAccounting()) {
     // This is called in the scope of a watermark buffer updater. Clear the
@@ -330,6 +344,8 @@ void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_conn
     Reset(rst_code);
   }
 }
+
+bool EnvoyQuicClientStream::hasPendingData() { return BufferedDataBytes() > 0; }
 
 } // namespace Quic
 } // namespace Envoy

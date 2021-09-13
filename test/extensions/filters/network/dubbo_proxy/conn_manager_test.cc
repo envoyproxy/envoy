@@ -1023,26 +1023,6 @@ TEST_F(ConnectionManagerTest, SendsLocalReplyWithCloseConnection) {
   conn_manager_->sendLocalReply(metadata, direct_response, true);
 }
 
-TEST_F(ConnectionManagerTest, ContinueDecodingWithHalfClose) {
-  initializeFilter();
-  writeHessianRequestMessage(buffer_, true, false, 0x0F);
-
-  config_->setupFilterChain(1, 0);
-  config_->expectOnDestroy();
-  auto& decoder_filter = config_->decoder_filters_[0];
-
-  EXPECT_CALL(*decoder_filter, onMessageDecoded(_, _))
-      .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
-        return FilterStatus::StopIteration;
-      }));
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
-  EXPECT_EQ(conn_manager_->onData(buffer_, true), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
-
-  conn_manager_->continueDecoding();
-}
-
 TEST_F(ConnectionManagerTest, RoutingSuccess) {
   initializeFilter();
   writeHessianRequestMessage(buffer_, false, false, 0x0F);

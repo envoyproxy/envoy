@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
+#include "source/common/http/utility.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
 #include "absl/strings/str_format.h"
@@ -9,6 +10,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+using envoy::extensions::filters::http::ext_proc::v3alpha::ExtProcPerRoute;
 using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
 
 using envoy::service::ext_proc::v3alpha::ImmediateResponse;
@@ -23,7 +25,21 @@ using Http::RequestTrailerMap;
 using Http::ResponseHeaderMap;
 using Http::ResponseTrailerMap;
 
-static const std::string kErrorPrefix = "ext_proc error";
+static const std::string ErrorPrefix = "ext_proc error";
+static const int DefaultImmediateStatus = 200;
+static const std::string FilterName = "envoy.filters.http.ext_proc";
+
+FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
+    : disabled_(config.disabled()) {
+  if (config.has_overrides()) {
+    processing_mode_ = config.overrides().processing_mode();
+  }
+}
+
+void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
+  disabled_ = src.disabled_;
+  processing_mode_ = src.processing_mode_;
+}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -50,6 +66,7 @@ Filter::StreamOpenState Filter::openStream() {
 }
 
 void Filter::onDestroy() {
+  ENVOY_LOG(trace, "onDestroy");
   // Make doubly-sure we no longer use the stream, as
   // per the filter contract.
   processing_complete_ = true;
@@ -89,6 +106,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
 
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
+  mergePerRouteConfig();
   if (end_stream) {
     decoding_state_.setCompleteBodyAvailable(true);
   }
@@ -221,7 +239,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
 
     // At this point we will continue, but with no data, because that will come later
     if (end_stream) {
-      // But we need to buffer the last chunk because it's our last chance to do stuff
+      // But we need to stop iteration for the last chunk because it's our last chance to do stuff
       state.setPaused(true);
       result = FilterDataStatus::StopIterationNoBuffer;
     } else {
@@ -230,8 +248,55 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     break;
   }
   case ProcessingMode::BUFFERED_PARTIAL:
-    ENVOY_LOG(debug, "Ignoring unimplemented request body processing mode");
-    result = FilterDataStatus::Continue;
+    // BUFFERED_PARTIAL mode works as follows:
+    //
+    // 1) As data chunks arrive, we move the data into a new buffer, which we store
+    // in the buffer queue, and continue the filter stream with an empty buffer. This
+    // is the same thing that we do in STREAMING mode.
+    // 2) If end of stream is reached before the queue reaches the buffer limit, we
+    // send the buffered data to the server and essentially behave as if we are in
+    // buffered mode.
+    // 3) If instead the buffer limit is reached before end of stream, then we also
+    // send the buffered data to the server, and raise the watermark to prevent Envoy
+    // from running out of memory while we wait.
+    // 4) It is possible that Envoy will keep sending us data even in that case, so
+    // we must continue to queue data and prepare to re-inject it later.
+    if (state.partialBodyProcessed()) {
+      // We already sent and received the buffer, so everything else just falls through.
+      ENVOY_LOG(trace, "Partial buffer limit reached");
+      result = FilterDataStatus::Continue;
+    } else if (state.callbackState() ==
+               ProcessorState::CallbackState::BufferedPartialBodyCallback) {
+      // More data came in while we were waiting for a callback result. We need
+      // to queue it and deliver it later in case the callback changes the data.
+      state.enqueueStreamingChunk(data, false, false);
+      ENVOY_LOG(trace, "Call in progress for partial mode");
+      state.setPaused(true);
+      result = FilterDataStatus::StopIterationNoBuffer;
+    } else if (end_stream || state.queueOverHighLimit()) {
+      switch (openStream()) {
+      case StreamOpenState::Error:
+        return FilterDataStatus::StopIterationNoBuffer;
+      case StreamOpenState::IgnoreError:
+        return FilterDataStatus::Continue;
+      case StreamOpenState::Ok:
+        // Fall through
+        break;
+      }
+      state.enqueueStreamingChunk(data, false, false);
+      // Put all buffered data so far into one big buffer
+      const auto& all_data = state.consolidateStreamedChunks(true);
+      ENVOY_LOG(debug, "Sending {} bytes of data in buffered partial mode. end_stream = {}",
+                all_data.data.length(), end_stream);
+      sendBodyChunk(state, all_data.data,
+                    ProcessorState::CallbackState::BufferedPartialBodyCallback, end_stream);
+      result = FilterDataStatus::StopIterationNoBuffer;
+      state.setPaused(true);
+    } else {
+      // Keep on running and buffering
+      state.enqueueStreamingChunk(data, false, false);
+      result = FilterDataStatus::Continue;
+    }
     break;
   case ProcessingMode::NONE:
   default:
@@ -414,6 +479,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // We won't be sending anything more to the stream after we
     // receive this message.
     processing_complete_ = true;
+    cleanUpTimers();
     sendImmediateResponse(response->immediate_response());
     message_handled = true;
     break;
@@ -458,7 +524,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
     cleanUpTimers();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
-    errorResponse.set_details(absl::StrFormat("%s: gRPC error %i", kErrorPrefix, status));
+    errorResponse.set_details(absl::StrFormat("%s: gRPC error %i", ErrorPrefix, status));
     sendImmediateResponse(errorResponse);
   }
 }
@@ -491,7 +557,7 @@ void Filter::onMessageTimeout() {
     encoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
-    errorResponse.set_details(absl::StrFormat("%s: per-message timeout exceeded", kErrorPrefix));
+    errorResponse.set_details(absl::StrFormat("%s: per-message timeout exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);
   }
 }
@@ -511,7 +577,11 @@ void Filter::cleanUpTimers() {
 }
 
 void Filter::sendImmediateResponse(const ImmediateResponse& response) {
-  const auto status_code = response.has_status() ? response.status().code() : 200;
+  auto status_code = response.has_status() ? response.status().code() : DefaultImmediateStatus;
+  if (!MutationUtils::isValidHttpStatus(status_code)) {
+    ENVOY_LOG(debug, "Ignoring attempt to set invalid HTTP status {}", status_code);
+    status_code = DefaultImmediateStatus;
+  }
   const auto grpc_status =
       response.has_grpc_status()
           ? absl::optional<Grpc::Status::GrpcStatus>(response.grpc_status().status())
@@ -523,8 +593,36 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   };
 
   sent_immediate_response_ = true;
+  ENVOY_LOG(debug, "Sending local reply with status code {}", status_code);
   encoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), response.body(),
                                      mutate_headers, grpc_status, response.details());
+}
+
+static ProcessingMode allDisabledMode() {
+  ProcessingMode pm;
+  pm.set_request_header_mode(ProcessingMode::SKIP);
+  pm.set_response_header_mode(ProcessingMode::SKIP);
+  return pm;
+}
+
+void Filter::mergePerRouteConfig() {
+  auto&& merged_config = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
+      FilterName, decoder_callbacks_->route(),
+      [](FilterConfigPerRoute& dst, const FilterConfigPerRoute& src) { dst.merge(src); });
+  if (merged_config) {
+    if (merged_config->disabled()) {
+      // Rather than introduce yet another flag, use the processing mode
+      // structure to disable all the callbacks.
+      ENVOY_LOG(trace, "Disabling filter due to per-route configuration");
+      const auto all_disabled = allDisabledMode();
+      decoding_state_.setProcessingMode(all_disabled);
+      encoding_state_.setProcessingMode(all_disabled);
+    } else if (merged_config->processingMode()) {
+      ENVOY_LOG(trace, "Setting new processing mode from per-route configuration");
+      decoding_state_.setProcessingMode(*(merged_config->processingMode()));
+      encoding_state_.setProcessingMode(*(merged_config->processingMode()));
+    }
+  }
 }
 
 std::string responseCaseToString(const ProcessingResponse::ResponseCase response_case) {

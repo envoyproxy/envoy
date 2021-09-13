@@ -635,24 +635,5 @@ TEST(DisableExtensions, DEPRECATED_FEATURE_TEST(IsDisabled)) {
       nullptr);
 }
 
-TEST(FactoryByTypeTest, EarlierVersionConfigType) {
-  envoy::config::filter::http::buffer::v2::Buffer v2_config;
-  auto factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
-      getFactoryByType(v2_config.GetDescriptor()->full_name());
-  EXPECT_NE(factory, nullptr);
-  EXPECT_EQ(factory->name(), "envoy.filters.http.buffer");
-
-  envoy::extensions::filters::http::buffer::v3::Buffer v3_config;
-  factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
-      getFactoryByType(v3_config.GetDescriptor()->full_name());
-  EXPECT_NE(factory, nullptr);
-  EXPECT_EQ(factory->name(), "envoy.filters.http.buffer");
-
-  ProtobufWkt::Any non_api_type;
-  factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
-      getFactoryByType(non_api_type.GetDescriptor()->full_name());
-  EXPECT_EQ(factory, nullptr);
-}
-
 } // namespace
 } // namespace Envoy

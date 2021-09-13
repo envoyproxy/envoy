@@ -103,7 +103,7 @@ void Span::finishSpan() {
 void Span::injectContext(Tracing::TraceContext& trace_context) {
   const std::string xray_header_value =
       fmt::format("Root={};Parent={};Sampled={}", traceId(), id(), sampled() ? "1" : "0");
-  trace_context.setTraceContextReferenceKey(XRayTraceHeader, xray_header_value);
+  trace_context.setByReferenceKey(XRayTraceHeader, xray_header_value);
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& operation_name,

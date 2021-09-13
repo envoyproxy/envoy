@@ -319,21 +319,6 @@ def test_sphinx_runner_sphinx_args(patches):
     assert "sphinx_args" not in runner.__dict__
 
 
-def test_sphinx_runner_tempdir(patches):
-    runner = sphinx_runner.SphinxRunner()
-    patched = patches(
-        "tempfile",
-        prefix="tools.docs.sphinx_runner")
-
-    with patched as (m_temp, ):
-        assert runner.tempdir == m_temp.TemporaryDirectory.return_value
-
-    assert (
-        list(m_temp.TemporaryDirectory.call_args)
-        == [(), {}])
-    assert "tempdir" in runner.__dict__
-
-
 def test_sphinx_runner_validator_path(patches):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
@@ -411,10 +396,19 @@ def test_sphinx_runner_version_string(patches, docs_tag):
     assert "version_string" not in runner.__dict__
 
 
-def test_sphinx_runner_add_arguments():
+def test_sphinx_runner_add_arguments(patches):
     runner = sphinx_runner.SphinxRunner()
     parser = MagicMock()
-    runner.add_arguments(parser)
+    patched = patches(
+        "runner.Runner.add_arguments",
+        prefix="tools.docs.sphinx_runner")
+
+    with patched as (m_super, ):
+        runner.add_arguments(parser)
+
+    assert (
+        list(m_super.call_args)
+        == [(parser, ), {}])
     assert (
         list(list(c) for c in parser.add_argument.call_args_list)
         == [[('--build_sha',), {}],
@@ -591,52 +585,9 @@ def test_sphinx_runner_create_tarball(patches):
         == [(m_html.return_value,), {'arcname': '.'}])
 
 
-@pytest.mark.parametrize("raises", [True, False])
-def test_sphinx_runner_run(patches, raises):
-    runner = sphinx_runner.SphinxRunner()
-    patched = patches(
-        "SphinxRunner.cleanup",
-        "SphinxRunner._run",
-        prefix="tools.docs.sphinx_runner")
-
-    with patched as (m_cleanup, m_run):
-        if raises:
-            m_run.side_effect = Exception("AN ERROR OCCURRED")
-
-        if not raises:
-            assert runner.run() == m_run.return_value
-        else:
-            with pytest.raises(Exception):
-                runner.run()
-
-    assert (
-        list(m_run.call_args)
-        == [(), {}])
-    assert (
-        list(m_cleanup.call_args)
-        == [(), {}])
-
-
-@pytest.mark.parametrize("color", [None, "COLOR"])
-def test_sphinx_runner__color(patches, color):
-    runner = sphinx_runner.SphinxRunner()
-    patched = patches(
-        "Style",
-        ("SphinxRunner.colors", dict(new_callable=PropertyMock)),
-        prefix="tools.docs.sphinx_runner")
-
-    with patched as (m_style, m_colors):
-        assert (
-            runner._color("MSG", color)
-            == f"{m_colors.return_value.__getitem__.return_value}MSG{m_style.RESET_ALL}")
-    assert (
-        list(m_colors.return_value.__getitem__.call_args)
-        == [(color or "chrome",), {}])
-
-
 @pytest.mark.parametrize("check_fails", [True, False])
 @pytest.mark.parametrize("build_fails", [True, False])
-def test_sphinx_runner__run(patches, check_fails, build_fails):
+def test_sphinx_runner_run(patches, check_fails, build_fails):
     runner = sphinx_runner.SphinxRunner()
     patched = patches(
         "print",
@@ -651,6 +602,8 @@ def test_sphinx_runner__run(patches, check_fails, build_fails):
     def _raise(error):
         raise error
 
+    assert runner.run.__wrapped__.__cleansup__
+
     with patched as (m_print, m_os, m_summary, m_check, m_build, m_create, m_config):
         if check_fails:
             _check_error = sphinx_runner.SphinxEnvError("CHECK FAILED")
@@ -658,7 +611,7 @@ def test_sphinx_runner__run(patches, check_fails, build_fails):
         if build_fails:
             _build_error = sphinx_runner.SphinxBuildError("BUILD FAILED")
             m_build.side_effect = lambda: _raise(_build_error)
-        assert runner._run() == (1 if (check_fails or build_fails) else None)
+        assert runner.run() == (1 if (check_fails or build_fails) else None)
 
     assert (
         list(m_check.call_args)
@@ -694,6 +647,23 @@ def test_sphinx_runner__run(patches, check_fails, build_fails):
     assert (
         list(m_create.call_args)
         == [(), {}])
+
+
+@pytest.mark.parametrize("color", [None, "COLOR"])
+def test_sphinx_runner__color(patches, color):
+    runner = sphinx_runner.SphinxRunner()
+    patched = patches(
+        "Style",
+        ("SphinxRunner.colors", dict(new_callable=PropertyMock)),
+        prefix="tools.docs.sphinx_runner")
+
+    with patched as (m_style, m_colors):
+        assert (
+            runner._color("MSG", color)
+            == f"{m_colors.return_value.__getitem__.return_value}MSG{m_style.RESET_ALL}")
+    assert (
+        list(m_colors.return_value.__getitem__.call_args)
+        == [(color or "chrome",), {}])
 
 
 def test_sphinx_runner_main(command_main):

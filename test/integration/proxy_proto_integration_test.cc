@@ -314,30 +314,33 @@ ProxyProtoFilterChainMatchIntegrationTest::ProxyProtoFilterChainMatchIntegration
   });
 }
 
+void ProxyProtoFilterChainMatchIntegrationTest::send(const std::string& data) {
+  initialize();
+
+  // Set verify to false because it is expected that Envoy will immediately disconnect after
+  // receiving the PROXY header, and it is a race whether the `write()` will fail due to
+  // disconnect, or finish the write before receiving the disconnect.
+  constexpr bool verify = false;
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write(data, false, verify));
+  tcp_client->waitForDisconnect();
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoFilterChainMatchIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
 // Validate that source IP and direct source IP match correctly.
 TEST_P(ProxyProtoFilterChainMatchIntegrationTest, MatchDirectSourceAndSource) {
-  initialize();
-
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(tcp_client->write("PROXY TCP4 1.2.3.4 254.254.254.254 12345 1234\r\nhello", false));
-  tcp_client->waitForDisconnect();
-
+  send("PROXY TCP4 1.2.3.4 254.254.254.254 12345 1234\r\nhello");
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::HasSubstr("directsource_localhost_and_source_1.2.3.0/24 -"));
 }
 
 // Test that a mismatched direct source prevents matching a filter chain with a matching source.
 TEST_P(ProxyProtoFilterChainMatchIntegrationTest, MismatchDirectSourceButMatchSource) {
-  initialize();
-
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(tcp_client->write("PROXY TCP4 5.5.5.5 254.254.254.254 12345 1234\r\nhello", false));
-  tcp_client->waitForDisconnect();
-
+  send("PROXY TCP4 5.5.5.5 254.254.254.254 12345 1234\r\nhello");
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::HasSubstr(
                   absl::StrCat("- ", StreamInfo::ResponseCodeDetails::get().FilterChainNotFound)));
@@ -346,12 +349,7 @@ TEST_P(ProxyProtoFilterChainMatchIntegrationTest, MismatchDirectSourceButMatchSo
 // Test that a more specific direct source match prevents matching a filter chain with a less
 // specific direct source match but matching source.
 TEST_P(ProxyProtoFilterChainMatchIntegrationTest, MoreSpecificDirectSource) {
-  initialize();
-
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(tcp_client->write("PROXY TCP4 6.6.6.6 254.254.254.254 12345 1234\r\nhello", false));
-  tcp_client->waitForDisconnect();
-
+  send("PROXY TCP4 6.6.6.6 254.254.254.254 12345 1234\r\nhello");
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::HasSubstr(
                   absl::StrCat("- ", StreamInfo::ResponseCodeDetails::get().FilterChainNotFound)));

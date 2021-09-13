@@ -52,8 +52,7 @@ public:
   // GrpcAccessLoggerCache
   MOCK_METHOD(GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               envoy::config::core::v3::ApiVersion, Common::GrpcAccessLoggerType logger_type,
-               Stats::Scope& scope));
+               Common::GrpcAccessLoggerType logger_type, Stats::Scope& scope));
 };
 
 class AccessLogTest : public testing::Test {
@@ -83,12 +82,11 @@ values:
     config_.mutable_common_config()->set_log_name("test_log");
     config_.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
-    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _, _, _))
+    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _, _))
         .WillOnce(
             [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                        config,
-                   envoy::config::core::v3::ApiVersion, Common::GrpcAccessLoggerType logger_type,
-                   Stats::Scope&) {
+                   Common::GrpcAccessLoggerType logger_type, Stats::Scope&) {
               EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
               EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;

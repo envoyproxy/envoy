@@ -1,7 +1,6 @@
 #include "test/extensions/filters/network/common/fuzz/uber_readfilter.h"
 
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/network/address_impl.h"
 
 using testing::Return;

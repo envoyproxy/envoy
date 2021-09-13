@@ -41,11 +41,10 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
   for (const auto& header : config_.additional_response_trailers_to_log()) {
     response_trailers_to_log_.emplace_back(header);
   }
-
-  tls_slot_->set([this, transport_version = Envoy::Config::Utility::getAndCheckTransportVersion(
-                            config_.common_config())](Event::Dispatcher&) {
+  Envoy::Config::Utility::checkTransportVersion(config_.common_config());
+  tls_slot_->set([this](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
-        config_.common_config(), transport_version, Common::GrpcAccessLoggerType::HTTP, scope_));
+        config_.common_config(), Common::GrpcAccessLoggerType::HTTP, scope_));
   });
 }
 

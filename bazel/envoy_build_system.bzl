@@ -6,6 +6,7 @@ load(":envoy_internal.bzl", "envoy_external_dep_path")
 load(
     ":envoy_library.bzl",
     _envoy_basic_cc_library = "envoy_basic_cc_library",
+    _envoy_cc_contrib_extension = "envoy_cc_contrib_extension",
     _envoy_cc_extension = "envoy_cc_extension",
     _envoy_cc_library = "envoy_cc_library",
     _envoy_cc_linux_library = "envoy_cc_linux_library",
@@ -50,8 +51,8 @@ load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
 
-def envoy_extension_package(enabled_default = True):
-    native.package(default_visibility = EXTENSION_PACKAGE_VISIBILITY)
+def envoy_extension_package(enabled_default = True, default_visibility = EXTENSION_PACKAGE_VISIBILITY):
+    native.package(default_visibility = default_visibility)
 
     bool_flag(
         name = "enabled",
@@ -62,6 +63,9 @@ def envoy_extension_package(enabled_default = True):
         name = "is_enabled",
         flag_values = {":enabled": "True"},
     )
+
+def envoy_contrib_package():
+    envoy_extension_package(default_visibility = ["//:contrib_library"])
 
 # A genrule variant that can output a directory. This is useful when doing things like
 # generating a fuzz corpus mechanically.
@@ -220,6 +224,7 @@ envoy_cc_binary = _envoy_cc_binary
 # Library wrappers (from envoy_library.bzl)
 envoy_basic_cc_library = _envoy_basic_cc_library
 envoy_cc_extension = _envoy_cc_extension
+envoy_cc_contrib_extension = _envoy_cc_contrib_extension
 envoy_cc_library = _envoy_cc_library
 envoy_cc_linux_library = _envoy_cc_linux_library
 envoy_cc_posix_library = _envoy_cc_posix_library

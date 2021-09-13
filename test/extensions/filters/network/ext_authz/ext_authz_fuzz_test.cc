@@ -74,8 +74,10 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   static Network::Address::InstanceConstSharedPtr addr =
       std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
 
-  filter_callbacks.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr);
-  filter_callbacks.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr);
+  filter_callbacks.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr);
+  filter_callbacks.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr);
 
   for (const auto& action : input.actions()) {
     switch (action.action_selector_case()) {

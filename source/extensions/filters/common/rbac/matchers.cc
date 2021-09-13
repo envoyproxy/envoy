@@ -137,7 +137,7 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
   Envoy::Network::Address::InstanceConstSharedPtr ip;
   switch (type_) {
   case ConnectionRemote:
-    ip = connection.addressProvider().remoteAddress();
+    ip = connection.connectionInfoProvider().remoteAddress();
     break;
   case DownstreamLocal:
     ip = info.downstreamAddressProvider().localAddress();

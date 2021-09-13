@@ -185,15 +185,11 @@ public:
       const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
-   * Access transport_api_version field in ApiConfigSource, while validating version
-   * compatibility.
+   * Validate transport_api_version field in ApiConfigSource.
    * @param api_config_source the config source to extract transport API version from.
-   * @return envoy::config::core::v3::ApiVersion transport API version
    * @throws DeprecatedMajorVersionException when the transport version is disabled.
    */
-  template <class Proto>
-  static envoy::config::core::v3::ApiVersion
-  getAndCheckTransportVersion(const Proto& api_config_source) {
+  template <class Proto> static void checkTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
     ASSERT(Thread::MainThread::isMainThread());
     if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO ||
@@ -206,12 +202,8 @@ public:
           "following the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition.",
           api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
-      if (!Runtime::runtimeFeatureEnabled(
-              "envoy.test_only.broken_in_production.enable_deprecated_v2_api")) {
-        throw DeprecatedMajorVersionException(warning);
-      }
+      throw DeprecatedMajorVersionException(warning);
     }
-    return transport_api_version;
   }
 
   /**
@@ -383,9 +375,7 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
 
-    translateOpaqueConfig(enclosing_message.typed_config(),
-                          enclosing_message.hidden_envoy_deprecated_config(), validation_visitor,
-                          *config);
+    translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config);
     return config;
   }
 
@@ -409,7 +399,7 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
 
-    translateOpaqueConfig(typed_config, ProtobufWkt::Struct(), validation_visitor, *config);
+    translateOpaqueConfig(typed_config, validation_visitor, *config);
     return config;
   }
 
@@ -453,15 +443,12 @@ public:
                                 Stats::Scope& scope, bool skip_cluster_check);
 
   /**
-   * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto
-   * message.
+   * Translate opaque config from google.protobuf.Any to defined proto message.
    * @param typed_config opaque config packed in google.protobuf.Any
-   * @param config the deprecated google.protobuf.Struct config, empty struct if doesn't exist.
    * @param validation_visitor message validation visitor instance.
    * @param out_proto the proto message instantiated by extensions
    */
   static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
-                                    const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto);
 

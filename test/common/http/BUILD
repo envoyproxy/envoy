@@ -320,6 +320,15 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test(
+    name = "inline_cookie_test",
+    srcs = ["inline_cookie_test.cc"],
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "header_utility_test",
     srcs = ["header_utility_test.cc"],
     deps = [

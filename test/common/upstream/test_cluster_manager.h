@@ -215,7 +215,7 @@ protected:
     }
   }
 
-  void postThreadLocalDrainConnections(const Cluster&, const HostVector& hosts_removed) override {
+  void postThreadLocalRemoveHosts(const Cluster&, const HostVector& hosts_removed) override {
     local_hosts_removed_.post(hosts_removed);
   }
 

@@ -57,9 +57,9 @@ Automatic protocol selection
 ----------------------------
 
 For Envoy acting as a forward proxy, the preferred configuration is the
-`AutoHttpConfig <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig>`
+:ref:`AutoHttpConfig <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig>`
 , configued via
-`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`.
+:ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`.
 By default it will use TCP and ALPN to select the best available protocol of HTTP/2 and HTTP/1.1.
 
 .. _arch_overview_http3_upstream:

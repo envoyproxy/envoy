@@ -27,6 +27,8 @@ public:
 class ProxyProtoFilterChainMatchIntegrationTest : public ProxyProtoTcpIntegrationTest {
 public:
   ProxyProtoFilterChainMatchIntegrationTest();
+
+  void send(const std::string& data);
 };
 
 } // namespace Envoy

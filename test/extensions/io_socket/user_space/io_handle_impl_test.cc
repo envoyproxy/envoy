@@ -20,6 +20,8 @@ namespace IoSocket {
 namespace UserSpace {
 namespace {
 
+constexpr int CONNECTED = 0;
+
 MATCHER(IsInvalidAddress, "") {
   return arg.err_->getErrorCode() == Api::IoError::IoErrorCode::NoSupport;
 }
@@ -1007,6 +1009,41 @@ TEST_F(IoHandleImplTest, Connect) {
   auto address_is_ignored =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_id");
   EXPECT_EQ(0, io_handle_->connect(address_is_ignored).return_value_);
+
+  // Below is emulation of the connect().
+  int immediate_error_value = -1;
+  socklen_t error_value_len = 0;
+  EXPECT_EQ(0, io_handle_->getOption(SOL_SOCKET, SO_ERROR, &immediate_error_value, &error_value_len)
+                   .return_value_);
+  EXPECT_EQ(sizeof(int), error_value_len);
+  EXPECT_EQ(CONNECTED, immediate_error_value);
+
+  // If the peer shutdown write but not yet closes, this io_handle should consider it
+  // as connected because the socket may be readable.
+  immediate_error_value = -1;
+  error_value_len = 0;
+  EXPECT_EQ(io_handle_peer_->shutdown(ENVOY_SHUT_WR).return_value_, 0);
+  EXPECT_EQ(0, io_handle_->getOption(SOL_SOCKET, SO_ERROR, &immediate_error_value, &error_value_len)
+                   .return_value_);
+  EXPECT_EQ(sizeof(int), error_value_len);
+  EXPECT_EQ(CONNECTED, immediate_error_value);
+}
+
+TEST_F(IoHandleImplTest, ConnectToClosedIoHandle) {
+  auto address_is_ignored =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_id");
+  io_handle_peer_->close();
+  auto result = io_handle_->connect(address_is_ignored);
+  EXPECT_EQ(-1, result.return_value_);
+  EXPECT_EQ(SOCKET_ERROR_INVAL, result.errno_);
+
+  // Below is emulation of the connect().
+  int immediate_error_value = -1;
+  socklen_t error_value_len = 0;
+  EXPECT_EQ(0, io_handle_->getOption(SOL_SOCKET, SO_ERROR, &immediate_error_value, &error_value_len)
+                   .return_value_);
+  EXPECT_EQ(sizeof(int), error_value_len);
+  EXPECT_NE(CONNECTED, immediate_error_value);
 }
 
 TEST_F(IoHandleImplTest, ActivateEvent) {

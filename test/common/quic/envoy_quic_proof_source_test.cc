@@ -151,9 +151,9 @@ public:
     EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
         .WillRepeatedly(Invoke([&](const Network::ConnectionSocket& connection_socket) {
           EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
-                    *connection_socket.addressProvider().localAddress());
+                    *connection_socket.connectionInfoProvider().localAddress());
           EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
-                    *connection_socket.addressProvider().remoteAddress());
+                    *connection_socket.connectionInfoProvider().remoteAddress());
           EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
           EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
           return &filter_chain_;
@@ -230,9 +230,9 @@ TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailBadConfig) {
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
       .WillRepeatedly(Invoke([&](const Network::ConnectionSocket& connection_socket) {
         EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
-                  *connection_socket.addressProvider().localAddress());
+                  *connection_socket.connectionInfoProvider().localAddress());
         EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
-                  *connection_socket.addressProvider().remoteAddress());
+                  *connection_socket.connectionInfoProvider().remoteAddress());
         EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
         EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
         return &filter_chain_;

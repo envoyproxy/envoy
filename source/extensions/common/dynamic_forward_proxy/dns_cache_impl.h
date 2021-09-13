@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/backoff_strategy.h"
+#include "envoy/common/key_value_store.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/dns.h"
@@ -21,6 +22,7 @@ namespace DynamicForwardProxy {
  * All DNS cache stats. @see stats_macros.h
  */
 #define ALL_DNS_CACHE_STATS(COUNTER, GAUGE)                                                        \
+  COUNTER(cache_load)                                                                              \
   COUNTER(dns_query_attempt)                                                                       \
   COUNTER(dns_query_failure)                                                                       \
   COUNTER(dns_query_success)                                                                       \
@@ -39,10 +41,14 @@ struct DnsCacheStats {
   ALL_DNS_CACHE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
+class DnsCacheImplTest;
+
 class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   DnsCacheImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-               Random::RandomGenerator& random, Runtime::Loader& loader, Stats::Scope& root_scope,
+               Random::RandomGenerator& random, Filesystem::Instance& file_system,
+               Runtime::Loader& loader, Stats::Scope& root_scope,
+               ProtobufMessage::ValidationVisitor& validation_visitor,
                const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   ~DnsCacheImpl() override;
   static DnsCacheStats generateDnsCacheStats(Stats::Scope& scope);
@@ -125,6 +131,7 @@ private:
     }
 
   private:
+    friend class DnsCacheImplTest;
     TimeSource& time_source_;
     const std::string resolved_host_;
     const bool is_ip_address_;
@@ -170,13 +177,19 @@ private:
   void startResolve(const std::string& host, PrimaryHostInfo& host_info)
       ABSL_LOCKS_EXCLUDED(primary_hosts_lock_);
   void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
-                     std::list<Network::DnsResponse>&& response);
+                     std::list<Network::DnsResponse>&& response, bool from_cache = false);
   void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);
   void runRemoveCallbacks(const std::string& host);
   void notifyThreads(const std::string& host, const DnsHostInfoImplSharedPtr& resolved_info);
   void onReResolve(const std::string& host);
   void onResolveTimeout(const std::string& host);
   PrimaryHostInfo& getPrimaryHost(const std::string& host);
+
+  void addCacheEntry(const std::string& host,
+                     const Network::Address::InstanceConstSharedPtr& address);
+  void removeCacheEntry(const std::string& host);
+  void loadCacheEntries(
+      const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
 
   Event::Dispatcher& main_thread_dispatcher_;
   const Network::DnsLookupFamily dns_lookup_family_;
@@ -188,10 +201,13 @@ private:
   absl::Mutex primary_hosts_lock_;
   absl::flat_hash_map<std::string, PrimaryHostInfoPtr>
       primary_hosts_ ABSL_GUARDED_BY(primary_hosts_lock_);
+  std::unique_ptr<KeyValueStore> key_value_store_;
   DnsCacheResourceManagerImpl resource_manager_;
   const std::chrono::milliseconds refresh_interval_;
   const std::chrono::milliseconds timeout_interval_;
   const BackOffStrategyPtr failure_backoff_strategy_;
+  Filesystem::Instance& file_system_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::chrono::milliseconds host_ttl_;
   const uint32_t max_hosts_;
 };

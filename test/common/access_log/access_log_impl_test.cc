@@ -39,10 +39,9 @@ namespace Envoy {
 namespace AccessLog {
 namespace {
 
-envoy::config::accesslog::v3::AccessLog parseAccessLogFromV3Yaml(const std::string& yaml,
-                                                                 bool avoid_boosting = true) {
+envoy::config::accesslog::v3::AccessLog parseAccessLogFromV3Yaml(const std::string& yaml) {
   envoy::config::accesslog::v3::AccessLog access_log;
-  TestUtility::loadFromYamlAndValidate(yaml, access_log, false, avoid_boosting);
+  TestUtility::loadFromYamlAndValidate(yaml, access_log);
   return access_log;
 }
 

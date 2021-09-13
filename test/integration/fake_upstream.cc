@@ -92,7 +92,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
   if (add_served_by_header_) {
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
-                          parent_.connection().addressProvider().localAddress()->asString());
+                          parent_.connection().connectionInfoProvider().localAddress()->asString());
   }
 
   postToConnectionThread([this, headers_copy, end_stream]() -> void {
@@ -284,8 +284,12 @@ AssertionResult FakeStream::waitForReset(milliseconds timeout) {
   return AssertionSuccess();
 }
 
-void FakeStream::startGrpcStream() {
-  encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+void FakeStream::startGrpcStream(bool send_headers) {
+  ASSERT(!grpc_stream_started_, "gRPC stream should not be started more than once");
+  grpc_stream_started_ = true;
+  if (send_headers) {
+    encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  }
 }
 
 void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {

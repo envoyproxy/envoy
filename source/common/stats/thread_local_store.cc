@@ -69,10 +69,19 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   Thread::LockGuard lock(lock_);
   const uint32_t first_histogram_index = deleted_histograms_.size();
   for (ScopeImpl* scope : scopes_) {
-    removeRejectedStats(scope->central_cache_->counters_, deleted_counters_);
-    removeRejectedStats(scope->central_cache_->gauges_, deleted_gauges_);
+    removeRejectedStats<CounterSharedPtr>(scope->central_cache_->counters_,
+                                          [this](const CounterSharedPtr& counter) mutable {
+                                            alloc_.markCounterForDeletion(counter);
+                                          });
+    removeRejectedStats<GaugeSharedPtr>(
+        scope->central_cache_->gauges_,
+        [this](const GaugeSharedPtr& gauge) mutable { alloc_.markGaugeForDeletion(gauge); });
     removeRejectedStats(scope->central_cache_->histograms_, deleted_histograms_);
-    removeRejectedStats(scope->central_cache_->text_readouts_, deleted_text_readouts_);
+    removeRejectedStats<TextReadoutSharedPtr>(
+        scope->central_cache_->text_readouts_,
+        [this](const TextReadoutSharedPtr& text_readout) mutable {
+          alloc_.markTextReadoutForDeletion(text_readout);
+        });
   }
 
   // Remove any newly rejected histograms from histogram_set_.
@@ -101,6 +110,23 @@ void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass&
   }
 }
 
+template <class StatSharedPtr>
+void ThreadLocalStoreImpl::removeRejectedStats(
+    StatNameHashMap<StatSharedPtr>& map, std::function<void(const StatSharedPtr&)> f_deletion) {
+  StatNameVec remove_list;
+  for (auto& stat : map) {
+    if (rejects(stat.first)) {
+      remove_list.push_back(stat.first);
+    }
+  }
+  for (StatName stat_name : remove_list) {
+    auto iter = map.find(stat_name);
+    ASSERT(iter != map.end());
+    f_deletion(iter->second);
+    map.erase(iter);
+  }
+}
+
 StatsMatcher::FastResult ThreadLocalStoreImpl::fastRejects(StatName stat_name) const {
   return stats_matcher_->fastRejects(stat_name);
 }
@@ -113,16 +139,9 @@ bool ThreadLocalStoreImpl::slowRejects(StatsMatcher::FastResult fast_reject_resu
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
-  StatNameHashSet names;
-  Thread::LockGuard lock(lock_);
-  for (ScopeImpl* scope : scopes_) {
-    for (auto& counter : scope->central_cache_->counters_) {
-      if (names.insert(counter.first).second) {
-        ret.push_back(counter.second);
-      }
-    }
-  }
-
+  forEachCounter(
+      [&ret](std::size_t size) mutable { ret.reserve(size); },
+      [&ret](Counter& counter) mutable { ret.emplace_back(CounterSharedPtr(&counter)); });
   return ret;
 }
 
@@ -141,34 +160,22 @@ ScopePtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
-  StatNameHashSet names;
-  Thread::LockGuard lock(lock_);
-  for (ScopeImpl* scope : scopes_) {
-    for (auto& gauge_iter : scope->central_cache_->gauges_) {
-      const GaugeSharedPtr& gauge = gauge_iter.second;
-      if (gauge->importMode() != Gauge::ImportMode::Uninitialized &&
-          names.insert(gauge_iter.first).second) {
-        ret.push_back(gauge);
-      }
-    }
-  }
-
+  forEachGauge([&ret](std::size_t size) mutable { ret.reserve(size); },
+               [&ret](Gauge& gauge) mutable {
+                 if (gauge.importMode() != Gauge::ImportMode::Uninitialized) {
+                   ret.emplace_back(GaugeSharedPtr(&gauge));
+                 }
+               });
   return ret;
 }
 
 std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<TextReadoutSharedPtr> ret;
-  StatNameHashSet names;
-  Thread::LockGuard lock(lock_);
-  for (ScopeImpl* scope : scopes_) {
-    for (auto& text_readout : scope->central_cache_->text_readouts_) {
-      if (names.insert(text_readout.first).second) {
-        ret.push_back(text_readout.second);
-      }
-    }
-  }
-
+  forEachTextReadout([&ret](std::size_t size) mutable { ret.reserve(size); },
+                     [&ret](TextReadout& text_readout) mutable {
+                       ret.emplace_back(TextReadoutSharedPtr(&text_readout));
+                     });
   return ret;
 }
 
@@ -973,6 +980,25 @@ bool ParentHistogramImpl::usedLockHeld() const {
     }
   }
   return false;
+}
+
+void ThreadLocalStoreImpl::forEachCounter(std::function<void(std::size_t)> f_size,
+                                          std::function<void(Stats::Counter&)> f_stat) const {
+  Thread::LockGuard lock(lock_);
+  alloc_.forEachCounter(f_size, f_stat);
+}
+
+void ThreadLocalStoreImpl::forEachGauge(std::function<void(std::size_t)> f_size,
+                                        std::function<void(Stats::Gauge&)> f_stat) const {
+  Thread::LockGuard lock(lock_);
+  alloc_.forEachGauge(f_size, f_stat);
+}
+
+void ThreadLocalStoreImpl::forEachTextReadout(
+    std::function<void(std::size_t)> f_size,
+    std::function<void(Stats::TextReadout&)> f_stat) const {
+  Thread::LockGuard lock(lock_);
+  alloc_.forEachTextReadout(f_size, f_stat);
 }
 
 } // namespace Stats

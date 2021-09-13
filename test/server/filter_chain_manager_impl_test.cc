@@ -79,7 +79,7 @@ public:
       local_address_ =
           Network::Utility::parseInternetAddress(destination_address, destination_port);
     }
-    mock_socket->address_provider_->setLocalAddress(local_address_);
+    mock_socket->connection_info_provider_->setLocalAddress(local_address_);
 
     ON_CALL(*mock_socket, requestedServerName())
         .WillByDefault(Return(absl::AsciiStrToLower(server_name)));
@@ -93,7 +93,7 @@ public:
     } else {
       remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
-    mock_socket->address_provider_->setRemoteAddress(remote_address_);
+    mock_socket->connection_info_provider_->setRemoteAddress(remote_address_);
     return filter_chain_manager_.findFilterChain(*mock_socket);
   }
 

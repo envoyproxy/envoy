@@ -42,6 +42,7 @@ public:
 
   virtual IoErrorCode getErrorCode() const PURE;
   virtual std::string getErrorDetails() const PURE;
+  virtual int getSystemErrorCode() const PURE;
 };
 
 using IoErrorDeleterType = void (*)(IoError*);

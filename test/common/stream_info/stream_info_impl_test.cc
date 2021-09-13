@@ -193,6 +193,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(testing::ReturnRef(session_id));
     stream_info.setUpstreamSslConnection(ssl_info);
     EXPECT_EQ(session_id, stream_info.upstreamSslConnection()->sessionId());
+
+    EXPECT_FALSE(stream_info.upstreamConnectionId().has_value());
+    stream_info.setUpstreamConnectionId(12345);
+    ASSERT_TRUE(stream_info.upstreamConnectionId().has_value());
+    EXPECT_EQ(12345, stream_info.upstreamConnectionId().value());
   }
 }
 

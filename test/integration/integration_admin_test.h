@@ -15,7 +15,7 @@ namespace Envoy {
 class IntegrationAdminTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
-    config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
+    config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
     config_helper_.addConfigModifier(
         [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           auto& hist_settings =

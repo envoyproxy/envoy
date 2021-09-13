@@ -93,6 +93,13 @@ if __name__ == "__main__":
     parser.add_argument('--include_headers', action='store_true')
     parser.add_argument('--vscode', action='store_true')
     parser.add_argument(
-        'bazel_targets', nargs='*', default=["//source/...", "//test/...", "//tools/..."])
+        'bazel_targets',
+        nargs='*',
+        default=[
+            "//source/...",
+            "//test/...",
+            "//tools/...",
+            "//contrib/...",
+        ])
     args = parser.parse_args()
     fix_compilation_database(args, generate_compilation_database(args))

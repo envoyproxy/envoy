@@ -27,6 +27,11 @@ void EnvoyQuicProofSourceBase::GetProof(const quic::QuicSocketAddress& /*server_
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+absl::InlinedVector<uint16_t, 8> EnvoyQuicProofSourceBase::SupportedTlsSignatureAlgorithms() const {
+  // Return empty here to defer rejecting unexpected algorithm to ComputeTlsSignature().
+  return {};
+}
+
 void EnvoyQuicProofSourceBase::ComputeTlsSignature(
     const quic::QuicSocketAddress& server_address, const quic::QuicSocketAddress& client_address,
     const std::string& hostname, uint16_t signature_algorithm, absl::string_view in,

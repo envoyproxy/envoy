@@ -52,58 +52,68 @@ AppleDnsResolverStats AppleDnsResolverImpl::generateAppleDnsResolverStats(Stats:
   return {ALL_APPLE_DNS_RESOLVER_STATS(POOL_COUNTER(scope))};
 }
 
+AppleDnsResolverImpl::StartResolutionResult
+AppleDnsResolverImpl::startResolution(const std::string& dns_name,
+                                      DnsLookupFamily dns_lookup_family, ResolveCb callback) {
+  ENVOY_LOG_EVENT(debug, "apple_dns_start", "DNS resolution for {} started", dns_name);
+
+  // When an IP address is submitted to c-ares in DnsResolverImpl, c-ares synchronously returns
+  // the IP without submitting a DNS query. Because Envoy has come to rely on this behavior, this
+  // resolver implements a similar resolution path to avoid making improper DNS queries for
+  // resolved IPs.
+  auto address = Utility::parseInternetAddressNoThrow(dns_name);
+
+  if (address != nullptr) {
+    ENVOY_LOG_EVENT(debug, "apple_dns_immediate_resolution",
+                    "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
+                    dns_name, address->asString());
+    callback(DnsResolver::ResolutionStatus::Success,
+             {DnsResponse(address, std::chrono::seconds(60))});
+    return {nullptr, true};
+  }
+
+  ENVOY_LOG(trace, "Performing DNS resolution via Apple APIs");
+  auto pending_resolution =
+      std::make_unique<PendingResolution>(*this, callback, dispatcher_, dns_name);
+
+  DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo(dns_lookup_family);
+  if (error != kDNSServiceErr_NoError) {
+    ENVOY_LOG(warn, "DNS resolver error ({}) in dnsServiceGetAddrInfo for {}", error, dns_name);
+    chargeGetAddrInfoErrorStats(error);
+    return {nullptr, false};
+  }
+
+  if (pending_resolution->synchronously_completed_) {
+    return {nullptr, true};
+  }
+
+  // Hook up the query's UDS socket to the event loop to process updates.
+  if (!pending_resolution->dnsServiceRefSockFD()) {
+    ENVOY_LOG(warn, "DNS resolver error in dnsServiceRefSockFD for {}", dns_name);
+    return {nullptr, false};
+  }
+
+  // Return the active resolution query, giving it ownership over itself so that it can
+  // can clean itself up once it's done.
+  pending_resolution->owned_ = true;
+
+  return {std::move(pending_resolution), true};
+}
+
 ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
                                               DnsLookupFamily dns_lookup_family,
                                               ResolveCb callback) {
-  ENVOY_LOG(debug, "DNS resolver resolve={}", dns_name);
+  auto pending_resolution_and_success = startResolution(dns_name, dns_lookup_family, callback);
 
-  Address::InstanceConstSharedPtr address{};
-  TRY_ASSERT_MAIN_THREAD {
-    // When an IP address is submitted to c-ares in DnsResolverImpl, c-ares synchronously returns
-    // the IP without submitting a DNS query. Because Envoy has come to rely on this behavior, this
-    // resolver implements a similar resolution path to avoid making improper DNS queries for
-    // resolved IPs.
-    address = Utility::parseInternetAddress(dns_name);
-    ENVOY_LOG(debug, "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
-              dns_name, address->asString());
-  }
-  END_TRY
-  catch (const EnvoyException& e) {
-    // Resolution via Apple APIs
-    ENVOY_LOG(trace, "DNS resolver local resolution failed with: {}", e.what());
+  // If we synchronously failed the resolution, trigger a failure callback.
+  if (!pending_resolution_and_success.second) {
+    ENVOY_LOG_EVENT(debug, "apple_dns_immediate_failure", "DNS resolution for {} failed", dns_name);
 
-    auto pending_resolution =
-        std::make_unique<PendingResolution>(*this, callback, dispatcher_, dns_name);
-
-    DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo(dns_lookup_family);
-    if (error != kDNSServiceErr_NoError) {
-      ENVOY_LOG(warn, "DNS resolver error ({}) in dnsServiceGetAddrInfo for {}", error, dns_name);
-      chargeGetAddrInfoErrorStats(error);
-      return nullptr;
-    }
-
-    // If the query was synchronously resolved in the Apple API call, there is no need to return the
-    // query.
-    if (pending_resolution->synchronously_completed_) {
-      return nullptr;
-    }
-
-    // Otherwise, hook up the query's UDS socket to the event loop to process updates.
-    if (!pending_resolution->dnsServiceRefSockFD()) {
-      ENVOY_LOG(warn, "DNS resolver error in dnsServiceRefSockFD for {}", dns_name);
-      return nullptr;
-    }
-
-    pending_resolution->owned_ = true;
-    return pending_resolution.release();
+    callback(DnsResolver::ResolutionStatus::Failure, {});
+    return nullptr;
   }
 
-  ASSERT(address != nullptr);
-  // Finish local, synchronous resolution. This needs to happen outside of the exception block above
-  // as the callback itself can throw.
-  callback(DnsResolver::ResolutionStatus::Success,
-           {DnsResponse(address, std::chrono::seconds(60))});
-  return nullptr;
+  return pending_resolution_and_success.first.release();
 }
 
 void AppleDnsResolverImpl::chargeGetAddrInfoErrorStats(DNSServiceErrorType error_code) {
@@ -176,6 +186,8 @@ void AppleDnsResolverImpl::PendingResolution::onEventCallback(uint32_t events) {
 }
 
 void AppleDnsResolverImpl::PendingResolution::finishResolve() {
+  ENVOY_LOG_EVENT(debug, "apple_dns_resolution_complete",
+                  "dns resolution for {} completed with status {}", dns_name_, pending_cb_.status_);
   callback_(pending_cb_.status_, std::move(pending_cb_.responses_));
 
   if (owned_) {
@@ -238,7 +250,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
             dns_name_, flags, flags & kDNSServiceFlagsMoreComing ? "yes" : "no",
             flags & kDNSServiceFlagsAdd ? "yes" : "no", interface_index, error_code, hostname);
 
-  // Generic error handling.
+  // Make sure that we trigger the failure callback if we get an error back.
   if (error_code != kDNSServiceErr_NoError) {
     parent_.chargeGetAddrInfoErrorStats(error_code);
 

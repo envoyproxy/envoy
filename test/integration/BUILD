@@ -32,7 +32,6 @@ envoy_cc_test_library(
         ":http_integration_lib",
         "//source/common/common:matchers_lib",
         "//source/common/config:protobuf_link_hacks",
-        "//source/common/config:version_converter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/version:version_lib",
         "//source/extensions/filters/network/redis_proxy:config",
@@ -387,6 +386,7 @@ envoy_cc_test(
         "buffer_accounting_integration_test.cc",
     ],
     deps = [
+        ":base_overload_integration_test_lib",
         ":http_integration_lib",
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
@@ -604,6 +604,7 @@ envoy_cc_test_library(
         "//test/integration/filters:add_body_filter_config_lib",
         "//test/integration/filters:add_trailers_filter_config_lib",
         "//test/integration/filters:call_decodedata_once_filter_config_lib",
+        "//test/integration/filters:crash_filter_config_lib",
         "//test/integration/filters:decode_headers_return_stop_all_filter_config_lib",
         "//test/integration/filters:encode_headers_return_stop_all_filter_config_lib",
         "//test/integration/filters:modify_buffer_filter_config_lib",
@@ -750,7 +751,6 @@ envoy_cc_test_library(
         ":integration_tcp_client_lib",
         ":utility_lib",
         "//source/common/config:api_version_lib",
-        "//source/common/config:version_converter_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
@@ -847,6 +847,7 @@ envoy_cc_test_library(
         "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/synchronization",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
@@ -885,7 +886,6 @@ envoy_cc_test_library(
         "//source/common/common:basic_resource_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:api_version_lib",
-        "//source/common/config:version_converter_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
@@ -955,8 +955,8 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/grpc_http1_bridge/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/grpc_http1_bridge/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
@@ -1255,6 +1255,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/extensions/transport_sockets/tls:test_private_key_method_provider_test_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:resources_lib",
@@ -1380,6 +1381,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/buffer:watermark_buffer_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
 
@@ -1816,7 +1818,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
-        "@com_googlesource_quiche//:quic_test_tools_session_peer_lib",
+        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ]),
 )
 

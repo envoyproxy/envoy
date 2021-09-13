@@ -20,7 +20,7 @@
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
-#include "source/common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/default_server_string.h"
@@ -176,10 +176,10 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
                 context.getServerFactoryContext(), context.messageValidationVisitor()));
       });
 
-  std::shared_ptr<Filter::Http::FilterConfigProviderManager> filter_config_provider_manager =
-      context.singletonManager().getTyped<Filter::Http::FilterConfigProviderManager>(
+  std::shared_ptr<FilterConfigProviderManager> filter_config_provider_manager =
+      context.singletonManager().getTyped<FilterConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(filter_config_provider_manager),
-          [] { return std::make_shared<Filter::Http::FilterConfigProviderManagerImpl>(); });
+          [] { return std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>(); });
 
   return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager,
           http_tracer_manager, filter_config_provider_manager};
@@ -192,7 +192,7 @@ std::shared_ptr<HttpConnectionManagerConfig> Utility::createConfig(
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
     Tracing::HttpTracerManager& http_tracer_manager,
-    Filter::Http::FilterConfigProviderManager& filter_config_provider_manager) {
+    FilterConfigProviderManager& filter_config_provider_manager) {
   return std::make_shared<HttpConnectionManagerConfig>(
       proto_config, context, date_provider, route_config_provider_manager,
       scoped_routes_config_provider_manager, http_tracer_manager, filter_config_provider_manager);
@@ -263,7 +263,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
     Tracing::HttpTracerManager& http_tracer_manager,
-    Filter::Http::FilterConfigProviderManager& filter_config_provider_manager)
+    FilterConfigProviderManager& filter_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
@@ -373,6 +373,16 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     auto* extension = ip_detection_extensions.Add();
     extension->set_name("envoy.http.original_ip_detection.xff");
     extension->mutable_typed_config()->PackFrom(xff_config);
+  } else {
+    if (use_remote_address_) {
+      throw EnvoyException(
+          "Original IP detection extensions and use_remote_address may not be mixed");
+    }
+
+    if (xff_num_trusted_hops_ > 0) {
+      throw EnvoyException(
+          "Original IP detection extensions and xff_num_trusted_hops may not be mixed");
+    }
   }
 
   original_ip_detection_extensions_.reserve(ip_detection_extensions.size());
@@ -469,18 +479,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     // Listener level traffic direction overrides the operation name
     switch (context.direction()) {
     case envoy::config::core::v3::UNSPECIFIED: {
-      switch (tracing_config.hidden_envoy_deprecated_operation_name()) {
-      case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-          Tracing::INGRESS:
-        tracing_operation_name = Tracing::OperationName::Ingress;
-        break;
-      case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-          Tracing::EGRESS:
-        tracing_operation_name = Tracing::OperationName::Egress;
-        break;
-      default:
-        NOT_REACHED_GCOVR_EXCL_LINE;
-      }
+      // Continuing legacy behavior; if unspecified, we treat this as ingress.
+      tracing_operation_name = Tracing::OperationName::Ingress;
       break;
     }
     case envoy::config::core::v3::INBOUND:
@@ -494,13 +494,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
 
     Tracing::CustomTagMap custom_tags;
-    for (const std::string& header :
-         tracing_config.hidden_envoy_deprecated_request_headers_for_tags()) {
-      envoy::type::tracing::v3::CustomTag::Header headerTag;
-      headerTag.set_name(header);
-      custom_tags.emplace(
-          header, std::make_shared<const Tracing::RequestHeaderCustomTag>(header, headerTag));
-    }
     for (const auto& tag : tracing_config.custom_tags()) {
       custom_tags.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
     }
@@ -661,11 +654,7 @@ void HttpConnectionManagerConfig::processFilter(
   ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
   ENVOY_LOG(debug, "    config: {}",
             MessageUtil::getJsonStringFromMessageOrError(
-                proto_config.has_typed_config()
-                    ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                    : static_cast<const Protobuf::Message&>(
-                          proto_config.hidden_envoy_deprecated_config()),
-                true));
+                static_cast<const Protobuf::Message&>(proto_config.typed_config()), true));
   filter_factories.push_back(std::move(filter_config_provider));
 }
 

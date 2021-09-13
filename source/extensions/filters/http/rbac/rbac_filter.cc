@@ -46,7 +46,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       "checking request: requestedServerName: {}, sourceIP: {}, directRemoteIP: {}, remoteIP: {},"
       "localAddress: {}, ssl: {}, headers: {}, dynamicMetadata: {}",
       callbacks_->connection()->requestedServerName(),
-      callbacks_->connection()->addressProvider().remoteAddress()->asString(),
+      callbacks_->connection()->connectionInfoProvider().remoteAddress()->asString(),
       callbacks_->streamInfo().downstreamAddressProvider().directRemoteAddress()->asString(),
       callbacks_->streamInfo().downstreamAddressProvider().remoteAddress()->asString(),
       callbacks_->streamInfo().downstreamAddressProvider().localAddress()->asString(),

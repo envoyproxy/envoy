@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -1307,6 +1308,80 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   EXPECT_EQ(1, host.priority());
 }
 
+TEST_F(HostImplTest, CreateConnection) {
+  MockClusterMockPrioritySet cluster;
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().CANARY)
+      .set_bool_value(true);
+  envoy::config::core::v3::Locality locality;
+  locality.set_region("oceania");
+  locality.set_zone("hello");
+  locality.set_sub_zone("world");
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto host = std::make_shared<HostImpl>(
+      cluster.info_, "lyft.com", address,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN, simTime());
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
+  Network::ConnectionSocket::OptionsSharedPtr options;
+  Network::MockTransportSocketFactory socket_factory;
+
+  auto connection = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, setBufferLimits(0));
+  EXPECT_CALL(dispatcher, createClientConnection_(_, _, _, _)).WillOnce(Return(connection));
+
+  Envoy::Upstream::Host::CreateConnectionData connection_data =
+      host->createConnection(dispatcher, options, transport_socket_options);
+  EXPECT_EQ(connection, connection_data.connection_.get());
+}
+
+TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
+  MockClusterMockPrioritySet cluster;
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().CANARY)
+      .set_bool_value(true);
+  envoy::config::core::v3::Locality locality;
+  locality.set_region("oceania");
+  locality.set_zone("hello");
+  locality.set_sub_zone("world");
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto host = std::make_shared<HostImpl>(
+      cluster.info_, "lyft.com", address,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN, simTime());
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
+  Network::ConnectionSocket::OptionsSharedPtr options;
+  Network::MockTransportSocketFactory socket_factory;
+
+  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+      address,
+  };
+  host->setAddressList(address_list);
+  auto connection = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, setBufferLimits(0));
+  EXPECT_CALL(*connection, addConnectionCallbacks(_));
+  // The underlying connection should be created with the first address in the list.
+  EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
+      .WillOnce(Return(connection));
+  EXPECT_CALL(dispatcher, createTimer_(_));
+
+  Envoy::Upstream::Host::CreateConnectionData connection_data =
+      host->createConnection(dispatcher, options, transport_socket_options);
+  // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
+  EXPECT_NE(connection, connection_data.connection_.get());
+}
+
 TEST_F(HostImplTest, HealthFlags) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
@@ -2191,7 +2266,7 @@ TEST(PrioritySet, Extend) {
   auto member_update_cb = priority_set.addMemberUpdateCb(
       [&](const HostVector&, const HostVector&) -> void { ++membership_changes; });
 
-  // The initial priority set starts with priority level 0..
+  // The initial priority set starts with priority level 0.
   EXPECT_EQ(1, priority_set.hostSetsPerPriority().size());
   EXPECT_EQ(0, priority_set.hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0, priority_set.hostSetsPerPriority()[0]->priority());
@@ -2215,20 +2290,25 @@ TEST(PrioritySet, Extend) {
   HostVectorSharedPtr hosts(
       new HostVector({makeTestHost(info, "tcp://127.0.0.1:80", *time_source)}));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostMapConstSharedPtr fake_cross_priority_host_map = std::make_shared<HostMap>();
   {
     HostVector hosts_added{hosts->front()};
     HostVector hosts_removed{};
 
-    priority_set.updateHosts(1,
-                             updateHostsParams(hosts, hosts_per_locality,
-                                               std::make_shared<const HealthyHostVector>(*hosts),
-                                               hosts_per_locality),
-                             {}, hosts_added, hosts_removed, absl::nullopt);
+    priority_set.updateHosts(
+        1,
+        updateHostsParams(hosts, hosts_per_locality,
+                          std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
+        {}, hosts_added, hosts_removed, absl::nullopt, fake_cross_priority_host_map);
   }
   EXPECT_EQ(1, priority_changes);
   EXPECT_EQ(1, membership_changes);
   EXPECT_EQ(last_priority, 1);
   EXPECT_EQ(1, priority_set.hostSetsPerPriority()[1]->hosts().size());
+
+  // Simply verify the set and get the cross-priority host map is working properly in the priority
+  // set.
+  EXPECT_EQ(fake_cross_priority_host_map.get(), priority_set.crossPriorityHostMap().get());
 
   // Test iteration.
   int i = 0;
@@ -2254,13 +2334,79 @@ TEST(PrioritySet, Extend) {
   EXPECT_EQ(2, membership_changes);
 }
 
+// Helper class used to test MainPrioritySetImpl.
+class TestMainPrioritySetImpl : public MainPrioritySetImpl {
+public:
+  HostMapConstSharedPtr constHostMapForTest() { return const_cross_priority_host_map_; }
+  HostMapSharedPtr mutableHostMapForTest() { return mutable_cross_priority_host_map_; }
+};
+
+// Test that the priority set in the main thread can work correctly.
+TEST(PrioritySet, MainPrioritySetTest) {
+  TestMainPrioritySetImpl priority_set;
+  priority_set.getOrCreateHostSet(0);
+
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
+  HostVectorSharedPtr hosts(
+      new HostVector({makeTestHost(info, "tcp://127.0.0.1:80", *time_source)}));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+
+  // The host map is initially empty or null.
+  EXPECT_TRUE(priority_set.constHostMapForTest()->empty());
+  EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
+
+  {
+    HostVector hosts_added{hosts->front()};
+    HostVector hosts_removed{};
+
+    priority_set.updateHosts(1,
+                             updateHostsParams(hosts, hosts_per_locality,
+                                               std::make_shared<const HealthyHostVector>(*hosts),
+                                               hosts_per_locality),
+                             {}, hosts_added, hosts_removed, absl::nullopt);
+  }
+
+  // Only mutable host map can be updated directly. Read only host map will not be updated before
+  // `crossPriorityHostMap` is called.
+  EXPECT_TRUE(priority_set.constHostMapForTest()->empty());
+  EXPECT_FALSE(priority_set.mutableHostMapForTest()->empty());
+
+  // Mutable host map will be moved to read only host map after `crossPriorityHostMap` is called.
+  HostMapSharedPtr host_map = priority_set.mutableHostMapForTest();
+  EXPECT_EQ(host_map.get(), priority_set.crossPriorityHostMap().get());
+  EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
+
+  {
+    HostVector hosts_added{};
+    HostVector hosts_removed{hosts->front()};
+
+    priority_set.updateHosts(1,
+                             updateHostsParams(hosts, hosts_per_locality,
+                                               std::make_shared<const HealthyHostVector>(*hosts),
+                                               hosts_per_locality),
+                             {}, hosts_added, hosts_removed, absl::nullopt);
+  }
+
+  // New mutable host map will be created and all update will be applied to new mutable host map.
+  // Read only host map will not be updated before `crossPriorityHostMap` is called.
+  EXPECT_EQ(host_map.get(), priority_set.constHostMapForTest().get());
+  EXPECT_TRUE((priority_set.mutableHostMapForTest().get() != nullptr &&
+               priority_set.mutableHostMapForTest().get() != host_map.get()));
+
+  // Again, mutable host map will be moved to read only host map after `crossPriorityHostMap` is
+  // called.
+  host_map = priority_set.mutableHostMapForTest();
+  EXPECT_EQ(host_map.get(), priority_set.crossPriorityHostMap().get());
+  EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
+}
+
 class ClusterInfoImplTest : public testing::Test {
 public:
   ClusterInfoImplTest() : api_(Api::createApiForTest(stats_, random_)) {}
 
-  std::unique_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml,
-                                                    bool avoid_boosting = true) {
-    cluster_config_ = parseClusterFromV3Yaml(yaml, avoid_boosting);
+  std::unique_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml) {
+    cluster_config_ = parseClusterFromV3Yaml(yaml);
     scope_ = stats_.createScope(fmt::format("cluster.{}.", cluster_config_.alt_stat_name().empty()
                                                                ? cluster_config_.name()
                                                                : cluster_config_.alt_stat_name()));
@@ -2521,7 +2667,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
           option: "value"
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml, false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                             "Didn't find a registered network or http filter or "
                             "protocol options implementation for name: 'no_such_filter'");
 }
@@ -2729,7 +2875,7 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
   }
   {
     auto cluster2 = makeCluster(yaml + explicit_timeout_new);
-    EXPECT_THROW_WITH_REGEX(makeCluster(yaml + explicit_timeout_bad, false), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(makeCluster(yaml + explicit_timeout_bad), EnvoyException,
                             ".*Proto constraint validation failed.*");
   }
   const std::string no_timeout = R"EOF(
@@ -2987,13 +3133,13 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
     TestNetworkFilterConfigFactory factory(factoryBase);
     Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
         factory);
-    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml, false), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                               "filter envoy.test.filter does not support protocol options");
   }
   {
     TestHttpFilterConfigFactory factory(factoryBase);
     Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(factory);
-    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml, false), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                               "filter envoy.test.filter does not support protocol options");
   }
 }

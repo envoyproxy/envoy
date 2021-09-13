@@ -1,4 +1,4 @@
-load("@pylint_pip3//:requirements.bzl", "requirement")
+load("@base_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_py_binary")
 
@@ -15,6 +15,7 @@ exports_files([
 envoy_py_binary(
     name = "tools.code_format.python_check",
     deps = [
+        "//tools/base:aio",
         "//tools/base:checker",
         "//tools/base:utils",
         requirement("flake8"),

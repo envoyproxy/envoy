@@ -153,6 +153,10 @@ public:
                                 const envoy::config::core::v3::Metadata* metadata) const;
   MonotonicTime creationTime() const override { return creation_time_; }
 
+  void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
+    address_list_ = address_list;
+  }
+
 protected:
   void setAddress(Network::Address::InstanceConstSharedPtr address) { address_ = address; }
 
@@ -265,6 +269,7 @@ protected:
   static Network::ClientConnectionPtr
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                    const Network::Address::InstanceConstSharedPtr& address,
+                   const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
                    Network::TransportSocketFactory& socket_factory,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    Network::TransportSocketOptionsConstSharedPtr transport_socket_options);
@@ -480,9 +485,14 @@ public:
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                    const HostVector& hosts_removed,
-                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
+                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
+                   HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
 
   void batchHostUpdate(BatchUpdateCb& callback) override;
+
+  HostMapConstSharedPtr crossPriorityHostMap() const override {
+    return const_cross_priority_host_map_;
+  }
 
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
@@ -503,6 +513,9 @@ protected:
   // It will expand as host sets are added but currently does not shrink to
   // avoid any potential lifetime issues.
   std::vector<std::unique_ptr<HostSet>> host_sets_;
+
+  // Read only all host map for fast host searching. This will never be null.
+  mutable HostMapConstSharedPtr const_cross_priority_host_map_{std::make_shared<HostMap>()};
 
 private:
   // This is a matching vector to store the callback handles for host_sets_. It is kept separately
@@ -540,6 +553,26 @@ private:
 };
 
 /**
+ * Specialized PrioritySetImpl designed for the main thread. It will update and maintain the read
+ * only cross priority host map when the host set changes.
+ */
+class MainPrioritySetImpl : public PrioritySetImpl, public Logger::Loggable<Logger::Id::upstream> {
+public:
+  // PrioritySet
+  void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
+                   LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
+                   const HostVector& hosts_removed,
+                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
+                   HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
+  HostMapConstSharedPtr crossPriorityHostMap() const override;
+
+protected:
+  void updateCrossPriorityHostMap(const HostVector& hosts_added, const HostVector& hosts_removed);
+
+  mutable HostMapSharedPtr mutable_cross_priority_host_map_;
+};
+
+/**
  * Implementation of ClusterInfo that reads from JSON.
  */
 class ClusterInfoImpl : public ClusterInfo,
@@ -568,6 +601,11 @@ public:
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
+  const envoy::config::cluster::v3::LoadBalancingPolicy_Policy&
+  loadBalancingPolicy() const override {
+    return load_balancing_policy_;
+  }
+  TypedLoadBalancerFactory* loadBalancerFactory() const override { return load_balancer_factory_; }
   const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const override {
     return common_lb_config_;
   }
@@ -751,6 +789,8 @@ private:
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::config::core::v3::Metadata metadata_;
   Envoy::Config::TypedMetadataImpl<ClusterTypedMetadataFactory> typed_metadata_;
+  envoy::config::cluster::v3::LoadBalancingPolicy_Policy load_balancing_policy_;
+  TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
@@ -798,6 +838,13 @@ public:
    * documented in setHealthChecker().
    */
   void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
+
+  /**
+   * Set the TransportSocketFactoryContext pointer so that the memory isn't lost
+   * for the cluster lifetime in case SDS is used.
+   */
+  void setTransportFactoryContext(
+      Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context);
 
   /**
    * Wrapper around Network::Address::resolveProtoAddress() that provides improved error message
@@ -875,7 +922,7 @@ protected:
 
 protected:
   TimeSource& time_source_;
-  PrioritySetImpl priority_set_;
+  MainPrioritySetImpl priority_set_;
 
   void validateEndpointsForZoneAwareRouting(
       const envoy::config::endpoint::v3::LocalityLbEndpoints& endpoints) const;
@@ -890,6 +937,7 @@ private:
   const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
+  Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context_{};
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;
@@ -958,8 +1006,6 @@ protected:
    * @param hosts_added_to_current_priority will be populated with hosts added to the priority.
    * @param hosts_removed_from_current_priority will be populated with hosts removed from the
    * priority.
-   * @param updated_hosts is used to aggregate the new state of all hosts across priority, and will
-   * be updated with the hosts that remain in this priority after the update.
    * @param all_hosts all known hosts prior to this host update across all priorities.
    * @param all_new_hosts addresses of all hosts in the new configuration across all priorities.
    * @return whether the hosts for the priority changed.
@@ -967,7 +1013,7 @@ protected:
   bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_priority_hosts,
                              HostVector& hosts_added_to_current_priority,
                              HostVector& hosts_removed_from_current_priority,
-                             HostMap& updated_hosts, const HostMap& all_hosts,
+                             const HostMap& all_hosts,
                              const absl::flat_hash_set<std::string>& all_new_hosts);
 };
 

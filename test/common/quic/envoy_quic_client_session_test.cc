@@ -6,6 +6,7 @@
 
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 #if defined(__GNUC__)
@@ -69,8 +70,10 @@ public:
   EnvoyQuicClientSessionTest()
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
-        quic_version_({quic::CurrentSupportedHttp3Versions()[0]}),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
+          SetQuicReloadableFlag(quic_decline_server_push_stream, true);
+          return quic::CurrentSupportedHttp3Versions();
+        }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
                                                         12345)),
         self_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -322,6 +325,23 @@ TEST_F(EnvoyQuicClientSessionTest, ConnectionClosePopulatesQuicVersionStats) {
             envoy_quic_session_.transportFailureReason());
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_EQ(1U, TestUtility::findCounter(store_, "http3.quic_version_rfc_v1")->value());
+}
+
+TEST_F(EnvoyQuicClientSessionTest, IncomingUnidirectionalReadStream) {
+  quic::QuicStreamId stream_id = 1u;
+  quic::QuicStreamFrame stream_frame(stream_id, false, 0, "aaa");
+  envoy_quic_session_.OnStreamFrame(stream_frame);
+  EXPECT_FALSE(quic::test::QuicSessionPeer::IsStreamCreated(&envoy_quic_session_, stream_id));
+  // IETF stream 3 is server initiated uni-directional stream.
+  stream_id = 3u;
+  auto payload = std::make_unique<char[]>(8);
+  quic::QuicDataWriter payload_writer(8, payload.get());
+  EXPECT_TRUE(payload_writer.WriteVarInt62(1ul));
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::QUIC_HTTP_RECEIVE_SERVER_PUSH, _,
+                                                           "Received server push stream"));
+  quic::QuicStreamFrame stream_frame2(stream_id, false, 0, absl::string_view(payload.get(), 1));
+  envoy_quic_session_.OnStreamFrame(stream_frame2);
 }
 
 } // namespace Quic

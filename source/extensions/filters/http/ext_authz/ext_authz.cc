@@ -374,7 +374,10 @@ void Filter::continueDecoding() {
 }
 
 Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr& route) const {
-  if (route == nullptr || route->routeEntry() == nullptr) {
+  if (route == nullptr ||
+      (!Runtime::runtimeFeatureEnabled(
+           "envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect") &&
+       route->routeEntry() == nullptr)) {
     return PerRouteFlags{true /*skip_check_*/, false /*skip_request_body_buffering_*/};
   }
 

@@ -27,6 +27,7 @@
 #pragma GCC diagnostic pop
 #endif
 
+#include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_client_connection.h"
@@ -70,7 +71,10 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam(),
                             ConfigHelper::quicHttpProxyConfig()),
         supported_versions_(quic::CurrentSupportedHttp3Versions()), conn_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
+        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {
+    // Enable this flag for test coverage.
+    SetQuicReloadableFlag(quic_tls_set_signature_algorithm_prefs, true);
+  }
 
   ~QuicHttpIntegrationTest() override {
     cleanupUpstreamAndDownstream();
@@ -278,10 +282,14 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsDefaultMode) {
 }
 
 TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsNoBPF) {
-  // Note: This runtime override is a no-op on platforms without BPF
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing", "false");
+  // Note: This setting is a no-op on platforms without BPF
+  class DisableBpf {
+  public:
+    DisableBpf() { ActiveQuicListenerFactory::setDisableKernelBpfPacketRoutingForTest(true); }
+    ~DisableBpf() { ActiveQuicListenerFactory::setDisableKernelBpfPacketRoutingForTest(false); }
+  };
 
+  DisableBpf disable;
   testMultipleQuicConnections();
 }
 

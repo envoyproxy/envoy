@@ -33,7 +33,6 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 
   SPIFFEConfig message;
   Config::Utility::translateOpaqueConfig(config->customValidatorConfig().value().typed_config(),
-                                         ProtobufWkt::Struct(),
                                          ProtobufMessage::getStrictValidationVisitor(), message);
 
   if (!config->subjectAltNameMatchers().empty()) {

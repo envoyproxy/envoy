@@ -228,6 +228,7 @@ class BaseChecker(runner.Runner):
             self.summary.print_summary()
         return 1 if self.has_failed else 0
 
+    @runner.cleansup
     def run(self) -> int:
         """Run all configured checks and return the sum of their error counts"""
         checks = self.get_checks()
@@ -275,10 +276,6 @@ class Checker(BaseChecker):
 
     def on_checks_complete(self) -> int:
         return super().on_checks_complete()
-
-
-class ForkingChecker(runner.ForkingRunner, Checker):
-    pass
 
 
 class BazelChecker(runner.BazelRunner, Checker):
@@ -357,6 +354,7 @@ class AsyncChecker(BaseChecker):
                 result = await self.on_checks_complete()
         return result
 
+    @runner.cleansup
     def run(self) -> int:
         try:
             return asyncio.get_event_loop().run_until_complete(self._run())

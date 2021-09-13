@@ -224,11 +224,11 @@ parseRequestHeader(absl::string_view param) {
 StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringHeaderExtractor(
     std::function<std::string(const Ssl::ConnectionInfo& connection_info)> string_extractor) {
   return [string_extractor](const StreamInfo::StreamInfo& stream_info) {
-    if (stream_info.downstreamSslConnection() == nullptr) {
+    if (stream_info.downstreamAddressProvider().sslConnection() == nullptr) {
       return std::string();
     }
 
-    return string_extractor(*stream_info.downstreamSslConnection());
+    return string_extractor(*stream_info.downstreamAddressProvider().sslConnection());
   };
 }
 
