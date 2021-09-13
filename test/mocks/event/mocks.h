@@ -57,6 +57,9 @@ public:
         createClientConnection_(address, source_address, transport_socket, options)};
   }
 
+  MOCK_METHOD(Network::InternalListenerManagerOptRef, getInternalListenerManager, ());
+  MOCK_METHOD(void, registerInternalListenerManager, (Network::InternalListenerManager&));
+
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override {
     return FileEventPtr{createFileEvent_(fd, cb, trigger, events)};
