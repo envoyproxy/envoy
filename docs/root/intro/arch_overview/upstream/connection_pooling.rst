@@ -77,7 +77,7 @@ which will be manually configured).
 If no such advertisement exists, then HTTP/2 or HTTP/1 will be used instead.
 
 If no alternate protocol cache is configured, then HTTP/3 connections will be attempted to
-all servers, even though which do not advertise HTTP/3.
+all servers, even those which do not advertise HTTP/3.
 
 Further, HTTP/3 runs over QUIC (which uses UDP) and not over TCP (which HTTP/1 and HTTP/2 use).
 It is not uncommon for network devices to block UDP traffic, and hence block HTTP/3. This
