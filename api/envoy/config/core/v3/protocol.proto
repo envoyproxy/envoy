@@ -489,7 +489,7 @@ message Http3ProtocolOptions {
   // the header mechanisms from the `HTTP/2 extended connect RFC
   // <https://datatracker.ietf.org/doc/html/rfc8441>`_
   // and settings `proposed for HTTP/3
-  // <https://github.com/RyanTheOptimist/httpbis-h3-websockets/blob/main/draft-hamilton-httpbis-h3-websockets.md>`_
+  // <https://datatracker.ietf.org/doc/draft-ietf-httpbis-h3-websockets/>`_
   // [#alpha:] as HTTP/3 CONNECT is not yet an RFC.
   bool allow_extended_connect = 5;
 }
