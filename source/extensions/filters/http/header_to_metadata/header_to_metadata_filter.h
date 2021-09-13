@@ -190,7 +190,7 @@ private:
                              Http::StreamFilterCallbacks& callbacks);
   bool addMetadata(StructMap&, const std::string&, const std::string&, std::string, ValueType,
                    ValueEncode) const;
-  void applyKeyValue(std::string&&, const Rule&, const KeyValuePair&, StructMap&);
+  std::string applyKeyValue(std::string&&, const Rule&, const KeyValuePair&, StructMap&);
   const std::string& decideNamespace(const std::string& nspace) const;
   const Config* getConfig() const;
 };

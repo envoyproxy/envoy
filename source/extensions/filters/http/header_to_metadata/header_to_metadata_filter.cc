@@ -7,6 +7,7 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/upstream_subject_alt_names.h"
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/strings/numbers.h"
@@ -216,8 +217,8 @@ const std::string& HeaderToMetadataFilter::decideNamespace(const std::string& ns
 }
 
 // add metadata['key']= value depending on header present or missing case
-void HeaderToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule,
-                                           const KeyValuePair& keyval, StructMap& np) {
+std::string HeaderToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule,
+                                                  const KeyValuePair& keyval, StructMap& np) {
   if (!keyval.value().empty()) {
     value = keyval.value();
   } else {
@@ -232,30 +233,45 @@ void HeaderToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule
   } else {
     ENVOY_LOG(debug, "value is empty, not adding metadata");
   }
+
+  return std::move(value);
 }
 
 void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
                                                    const HeaderToMetadataRules& rules,
                                                    Http::StreamFilterCallbacks& callbacks) {
   StructMap structs_by_namespace;
+  std::vector<std::string> upstream_subject_alt_names{};
 
   for (const auto& rule : rules) {
     const auto& proto_rule = rule.rule();
     absl::optional<std::string> value = rule.selector_->extract(headers);
 
     if (value && proto_rule.has_on_header_present()) {
-      applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_header_present(),
-                    structs_by_namespace);
+      auto applied_value = applyKeyValue(std::move(value).value_or(""), rule,
+                                         proto_rule.on_header_present(), structs_by_namespace);
+      if (!applied_value.empty() && proto_rule.use_as_upstream_subject_alt_name()) {
+        upstream_subject_alt_names.push_back(std::move(applied_value));
+      }
     } else if (!value && proto_rule.has_on_header_missing()) {
       applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_header_missing(),
                     structs_by_namespace);
     }
   }
+
+  auto& stream_info = callbacks.streamInfo();
+
   // Any matching rules?
   if (!structs_by_namespace.empty()) {
     for (auto const& entry : structs_by_namespace) {
-      callbacks.streamInfo().setDynamicMetadata(entry.first, entry.second);
+      stream_info.setDynamicMetadata(entry.first, entry.second);
     }
+  }
+
+  if (!upstream_subject_alt_names.empty()) {
+    auto data = std::make_unique<Network::UpstreamSubjectAltNames>(upstream_subject_alt_names);
+    stream_info.filterState()->setData(Network::UpstreamSubjectAltNames::key(), std::move(data),
+                                       StreamInfo::FilterState::StateType::Mutable);
   }
 }
 

@@ -86,7 +86,7 @@ message Config {
   }
 
   // A Rule defines what metadata to apply when a header is present or missing.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message Rule {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.header_to_metadata.v2.Config.Rule";
@@ -122,6 +122,10 @@ message Config {
     // This prevents headers from leaking.
     // This field is not supported in case of a cookie.
     bool remove = 4;
+
+    // If this is set, the applied metadata value will also be used as one of the SANs to validate the
+    // certificate to set in the upstream connection. This is used to override the SAN in the TLS context.
+    bool use_as_upstream_subject_alt_name = 6;
   }
 
   // The list of rules to apply to requests.
