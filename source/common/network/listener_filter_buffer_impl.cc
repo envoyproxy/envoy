@@ -1,5 +1,6 @@
 #include "source/common/network/listener_filter_buffer_impl.h"
 
+#include <bits/stdint-uintn.h>
 #include <string.h>
 
 namespace Envoy {
@@ -14,6 +15,7 @@ const Buffer::ConstRawSlice ListenerFilterBufferImpl::rawSlice() const {
 }
 
 uint64_t ListenerFilterBufferImpl::drain(uint64_t length) {
+  ASSERT(length < data_size_);
   auto size_to_drain = std::min(length, data_size_);
   // It doesn't drain the data from buffer directly until drain the data
   // from actual socket.
@@ -23,20 +25,35 @@ uint64_t ListenerFilterBufferImpl::drain(uint64_t length) {
 }
 
 bool ListenerFilterBufferImpl::drainFromSocket() {
+  if (drained_size_ == 0) {
+    return true;
+  }
   // Since we want to drain the data from the socket, so a
   // temporary buffer need here.
   std::unique_ptr<uint8_t[]> buf(new uint8_t[drained_size_]);
-  auto result = io_handle_.recv(buf.get(), drained_size_, 0);
-  if (!result.ok()) {
-    on_close_cb_();
-    return false;
+  uint64_t read_size = 0;
+  while (1) {
+    auto result = io_handle_.recv(buf.data(), drained_size_ - read_size, 0);
+    if (!result.ok()) {
+      on_close_cb_();
+      return false;
+    }
+    read_size += result.return_value_;
+    if (read_size < drained_size_) {
+      continue;
+    }
+    buffer_->drain(drained_size_);
+    drained_size_ = 0;
+    break;
   }
-  buffer_->drain(drained_size_);
-  drained_size_ = 0;
   return true;
 }
 
 PeekState ListenerFilterBufferImpl::peekFromSocket() {
+  // For getting continuous memory space, we allocate single
+  // slice in the contructor. so we can assume there is only
+  // one slice in the buffer.
+  ASSERT(buffer_->getRawSlices().size() == 1);
   auto raw_slice = buffer_->frontSlice();
 
   const auto result = io_handle_.recv(raw_slice.mem_, raw_slice.len_, MSG_PEEK);
@@ -53,6 +70,7 @@ PeekState ListenerFilterBufferImpl::peekFromSocket() {
 void ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
   if (events & Event::FileReadyType::Closed) {
     on_close_cb_();
+    return;
   }
 
   auto state = peekFromSocket();
@@ -61,6 +79,7 @@ void ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
   } else if (state == PeekState::Error) {
     on_close_cb_();
   }
+  // did nothing for `Api::IoError::IoErrorCode::Again`
 }
 
 } // namespace Network

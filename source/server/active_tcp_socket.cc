@@ -75,9 +75,6 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
     bool no_error = true;
     if (iter_ == accept_filters_.end()) {
       iter_ = accept_filters_.begin();
-      // TODO(soulxu) This is for PoC, but we should initialize and reset file event
-      // for each filter, then we can back-compatible with existing filter. After all
-      // filter switch to the new method to get peek data, then we can change to this way.
       if (inspect_buffer_size_ > 0) {
         listener_filter_buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
             socket_->ioHandle(), listener_.dispatcher(), [this]() { continueFilterChain(false); },
@@ -89,7 +86,6 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
               continueFilterChain(true);
             },
             inspect_buffer_size_);
-        listener_filter_buffer_->initialize();
         // when accept the connection, the socket already has the data, so trigger
         // the data peek manually instead of waiting for next reading event.
         if (listener_filter_buffer_->peekFromSocket() == Network::PeekState::Error) {

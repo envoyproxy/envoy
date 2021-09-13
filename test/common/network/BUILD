@@ -227,6 +227,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "listener_filter_buffer_impl_test",
+    srcs = ["listener_filter_buffer_impl_test.cc"],
+    deps = [
+        "//source/common/network:listener_filter_buffer_lib",
+        "//test/mocks/network:io_handle_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "listener_impl_test",
     srcs = ["listener_impl_test.cc"],
     deps = [

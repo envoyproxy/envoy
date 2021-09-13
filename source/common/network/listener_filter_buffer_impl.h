@@ -15,6 +15,7 @@
 namespace Envoy {
 namespace Network {
 
+// TODO(soulxu): check whether provide the error code to the callback.
 using ListenerFilterBufferOnCloseCb = std::function<void()>;
 using ListenerFilterBufferOnDataCb = std::function<void()>;
 
@@ -34,15 +35,21 @@ public:
                            ListenerFilterBufferOnDataCb on_data_cb, uint64_t buffer_size)
       : io_handle_(io_handle), dispatcher_(dispatcher), on_close_cb_(close_cb),
         on_data_cb_(on_data_cb), buffer_(new Buffer::OwnedImpl()) {
+    // If the buffer_size not greater than 0, it means that doesn't expect any data.
+    ASSERT(buffer_size > 0);
     // Since we need the single slice for peek from the socket, so initialize that
     // single slice.
     auto reservation = buffer_->reserveSingleSlice(buffer_size);
     reservation.commit(buffer_size);
+    io_handle_.initializeFileEvent(
+        dispatcher_, [this](uint32_t events) { onFileEvent(events); },
+        Event::PlatformDefaultTriggerType,
+        Event::FileReadyType::Read | Event::FileReadyType::Closed);
   }
 
   const Buffer::ConstRawSlice rawSlice() const override;
   uint64_t drain(uint64_t length) override;
-  uint64_t length() const override { return buffer_->length(); }
+  uint64_t length() const override { return data_size_; }
 
   /**
    * trigger the data peek from the socket.
@@ -53,13 +60,6 @@ public:
    * sync the drain to the actual socket.
    */
   bool drainFromSocket();
-
-  void initialize() {
-    io_handle_.initializeFileEvent(
-        dispatcher_, [this](uint32_t events) { onFileEvent(events); },
-        Event::PlatformDefaultTriggerType,
-        Event::FileReadyType::Read | Event::FileReadyType::Closed);
-  }
 
   void reset() { io_handle_.resetFileEvents(); }
 
