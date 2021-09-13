@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-18.04
     timeout-minutes: 90
     container:
-      image: envoyproxy/envoy-build-ubuntu:e33c93e6d79804bf95ff80426d10bdcc9096c785
+      image: envoyproxy/envoy-build-ubuntu:b51ac7a0f2cb5dd729984a379a301ce029ac765d
     steps:
       - uses: actions/checkout@v1
         with:
@@ -20,18 +20,21 @@ jobs:
       - id: check_context
         name: 'Check whether to run'
         run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e cc/ -e python/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ ; then
+          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e cc/ -e python/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/python_tests.yml$ ; then
             echo "Tests will run."
             echo "::set-output name=run_tests::true"
           else
             echo "Skipping tests."
             echo "::set-output name=run_tests::false"
           fi
-      - name: 'Python setup'
-        if: steps.check_context.outputs.run_tests == 'true'
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.8'
       - name: 'Run tests'
         if: steps.check_context.outputs.run_tests == 'true'
-        run: bazel test --action_env=LD_LIBRARY_PATH --test_output=all //test/python/...
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bazel test \
+            --action_env=LD_LIBRARY_PATH \
+            --test_output=all \
+            --config=remote-ci-linux \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            //test/python/...
