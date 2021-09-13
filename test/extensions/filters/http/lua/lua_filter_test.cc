@@ -2393,7 +2393,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterSetResponseBufferChunked) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
 }
 
-// bodyBuffer should not truncated when bodyBuffer set hex character
+// BodyBuffer should not truncated when bodyBuffer set hex character
 TEST_F(LuaHttpFilterTest, LuaBodyBufferSetBytesWithHex) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
@@ -2420,7 +2420,7 @@ TEST_F(LuaHttpFilterTest, LuaBodyBufferSetBytesWithHex) {
   EXPECT_EQ(5, encoder_callbacks_.buffer_->length());
 }
 
-// bodyBuffer should not truncated when bodyBuffer set zero
+// BodyBuffer should not truncated when bodyBuffer set zero
 TEST_F(LuaHttpFilterTest, LuaBodyBufferSetBytesWithZero) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
@@ -2443,6 +2443,23 @@ TEST_F(LuaHttpFilterTest, LuaBodyBufferSetBytesWithZero) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
   EXPECT_EQ(1, encoder_callbacks_.buffer_->length());
 }
+
+// Script logging a table instead of the expected string.
+TEST_F(LuaHttpFilterTest, LogTableInsteadOfString) {
+  const std::string LOG_TABLE{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace({})
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(LOG_TABLE);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::err, StrEq("[string \"...\"]:3: bad argument #1 to 'logTrace' (string expected, got table)")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
 } // namespace
 } // namespace Lua
 } // namespace HttpFilters
