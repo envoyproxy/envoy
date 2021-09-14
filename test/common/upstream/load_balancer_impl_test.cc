@@ -570,6 +570,15 @@ public:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    return {};
+  }
+
+  absl::optional<Upstream::SelectedPoolAndConnection> selectPool(LoadBalancerContext*, const Host&,
+                                                                 std::vector<uint8_t>&) override {
+    return {};
+  }
+
   HostConstSharedPtr choose_host_once_host_{std::make_shared<NiceMock<MockHost>>()};
 };
 

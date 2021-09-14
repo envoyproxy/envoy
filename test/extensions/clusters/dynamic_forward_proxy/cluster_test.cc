@@ -314,6 +314,36 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnectionHttp3) {
   EXPECT_EQ(&connection, &selection->connection_);
 }
 
+TEST_F(ClusterTest, LoadBalancer_SelectPoolNoMatchingConnectionAfterDraining) {
+  initialize(coalesce_connection_config_, false);
+
+  const std::string hostname = "mail.example.org";
+  Upstream::MockHost host;
+  EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+  EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
+  std::vector<uint8_t> hash_key = {1, 2, 3};
+
+  Envoy::Http::ConnectionPool::MockInstance pool;
+  Envoy::Network::MockConnection connection;
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
+      lb_->lifetimeCallbacks();
+  ASSERT_TRUE(lifetime_callbacks.has_value());
+
+  EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
+  EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
+  lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
+
+  // Drain the connection then no verify that no connection is subsequently selected.
+  lifetime_callbacks->onConnectionDraining(pool, hash_key, connection);
+
+  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+      lb_->selectPool(&lb_context_, host, hash_key);
+
+  ASSERT_FALSE(selection.has_value());
+}
+
 TEST_F(ClusterTest, LoadBalancer_SelectPoolInvalidAlpn) {
   initialize(coalesce_connection_config_, false);
 
