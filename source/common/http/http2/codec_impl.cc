@@ -962,7 +962,7 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
     if (frame->hd.type != METADATA_FRAME_TYPE) {
       stream->bytes_meterer_->addWireBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
     }
-    if (frame->hd.type == NGHTTP2_DATA) {
+    if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
       stream->bytes_meterer_->addBodyBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
     }
   }
