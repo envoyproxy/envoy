@@ -48,7 +48,10 @@ envoy_extension_cc_test(
     srcs = ["rbac_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
     deps = [
+        "//source/extensions/clusters/dynamic_forward_proxy:cluster",
+        "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//source/extensions/filters/http/rbac:config",
+        "//source/extensions/key_value/file_based:config_lib",
         "//test/config:utility_lib",
         "//test/integration:http_protocol_integration_lib",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",

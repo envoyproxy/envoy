@@ -59,13 +59,17 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   cluster_info_ = cluster->info();
 
+  ENVOY_STREAM_LOG(debug, "ProxyFilter::decodeHeaders", *this->decoder_callbacks_);
   // We only need to do DNS lookups for hosts in dynamic forward proxy clusters,
   // since the other cluster types do their own DNS management.
   const absl::optional<CustomClusterType>& cluster_type = cluster_info_->clusterType();
   if (!cluster_type) {
+    ENVOY_STREAM_LOG(debug, "!cluster_type ", *this->decoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
   }
   if (cluster_type->name() != "envoy.clusters.dynamic_forward_proxy") {
+    ENVOY_STREAM_LOG(debug, "cluster_type->name(): {} ", *this->decoder_callbacks_,
+                     cluster_type->name());
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -154,33 +158,18 @@ void ProxyFilter::addHostAddressToFilterState(
     return;
   }
 
-  if (!decoder_callbacks_ || !address) {
-    ENVOY_LOG_MISC(warn, "Bad parameter - decoder callbacks or address");
-    return;
-  }
-
   ENVOY_STREAM_LOG(trace, "Adding resolved host {} to filter state", *decoder_callbacks_,
                    address->asString());
 
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
 
-  if (!filter_state->hasData<StreamInfo::UpstreamAddressSet>(
-          StreamInfo::UpstreamAddressSet::key())) {
-    auto address_set = std::make_unique<StreamInfo::UpstreamAddressSet>();
-    address_set->addresses_.emplace(address);
+  auto address_set = std::make_unique<StreamInfo::UpstreamAddressSet>();
+  address_set->addresses_.emplace(address);
 
-    filter_state->setData(StreamInfo::UpstreamAddressSet::key(), std::move(address_set),
-                          StreamInfo::FilterState::StateType::Mutable,
-                          StreamInfo::FilterState::LifeSpan::Request);
-
-  } else {
-    StreamInfo::UpstreamAddressSet& address_set =
-        filter_state->getDataMutable<StreamInfo::UpstreamAddressSet>(
-            StreamInfo::UpstreamAddressSet::key());
-    address_set.addresses_.clear();
-    address_set.addresses_.emplace(address);
-  }
+  filter_state->setData(StreamInfo::UpstreamAddressSet::key(), std::move(address_set),
+                        StreamInfo::FilterState::StateType::Mutable,
+                        StreamInfo::FilterState::LifeSpan::Request);
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(

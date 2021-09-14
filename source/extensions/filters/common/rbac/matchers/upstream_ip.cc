@@ -18,23 +18,24 @@ bool UpstreamIpMatcher::matches(const Network::Connection&, const Envoy::Http::R
                                 const StreamInfo::StreamInfo& info) const {
 
   if (!info.filterState().hasDataWithName(StreamInfo::UpstreamAddressSet::key())) {
-    ENVOY_LOG(warn,
-              "Did not find filter state with key: {}. Do you have a filter in the filter chain "
-              "before the RBAC filter which populates the filter state with upstream addresses ?",
-              StreamInfo::UpstreamAddressSet::key());
+    ENVOY_LOG_EVERY_POW_2(
+        warn,
+        "Did not find filter state with key: {}. Do you have a filter in the filter chain "
+        "before the RBAC filter which populates the filter state with upstream addresses ?",
+        StreamInfo::UpstreamAddressSet::key());
 
     return false;
   }
 
-  bool ipMatch = false;
+  bool ip_match = false;
 
   const StreamInfo::UpstreamAddressSet& address_set =
       info.filterState().getDataReadOnly<StreamInfo::UpstreamAddressSet>(
           StreamInfo::UpstreamAddressSet::key());
 
   address_set.iterate([&, this](const Network::Address::InstanceConstSharedPtr& address) {
-    ipMatch = range_.isInRange(*address.get());
-    if (ipMatch) {
+    ip_match = range_.isInRange(*address.get());
+    if (ip_match) {
       ENVOY_LOG(debug, "Address {} matched range: {}", address->asString(), range_.asString());
       return false;
     }
@@ -42,8 +43,9 @@ bool UpstreamIpMatcher::matches(const Network::Connection&, const Envoy::Http::R
     return true;
   });
 
-  ENVOY_LOG(debug, "UpstreamIp matcher for range: {} evaluated to: {}", range_.asString(), ipMatch);
-  return ipMatch;
+  ENVOY_LOG(debug, "UpstreamIp matcher for range: {} evaluated to: {}", range_.asString(),
+            ip_match);
+  return ip_match;
 }
 
 REGISTER_FACTORY(UpstreamIpMatcherFactory, MatcherExtensionFactory);

@@ -26,7 +26,7 @@ private:
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
   Upstream::ClusterManager& cluster_manager_;
-  bool save_upstream_address_ = false;
+  const bool save_upstream_address_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;

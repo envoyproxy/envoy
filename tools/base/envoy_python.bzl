@@ -88,7 +88,7 @@ def envoy_py_script(
     package named `envoy.code_format.python`, you can use this macro as
     follows:
 
-    ```skylark
+    ```starlark
 
     envoy_py_script(
         name = "tools.code_format.python",

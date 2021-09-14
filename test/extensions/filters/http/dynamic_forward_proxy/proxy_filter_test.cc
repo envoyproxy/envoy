@@ -404,50 +404,6 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, AddResolvedHostFilterStateMetadata
   filter_->onDestroy();
 }
 
-// Tests if address set is populated in the filter state when an upstream host is resolved
-// successfully but is null.
-TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddress) {
-  Upstream::ResourceAutoIncDec* circuit_breakers_(
-      new Upstream::ResourceAutoIncDec(pending_requests_));
-
-  EXPECT_CALL(callbacks_, streamInfo());
-  auto& filter_state = callbacks_.streamInfo().filterState();
-
-  InSequence s;
-
-  // Setup test host
-  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
-  host_info->address_ = nullptr;
-
-  EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(cm_, getThreadLocalCluster(_));
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
-      .WillOnce(Return(circuit_breakers_));
-  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
-
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _))
-      .WillOnce(Invoke([&](absl::string_view, uint16_t, ProxyFilter::LoadDnsCacheEntryCallbacks&) {
-        return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
-      }));
-
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, getHost(_))
-      .WillOnce(
-          Invoke([&](absl::string_view)
-                     -> absl::optional<const Common::DynamicForwardProxy::DnsHostInfoSharedPtr> {
-            return host_info;
-          }));
-
-  EXPECT_CALL(*host_info, address());
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-
-  // We do not expect FilterState to be populated
-  EXPECT_FALSE(
-      filter_state->hasData<StreamInfo::UpstreamAddressSet>(StreamInfo::UpstreamAddressSet::key()));
-
-  filter_->onDestroy();
-}
-
 // Tests if an already existing address set in filter state is updated when upstream host is
 // resolved successfully.
 TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetadata) {

@@ -16,25 +16,17 @@ using namespace Filters::Common::RBAC;
 
 bool UpstreamPortMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                                   const StreamInfo::StreamInfo& info) const {
-  if (start_ > end_) {
-    ENVOY_LOG(error,
-              "Upstream port matcher is misconfigured. Port range start: {} is greater than port "
-              "range end: {}",
-              start_, end_);
-
-    return false;
-  }
-
   if (!info.filterState().hasDataWithName(StreamInfo::UpstreamAddressSet::key())) {
-    ENVOY_LOG(warn,
-              "Did not find filter state with key: {}. Do you have a filter in the filter chain "
-              "before the RBAC filter which populates the filter state with upstream addresses ?",
-              StreamInfo::UpstreamAddressSet::key());
+    ENVOY_LOG_EVERY_POW_2(
+        warn,
+        "Did not find filter state with key: {}. Do you have a filter in the filter chain "
+        "before the RBAC filter which populates the filter state with upstream addresses ?",
+        StreamInfo::UpstreamAddressSet::key());
 
     return false;
   }
 
-  bool isMatch = false;
+  bool is_match = false;
 
   const StreamInfo::UpstreamAddressSet& address_set =
       info.filterState().getDataReadOnly<StreamInfo::UpstreamAddressSet>(
@@ -43,8 +35,8 @@ bool UpstreamPortMatcher::matches(const Network::Connection&, const Envoy::Http:
   address_set.iterate([&, this](const Network::Address::InstanceConstSharedPtr& address) {
     auto port = address->ip()->port();
 
-    isMatch = (port >= start_ && port <= end_);
-    if (isMatch) {
+    is_match = (port >= start_ && port <= end_);
+    if (is_match) {
       ENVOY_LOG(debug, "Port {} matched range: {}, {}", port, start_, end_);
       return false;
     }
@@ -53,8 +45,8 @@ bool UpstreamPortMatcher::matches(const Network::Connection&, const Envoy::Http:
   });
 
   ENVOY_LOG(debug, "UpstreamPort matcher for range ({}, {}) evaluated to: {}", start_, end_,
-            isMatch);
-  return isMatch;
+            is_match);
+  return is_match;
 }
 
 REGISTER_FACTORY(UpstreamPortMatcherFactory, MatcherExtensionFactory);
