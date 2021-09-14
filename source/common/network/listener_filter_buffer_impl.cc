@@ -50,7 +50,7 @@ bool ListenerFilterBufferImpl::drainFromSocket() {
 
 PeekState ListenerFilterBufferImpl::peekFromSocket() {
   // For getting continuous memory space, we allocate single
-  // slice in the contructor. so we can assume there is only
+  // slice in the constructor. so we can assume there is only
   // one slice in the buffer.
   ASSERT(buffer_->getRawSlices().size() == 1);
   auto raw_slice = buffer_->frontSlice();

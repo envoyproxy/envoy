@@ -197,7 +197,7 @@ TEST_F(ListenerFilterBufferImplTest, DrainData) {
   auto slice2 = listener_buffer_->rawSlice();
   EXPECT_EQ(buffer_size_ - drained_size, slice2.len_);
 
-  // peek again after drain the data from acutal socket
+  // peek again after drain the data from actual socket
   EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
     // expect to read, not peek
     EXPECT_EQ(MSG_PEEK, flags);
