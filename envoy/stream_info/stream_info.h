@@ -239,16 +239,16 @@ struct UpstreamTiming {
 struct BytesMeterer {
   uint64_t wireBytesSent() const { return wire_bytes_sent_; }
   uint64_t wireBytesReceived() const { return wire_bytes_received_; }
-  uint64_t bodyBytesSent() const { return body_bytes_sent_; }
-  uint64_t bodyBytesReceived() const { return body_bytes_received_; }
-  void addBodyBytesSent(uint64_t added_bytes) { body_bytes_sent_ += added_bytes; }
-  void addBodyBytesReceived(uint64_t added_bytes) { body_bytes_received_ += added_bytes; }
+  uint64_t headerBytesSent() const { return header_bytes_sent_; }
+  uint64_t headerBytesReceived() const { return header_bytes_received_; }
+  void addHeaderBytesSent(uint64_t added_bytes) { header_bytes_sent_ += added_bytes; }
+  void addHeaderBytesReceived(uint64_t added_bytes) { header_bytes_received_ += added_bytes; }
   void addWireBytesSent(uint64_t added_bytes) { wire_bytes_sent_ += added_bytes; }
   void addWireBytesReceived(uint64_t added_bytes) { wire_bytes_received_ += added_bytes; }
 
 private:
-  uint64_t body_bytes_sent_{};
-  uint64_t body_bytes_received_{};
+  uint64_t header_bytes_sent_{};
+  uint64_t header_bytes_received_{};
   uint64_t wire_bytes_sent_{};
   uint64_t wire_bytes_received_{};
 };

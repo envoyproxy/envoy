@@ -255,14 +255,14 @@ The following command operators are supported:
   TCP
     Not implemented (0).
 
-%UPSTREAM_BODY_BYTES_SENT%
+%UPSTREAM_HEADER_BYTES_SENT%
   HTTP
     Number of body bytes sent to the upstream by the http stream.
 
   TCP
     Not implemented (0).
 
-%UPSTREAM_BODY_BYTES_RECEIVED%
+%UPSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
     Number of body bytes received from the upstream by the http stream.
 
@@ -283,14 +283,14 @@ The following command operators are supported:
   TCP
     Not implemented (0).
 
-%DOWNSTREAM_BODY_BYTES_SENT%
+%DOWNSTREAM_HEADER_BYTES_SENT%
   HTTP
     Number of body bytes sent to the downstream by the http stream.
 
   TCP
     Not implemented (0).
 
-%DOWNSTREAM_BODY_BYTES_RECEIVED%
+%DOWNSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
     Number of body bytes received from the downstream by the http stream.
 

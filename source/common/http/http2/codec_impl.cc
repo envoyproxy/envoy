@@ -886,8 +886,8 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   if (frame->hd.type != METADATA_FRAME_TYPE) {
     stream->bytes_meterer_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
   }
-  if (frame->hd.type == NGHTTP2_DATA) {
-    stream->bytes_meterer_->addBodyBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
+  if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
+    stream->bytes_meterer_->addHeaderBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
   }
 
   switch (frame->hd.type) {
@@ -963,7 +963,7 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
       stream->bytes_meterer_->addWireBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
     }
     if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
-      stream->bytes_meterer_->addBodyBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
+      stream->bytes_meterer_->addHeaderBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
     }
   }
   switch (frame->hd.type) {

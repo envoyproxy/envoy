@@ -80,15 +80,6 @@ StatefulHeaderKeyFormatterPtr statefulFormatterFromSettings(const Http::Http1Set
   return nullptr;
 }
 
-int countHexDigits(int number) {
-  int hex_digits_count = 0;
-  do {
-    hex_digits_count++;
-    number /= 16;
-  } while (number > 0);
-  return hex_digits_count;
-}
-
 constexpr size_t CRLF_SIZE = 2;
 
 } // namespace
@@ -110,12 +101,13 @@ void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const c
                                      uint32_t value_size) {
 
   ASSERT(key_size > 0);
-
+  uint64_t old_buffer_length = connection_.buffer().length();
   connection_.copyToBuffer(key, key_size);
   connection_.addCharToBuffer(':');
   connection_.addCharToBuffer(' ');
   connection_.copyToBuffer(value, value_size);
   connection_.addToBuffer(CRLF);
+  bytes_meterer_->addHeaderBytesSent(connection_.buffer().length() - old_buffer_length);
 }
 void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
   this->encodeHeader(key.data(), key.size(), value.data(), value.size());
@@ -250,10 +242,8 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   // end_stream may be indicated with a zero length data buffer. If that is the case, so not
   // actually write the zero length buffer out.
   if (data.length() > 0) {
-    size_t body_frame_size = data.length();
     if (chunk_encoding_) {
       std::string chunk_header = absl::StrCat(absl::Hex(data.length()), CRLF);
-      body_frame_size += chunk_header.size();
       connection_.buffer().add(std::move(chunk_header));
     }
 
@@ -261,9 +251,7 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 
     if (chunk_encoding_) {
       connection_.buffer().add(CRLF);
-      body_frame_size += CRLF_SIZE;
     }
-    bytes_meterer_->addBodyBytesSent(body_frame_size);
   }
 
   if (end_stream) {
@@ -520,10 +508,17 @@ Status ConnectionImpl::completeLastHeader() {
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
+  auto& headers_or_trailers = headersOrTrailers();
+  StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
+  if (bytes_meterer) {
+    // Account for ":" bytes between the header key value pair.
+    bytes_meterer->addHeaderBytesReceived(headers_or_trailers.size());
+    // Account for "\r\n" at the end of headers.
+    bytes_meterer->addHeaderBytesReceived(CRLF_SIZE);
+  }
 
   // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
   RETURN_IF_ERROR(checkHeaderNameForUnderscores());
-  auto& headers_or_trailers = headersOrTrailers();
   if (!current_header_field_.empty()) {
     // Strip trailing whitespace of the current header value if any. Leading whitespace was trimmed
     // in ConnectionImpl::onHeaderValue. http_parser does not strip leading or trailing whitespace
@@ -591,7 +586,8 @@ void ConnectionImpl::onDispatch(const Buffer::Instance& data) {
   if (bytes_meterer) {
     bytes_meterer->addWireBytesReceived(data.length());
   } else {
-    // Bytes dispatched before we create pending response or active request.
+    // Bytes dispatched before we create active request.
+    // Should never happen for pending response.
     dispatched_bytes_before_stream_ += data.length();
   }
 }
@@ -689,6 +685,10 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
 
 Status ConnectionImpl::onHeaderField(const char* data, size_t length) {
   ASSERT(dispatching_);
+  StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
+  if (bytes_meterer) {
+    bytes_meterer->addHeaderBytesReceived(length);
+  }
   // We previously already finished up the headers, these headers are
   // now trailers.
   if (header_parsing_state_ == HeaderParsingState::Done) {
@@ -711,6 +711,10 @@ Status ConnectionImpl::onHeaderField(const char* data, size_t length) {
 
 Status ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   ASSERT(dispatching_);
+  StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
+  if (bytes_meterer) {
+    bytes_meterer->addHeaderBytesReceived(length);
+  }
   if (header_parsing_state_ == HeaderParsingState::Done && !enableTrailers()) {
     // Ignore trailers.
     return okStatus();
@@ -860,13 +864,6 @@ void ConnectionImpl::dispatchBufferedBody() {
 
 void ConnectionImpl::onChunkHeader(int content_length) {
   bool is_final_chunk = (content_length == 0);
-
-  StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
-  // Count overhead of chunk encoding per chunk.
-  if (bytes_meterer) {
-    bytes_meterer->addBodyBytesReceived(is_final_chunk ? 3 : 4 + countHexDigits(content_length));
-  }
-
   if (is_final_chunk) {
     // Dispatch body before parsing trailers, so body ends up dispatched even if an error is found
     // while processing trailers.
@@ -1188,8 +1185,6 @@ void ServerConnectionImpl::onBody(Buffer::Instance& data) {
   ASSERT(!deferred_end_stream_headers_);
   if (active_request_.has_value()) {
     ENVOY_CONN_LOG(trace, "body size={}", connection_, data.length());
-    ASSERT(getBytesMeterer());
-    getBytesMeterer()->addBodyBytesReceived(data.length());
     active_request_.value().request_decoder_->decodeData(data, false);
   }
 }
@@ -1403,9 +1398,6 @@ void ClientConnectionImpl::onBody(Buffer::Instance& data) {
   ASSERT(!deferred_end_stream_headers_);
   if (pending_response_.has_value()) {
     ASSERT(!pending_response_done_);
-    StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
-    bytes_meterer->addBodyBytesReceived(data.length());
-
     pending_response_.value().decoder_->decodeData(data, false);
   }
 }
