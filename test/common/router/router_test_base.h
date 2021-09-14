@@ -58,6 +58,7 @@ public:
 
   void expectResponseTimerCreate();
   void expectPerTryTimerCreate();
+  void expectPerTryIdleTimerCreate(std::chrono::milliseconds timeout);
   void expectMaxStreamDurationTimerCreate(std::chrono::milliseconds duration_msec);
   AssertionResult verifyHostUpstreamStats(uint64_t success, uint64_t error);
   void verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_match);
@@ -97,6 +98,7 @@ public:
   RouterTestFilter router_;
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
+  Event::MockTimer* per_try_idle_timeout_{};
   Event::MockTimer* max_stream_duration_timer_{};
   Network::Address::InstanceConstSharedPtr host_address_{
       Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
