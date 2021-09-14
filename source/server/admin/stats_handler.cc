@@ -138,7 +138,7 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
   }
   PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
                                               server_.stats().histograms(), response, used_only,
-                                              regex);
+                                              regex, server_.api().customStatNamespaces());
   return Http::Code::OK;
 }
 
