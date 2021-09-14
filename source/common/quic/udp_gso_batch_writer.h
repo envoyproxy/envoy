@@ -1,6 +1,6 @@
 #pragma once
 
-#if !defined(__linux__)
+#if !defined(__linux__) || defined(__ANDROID_API__)
 #define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 0
 #else
 #define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 1

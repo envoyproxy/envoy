@@ -17,6 +17,15 @@ Incompatible Behavior Changes
   :ref:`contrib images <install_contrib>`.
 * contrib: the :ref:`MySQL proxy filter <config_network_filters_mysql_proxy>` has been moved to
   :ref:`contrib images <install_contrib>`.
+* dns_filter: :ref:`dns_filter <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>`
+  protobuf fields have been renumbered to restore compatibility with Envoy
+  1.18, breaking compatibility with Envoy 1.19.0 and 1.19.1. The new field
+  numbering allows control planes supporting Envoy 1.18 to gracefully upgrade to
+  :ref:`dns_resolution_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolution_config>`,
+  provided they skip over Envoy 1.19.0 and 1.19.1.
+  Control planes upgrading from Envoy 1.19.0 and 1.19.1 will need to
+  vendor the corresponding protobuf definitions to ensure that the
+  renumbered fields have the types expected by those releases.
 * ext_authz: fixed skipping authentication when returning either a direct response or a redirect. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect`` runtime guard to false.
 
 Minor Behavior Changes
@@ -67,9 +76,11 @@ Bug Fixes
 * aws request signer: fix the AWS Request Signer extension to correctly normalize the path and query string to be signed according to AWS' guidelines, so that the hash on the server side matches. See `AWS SigV4 documentaion <https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html>`_.
 * cluster: delete pools when they're idle to fix unbounded memory use when using PROXY protocol upstream with tcp_proxy. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.conn_pool_delete_when_idle`` runtime guard to false.
 * cluster: finish cluster warming even if hosts are removed before health check initialization. This only affected clusters with :ref:`ignore_health_on_host_removal <envoy_v3_api_field_config.cluster.v3.Cluster.ignore_health_on_host_removal>`.
+* compressor: fix a bug where if trailers were added and a subsequent filter paused the filter chain, the request could be stalled. This behavior can be reverted by setting ``envoy.reloadable_features.fix_added_trailers`` to false.
 * dynamic forward proxy: fixing a validation bug where san and sni checks were not applied setting :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` via :ref:`typed_extension_protocol_options <envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
 * ext_authz: fix the ext_authz filter to correctly merge multiple same headers using the ',' as separator in the check request to the external authorization service.
-* ext_authz: the network ext_authz filter now correctly sets dynamic metdata returned by the authorization service for non-OK responses. This behavior now matches the http ext_authz filter.
+* ext_authz: fix the HTTP ext_authz filter to respond with ``403 Forbidden`` when a gRPC auth server sends a denied check response with an empty HTTP status code.
+* ext_authz: the network ext_authz filter now correctly sets dynamic metadata returned by the authorization service for non-OK responses. This behavior now matches the http ext_authz filter.
 * hcm: remove deprecation for :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>` and forbid mixing ip detection extensions with old related knobs.
 * http: limit use of deferred resets in the http2 codec to server-side connections. Use of deferred reset for client connections can result in incorrect behavior and performance problems.
 * listener: fixed an issue on Windows where connections are not handled by all worker threads.
