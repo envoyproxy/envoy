@@ -123,8 +123,8 @@ message Config {
     // This field is not supported in case of a cookie.
     bool remove = 4;
 
-    // If this is set, the applied metadata value will also be used as one of the SANs to validate the
-    // certificate to set in the upstream connection. This is used to override the SAN in the TLS context.
+    // If this is set, the applied metadata value will be used as one of the SANs to validate the
+    // certificate in the upstream connection. This is used to override the SAN in the TLS context.
     bool use_as_upstream_subject_alt_name = 6;
   }
 
