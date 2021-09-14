@@ -113,6 +113,9 @@ public:
 
   struct {
     const std::string AcceptEncoding{"Accept-Encoding"};
+    const std::string Accept{"Accept"};
+    const std::string UserAgent{"User-Agent"};
+    const std::string ContentType{"Content-Type"};
     const std::string Wildcard{"*"};
   } VaryValues;
 };

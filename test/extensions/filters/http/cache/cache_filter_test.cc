@@ -15,15 +15,41 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
+
+class CacheFilterTestPeer {
+public:
+  static bool isSuccessfulValidation(const CacheFilterSharedPtr filter,
+                                     const Http::ResponseHeaderMap& response_headers) {
+    return filter->isSuccessfulValidation(response_headers);
+  }
+
+  static void clearVaryAllowList(CacheFilterSharedPtr filter) {
+    envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
+    filter->vary_allow_list_ = config.allowed_vary_headers();
+  }
+};
+
 namespace {
+
+envoy::extensions::filters::http::cache::v3alpha::CacheConfig
+getConfig(bool extraAllowedVaryHeaders) {
+  // Allows 'accept' to be varied in the tests.
+  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
+  if (extraAllowedVaryHeaders) {
+    const auto& add_accept = config.mutable_allowed_vary_headers()->Add();
+    add_accept->set_exact("accept");
+  }
+  return config;
+}
 
 class CacheFilterTest : public ::testing::Test {
 protected:
   // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
   // cache callbacks.
-  CacheFilterSharedPtr makeFilter(HttpCache& cache) {
-    auto filter = std::make_shared<CacheFilter>(config_, /*stats_prefix=*/"", context_.scope(),
-                                                context_.timeSource(), cache);
+  CacheFilterSharedPtr makeFilter(HttpCache& cache, bool extraAllowedVaryHeaders = false) {
+    auto filter =
+        std::make_shared<CacheFilter>(getConfig(extraAllowedVaryHeaders), /*stats_prefix=*/"",
+                                      context_.scope(), context_.timeSource(), cache);
     filter->setDecoderFilterCallbacks(decoder_callbacks_);
     filter->setEncoderFilterCallbacks(encoder_callbacks_);
     return filter;
@@ -118,7 +144,6 @@ protected:
   void waitBeforeSecondRequest() { time_source_.advanceTimeWait(delay_); }
 
   SimpleHttpCache simple_cache_;
-  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Event::SimulatedTimeSystem time_source_;
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
@@ -387,6 +412,116 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
 
     ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
 
+    filter->onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, EtagMismatchFailsValidation) {
+  request_headers_.setHost("etagMismatchFailsValidation");
+  const std::string body = "abc";
+  const std::string etag_1 = "abc123";
+  const std::string etag_2 = "efg456";
+  {
+    // Create filter for request 1
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    testDecodeRequestMiss(filter);
+
+    // Encode response
+    // Add Etag & Last-Modified headers to the response for validation.
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag_1);
+
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter->onDestroy();
+  }
+  waitBeforeSecondRequest();
+  {
+    // Create filter for request 2.
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    // Make request require validation
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag_1);
+
+    // Decoding the request should find a cached response that requires validation.
+    testDecodeRequestMiss(filter);
+
+    // Make sure validation conditional headers are added.
+    const Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", etag_1}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+
+    // Encode 304 response with a different etag
+    Http::TestResponseHeaderMapImpl etag_2_response_headers = {{":status", "304"},
+                                                               {"etag", etag_2}};
+
+    // Expects failed validation because the etag has changed
+    EXPECT_FALSE(CacheFilterTestPeer::isSuccessfulValidation(filter, etag_2_response_headers));
+    ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
+    filter->onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, VaryMismatchFailsValidation) {
+  request_headers_.setHost("varyMismatchFailsValidation");
+  const std::string body = "abc";
+  const std::string vary_1 = "accept";
+  const std::string vary_2 = "content-type";
+  {
+    // Create filter for request 1
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_, true);
+
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().Accept, "text/*");
+
+    testDecodeRequestMiss(filter);
+
+    // Encode response
+    // Add Etag & Last-Modified headers to the response for validation.
+
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Vary, vary_1);
+    // response_headers_.setReferenceKey(Http::CustomHeaders::get().Accept, "text/*");
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter->onDestroy();
+  }
+  waitBeforeSecondRequest();
+
+  {
+    // Create filter for request 2.
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_, true);
+
+    // Make request require validation
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().Accept, "text/*");
+
+    // Decoding the request should find a cached response that requires validation.
+    testDecodeRequestMiss(filter);
+
+    Http::TestResponseHeaderMapImpl different_vary_response_headers = {{":status", "304"},
+                                                                       {"vary", vary_2}};
+
+    // Expects failed validation because the etag has changed
+    EXPECT_FALSE(
+        CacheFilterTestPeer::isSuccessfulValidation(filter, different_vary_response_headers));
+
+    Http::TestResponseHeaderMapImpl incorrect_status_response_headers = {{":status", "201"},
+                                                                         {"vary", vary_1}};
+
+    // Expects failed validation because the etag has changed
+    EXPECT_FALSE(
+        CacheFilterTestPeer::isSuccessfulValidation(filter, different_vary_response_headers));
+
+    Http::TestResponseHeaderMapImpl success_response_headers = {{":status", "304"},
+                                                                {"vary", vary_1}};
+    EXPECT_TRUE(CacheFilterTestPeer::isSuccessfulValidation(filter, success_response_headers));
+
+    CacheFilterTestPeer::clearVaryAllowList(filter);
+    EXPECT_FALSE(CacheFilterTestPeer::isSuccessfulValidation(filter, success_response_headers));
+
+    ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
     filter->onDestroy();
   }
 }

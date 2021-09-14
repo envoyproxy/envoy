@@ -365,7 +365,7 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersForMissingKey) {
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 }
 
-TEST_F(SimpleHttpCacheTest, UpdateHeadersDisabledForVaryHeaders) {
+TEST_F(SimpleHttpCacheTest, UpdateHeadersForVaryHeaders) {
   const std::string request_path_1("/name");
   const std::string time_value_1 = formatter_.fromTime(time_source_.systemTime());
   Http::TestResponseHeaderMapImpl response_headers_1{{"date", time_value_1},
@@ -385,7 +385,7 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersDisabledForVaryHeaders) {
                                                      {"vary", "accept"}};
   updateHeaders(request_path_1, response_headers_2, {time_2});
 
-  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
+  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_2));
 }
 
 TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipEtagHeader) {

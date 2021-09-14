@@ -38,6 +38,8 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
 
 private:
+  friend class CacheFilterTestPeer;
+
   // Utility functions; make any necessary checks and call the corresponding lookup_ functions
   void getHeaders(Http::RequestHeaderMap& request_headers);
   void getBody();
@@ -55,8 +57,8 @@ private:
 
   // Precondition: lookup_result_ points to a cache lookup result that requires validation.
   //               filter_state_ is ValidatingCachedResponse.
-  // Checks if a cached entry should be updated with a 304 response.
-  bool shouldUpdateCachedEntry(const Http::ResponseHeaderMap& response_headers) const;
+  // Checks if a cached entry validation is successful, i.e whether certain fields matches
+  bool isSuccessfulValidation(const Http::ResponseHeaderMap& response_headers) const;
 
   // Precondition: lookup_result_ points to a cache lookup result that requires validation.
   // Should only be called during onHeaders as it modifies RequestHeaderMap.

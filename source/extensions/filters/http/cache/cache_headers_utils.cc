@@ -345,6 +345,15 @@ VaryHeaderUtils::createVaryIdentifier(const VaryAllowList& allow_list,
   return vary_identifier;
 }
 
+bool VaryHeaderUtils::hasEqualVaryValues(const Envoy::Http::ResponseHeaderMap& existing_headers,
+                                         const Envoy::Http::ResponseHeaderMap& incoming_headers) {
+  absl::btree_set<absl::string_view> existing_vary_header_values =
+      VaryHeaderUtils::getVaryValues(existing_headers);
+  absl::btree_set<absl::string_view> response_vary_header_values =
+      VaryHeaderUtils::getVaryValues(incoming_headers);
+  return existing_vary_header_values == response_vary_header_values;
+}
+
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

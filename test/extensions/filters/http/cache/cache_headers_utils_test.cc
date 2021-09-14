@@ -872,6 +872,21 @@ TEST_F(VaryAllowListTest, NotAllowsHeadersMixed) {
   EXPECT_FALSE(vary_allow_list_.allowsHeaders(response_headers_));
 }
 
+TEST(HasEqualVaryValuesTest, NotEqualVary) {
+  Http::TestResponseHeaderMapImpl headers_1{{"accept", "image/*"}, {"vary", "content-type"}};
+  Http::TestResponseHeaderMapImpl headers_2{{"accept", "image/*"},
+                                            {"vary", "user-agent, content-type"}};
+  Http::TestResponseHeaderMapImpl headers_3{{"accept", "image/*"}, {"vary", "user-agent"}};
+  EXPECT_FALSE(VaryHeaderUtils::hasEqualVaryValues(headers_1, headers_2));
+  EXPECT_FALSE(VaryHeaderUtils::hasEqualVaryValues(headers_1, headers_3));
+}
+
+TEST(HasEqualVaryValuesTest, EqualVary) {
+  Http::TestResponseHeaderMapImpl headers_1{{"accept", "image/*"}, {"vary", "content-type"}};
+  Http::TestResponseHeaderMapImpl headers_2{{"accept", "application/*"}, {"vary", "content-type"}};
+  EXPECT_TRUE(VaryHeaderUtils::hasEqualVaryValues(headers_1, headers_2));
+}
+
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters

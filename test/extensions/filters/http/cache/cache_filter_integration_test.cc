@@ -423,7 +423,7 @@ TEST_P(CacheIntegrationTest, ServeGetFollowedByHead304WithValidation) {
   // Also to make sure response date header gets updated with the 304 date
   simTime().advanceTimeWait(Seconds(11));
 
-  // Send HEAD request, the cached response should be validate then served
+  // Send HEAD request, the cached response should be validated then served
   {
     // Include test name and params in URL to make each test's requests unique.
     const Http::TestRequestHeaderMapImpl request_headers =

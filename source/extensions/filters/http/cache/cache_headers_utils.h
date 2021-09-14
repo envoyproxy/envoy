@@ -153,6 +153,9 @@ absl::optional<std::string>
 createVaryIdentifier(const VaryAllowList& allow_list,
                      const absl::btree_set<absl::string_view>& vary_header_values,
                      const Envoy::Http::RequestHeaderMap& request_headers);
+
+bool hasEqualVaryValues(const Envoy::Http::ResponseHeaderMap& existing_headers,
+                        const Envoy::Http::ResponseHeaderMap& incoming_headers);
 } // namespace VaryHeaderUtils
 
 } // namespace Cache

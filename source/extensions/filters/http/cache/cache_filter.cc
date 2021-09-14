@@ -88,7 +88,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (filter_state_ == FilterState::ValidatingCachedResponse && isResponseNotModified(headers)) {
+  if (filter_state_ == FilterState::ValidatingCachedResponse && isSuccessfulValidation(headers)) {
     processSuccessfulValidation(headers);
     // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
     if (is_head_request_) {
@@ -355,11 +355,10 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   ASSERT(
       filter_state_ == FilterState::ValidatingCachedResponse,
       "processSuccessfulValidation must only be called when a cached response is being validated");
-  ASSERT(isResponseNotModified(response_headers),
-         "processSuccessfulValidation must only be called with 304 responses");
-
-  // Check whether the cached entry should be updated before modifying the 304 response.
-  const bool should_update_cached_entry = shouldUpdateCachedEntry(response_headers);
+  ASSERT(
+      isSuccessfulValidation(response_headers),
+      "processSuccessfulValidation must only be called when the entity-identifying fields matches,"
+      " e.g. etag, vary");
 
   filter_state_ = FilterState::EncodeServingFromCache;
 
@@ -384,27 +383,42 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
     return Http::HeaderMap::Iterate::Continue;
   });
 
-  if (should_update_cached_entry) {
-    // TODO(yosrym93): else the cached entry should be deleted.
-    // Update metadata associated with the cached response. Right now this is only response_time;
-    const ResponseMetadata metadata = {time_source_.systemTime()};
-    cache_.updateHeaders(*lookup_, response_headers, metadata);
-  }
+  // Update metadata associated with the cached response. Right now this is only response_time;
+  const ResponseMetadata metadata = {time_source_.systemTime()};
+  cache_.updateHeaders(*lookup_, response_headers, metadata);
 
   // A cache entry was successfully validated -> encode cached body and trailers.
   encodeCachedResponse();
 }
 
 // TODO(yosrym93): Write a test that exercises this when SimpleHttpCache implements updateHeaders
-bool CacheFilter::shouldUpdateCachedEntry(const Http::ResponseHeaderMap& response_headers) const {
-  ASSERT(isResponseNotModified(response_headers),
-         "shouldUpdateCachedEntry must only be called with 304 responses");
-  ASSERT(lookup_result_, "shouldUpdateCachedEntry precondition unsatisfied: lookup_result_ "
+bool CacheFilter::isSuccessfulValidation(const Http::ResponseHeaderMap& response_headers) const {
+  ASSERT(lookup_result_, "isSuccessfulValidation precondition unsatisfied: lookup_result_ "
                          "does not point to a cache lookup result");
   ASSERT(filter_state_ == FilterState::ValidatingCachedResponse,
-         "shouldUpdateCachedEntry precondition unsatisfied: the "
+         "isSuccessfulValidation precondition unsatisfied: the "
          "CacheFilter is not validating a cache lookup result");
+  // Should only update for 304 responses
+  if (!isResponseNotModified(response_headers)) {
+    return false;
+  }
 
+  // Delete the entry instead of updating if
+  // (1) the vary header has changed
+  // (2) the vary allow list changed to disallow the varied field. Note this is a rare case
+  //     because the vary allow list change must happen between the initial look up and validation
+  if (VaryHeaderUtils::hasVary(*(lookup_result_->headers_))) {
+    if (!VaryHeaderUtils::hasEqualVaryValues(*(lookup_result_->headers_), response_headers)) {
+      return false;
+    }
+    absl::btree_set<absl::string_view> vary_header_values =
+        VaryHeaderUtils::getVaryValues(response_headers);
+    for (const auto& value : VaryHeaderUtils::getVaryValues(response_headers)) {
+      if (!value.empty() && !vary_allow_list_.allowsValue(value)) {
+        return false;
+      }
+    }
+  }
   // According to: https://httpwg.org/specs/rfc7234.html#freshening.responses,
   // and assuming a single cached response per key:
   // If the 304 response contains a strong validator (etag) that does not match the cached response,

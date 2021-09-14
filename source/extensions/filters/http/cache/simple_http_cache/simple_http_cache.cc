@@ -131,19 +131,38 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
                                     const Http::ResponseHeaderMap& response_headers,
                                     const ResponseMetadata& metadata) {
   const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
-  const Key& key = simple_lookup_context.request().key();
+  const LookupRequest& request = simple_lookup_context.request();
+  const Key& key = request.key();
   absl::WriterMutexLock lock(&mutex_);
 
   auto iter = map_.find(key);
   if (iter == map_.end() || !iter->second.response_headers_) {
     return;
   }
-  auto& entry = iter->second;
+  Entry& firstEntry = iter->second;
 
-  // TODO(tangsaidi) handle Vary header updates properly
-  if (VaryHeaderUtils::hasVary(*(entry.response_headers_))) {
-    return;
+  if (VaryHeaderUtils::hasVary(*(firstEntry.response_headers_))) {
+    // sanity check whether the vary field is the same
+    ASSERT(VaryHeaderUtils::hasEqualVaryValues(*(firstEntry.response_headers_), response_headers));
+
+    // create vary identifier and varied_request_key
+    absl::btree_set<absl::string_view> vary_header_values =
+        VaryHeaderUtils::getVaryValues(response_headers);
+    const absl::optional<std::string> vary_identifier = VaryHeaderUtils::createVaryIdentifier(
+        request.varyAllowList(), vary_header_values, request.requestHeaders());
+
+    Key varied_request_key = request.key();
+    varied_request_key.add_custom_fields(vary_identifier.value());
+
+    iter = map_.find(varied_request_key);
+    if (iter == map_.end()) {
+      return;
+    }
+    ASSERT(iter->second.response_headers_ || !iter->second.response_headers_);
   }
+
+  // the iterator should point to the correct entry now
+  Entry& entry = iter->second;
 
   // Assumptions:
   // 1. The internet is fast, i.e. we get the result as soon as the server sends it.
