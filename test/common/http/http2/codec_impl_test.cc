@@ -3037,6 +3037,7 @@ TEST_P(Http2CodecImplTest, ConnectTest) {
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_headers.setReferenceKey(Headers::get().Method, Http::Headers::get().MethodValues.Connect);
+  request_headers.setReferenceKey(Headers::get().Protocol, "bytestream");
   TestRequestHeaderMapImpl expected_headers;
   HttpTestUtility::addDefaultHeaders(expected_headers);
   expected_headers.setReferenceKey(Headers::get().Method,

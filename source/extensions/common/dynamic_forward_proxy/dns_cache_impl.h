@@ -5,6 +5,7 @@
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/dns.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/cleanup.h"
@@ -45,10 +46,7 @@ class DnsCacheImplTest;
 
 class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
-  DnsCacheImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-               Random::RandomGenerator& random, Filesystem::Instance& file_system,
-               Runtime::Loader& loader, Stats::Scope& root_scope,
-               ProtobufMessage::ValidationVisitor& validation_visitor,
+  DnsCacheImpl(Server::Configuration::FactoryContextBase& context,
                const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   ~DnsCacheImpl() override;
   static DnsCacheStats generateDnsCacheStats(Stats::Scope& scope);

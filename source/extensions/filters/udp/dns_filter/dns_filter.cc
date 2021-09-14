@@ -170,7 +170,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     // In case client_config doesn't exist, craft an empty DNS resolver config
     // and stored in typed_dns_resolver_config_.
     Envoy::Network::makeDnsResolverConfig(envoy::extensions::filters::udp::dns_filter::v3alpha::
-                                          DnsFilterConfig::ClientContextConfig(),
+                                              DnsFilterConfig::ClientContextConfig(),
                                           typed_dns_resolver_config_);
   }
 }

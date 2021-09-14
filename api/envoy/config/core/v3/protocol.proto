@@ -60,15 +60,26 @@ message UpstreamHttpProtocolOptions {
       "envoy.api.v2.core.UpstreamHttpProtocolOptions";
 
   // Set transport socket `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ for new
-  // upstream connections based on the downstream HTTP host/authority header, as seen by the
-  // :ref:`router filter <config_http_filters_router>`.
+  // upstream connections based on the downstream HTTP host/authority header or any other arbitrary
+  // header when :ref:`override_auto_sni_header <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.override_auto_sni_header>`
+  // is set, as seen by the :ref:`router filter <config_http_filters_router>`.
   bool auto_sni = 1;
 
   // Automatic validate upstream presented certificate for new upstream connections based on the
-  // downstream HTTP host/authority header, as seen by the
-  // :ref:`router filter <config_http_filters_router>`.
-  // This field is intended to set with `auto_sni` field.
+  // downstream HTTP host/authority header or any other arbitrary header when :ref:`override_auto_sni_header <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.override_auto_sni_header>`
+  // is set, as seen by the :ref:`router filter <config_http_filters_router>`.
+  // This field is intended to be set with `auto_sni` field.
   bool auto_san_validation = 2;
+
+  // An optional alternative to the host/authority header to be used for setting the SNI value.
+  // It should be a valid downstream HTTP header, as seen by the
+  // :ref:`router filter <config_http_filters_router>`.
+  // If unset, host/authority header will be used for populating the SNI. If the specified header
+  // is not found or the value is empty, host/authority header will be used instead.
+  // This field is intended to be set with `auto_sni` and/or `auto_san_validation` fields.
+  // If none of these fields are set then setting this would be a no-op.
+  string override_auto_sni_header = 3
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 }
 
 // Configures the alternate protocols cache which tracks alternate protocols that can be used to
@@ -473,6 +484,7 @@ message GrpcProtocolOptions {
 }
 
 // A message which allows using HTTP/3.
+// [#next-free-field: 6]
 message Http3ProtocolOptions {
   QuicProtocolOptions quic_protocol_options = 1;
 
@@ -483,6 +495,14 @@ message Http3ProtocolOptions {
   // If set, this overrides any HCM :ref:`stream_error_on_invalid_http_messaging
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`.
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 2;
+
+  // Allows proxying Websocket and other upgrades over HTTP/3 CONNECT using
+  // the header mechanisms from the `HTTP/2 extended connect RFC
+  // <https://datatracker.ietf.org/doc/html/rfc8441>`_
+  // and settings `proposed for HTTP/3
+  // <https://datatracker.ietf.org/doc/draft-ietf-httpbis-h3-websockets/>`_
+  // [#alpha:] as HTTP/3 CONNECT is not yet an RFC.
+  bool allow_extended_connect = 5;
 }
 
 // A message to control transformations to the :scheme header
