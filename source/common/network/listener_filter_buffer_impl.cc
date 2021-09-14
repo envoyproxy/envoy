@@ -33,9 +33,8 @@ bool ListenerFilterBufferImpl::drainFromSocket() {
   std::unique_ptr<uint8_t[]> buf(new uint8_t[drained_size_]);
   uint64_t read_size = 0;
   while (1) {
-    auto result = io_handle_.recv(buf.data(), drained_size_ - read_size, 0);
+    auto result = io_handle_.recv(buf.get(), drained_size_ - read_size, 0);
     if (!result.ok()) {
-      on_close_cb_();
       return false;
     }
     read_size += result.return_value_;

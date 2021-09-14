@@ -23,7 +23,6 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
 ActiveTcpSocket::~ActiveTcpSocket() {
   accept_filters_.clear();
   listener_.stats_.downstream_pre_cx_active_.dec();
-
   // If the underlying socket is no longer attached, it means that it has been transferred to
   // an active connection. In this case, the active connection will decrement the number
   // of listener connections.
@@ -79,6 +78,10 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
         listener_filter_buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
             socket_->ioHandle(), listener_.dispatcher(), [this]() { continueFilterChain(false); },
             [this]() {
+              // If the filter doesn't need any data, then return directly.
+              if ((*iter_)->maxReadBytes() == 0) {
+                return;
+              }
               Network::FilterStatus status = (*iter_)->onData(*listener_filter_buffer_);
               if (status == Network::FilterStatus::StopIteration) {
                 return;
@@ -108,11 +111,13 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
           break;
         } else {
           // There may already have data peeked due to previous filter.
-          if ((*iter_)->maxReadBytes() > 0 && listener_filter_buffer_->length() > 0) {
-            Network::FilterStatus status = (*iter_)->onData(*listener_filter_buffer_);
-            // The filter needn't to inspect more data, then go to next filter.
-            if (status == Network::FilterStatus::Continue) {
-              continue;
+          if ((*iter_)->maxReadBytes() > 0 && listener_filter_buffer_ != nullptr) {
+            if (listener_filter_buffer_->length() > 0) {
+              Network::FilterStatus status = (*iter_)->onData(*listener_filter_buffer_);
+              // The filter needn't to inspect more data, then go to next filter.
+              if (status == Network::FilterStatus::Continue) {
+                continue;
+              }
             }
           }
           // Blocking at the filter but no error
@@ -122,8 +127,11 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
     }
     // Successfully ran all the accept filters.
     if (no_error) {
-      listener_filter_buffer_->reset();
-      if (listener_filter_buffer_->drainFromSocket()) {
+      if (listener_filter_buffer_ != nullptr) {
+        // if drain from socket failed, then end the connection.
+        no_error = listener_filter_buffer_->drainFromSocket();
+      }
+      if (no_error) {
         newConnection();
       }
     } else {
@@ -171,7 +179,9 @@ void ActiveTcpSocket::newConnection() {
     }
     // Reset the file events which are registered by listener filter.
     // reference https://github.com/envoyproxy/envoy/issues/8925.
-    socket_->ioHandle().resetFileEvents();
+    if (listener_filter_buffer_ != nullptr) {
+      listener_filter_buffer_->reset();
+    }
     accept_filters_.clear();
     // Create a new connection on this listener.
     listener_.newConnection(std::move(socket_), std::move(stream_info_));

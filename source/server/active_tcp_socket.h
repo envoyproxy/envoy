@@ -54,6 +54,8 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
       return listener_filter_->onData(buffer);
     }
 
+    size_t maxReadBytes() const override { return listener_filter_->maxReadBytes(); }
+
     /**
      * Check if this filter filter should be disabled on the incoming socket.
      * @param cb the callbacks the filter instance can use to communicate with the filter chain.
