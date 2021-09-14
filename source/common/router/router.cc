@@ -160,6 +160,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
     }
   }
   timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
+  timeout.per_try_idle_timeout_ = route.retryPolicy().perTryIdleTimeout();
 
   uint64_t header_timeout;
 
@@ -969,13 +970,24 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
   }
 }
 
+void Filter::onPerTryIdleTimeout(UpstreamRequest& upstream_request) {
+  onPerTryTimeoutCommon(upstream_request, cluster_->stats().upstream_rq_per_try_idle_timeout_,
+                        StreamInfo::ResponseCodeDetails::get().UpstreamPerTryIdleTimeout);
+}
+
 void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
+  onPerTryTimeoutCommon(upstream_request, cluster_->stats().upstream_rq_per_try_timeout_,
+                        StreamInfo::ResponseCodeDetails::get().UpstreamPerTryTimeout);
+}
+
+void Filter::onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Counter& error_counter,
+                                   const std::string& response_code_details) {
   if (hedging_params_.hedge_on_per_try_timeout_) {
     onSoftPerTryTimeout(upstream_request);
     return;
   }
 
-  cluster_->stats().upstream_rq_per_try_timeout_.inc();
+  error_counter.inc();
   if (upstream_request.upstreamHost()) {
     upstream_request.upstreamHost()->stats().rq_timeout_.inc();
   }
@@ -993,8 +1005,7 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
 
   // Remove this upstream request from the list now that we're done with it.
   upstream_request.removeFromList(upstream_requests_);
-  onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout,
-                         StreamInfo::ResponseCodeDetails::get().UpstreamPerTryTimeout);
+  onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout, response_code_details);
 }
 
 void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
