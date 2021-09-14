@@ -605,7 +605,6 @@ request_rules:
           regex: "^/(cluster[\\d\\w-]+)/?.*$"
         substitution: "\\1-san"
 )EOF";
-  initializeFilter(config);
 
   // Match.
   {
@@ -613,10 +612,12 @@ request_rules:
     Http::TestRequestHeaderMapImpl headers{{":path", "/cluster-prod-001/x/y"}};
     std::map<std::string, std::string> expected = {{"cluster", "cluster-prod-001-san"}};
 
+    initializeFilter(config);
+
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
-    EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+    EXPECT_CALL(stream_info, setDynamicMetadata("envoy.lb", MapEq(expected)));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-    EXPECT_EQ("cluster-prod-001-san", req_info_.filterState()
+    EXPECT_EQ("cluster-prod-001-san", stream_info.filterState()
                                           ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
                                               Network::UpstreamSubjectAltNames::key())
                                           .value()[0]);
@@ -627,10 +628,12 @@ request_rules:
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
     Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}};
 
+    initializeFilter(config);
+
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
-    EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+    EXPECT_CALL(stream_info, setDynamicMetadata(_, _)).Times(0);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-    EXPECT_FALSE(req_info_.filterState()->hasData<Network::UpstreamSubjectAltNames>(
+    EXPECT_FALSE(stream_info.filterState()->hasData<Network::UpstreamSubjectAltNames>(
         Network::UpstreamSubjectAltNames::key()));
   }
 }
