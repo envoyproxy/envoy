@@ -109,8 +109,7 @@ class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
             copytree(testdata_path, cls._temp_dir.name, dirs_exist_ok=True)
 
             # copy in buf config
-            bazel_buf_config_loc = Path.cwd().joinpath(
-                "external", "envoy_api_canonical", "buf.yaml")
+            bazel_buf_config_loc = Path.cwd().joinpath("external", "envoy_api", "buf.yaml")
             copyfile(bazel_buf_config_loc, cls._config_file_loc)
 
             # pull buf dependencies and initialize git repo with test data files

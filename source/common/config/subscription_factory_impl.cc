@@ -44,7 +44,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     Utility::checkTransportVersion(api_config_source);
     const auto transport_api_version = envoy::config::core::v3::ApiVersion::V3;
     switch (api_config_source.api_type()) {
-    case envoy::config::core::v3::ApiConfigSource::hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY:
+    case envoy::config::core::v3::ApiConfigSource::DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE:
       throw EnvoyException(
           "REST_LEGACY no longer a supported ApiConfigSource. "
           "Please specify an explicit supported api_type in the following config:\n" +

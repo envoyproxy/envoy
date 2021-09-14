@@ -11,8 +11,8 @@ py_library(
     srcs = ["exports.py"],
     data = [
         "//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations_utils.bzl",
+        "@envoy_api//bazel:repository_locations.bzl",
+        "@envoy_api//bazel:repository_locations_utils.bzl",
     ],
 )
 
