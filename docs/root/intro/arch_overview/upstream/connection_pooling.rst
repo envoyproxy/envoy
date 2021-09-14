@@ -68,8 +68,8 @@ then 300ms later, if a QUIC connection is not established, will also attempt to 
 Whichever handshake succeeds will be used for the initial
 stream, but if both TCP and QUIC connections are established, QUIC will eventually be preferred.
 
-If an alternate protocol cache is configured via the
-:ref:`alternate_protocols_cache_options <envoy_v3_api_msg_extensions.upstreams.http.v3.AlternateProtocolsCacheOptions>`
+If an alternate protocol cache is configured via
+:ref:`alternate_protocols_cache_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig.alternate_protocols_cache_options>`
 then HTTP/3 connections will only be attempted to servers which
 advertise HTTP/3 support either via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`, (eventually
 the `HTTPS DNS resource record<https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>` or "QUIC hints"
