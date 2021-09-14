@@ -51,6 +51,7 @@ public:
   struct TimeoutData {
     std::chrono::milliseconds global_timeout_{0};
     std::chrono::milliseconds per_try_timeout_{0};
+    std::chrono::milliseconds per_try_idle_timeout_{0};
   };
 
   struct HedgingParams {
@@ -271,6 +272,7 @@ public:
                                UpstreamRequest& upstream_request) PURE;
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
   virtual void onPerTryTimeout(UpstreamRequest& upstream_request) PURE;
+  virtual void onPerTryIdleTimeout(UpstreamRequest& upstream_request) PURE;
   virtual void onStreamMaxDurationReached(UpstreamRequest& upstream_request) PURE;
 
   virtual Http::StreamDecoderFilterCallbacks* callbacks() PURE;
@@ -445,6 +447,7 @@ public:
                        UpstreamRequest& upstream_request) override;
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override;
   void onPerTryTimeout(UpstreamRequest& upstream_request) override;
+  void onPerTryIdleTimeout(UpstreamRequest& upstream_request) override;
   void onStreamMaxDurationReached(UpstreamRequest& upstream_request) override;
   Http::StreamDecoderFilterCallbacks* callbacks() override { return callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
@@ -469,8 +472,8 @@ public:
 private:
   friend class UpstreamRequest;
 
-  RetryStatePtr retry_state_;
-
+  void onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Counter& error_counter,
+                             const std::string& response_code_details);
   Stats::StatName upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
   void chargeUpstreamCode(uint64_t response_status_code,
                           const Http::ResponseHeaderMap& response_headers,
@@ -528,6 +531,7 @@ private:
                                    uint64_t grpc_to_http_status);
   Http::Context& httpContext() { return config_.http_context_; }
 
+  RetryStatePtr retry_state_;
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_;

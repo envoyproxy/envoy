@@ -51,6 +51,11 @@ void RouterTestBase::expectPerTryTimerCreate() {
   EXPECT_CALL(*per_try_timeout_, disableTimer());
 }
 
+void RouterTestBase::expectPerTryIdleTimerCreate(std::chrono::milliseconds timeout) {
+  per_try_idle_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
+  EXPECT_CALL(*per_try_idle_timeout_, enableTimer(timeout, _));
+}
+
 void RouterTestBase::expectMaxStreamDurationTimerCreate(std::chrono::milliseconds duration_msec) {
   max_stream_duration_timer_ = new Event::MockTimer(&callbacks_.dispatcher_);
   EXPECT_CALL(*max_stream_duration_timer_, enableTimer(Eq(duration_msec), _));
