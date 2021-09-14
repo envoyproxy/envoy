@@ -100,7 +100,8 @@ private:
   class DnsHostInfoImpl : public DnsHostInfo {
   public:
     DnsHostInfoImpl(TimeSource& time_source, absl::string_view resolved_host, bool is_ip_address)
-        : time_source_(time_source), resolved_host_(resolved_host), is_ip_address_(is_ip_address) {
+        : time_source_(time_source), resolved_host_(resolved_host), is_ip_address_(is_ip_address),
+          stale_at_time_(time_source.monotonicTime()) {
       touch();
     }
 
@@ -112,6 +113,9 @@ private:
     const std::string& resolvedHost() const override { return resolved_host_; }
     bool isIpAddress() const override { return is_ip_address_; }
     void touch() final { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
+    void updateStale(MonotonicTime resolution_time, std::chrono::seconds ttl) {
+      stale_at_time_ = resolution_time + ttl;
+    }
 
     void setAddress(Network::Address::InstanceConstSharedPtr address) {
       absl::WriterMutexLock lock{&resolve_lock_};
@@ -141,6 +145,7 @@ private:
     // Using std::chrono::steady_clock::duration is required for compilation within an atomic vs.
     // using MonotonicTime.
     std::atomic<std::chrono::steady_clock::duration> last_used_time_;
+    std::atomic<MonotonicTime> stale_at_time_;
     bool first_resolve_complete_ ABSL_GUARDED_BY(resolve_lock_){false};
   };
 
@@ -177,7 +182,8 @@ private:
   void startResolve(const std::string& host, PrimaryHostInfo& host_info)
       ABSL_LOCKS_EXCLUDED(primary_hosts_lock_);
   void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
-                     std::list<Network::DnsResponse>&& response, bool from_cache = false);
+                     std::list<Network::DnsResponse>&& response,
+                     absl::optional<MonotonicTime> resolution_time = {});
   void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);
   void runRemoveCallbacks(const std::string& host);
   void notifyThreads(const std::string& host, const DnsHostInfoImplSharedPtr& resolved_info);
@@ -186,10 +192,12 @@ private:
   PrimaryHostInfo& getPrimaryHost(const std::string& host);
 
   void addCacheEntry(const std::string& host,
-                     const Network::Address::InstanceConstSharedPtr& address);
+                     const Network::Address::InstanceConstSharedPtr& address,
+                     const std::chrono::seconds ttl);
   void removeCacheEntry(const std::string& host);
   void loadCacheEntries(
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
+  PrimaryHostInfo* createHost(const std::string& host, uint16_t default_port);
 
   Event::Dispatcher& main_thread_dispatcher_;
   const Network::DnsLookupFamily dns_lookup_family_;
