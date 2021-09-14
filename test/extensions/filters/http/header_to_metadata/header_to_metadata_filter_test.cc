@@ -607,32 +607,44 @@ request_rules:
 )EOF";
   initializeFilter(config);
 
-  // Match.
-  {
-    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-    Http::TestRequestHeaderMapImpl headers{{":path", "/cluster-prod-001/x/y"}};
-    std::map<std::string, std::string> expected = {{"cluster", "cluster-prod-001-san"}};
+  Http::TestRequestHeaderMapImpl headers{{":path", "/cluster-prod-001/x/y"}};
+  std::map<std::string, std::string> expected = {{"cluster", "cluster-prod-001-san"}};
 
-    EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
-    EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-    EXPECT_EQ("cluster-prod-001-san", req_info_.filterState()
-                                          ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
-                                              Network::UpstreamSubjectAltNames::key())
-                                          .value()[0]);
-  }
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ("cluster-prod-001-san", req_info_.filterState()
+                                        ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
+                                            Network::UpstreamSubjectAltNames::key())
+                                        .value()[0]);
+}
 
-  // No match.
-  {
-    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-    Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}};
+/**
+ * Regex substitution and use as upstream SAN: no match.
+ */
+TEST_F(HeaderToMetadataTest, RegexSubstitutionUpstreamSANNoMatch) {
+  const std::string config = R"EOF(
+request_rules:
+  - header: x-use-as-upstream-san
+    use_as_upstream_subject_alt_name: true
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: cluster
+      regex_value_rewrite:
+        pattern:
+          google_re2: {}
+          regex: "^/(cluster[\\d\\w-]+)/?.*$"
+        substitution: "\\1-san"
+)EOF";
+  initializeFilter(config);
 
-    EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
-    EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-    EXPECT_FALSE(req_info_.filterState()->hasData<Network::UpstreamSubjectAltNames>(
-        Network::UpstreamSubjectAltNames::key()));
-  }
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}};
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_FALSE(req_info_.filterState()->hasData<Network::UpstreamSubjectAltNames>(
+      Network::UpstreamSubjectAltNames::key()));
 }
 
 /**
