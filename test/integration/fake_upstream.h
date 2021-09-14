@@ -570,6 +570,7 @@ struct FakeUpstreamConfig {
     // Legacy options which are always set.
     http2_options_.set_allow_connect(true);
     http2_options_.set_allow_metadata(true);
+    http3_options_.set_allow_extended_connect(true);
   }
 
   Event::TestTimeSystem& time_system_;

@@ -321,6 +321,12 @@ public:
    * Drain all connection pool connections owned by all clusters in the cluster manager.
    */
   virtual void drainConnections() PURE;
+
+  /**
+   * Check if the cluster is active and statically configured, and if not, throw excetion.
+   * @param cluster, the cluster to check.
+   */
+  virtual void checkActiveStaticCluster(const std::string& cluster) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
