@@ -6,10 +6,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-exports_files([
-    "base_command.py",
-])
-
 envoy_py_library(
     "tools.base.aio",
     deps = [
