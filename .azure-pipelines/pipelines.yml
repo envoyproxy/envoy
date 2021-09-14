@@ -244,6 +244,8 @@ stages:
       matrix:
         api:
           CI_TARGET: "bazel.api"
+        api_compat:
+          CI_TARGET: "bazel.api_compat"
         gcc:
           CI_TARGET: "bazel.gcc"
         clang_tidy:

@@ -268,7 +268,7 @@ def format_header_from_file(
                 # import_deprecation_proto is True or the proto is frozen.
                 continue
             infra_imports.append(d)
-        elif d.startswith('envoy/'):
+        elif d.startswith('envoy/') or d.startswith('contrib/'):
             # We ignore existing envoy/ imports, since these are computed explicitly
             # from type_dependencies.
             pass

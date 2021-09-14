@@ -19,9 +19,8 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
                              const std::string& system_version_info) {
   Config::ScopedResume maybe_resume_eds;
   if (cm_.adsMux()) {
-    const auto type_urls =
-        Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-    maybe_resume_eds = cm_.adsMux()->pause(type_urls);
+    const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+    maybe_resume_eds = cm_.adsMux()->pause(type_url);
   }
 
   ENVOY_LOG(info, "{}: add {} cluster(s), remove {} cluster(s)", name_, added_resources.size(),

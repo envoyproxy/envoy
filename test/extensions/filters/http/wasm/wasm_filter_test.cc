@@ -1773,7 +1773,7 @@ TEST_P(WasmHttpFilterTest, Property) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, true));
   StreamInfo::MockStreamInfo log_stream_info;
   request_stream_info_.route_name_ = "route12";
-  request_stream_info_.downstream_address_provider_->setRequestedServerName("w3.org");
+  request_stream_info_.downstream_connection_info_provider_->setRequestedServerName("w3.org");
   NiceMock<Network::MockConnection> connection;
   EXPECT_CALL(connection, id()).WillRepeatedly(Return(4));
   EXPECT_CALL(encoder_callbacks_, connection()).WillRepeatedly(Return(&connection));

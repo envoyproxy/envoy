@@ -26,7 +26,7 @@ public:
   }
 
   void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {
-    config_helper_.addFilter(filter_config);
+    config_helper_.prependFilter(filter_config);
 
     // Create static clusters.
     createClusters();
@@ -72,15 +72,13 @@ public:
   }
 
   void initializeWithYaml(const std::string& filter_config, const std::string& route_config) {
-    config_helper_.addFilter(filter_config);
+    config_helper_.prependFilter(filter_config);
 
     createClusters();
     config_helper_.addConfigModifier(
         [route_config](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) {
-          TestUtility::loadFromYaml(route_config, *hcm.mutable_route_config(), true);
-        });
+                hcm) { TestUtility::loadFromYaml(route_config, *hcm.mutable_route_config()); });
     initialize();
   }
 
@@ -103,7 +101,7 @@ public:
 
   void initializeWithRds(const std::string& filter_config, const std::string& route_config_name,
                          const std::string& initial_route_config) {
-    config_helper_.addFilter(filter_config);
+    config_helper_.prependFilter(filter_config);
 
     // Create static clusters.
     createClusters();

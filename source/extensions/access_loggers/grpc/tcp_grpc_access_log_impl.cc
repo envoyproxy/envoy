@@ -24,10 +24,10 @@ TcpGrpcAccessLog::TcpGrpcAccessLog(
     Stats::Scope& scope)
     : Common::ImplBase(std::move(filter)), scope_(scope), config_(std::move(config)),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
-  tls_slot_->set([this, transport_version = Config::Utility::getAndCheckTransportVersion(
-                            config_.common_config())](Event::Dispatcher&) {
+  Config::Utility::checkTransportVersion(config_.common_config());
+  tls_slot_->set([this](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
-        config_.common_config(), transport_version, Common::GrpcAccessLoggerType::TCP, scope_));
+        config_.common_config(), Common::GrpcAccessLoggerType::TCP, scope_));
   });
 }
 

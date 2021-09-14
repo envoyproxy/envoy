@@ -64,7 +64,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
       }
 #endif
       // Restore the local address to the original one.
-      socket.addressProvider().restoreLocalAddress(original_local_address);
+      socket.connectionInfoProvider().restoreLocalAddress(original_local_address);
     }
   }
 

@@ -61,7 +61,7 @@ struct AppleDnsResolverStats {
  * Implementation of DnsResolver that uses Apple dns_sd.h APIs. All calls and callbacks are assumed
  * to happen on the thread that owns the creating dispatcher.
  */
-class AppleDnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::upstream> {
+class AppleDnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
   AppleDnsResolverImpl(Event::Dispatcher& dispatcher, Stats::Scope& root_scope);
 

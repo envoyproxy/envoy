@@ -195,7 +195,7 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
 void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "UpstreamRequest " << this << "\n";
-  const auto addressProvider = connection().addressProviderSharedPtr();
+  const auto addressProvider = connection().connectionInfoProviderSharedPtr();
   const Http::RequestHeaderMap* request_headers = parent_.downstreamHeaders();
   DUMP_DETAILS(addressProvider);
   DUMP_DETAILS(request_headers);
@@ -457,14 +457,18 @@ void UpstreamRequest::onPoolReady(
     paused_for_connect_ = true;
   }
 
-  if (upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
-    const auto max_stream_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+  absl::optional<std::chrono::milliseconds> max_stream_duration;
+  if (parent_.dynamicMaxStreamDuration().has_value()) {
+    max_stream_duration = parent_.dynamicMaxStreamDuration().value();
+  } else if (upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
+    max_stream_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
         upstream_host_->cluster().commonHttpProtocolOptions().max_stream_duration()));
-    if (max_stream_duration.count()) {
-      max_stream_duration_timer_ = parent_.callbacks()->dispatcher().createTimer(
-          [this]() -> void { onStreamMaxDurationReached(); });
-      max_stream_duration_timer_->enableTimer(max_stream_duration);
-    }
+  }
+
+  if (max_stream_duration.has_value() && max_stream_duration->count()) {
+    max_stream_duration_timer_ = parent_.callbacks()->dispatcher().createTimer(
+        [this]() -> void { onStreamMaxDurationReached(); });
+    max_stream_duration_timer_->enableTimer(*max_stream_duration);
   }
 
   const Http::Status status =

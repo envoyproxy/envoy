@@ -25,7 +25,7 @@ class DummyForkingRunner(runner.ForkingRunner):
         self.args = PropertyMock()
 
 
-class Error1(Exception):
+class OneError(Exception):
 
     def __str__(self):
         return ""
@@ -33,7 +33,7 @@ class Error1(Exception):
     pass
 
 
-class Error2(Exception):
+class TwoError(Exception):
     pass
 
 
@@ -72,10 +72,10 @@ def _failing_runner(errors):
 @pytest.mark.parametrize("async_fun", [True, False])
 @pytest.mark.parametrize(
     "errors",
-    [Error1, (Error1, Error2)])
+    [OneError, (OneError, TwoError)])
 @pytest.mark.parametrize(
     "raises",
-    [None, Error1, Error2])
+    [None, OneError, TwoError])
 @pytest.mark.parametrize(
     "args",
     [(), ("ARG1", "ARG2")])

@@ -42,7 +42,7 @@ typed_config:
   response_size_header: "{}"
             )EOF",
         response_size_header ? *response_size_header : "");
-    config_helper_.addFilter(filter);
+    config_helper_.prependFilter(filter);
 
     auto vhost = config_helper_.createVirtualHost("disabled");
     envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfigPerRoute

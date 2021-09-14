@@ -192,7 +192,7 @@ else
     # We test contrib on release only.
     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "//contrib/...")
   fi
-  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_googlesource_quiche//:ci_tests")
+  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests")
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
@@ -366,14 +366,23 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
   echo "Validating API structure..."
   "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
-  echo "Testing API and API Boosting..."
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api_canonical//test/... @envoy_api_canonical//tools/... \
-    @envoy_api_canonical//tools:tap2pcap_test @envoy_dev//clang_tools/api_booster/...
+  echo "Validate Golang protobuf generation..."
+  "${ENVOY_SRCDIR}"/tools/api/generate_go_protobuf.py
+  echo "Testing API..."
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
+    @envoy_api//tools:tap2pcap_test
   echo "Building API..."
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api_canonical//envoy/...
-  echo "Testing API boosting (golden C++ tests)..."
-  # We use custom BAZEL_BUILD_OPTIONS here; the API booster isn't capable of working with libc++ yet.
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" python3.8 "${ENVOY_SRCDIR}"/tools/api_boost/api_boost_test.py
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api//envoy/...
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.api_compat" ]]; then
+  echo "Building buf..."
+  bazel build @com_github_bufbuild_buf//:buf
+  BUF_PATH=$(realpath "bazel-source/external/com_github_bufbuild_buf/bin/buf")
+  echo "Checking API for breaking changes to protobuf backwards compatibility..."
+  BASE_BRANCH_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
+  COMMIT_TITLE=$(git log -n 1 --pretty='format:%C(auto)%h (%s, %ad)' "${BASE_BRANCH_REF}")
+  echo -e "\tUsing base commit ${COMMIT_TITLE}"
+  "${ENVOY_SRCDIR}"/tools/api_proto_breaking_change_detector/detector_ci.sh "${BUF_PATH}" "${BASE_BRANCH_REF}"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
   setup_clang_toolchain
@@ -468,9 +477,6 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
 
   echo "Run protoxform test"
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
-
-  echo "Run merge active shadow test"
-  bazel test "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:merge_active_shadow_test
 
   echo "check_format_test..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN

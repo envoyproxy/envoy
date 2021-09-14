@@ -31,13 +31,6 @@ following are the command line options that Envoy supports.
 
       ./envoy -c bootstrap.yaml --config-yaml "node: {id: 'node1'}"
 
-.. option:: --bootstrap-version <integer>
-
-   *(optional)* The API version to load the bootstrap as. The value should be a single integer, e.g.
-   to parse the bootstrap configuration as V3, specify ``--bootstrap-version 3``. If unset, Envoy will
-   attempt to load the bootstrap as the previous API version and upgrade it to the latest. If that fails,
-   Envoy will attempt to load the configuration as the latest version.
-
 .. option:: --mode <string>
 
   *(optional)* One of the operating modes for Envoy:

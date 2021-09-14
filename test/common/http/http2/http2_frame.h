@@ -129,6 +129,8 @@ public:
   // Methods for creating HTTP2 frames
   static Http2Frame makePingFrame(absl::string_view data = {});
   static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::None);
+  static Http2Frame makeSettingsFrame(SettingsFlags flags,
+                                      std::list<std::pair<uint16_t, uint32_t>> settings);
   static Http2Frame makeEmptyHeadersFrame(uint32_t stream_index,
                                           HeadersFlags flags = HeadersFlags::None);
   static Http2Frame makeHeadersFrameNoStatus(uint32_t stream_index);

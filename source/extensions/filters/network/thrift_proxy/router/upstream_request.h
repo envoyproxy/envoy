@@ -44,10 +44,10 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
   void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
-  bool handleUpstreamData(Buffer::Instance& data, bool end_stream, RequestOwner& owner,
+  bool handleUpstreamData(Buffer::Instance& data, bool end_stream,
                           UpstreamResponseCallbacks& callbacks);
   void handleUpgradeResponse(Buffer::Instance& data);
-  ThriftFilters::ResponseStatus handleRegularResponse(Buffer::Instance& data, RequestOwner& owner,
+  ThriftFilters::ResponseStatus handleRegularResponse(Buffer::Instance& data,
                                                       UpstreamResponseCallbacks& callbacks);
   uint64_t encodeAndWrite(Buffer::OwnedImpl& request_buffer);
   void onEvent(Network::ConnectionEvent event);

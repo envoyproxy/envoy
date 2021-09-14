@@ -6,7 +6,23 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_py_library("tools.base.aio")
+exports_files([
+    "base_command.py",
+])
+
+envoy_py_library(
+    "tools.base.aio",
+    deps = [
+        requirement("aio.functional"),
+    ],
+)
+
+envoy_py_library(
+    "tools.base.checker",
+    deps = [
+        ":runner",
+    ],
+)
 
 envoy_py_library(
     "tools.base.runner",
@@ -18,19 +34,10 @@ envoy_py_library(
     ],
 )
 
-envoy_py_library("tools.base.functional")
-
 envoy_py_library(
     "tools.base.utils",
     deps = [
         requirement("pyyaml"),
         requirement("setuptools"),
-    ],
-)
-
-envoy_py_library(
-    "tools.base.checker",
-    deps = [
-        ":runner",
     ],
 )

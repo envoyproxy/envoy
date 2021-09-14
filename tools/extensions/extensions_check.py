@@ -54,7 +54,7 @@ EXTENSION_CATEGORIES = (
     "envoy.retry_host_predicates", "envoy.retry_priorities", "envoy.stats_sinks",
     "envoy.thrift_proxy.filters", "envoy.tracers", "envoy.transport_sockets.downstream",
     "envoy.transport_sockets.upstream", "envoy.tls.cert_validator", "envoy.upstreams",
-    "envoy.wasm.runtime")
+    "envoy.wasm.runtime", "envoy.common.key_value")
 
 EXTENSION_STATUS_VALUES = (
     # This extension is stable and is expected to be production usable.
@@ -178,7 +178,9 @@ class ExtensionsChecker(checker.Checker):
         categories = self.metadata[extension].get("categories", ())
         for cat in categories:
             if cat not in self.extension_categories:
-                yield f"Unknown extension category for {extension}: {cat}"
+                yield (
+                    f"Unknown extension category for {extension}: {cat}. "
+                    "Please add it to tools/extensions/extensions_check.py")
         if not categories:
             yield (
                 f"Missing extension category for {extension}. "

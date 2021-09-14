@@ -69,7 +69,7 @@ TEST_P(IntegrationAdminTest, HealthCheckWithoutServerStats) {
 }
 
 TEST_P(IntegrationAdminTest, HealthCheckWithBufferFilter) {
-  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultBufferFilter());
   initialize();
 
   BufferingStreamDecoderPtr response;
@@ -573,7 +573,6 @@ TEST_P(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
 }
 
 TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(DISABLED_ExcludeRequests)) {
-  v2_bootstrap_ = true;
   stats_matcher_.mutable_exclusion_list()->add_patterns()->MergeFrom(
       TestUtility::createRegexMatcher(".*requests.*"));
   initialize();
@@ -589,7 +588,6 @@ TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeExact)) {
 }
 
 TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(DISABLED_ExcludeMultipleExact)) {
-  v2_bootstrap_ = true;
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
   stats_matcher_.mutable_exclusion_list()->add_patterns()->MergeFrom(
       TestUtility::createRegexMatcher(".*live"));

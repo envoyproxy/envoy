@@ -14,7 +14,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
@@ -74,7 +73,6 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const std::string& stat_prefix, const OptionalHttpFilters& optional_http_filters,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
     : Envoy::Config::SubscriptionBase<envoy::config::route::v3::RouteConfiguration>(
-          rds.config_source().resource_api_version(),
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       route_config_name_(rds.route_config_name()),
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
@@ -140,11 +138,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
           route_config_name_, config_update_info_->configHash());
       maybeCreateInitManager(version_info, noop_init_manager, resume_rds);
       vhds_subscription_ = std::make_unique<VhdsSubscription>(
-          config_update_info_, factory_context_, stat_prefix_, route_config_provider_opt_,
-          config_update_info_->protobufConfiguration()
-              .vhds()
-              .config_source()
-              .resource_api_version());
+          config_update_info_, factory_context_, stat_prefix_, route_config_provider_opt_);
       vhds_subscription_->registerInitTargetWithInitManager(
           noop_init_manager == nullptr ? local_init_manager_ : *noop_init_manager);
     }
@@ -399,7 +393,7 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs(
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
       dynamic_config->set_version_info(subscription->routeConfigUpdate()->configVersion());
       dynamic_config->mutable_route_config()->PackFrom(
-          API_RECOVER_ORIGINAL(subscription->routeConfigUpdate()->protobufConfiguration()));
+          subscription->routeConfigUpdate()->protobufConfiguration());
       TimestampUtil::systemClockToTimestamp(subscription->routeConfigUpdate()->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
     }
@@ -411,8 +405,7 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs(
       continue;
     }
     auto* static_config = config_dump->mutable_static_route_configs()->Add();
-    static_config->mutable_route_config()->PackFrom(
-        API_RECOVER_ORIGINAL(provider->configInfo().value().config_));
+    static_config->mutable_route_config()->PackFrom(provider->configInfo().value().config_);
     TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                           *static_config->mutable_last_updated());
   }

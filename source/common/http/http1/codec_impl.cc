@@ -380,7 +380,7 @@ void StreamEncoderImpl::readDisable(bool disable) {
 uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
 
 const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLocalAddress() {
-  return connection_.connection().addressProvider().localAddress();
+  return connection_.connection().connectionInfoProvider().localAddress();
 }
 
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";

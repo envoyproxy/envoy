@@ -12,26 +12,25 @@ namespace Envoy {
 
 // Helper functions to build API responses.
 envoy::config::cluster::v3::Cluster XdsFuzzTest::buildCluster(const std::string& name) {
-  return ConfigHelper::buildCluster(name, "ROUND_ROBIN", api_version_);
+  return ConfigHelper::buildCluster(name, "ROUND_ROBIN");
 };
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
 XdsFuzzTest::buildClusterLoadAssignment(const std::string& name) {
   return ConfigHelper::buildClusterLoadAssignment(
       name, Network::Test::getLoopbackAddressString(ip_version_),
-      fake_upstreams_[0]->localAddress()->ip()->port(), api_version_);
+      fake_upstreams_[0]->localAddress()->ip()->port());
 }
 
 envoy::config::listener::v3::Listener XdsFuzzTest::buildListener(const std::string& listener_name,
                                                                  const std::string& route_name) {
-  return ConfigHelper::buildListener(listener_name, route_name,
-                                     Network::Test::getLoopbackAddressString(ip_version_),
-                                     "ads_test", api_version_);
+  return ConfigHelper::buildListener(
+      listener_name, route_name, Network::Test::getLoopbackAddressString(ip_version_), "ads_test");
 }
 
 envoy::config::route::v3::RouteConfiguration
 XdsFuzzTest::buildRouteConfig(const std::string& route_name) {
-  return ConfigHelper::buildRouteConfig(route_name, "cluster_0", api_version_);
+  return ConfigHelper::buildRouteConfig(route_name, "cluster_0");
 }
 
 // Helper functions to send API responses.
@@ -55,17 +54,15 @@ void XdsFuzzTest::updateRoute(
       std::to_string(version_));
 }
 
-XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& input,
-                         envoy::config::core::v3::ApiVersion api_version)
+XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& input)
     : HttpIntegrationTest(
           Http::CodecType::HTTP2, TestEnvironment::getIpVersionsForTest()[0],
           ConfigHelper::adsBootstrap(input.config().sotw_or_delta() ==
                                              test::server::config_validation::Config::SOTW
                                          ? "GRPC"
-                                         : "DELTA_GRPC",
-                                     api_version)),
+                                         : "DELTA_GRPC")),
       verifier_(input.config().sotw_or_delta()), actions_(input.actions()), version_(1),
-      api_version_(api_version), ip_version_(TestEnvironment::getIpVersionsForTest()[0]) {
+      ip_version_(TestEnvironment::getIpVersionsForTest()[0]) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = false;

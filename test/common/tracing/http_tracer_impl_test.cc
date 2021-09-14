@@ -141,7 +141,7 @@ TEST_F(HttpConnManFinalizerImplTest, OriginalAndLongPath) {
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpUrl), Eq(path_prefix + expected_path)));
@@ -172,7 +172,7 @@ TEST_F(HttpConnManFinalizerImplTest, NoGeneratedId) {
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpUrl), Eq(path_prefix + expected_path)));
@@ -202,7 +202,7 @@ TEST_F(HttpConnManFinalizerImplTest, Connect) {
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpUrl), Eq("")));
@@ -326,7 +326,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanOptionalHeaders) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   // Check that span is populated correctly.
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GuidXRequestId), Eq("id")));
@@ -364,7 +364,7 @@ TEST_F(HttpConnManFinalizerImplTest, UnixDomainSocketPeerAddressTag) {
   const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
   const auto remote_address = Network::Utility::resolveUrl("unix://" + path_);
 
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   // Check that the PeerAddress is populated correctly for Unix domain sockets.
   EXPECT_CALL(span, setTag(_, _)).Times(AnyNumber());
@@ -511,7 +511,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   // Check that span is populated correctly.
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GuidXRequestId), Eq("id")));
@@ -570,7 +570,7 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcOkStatus) {
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().DownstreamCluster), Eq("-")));
@@ -622,7 +622,7 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
@@ -667,7 +667,7 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(remote_address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));

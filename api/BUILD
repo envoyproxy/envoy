@@ -58,6 +58,12 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//contrib/envoy/extensions/filters/http/squash/v3:pkg",
+        "//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg",
+        "//contrib/envoy/extensions/filters/network/kafka_broker/v3:pkg",
+        "//contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha:pkg",
+        "//contrib/envoy/extensions/filters/network/mysql_proxy/v3:pkg",
+        "//contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg",
+        "//contrib/envoy/extensions/filters/network/rocketmq_proxy/v3:pkg",
         "//envoy/admin/v3:pkg",
         "//envoy/config/accesslog/v3:pkg",
         "//envoy/config/bootstrap/v3:pkg",
@@ -95,6 +101,7 @@ proto_library(
         "//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg",
         "//envoy/extensions/clusters/redis/v3:pkg",
         "//envoy/extensions/common/dynamic_forward_proxy/v3:pkg",
+        "//envoy/extensions/common/key_value/v3:pkg",
         "//envoy/extensions/common/matching/v3:pkg",
         "//envoy/extensions/common/ratelimit/v3:pkg",
         "//envoy/extensions/common/tap/v3:pkg",
@@ -159,15 +166,11 @@ proto_library(
         "//envoy/extensions/filters/network/echo/v3:pkg",
         "//envoy/extensions/filters/network/ext_authz/v3:pkg",
         "//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
-        "//envoy/extensions/filters/network/kafka_broker/v3:pkg",
         "//envoy/extensions/filters/network/local_ratelimit/v3:pkg",
         "//envoy/extensions/filters/network/mongo_proxy/v3:pkg",
-        "//envoy/extensions/filters/network/mysql_proxy/v3:pkg",
-        "//envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg",
         "//envoy/extensions/filters/network/ratelimit/v3:pkg",
         "//envoy/extensions/filters/network/rbac/v3:pkg",
         "//envoy/extensions/filters/network/redis_proxy/v3:pkg",
-        "//envoy/extensions/filters/network/rocketmq_proxy/v3:pkg",
         "//envoy/extensions/filters/network/sni_cluster/v3:pkg",
         "//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3alpha:pkg",
         "//envoy/extensions/filters/network/tcp_proxy/v3:pkg",
@@ -187,6 +190,7 @@ proto_library(
         "//envoy/extensions/internal_redirect/allow_listed_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/previous_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg",
+        "//envoy/extensions/key_value/file_based/v3:pkg",
         "//envoy/extensions/matching/common_inputs/environment_variable/v3:pkg",
         "//envoy/extensions/matching/input_matchers/consistent_hashing/v3:pkg",
         "//envoy/extensions/matching/input_matchers/ip/v3:pkg",
@@ -253,4 +257,12 @@ proto_library(
         ":v2_protos",
         ":v3_protos",
     ],
+)
+
+filegroup(
+    name = "proto_breaking_change_detector_buf_config",
+    srcs = [
+        "buf.yaml",
+    ],
+    visibility = ["//visibility:public"],
 )

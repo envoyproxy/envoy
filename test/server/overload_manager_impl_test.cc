@@ -691,6 +691,16 @@ TEST_F(OverloadManagerImplTest, DuplicateTrigger) {
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException, "Duplicate trigger .*");
 }
 
+TEST_F(OverloadManagerImplTest, ShouldThrowIfUsingResetStreamsWithoutBufferFactoryConfig) {
+  const std::string lower_greater_than_upper_config = R"EOF(
+  actions:
+    - name: envoy.overload_actions.reset_high_memory_stream
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(lower_greater_than_upper_config), EnvoyException,
+                          "Overload action .* requires buffer_factory_config.");
+}
+
 TEST_F(OverloadManagerImplTest, Shutdown) {
   setDispatcherExpectation();
 

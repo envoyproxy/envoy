@@ -315,9 +315,14 @@ public:
     return cluster_timeout_budget_stat_names_;
   }
 
+  void drainConnections(const std::string& cluster) override;
+
+  void drainConnections() override;
+
+  void checkActiveStaticCluster(const std::string& cluster) override;
+
 protected:
-  virtual void postThreadLocalDrainConnections(const Cluster& cluster,
-                                               const HostVector& hosts_removed);
+  virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
   // Parameters for calling postThreadLocalClusterUpdate()
   struct ThreadLocalClusterUpdateParams {
@@ -423,10 +428,15 @@ private:
                        PrioritySet::UpdateHostsParams&& update_hosts_params,
                        LocalityWeightsConstSharedPtr locality_weights,
                        const HostVector& hosts_added, const HostVector& hosts_removed,
-                       absl::optional<uint32_t> overprovisioning_factor);
+                       absl::optional<uint32_t> overprovisioning_factor,
+                       HostMapConstSharedPtr cross_priority_host_map);
 
       // Drains any connection pools associated with the removed hosts.
       void drainConnPools(const HostVector& hosts_removed);
+      // Drains idle clients in connection pools for all hosts.
+      void drainConnPools();
+      // Drain all clients in connection pools for all hosts.
+      void drainAllConnPools();
 
     private:
       Http::ConnectionPool::Instance*
@@ -459,9 +469,15 @@ private:
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   const absl::optional<LocalClusterParams>& local_cluster_params);
     ~ThreadLocalClusterManagerImpl() override;
+    // TODO(junr03): clean up drainConnPools vs drainAllConnPools once ConnPoolImplBase::startDrain
+    // and
+    // ConnPoolImplBase::drainConnections() get cleaned up. The code in onHostHealthFailure and the
+    // code in ThreadLocalClusterManagerImpl::drainConnPools(const HostVector& hosts) is very
+    // similar and can be merged in a similar fashion to the ConnPoolImplBase case.
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
     void drainTcpConnPools(TcpConnPoolsContainer& container);
+    void drainAllConnPoolsWorker(const HostSharedPtr& host);
     void httpConnPoolIsIdle(HostConstSharedPtr host, ResourcePriority priority,
                             const std::vector<uint8_t>& hash_key);
     void tcpConnPoolIsIdle(HostConstSharedPtr host, const std::vector<uint8_t>& hash_key);
@@ -471,7 +487,8 @@ private:
                                  PrioritySet::UpdateHostsParams update_hosts_params,
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
-                                 uint64_t overprovisioning_factor);
+                                 uint64_t overprovisioning_factor,
+                                 HostMapConstSharedPtr cross_priority_host_map);
     void onHostHealthFailure(const HostSharedPtr& host);
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
