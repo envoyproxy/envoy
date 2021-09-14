@@ -1324,7 +1324,7 @@ message RetryPolicy {
   // :ref:`route idle timeout <envoy_v3_api_field_config.route.v3.RouteAction.timeout>` and
   // :ref:`stream idle timeout
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>`
-  // both enforced by the HTTP connection manager. The differences is that this idle timeout
+  // both enforced by the HTTP connection manager. The difference is that this idle timeout
   // is enforced by the router for each individual attempt and thus after all previous filters have
   // run, as opposed to *before* all previous filters run for the other idle timeouts. This timeout
   // is useful in cases in which total request timeout is bounded by a number of retries and a
@@ -1335,8 +1335,8 @@ message RetryPolicy {
   // router *and* a connection pool connection has been obtained. Unlike
   // :ref:`per_try_timeout <envoy_v3_api_field_config.route.v3.RetryPolicy.per_try_timeout>`,
   // the idle timer continues once the response starts streaming back to the downstream client.
-  // This ensures that response data continues to make progress when not also using one of the
-  // HTTP connection manager idle timeouts.
+  // This ensures that response data continues to make progress without using one of the HTTP
+  // connection manager idle timeouts.
   google.protobuf.Duration per_try_idle_timeout = 13;
 
   // Specifies an implementation of a RetryPriority which is used to determine the
