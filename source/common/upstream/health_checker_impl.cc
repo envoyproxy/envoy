@@ -152,27 +152,12 @@ HttpHealthCheckerImpl::HttpStatusChecker::HttpStatusChecker(
     const Protobuf::RepeatedPtrField<envoy::type::v3::Int64Range>& retriable_statuses,
     uint64_t default_expected_status) {
   for (const auto& status_range : expected_statuses) {
-    const auto start = status_range.start();
-    const auto end = status_range.end();
+    const auto start = static_cast<uint64_t>(status_range.start());
+    const auto end = static_cast<uint64_t>(status_range.end());
 
-    if (start >= end) {
-      throw EnvoyException(fmt::format(
-          "Invalid http status range: expecting start < end, but found start={} and end={}", start,
-          end));
-    }
+    validateRange(start, end, "expected");
 
-    if (start < 100) {
-      throw EnvoyException(fmt::format(
-          "Invalid http status range: expecting start >= 100, but found start={}", start));
-    }
-
-    if (end > 600) {
-      throw EnvoyException(
-          fmt::format("Invalid http status range: expecting end <= 600, but found end={}", end));
-    }
-
-    expected_ranges_.emplace_back(
-        std::make_pair(static_cast<uint64_t>(start), static_cast<uint64_t>(end)));
+    expected_ranges_.emplace_back(std::make_pair(start, end));
   }
 
   if (expected_ranges_.empty()) {
@@ -181,28 +166,32 @@ HttpHealthCheckerImpl::HttpStatusChecker::HttpStatusChecker(
   }
 
   for (const auto& status_range : retriable_statuses) {
-    const auto start = status_range.start();
-    const auto end = status_range.end();
+    const auto start = static_cast<uint64_t>(status_range.start());
+    const auto end = static_cast<uint64_t>(status_range.end());
 
-    if (start >= end) {
-      throw EnvoyException(fmt::format("Invalid http retriable status range: expecting start < "
-                                       "end, but found start={} and end={}",
-                                       start, end));
-    }
+    validateRange(start, end, "retriable");
 
-    if (start < 100) {
-      throw EnvoyException(fmt::format(
-          "Invalid http retriable status range: expecting start >= 100, but found start={}",
-          start));
-    }
+    retriable_ranges_.emplace_back(std::make_pair(start, end));
+  }
+}
 
-    if (end > 600) {
-      throw EnvoyException(fmt::format(
-          "Invalid http retriable status range: expecting end <= 600, but found end={}", end));
-    }
+void HttpHealthCheckerImpl::HttpStatusChecker::validateRange(uint64_t start, uint64_t end,
+                                                             absl::string_view range_type) const {
+  if (start >= end) {
+    throw EnvoyException(fmt::format("Invalid http {} status range: expecting start < "
+                                     "end, but found start={} and end={}",
+                                     range_type, start, end));
+  }
 
-    retriable_ranges_.emplace_back(
-        std::make_pair(static_cast<uint64_t>(start), static_cast<uint64_t>(end)));
+  if (start < 100) {
+    throw EnvoyException(
+        fmt::format("Invalid http {} status range: expecting start >= 100, but found start={}",
+                    range_type, start));
+  }
+
+  if (end > 600) {
+    throw EnvoyException(fmt::format(
+        "Invalid http {} status range: expecting end <= 600, but found end={}", range_type, end));
   }
 }
 
@@ -215,7 +204,7 @@ bool HttpHealthCheckerImpl::HttpStatusChecker::inExpectedRanges(uint64_t http_st
 }
 
 bool HttpHealthCheckerImpl::HttpStatusChecker::inRanges(
-    uint64_t http_status, std::vector<std::pair<uint64_t, uint64_t>> ranges) const {
+    uint64_t http_status, const std::vector<std::pair<uint64_t, uint64_t>>& ranges) const {
   for (const auto& range : ranges) {
     if (http_status >= range.first && http_status < range.second) {
       return true;

@@ -69,7 +69,9 @@ public:
     bool inExpectedRanges(uint64_t http_status) const;
 
   private:
-    bool inRanges(uint64_t http_status, std::vector<std::pair<uint64_t, uint64_t>>) const;
+    bool inRanges(uint64_t http_status,
+                  const std::vector<std::pair<uint64_t, uint64_t>>& ranges) const;
+    void validateRange(uint64_t start, uint64_t end, absl::string_view range_type) const;
 
     std::vector<std::pair<uint64_t, uint64_t>> expected_ranges_;
     std::vector<std::pair<uint64_t, uint64_t>> retriable_ranges_;

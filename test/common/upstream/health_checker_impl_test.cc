@@ -3331,7 +3331,8 @@ TEST(HttpStatusChecker, ExpectedBelow100) {
       HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
           conf.http_health_check().expected_statuses(),
           conf.http_health_check().retriable_statuses(), 200),
-      EnvoyException, "Invalid http status range: expecting start >= 100, but found start=99");
+      EnvoyException,
+      "Invalid http expected status range: expecting start >= 100, but found start=99");
 }
 
 TEST(HttpStatusChecker, RetriableBelow100) {
@@ -3374,11 +3375,12 @@ TEST(HttpStatusChecker, ExpectedAbove599) {
   )EOF";
 
   auto conf = parseHealthCheckFromV3Yaml(yaml);
-  EXPECT_THROW_WITH_MESSAGE(HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-                                conf.http_health_check().expected_statuses(),
-                                conf.http_health_check().retriable_statuses(), 200),
-                            EnvoyException,
-                            "Invalid http status range: expecting end <= 600, but found end=601");
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+          conf.http_health_check().expected_statuses(),
+          conf.http_health_check().retriable_statuses(), 200),
+      EnvoyException,
+      "Invalid http expected status range: expecting end <= 600, but found end=601");
 }
 
 TEST(HttpStatusChecker, RetriableAbove599) {
@@ -3426,7 +3428,7 @@ TEST(HttpStatusChecker, InvalidExpectedRange) {
           conf.http_health_check().expected_statuses(),
           conf.http_health_check().retriable_statuses(), 200),
       EnvoyException,
-      "Invalid http status range: expecting start < end, but found start=200 and end=200");
+      "Invalid http expected status range: expecting start < end, but found start=200 and end=200");
 }
 
 TEST(HttpStatusChecker, InvalidRetriableRange) {
