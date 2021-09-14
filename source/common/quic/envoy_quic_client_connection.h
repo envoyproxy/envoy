@@ -5,6 +5,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_network_connection.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -28,41 +29,43 @@ public:
   virtual size_t numPacketsExpectedPerEventLoop() PURE;
 };
 
-class EnvoyQuicPathValidationContext : public quic::QuicPathValidationContext {
-public:
-  EnvoyQuicPathValidationContext(quic::QuicSocketAddress& self_address, quic::QuicSocketAddress& peer_address, 
-    Network::ConnectionSocketPtr connectionSocket, std::unique_ptr<EnvoyQuicPacketWriter> writer);
-
-  ~EnvoyQuicPathValidationContext() override;
-
-  quic::QuicPacketWriter* WriterToUse() override;
-
-  std::unique_ptr<EnvoyQuicPacketWriter> ReleaseWriter();
-  Network::ConnectionSocketPtr ReleaseSocket();
-
-
-private:
-  Network::ConnectionSocketPtr socket_;
-  std::unique_ptr<EnvoyQuicPacketWriter> writer_;
-};
-
-class EnvoyPathValidationResultDelegate : public quic::QuicPathValidator::ResultDelegate {
-public:
-  explicit EnvoyPathValidationResultDelegate(EnvoyQuicClientConnection& connection);
-
-  void OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context) override;
-
-  void OnPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context) override;
-
-private:
-  EnvoyQuicClientConnection& connection_;
-};
-
 // A client QuicConnection instance managing its own file events.
 class EnvoyQuicClientConnection : public quic::QuicConnection,
                                   public QuicNetworkConnection,
                                   public Network::UdpPacketProcessor {
 public:
+
+  class EnvoyQuicPathValidationContext : public quic::QuicPathValidationContext {
+  public:
+    EnvoyQuicPathValidationContext(quic::QuicSocketAddress& self_address, quic::QuicSocketAddress& peer_address, 
+      Network::ConnectionSocketPtr connectionSocket, std::unique_ptr<EnvoyQuicPacketWriter> writer);
+
+    ~EnvoyQuicPathValidationContext() override;
+
+    quic::QuicPacketWriter* WriterToUse() override;
+
+    std::unique_ptr<EnvoyQuicPacketWriter> ReleaseWriter();
+    Network::ConnectionSocketPtr ReleaseSocket();
+
+
+  private:
+    Network::ConnectionSocketPtr socket_;
+    std::unique_ptr<EnvoyQuicPacketWriter> writer_;
+  };
+
+  class EnvoyPathValidationResultDelegate : public quic::QuicPathValidator::ResultDelegate {
+  public:
+    explicit EnvoyPathValidationResultDelegate(EnvoyQuicClientConnection& connection);
+
+    void OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context) override;
+
+    void OnPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context) override;
+
+  private:
+    EnvoyQuicClientConnection& connection_;
+  };
+
+
   // A connection socket will be created with given |local_addr|. If binding
   // port not provided in |local_addr|, pick up a random port.
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
@@ -98,7 +101,7 @@ public:
   }
 
   // Register file event and apply socket options.
-  void setUpConnectionSocket(Network::ConnectionSocketPtr&& connection_socket, OptRef<PacketsToReadDelegate> delegate);
+  void setUpConnectionSocket(Network::ConnectionSocket& connection_socket, OptRef<PacketsToReadDelegate> delegate);
 
   // Switch underlying socket with the given one. This is used in connection migration.
   void switchConnectionSocket(Network::ConnectionSocketPtr&& connection_socket);

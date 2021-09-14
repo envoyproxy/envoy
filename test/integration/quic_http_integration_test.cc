@@ -356,6 +356,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   cleanupUpstreamAndDownstream();
 }
 
+/*
 TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   concurrency_ = 2;
   initialize();
@@ -396,7 +397,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
-}
+}*/
 
 TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {
   testAdminDrain(Http::CodecType::HTTP1);
