@@ -110,16 +110,11 @@ message RateLimit {
   bool disable_x_envoy_ratelimited_header = 9;
 }
 
-// TODO(tyxia) message name!!!
+// Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
+// Also applies to Local rate limiting :ref:`using descriptors <config_http_filters_local_rate_limit_descriptors>`.
 message RateLimitConfig {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
-
   // [#next-free-field: 10]
   message Action {
-    // TODO(tyxia) Those `previous_message_type`
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.api.v2.route.RateLimit.Action";
-
     // The following descriptor entry is appended to the descriptor:
     //
     // .. code-block:: cpp
@@ -128,8 +123,6 @@ message RateLimitConfig {
     //
     // <local service cluster> is derived from the :option:`--service-cluster` option.
     message SourceCluster {
-      option (udpa.annotations.versioning).previous_message_type =
-          "envoy.api.v2.route.RateLimit.Action.SourceCluster";
     }
 
     // The following descriptor entry is appended to the descriptor:
@@ -149,8 +142,6 @@ message RateLimitConfig {
     // * :ref:`cluster_header <envoy_v3_api_field_config.route.v3.RouteAction.cluster_header>` indicates which
     //   header in the request contains the target cluster.
     message DestinationCluster {
-      option (udpa.annotations.versioning).previous_message_type =
-          "envoy.api.v2.route.RateLimit.Action.DestinationCluster";
     }
 
     // The following descriptor entry is appended when a header contains a key that matches the
@@ -160,9 +151,6 @@ message RateLimitConfig {
     //
     //   ("<descriptor_key>", "<header_value_queried_from_header>")
     message RequestHeaders {
-      option (udpa.annotations.versioning).previous_message_type =
-          "envoy.api.v2.route.RateLimit.Action.RequestHeaders";
-
       // The header name to be queried from the request headers. The header’s
       // value is used to populate the value of the descriptor entry for the
       // descriptor_key.
@@ -185,8 +173,6 @@ message RateLimitConfig {
     //
     //   ("remote_address", "<trusted address from x-forwarded-for>")
     message RemoteAddress {
-      option (udpa.annotations.versioning).previous_message_type =
-          "envoy.api.v2.route.RateLimit.Action.RemoteAddress";
     }
 
     // The following descriptor entry is appended to the descriptor:
@@ -195,9 +181,6 @@ message RateLimitConfig {
     //
     //   ("generic_key", "<descriptor_value>")
     message GenericKey {
-      option (udpa.annotations.versioning).previous_message_type =
-          "envoy.api.v2.route.RateLimit.Action.GenericKey";
-
       // The value to use in the descriptor entry.
       string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
 
@@ -212,9 +195,6 @@ message RateLimitConfig {
     //
     //   ("header_match", "<descriptor_value>")
     message HeaderValueMatch {
-      option (udpa.annotations.versioning).previous_message_type =
-          "envoy.api.v2.route.RateLimit.Action.HeaderValueMatch";
-
       // The value to use in the descriptor entry.
       string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
 
