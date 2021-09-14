@@ -103,12 +103,13 @@ public:
     // Stream info for the previous request attempt that is about to be retried.
     const StreamInfo::StreamInfo& retriable_request_stream_info_;
     // The current upstream socket options that were used for connection pool selection on the
-    // previous attempt.
+    // previous attempt, or the result of an updated set of options from a previously run
+    // retry options predicate.
     Network::Socket::OptionsSharedPtr current_upstream_socket_options_;
   };
 
   struct UpdateOptionsReturn {
-    // New upstream socket options to apply to the next request attempt. If changed, will effect
+    // New upstream socket options to apply to the next request attempt. If changed, will affect
     // connection pool selection similar to that which was done for the initial request.
     absl::optional<Network::Socket::OptionsSharedPtr> new_upstream_socket_options_;
   };

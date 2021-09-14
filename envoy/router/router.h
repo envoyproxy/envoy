@@ -235,7 +235,7 @@ public:
    * @return the retry options predicates for this policy. Each policy will be applied prior
    * to retrying a request, allowing for request behavior to be customized.
    */
-  virtual const std::vector<Upstream::RetryOptionsPredicateConstSharedPtr>&
+  virtual absl::Span<const Upstream::RetryOptionsPredicateConstSharedPtr>
   retryOptionsPredicates() const PURE;
 
   /**

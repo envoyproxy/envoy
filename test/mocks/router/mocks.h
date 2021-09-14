@@ -108,7 +108,7 @@ public:
   uint32_t retryOn() const override { return retry_on_; }
   MOCK_METHOD(std::vector<Upstream::RetryHostPredicateSharedPtr>, retryHostPredicates, (), (const));
   MOCK_METHOD(Upstream::RetryPrioritySharedPtr, retryPriority, (), (const));
-  const std::vector<Upstream::RetryOptionsPredicateConstSharedPtr>&
+  absl::Span<const Upstream::RetryOptionsPredicateConstSharedPtr>
   retryOptionsPredicates() const override {
     return retry_options_predicates_;
   }

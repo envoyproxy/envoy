@@ -302,7 +302,7 @@ public:
   uint32_t retryOn() const override { return retry_on_; }
   std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override;
   Upstream::RetryPrioritySharedPtr retryPriority() const override;
-  const std::vector<Upstream::RetryOptionsPredicateConstSharedPtr>&
+  absl::Span<const Upstream::RetryOptionsPredicateConstSharedPtr>
   retryOptionsPredicates() const override {
     return retry_options_predicates_;
   }
