@@ -2,6 +2,7 @@
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
+#include "source/common/common/regex.h"
 #include "source/common/stats/histogram_impl.h"
 
 #include "absl/strings/str_cat.h"
@@ -11,18 +12,18 @@ namespace Server {
 
 namespace {
 
-// TODO(mathetake) replace with re2 for speed and safety,
-// and change the signature of sanitizeName so it accepts string_view.
-const std::regex& promRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "[^a-zA-Z0-9_]"); }
+const Regex::CompiledGoogleReMatcher& promRegex() {
+  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, "[^a-zA-Z0-9_]", false);
+}
 
 /**
  * Take a string and sanitize it according to Prometheus conventions.
  */
-std::string sanitizeName(const std::string& name) {
+std::string sanitizeName(const absl::string_view name) {
   // The name must match the regex [a-zA-Z_][a-zA-Z0-9_]* as required by
   // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
   // The initial [a-zA-Z_] constraint is always satisfied by the namespace prefix.
-  return std::regex_replace(name, promRegex(), "_");
+  return promRegex().replaceAll(name, "_");
 }
 
 /*
@@ -199,7 +200,7 @@ PrometheusStatsFormatter::metricName(const std::string& extracted_name,
       custom_namespaces.stripRegisteredPrefix(extracted_name);
   if (custom_namespace_stripped.has_value()) {
     // This case the name has a custom namespace, and it is a custom metric.
-    const std::string sanitized_name = sanitizeName(std::string(custom_namespace_stripped.value()));
+    const std::string sanitized_name = sanitizeName(custom_namespace_stripped.value());
     // We expose these metrics without modifying (e.g. without "envoy_"),
     // so we have to check the "user-defined" stat name complies with the Prometheus naming
     // convention. Specifically the name must start with the "[a-zA-Z_]" pattern.
