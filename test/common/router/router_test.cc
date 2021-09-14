@@ -141,65 +141,130 @@ public:
 
     router_.onDestroy();
   }
+
+  void testAutoSniOptions(
+      absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> dummy_option,
+      Envoy::Http::TestRequestHeaderMapImpl headers, std::string server_name = "host",
+      bool should_validate_san = false, std::string alt_server_name = "host") {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
+        .WillByDefault(ReturnRef(dummy_option));
+    ON_CALL(callbacks_.stream_info_, filterState())
+        .WillByDefault(ReturnRef(stream_info.filterState()));
+    EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+        .WillOnce(Return(&cancellable_));
+    stream_info.filterState()->setData(Network::UpstreamServerName::key(),
+                                       std::make_unique<Network::UpstreamServerName>("dummy"),
+                                       StreamInfo::FilterState::StateType::Mutable);
+    expectResponseTimerCreate();
+
+    HttpTestUtility::addDefaultHeaders(headers);
+    router_.decodeHeaders(headers, true);
+    EXPECT_EQ(server_name,
+              stream_info.filterState()
+                  ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
+                  .value());
+    if (should_validate_san) {
+      EXPECT_EQ(alt_server_name, stream_info.filterState()
+                                     ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
+                                         Network::UpstreamSubjectAltNames::key())
+                                     .value()[0]);
+    }
+    EXPECT_CALL(cancellable_, cancel(_));
+    router_.onDestroy();
+    EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+    EXPECT_EQ(0U,
+              callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+    EXPECT_EQ(0U,
+              callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  }
 };
 
-TEST_F(RouterTest, UpdateServerNameFilterState) {
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+TEST_F(RouterTest, UpdateServerNameFilterStateWithoutHeaderOverride) {
   auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
-      .WillByDefault(ReturnRef(dummy_option));
-  ON_CALL(callbacks_.stream_info_, filterState())
-      .WillByDefault(ReturnRef(stream_info.filterState()));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
-      .WillOnce(Return(&cancellable_));
-  stream_info.filterState()->setData(Network::UpstreamServerName::key(),
-                                     std::make_unique<Network::UpstreamServerName>("dummy"),
-                                     StreamInfo::FilterState::StateType::Mutable);
-  expectResponseTimerCreate();
 
-  Http::TestRequestHeaderMapImpl headers;
-
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
-  EXPECT_EQ("host",
-            stream_info.filterState()
-                ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
-                .value());
-  EXPECT_CALL(cancellable_, cancel(_));
-  router_.onDestroy();
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
-  EXPECT_EQ(0U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-  EXPECT_EQ(0U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  Http::TestRequestHeaderMapImpl headers{};
+  testAutoSniOptions(dummy_option, headers);
 }
 
-TEST_F(RouterTest, UpdateSubjectAltNamesFilterState) {
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+TEST_F(RouterTest, UpdateServerNameFilterStateWithHostHeaderOverride) {
   auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+  dummy_option.value().set_override_auto_sni_header(":authority");
+
+  Http::TestRequestHeaderMapImpl headers{};
+  testAutoSniOptions(dummy_option, headers);
+}
+
+TEST_F(RouterTest, UpdateServerNameFilterStateWithHeaderOverride) {
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+  dummy_option.value().set_override_auto_sni_header("x-host");
+
+  const auto server_name = "foo.bar";
+  Http::TestRequestHeaderMapImpl headers{{"x-host", server_name}};
+  testAutoSniOptions(dummy_option, headers, server_name);
+}
+
+TEST_F(RouterTest, UpdateServerNameFilterStateWithEmptyValueHeaderOverride) {
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+  dummy_option.value().set_override_auto_sni_header("x-host");
+
+  Http::TestRequestHeaderMapImpl headers{{"x-host", ""}};
+  testAutoSniOptions(dummy_option, headers);
+}
+
+TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithoutHeaderOverride) {
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
   dummy_option.value().set_auto_san_validation(true);
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
-      .WillByDefault(ReturnRef(dummy_option));
-  ON_CALL(callbacks_.stream_info_, filterState())
-      .WillByDefault(ReturnRef(stream_info.filterState()));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
-      .WillOnce(Return(&cancellable_));
-  expectResponseTimerCreate();
 
-  Http::TestRequestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers{};
+  testAutoSniOptions(dummy_option, headers, "host", true);
+}
 
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
-  EXPECT_EQ("host", stream_info.filterState()
-                        ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
-                            Network::UpstreamSubjectAltNames::key())
-                        .value()[0]);
-  EXPECT_CALL(cancellable_, cancel(_));
-  router_.onDestroy();
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
-  EXPECT_EQ(0U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHostHeaderOverride) {
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+  dummy_option.value().set_auto_san_validation(true);
+  dummy_option.value().set_override_auto_sni_header(":authority");
+
+  Http::TestRequestHeaderMapImpl headers{};
+  testAutoSniOptions(dummy_option, headers, "host", true);
+}
+
+TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHeaderOverride) {
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+  dummy_option.value().set_auto_san_validation(true);
+  dummy_option.value().set_override_auto_sni_header("x-host");
+
+  const auto server_name = "foo.bar";
+  Http::TestRequestHeaderMapImpl headers{{"x-host", server_name}};
+  testAutoSniOptions(dummy_option, headers, server_name, true, server_name);
+}
+
+TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithEmptyValueHeaderOverride) {
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+  dummy_option.value().set_auto_san_validation(true);
+  dummy_option.value().set_override_auto_sni_header("x-host");
+
+  Http::TestRequestHeaderMapImpl headers{{"x-host", ""}};
+  testAutoSniOptions(dummy_option, headers, "host", true);
+}
+
+TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithIpHeaderOverride) {
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+  dummy_option.value().set_auto_san_validation(true);
+  dummy_option.value().set_override_auto_sni_header("x-host");
+
+  const auto server_name = "127.0.0.1";
+  Http::TestRequestHeaderMapImpl headers{{"x-host", server_name}};
+  testAutoSniOptions(dummy_option, headers, "dummy", true, server_name);
 }
 
 TEST_F(RouterTest, RouteNotFound) {
