@@ -1155,6 +1155,9 @@ void ClusterImplBase::onPreInitComplete() {
 }
 
 void ClusterImplBase::onInitDone() {
+  if (health_checker_) {
+    health_checker_->start();
+  }
   if (health_checker_ && pending_initialize_health_checks_ == 0) {
     for (auto& host_set : prioritySet().hostSetsPerPriority()) {
       pending_initialize_health_checks_ += host_set->hosts().size();
@@ -1194,7 +1197,6 @@ void ClusterImplBase::finishInitialization() {
 void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_checker) {
   ASSERT(!health_checker_);
   health_checker_ = health_checker;
-  health_checker_->start();
   health_checker_->addHostCheckCompleteCb(
       [this](const HostSharedPtr& host, HealthTransition changed_state) -> void {
         // If we get a health check completion that resulted in a state change, signal to
