@@ -83,7 +83,9 @@ void ValidationInstance::initialize(const Options& options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
   Config::Utility::createTagProducer(bootstrap_);
-  bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
+  if (!bootstrap_.node().user_agent_build_version().has_version()) {
+    *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
+  }
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,

@@ -65,7 +65,8 @@ WasmFactory::createBootstrapExtension(const Protobuf::Message& config,
   auto typed_config =
       MessageUtil::downcastAndValidate<const envoy::extensions::wasm::v3::WasmService&>(
           config, context.messageValidationContext().staticValidationVisitor());
-
+  context.api().customStatNamespaces().registerStatNamespace(
+      Extensions::Common::Wasm::CustomStatNamespace);
   return std::make_unique<WasmServiceExtension>(typed_config, context);
 }
 
