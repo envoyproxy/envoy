@@ -1001,7 +1001,7 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
 
 TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   auto* time_source = new NiceMock<MockTimeSystem>();
-  dispatcher_.time_system_.reset(time_source);
+  context_.dispatcher_.time_system_.reset(time_source);
 
   // Configure the cache.
   MockKeyValueStoreFactory factory;
