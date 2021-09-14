@@ -35,6 +35,14 @@ public:
             hcm.mutable_request_timeout()->set_seconds(0);
             hcm.mutable_request_timeout()->set_nanos(RequestTimeoutMs * 1000 * 1000);
           }
+          if (enable_per_try_idle_timeout_) {
+            auto* route_config = hcm.mutable_route_config();
+            auto* virtual_host = route_config->mutable_virtual_hosts(0);
+            auto* route = virtual_host->mutable_routes(0)->mutable_route();
+            auto* retry_policy = route->mutable_retry_policy();
+            retry_policy->mutable_per_try_idle_timeout()->set_seconds(0);
+            retry_policy->mutable_per_try_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
+          }
 
           // For validating encode100ContinueHeaders() timer kick.
           hcm.set_proxy_100_continue(true);
@@ -58,6 +66,26 @@ public:
     result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
     RELEASE_ASSERT(result, result.message());
     result = upstream_request_->waitForHeadersComplete();
+    RELEASE_ASSERT(result, result.message());
+    return response;
+  }
+
+  IntegrationStreamDecoderPtr setupPerTryIdleTimeoutTest(const char* method = "GET") {
+    initialize();
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+    auto response = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", method},
+                                       {":path", "/test/long/url"},
+                                       {":scheme", "http"},
+                                       {":authority", "host"}});
+    AssertionResult result =
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+    RELEASE_ASSERT(result, result.message());
+    result = upstream_request_->waitForHeadersComplete();
+    RELEASE_ASSERT(result, result.message());
+    result = upstream_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
     return response;
   }
@@ -86,6 +114,7 @@ public:
   bool enable_global_idle_timeout_{false};
   bool enable_per_stream_idle_timeout_{false};
   bool enable_request_timeout_{false};
+  bool enable_per_try_idle_timeout_{false};
   DangerousDeprecatedTestTime test_time_;
 };
 
@@ -269,6 +298,23 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterUpstreamHeaders) {
   waitForTimeout(*response, "downstream_rq_idle_timeout");
 
   EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_FALSE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("", response->body());
+}
+
+// Per-try idle timeout after upstream headers have been sent.
+TEST_P(IdleTimeoutIntegrationTest, PerTryIdleTimeoutAfterUpstreamHeaders) {
+  enable_per_try_idle_timeout_ = true;
+  auto response = setupPerTryIdleTimeoutTest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+
+  waitForTimeout(*response);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_per_try_idle_timeout", 1);
+
+  EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_FALSE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
