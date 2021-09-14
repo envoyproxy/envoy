@@ -473,6 +473,7 @@ message GrpcProtocolOptions {
 }
 
 // A message which allows using HTTP/3.
+// [#next-free-field: 6]
 message Http3ProtocolOptions {
   QuicProtocolOptions quic_protocol_options = 1;
 
@@ -483,6 +484,14 @@ message Http3ProtocolOptions {
   // If set, this overrides any HCM :ref:`stream_error_on_invalid_http_messaging
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`.
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 2;
+
+  // Allows proxying Websocket and other upgrades over HTTP/3 CONNECT using
+  // the header mechanisms from the `HTTP/2 extended connect RFC
+  // <https://datatracker.ietf.org/doc/html/rfc8441>`_
+  // and settings `proposed for HTTP/3
+  // <https://datatracker.ietf.org/doc/draft-ietf-httpbis-h3-websockets/>`_
+  // [#alpha:] as HTTP/3 CONNECT is not yet an RFC.
+  bool allow_extended_connect = 5;
 }
 
 // A message to control transformations to the :scheme header
