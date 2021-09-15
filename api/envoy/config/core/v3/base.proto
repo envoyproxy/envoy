@@ -320,12 +320,35 @@ message HeaderValueOption {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HeaderValueOption";
 
+  // Describes the supported actions types to be used in :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>`
+  enum HeaderAppendAction {
+    // This action will append the specified value to the existing values if the header
+    // already exist. If the header doesn't exist then this will add the header with
+    // specified key and value.
+    APPEND_IF_EXISTS = 0;
+
+    // This action will only append the header if it doesn't already exist. If the header
+    // already exist then this will be a no-op.
+    APPEND = 1;
+
+    // This action will overwrite the specified value by discarding any existing values if
+    // the header already exist. If the header doesn't exist then this will add the header
+    // with specified key and value.
+    OVERWRITE_IF_EXISTS = 2;
+  }
+
   // Header name/value pair that this option applies to.
   HeaderValue header = 1 [(validate.rules).message = {required: true}];
 
   // Should the value be appended? If true (default), the value is appended to
   // existing values. Otherwise it replaces any existing values.
-  google.protobuf.BoolValue append = 2;
+  // This is deprecated in favor of `action`.
+  google.protobuf.BoolValue append = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // One of the actions described in :ref:`header append action <envoy_v3_api_field_config.core.v3.HeaderValueOption.HeaderAppendAction>`
+  // controlling the behavior on whether the new value should be appended or overwritten.
+  HeaderAppendAction append_action = 3 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Wrapper for a set of headers.
