@@ -4,9 +4,9 @@
 #
 # with bazel:
 #
-#  $ bazel //tools/dependency:pip_check -- -h
+#  $ bazel run //tools/dependency:pip_check -- -h
 #
-#  $ bazel //tools/dependency:pip_check
+#  $ bazel run //tools/dependency:pip_check
 #
 # with pip:
 #

@@ -4,9 +4,9 @@
 #
 # with bazel:
 #
-#  $ bazel //tools/code_format:python_check -- -h
+#  $ bazel run //tools/code_format:python_check -- -h
 #
-#  $ bazel //tools/code_format:python_check
+#  $ bazel run //tools/code_format:python_check
 #
 # with pip:
 #
