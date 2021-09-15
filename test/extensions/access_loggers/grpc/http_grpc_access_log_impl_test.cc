@@ -39,6 +39,9 @@ using envoy::data::accesslog::v3::HTTPAccessLogEntry;
 class MockGrpcAccessLogger : public GrpcCommon::GrpcAccessLogger {
 public:
   // GrpcAccessLogger
+  MOCK_METHOD(void, startIntervalFlushTimer,
+              (Event::Dispatcher & dispatcher,
+               const std::chrono::milliseconds buffer_flush_interval_msec));
   MOCK_METHOD(void, log, (HTTPAccessLogEntry && entry, bool is_critical));
   MOCK_METHOD(void, log,
               (envoy::data::accesslog::v3::TCPAccessLogEntry && entry, bool is_critical));

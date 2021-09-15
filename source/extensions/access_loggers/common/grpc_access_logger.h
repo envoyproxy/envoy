@@ -44,6 +44,15 @@ public:
   virtual ~GrpcAccessLogger() = default;
 
   /**
+   * Start interval log flusher.
+   * @param dispatcher Event dispatcher to create timer to flush log message.
+   * @param buffer_flush_interval_msec Buffer flush interval msec.
+   */
+  virtual void
+  startIntervalFlushTimer(Event::Dispatcher& dispatcher,
+                          const std::chrono::milliseconds buffer_flush_interval_msec) PURE;
+
+  /**
    * Log http access entry.
    * @param entry supplies the access log to send.
    * @param is_critical determine whether log entry is critical or not.
@@ -161,28 +170,23 @@ class GrpcAccessLogger : public Detail::GrpcAccessLogger<HttpLogProto, TcpLogPro
 public:
   using Interface = Detail::GrpcAccessLogger<HttpLogProto, TcpLogProto>;
 
-  GrpcAccessLogger(const Grpc::RawAsyncClientSharedPtr& client,
-                   std::chrono::milliseconds buffer_flush_interval_msec,
-                   uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
+  GrpcAccessLogger(const Grpc::RawAsyncClientSharedPtr& client, uint64_t max_buffer_size_bytes,
                    Stats::Scope& scope, std::string access_log_prefix,
                    const Protobuf::MethodDescriptor& service_method)
-      : client_(client, service_method), buffer_flush_interval_msec_(buffer_flush_interval_msec),
-        flush_timer_(dispatcher.createTimer([this]() {
-          flush();
-          flushCriticalMessage();
-          flush_timer_->enableTimer(buffer_flush_interval_msec_);
-        })),
-        max_buffer_size_bytes_(max_buffer_size_bytes),
-        stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(scope, access_log_prefix))}) {
-    flush_timer_->enableTimer(buffer_flush_interval_msec_);
+      : client_(client, service_method), max_buffer_size_bytes_(max_buffer_size_bytes),
+        stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(scope, access_log_prefix))}) {}
+
+  void
+  startIntervalFlushTimer(Event::Dispatcher& dispatcher,
+                          const std::chrono::milliseconds buffer_flush_interval_msec) override {
+    flush_timer_ = dispatcher.createTimer([this, buffer_flush_interval_msec]() {
+      flush();
+      flush_timer_->enableTimer(buffer_flush_interval_msec);
+    });
+    flush_timer_->enableTimer(buffer_flush_interval_msec);
   }
 
-  void log(HttpLogProto&& entry, bool is_critical) {
-    if (is_critical) {
-      logCritical(std::move(entry));
-      return;
-    }
-
+  void log(HttpLogProto&& entry, bool) override {
     if (!canLogMore()) {
       return;
     }
@@ -193,7 +197,7 @@ public:
     }
   }
 
-  void log(TcpLogProto&& entry, bool) {
+  void log(TcpLogProto&& entry, bool) override {
     approximate_message_size_bytes_ += entry.ByteSizeLong();
     addEntry(std::move(entry));
     if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
@@ -202,18 +206,6 @@ public:
   }
 
 protected:
-  Detail::GrpcAccessLogClient<LogRequest, LogResponse> client_;
-  LogRequest message_;
-
-private:
-  virtual bool isEmpty() PURE;
-  virtual void initMessage() PURE;
-  virtual void addEntry(HttpLogProto&& entry) PURE;
-  virtual void addEntry(TcpLogProto&& entry) PURE;
-  virtual void clearMessage() { message_.Clear(); }
-  virtual void flushCriticalMessage() {}
-  virtual void logCritical(HttpLogProto&&) {}
-
   void flush() {
     if (isEmpty()) {
       // Nothing to flush.
@@ -231,6 +223,17 @@ private:
     }
   }
 
+  Detail::GrpcAccessLogClient<LogRequest, LogResponse> client_;
+  LogRequest message_;
+  Event::TimerPtr flush_timer_;
+
+private:
+  virtual bool isEmpty() PURE;
+  virtual void initMessage() PURE;
+  virtual void addEntry(HttpLogProto&& entry) PURE;
+  virtual void addEntry(TcpLogProto&& entry) PURE;
+  virtual void clearMessage() { message_.Clear(); }
+
   bool canLogMore() {
     if (max_buffer_size_bytes_ == 0 || approximate_message_size_bytes_ < max_buffer_size_bytes_) {
       stats_.logs_written_.inc();
@@ -245,8 +248,6 @@ private:
     return false;
   }
 
-  const std::chrono::milliseconds buffer_flush_interval_msec_;
-  const Event::TimerPtr flush_timer_;
   const uint64_t max_buffer_size_bytes_;
   uint64_t approximate_message_size_bytes_ = 0;
   GrpcAccessLoggerStats stats_;

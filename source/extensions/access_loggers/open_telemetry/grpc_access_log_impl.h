@@ -36,9 +36,8 @@ class GrpcAccessLoggerImpl
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse> {
 public:
   GrpcAccessLoggerImpl(const Grpc::RawAsyncClientSharedPtr& client, std::string log_name,
-                       std::chrono::milliseconds buffer_flush_interval_msec,
-                       uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
-                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
+                       uint64_t max_buffer_size_bytes, const LocalInfo::LocalInfo& local_info,
+                       Stats::Scope& scope);
 
 private:
   void initMessageRoot(const std::string& log_name, const LocalInfo::LocalInfo& local_info);

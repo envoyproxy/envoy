@@ -79,9 +79,10 @@ public:
       : async_client_(new Grpc::MockAsyncClient), timer_(new Event::MockTimer(&dispatcher_)),
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
     EXPECT_CALL(*timer_, enableTimer(_, _));
-    logger_ = std::make_unique<GrpcAccessLoggerImpl>(
-        Grpc::RawAsyncClientPtr{async_client_}, "test_log_name", FlushInterval, BUFFER_SIZE_BYTES,
-        dispatcher_, local_info_, stats_store_);
+    logger_ = std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_},
+                                                     "test_log_name", BUFFER_SIZE_BYTES,
+                                                     local_info_, stats_store_);
+    logger_->startIntervalFlushTimer(dispatcher_, FlushInterval);
   }
 
   Grpc::MockAsyncClient* async_client_;

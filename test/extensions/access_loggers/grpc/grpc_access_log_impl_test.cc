@@ -91,8 +91,9 @@ public:
     EXPECT_CALL(*timer_, enableTimer(_, _));
     config_.set_log_name("test_log_name");
     logger_ = std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_},
-                                                     config_, FlushInterval, BUFFER_SIZE_BYTES,
-                                                     dispatcher_, local_info_, stats_store_);
+                                                     config_, BUFFER_SIZE_BYTES, dispatcher_,
+                                                     local_info_, stats_store_);
+    logger_->startIntervalFlushTimer(dispatcher_, FlushInterval);
   }
 
   Grpc::MockAsyncClient* async_client_;

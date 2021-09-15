@@ -44,6 +44,9 @@ namespace {
 class MockGrpcAccessLogger : public GrpcAccessLogger {
 public:
   // GrpcAccessLogger
+  MOCK_METHOD(void, startIntervalFlushTimer,
+              (Event::Dispatcher & dispatcher,
+               std::chrono::milliseconds buffer_flush_interval_msec));
   MOCK_METHOD(void, log, (LogRecord && entry, bool));
   MOCK_METHOD(void, log, (ProtobufWkt::Empty && entry, bool));
 };
