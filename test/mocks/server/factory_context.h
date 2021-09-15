@@ -33,6 +33,7 @@ public:
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
+  MOCK_METHOD(Stats::Scope&, serverScope, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());

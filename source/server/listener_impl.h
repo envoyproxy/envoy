@@ -114,6 +114,7 @@ public:
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
   Envoy::Runtime::Loader& runtime() override;
+  Stats::Scope& serverScope() override { return server_.stats(); }
   Stats::Scope& scope() override;
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
@@ -188,6 +189,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override;
   Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
+  Stats::Scope& serverScope() override { return listener_factory_context_base_->serverScope(); }
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::Instance& threadLocal() override;

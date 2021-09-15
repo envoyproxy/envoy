@@ -27,7 +27,6 @@ AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
       const envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  
   const auto service_config = proto_config.common_config().grpc_service();
   if (service_config.has_envoy_grpc()) {
     context.clusterManager().checkActiveStaticCluster(service_config.envoy_grpc().cluster_name());
