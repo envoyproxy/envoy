@@ -53,9 +53,12 @@ constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
 void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms& src) {
   dest.headers_to_append.insert(dest.headers_to_append.end(), src.headers_to_append.begin(),
                                 src.headers_to_append.end());
-  dest.headers_to_overwrite.insert(dest.headers_to_overwrite.end(),
-                                   src.headers_to_overwrite.begin(),
-                                   src.headers_to_overwrite.end());
+  dest.headers_to_append_if_exist.insert(dest.headers_to_append_if_exist.end(),
+                                         src.headers_to_append_if_exist.begin(),
+                                         src.headers_to_append_if_exist.end());
+  dest.headers_to_overwrite_if_exist.insert(dest.headers_to_overwrite_if_exist.end(),
+                                            src.headers_to_overwrite_if_exist.begin(),
+                                            src.headers_to_overwrite_if_exist.end());
   dest.headers_to_remove.insert(dest.headers_to_remove.end(), src.headers_to_remove.begin(),
                                 src.headers_to_remove.end());
 }

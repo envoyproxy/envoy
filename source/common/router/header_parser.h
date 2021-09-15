@@ -32,12 +32,13 @@ public:
 
   /*
    * @param headers_to_add defines headers to add during calls to evaluateHeaders.
-   * @param append defines whether headers will be appended or replaced.
+   * @param append_action defines whether the header should be added only if it doesn't exist or if
+   * the value needs be appended/overwritten to the existing values when the header already exists.
    * @return HeaderParserPtr a configured HeaderParserPtr.
    */
   static HeaderParserPtr
   configure(const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers_to_add,
-            bool append);
+            const envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action);
 
   /*
    * @param headers_to_add defines headers to add during calls to evaluateHeaders

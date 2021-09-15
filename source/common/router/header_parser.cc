@@ -37,8 +37,9 @@ std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%
 // The statement machine does minimal validation of the arguments (if any) and does not know the
 // names of valid variables. Interpretation of the variable name and arguments is delegated to
 // StreamInfoHeaderFormatter.
-HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& header_value,
-                                 bool append) {
+HeaderFormatterPtr
+parseInternal(const envoy::config::core::v3::HeaderValue& header_value,
+              envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action) {
   const std::string& key = header_value.key();
   // PGV constraints provide this guarantee.
   ASSERT(!key.empty());
@@ -55,7 +56,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
 
   absl::string_view format(header_value.value());
   if (format.empty()) {
-    return std::make_unique<PlainHeaderFormatter>("", append);
+    return std::make_unique<PlainHeaderFormatter>("", append_action);
   }
 
   std::vector<HeaderFormatterPtr> formatters;
@@ -89,7 +90,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
       state = ParserState::VariableName;
       if (pos > start) {
         absl::string_view literal = format.substr(start, pos - start);
-        formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append));
+        formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append_action));
       }
       start = pos + 1;
       break;
@@ -99,7 +100,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
       if (ch == '%') {
         // Found complete variable name, add formatter.
         formatters.emplace_back(
-            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append));
+            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append_action));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -180,7 +181,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
       // Search for closing % of a %VAR(...)% expression
       if (ch == '%') {
         formatters.emplace_back(
-            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append));
+            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append_action));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -208,7 +209,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
   if (pos > start) {
     // Trailing constant data.
     absl::string_view literal = format.substr(start, pos - start);
-    formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append));
+    formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append_action));
   }
 
   ASSERT(!formatters.empty());
@@ -217,7 +218,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
     return std::move(formatters[0]);
   }
 
-  return std::make_unique<CompoundHeaderFormatter>(std::move(formatters), append);
+  return std::make_unique<CompoundHeaderFormatter>(std::move(formatters), append_action);
 }
 
 } // namespace
@@ -227,8 +228,18 @@ HeaderParserPtr HeaderParser::configure(
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value_option : headers_to_add) {
-    const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
-    HeaderFormatterPtr header_formatter = parseInternal(header_value_option.header(), append);
+    envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action =
+        header_value_option.append_action();
+    // Preserve the old behavior until `append` field is fully deprecated.
+    if (header_value_option.has_append()) {
+      if (header_value_option.append().value()) {
+        append_action = envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS;
+      } else {
+        append_action = envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS;
+      }
+    }
+    HeaderFormatterPtr header_formatter =
+        parseInternal(header_value_option.header(), append_action);
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value_option.header().key()),
         HeadersToAddEntry{std::move(header_formatter), header_value_option.header().value()});
@@ -239,11 +250,11 @@ HeaderParserPtr HeaderParser::configure(
 
 HeaderParserPtr HeaderParser::configure(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers_to_add,
-    bool append) {
+    envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action) {
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value : headers_to_add) {
-    HeaderFormatterPtr header_formatter = parseInternal(header_value, append);
+    HeaderFormatterPtr header_formatter = parseInternal(header_value, append_action);
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value.key()),
         HeadersToAddEntry{std::move(header_formatter), header_value.value()});
@@ -286,12 +297,30 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   for (const auto& [key, entry] : headers_to_add_) {
     const std::string value =
         stream_info != nullptr ? entry.formatter_->format(*stream_info) : entry.original_value_;
-    if (!value.empty()) {
-      if (entry.formatter_->append()) {
-        headers.addReferenceKey(key, value);
-      } else {
+    switch (entry.formatter_->appendAction()) {
+    case envoy::config::core::v3::HeaderValueOption::APPEND:
+      // Check whether the header already exist or not. We only
+      // need to add the header if it doesn't already exist.
+      if (headers.get(key).empty() && !value.empty()) {
         headers.setReferenceKey(key, value);
       }
+      break;
+    case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS:
+      // Append the new value to the existing values if the header
+      // already exist otherwise simply add the key-value pair.
+      if (!value.empty()) {
+        headers.addReferenceKey(key, value);
+      }
+      break;
+    case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS:
+      // Overwrite the new value by discarding any existing values if the
+      // header already exist otherwise simply add the key-value pair.
+      if (!value.empty()) {
+        headers.setReferenceKey(key, value);
+      }
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 }
@@ -301,21 +330,34 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
   Http::HeaderTransforms transforms;
 
   for (const auto& [key, entry] : headers_to_add_) {
+    std::string value = entry.original_value_;
     if (do_formatting) {
-      const std::string value = entry.formatter_->format(stream_info);
+      value = entry.formatter_->format(stream_info);
+    }
+
+    switch (entry.formatter_->appendAction()) {
+    case envoy::config::core::v3::HeaderValueOption::APPEND:
+      // Headers to be appended if it doesn't already exist
       if (!value.empty()) {
-        if (entry.formatter_->append()) {
-          transforms.headers_to_append.push_back({key, value});
-        } else {
-          transforms.headers_to_overwrite.push_back({key, value});
-        }
+        transforms.headers_to_append.push_back({key, value});
       }
-    } else {
-      if (entry.formatter_->append()) {
-        transforms.headers_to_append.push_back({key, entry.original_value_});
-      } else {
-        transforms.headers_to_overwrite.push_back({key, entry.original_value_});
+      break;
+    case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS:
+      // Headers on which the new value needs to be appended
+      // to the existing values if the header already exists
+      if (!value.empty()) {
+        transforms.headers_to_append_if_exist.push_back({key, value});
       }
+      break;
+    case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS:
+      // Headers on which the new value needs to be overwritten by
+      // discarding any existing values if the header already exists
+      if (!value.empty()) {
+        transforms.headers_to_overwrite_if_exist.push_back({key, value});
+      }
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 

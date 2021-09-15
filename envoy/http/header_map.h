@@ -687,7 +687,8 @@ using HeaderMapPtr = std::unique_ptr<HeaderMap>;
  */
 struct HeaderTransforms {
   std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_append;
-  std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_overwrite;
+  std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_append_if_exist;
+  std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_overwrite_if_exist;
   std::vector<Http::LowerCaseString> headers_to_remove;
 };
 

@@ -22,10 +22,13 @@ public:
   virtual const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
-   * @return bool indicating whether the formatted header should be appended to the existing
-   *              headers or replace any existing values for the header
+   * @return envoy::config::core::v3::HeaderValueOption::HeaderAppendAction describes what append
+   * action to take indicating whether:
+   * 1. The formatted header should be added only if it's not already present;
+   * 2. New value should be appended to the existing values if header already exists; or
+   * 3. New value should be overwritten by discarding any existing values if header already exists;
    */
-  virtual bool append() const PURE;
+  virtual envoy::config::core::v3::HeaderValueOption::HeaderAppendAction appendAction() const PURE;
 };
 
 using HeaderFormatterPtr = std::unique_ptr<HeaderFormatter>;
@@ -35,18 +38,22 @@ using HeaderFormatterPtr = std::unique_ptr<HeaderFormatter>;
  */
 class StreamInfoHeaderFormatter : public HeaderFormatter {
 public:
-  StreamInfoHeaderFormatter(absl::string_view field_name, bool append);
+  StreamInfoHeaderFormatter(
+      absl::string_view field_name,
+      envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action);
 
   // HeaderFormatter::format
   const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const override;
-  bool append() const override { return append_; }
+  envoy::config::core::v3::HeaderValueOption::HeaderAppendAction appendAction() const override {
+    return append_action_;
+  }
 
   using FieldExtractor = std::function<std::string(const Envoy::StreamInfo::StreamInfo&)>;
   using FormatterPtrMap = absl::node_hash_map<std::string, Envoy::Formatter::FormatterPtr>;
 
 private:
   FieldExtractor field_extractor_;
-  const bool append_;
+  const envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action_;
 
   // Maps a string format pattern (including field name and any command operators between
   // parenthesis) to the list of FormatterProviderPtrs that are capable of formatting that pattern.
@@ -61,18 +68,21 @@ private:
  */
 class PlainHeaderFormatter : public HeaderFormatter {
 public:
-  PlainHeaderFormatter(const std::string& static_header_value, bool append)
-      : static_value_(static_header_value), append_(append) {}
+  PlainHeaderFormatter(const std::string& static_header_value,
+                       envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action)
+      : static_value_(static_header_value), append_action_(append_action) {}
 
   // HeaderFormatter::format
   const std::string format(const Envoy::StreamInfo::StreamInfo&) const override {
     return static_value_;
   };
-  bool append() const override { return append_; }
+  envoy::config::core::v3::HeaderValueOption::HeaderAppendAction appendAction() const override {
+    return append_action_;
+  }
 
 private:
   const std::string static_value_;
-  const bool append_;
+  const envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action_;
 };
 
 /**
@@ -80,8 +90,10 @@ private:
  */
 class CompoundHeaderFormatter : public HeaderFormatter {
 public:
-  CompoundHeaderFormatter(std::vector<HeaderFormatterPtr>&& formatters, bool append)
-      : formatters_(std::move(formatters)), append_(append) {}
+  CompoundHeaderFormatter(
+      std::vector<HeaderFormatterPtr>&& formatters,
+      envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action)
+      : formatters_(std::move(formatters)), append_action_(append_action) {}
 
   // HeaderFormatter::format
   const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const override {
@@ -91,11 +103,13 @@ public:
     }
     return buf;
   };
-  bool append() const override { return append_; }
+  envoy::config::core::v3::HeaderValueOption::HeaderAppendAction appendAction() const override {
+    return append_action_;
+  }
 
 private:
   const std::vector<HeaderFormatterPtr> formatters_;
-  const bool append_;
+  const envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action_;
 };
 
 } // namespace Router
