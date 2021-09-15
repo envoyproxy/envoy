@@ -67,13 +67,17 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
   } else {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
     authz_response->status = CheckStatus::Denied;
+
+    // The default HTTP status code for denied response is 403 Forbidden.
+    authz_response->status_code = Http::Code::Forbidden;
     if (response->has_denied_response()) {
       toAuthzResponseHeader(authz_response, response->denied_response().headers());
-      authz_response->status_code =
-          static_cast<Http::Code>(response->denied_response().status().code());
+
+      const uint32_t status_code = response->denied_response().status().code();
+      if (status_code > 0) {
+        authz_response->status_code = static_cast<Http::Code>(status_code);
+      }
       authz_response->body = response->denied_response().body();
-    } else {
-      authz_response->status_code = Http::Code::Forbidden;
     }
   }
 
