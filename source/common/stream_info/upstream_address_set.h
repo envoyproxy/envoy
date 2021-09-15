@@ -8,6 +8,9 @@
 namespace Envoy {
 namespace StreamInfo {
 
+/*
+ * A FilterState object that wraps a set of network address shared pointers.
+ */
 struct UpstreamAddressSet : public FilterState::Object {
 
   void iterate(const std::function<bool(const Network::Address::InstanceConstSharedPtr& address)>&
