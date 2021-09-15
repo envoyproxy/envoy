@@ -13,6 +13,7 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
     "EXTENSION_CONFIG_VISIBILITY",
+    "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
 )
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
@@ -75,7 +76,7 @@ def envoy_cc_contrib_extension(
         name,
         tags = [],
         extra_visibility = [],
-        visibility = ["//:contrib_library"],
+        visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY,
         **kwargs):
     envoy_cc_extension(name, tags, extra_visibility, visibility, **kwargs)
 
