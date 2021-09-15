@@ -77,62 +77,17 @@ public:
                               Grpc::BufferedAsyncClient<RequestType, ResponseType>& client,
                               std::chrono::milliseconds message_ack_timeout)
         : dispatcher_(dispatcher), message_ack_timeout_(message_ack_timeout), stats_(stats),
-          client_(client) {}
+          client_(client), timer_(dispatcher_.createTimer([this] { callback(); })) {}
 
-    ~InflightMessageTtlManager() {
-      if (timer_ != nullptr) {
-        timer_->disableTimer();
-      }
-    }
+    ~InflightMessageTtlManager() { timer_->disableTimer(); }
 
     void setDeadline(absl::flat_hash_set<uint32_t>&& ids) {
       auto expires_at = dispatcher_.timeSource().monotonicTime() + message_ack_timeout_;
       deadline_.emplace(expires_at, std::move(ids));
-
-      if (timer_ == nullptr) {
-        timer_ = dispatcher_.createTimer([this] {
-          callback();
-          restartTimer();
-        });
-
-        // Since this if section is never called except at the first startup,
-        // it is sufficient to set message_ack_timeout.
-        setTimer(message_ack_timeout_);
-      }
+      timer_->enableTimer(message_ack_timeout_);
     }
 
   private:
-    void restartTimer() {
-      if (timer_ != nullptr) {
-        return;
-      }
-
-      if (deadline_.empty()) {
-        timer_ = nullptr;
-        return;
-      }
-
-      // When restarting the timer, set the earliest time point among the currently remaining
-      // messages. This will allow you to enforce an accurate timeout.
-      const auto earlier_timepoint = deadline_.rbegin()->first;
-      auto timer_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-          earlier_timepoint - dispatcher_.timeSource().monotonicTime());
-
-      // A corner case may occur where the timer is not subject to a timeout
-      // at the stage where it fires, but becomes subject to a timeout at the
-      // stage where the timer glue start takes place. This if statement is
-      // a mechanism to prevent this from happening.
-      setTimer(timer_duration.count() > 0 ? timer_duration : message_ack_timeout_);
-    }
-
-    void setTimer(std::chrono::milliseconds duration) {
-      timer_ = dispatcher_.createTimer([this] {
-        callback();
-        restartTimer();
-      });
-      timer_->enableTimer(duration);
-    }
-
     void callback() {
       const auto now = dispatcher_.timeSource().monotonicTime();
       std::vector<MonotonicTime> expired_timepoints;
@@ -153,6 +108,16 @@ public:
         deadline_.erase(timepoint);
       }
 
+      std::chrono::milliseconds timer_duration;
+
+      if (!deadline_.empty()) {
+        // When restarting the timer, set the earliest time point among the currently remaining
+        // messages. This will allow you to enforce an accurate timeout.
+        const auto earliest_timepoint = deadline_.rbegin()->first;
+        timer_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+            earliest_timepoint - dispatcher_.timeSource().monotonicTime());
+      }
+
       // Restore pending messages to buffer due to timeout.
       for (auto&& id : expired_message_ids) {
         const auto& message_buffer = client_.messageBuffer();
@@ -168,7 +133,9 @@ public:
         }
       }
 
-      timer_ = nullptr;
+      if (!deadline_.empty()) {
+        timer_->enableTimer(timer_duration);
+      }
     }
 
     Event::Dispatcher& dispatcher_;
