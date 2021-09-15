@@ -82,17 +82,26 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     return Http::Code::BadRequest;
   }
 
+  const Stats::CustomStatNamespaces& custom_stat_namespaces = server_.api().customStatNamespaces();
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     if (shouldShowMetric(*counter, used_only, regex)) {
-      all_stats.emplace(counter->name(), counter->value());
+      const std::string original_name = counter->name();
+      const absl::optional<absl::string_view> stripped_name =
+          custom_stat_namespaces.stripRegisteredPrefix(original_name);
+      all_stats.emplace(stripped_name.has_value() ? stripped_name.value() : original_name,
+                        counter->value());
     }
   }
 
   for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
     if (shouldShowMetric(*gauge, used_only, regex)) {
       ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
-      all_stats.emplace(gauge->name(), gauge->value());
+      const std::string original_name = gauge->name();
+      const absl::optional<absl::string_view> stripped_name =
+          custom_stat_namespaces.stripRegisteredPrefix(original_name);
+      all_stats.emplace(stripped_name.has_value() ? stripped_name.value() : original_name,
+                        gauge->value());
     }
   }
 
@@ -112,8 +121,8 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
 
   if (format_value.value() == "json") {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-    response.add(
-        statsAsJson(all_stats, text_readouts, server_.stats().histograms(), used_only, regex));
+    response.add(statsAsJson(all_stats, text_readouts, server_.stats().histograms(), used_only,
+                             regex, custom_stat_namespaces));
     return Http::Code::OK;
   }
 
@@ -175,10 +184,16 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
   for (const auto& stat : all_stats) {
     response.add(fmt::format("{}: {}\n", stat.first, stat.second));
   }
+  const Stats::CustomStatNamespaces& custom_stat_namespaces = server_.api().customStatNamespaces();
   std::map<std::string, std::string> all_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
     if (shouldShowMetric(*histogram, used_only, regex)) {
-      auto insert = all_histograms.emplace(histogram->name(), histogram->quantileSummary());
+      const std::string original_name = histogram->name();
+      const absl::optional<absl::string_view> stripped_name =
+          custom_stat_namespaces.stripRegisteredPrefix(original_name);
+      auto insert =
+          all_histograms.emplace(stripped_name.has_value() ? stripped_name.value() : original_name,
+                                 histogram->quantileSummary());
       ASSERT(insert.second); // No duplicates expected.
     }
   }
@@ -192,6 +207,7 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                           const std::map<std::string, std::string>& text_readouts,
                           const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                           const bool used_only, const absl::optional<std::regex>& regex,
+                          const Stats::CustomStatNamespaces& custom_stat_namespaces,
                           const bool pretty_print) {
 
   ProtobufWkt::Struct document;
@@ -236,7 +252,11 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
 
       ProtobufWkt::Struct computed_quantile;
       auto* computed_quantile_fields = computed_quantile.mutable_fields();
-      (*computed_quantile_fields)["name"] = ValueUtil::stringValue(histogram->name());
+      const std::string original_name = histogram->name();
+      const absl::optional<absl::string_view> stripped_name =
+          custom_stat_namespaces.stripRegisteredPrefix(original_name);
+      (*computed_quantile_fields)["name"] = ValueUtil::stringValue(
+          stripped_name.has_value() ? std::string(stripped_name.value()) : original_name);
 
       std::vector<ProtobufWkt::Value> computed_quantile_value_array;
       for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {

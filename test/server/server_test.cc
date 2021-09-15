@@ -776,6 +776,7 @@ TEST_P(ServerStatsTest, FlushStats) {
 }
 
 TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
+  Thread::MainThread::initTestThread();
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
   auto server_thread =
