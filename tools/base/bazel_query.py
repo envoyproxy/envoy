@@ -14,7 +14,7 @@ python usage:
 ```python
 from tools.base.bazel_query import query
 
-result = query("source/...")
+result = query("deps(source/...)")
 ```
 
 NB: This allows running queries that do not define scope and cannot be
