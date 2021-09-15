@@ -49,12 +49,11 @@ class MockGrpcAccessLoggerImpl
                                       ProtobufWkt::Struct> {
 public:
   MockGrpcAccessLoggerImpl(const Grpc::RawAsyncClientSharedPtr& client,
-                           std::chrono::milliseconds buffer_flush_interval_msec,
-                           uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
-                           Stats::Scope& scope, std::string access_log_prefix,
+                           uint64_t max_buffer_size_bytes, Stats::Scope& scope,
+                           std::string access_log_prefix,
                            const Protobuf::MethodDescriptor& service_method)
-      : GrpcAccessLogger(std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes,
-                         dispatcher, scope, access_log_prefix, service_method) {}
+      : GrpcAccessLogger(std::move(client), max_buffer_size_bytes, scope, access_log_prefix,
+                         service_method) {}
 
   int numInits() const { return num_inits_; }
 
@@ -115,8 +114,9 @@ public:
     timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(*timer_, enableTimer(buffer_flush_interval_msec, _));
     logger_ = std::make_unique<MockGrpcAccessLoggerImpl>(
-        Grpc::RawAsyncClientPtr{async_client_}, buffer_flush_interval_msec, buffer_size_bytes,
-        dispatcher_, stats_store_, "mock_access_log_prefix.", mockMethodDescriptor());
+        Grpc::RawAsyncClientPtr{async_client_}, buffer_size_bytes, stats_store_,
+        "mock_access_log_prefix.", mockMethodDescriptor());
+    logger_->startIntervalFlushTimer(dispatcher_, buffer_flush_interval_msec);
   }
 
   void expectStreamStart(MockAccessLogStream& stream, AccessLogCallbacks** callbacks_to_set) {
@@ -322,9 +322,11 @@ private:
                const Grpc::RawAsyncClientSharedPtr& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) override {
-    return std::make_shared<MockGrpcAccessLoggerImpl>(
-        std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher, scope,
-        "mock_access_log_prefix.", mockMethodDescriptor());
+    auto logger = std::make_shared<MockGrpcAccessLoggerImpl>(
+        std::move(client), max_buffer_size_bytes, scope, "mock_access_log_prefix.",
+        mockMethodDescriptor());
+    logger->startIntervalFlushTimer(dispatcher, buffer_flush_interval_msec);
+    return logger;
   }
 };
 
