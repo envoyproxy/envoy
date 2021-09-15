@@ -329,7 +329,6 @@ message RateLimitConfig {
   // .. note::
   //
   //   The filter supports a range of 0 - 10 inclusively for stage numbers.
-  // google.protobuf.UInt32Value stage = 1 [(validate.rules).uint32 = {lte: 10}];
   uint32 stage = 1 [(validate.rules).uint32 = {lte: 10}];
 
   // The key to be set in runtime to disable this rate limit configuration.
