@@ -1465,14 +1465,14 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
       EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-override", headers.get_("x-route-header"));
       auto transforms = route->responseHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append,
+      EXPECT_THAT(transforms.headers_to_append_if_exist,
                   ElementsAre(Pair(Http::LowerCaseString("x-route-header"), "route-override"),
                               Pair(Http::LowerCaseString("x-global-header1"), "route-override"),
                               Pair(Http::LowerCaseString("x-vhost-header1"), "route-override"),
                               Pair(Http::LowerCaseString("x-global-header1"), "vhost-override"),
                               Pair(Http::LowerCaseString("x-vhost-header1"), "vhost1-www2"),
                               Pair(Http::LowerCaseString("x-global-header1"), "global1")));
-      EXPECT_THAT(transforms.headers_to_overwrite, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_if_exist, IsEmpty());
       EXPECT_THAT(transforms.headers_to_remove,
                   ElementsAre(Http::LowerCaseString("x-vhost-remove"),
                               Http::LowerCaseString("x-global-remove")));
@@ -1488,12 +1488,12 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
       EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allpath", headers.get_("x-route-header"));
       auto transforms = route->responseHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append,
+      EXPECT_THAT(transforms.headers_to_append_if_exist,
                   ElementsAre(Pair(Http::LowerCaseString("x-route-header"), "route-allpath"),
                               Pair(Http::LowerCaseString("x-global-header1"), "vhost-override"),
                               Pair(Http::LowerCaseString("x-vhost-header1"), "vhost1-www2"),
                               Pair(Http::LowerCaseString("x-global-header1"), "global1")));
-      EXPECT_THAT(transforms.headers_to_overwrite, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_if_exist, IsEmpty());
       EXPECT_THAT(transforms.headers_to_remove,
                   ElementsAre(Http::LowerCaseString("x-route-remove"),
                               Http::LowerCaseString("x-vhost-remove"),
@@ -1511,11 +1511,11 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
       EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allprefix", headers.get_("x-route-header"));
       auto transforms = route->responseHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append,
+      EXPECT_THAT(transforms.headers_to_append_if_exist,
                   ElementsAre(Pair(Http::LowerCaseString("x-route-header"), "route-allprefix"),
                               Pair(Http::LowerCaseString("x-vhost-header1"), "vhost1-www2_staging"),
                               Pair(Http::LowerCaseString("x-global-header1"), "global1")));
-      EXPECT_THAT(transforms.headers_to_overwrite, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_if_exist, IsEmpty());
       EXPECT_THAT(transforms.headers_to_remove,
                   ElementsAre(Http::LowerCaseString("x-global-remove")));
     }
@@ -1528,9 +1528,9 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
       route->finalizeResponseHeaders(headers, stream_info);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
       auto transforms = route->responseHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append,
+      EXPECT_THAT(transforms.headers_to_append_if_exist,
                   ElementsAre(Pair(Http::LowerCaseString("x-global-header1"), "global1")));
-      EXPECT_THAT(transforms.headers_to_overwrite, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_if_exist, IsEmpty());
       EXPECT_THAT(transforms.headers_to_remove,
                   ElementsAre(Http::LowerCaseString("x-global-remove")));
     }
@@ -1556,8 +1556,8 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalse) {
   EXPECT_EQ("route-override", headers.get_("x-route-header"));
 
   auto transforms = route->responseHeaderTransforms(stream_info);
-  EXPECT_THAT(transforms.headers_to_append, IsEmpty());
-  EXPECT_THAT(transforms.headers_to_overwrite,
+  EXPECT_THAT(transforms.headers_to_append_if_exist, IsEmpty());
+  EXPECT_THAT(transforms.headers_to_overwrite_if_exist,
               ElementsAre(Pair(Http::LowerCaseString("x-route-header"), "route-override"),
                           Pair(Http::LowerCaseString("x-global-header1"), "route-override"),
                           Pair(Http::LowerCaseString("x-vhost-header1"), "route-override"),
@@ -1584,8 +1584,8 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
   EXPECT_EQ("route-override", headers.get_("x-route-header"));
 
   auto transforms = route->responseHeaderTransforms(stream_info);
-  EXPECT_THAT(transforms.headers_to_append, IsEmpty());
-  EXPECT_THAT(transforms.headers_to_overwrite,
+  EXPECT_THAT(transforms.headers_to_append_if_exist, IsEmpty());
+  EXPECT_THAT(transforms.headers_to_overwrite_if_exist,
               ElementsAre(Pair(Http::LowerCaseString("x-global-header1"), "global1"),
                           Pair(Http::LowerCaseString("x-global-header1"), "vhost-override"),
                           Pair(Http::LowerCaseString("x-vhost-header1"), "vhost1-www2"),
@@ -1633,12 +1633,12 @@ response_headers_to_add:
   route->finalizeResponseHeaders(headers, stream_info);
 
   auto transforms = route->responseHeaderTransforms(stream_info, /*do_formatting=*/true);
-  EXPECT_THAT(transforms.headers_to_overwrite,
+  EXPECT_THAT(transforms.headers_to_overwrite_if_exist,
               ElementsAre(Pair(Http::LowerCaseString("x-has-variable"), "test_value")));
 
   transforms = route->responseHeaderTransforms(stream_info, /*do_formatting=*/false);
   EXPECT_THAT(
-      transforms.headers_to_overwrite,
+      transforms.headers_to_overwrite_if_exist,
       ElementsAre(Pair(Http::LowerCaseString("x-has-variable"), "%PER_REQUEST_STATE(testing)%")));
 }
 
@@ -5097,12 +5097,12 @@ virtual_hosts:
   Http::TestRequestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/", "GET");
   const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
   auto transforms = route->responseHeaderTransforms(stream_info);
-  EXPECT_THAT(transforms.headers_to_append,
+  EXPECT_THAT(transforms.headers_to_append_if_exist,
               ElementsAre(Pair(Http::LowerCaseString("x-cluster-header"), "cluster1"),
                           Pair(Http::LowerCaseString("x-route-header"), "route-override"),
                           Pair(Http::LowerCaseString("x-global-header1"), "route-override"),
                           Pair(Http::LowerCaseString("x-vhost-header1"), "route-override")));
-  EXPECT_THAT(transforms.headers_to_overwrite, IsEmpty());
+  EXPECT_THAT(transforms.headers_to_overwrite_if_exist, IsEmpty());
   EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-vhost-remove")));
 }
 

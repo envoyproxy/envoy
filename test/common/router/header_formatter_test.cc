@@ -49,7 +49,8 @@ public:
   void testFormatting(const Envoy::StreamInfo::MockStreamInfo& stream_info,
                       const std::string& variable, const std::string& expected_output) {
     {
-      auto f = StreamInfoHeaderFormatter(variable, false);
+      auto f = StreamInfoHeaderFormatter(
+          variable, envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
       const std::string formatted_string = f.format(stream_info);
       EXPECT_EQ(expected_output, formatted_string);
     }
@@ -61,8 +62,10 @@ public:
   }
 
   void testInvalidFormat(const std::string& variable) {
-    EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter(variable, false), EnvoyException,
-                              fmt::format("field '{}' not supported as custom header", variable));
+    EXPECT_THROW_WITH_MESSAGE(
+        StreamInfoHeaderFormatter(variable,
+                                  envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+        EnvoyException, fmt::format("field '{}' not supported as custom header", variable));
   }
 };
 
@@ -711,22 +714,29 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVari
 
 TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnPerRequestStateVariable) {
   // No parameters
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("PER_REQUEST_STATE()", false), EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "PER_REQUEST_STATE(<data_name>), actual format "
-                            "PER_REQUEST_STATE()");
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoHeaderFormatter("PER_REQUEST_STATE()",
+                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      EnvoyException,
+      "Invalid header configuration. Expected format "
+      "PER_REQUEST_STATE(<data_name>), actual format "
+      "PER_REQUEST_STATE()");
 
   // Missing single parens
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("PER_REQUEST_STATE(testing", false),
-                            EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "PER_REQUEST_STATE(<data_name>), actual format "
-                            "PER_REQUEST_STATE(testing");
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("PER_REQUEST_STATE testing)", false),
-                            EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "PER_REQUEST_STATE(<data_name>), actual format "
-                            "PER_REQUEST_STATE testing)");
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoHeaderFormatter("PER_REQUEST_STATE(testing",
+                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      EnvoyException,
+      "Invalid header configuration. Expected format "
+      "PER_REQUEST_STATE(<data_name>), actual format "
+      "PER_REQUEST_STATE(testing");
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoHeaderFormatter("PER_REQUEST_STATE testing)",
+                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      EnvoyException,
+      "Invalid header configuration. Expected format "
+      "PER_REQUEST_STATE(<data_name>), actual format "
+      "PER_REQUEST_STATE testing)");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, UnknownVariable) { testInvalidFormat("INVALID_VARIABLE"); }
@@ -734,51 +744,69 @@ TEST_F(StreamInfoHeaderFormatterTest, UnknownVariable) { testInvalidFormat("INVA
 TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   // Invalid JSON.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA(abcd)", false), EnvoyException,
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA(abcd)",
+                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      EnvoyException,
       "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
       "...]), actual format UPSTREAM_METADATA(abcd), because JSON supplied is not valid. "
       "Error(offset 0, line 1): Invalid value.\n");
 
   // No parameters.
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA", false), EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                            "UPSTREAM_METADATA");
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA",
+                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      EnvoyException,
+      "Invalid header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+      "UPSTREAM_METADATA");
 
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA()", false), EnvoyException,
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA()",
+                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      EnvoyException,
       "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
       "...]), actual format UPSTREAM_METADATA(), because JSON supplied is not valid. Error(offset "
       "0, line 1): The document is empty.\n");
 
   // One parameter.
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"ns\"])", false),
-                            EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                            "UPSTREAM_METADATA([\"ns\"])");
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"ns\"])",
+                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      EnvoyException,
+      "Invalid header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+      "UPSTREAM_METADATA([\"ns\"])");
 
   // Missing close paren.
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA(", false), EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                            "UPSTREAM_METADATA(");
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA(",
+                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      EnvoyException,
+      "Invalid header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+      "UPSTREAM_METADATA(");
 
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([a,b,c,d]", false),
-                            EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                            "UPSTREAM_METADATA([a,b,c,d]");
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA([a,b,c,d]",
+                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      EnvoyException,
+      "Invalid header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+      "UPSTREAM_METADATA([a,b,c,d]");
 
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\",\"b\"]", false),
-                            EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                            "UPSTREAM_METADATA([\"a\",\"b\"]");
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\",\"b\"]",
+                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      EnvoyException,
+      "Invalid header configuration. Expected format "
+      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+      "UPSTREAM_METADATA([\"a\",\"b\"]");
 
   // Non-string elements.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", 1])", false), EnvoyException,
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", 1])",
+                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA([\"a\", 1]), because JSON field from line 1 accessed with type 'String' "
@@ -786,14 +814,18 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   // Invalid string elements.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", \"\\unothex\"])", false), EnvoyException,
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", \"\\unothex\"])",
+                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      EnvoyException,
       "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
       "...]), actual format UPSTREAM_METADATA([\"a\", \"\\unothex\"]), because JSON supplied is "
       "not valid. Error(offset 7, line 1): Incorrect hex digit after \\u escape in string.\n");
 
   // Non-array parameters.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA({\"a\":1})", false), EnvoyException,
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA({\"a\":1})",
+                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA({\"a\":1}), because JSON field from line 1 accessed with type 'Array' "
@@ -1060,7 +1092,9 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   // This tests when we have "StreamInfoHeaderFormatter", but stream info is null.
   first_entry.set_value("%DOWNSTREAM_REMOTE_ADDRESS%");
 
-  HeaderParserPtr req_header_parser_add = HeaderParser::configure(headers_values, /*append=*/true);
+  HeaderParserPtr req_header_parser_add = HeaderParser::configure(
+      headers_values,
+      /*append_action=*/envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
   req_header_parser_add->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("key"));
   EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS%", header_map.get_("key"));
@@ -1070,7 +1104,9 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   set_entry.set_key("key");
   set_entry.set_value("great");
 
-  HeaderParserPtr req_header_parser_set = HeaderParser::configure(headers_values, /*append=*/false);
+  HeaderParserPtr req_header_parser_set = HeaderParser::configure(
+      headers_values,
+      /*append_action=*/envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
   req_header_parser_set->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("key"));
   EXPECT_EQ("great", header_map.get_("key"));
@@ -1080,8 +1116,9 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   empty_entry.set_key("empty");
   empty_entry.set_value("");
 
-  HeaderParserPtr req_header_parser_empty =
-      HeaderParser::configure(headers_values, /*append=*/false);
+  HeaderParserPtr req_header_parser_empty = HeaderParser::configure(
+      headers_values,
+      /*append_action=*/envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
   req_header_parser_empty->evaluateHeaders(header_map, nullptr);
   EXPECT_FALSE(header_map.has("empty"));
 }
@@ -1310,6 +1347,61 @@ request_headers_to_add:
   EXPECT_EQ(1, counts["x-request-start"]);
 }
 
+TEST(HeaderParserTest, EvaluateHeadersWithAppendActions) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "static-header"
+      value: "static-value"
+    append_action: "APPEND"
+  - header:
+      key: "x-client-ip"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    append_action: "OVERWRITE_IF_EXISTS"
+  - header:
+      key: "x-request-start"
+      value: "%START_TIME(%s%3f)%"
+    append: false
+  - header:
+      key: "x-request-start-default"
+      value: "%START_TIME%"
+    append_action: "APPEND_IF_EXISTS"
+  - header:
+      key: "x-request-start-range"
+      value: "%START_TIME(%f, %1f, %2f, %3f, %4f, %5f, %6f, %7f, %8f, %9f)%"
+    append_action: "OVERWRITE_IF_EXISTS"
+)EOF";
+
+  // Disable append mode.
+  envoy::config::route::v3::Route route = parseRouteFromV3Yaml(yaml);
+
+  HeaderParserPtr req_header_parser =
+      Router::HeaderParser::configure(route.request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map{
+      {":method", "POST"}, {"static-header", "old-value"}, {"x-client-ip", "0.0.0.0"}};
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  const SystemTime start_time(std::chrono::microseconds(1522796769123456));
+  EXPECT_CALL(stream_info, startTime()).Times(3).WillRepeatedly(Return(start_time));
+
+  req_header_parser->evaluateHeaders(header_map, stream_info);
+  EXPECT_TRUE(header_map.has("static-header"));
+  EXPECT_EQ("old-value", header_map.get_("static-header"));
+  EXPECT_TRUE(header_map.has("x-client-ip"));
+  EXPECT_EQ("127.0.0.1", header_map.get_("x-client-ip"));
+  EXPECT_TRUE(header_map.has("x-request-start"));
+  EXPECT_EQ("1522796769123", header_map.get_("x-request-start"));
+  EXPECT_TRUE(header_map.has("x-request-start-default"));
+  EXPECT_EQ("2018-04-03T23:06:09.123Z", header_map.get_("x-request-start-default"));
+  EXPECT_TRUE(header_map.has("x-request-start-range"));
+  EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
+            header_map.get_("x-request-start-range"));
+}
+
 TEST(HeaderParserTest, EvaluateResponseHeaders) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
@@ -1446,15 +1538,19 @@ response_headers_to_add:
   - header:
       key: "x-foo-header"
       value: "foo"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "x-bar-header"
       value: "bar"
-    append: false
+    append_action: "OVERWRITE_IF_EXISTS"
   - header:
       key: "x-per-request-header"
       value: "%PER_REQUEST_STATE(testing)%"
-    append: false
+    append_action: "OVERWRITE_IF_EXISTS"
+  - header:
+      key: "x-foobar-header"
+      value: "foobar"
+    append_action: "APPEND"
 response_headers_to_remove: ["x-baz-header"]
 )EOF";
 
@@ -1473,9 +1569,11 @@ response_headers_to_remove: ["x-baz-header"]
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
   auto transforms = resp_header_parser->getHeaderTransforms(stream_info);
-  EXPECT_THAT(transforms.headers_to_append,
+  EXPECT_THAT(transforms.headers_to_append_if_exist,
               ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
-  EXPECT_THAT(transforms.headers_to_overwrite,
+  EXPECT_THAT(transforms.headers_to_append,
+              ElementsAre(Pair(Http::LowerCaseString("x-foobar-header"), "foobar")));
+  EXPECT_THAT(transforms.headers_to_overwrite_if_exist,
               ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar"),
                           Pair(Http::LowerCaseString("x-per-request-header"), "test_value")));
   EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
@@ -1518,9 +1616,9 @@ response_headers_to_remove: ["x-baz-header"]
 
   auto transforms =
       response_header_parser->getHeaderTransforms(stream_info, /*do_formatting=*/false);
-  EXPECT_THAT(transforms.headers_to_append,
+  EXPECT_THAT(transforms.headers_to_append_if_exist,
               ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
-  EXPECT_THAT(transforms.headers_to_overwrite,
+  EXPECT_THAT(transforms.headers_to_overwrite_if_exist,
               ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar"),
                           Pair(Http::LowerCaseString("x-per-request-header"),
                                "%PER_REQUEST_STATE(testing)%")));
