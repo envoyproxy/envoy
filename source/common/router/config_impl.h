@@ -86,7 +86,6 @@ public:
 private:
   RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
-                                  const ProtobufWkt::Struct& config,
                                   const OptionalHttpFilters& optional_http_filters,
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator);
@@ -293,15 +292,21 @@ class RetryPolicyImpl : public RetryPolicy {
 
 public:
   RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
-                  ProtobufMessage::ValidationVisitor& validation_visitor);
+                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                  Upstream::RetryExtensionFactoryContext& factory_context);
   RetryPolicyImpl() = default;
 
   // Router::RetryPolicy
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
+  std::chrono::milliseconds perTryIdleTimeout() const override { return per_try_idle_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
   std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override;
   Upstream::RetryPrioritySharedPtr retryPriority() const override;
+  absl::Span<const Upstream::RetryOptionsPredicateConstSharedPtr>
+  retryOptionsPredicates() const override {
+    return retry_options_predicates_;
+  }
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_attempts_; }
   const std::vector<uint32_t>& retriableStatusCodes() const override {
     return retriable_status_codes_;
@@ -321,6 +326,7 @@ public:
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
+  std::chrono::milliseconds per_try_idle_timeout_{0};
   // We set the number of retries to 1 by default (i.e. when no route or vhost level retry policy is
   // set) so that when retries get enabled through the x-envoy-retry-on header we default to 1
   // retry.
@@ -343,6 +349,7 @@ private:
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{300000};
   ProtobufMessage::ValidationVisitor* validation_visitor_{};
+  std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
 };
 
 /**
@@ -812,6 +819,8 @@ private:
         const std::string& filter_name,
         std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
+    const Http::LowerCaseString& clusterHeaderName() { return cluster_header_name_; }
+
   private:
     const std::string runtime_key_;
     Runtime::Loader& loader_;
@@ -821,6 +830,7 @@ private:
     HeaderParserPtr response_headers_parser_;
     PerFilterConfigs per_filter_configs_;
     const std::string host_rewrite_;
+    const Http::LowerCaseString cluster_header_name_;
   };
 
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
@@ -845,7 +855,8 @@ private:
   RetryPolicyImpl
   buildRetryPolicy(const absl::optional<envoy::config::route::v3::RetryPolicy>& vhost_retry_policy,
                    const envoy::config::route::v3::RouteAction& route_config,
-                   ProtobufMessage::ValidationVisitor& validation_visitor) const;
+                   ProtobufMessage::ValidationVisitor& validation_visitor,
+                   Server::Configuration::ServerFactoryContext& factory_context) const;
 
   InternalRedirectPolicyImpl
   buildInternalRedirectPolicy(const envoy::config::route::v3::RouteAction& route_config,
@@ -904,6 +915,7 @@ private:
   envoy::config::core::v3::Metadata metadata_;
   Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory> typed_metadata_;
   const bool match_grpc_;
+  const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;

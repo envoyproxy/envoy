@@ -15,6 +15,7 @@ ARN
 ASAN
 ASCII
 ASM
+ASSERTed
 ASSERTs
 AST
 AWS
@@ -24,6 +25,7 @@ BPF
 btree
 CAS
 CB
+cbor
 CDN
 CDS
 CEL
@@ -42,6 +44,7 @@ RTP
 STATNAME
 SkyWalking
 TIDs
+Timedout
 WRSQ
 WASI
 ceil
@@ -189,6 +192,7 @@ LEDS
 LEV
 LF
 LHS
+libsxg
 LLVM
 LPT
 LRS
@@ -196,6 +200,7 @@ Loggable
 MB
 MD
 MERCHANTABILITY
+Merkle
 MGET
 MQ
 MSDN
@@ -248,6 +253,7 @@ PGV
 PID
 PKTINFO
 PNG
+Pointwise
 PostCBs
 PREBIND
 PRNG
@@ -324,6 +330,7 @@ STRLEN
 STS
 SVG
 SVID
+SXG
 Symbolizer
 TBD
 TCLAP
@@ -766,6 +773,7 @@ lexically
 libc
 libevent
 libprotobuf
+librdkafka
 libtool
 libstdc
 lifecycle
@@ -1006,6 +1014,7 @@ refcount
 referencee
 referer
 refetch
+refvec
 regex
 regexes
 reified

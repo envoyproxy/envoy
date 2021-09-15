@@ -254,20 +254,25 @@ bool maybeAdjustForIpv6(absl::string_view absolute_url, uint64_t& offset, uint64
   return true;
 }
 
-absl::string_view parseCookie(absl::string_view cookie_value, absl::string_view key) {
-  // Split the cookie header into individual cookies.
-  for (const auto& s : StringUtil::splitToken(cookie_value, ";")) {
-    // Find the key part of the cookie (i.e. the name of the cookie).
-    size_t first_non_space = s.find_first_not_of(' ');
-    size_t equals_index = s.find('=');
-    if (equals_index == absl::string_view::npos) {
-      // The cookie is malformed if it does not have an `=`. Continue
-      // checking other cookies in this header.
-      continue;
-    }
-    absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
-    // If the key matches, parse the value from the rest of the cookie string.
-    if (k == key) {
+void forEachCookie(
+    const HeaderMap& headers, const LowerCaseString& cookie_header,
+    const std::function<bool(absl::string_view, absl::string_view)>& cookie_consumer) {
+  const Http::HeaderMap::GetResult cookie_headers = headers.get(cookie_header);
+
+  for (size_t index = 0; index < cookie_headers.size(); index++) {
+    auto cookie_header_value = cookie_headers[index]->value().getStringView();
+
+    // Split the cookie header into individual cookies.
+    for (const auto& s : StringUtil::splitToken(cookie_header_value, ";")) {
+      // Find the key part of the cookie (i.e. the name of the cookie).
+      size_t first_non_space = s.find_first_not_of(' ');
+      size_t equals_index = s.find('=');
+      if (equals_index == absl::string_view::npos) {
+        // The cookie is malformed if it does not have an `=`. Continue
+        // checking other cookies in this header.
+        continue;
+      }
+      absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
       absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
 
       // Cookie values may be wrapped in double quotes.
@@ -275,25 +280,53 @@ absl::string_view parseCookie(absl::string_view cookie_value, absl::string_view 
       if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
         v = v.substr(1, v.size() - 2);
       }
-      return v;
+
+      if (!cookie_consumer(k, v)) {
+        return;
+      }
     }
   }
-  return EMPTY_STRING;
 }
 
 std::string parseCookie(const HeaderMap& headers, const std::string& key,
                         const LowerCaseString& cookie) {
-  const Http::HeaderMap::GetResult cookie_headers = headers.get(cookie);
+  std::string value;
 
-  for (size_t index = 0; index < cookie_headers.size(); index++) {
-    auto cookie_header_value = cookie_headers[index]->value().getStringView();
-    absl::string_view result = parseCookie(cookie_header_value, key);
-    if (!result.empty()) {
-      return std::string{result};
+  // Iterate over each cookie & return if its value is not empty.
+  forEachCookie(headers, cookie, [&key, &value](absl::string_view k, absl::string_view v) -> bool {
+    if (key == k) {
+      value = std::string{v};
+      return false;
     }
-  }
 
-  return EMPTY_STRING;
+    // continue iterating until a cookie that matches `key` is found.
+    return true;
+  });
+
+  return value;
+}
+
+absl::flat_hash_map<std::string, std::string>
+Utility::parseCookies(const RequestHeaderMap& headers) {
+  return Utility::parseCookies(headers, [](absl::string_view) -> bool { return true; });
+}
+
+absl::flat_hash_map<std::string, std::string>
+Utility::parseCookies(const RequestHeaderMap& headers,
+                      const std::function<bool(absl::string_view)>& key_filter) {
+  absl::flat_hash_map<std::string, std::string> cookies;
+
+  forEachCookie(headers, Http::Headers::get().Cookie,
+                [&cookies, &key_filter](absl::string_view k, absl::string_view v) -> bool {
+                  if (key_filter(k)) {
+                    cookies.emplace(k, v);
+                  }
+
+                  // continue iterating until all cookies are processed.
+                  return true;
+                });
+
+  return cookies;
 }
 
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {

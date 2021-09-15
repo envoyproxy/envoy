@@ -52,7 +52,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
@@ -180,6 +180,19 @@ message JwtProvider {
   //    /path?jwt_token=<JWT>
   //
   repeated string from_params = 7;
+
+  // JWT is sent in a cookie. `from_cookies` represents the cookie names to extract from.
+  //
+  // For example, if config is:
+  //
+  // .. code-block:: yaml
+  //
+  //   from_cookies:
+  //   - auth-token
+  //
+  // Then JWT will be extracted from `auth-token` cookie in the request.
+  //
+  repeated string from_cookies = 13;
 
   // This field specifies the header name to forward a successfully verified JWT payload to the
   // backend. The forwarded data is::

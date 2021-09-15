@@ -109,11 +109,38 @@ LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
   return std::make_unique<SimpleLookupContext>(*this, std::move(request));
 }
 
-void SimpleHttpCache::updateHeaders(const LookupContext&, const Http::ResponseHeaderMap&,
-                                    const ResponseMetadata&) {
-  // TODO(toddmgreer): Support updating headers.
-  // Not implemented yet, however this is called during tests
-  // NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
+                                    const Http::ResponseHeaderMap& response_headers,
+                                    const ResponseMetadata& metadata) {
+  const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
+  const Key& key = simple_lookup_context.request().key();
+  absl::WriterMutexLock lock(&mutex_);
+
+  auto iter = map_.find(key);
+  if (iter == map_.end() || !iter->second.response_headers_) {
+    return;
+  }
+  auto& entry = iter->second;
+
+  // TODO(tangsaidi) handle Vary header updates properly
+  if (VaryHeaderUtils::hasVary(*(entry.response_headers_))) {
+    return;
+  }
+
+  // https://www.rfc-editor.org/rfc/pdfrfc/rfc7234.txt.pdf
+  // 4.3.4 Freshening Stored Responses upon Validation
+  // use other header fields provided in the 304 (Not Modified)
+  // response to replace all instances of the corresponding header
+  // fields in the stored response.
+  //
+  // Assumptions:
+  // 1. The internet is fast, i.e. we get the result as soon as the server sends it.
+  // Race conditions would not be possible because we are always processing up-to-date data.
+  // 2. No key collision for etag. Therefore, if etag matches it's the same resource.
+  // 3. Backend is correct. etag is being used as a unique identifier to the resource
+  // TODO(tangsaidi) merge the header map instead of replacing it according to rfc7234
+  entry.response_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
+  entry.metadata_ = metadata;
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {

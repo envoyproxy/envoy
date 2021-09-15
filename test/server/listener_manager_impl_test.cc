@@ -1516,7 +1516,7 @@ filter_chains:
 
   Network::Address::InstanceConstSharedPtr local_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 1234));
-  listener_factory_.socket_->address_provider_->setLocalAddress(local_address);
+  listener_factory_.socket_->connection_info_provider_->setLocalAddress(local_address);
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
@@ -1576,7 +1576,7 @@ filter_chains:
 
   Network::Address::InstanceConstSharedPtr local_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 1234));
-  listener_factory_.socket_->address_provider_->setLocalAddress(local_address);
+  listener_factory_.socket_->connection_info_provider_->setLocalAddress(local_address);
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));

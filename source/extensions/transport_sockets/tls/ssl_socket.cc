@@ -197,6 +197,11 @@ void SslSocket::drainErrorQueue() {
       } else if (ERR_GET_REASON(err) == SSL_R_CERTIFICATE_VERIFY_FAILED) {
         saw_counted_error = true;
       }
+    } else if (ERR_GET_LIB(err) == ERR_LIB_SYS) {
+      // Any syscall errors that result in connection closure are already tracked in other
+      // connection related stats. We will still retain the specific syscall failure for
+      // transport failure reasons.
+      saw_counted_error = true;
     }
     saw_error = true;
 

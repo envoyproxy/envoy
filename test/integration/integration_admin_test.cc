@@ -69,7 +69,7 @@ TEST_P(IntegrationAdminTest, HealthCheckWithoutServerStats) {
 }
 
 TEST_P(IntegrationAdminTest, HealthCheckWithBufferFilter) {
-  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultBufferFilter());
   initialize();
 
   BufferingStreamDecoderPtr response;

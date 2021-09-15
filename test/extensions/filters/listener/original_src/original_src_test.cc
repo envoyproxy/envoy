@@ -38,7 +38,8 @@ public:
   }
 
   void setAddressToReturn(const std::string& address) {
-    callbacks_.socket_.address_provider_->setRemoteAddress(Network::Utility::resolveUrl(address));
+    callbacks_.socket_.connection_info_provider_->setRemoteAddress(
+        Network::Utility::resolveUrl(address));
   }
 
 protected:

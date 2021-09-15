@@ -1,5 +1,6 @@
 #include "source/common/upstream/load_balancer_impl.h"
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -21,6 +22,10 @@ namespace {
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
+
+static constexpr uint32_t UnhealthyStatus = 1u << static_cast<size_t>(Host::Health::Unhealthy);
+static constexpr uint32_t DegradedStatus = 1u << static_cast<size_t>(Host::Health::Degraded);
+static constexpr uint32_t HealthyStatus = 1u << static_cast<size_t>(Host::Health::Healthy);
 
 bool tooManyPreconnects(size_t num_preconnect_picks, uint32_t healthy_hosts) {
   // Currently we only allow the number of preconnected connections to equal the
@@ -361,6 +366,9 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
   resizePerPriorityState();
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
+        // Update cross priority host map for fast host searching.
+        cross_priority_host_map_ = priority_set_.crossPriorityHostMap();
+
         // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
         resizePerPriorityState();
         // If P=0 changes, regenerate locality routing structures. Locality based routing is
@@ -507,8 +515,59 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
-HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
-  HostConstSharedPtr host;
+bool LoadBalancerContextBase::validateOverrideHostStatus(Host::Health health,
+                                                         OverrideHostStatus status) {
+  switch (health) {
+  case Host::Health::Unhealthy:
+    return status & UnhealthyStatus;
+  case Host::Health::Degraded:
+    return status & DegradedStatus;
+  case Host::Health::Healthy:
+    return status & HealthyStatus;
+  }
+  return false;
+}
+
+HostConstSharedPtr LoadBalancerContextBase::selectOverrideHost(const HostMap* host_map,
+                                                               LoadBalancerContext* context) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+
+  auto override_host = context->overrideHostToSelect();
+  if (!override_host.has_value()) {
+    return nullptr;
+  }
+
+  if (host_map == nullptr) {
+    return nullptr;
+  }
+
+  auto host_iter = host_map->find(override_host.value().first);
+
+  // The override host cannot be found in the host map.
+  if (host_iter == host_map->end()) {
+    return nullptr;
+  }
+
+  HostConstSharedPtr host = host_iter->second;
+  ASSERT(host != nullptr);
+
+  // Verify the host status.
+  if (LoadBalancerContextBase::validateOverrideHostStatus(host->health(),
+                                                          override_host.value().second)) {
+    return host;
+  }
+  return nullptr;
+}
+
+HostConstSharedPtr ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
+  HostConstSharedPtr host =
+      LoadBalancerContextBase::selectOverrideHost(cross_priority_host_map_.get(), context);
+  if (host != nullptr) {
+    return host;
+  }
+
   const size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
   for (size_t i = 0; i < max_attempts; ++i) {
     host = chooseHostOnce(context);

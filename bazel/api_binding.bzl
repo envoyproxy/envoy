@@ -9,9 +9,11 @@ def _default_envoy_api_impl(ctx):
         "tools",
         "versioning",
         "contrib",
+        "buf.yaml",
     ]
     for d in api_dirs:
         ctx.symlink(ctx.path(ctx.attr.envoy_root).dirname.get_child(ctx.attr.reldir).get_child(d), d)
+    ctx.symlink(ctx.path(ctx.attr.envoy_root).dirname.get_child("bazel").get_child("utils.bzl"), "utils.bzl")
 
 _default_envoy_api = repository_rule(
     implementation = _default_envoy_api_impl,
@@ -23,14 +25,9 @@ _default_envoy_api = repository_rule(
 
 def envoy_api_binding():
     # Treat the data plane API as an external repo, this simplifies exporting
-    # the API to https://github.com/envoyproxy/data-plane-api. This is the
-    # shadow API for Envoy internal use, see #9479.
+    # the API to https://github.com/envoyproxy/data-plane-api.
     if "envoy_api" not in native.existing_rules().keys():
-        _default_envoy_api(name = "envoy_api", reldir = "generated_api_shadow")
-
-    # We also provide the non-shadowed API for developer use (see #9479).
-    if "envoy_api_raw" not in native.existing_rules().keys():
-        _default_envoy_api(name = "envoy_api_canonical", reldir = "api")
+        _default_envoy_api(name = "envoy_api", reldir = "api")
 
     # TODO(https://github.com/envoyproxy/envoy/issues/7719) need to remove both bindings and use canonical rules
     native.bind(

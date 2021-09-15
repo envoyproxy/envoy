@@ -205,7 +205,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
     : ActiveHealthCheckSession(parent, host), parent_(parent),
       hostname_(getHostname(host, parent_.host_value_, parent_.cluster_.info())),
       protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)),
-      local_address_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
+      local_connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
           Network::Utility::getCanonicalIpv4LoopbackAddress(),
           Network::Utility::getCanonicalIpv4LoopbackAddress())) {}
 
@@ -270,7 +270,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       host_->transportSocketFactory().implementsSecureTransport(),
       host_->transportSocketFactory().implementsSecureTransport());
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource(),
-                                         local_address_provider_);
+                                         local_connection_info_provider_);
   stream_info.onUpstreamHostSelected(host_);
   parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);
   auto status = request_encoder->encodeHeaders(*request_headers, true);

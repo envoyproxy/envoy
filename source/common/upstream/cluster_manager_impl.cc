@@ -782,6 +782,9 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   if (new_cluster->outlierDetector() != nullptr) {
     new_cluster->outlierDetector()->addChangedStateCb([this](HostSharedPtr host) {
       if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+        ENVOY_LOG_EVENT(debug, "outlier_detection_ejection",
+                        "host {} in cluster {} was ejected by the outlier detector",
+                        host->address(), host->cluster().name());
         postThreadLocalHealthFailure(host);
       }
     });
@@ -946,20 +949,36 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
 }
 
 void ClusterManagerImpl::drainConnections(const std::string& cluster) {
+  ENVOY_LOG_EVENT(debug, "drain_connections_call", "drainConnections called for cluster {}",
+                  cluster);
+
   tls_.runOnAllThreads([cluster](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     auto cluster_entry = cluster_manager->thread_local_clusters_.find(cluster);
     if (cluster_entry != cluster_manager->thread_local_clusters_.end()) {
-      cluster_entry->second->drainConnPools();
+      cluster_entry->second->drainAllConnPools();
     }
   });
 }
 
 void ClusterManagerImpl::drainConnections() {
+  ENVOY_LOG_EVENT(debug, "drain_connections_call_for_all_clusters",
+                  "drainConnections called for all clusters");
+
   tls_.runOnAllThreads([](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     for (const auto& cluster_entry : cluster_manager->thread_local_clusters_) {
-      cluster_entry.second->drainConnPools();
+      cluster_entry.second->drainAllConnPools();
     }
   });
+}
+
+void ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
+  const auto& it = active_clusters_.find(cluster);
+  if (it == active_clusters_.end()) {
+    throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster));
+  }
+  if (it->second->added_via_api_) {
+    throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster));
+  }
 }
 
 void ClusterManagerImpl::postThreadLocalRemoveHosts(const Cluster& cluster,
@@ -1188,10 +1207,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
   // guarding deletion with `do_not_delete_` in the registered idle callback, and then checking
   // afterwards whether it is empty and deleting it if necessary.
   container.do_not_delete_ = true;
-  pools->startDrain();
+  pools->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   container.do_not_delete_ = false;
 
-  if (container.pools_->size() == 0) {
+  if (container.pools_->empty()) {
     host_http_conn_pool_map_.erase(old_host);
   }
 }
@@ -1208,7 +1227,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainTcpConnPools(
 
   container.draining_ = true;
   for (auto pool : pools) {
-    pool->startDrain();
+    pool->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   }
 }
 
@@ -1253,49 +1272,13 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     const HostSharedPtr& host) {
 
-  // Drain all HTTP connection pool connections in the case of a host health failure. If outlier/
-  // health is due to `ECMP` flow hashing issues for example, a new set of connections might do
-  // better.
+  // Drain all HTTP and TCP connection pool connections in the case of a host health failure. If
+  // outlier/ health is due to `ECMP` flow hashing issues for example, a new set of connections
+  // might do better.
   // TODO(mattklein123): This function is currently very specific, but in the future when we do
   // more granular host set changes, we should be able to capture single host changes and make them
   // more targeted.
-  {
-    const auto container = getHttpConnPoolsContainer(host);
-    if (container != nullptr) {
-      container->do_not_delete_ = true;
-      container->pools_->drainConnections();
-      container->do_not_delete_ = false;
-
-      if (container->pools_->size() == 0) {
-        host_http_conn_pool_map_.erase(host);
-      }
-    }
-  }
-  {
-    // Drain or close any TCP connection pool for the host. Draining a TCP pool doesn't lead to
-    // connections being closed, it only prevents new connections through the pool. The
-    // CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE can be used to make the pool close any
-    // active connections.
-    const auto& container = host_tcp_conn_pool_map_.find(host);
-    if (container != host_tcp_conn_pool_map_.end()) {
-      // Draining pools or closing connections can cause pool deletion if it becomes
-      // idle. Copy `pools_` so that we aren't iterating through a container that
-      // gets mutated by callbacks deleting from it.
-      std::vector<Tcp::ConnectionPool::Instance*> pools;
-      for (const auto& pair : container->second.pools_) {
-        pools.push_back(pair.second.get());
-      }
-
-      for (auto* pool : pools) {
-        if (host->cluster().features() &
-            ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
-          pool->closeConnections();
-        } else {
-          pool->drainConnections();
-        }
-      }
-    }
-  }
+  drainAllConnPoolsWorker(host);
 
   if (host->cluster().features() &
       ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
@@ -1399,6 +1382,59 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnPools() {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     parent_.drainConnPools(host_set->hosts());
+  }
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainAllConnPools() {
+  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
+    for (const HostSharedPtr& host : host_set->hosts()) {
+      parent_.drainAllConnPoolsWorker(host);
+    }
+  }
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainAllConnPoolsWorker(
+    const HostSharedPtr& host) {
+  // Drain or close any HTTP connection pool for the host. Draining an HTTP pool only leads to
+  // idle connections being closed. Non-idle connections are marked as draining and prevents new
+  // streams to go through them, causing new connections to be opened.
+  {
+    const auto container = getHttpConnPoolsContainer(host);
+    if (container != nullptr) {
+      container->do_not_delete_ = true;
+      container->pools_->drainConnections(
+          Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+      container->do_not_delete_ = false;
+
+      if (container->pools_->empty()) {
+        host_http_conn_pool_map_.erase(host);
+      }
+    }
+  }
+  {
+    // Drain or close any TCP connection pool for the host. Draining a TCP pool doesn't lead to
+    // connections being closed, it only prevents new connections through the pool. The
+    // CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE can be used to make the pool close any
+    // active connections.
+    const auto& container = host_tcp_conn_pool_map_.find(host);
+    if (container != host_tcp_conn_pool_map_.end()) {
+      // Draining pools or closing connections can cause pool deletion if it becomes
+      // idle. Copy `pools_` so that we aren't iterating through a container that
+      // gets mutated by callbacks deleting from it.
+      std::vector<Tcp::ConnectionPool::Instance*> pools;
+      for (const auto& pair : container->second.pools_) {
+        pools.push_back(pair.second.get());
+      }
+
+      for (auto* pool : pools) {
+        if (host->cluster().features() &
+            ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
+          pool->closeConnections();
+        } else {
+          pool->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+        }
+      }
+    }
   }
 }
 
@@ -1516,7 +1552,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
     // Guard deletion of the container with `do_not_delete_` to avoid deletion while
     // iterating through the container in `container->pools_->startDrain()`. See
     // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
-    if (!container->do_not_delete_ && container->pools_->size() == 0) {
+    if (!container->do_not_delete_ && container->pools_->empty()) {
       ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
       host_http_conn_pool_map_.erase(
           host); // NOTE: `container` is erased after this point in the lambda.

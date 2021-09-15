@@ -38,17 +38,15 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-/**
- * Common interface for downstream and upstream network filters.
- */
-class CommonFactoryContext {
+// Shared factory context between server factories and cluster factories
+class FactoryContextBase {
 public:
-  virtual ~CommonFactoryContext() = default;
+  virtual ~FactoryContextBase() = default;
 
   /**
-   * @return Upstream::ClusterManager& singleton for use by the entire server.
+   * @return Server::Options& the command-line options that Envoy was started with.
    */
-  virtual Upstream::ClusterManager& clusterManager() PURE;
+  virtual const Options& options() PURE;
 
   /**
    * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used
@@ -57,14 +55,56 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
-   * @return Server::Options& the command-line options that Envoy was started with.
+   * @return Api::Api& a reference to the api object.
    */
-  virtual const Options& options() PURE;
+  virtual Api::Api& api() PURE;
 
   /**
    * @return information about the local environment the server is running in.
    */
   virtual const LocalInfo::LocalInfo& localInfo() const PURE;
+
+  /**
+   * @return Server::Admin& the server's global admin HTTP endpoint.
+   */
+  virtual Server::Admin& admin() PURE;
+
+  /**
+   * @return Runtime::Loader& the singleton runtime loader for the server.
+   */
+  virtual Envoy::Runtime::Loader& runtime() PURE;
+
+  /**
+   * @return Singleton::Manager& the server-wide singleton manager.
+   */
+  virtual Singleton::Manager& singletonManager() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
+   * @return Stats::Scope& the context's stats scope.
+   */
+  virtual Stats::Scope& scope() PURE;
+
+  /**
+   * @return ThreadLocal::SlotAllocator& the thread local storage engine for the server. This is
+   *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
+   */
+  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
+};
+
+/**
+ * Common interface for downstream and upstream network filters.
+ */
+class CommonFactoryContext : public FactoryContextBase {
+public:
+  /**
+   * @return Upstream::ClusterManager& singleton for use by the entire server.
+   */
+  virtual Upstream::ClusterManager& clusterManager() PURE;
 
   /**
    * @return ProtobufMessage::ValidationContext& validation visitor for xDS and static configuration
@@ -73,51 +113,14 @@ public:
   virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
 
   /**
-   * @return Runtime::Loader& the singleton runtime loader for the server.
-   */
-  virtual Envoy::Runtime::Loader& runtime() PURE;
-
-  /**
-   * @return Stats::Scope& the filter's stats scope.
-   */
-  virtual Stats::Scope& scope() PURE;
-
-  /**
-   * @return Singleton::Manager& the server-wide singleton manager.
-   */
-  virtual Singleton::Manager& singletonManager() PURE;
-
-  /**
-   * @return ThreadLocal::SlotAllocator& the thread local storage engine for the server. This is
-   *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
-   */
-  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
-
-  /**
-   * @return Server::Admin& the server's global admin HTTP endpoint.
-   */
-  virtual Server::Admin& admin() PURE;
-
-  /**
    * @return TimeSource& a reference to the time source.
    */
   virtual TimeSource& timeSource() PURE;
 
   /**
-   * @return Api::Api& a reference to the api object.
-   */
-  virtual Api::Api& api() PURE;
-
-  /**
    * @return AccessLogManager for use by the entire server.
    */
   virtual AccessLog::AccessLogManager& accessLogManager() PURE;
-
-  /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
-   *         messages.
-   */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 
   /**
    * @return ServerLifecycleNotifier& the lifecycle notifier for the server.

@@ -88,7 +88,7 @@ The name of the dependency can be found in
 [the repository locations file.](https://github.com/envoyproxy/envoy/blob/main/bazel/repository_locations.bzl)
 The path of the local copy has to be absolute path.
 
-For repositories built by `envoy_cmake()` in `bazel/foreign_cc/BUILD`,
+For repositories built by `envoy_cmake_external()` in `bazel/foreign_cc/BUILD`,
 it is necessary to populate the local copy with some additional Bazel machinery
 to support `--override_repository`:
 1. Place an empty `WORKSPACE` in the root.

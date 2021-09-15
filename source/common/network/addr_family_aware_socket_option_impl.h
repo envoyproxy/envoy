@@ -24,9 +24,11 @@ public:
   // Socket::Option
   bool setOption(Socket& socket,
                  envoy::config::core::v3::SocketOption::SocketState state) const override;
-  // The common socket options don't require a hash key.
-  void hashKey(std::vector<uint8_t>&) const override {}
-
+  void hashKey(std::vector<uint8_t>& hash_key) const override {
+    // Add both sub-options to the hash.
+    ipv4_option_->hashKey(hash_key);
+    ipv6_option_->hashKey(hash_key);
+  }
   absl::optional<Details>
   getOptionDetails(const Socket& socket,
                    envoy::config::core::v3::SocketOption::SocketState state) const override;

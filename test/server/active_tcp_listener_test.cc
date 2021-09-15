@@ -95,7 +95,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
 
   absl::string_view server_name = "envoy.io";
   auto accepted_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
-  accepted_socket->address_provider_->setRequestedServerName(server_name);
+  accepted_socket->connection_info_provider_->setRequestedServerName(server_name);
 
   // fake the socket is open.
   NiceMock<Network::MockIoHandle> io_handle;

@@ -266,6 +266,12 @@ public:
     return expected_transport_failure_reason_contains_;
   }
 
+  TestUtilOptions& setNotExpectedClientStats(const std::string& stat) {
+    not_expected_client_stats_ = stat;
+    return *this;
+  }
+  const std::string& notExpectedClientStats() const { return not_expected_client_stats_; }
+
 private:
   const std::string client_ctx_yaml_;
   const std::string server_ctx_yaml_;
@@ -288,6 +294,7 @@ private:
   std::string expected_ocsp_response_;
   bool ocsp_stapling_enabled_{false};
   std::string expected_transport_failure_reason_contains_;
+  std::string not_expected_client_stats_;
 };
 
 void testUtil(const TestUtilOptions& options) {
@@ -492,6 +499,10 @@ void testUtil(const TestUtilOptions& options) {
 
   if (!options.expectedServerStats().empty()) {
     EXPECT_EQ(1UL, server_stats_store.counter(options.expectedServerStats()).value());
+  }
+
+  if (!options.notExpectedClientStats().empty()) {
+    EXPECT_EQ(0, client_stats_store.counter(options.notExpectedClientStats()).value());
   }
 
   if (options.expectSuccess()) {
@@ -5454,7 +5465,8 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptCompleteFailure) {
   testUtil(failing_test_options.setPrivateKeyMethodExpected(true)
                .setExpectedServerCloseEvent(Network::ConnectionEvent::LocalClose)
                .setExpectedServerStats("ssl.connection_error")
-               .setExpectedTransportFailureReasonContains("system library"));
+               .setExpectedTransportFailureReasonContains("system library")
+               .setNotExpectedClientStats("ssl.connection_error"));
 }
 
 // Test having one cert with private key method and another with just

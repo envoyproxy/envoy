@@ -303,3 +303,4 @@ EXTENSIONS = {
 # need to directly reference Envoy extensions.
 EXTENSION_CONFIG_VISIBILITY = ["//:extension_config"]
 EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library"]
+CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]

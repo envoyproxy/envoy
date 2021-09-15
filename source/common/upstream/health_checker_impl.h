@@ -141,7 +141,7 @@ private:
     Http::ResponseHeaderMapPtr response_headers_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
-    Network::ConnectionInfoProviderSharedPtr local_address_provider_;
+    Network::ConnectionInfoProviderSharedPtr local_connection_info_provider_;
     bool expect_reset_{};
     bool reuse_connection_ = false;
     bool request_in_flight_ = false;

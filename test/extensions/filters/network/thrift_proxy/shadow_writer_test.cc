@@ -409,7 +409,7 @@ TEST_F(ShadowWriterTest, TestNullResponseDecoder) {
   auto decoder_ptr = std::make_unique<NullResponseDecoder>(*transport_ptr, *protocol_ptr);
 
   decoder_ptr->newDecoderEventHandler();
-  EXPECT_FALSE(decoder_ptr->passthroughEnabled());
+  EXPECT_TRUE(decoder_ptr->passthroughEnabled());
 
   metadata_->setMessageType(MessageType::Reply);
   EXPECT_EQ(FilterStatus::Continue, decoder_ptr->messageBegin(metadata_));
