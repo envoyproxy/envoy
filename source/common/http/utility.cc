@@ -1,6 +1,5 @@
 #include "source/common/http/utility.h"
 
-#include <bits/stdint-uintn.h>
 #include <http_parser.h>
 
 #include <cstdint>
