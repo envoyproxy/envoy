@@ -9,7 +9,7 @@ py_binary(
     ],
     data = [
         "@com_github_bufbuild_buf//:buf",
-        "@envoy_api_canonical//:proto_breaking_change_detector_buf_config",
+        "@envoy_api//:proto_breaking_change_detector_buf_config",
     ],
     main = "detector.py",
     tags = ["manual"],

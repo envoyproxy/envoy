@@ -30,8 +30,6 @@ const std::string toString(envoy::type::matcher::v3::StringMatcher::MatchPattern
     return "suffix";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
     return "safe_regex";
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
-    return "deprecated_regex";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains:
     return "contains";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::MATCH_PATTERN_NOT_SET:
@@ -44,10 +42,6 @@ const std::string toString(const envoy::config::route::v3::HeaderMatcher& header
   switch (header.header_match_specifier_case()) {
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
     return "exact_match";
-    break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
-      kHiddenEnvoyDeprecatedRegexMatch:
-    return "regex_match";
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
     return "safe_regex_match";

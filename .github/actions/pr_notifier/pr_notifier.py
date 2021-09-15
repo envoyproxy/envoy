@@ -231,3 +231,4 @@ if __name__ == '__main__':
     post_to_oncall(client, maintainers_and_messages['unassigned'], stalled_prs)
     post_to_assignee(client, shephards_and_messages, API_REVIEWERS)
     post_to_assignee(client, maintainers_and_messages, MAINTAINERS)
+    post_to_assignee(client, maintainers_and_messages, FIRST_PASS)
