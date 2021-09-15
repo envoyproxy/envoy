@@ -2,7 +2,10 @@
 
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/singleton/manager_impl.h"
+
 #include "test/mocks/secret/mocks.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -16,6 +19,7 @@ public:
   ~MockClusterManagerFactory() override;
 
   Secret::MockSecretManager& secretManager() override { return secret_manager_; };
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
 
   MOCK_METHOD(ClusterManagerPtr, clusterManagerFromProto,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
@@ -44,6 +48,7 @@ public:
 
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
 };
 } // namespace Upstream
 } // namespace Envoy

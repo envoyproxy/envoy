@@ -88,6 +88,7 @@ public:
                       const xds::core::v3::ResourceLocator* cds_resources_locator,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
 
 protected:
   Event::Dispatcher& main_thread_dispatcher_;
