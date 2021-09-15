@@ -202,7 +202,7 @@ message RateLimitConfig {
       // request matches the headers. If set to false, the action will append a
       // descriptor entry when the request does not match the headers. The
       // default value is true.
-      google.protobuf.BoolValue expect_match = 2;
+      bool expect_match = 2;
 
       // Specifies a set of headers that the rate limit action should match
       // on. The action will check the request’s headers against all the
