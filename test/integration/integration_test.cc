@@ -2158,7 +2158,7 @@ TEST_P(IntegrationTest, RetryOptionsPredicate) {
   };
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  codec_client_->makeHeaderOnlyRequest(request_headers);
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   AssertionResult result =
       fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
   RELEASE_ASSERT(result, result.message());
@@ -2172,15 +2172,23 @@ TEST_P(IntegrationTest, RetryOptionsPredicate) {
 
   // Using a different socket option will cause a new connection pool to be used and a new
   // connection.
-  FakeHttpConnectionPtr new_upstream_connection_;
-  result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  FakeHttpConnectionPtr new_upstream_connection;
+  FakeStreamPtr new_upstream_request;
+  result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, new_upstream_connection);
   RELEASE_ASSERT(result, result.message());
-  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  result = new_upstream_connection->waitForNewStream(*dispatcher_, new_upstream_request);
   RELEASE_ASSERT(result, result.message());
-  result = upstream_request_->waitForEndStream(*dispatcher_);
+  result = new_upstream_request->waitForEndStream(*dispatcher_);
   RELEASE_ASSERT(result, result.message());
 
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  new_upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  result = response->waitForEndStream();
+  RELEASE_ASSERT(result, result.message());
+
+  result = new_upstream_connection->close();
+  RELEASE_ASSERT(result, result.message());
+  result = new_upstream_connection->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
 }
 
 // Tests that a filter (set-route-filter) using the setRoute callback and DelegatingRoute mechanism
