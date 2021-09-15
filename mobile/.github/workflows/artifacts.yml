@@ -107,7 +107,15 @@ jobs:
       - name: 'Install dependencies'
         run: ./ci/mac_ci_setup.sh
       - name: 'Build Envoy.framework distributable'
-        run: bazelisk build --config=release-ios --ios_multi_cpus=i386,x86_64,armv7,arm64 //:ios_dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bazelisk build \
+            --config=release-ios \
+            --ios_multi_cpus=i386,x86_64,armv7,arm64 \
+            --config=remote-ci-macos \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            //:ios_dist
       - name: 'Create temporary directory for artifact to produce properly named zip'
         run: mkdir -p dist/ios_artifact/Envoy.framework
       - name: 'Move artifact to directory for zipping'
