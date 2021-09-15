@@ -89,8 +89,8 @@ message CommonGrpcAccessLogConfig {
   repeated string filter_state_objects_to_log = 5;
 
   // Define the log condition for critical access logs.
-  // Logs that match the filter are not forwarded to the normal endpoint,
-  // but are sent to a special endpoint.
+  // Logs that match the filter are not sent to `StreamAccessLogs`,
+  // but are sent to `CriticalAccessLogs`.
   config.accesslog.v3.AccessLogFilter critical_buffer_log_filter = 7;
 
   // The time to wait for an ACK message. If no ACK message is returned after this time,
