@@ -663,91 +663,6 @@ typed_config:
 }
 
 // Verify that if upstream ip matcher is configured and upstream address is saved by dynamic
-// forward proxy, then RBAC policy is evaluated correctly.
-TEST_P(RbacDynamicForwardProxyIntegrationHelper, AllowIpWithFilterState) {
-  const std::string rbac_config = R"EOF(
-name: rbac
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
-  rules:
-    action: ALLOW
-    policies:
-      foo:
-        permissions:
-        - or_rules:
-            rules:
-            - matcher:
-                name: envoy.filters.http.rbac.matchers.upstream_ip
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip.v3.UpstreamIpMatcher
-                  upstream_ip:
-                    address_prefix: 127.0.0.1
-                    prefix_len: 24
-        principals:
-          - any: true
-)EOF";
-
-  initializeWithFilterConfigs(true, rbac_config);
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
-
-  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
-
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-}
-
-// Verify that if upstream ip matcher is configured and upstream address is saved by dynamic
-// forward proxy, then RBAC DENY policy is evaluated correctly.
-TEST_P(RbacDynamicForwardProxyIntegrationHelper, DenyIpWithFilterState) {
-  const std::string rbac_config = R"EOF(
-name: rbac
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
-  rules:
-    action: DENY
-    policies:
-      foo:
-        permissions:
-        - or_rules:
-            rules:
-            - matcher:
-                name: envoy.filters.http.rbac.matchers.upstream_ip
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip.v3.UpstreamIpMatcher
-                  upstream_ip:
-                    address_prefix: 127.0.0.1
-                    prefix_len: 24
-        principals:
-          - any: true
-)EOF";
-
-  initializeWithFilterConfigs(true, rbac_config);
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
-
-  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("403", response->headers().getStatusValue());
-}
-
-// Verify that if upstream ip matcher is configured and upstream address is saved by dynamic
 // forward proxy, then RBAC policy is evaluated correctly for `or_rules`.
 TEST_P(RbacDynamicForwardProxyIntegrationHelper, DenyIpOrPortWithFilterState) {
   const std::string rbac_config = R"EOF(
@@ -774,6 +689,13 @@ typed_config:
                   "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip.v3.UpstreamIpMatcher
                   upstream_ip:
                     address_prefix: 127.0.0.1
+                    prefix_len: 24
+            - matcher:
+                name: envoy.filters.http.rbac.matchers.upstream_ip
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip.v3.UpstreamIpMatcher
+                  upstream_ip:
+                    address_prefix: ::1
                     prefix_len: 24
             - matcher:
                 name: envoy.filters.http.rbac.matchers.upstream_port

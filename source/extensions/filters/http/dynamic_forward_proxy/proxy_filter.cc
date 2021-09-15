@@ -59,12 +59,10 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   cluster_info_ = cluster->info();
 
-  ENVOY_STREAM_LOG(debug, "ProxyFilter::decodeHeaders", *this->decoder_callbacks_);
   // We only need to do DNS lookups for hosts in dynamic forward proxy clusters,
   // since the other cluster types do their own DNS management.
   const absl::optional<CustomClusterType>& cluster_type = cluster_info_->clusterType();
   if (!cluster_type) {
-    ENVOY_STREAM_LOG(debug, "!cluster_type ", *this->decoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
   }
   if (cluster_type->name() != "envoy.clusters.dynamic_forward_proxy") {
@@ -155,6 +153,12 @@ void ProxyFilter::addHostAddressToFilterState(
     const Network::Address::InstanceConstSharedPtr& address) {
 
   if (!config_->saveUpstreamAddress()) {
+    return;
+  }
+
+  if (!address) {
+    ENVOY_STREAM_LOG(warn, "Cannot add address to filter state: invalid address",
+                     *decoder_callbacks_);
     return;
   }
 
