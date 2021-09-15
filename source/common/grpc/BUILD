@@ -209,7 +209,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "buffered_async_client_lib",
-    hdrs = ["buffered_async_client_impl.h"],
+    hdrs = ["buffered_async_client.h"],
     deps = [
         ":typed_async_client_lib",
         "//source/common/protobuf:utility_lib",

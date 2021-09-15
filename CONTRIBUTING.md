@@ -253,15 +253,9 @@ Extension configuration should be located in a directory structure like
 The code for the extension should be located under the equivalent
 `source/extensions/area/plugin`, and include an *envoy_cc_extension* with the
 configuration and tagged with the appropriate security posture, and an
-*envoy_cc_library* with the code. More details on how to add a new extension
-API can be found [here](api/STYLE.md#adding-an-extension-configuration-to-the-api):
+*envoy_cc_library* with the code.
 
-Other changes will likely include
-
-  * Editing [source/extensions/extensions_build_config.bzl](source/extensions/extensions_build_config.bzl) to include the new extensions
-  * Editing [source/extensions/extensions_metadata.yaml](source/extensions/extensions_metadata.yaml) to include metadata for the new extensions
-  * Editing [docs/root/api-v3/config/config.rst](docs/root/api-v3/config/config.rst) to add area/area
-  * Adding `docs/root/api-v3/config/area/area.rst` to add a table of contents for the API docs
+More details on how to add a new extension API can be found [here](api/STYLE.md#adding-an-extension-configuration-to-the-api):
 
 # Adding contrib extensions
 

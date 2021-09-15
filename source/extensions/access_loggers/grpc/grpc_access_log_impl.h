@@ -14,7 +14,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/linked_object.h"
-#include "source/common/grpc/buffered_async_client_impl.h"
+#include "source/common/grpc/buffered_async_client.h"
 #include "source/extensions/access_loggers/common/grpc_access_logger.h"
 
 namespace Envoy {
@@ -56,7 +56,7 @@ public:
         break;
       case envoy::service::accesslog::v3::CriticalAccessLogsResponse::NACK:
         parent_.stats_.critical_logs_nack_received_.inc();
-        parent_.client_->onError(id, true);
+        parent_.client_->onError(id);
         break;
       default:
         return;
@@ -80,7 +80,7 @@ public:
       timer_ = dispatcher_.createTimer([this, &client, &stats] {
         const auto now = dispatcher_.timeSource().monotonicTime();
         std::vector<MonotonicTime> expired_timepoints;
-        std::set<uint32_t> expired_message_ids;
+        absl::flat_hash_set<uint32_t> expired_message_ids;
 
         auto it = deadline_.lower_bound(now);
         while (it != deadline_.end()) {
@@ -99,8 +99,8 @@ public:
           }
 
           auto& message = message_buffer.at(id);
-          if (message.first == Grpc::BufferState::Pending) {
-            client.onError(id, true);
+          if (message.first == Grpc::BufferState::PendingFlush) {
+            client.onError(id);
             stats.critical_logs_message_timeout_.inc();
           }
         }
@@ -117,7 +117,7 @@ public:
 
     ~InflightMessageTtlManager() { timer_->disableTimer(); }
 
-    void setDeadline(std::set<uint32_t>&& ids) {
+    void setDeadline(absl::flat_hash_set<uint32_t>&& ids) {
       auto expires_at = dispatcher_.timeSource().monotonicTime() + message_ack_timeout_;
       deadline_.emplace(expires_at, std::move(ids));
     }
@@ -126,17 +126,16 @@ public:
     Event::Dispatcher& dispatcher_;
     std::chrono::milliseconds message_ack_timeout_;
     Event::TimerPtr timer_;
-    std::map<MonotonicTime, std::set<uint32_t>, std::greater<>> deadline_;
+    std::map<MonotonicTime, absl::flat_hash_set<uint32_t>, std::greater<>> deadline_;
   };
 
   CriticalAccessLogger(const Grpc::RawAsyncClientSharedPtr& client,
                        const Protobuf::MethodDescriptor& method, Event::Dispatcher& dispatcher,
-                       Stats::Scope& scope, uint64_t message_ack_timeout,
+                       Stats::Scope& scope, const LocalInfo::LocalInfo& local_info, const std::string& log_name,
+                       uint64_t message_ack_timeout,
                        uint64_t max_pending_buffer_size_bytes);
 
   void flush(RequestType& message);
-
-  bool shouldSetLogIdentifier() { return client_->hasActiveStream(); }
 
 private:
   friend CriticalLogStream;
@@ -144,6 +143,8 @@ private:
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds message_ack_timeout_;
   CriticalAccessLoggerGrpcClientStats stats_;
+  const LocalInfo::LocalInfo& local_info_;
+  const std::string log_name_;
   CriticalLogStream stream_callback_;
   Grpc::BufferedAsyncClientPtr<RequestType, ResponseType> client_;
   std::unique_ptr<InflightMessageTtlManager> inflight_message_ttl_;
@@ -163,7 +164,6 @@ public:
 
 private:
   bool isCriticalMessageEmpty();
-  void initCriticalMessage();
   void addCriticalMessageEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry);
   void addCriticalMessageEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry);
   void clearCriticalMessage() { critical_message_.Clear(); }

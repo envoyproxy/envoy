@@ -39,14 +39,7 @@ public:
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
-
-  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
-  Upstream::MockClusterMockPrioritySet cluster;
-  cluster_maps.active_clusters_.emplace("foo", cluster);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_maps));
-  EXPECT_CALL(cluster, info());
-  EXPECT_CALL(*cluster.info_, addedViaApi());
-
+  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Return());
   async_client_manager_.factoryForGrpcService(grpc_service, scope_, false);
 }
 
@@ -89,30 +82,15 @@ TEST_F(AsyncClientManagerImplTest, EnableRawAsyncClientCache) {
   EXPECT_NE(foo_client1.get(), bar_client.get());
 }
 
-TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
+TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
-
-  EXPECT_CALL(cm_, clusters());
+  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Invoke([](const std::string&) {
+    throw EnvoyException("fake exception");
+  }));
   EXPECT_THROW_WITH_MESSAGE(
       async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "Unknown gRPC client cluster 'foo'");
-}
-
-TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
-  envoy::config::core::v3::GrpcService grpc_service;
-  grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
-
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockClusterMockPrioritySet cluster;
-  cluster_map.emplace("foo", cluster);
-  EXPECT_CALL(cm_, clusters())
-      .WillOnce(Return(Upstream::ClusterManager::ClusterInfoMaps{cluster_map, {}}));
-  EXPECT_CALL(cluster, info());
-  EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
-  EXPECT_THROW_WITH_MESSAGE(
-      async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "gRPC client cluster 'foo' is not static");
+      "fake exception");
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
@@ -187,11 +165,11 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInValue) {
 #endif
 }
 
-TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknownOk) {
+TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknownSkipClusterCheck) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
-  EXPECT_CALL(cm_, clusters()).Times(0);
+  EXPECT_CALL(cm_, checkActiveStaticCluster(_)).Times(0);
   ASSERT_NO_THROW(async_client_manager_.factoryForGrpcService(grpc_service, scope_, true));
 }
 

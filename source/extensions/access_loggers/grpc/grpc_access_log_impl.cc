@@ -30,7 +30,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
       client,
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.accesslog.v3.AccessLogService.CriticalAccessLogs"),
-      dispatcher, scope, PROTOBUF_GET_MS_OR_DEFAULT(config, message_ack_timeout, 5000),
+      dispatcher, scope, local_info_, log_name_, PROTOBUF_GET_MS_OR_DEFAULT(config, message_ack_timeout, 5000),
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_pending_buffer_size_bytes, 16384));
 }
 
@@ -67,9 +67,6 @@ void GrpcAccessLoggerImpl::flushCriticalMessage() {
   if (isCriticalMessageEmpty()) {
     return;
   }
-  if (!critical_logger_->shouldSetLogIdentifier()) {
-    initCriticalMessage();
-  }
 
   approximate_critical_message_size_bytes_ = 0;
   critical_logger_->flush(critical_message_);
@@ -91,21 +88,19 @@ void GrpcAccessLoggerImpl::initMessage() {
   identifier->set_log_name(log_name_);
 }
 
-void GrpcAccessLoggerImpl::initCriticalMessage() {
-  auto* identifier = critical_message_.mutable_message()->mutable_identifier();
-  *identifier->mutable_node() = local_info_.node();
-  identifier->set_log_name(log_name_);
-}
-
 CriticalAccessLogger::CriticalAccessLogger(const Grpc::RawAsyncClientSharedPtr& client,
                                            const Protobuf::MethodDescriptor& method,
                                            Event::Dispatcher& dispatcher, Stats::Scope& scope,
+                                           const LocalInfo::LocalInfo& local_info,
+                                           const std::string& log_name,
                                            uint64_t message_ack_timeout,
                                            uint64_t max_pending_buffer_size_bytes)
     : dispatcher_(dispatcher), message_ack_timeout_(message_ack_timeout),
       stats_({CRITICAL_ACCESS_LOGGER_GRPC_CLIENT_STATS(
           POOL_COUNTER_PREFIX(scope, GRPC_LOG_STATS_PREFIX.data()),
           POOL_GAUGE_PREFIX(scope, GRPC_LOG_STATS_PREFIX.data()))}),
+      local_info_(local_info),
+      log_name_(log_name),
       stream_callback_(*this) {
   client_ = std::make_unique<Grpc::BufferedAsyncClient<RequestType, ResponseType>>(
       max_pending_buffer_size_bytes, method, stream_callback_, client);
@@ -116,6 +111,13 @@ void CriticalAccessLogger::flush(CriticalAccessLogger::RequestType& message) {
     inflight_message_ttl_ = std::make_unique<InflightMessageTtlManager>(
         dispatcher_, stats_, *client_, message_ack_timeout_);
   }
+
+  if (!client_->hasActiveStream()) {
+    auto* identifier = message.mutable_message()->mutable_identifier();
+    *identifier->mutable_node() = local_info_.node();
+    identifier->set_log_name(log_name_);
+  }
+
   const uint32_t message_id = client_->publishId(message);
   message.set_id(message_id);
   client_->bufferMessage(message_id, message);

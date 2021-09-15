@@ -188,8 +188,8 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
-    name = "buffered_async_client_impl_test",
-    srcs = ["buffered_async_client_impl_test.cc"],
+    name = "buffered_async_client_test",
+    srcs = ["buffered_async_client_test.cc"],
     deps = [
         "//source/common/grpc:async_client_lib",
         "//source/common/grpc:buffered_async_client_lib",
