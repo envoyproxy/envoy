@@ -3,6 +3,8 @@ syntax = "proto3";
 package envoy.extensions.filters.http.router.v3;
 
 import "envoy/config/accesslog/v3/accesslog.proto";
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/health_check.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -19,10 +21,23 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Router :ref:`configuration overview <config_http_filters_router>`.
 // [#extension: envoy.filters.http.router]
 
-// [#next-free-field: 8]
+// [#next-free-field: 11]
 message Router {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.router.v2.Router";
+
+  message StatefulSessionSticky {
+    // The expected health status of the host. Suppose the current session
+    // stuck on the host X. However, if the health status of host X does not
+    // meet expectations, Envoy will select a new host for the current request
+    // according to the load balancing algorithm.
+    repeated config.core.v3.HealthStatus expected_statuses = 1
+        [(validate.rules).repeated = {min_items: 1}];
+
+    // Specific implementation of stateful session sticky.
+    config.core.v3.TypedExtensionConfig session_state = 2
+        [(validate.rules).message = {required: true}];
+  }
 
   // Whether the router generates dynamic cluster statistics. Defaults to
   // true. Can be disabled in high performance scenarios.
@@ -88,4 +103,8 @@ message Router {
   // :ref:`gRPC stats filter<config_http_filters_grpc_stats>` documentation
   // for more details.
   bool suppress_grpc_request_failure_code_stats = 7;
+
+  // Used to enable stateful session sticky capabilities. If this config is enabled, the Router
+  // will preferentially select the upstream host based on the result of the session sticky.
+  StatefulSessionSticky stateful_session_sticky = 10;
 }

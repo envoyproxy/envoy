@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package envoy.extensions.http.stateful_session.cookie.v3;
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.stateful_session.cookie.v3";
+option java_outer_classname = "CookieProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Cookie based stateful session extension]
+
+// This extension allows for the session state to be set and get by the cookies.
+//
+// This extension first will encodes address of upstream host that choosed by the load
+// balancer into the `set-cookie` headers of response with the configured name.
+// And this extension will also try to parse out specific upstream host address from
+// the named cookie when new requests come. If the address parsed from the cookie
+// corresponds to valid upstream host, this upstream host will be selected first.
+// See :ref:`stateful_session_sticky
+// <envoy_v3_api_field_extensions.filters.http.router.v3.Router.stateful_session_sticky>`.
+//
+// [#extension: envoy.http.stateful_session.cookie]
+message CookieBasedSessionState {
+  // The name of the cookie that will be used to obtain the encoded
+  // upstream host.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // If specified, a cookie with the TTL will be generated if the
+  // cookie is not present. If the TTL is present and zero, the
+  // generated cookie will be a session cookie.
+  google.protobuf.Duration ttl = 2;
+
+  // The name of the path for the cookie. If no path is specified
+  // here, no path will be set for the cookie.
+  string path = 3;
+}
