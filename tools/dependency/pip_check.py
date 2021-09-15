@@ -4,11 +4,26 @@
 #
 # with bazel:
 #
-#  bazel //tools/dependency:pip_check -- -h
+#  $ bazel //tools/dependency:pip_check -- -h
 #
-# alternatively, if you have the necessary python deps available
+#  $ bazel //tools/dependency:pip_check
 #
-#  ./tools/dependency/pip_check.py -h
+# with pip:
+#
+#  $ pip install envoy.dependency.pip_check
+#  $ envoy.dependency.pip_check -h
+#
+# usage with pip requires a path, eg
+#
+#  $ envoy.dependency.pip_check .
+#
+# The upstream lib is maintained here:
+#
+#    https://github.com/envoyproxy/pytooling/tree/main/envoy.dependency.pip_check
+#
+# Please submit issues/PRs to the pytooling repo:
+#
+#    https://github.com/envoyproxy/pytooling
 #
 
 import pathlib

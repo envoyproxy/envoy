@@ -4,13 +4,26 @@
 #
 # with bazel:
 #
-#  bazel run //tools/code_format:python_check -- -h
+#  $ bazel //tools/code_format:python_check -- -h
 #
-# alternatively, if you have the necessary python deps available
+#  $ bazel //tools/code_format:python_check
 #
-#  PYTHONPATH=. ./tools/code_format/python_check.py -h
+# with pip:
 #
-# python requires: flake8, yapf
+#  $ pip install envoy.code_format.python_check
+#  $ envoy.code_format.python_check -h
+#
+# usage with pip requires a path, eg
+#
+#  $ envoy.code_format.python_check .
+#
+# The upstream lib is maintained here:
+#
+#    https://github.com/envoyproxy/pytooling/tree/main/envoy.code_format.python_check
+#
+# Please submit issues/PRs to the pytooling repo:
+#
+#    https://github.com/envoyproxy/pytooling
 #
 
 import pathlib
