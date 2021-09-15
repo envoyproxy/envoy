@@ -1080,26 +1080,30 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
       .WillRepeatedly(ReturnRef(local_address_));
   handler_->addListener(absl::nullopt, *test_listener);
 
-  Network::MockListenerFilter* test_filter = new NiceMock<Network::MockListenerFilter>();
+  Network::MockListenerFilter* test_filter = new NiceMock<Network::MockListenerFilter>(128);
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         manager.addAcceptFilter(listener_filter_matcher_, Network::ListenerFilterPtr{test_filter});
         return true;
       }));
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  Network::IoSocketHandleImpl io_handle{42};
+  EXPECT_CALL(*accepted_socket, ioHandle())
+      .WillRepeatedly(ReturnRef(io_handle))
+      .RetiresOnSaturation();
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
       }));
-  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
-  Network::IoSocketHandleImpl io_handle{42};
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
+  EXPECT_CALL(*accepted_socket, ioHandle())
+      .WillRepeatedly(ReturnRef(io_handle))
+      .RetiresOnSaturation();
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
   Stats::Gauge& downstream_pre_cx_active =
       stats_store_.gauge("downstream_pre_cx_active", Stats::Gauge::ImportMode::Accumulate);
   EXPECT_EQ(1UL, downstream_pre_cx_active.value());
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
   EXPECT_CALL(*test_filter, destroy_());
   // Barrier: test_filter must be destructed before findFilterChain
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
@@ -1134,26 +1138,30 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
       .WillRepeatedly(ReturnRef(local_address_));
   handler_->addListener(absl::nullopt, *test_listener);
 
-  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter(123);
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         manager.addAcceptFilter(listener_filter_matcher_, Network::ListenerFilterPtr{test_filter});
         return true;
       }));
   Network::ListenerFilterCallbacks* listener_filter_cb{};
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  Network::IoSocketHandleImpl io_handle{42};
+  EXPECT_CALL(*accepted_socket, ioHandle())
+      .WillRepeatedly(ReturnRef(io_handle))
+      .RetiresOnSaturation();
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
         listener_filter_cb = &cb;
         return Network::FilterStatus::StopIteration;
       }));
-  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
-  Network::IoSocketHandleImpl io_handle{42};
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
-
+  EXPECT_CALL(*accepted_socket, ioHandle())
+      .WillRepeatedly(ReturnRef(io_handle))
+      .RetiresOnSaturation();
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
+
   EXPECT_CALL(*test_filter, destroy_());
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(*access_log_, log(_, _, _, _));
