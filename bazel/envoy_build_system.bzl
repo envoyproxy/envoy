@@ -44,8 +44,8 @@ load(
 )
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
-    "EXTENSION_PACKAGE_VISIBILITY",
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
+    "EXTENSION_PACKAGE_VISIBILITY",
 )
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 

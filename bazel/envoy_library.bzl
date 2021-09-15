@@ -12,8 +12,8 @@ load(":envoy_pch.bzl", "envoy_pch_copts")
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
-    "EXTENSION_CONFIG_VISIBILITY",
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
+    "EXTENSION_CONFIG_VISIBILITY",
 )
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
