@@ -39,7 +39,7 @@ std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%
 // StreamInfoHeaderFormatter.
 HeaderFormatterPtr
 parseInternal(const envoy::config::core::v3::HeaderValue& header_value,
-              envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action) {
+              const envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action) {
   const std::string& key = header_value.key();
   // PGV constraints provide this guarantee.
   ASSERT(!key.empty());
@@ -337,21 +337,21 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
 
     switch (entry.formatter_->appendAction()) {
     case envoy::config::core::v3::HeaderValueOption::APPEND:
-      // Headers to be appended if it doesn't already exist
+      // Headers to be appended if it doesn't already exist.
       if (!value.empty()) {
         transforms.headers_to_append.push_back({key, value});
       }
       break;
     case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS:
       // Headers on which the new value needs to be appended
-      // to the existing values if the header already exists
+      // to the existing values if the header already exists.
       if (!value.empty()) {
         transforms.headers_to_append_if_exist.push_back({key, value});
       }
       break;
     case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS:
       // Headers on which the new value needs to be overwritten by
-      // discarding any existing values if the header already exists
+      // discarding any existing values if the header already exists.
       if (!value.empty()) {
         transforms.headers_to_overwrite_if_exist.push_back({key, value});
       }

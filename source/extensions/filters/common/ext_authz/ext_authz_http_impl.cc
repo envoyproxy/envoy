@@ -126,7 +126,8 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
       path_prefix_(path_prefix),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(Router::HeaderParser::configure(
-          config.http_service().authorization_request().headers_to_add(), false, true)) {}
+          config.http_service().authorization_request().headers_to_add(),
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS)) {}
 
 MatcherSharedPtr
 ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
