@@ -41,6 +41,10 @@ TEST_F(SocketOptionImplTest, HasName) {
   EXPECT_LOG_CONTAINS(
       "warning", "Setting SOL_SOCKET/SO_SNDBUF option on socket failed",
       socket_option.setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
+
+  std::vector<uint8_t> hash_key;
+  socket_option.hashKey(hash_key);
+  EXPECT_FALSE(hash_key.empty());
 }
 
 TEST_F(SocketOptionImplTest, SetOptionSuccessTrue) {
