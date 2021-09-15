@@ -82,7 +82,7 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     return Http::Code::BadRequest;
   }
 
-  absl::optional<std::string> format_value = Utility::formatParam(params);
+  const absl::optional<std::string> format_value = Utility::formatParam(params);
   if (format_value.has_value() && format_value.value() == "prometheus") {
     return handlerPrometheusStats(url, response_headers, response, admin_stream);
   }
