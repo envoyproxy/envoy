@@ -82,6 +82,11 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     return Http::Code::BadRequest;
   }
 
+  const absl::optional<std::string> format_value = Utility::formatParam(params);
+  if (format_value.has_value() && format_value.value() == "prometheus") {
+    return handlerPrometheusStats(url, response_headers, response, admin_stream);
+  }
+
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     if (shouldShowMetric(*counter, used_only, regex)) {
@@ -103,7 +108,6 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     }
   }
 
-  absl::optional<std::string> format_value = Utility::formatParam(params);
   if (!format_value.has_value()) {
     // Display plain stats if format query param is not there.
     statsAsText(all_stats, text_readouts, server_.stats().histograms(), used_only, regex, response);
@@ -115,10 +119,6 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     response.add(
         statsAsJson(all_stats, text_readouts, server_.stats().histograms(), used_only, regex));
     return Http::Code::OK;
-  }
-
-  if (format_value.value() == "prometheus") {
-    return handlerPrometheusStats(url, response_headers, response, admin_stream);
   }
 
   response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
