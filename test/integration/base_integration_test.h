@@ -43,6 +43,26 @@ class BaseIntegrationTest : protected Logger::Loggable<Logger::Id::testing> {
 public:
   using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;
 
+  // The contents of a single expected DeltaDiscoveryRequest.
+  struct DeltaDiscoveryRequestExpectedContents {
+    DeltaDiscoveryRequestExpectedContents(
+        const std::string& type_url, const std::vector<std::string>& subscriptions,
+        const std::vector<std::string>& unsubscriptions,
+        const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
+        const std::string& error_substring = "")
+        : type_url_(type_url),
+          // Convert subscribed/unsubscribed names into sets to ignore ordering.
+          subscriptions_(subscriptions.begin(), subscriptions.end()),
+          unsubscriptions_(unsubscriptions.begin(), unsubscriptions.end()), error_code_(error_code),
+          error_substring_(error_substring) {}
+
+    const std::string& type_url_;
+    const std::set<std::string> subscriptions_;
+    const std::set<std::string> unsubscriptions_;
+    const Protobuf::int32 error_code_;
+    const std::string& error_substring_;
+  };
+
   // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
   // provided IP |version|.
   BaseIntegrationTest(Network::Address::IpVersion version,
@@ -168,6 +188,12 @@ public:
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
+  // Wait for a batch of requests to arrive. This is useful if the order of
+  // expected requests is non-deterministic.
+  AssertionResult compareMultipleDeltaDiscoveryRequests(
+      const std::vector<DeltaDiscoveryRequestExpectedContents>& expected_requests_contents,
+      FakeStreamPtr& xds_stream);
+
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
       const std::vector<std::string>& expected_resource_names, bool expect_node = false,
@@ -204,29 +230,41 @@ public:
     stream->sendGrpcMessage(response);
   }
 
+  // Sends a DeltaDiscoveryResponse with a given list of added resources.
+  // Note that the resources are expected to be of the same type, and match type_url.
+  void sendExplicitResourcesDeltaDiscoveryResponse(
+      const std::string& type_url,
+      const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
+      const std::vector<std::string>& removed) {
+    xds_stream_->sendGrpcMessage(
+        createExplicitResourcesDeltaDiscoveryResponse(type_url, added_or_updated, removed));
+  }
+
+  envoy::service::discovery::v3::DeltaDiscoveryResponse
+  createExplicitResourcesDeltaDiscoveryResponse(
+      const std::string& type_url,
+      const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
+      const std::vector<std::string>& removed);
+
   template <class T>
   envoy::service::discovery::v3::DeltaDiscoveryResponse
   createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                                const std::vector<std::string>& removed, const std::string& version,
                                const std::vector<std::string>& aliases) {
-    envoy::service::discovery::v3::DeltaDiscoveryResponse response;
-    response.set_system_version_info("system_version_info_this_is_a_test");
-    response.set_type_url(type_url);
+    std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& message : added_or_updated) {
-      auto* resource = response.add_resources();
+      envoy::service::discovery::v3::Resource resource;
       ProtobufWkt::Any temp_any;
       temp_any.PackFrom(message);
-      resource->mutable_resource()->PackFrom(message);
-      resource->set_name(intResourceName(message));
-      resource->set_version(version);
+      resource.mutable_resource()->PackFrom(message);
+      resource.set_name(intResourceName(message));
+      resource.set_version(version);
       for (const auto& alias : aliases) {
-        resource->add_aliases(alias);
+        resource.add_aliases(alias);
       }
+      resources.emplace_back(resource);
     }
-    *response.mutable_removed_resources() = {removed.begin(), removed.end()};
-    static int next_nonce_counter = 0;
-    response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
-    return response;
+    return createExplicitResourcesDeltaDiscoveryResponse(type_url, resources, removed);
   }
 
 private:
@@ -239,6 +277,11 @@ private:
       return m.name();
     }
   }
+
+  AssertionResult internalCompareDeltaDiscoveryRequest(
+      const DeltaDiscoveryRequestExpectedContents& expected_request,
+      const envoy::service::discovery::v3::DeltaDiscoveryRequest& actual_request,
+      const std::set<std::string>& actual_sub, const std::set<std::string>& actual_unsub);
 
   Event::GlobalTimeSystem time_system_;
 

@@ -182,11 +182,12 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      Config::ScopedResume maybe_resume_eds;
+      Config::ScopedResume maybe_resume_eds_leds;
       if (cm_.adsMux()) {
-        const auto type_url =
+        const auto eds_type_url =
             Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-        maybe_resume_eds = cm_.adsMux()->pause(type_url);
+        const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
+        maybe_resume_eds_leds = cm_.adsMux()->pause({eds_type_url, leds_type_url});
       }
       initializeSecondaryClusters();
     }

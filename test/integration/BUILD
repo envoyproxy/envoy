@@ -148,6 +148,21 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "leds_integration_test",
+    srcs = ["leds_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//test/config:utility_lib",
+        "//test/test_common:network_utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_proto_library(
     name = "filter_manager_integration_proto",
     srcs = [":filter_manager_integration_test.proto"],
