@@ -56,8 +56,7 @@ public:
       AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager,
       const Server::Options& options, Quic::QuicStatNames& quic_stat_names)
       : context_(options, main_thread_dispatcher, api, local_info, admin, runtime,
-                 singleton_manager, validation_context.staticValidationVisitor(), stats,
-                 tls),
+                 singleton_manager, validation_context.staticValidationVisitor(), stats, tls),
         validation_context_(validation_context), http_context_(http_context),
         grpc_context_(grpc_context), router_context_(router_context), admin_(admin), stats_(stats),
         tls_(tls), dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
