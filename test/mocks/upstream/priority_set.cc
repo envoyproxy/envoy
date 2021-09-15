@@ -11,7 +11,7 @@ namespace Upstream {
 
 using ::testing::_;
 using ::testing::Invoke;
-using ::testing::Return;
+using ::testing::ReturnPointee;
 using ::testing::ReturnRef;
 
 MockPrioritySet::MockPrioritySet() {
@@ -26,7 +26,7 @@ MockPrioritySet::MockPrioritySet() {
       .WillByDefault(Invoke([this](PrioritySet::PriorityUpdateCb cb) -> Common::CallbackHandlePtr {
         return priority_update_cb_helper_.add(cb);
       }));
-  ON_CALL(*this, crossPriorityHostMap()).WillByDefault(Return(cross_priority_host_map_));
+  ON_CALL(*this, crossPriorityHostMap()).WillByDefault(ReturnPointee(&cross_priority_host_map_));
 }
 
 MockPrioritySet::~MockPrioritySet() = default;

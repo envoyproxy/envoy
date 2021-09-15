@@ -18,7 +18,6 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
-#include "envoy/http/header_map.h"
 #include "envoy/router/internal_redirect.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
@@ -205,9 +204,14 @@ public:
   virtual ~RetryPolicy() = default;
 
   /**
-   * @return std::chrono::milliseconds timeout per retry attempt.
+   * @return std::chrono::milliseconds timeout per retry attempt. 0 is disabled.
    */
   virtual std::chrono::milliseconds perTryTimeout() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the optional per try idle timeout. 0 is disabled.
+   */
+  virtual std::chrono::milliseconds perTryIdleTimeout() const PURE;
 
   /**
    * @return uint32_t the number of retries to allow against the route.
