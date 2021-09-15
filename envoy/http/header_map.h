@@ -686,15 +686,15 @@ using HeaderMapPtr = std::unique_ptr<HeaderMap>;
  * Wraps a set of header modifications.
  */
 struct HeaderTransforms {
-  // List of headers which needs to be appended if they are absent
-  std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_append;
+  // List of headers which needs to be added if they are absent.
+  std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_add_if_absent;
   // List of headers for which the new value should be appended to the existing values if these
   // headers already exist.
   std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_append_if_exist;
   // List of headers for which the new value should be overwritten by discarding any existing
   // value if these headers already exist.
   std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_overwrite_if_exist;
-  // List of headers which needs to be removed
+  // List of headers which needs to be removed.
   std::vector<Http::LowerCaseString> headers_to_remove;
 };
 

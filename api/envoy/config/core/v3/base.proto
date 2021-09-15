@@ -323,16 +323,16 @@ message HeaderValueOption {
   // Describes the supported actions types to be used in :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>`
   enum HeaderAppendAction {
     // This action will append the specified value to the existing values if the header
-    // already exist. If the header doesn't exist then this will add the header with
+    // already exists. If the header doesn't exist then this will add the header with
     // specified key and value.
     APPEND_IF_EXISTS = 0;
 
-    // This action will only append the header if it doesn't already exist. If the header
-    // already exist then this will be a no-op.
-    APPEND = 1;
+    // This action will add the header if it doesn't already exist. If the header
+    // already exists then this will be a no-op.
+    ADD_IF_ABSENT = 1;
 
     // This action will overwrite the specified value by discarding any existing values if
-    // the header already exist. If the header doesn't exist then this will add the header
+    // the header already exists. If the header doesn't exist then this will add the header
     // with specified key and value.
     OVERWRITE_IF_EXISTS = 2;
   }

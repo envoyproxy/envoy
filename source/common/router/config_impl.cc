@@ -51,8 +51,9 @@ const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
 
 void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms& src) {
-  dest.headers_to_append.insert(dest.headers_to_append.end(), src.headers_to_append.begin(),
-                                src.headers_to_append.end());
+  dest.headers_to_add_if_absent.insert(dest.headers_to_add_if_absent.end(),
+                                       src.headers_to_add_if_absent.begin(),
+                                       src.headers_to_add_if_absent.end());
   dest.headers_to_append_if_exist.insert(dest.headers_to_append_if_exist.end(),
                                          src.headers_to_append_if_exist.begin(),
                                          src.headers_to_append_if_exist.end());
