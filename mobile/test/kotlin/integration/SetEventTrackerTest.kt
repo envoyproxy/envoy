@@ -4,6 +4,7 @@ import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.engine.JniLibrary
+import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
@@ -74,11 +75,11 @@ class SetEventTrackerTest {
 
     client
       .newStreamPrototype()
-      .setOnResponseHeaders { _, _, _ ->
+      .setOnResponseData { _, _, _ ->
         countDownLatch.countDown()
       }
       .start()
-      .sendHeaders(requestHeaders, true)
+      .close(ByteBuffer.allocate(1))
 
     countDownLatch.await(30, TimeUnit.SECONDS)
     engine.terminate()

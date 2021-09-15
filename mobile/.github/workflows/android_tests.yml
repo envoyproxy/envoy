@@ -120,5 +120,13 @@ jobs:
           architecture: x64
       - name: 'Run Kotlin library integration tests'
         if: steps.check_context.outputs.run_tests == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazel test --test_output=all --build_tests_only //test/kotlin/...
+          bazel test \
+            --test_output=all \
+            --build_tests_only \
+            --config=remote-ci-linux-clang \
+            --config=remote-ci-linux-local-java8 \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            //test/kotlin/...
