@@ -14,6 +14,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
@@ -32,6 +33,10 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 namespace {
+
+static constexpr uint32_t UnhealthyStatus = 1u << static_cast<size_t>(Host::Health::Unhealthy);
+static constexpr uint32_t DegradedStatus = 1u << static_cast<size_t>(Host::Health::Degraded);
+static constexpr uint32_t HealthyStatus = 1u << static_cast<size_t>(Host::Health::Healthy);
 
 class LoadBalancerTestBase : public Event::TestUsingSimulatedTime,
                              public testing::TestWithParam<bool> {
@@ -70,9 +75,8 @@ public:
   using LoadBalancerBase::percentageDegradedLoad;
   using LoadBalancerBase::percentageLoad;
 
-  HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  HostConstSharedPtr chooseHost(LoadBalancerContext*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
@@ -537,6 +541,100 @@ TEST_P(LoadBalancerBaseTest, BoundaryConditions) {
     uint32_t healthy_hosts = std::min<uint32_t>(num_hosts, rand.random() % 100);
     // Make sure random health situations don't trigger the assert in recalculatePerPriorityState
     updateHostSet(*priority_set_.getMockHostSet(i), num_hosts, healthy_hosts);
+  }
+}
+
+class TestZoneAwareLb : public ZoneAwareLoadBalancerBase {
+public:
+  TestZoneAwareLb(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+                  Random::RandomGenerator& random,
+                  const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
+      : ZoneAwareLoadBalancerBase(priority_set, nullptr, stats, runtime, random, common_config) {}
+
+  // ZoneAwareLoadBalancerBase will keep a copy of cross priority host map shared pointer and update
+  // it when the membership is updated.
+  const HostMapConstSharedPtr& crossPriorityHostMapForTest() { return cross_priority_host_map_; }
+
+  HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
+    return choose_host_once_host_;
+  }
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  HostConstSharedPtr choose_host_once_host_{std::make_shared<NiceMock<MockHost>>()};
+};
+
+// Used to test common functions of ZoneAwareLoadBalancerBase.
+class ZoneAwareLoadBalancerBaseTest : public LoadBalancerTestBase {
+public:
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
+  TestZoneAwareLb lb_{priority_set_, stats_, runtime_, random_, common_config_};
+};
+
+TEST_F(ZoneAwareLoadBalancerBaseTest, CrossPriorityHostMapUpdate) {
+  // Fake cross priority host map.
+  auto host_map = std::make_shared<HostMap>();
+  priority_set_.cross_priority_host_map_ = host_map;
+
+  // Mock membership update and priority update callbacks will be executed.
+  host_set_.runCallbacks({}, {});
+
+  // Host map in the lb is updated.
+  EXPECT_EQ(host_map.get(), lb_.crossPriorityHostMapForTest().get());
+}
+
+TEST_F(ZoneAwareLoadBalancerBaseTest, SelectOverrideHostTestInLb) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+
+  {
+    LoadBalancerContext::OverrideHost override_host{"1.2.3.4", HealthyStatus | DegradedStatus};
+    EXPECT_CALL(context, overrideHostToSelect())
+        .WillOnce(Return(absl::make_optional(override_host)));
+
+    // Mock membership update and update host map shared pointer in the lb.
+    auto host_map = std::make_shared<HostMap>();
+    priority_set_.cross_priority_host_map_ = host_map;
+    host_set_.runCallbacks({}, {});
+
+    // The expected host does not exist in the host map, therefore `chooseHostOnce` will be called.
+    EXPECT_EQ(lb_.choose_host_once_host_, lb_.chooseHost(&context));
+  }
+
+  {
+    auto mock_host = std::make_shared<NiceMock<MockHost>>();
+    EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Unhealthy));
+
+    LoadBalancerContext::OverrideHost override_host{"1.2.3.4", HealthyStatus | DegradedStatus};
+    EXPECT_CALL(context, overrideHostToSelect())
+        .WillOnce(Return(absl::make_optional(override_host)));
+
+    // Mock membership update and update host map shared pointer in the lb.
+    auto host_map = std::make_shared<HostMap>();
+    host_map->insert({"1.2.3.4", mock_host});
+    priority_set_.cross_priority_host_map_ = host_map;
+    host_set_.runCallbacks({}, {});
+
+    // Host status does not match the expected host status, therefore `chooseHostOnce` will be
+    // called.
+    EXPECT_EQ(lb_.choose_host_once_host_, lb_.chooseHost(&context));
+  }
+
+  {
+    auto mock_host = std::make_shared<NiceMock<MockHost>>();
+    EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Degraded));
+
+    LoadBalancerContext::OverrideHost override_host{"1.2.3.4", HealthyStatus | DegradedStatus};
+    EXPECT_CALL(context, overrideHostToSelect())
+        .WillOnce(Return(absl::make_optional(override_host)));
+
+    // Mock membership update and update host map shared pointer in the lb.
+    auto host_map = std::make_shared<HostMap>();
+    host_map->insert({"1.2.3.4", mock_host});
+    priority_set_.cross_priority_host_map_ = host_map;
+    host_set_.runCallbacks({}, {});
+
+    EXPECT_EQ(mock_host, lb_.chooseHost(&context));
   }
 }
 
@@ -1902,6 +2000,92 @@ TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetEqualKeysInvalid) {
 
   EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
                             "fallback_keys_subset cannot be equal to keys");
+}
+
+TEST(LoadBalancerContextBaseTest, LoadBalancerContextBaseTest) {
+  {
+    LoadBalancerContextBase context;
+    MockPrioritySet mock_priority_set;
+    HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({100, 0, 0}),
+                                         Upstream::DegradedLoad({0, 0, 0})};
+    RetryPriority::PriorityMappingFunc empty_func =
+        [](const Upstream::HostDescription&) -> absl::optional<uint32_t> { return absl::nullopt; };
+    MockHost mock_host;
+
+    EXPECT_EQ(absl::nullopt, context.computeHashKey());
+    EXPECT_EQ(nullptr, context.downstreamConnection());
+    EXPECT_EQ(nullptr, context.metadataMatchCriteria());
+    EXPECT_EQ(nullptr, context.downstreamHeaders());
+
+    EXPECT_EQ(&priority_load,
+              &(context.determinePriorityLoad(mock_priority_set, priority_load, empty_func)));
+    EXPECT_EQ(false, context.shouldSelectAnotherHost(mock_host));
+    EXPECT_EQ(1, context.hostSelectionRetryCount());
+    EXPECT_EQ(nullptr, context.upstreamSocketOptions());
+    EXPECT_EQ(nullptr, context.upstreamTransportSocketOptions());
+    EXPECT_EQ(absl::nullopt, context.overrideHostToSelect());
+  }
+
+  EXPECT_TRUE(LoadBalancerContextBase::validateOverrideHostStatus(Host::Health::Unhealthy,
+                                                                  UnhealthyStatus));
+  EXPECT_TRUE(
+      LoadBalancerContextBase::validateOverrideHostStatus(Host::Health::Healthy, HealthyStatus));
+  EXPECT_FALSE(
+      LoadBalancerContextBase::validateOverrideHostStatus(Host::Health::Healthy, UnhealthyStatus));
+}
+
+TEST(LoadBalancerContextBaseTest, selectOverrideHostTest) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+
+  {
+    // No valid host map.
+    EXPECT_EQ(nullptr, LoadBalancerContextBase::selectOverrideHost(nullptr, &context));
+  }
+  {
+    // No valid load balancer context.
+    auto host_map = std::make_shared<HostMap>();
+    EXPECT_EQ(nullptr, LoadBalancerContextBase::selectOverrideHost(host_map.get(), nullptr));
+  }
+  {
+    // No valid expected host.
+    EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::nullopt));
+    auto host_map = std::make_shared<HostMap>();
+    EXPECT_EQ(nullptr, LoadBalancerContextBase::selectOverrideHost(host_map.get(), &context));
+  }
+  {
+    // The host map does not contain the expected host.
+    LoadBalancerContext::OverrideHost override_host{"1.2.3.4", HealthyStatus};
+    EXPECT_CALL(context, overrideHostToSelect())
+        .WillOnce(Return(absl::make_optional(override_host)));
+    auto host_map = std::make_shared<HostMap>();
+    EXPECT_EQ(nullptr, LoadBalancerContextBase::selectOverrideHost(host_map.get(), &context));
+  }
+  {
+    // The status of host is not as expected.
+    auto mock_host = std::make_shared<NiceMock<MockHost>>();
+    EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Unhealthy));
+
+    LoadBalancerContext::OverrideHost override_host{"1.2.3.4", HealthyStatus};
+    EXPECT_CALL(context, overrideHostToSelect())
+        .WillOnce(Return(absl::make_optional(override_host)));
+
+    auto host_map = std::make_shared<HostMap>();
+    host_map->insert({"1.2.3.4", mock_host});
+    EXPECT_EQ(nullptr, LoadBalancerContextBase::selectOverrideHost(host_map.get(), &context));
+  }
+  {
+    // Get expected host.
+    auto mock_host = std::make_shared<NiceMock<MockHost>>();
+    EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Degraded));
+
+    LoadBalancerContext::OverrideHost override_host{"1.2.3.4", HealthyStatus | DegradedStatus};
+    EXPECT_CALL(context, overrideHostToSelect())
+        .WillOnce(Return(absl::make_optional(override_host)));
+
+    auto host_map = std::make_shared<HostMap>();
+    host_map->insert({"1.2.3.4", mock_host});
+    EXPECT_EQ(mock_host, LoadBalancerContextBase::selectOverrideHost(host_map.get(), &context));
+  }
 }
 
 } // namespace

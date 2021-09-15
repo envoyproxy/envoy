@@ -37,7 +37,13 @@ OriginalConnPoolImpl::~OriginalConnPoolImpl() {
   dispatcher_.clearDeferredDeleteList();
 }
 
-void OriginalConnPoolImpl::drainConnections() {
+void OriginalConnPoolImpl::drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) {
+  if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
+    is_draining_ = true;
+    checkForIdleAndCloseIdleConnsIfDraining();
+    return;
+  }
+
   ENVOY_LOG(debug, "draining connections");
   while (!ready_conns_.empty()) {
     ready_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
@@ -69,11 +75,6 @@ void OriginalConnPoolImpl::closeConnections() {
 }
 
 void OriginalConnPoolImpl::addIdleCallback(IdleCb cb) { idle_callbacks_.push_back(cb); }
-
-void OriginalConnPoolImpl::startDrain() {
-  is_draining_ = true;
-  checkForIdleAndCloseIdleConnsIfDraining();
-}
 
 void OriginalConnPoolImpl::assignConnection(ActiveConn& conn,
                                             ConnectionPool::Callbacks& callbacks) {

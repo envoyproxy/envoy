@@ -82,6 +82,9 @@ SubsetLoadBalancer::SubsetLoadBalancer(
         // performed.
         rebuildSingle();
 
+        // Update cross priority host map.
+        cross_priority_host_map_ = original_priority_set_.crossPriorityHostMap();
+
         if (hosts_added.empty() && hosts_removed.empty()) {
           // It's possible that metadata changed, without hosts being added nor removed.
           // If so we need to add any new subsets, remove unused ones, and regroup hosts into
@@ -276,6 +279,12 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
 }
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
+  HostConstSharedPtr override_host =
+      LoadBalancerContextBase::selectOverrideHost(cross_priority_host_map_.get(), context);
+  if (override_host != nullptr) {
+    return override_host;
+  }
+
   if (context) {
     bool host_chosen;
     HostConstSharedPtr host = tryChooseHostFromContext(context, host_chosen);

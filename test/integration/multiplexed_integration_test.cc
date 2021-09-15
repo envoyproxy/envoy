@@ -408,7 +408,7 @@ void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string
 }
 
 TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
-  addFilters({response_metadata_filter});
+  prependFilters({response_metadata_filter});
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
@@ -652,7 +652,7 @@ typed_config:
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
-  addFilters({request_metadata_filter});
+  prependFilters({request_metadata_filter});
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
@@ -799,7 +799,7 @@ void Http2MetadataIntegrationTest::verifyHeadersOnlyTest() {
 }
 
 TEST_P(Http2MetadataIntegrationTest, HeadersOnlyRequestWithRequestMetadata) {
-  addFilters({request_metadata_filter});
+  prependFilters({request_metadata_filter});
   // Send a headers only request.
   runHeaderOnlyTest(false, 0);
   verifyHeadersOnlyTest();
@@ -842,17 +842,17 @@ typed_config:
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, RequestMetadataWithStopAllFilterBeforeMetadataFilter) {
-  addFilters({request_metadata_filter, metadata_stop_all_filter});
+  prependFilters({request_metadata_filter, metadata_stop_all_filter});
   testRequestMetadataWithStopAllFilter();
 }
 
 TEST_P(Http2MetadataIntegrationTest, RequestMetadataWithStopAllFilterAfterMetadataFilter) {
-  addFilters({metadata_stop_all_filter, request_metadata_filter});
+  prependFilters({metadata_stop_all_filter, request_metadata_filter});
   testRequestMetadataWithStopAllFilter();
 }
 
 TEST_P(Http2MetadataIntegrationTest, TestAddEncodedMetadata) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
 )EOF");
 
@@ -957,7 +957,7 @@ TEST_P(Http2IntegrationTest, BadFrame) {
 // response are received.
 TEST_P(Http2IntegrationTest, GoAway) {
   EXCLUDE_DOWNSTREAM_HTTP3; // QuicHttpClientConnectionImpl::goAway NOT_REACHED_GCOVR_EXCL_LINE
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1319,7 +1319,7 @@ TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
 }
 
 TEST_P(Http2IntegrationTest, PauseAndResume) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
     "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
@@ -1349,7 +1349,7 @@ TEST_P(Http2IntegrationTest, PauseAndResume) {
 }
 
 TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
     "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
@@ -1829,7 +1829,7 @@ typed_config:
 )EOF";
 
 TEST_P(Http2IntegrationTest, OnLocalReply) {
-  config_helper_.addFilter(on_local_reply_filter);
+  config_helper_.prependFilter(on_local_reply_filter);
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
