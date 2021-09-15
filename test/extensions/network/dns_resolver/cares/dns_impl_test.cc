@@ -360,15 +360,15 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   auto addr6 = Network::Utility::parseInternetAddressAndPort("[::1]:54");
 
   // convert the address and options into typed_dns_resolver_config
-  auto dns_resolvers = envoy::config::core::v3::Address();
-  dns_resolvers.mutable_socket_address()->set_address(addr4->ip()->addressAsString());
-  dns_resolvers.mutable_socket_address()->set_port_value(addr4->ip()->port());
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
+      dns_resolvers);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.add_resolvers()->MergeFrom(dns_resolvers);
-  dns_resolvers.Clear();
-  // add v6 address
-  dns_resolvers.mutable_socket_address()->set_address(addr6->ip()->addressAsString());
-  dns_resolvers.mutable_socket_address()->set_port_value(addr6->ip()->port());
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv6Instance(addr6->ip()->addressAsString(), addr6->ip()->port()),
+      dns_resolvers);
   cares.add_resolvers()->MergeFrom(dns_resolvers);
   // copy over dns_resolver_options_
   cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
@@ -403,29 +403,27 @@ TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {
   auto addr6_b = Network::Utility::parseInternetAddressAndPort("[::3]:91");
 
   // convert the address and options into typed_dns_resolver_config
-  auto dns_resolvers = envoy::config::core::v3::Address();
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4_a->ip()->addressAsString(), addr4_a->ip()->port()),
+      dns_resolvers);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   // copy addr4_a
-  dns_resolvers.mutable_socket_address()->set_address(addr4_a->ip()->addressAsString());
-  dns_resolvers.mutable_socket_address()->set_port_value(addr4_a->ip()->port());
   cares.add_resolvers()->MergeFrom(dns_resolvers);
-  dns_resolvers.Clear();
-
   // copy addr4_b
-  dns_resolvers.mutable_socket_address()->set_address(addr4_b->ip()->addressAsString());
-  dns_resolvers.mutable_socket_address()->set_port_value(addr4_b->ip()->port());
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4_b->ip()->addressAsString(), addr4_b->ip()->port()),
+      dns_resolvers);
   cares.add_resolvers()->MergeFrom(dns_resolvers);
-  dns_resolvers.Clear();
-
   // copy addr6_a
-  dns_resolvers.mutable_socket_address()->set_address(addr6_a->ip()->addressAsString());
-  dns_resolvers.mutable_socket_address()->set_port_value(addr6_a->ip()->port());
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv6Instance(addr6_a->ip()->addressAsString(), addr6_a->ip()->port()),
+      dns_resolvers);
   cares.add_resolvers()->MergeFrom(dns_resolvers);
-  dns_resolvers.Clear();
-
   // copy addr6_b
-  dns_resolvers.mutable_socket_address()->set_address(addr6_b->ip()->addressAsString());
-  dns_resolvers.mutable_socket_address()->set_port_value(addr6_b->ip()->port());
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv6Instance(addr6_b->ip()->addressAsString(), addr6_b->ip()->port()),
+      dns_resolvers);
   cares.add_resolvers()->MergeFrom(dns_resolvers);
 
   // copy over dns_resolver_options_
@@ -500,9 +498,11 @@ TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
   EXPECT_EQ(test_instance->asString(), "127.0.0.1:borked_port_45");
 
   // Construct a typed_dns_resolver_config based on the IP address and port number.
-  auto dns_resolvers = envoy::config::core::v3::Address();
-  dns_resolvers.mutable_socket_address()->set_address(test_instance->ip()->addressAsString());
-  dns_resolvers.mutable_socket_address()->set_port_value(test_instance->ip()->port());
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(test_instance->ip()->addressAsString(),
+                                     test_instance->ip()->port()),
+      dns_resolvers);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.add_resolvers()->MergeFrom(dns_resolvers);
   // copy over dns_resolver_options_
@@ -552,10 +552,9 @@ public:
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
     auto dns_resolvers = envoy::config::core::v3::Address();
 
-    // Setup the DNS resolver address.
+    // Setup the DNS resolver address. Could be either IPv4 or IPv6.
     for (const auto& resolver : resolver_inst) {
       if (resolver->ip() != nullptr) {
-        dns_resolvers.Clear();
         dns_resolvers.mutable_socket_address()->set_address(resolver->ip()->addressAsString());
         dns_resolvers.mutable_socket_address()->set_port_value(resolver->ip()->port());
         cares.add_resolvers()->MergeFrom(dns_resolvers);

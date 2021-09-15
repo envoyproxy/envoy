@@ -1,3 +1,4 @@
+#include "source/common/network/address_impl.h"
 #include "source/common/network/dns_resolver/dns_factory.h"
 
 #include "test/mocks/network/mocks.h"
@@ -85,17 +86,15 @@ TEST_F(DnsFactoryTest, LegacyDnsResolverDataClusterConfigNonEmpty) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cluster_config.set_use_tcp_for_dns_lookups(true);
-  envoy::config::core::v3::Address* dns_resolvers = cluster_config.add_dns_resolvers();
-  dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
-  dns_resolvers->mutable_socket_address()->set_port_value(8080);
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 8080),
+                                             resolvers);
+  cluster_config.add_dns_resolvers()->MergeFrom(resolvers);
   handleLegacyDnsResolverData(cluster_config, typed_dns_resolver_config);
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
   EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
   EXPECT_FALSE(cares.resolvers().empty());
-  auto resolvers = envoy::config::core::v3::Address();
-  resolvers.mutable_socket_address()->set_address("1.2.3.4");
-  resolvers.mutable_socket_address()->set_port_value(8080);
   EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
 }
 
@@ -137,18 +136,16 @@ TEST_F(DnsFactoryTest, CheckDnsResolutionConfigExistWithBoostrap) {
   bootstrap_config.mutable_dns_resolution_config()
       ->mutable_dns_resolver_options()
       ->set_no_default_search_domain(true);
-  envoy::config::core::v3::Address* dns_resolvers =
-      bootstrap_config.mutable_dns_resolution_config()->add_resolvers();
-  dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
-  dns_resolvers->mutable_socket_address()->set_port_value(8080);
+
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 8080),
+                                             resolvers);
+  bootstrap_config.mutable_dns_resolution_config()->add_resolvers()->MergeFrom(resolvers);
   EXPECT_TRUE(checkDnsResolutionConfigExist(bootstrap_config, typed_dns_resolver_config));
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
   EXPECT_EQ(true, cares.dns_resolver_options().no_default_search_domain());
   EXPECT_FALSE(cares.resolvers().empty());
-  auto resolvers = envoy::config::core::v3::Address();
-  resolvers.mutable_socket_address()->set_address("1.2.3.4");
-  resolvers.mutable_socket_address()->set_port_value(8080);
   EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
 }
 
@@ -161,10 +158,10 @@ TEST_F(DnsFactoryTest, CheckTypedDnsResolverConfigExistWithBoostrap) {
 
   cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(true);
   cares.mutable_dns_resolver_options()->set_no_default_search_domain(true);
-  envoy::config::core::v3::Address* dns_resolvers = cares.add_resolvers();
-  dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
-  dns_resolvers->mutable_socket_address()->set_port_value(8080);
-
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 8080),
+                                             resolvers);
+  cares.add_resolvers()->MergeFrom(resolvers);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   bootstrap_config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
@@ -177,9 +174,6 @@ TEST_F(DnsFactoryTest, CheckTypedDnsResolverConfigExistWithBoostrap) {
   EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
   EXPECT_EQ(true, cares.dns_resolver_options().no_default_search_domain());
   EXPECT_FALSE(cares.resolvers().empty());
-  auto resolvers = envoy::config::core::v3::Address();
-  resolvers.mutable_socket_address()->set_address("1.2.3.4");
-  resolvers.mutable_socket_address()->set_port_value(8080);
   EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
 }
 
@@ -245,16 +239,15 @@ TEST_F(DnsFactoryTest, CheckBothTypedAndDnsResolutionConfigExistWithBoostrapWron
   EXPECT_TRUE(bootstrap_config.has_typed_dns_resolver_config());
   typed_dns_resolver_config.Clear();
 
-  envoy::config::core::v3::DnsResolutionConfig dns_resolution_config;
-
   // setup dns_resolution_config with multiple resolver addresses
-  envoy::config::core::v3::Address* dns_resolvers =
-      bootstrap_config.mutable_dns_resolution_config()->add_resolvers();
-  dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
-  dns_resolvers->mutable_socket_address()->set_port_value(8080);
-  dns_resolvers = bootstrap_config.mutable_dns_resolution_config()->add_resolvers();
-  dns_resolvers->mutable_socket_address()->set_address("5.6.7.8");
-  dns_resolvers->mutable_socket_address()->set_port_value(8081);
+  envoy::config::core::v3::Address resolvers0;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 8080),
+                                             resolvers0);
+  bootstrap_config.mutable_dns_resolution_config()->add_resolvers()->MergeFrom(resolvers0);
+  envoy::config::core::v3::Address resolvers1;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("5.6.7.8", 8081),
+                                             resolvers1);
+  bootstrap_config.mutable_dns_resolution_config()->add_resolvers()->MergeFrom(resolvers1);
   bootstrap_config.mutable_dns_resolution_config()
       ->mutable_dns_resolver_options()
       ->set_use_tcp_for_dns_lookups(true);
@@ -273,16 +266,10 @@ TEST_F(DnsFactoryTest, CheckBothTypedAndDnsResolutionConfigExistWithBoostrapWron
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
 
   // verify the typed_dns_resolver_config data matching DNS resolution config
-  auto resolvers = envoy::config::core::v3::Address();
   EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
   EXPECT_EQ(true, cares.dns_resolver_options().no_default_search_domain());
-  resolvers.mutable_socket_address()->set_address("1.2.3.4");
-  resolvers.mutable_socket_address()->set_port_value(8080);
-  EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
-  resolvers.Clear();
-  resolvers.mutable_socket_address()->set_address("5.6.7.8");
-  resolvers.mutable_socket_address()->set_port_value(8081);
-  EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(1), resolvers));
+  EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers0));
+  EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(1), resolvers1));
 }
 
 // Test checkTypedDnsResolverConfigExist() function with Bootstrap type.

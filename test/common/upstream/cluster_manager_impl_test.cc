@@ -2589,12 +2589,12 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedField) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  auto resolvers = envoy::config::core::v3::Address();
-  resolvers.mutable_socket_address()->set_address("1.2.3.4");
-  resolvers.mutable_socket_address()->set_port_value(80);
-  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   // As custom resolver is specified via deprecated field `dns_resolvers` in clusters
@@ -2630,13 +2630,13 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedFieldMulti
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-  auto resolvers = envoy::config::core::v3::Address();
-  resolvers.mutable_socket_address()->set_address("1.2.3.4");
-  resolvers.mutable_socket_address()->set_port_value(80);
+
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
-  resolvers.Clear();
-  resolvers.mutable_socket_address()->set_address("1.2.3.5");
-  resolvers.mutable_socket_address()->set_port_value(81);
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.5", 81),
+                                             resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
@@ -2668,12 +2668,12 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecified) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  auto resolvers = envoy::config::core::v3::Address();
-  resolvers.mutable_socket_address()->set_address("1.2.3.4");
-  resolvers.mutable_socket_address()->set_port_value(80);
-  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
@@ -2712,13 +2712,12 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedMultipleResolvers) {
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-  auto resolvers = envoy::config::core::v3::Address();
-  resolvers.mutable_socket_address()->set_address("1.2.3.4");
-  resolvers.mutable_socket_address()->set_port_value(80);
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
-  resolvers.Clear();
-  resolvers.mutable_socket_address()->set_address("1.2.3.5");
-  resolvers.mutable_socket_address()->set_port_value(81);
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.5", 81),
+                                             resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
@@ -2757,12 +2756,12 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedOveridingDeprecatedReso
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  auto resolvers = envoy::config::core::v3::Address();
-  resolvers.mutable_socket_address()->set_address("1.2.3.5");
-  resolvers.mutable_socket_address()->set_port_value(81);
-  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.5", 81),
+                                             resolvers);
   cares.add_resolvers()->MergeFrom(resolvers);
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
@@ -3091,9 +3090,9 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecified) {
 
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
-  auto resolvers = envoy::config::core::v3::Address();
-  resolvers.mutable_socket_address()->set_address("1.2.3.4");
-  resolvers.mutable_socket_address()->set_port_value(80);
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
   EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
   EXPECT_EQ(true, cares.dns_resolver_options().no_default_search_domain());
   EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
@@ -3131,9 +3130,9 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigResolversSpecified) {
 
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
-  auto resolvers = envoy::config::core::v3::Address();
-  resolvers.mutable_socket_address()->set_address("1.2.3.4");
-  resolvers.mutable_socket_address()->set_port_value(80);
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
   EXPECT_EQ(false, cares.dns_resolver_options().use_tcp_for_dns_lookups());
   EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
   EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
@@ -3174,15 +3173,14 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigMultipleResolversSpecified)
 
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
-  auto resolvers = envoy::config::core::v3::Address();
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
   EXPECT_EQ(false, cares.dns_resolver_options().use_tcp_for_dns_lookups());
   EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
-  resolvers.mutable_socket_address()->set_address("1.2.3.4");
-  resolvers.mutable_socket_address()->set_port_value(80);
   EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
-  resolvers.Clear();
-  resolvers.mutable_socket_address()->set_address("1.2.3.5");
-  resolvers.mutable_socket_address()->set_port_value(81);
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.5", 81),
+                                             resolvers);
   EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(1), resolvers));
   factory_.tls_.shutdownThread();
 }
@@ -3275,15 +3273,14 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedOveridingDeprecate
 
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
-  auto resolvers = envoy::config::core::v3::Address();
-  resolvers.mutable_socket_address()->set_address("9.10.11.12");
-  resolvers.mutable_socket_address()->set_port_value(100);
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("9.10.11.12", 100),
+                                             resolvers);
   EXPECT_EQ(true, cares.dns_resolver_options().use_tcp_for_dns_lookups());
   EXPECT_EQ(true, cares.dns_resolver_options().no_default_search_domain());
   EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
-  resolvers.Clear();
-  resolvers.mutable_socket_address()->set_address("5.6.7.8");
-  resolvers.mutable_socket_address()->set_port_value(200);
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("5.6.7.8", 200),
+                                             resolvers);
   EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(1), resolvers));
   factory_.tls_.shutdownThread();
 }

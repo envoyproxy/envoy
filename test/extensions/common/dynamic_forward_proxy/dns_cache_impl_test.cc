@@ -961,14 +961,13 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
   std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
-
-  envoy::config::core::v3::Address* dns_resolvers =
-      config.mutable_dns_resolution_config()->add_resolvers();
-  dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
-  dns_resolvers->mutable_socket_address()->set_port_value(8080);
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 80),
+                                             resolvers);
+  config.mutable_dns_resolution_config()->add_resolvers()->MergeFrom(resolvers);
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-  cares.add_resolvers()->MergeFrom(*dns_resolvers);
+  cares.add_resolvers()->MergeFrom(resolvers);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   EXPECT_CALL(context.dispatcher_, createDnsResolver(ProtoEq(typed_dns_resolver_config)))
@@ -986,10 +985,10 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfigOverridingUseTcp) {
   config.set_use_tcp_for_dns_lookups(false);
 
   // setup dns_resolution_config
-  envoy::config::core::v3::Address* dns_resolvers =
-      config.mutable_dns_resolution_config()->add_resolvers();
-  dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
-  dns_resolvers->mutable_socket_address()->set_port_value(8080);
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 8080),
+                                             resolvers);
+  config.mutable_dns_resolution_config()->add_resolvers()->MergeFrom(resolvers);
   config.mutable_dns_resolution_config()
       ->mutable_dns_resolver_options()
       ->set_use_tcp_for_dns_lookups(true);
@@ -1000,7 +999,7 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfigOverridingUseTcp) {
   // setup expected typed config parameter
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-  cares.add_resolvers()->MergeFrom(*dns_resolvers);
+  cares.add_resolvers()->MergeFrom(resolvers);
   cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(true);
   cares.mutable_dns_resolver_options()->set_no_default_search_domain(true);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
@@ -1019,10 +1018,10 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyTypedDnsResolverConfig) {
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
 
   // setup dns_resolution_config
-  envoy::config::core::v3::Address* dns_resolvers =
-      config.mutable_dns_resolution_config()->add_resolvers();
-  dns_resolvers->mutable_socket_address()->set_address("1.2.3.4");
-  dns_resolvers->mutable_socket_address()->set_port_value(8080);
+  envoy::config::core::v3::Address resolvers;
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("1.2.3.4", 8080),
+                                             resolvers);
+  config.mutable_dns_resolution_config()->add_resolvers()->MergeFrom(resolvers);
   config.mutable_dns_resolution_config()
       ->mutable_dns_resolver_options()
       ->set_use_tcp_for_dns_lookups(false);
@@ -1034,9 +1033,8 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyTypedDnsResolverConfig) {
   config.set_use_tcp_for_dns_lookups(false);
 
   // setup typed_dns_resolver_config
-  auto resolvers = envoy::config::core::v3::Address();
-  resolvers.mutable_socket_address()->set_address("5.6.7.8");
-  resolvers.mutable_socket_address()->set_port_value(9090);
+  Network::Utility::addressToProtobufAddress(Network::Address::Ipv4Instance("5.6.7.8", 9090),
+                                             resolvers);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.add_resolvers()->MergeFrom(resolvers);
   cares.mutable_dns_resolver_options()->set_use_tcp_for_dns_lookups(true);
