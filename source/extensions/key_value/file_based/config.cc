@@ -44,8 +44,7 @@ KeyValueStorePtr FileBasedKeyValueStoreFactory::createStore(
     const Protobuf::Message& config, ProtobufMessage::ValidationVisitor& validation_visitor,
     Event::Dispatcher& dispatcher, Filesystem::Instance& file_system) {
   const auto& typed_config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::common::key_value::v3::KeyValueStoreConfig&>(config,
-                                                                            validation_visitor);
+      const envoy::config::common::key_value::v3::KeyValueStoreConfig&>(config, validation_visitor);
   const auto file_config = MessageUtil::anyConvertAndValidate<
       envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig>(
       typed_config.config().typed_config(), validation_visitor);
