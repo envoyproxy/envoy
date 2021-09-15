@@ -603,7 +603,7 @@ private:
 
     if (active_request_bias_ == 1.0) {
       host_weight = static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
-    } else if (active_request_bias_ != 0.0 && active_request_bias_ != 1.0) {
+    } else if (active_request_bias_ != 0.0) {
       host_weight = static_cast<double>(host.weight()) /
                     std::pow(host.stats().rq_active_.value() + 1, active_request_bias_);
     }

@@ -11,6 +11,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/fixed_array.h"
@@ -794,6 +795,7 @@ void EdfLoadBalancerBase::initialize() {
 
 void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts) {
   auto current_time = time_source_.monotonicTime();
+  // TODO(nezdolik): linear scan can be improved with using flat hash set for hosts in slow start.
   for (const auto& host : hosts) {
     auto host_create_duration =
         std::chrono::duration_cast<std::chrono::milliseconds>(current_time - host->creationTime());
@@ -872,15 +874,13 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
 bool EdfLoadBalancerBase::noHostsAreInSlowStart() {
   if (!slow_start_enabled_) {
     return true;
-  } else {
-    auto current_time = time_source_.monotonicTime();
-    if (std::chrono::duration_cast<std::chrono::milliseconds>(
-            current_time - latest_host_added_time_) <= slow_start_window_) {
-      return false;
-    } else {
-      return true;
-    }
   }
+  auto current_time = time_source_.monotonicTime();
+  if (std::chrono::duration_cast<std::chrono::milliseconds>(
+          current_time - latest_host_added_time_) <= slow_start_window_) {
+    return false;
+  }
+  return true;
 }
 
 HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* context) {
@@ -955,6 +955,10 @@ double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host&
   if (host_create_duration < slow_start_window_ &&
       host.health() == Upstream::Host::Health::Healthy) {
     aggression_ = aggression_runtime_ != absl::nullopt ? aggression_runtime_.value().value() : 1.0;
+    if (aggression_ < 0.0) {
+      ENVOY_LOG_EVERY_POW_2(error, "Invalid runtime value provided for aggression parameter, "
+                                   "agression cannot be less than 0.0");
+    }
     aggression_ = std::max(0.0, aggression_);
 
     ASSERT(aggression_ > 0.0);

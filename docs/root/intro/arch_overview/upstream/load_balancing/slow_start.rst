@@ -4,7 +4,7 @@ Slow start mode
 ===============
 
 Slow start mode is a configuration setting in Envoy to progressively increase amount of traffic for newly added upstream endpoints.
-With no slow start enabled Envoy would send a proportional amount of traffic to new upstream ednpoints.
+With no slow start enabled Envoy would send a proportional amount of traffic to new upstream endpoints.
 This could be undesirable for services that require warm up time to serve full production load and could result in request timeouts, loss of data and deteriorated user experience.
 
 Slow start mode is a mechanism that affects load balancing weight of upstream endpoints and can be configured per upstream cluster.
@@ -15,15 +15,15 @@ During slow start window, load balancing weight of a particular endpoint will be
 
 .. math::
 
-  NewWeight = {Weight*TimeFactor}
+  NewWeight = {Weight*TimeFactor}^\frac{1}{Aggression}
 
 where,
 
 .. math::
 
-  TimeFactor = {(\frac{max(TimeSinceStartInSeconds,1)}{SlowStartWindowInSeconds})}^\frac{1}{Aggression}
+  TimeFactor = \frac{max(TimeSinceStartInSeconds,1)}{SlowStartWindowInSeconds} 
 
-As time progresses, more and more traffic would be send to endpoint within slow start window.
+As time progresses, more and more traffic would be sent to endpoint within slow start window.
 
 :ref:`Aggression parameter<envoy_v3_api_field_config.cluster.v3.Cluster.SlowStartConfig.aggression>` non-linearly affects endpoint weight and represents the speed of ramp-up.
 By tuning aggression parameter, one could achieve polynomial or exponential speed for traffic increase.
@@ -47,7 +47,7 @@ Endpoint exits slow start mode when:
   * It does not pass an active healthcheck configured per cluster.
     Endpoint could further re-enter slow start, if it passes an active healthcheck and its creation time is within slow start window.
 
-It is not recommended to enable slow start mode in low traffic or high number of endpoints scenarios, potential drawbacks would be:
+It is not recommended enabling slow start mode in low traffic or high number of endpoints scenarios, potential drawbacks would be:
  * Endpoint starvation, where endpoint has low probability to receive a request either due to low traffic or high number of total endpoints.
  * Spurious (non-gradual) increase of traffic per endpoint, whenever a starving endpoint receives a request and sufficient time has passed within slow start window,
    its load balancing weight will increase non linearly due to time factor.
