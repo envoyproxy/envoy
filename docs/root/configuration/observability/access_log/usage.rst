@@ -257,14 +257,14 @@ The following command operators are supported:
 
 %UPSTREAM_HEADER_BYTES_SENT%
   HTTP
-    Number of body bytes sent to the upstream by the http stream.
+    Number of header bytes sent to the upstream by the http stream.
 
   TCP
     Not implemented (0).
 
 %UPSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
-    Number of body bytes received from the upstream by the http stream.
+    Number of header bytes received from the upstream by the http stream.
 
   TCP
     Not implemented (0).
@@ -285,14 +285,14 @@ The following command operators are supported:
 
 %DOWNSTREAM_HEADER_BYTES_SENT%
   HTTP
-    Number of body bytes sent to the downstream by the http stream.
+    Number of header bytes sent to the downstream by the http stream.
 
   TCP
     Not implemented (0).
 
 %DOWNSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
-    Number of body bytes received from the downstream by the http stream.
+    Number of header bytes received from the downstream by the http stream.
 
   TCP
     Not implemented (0).

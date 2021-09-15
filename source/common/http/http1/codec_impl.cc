@@ -514,7 +514,7 @@ Status ConnectionImpl::completeLastHeader() {
     // Account for ":" bytes between the header key value pair.
     bytes_meterer->addHeaderBytesReceived(headers_or_trailers.size());
     // Account for "\r\n" at the end of headers.
-    bytes_meterer->addHeaderBytesReceived(CRLF_SIZE);
+    bytes_meterer->addHeaderBytesReceived(CRLF_SIZE * headers_or_trailers.size());
   }
 
   // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
