@@ -939,6 +939,8 @@ public:
       resource_decoder_{"cluster_name"};
 };
 
+TEST_F(NullGrpcMuxImplTest, StartImplemented) { EXPECT_NO_THROW(null_mux_->start()); }
+
 TEST_F(NullGrpcMuxImplTest, PauseImplemented) {
   ScopedResume scoped;
   EXPECT_NO_THROW(scoped = null_mux_->pause("ignored"));

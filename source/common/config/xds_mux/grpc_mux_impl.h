@@ -91,7 +91,6 @@ public:
   const absl::flat_hash_map<std::string, std::unique_ptr<S>>& subscriptions() const {
     return subscriptions_;
   }
-  bool isUnified() const override { return true; }
 
   // GrpcStreamCallbacks
   void onStreamEstablished() override { handleEstablishedStream(); }
@@ -250,7 +249,6 @@ public:
                                    SubscriptionCallbacks&, OpaqueResourceDecoder&,
                                    const SubscriptionOptions&) override;
 
-  // legacy mux interface not implemented by unified mux.
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
