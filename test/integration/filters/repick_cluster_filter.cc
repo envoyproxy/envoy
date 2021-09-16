@@ -20,12 +20,7 @@ namespace RepickClusterFilter {
 class RepickClusterFilter : public Http::PassThroughFilter {
 public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& request_header, bool) override {
-    for (int i = TotalUpstreamClusterCount - TotalUpstreamClusterWithHeaderCount;
-         i < TotalUpstreamClusterCount; ++i) {
-      request_header.addCopy(
-          Envoy::Http::LowerCaseString(absl::StrFormat(ClusterHeaderNamePrefix, i)),
-          absl::StrFormat(ClusterNamePrefix, i));
-    }
+    request_header.addCopy(Envoy::Http::LowerCaseString(ClusterHeaderName), ClusterName);
     decoder_callbacks_->clearRouteCache();
     return Http::FilterHeadersStatus::Continue;
   }
