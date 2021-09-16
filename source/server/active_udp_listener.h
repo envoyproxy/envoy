@@ -103,11 +103,9 @@ public:
     read_filter_.reset();
     udp_listener_.reset();
   }
-  void updateListenerConfig(Network::ListenerConfig&) override {
-    ENVOY_BUG(false, "In-place filter chain update observed on raw UDP listener.");
-  }
+  void updateListenerConfig(Network::ListenerConfig&) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   void onFilterChainDraining(const std::list<const Network::FilterChain*>&) override {
-    ENVOY_BUG(false, "Filter chain draining observed on raw UDP listener.");
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   // Network::UdpListenerFilterManager

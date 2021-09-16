@@ -553,6 +553,13 @@ void ListenerImpl::validateFilterChains(Network::Socket::Type socket_type) {
                                        "specified for connection oriented UDP listener",
                                        address_->asString()));
     }
+  } else if ((!config_.filter_chains().empty() || config_.has_default_filter_chain()) &&
+             udp_listener_config_ != nullptr &&
+             udp_listener_config_->listener_factory_->isTransportConnectionless()) {
+
+    throw EnvoyException(fmt::format("error adding listener '{}': {} filter chain(s) specified for "
+                                     "connection-less UDP listener.",
+                                     address_->asString(), config_.filter_chains_size()));
   }
 }
 
@@ -768,7 +775,6 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
     return false;
   }
 
-  ;
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place") &&
       (Network::Utility::protobufAddressSocketType(config_.address()) !=
