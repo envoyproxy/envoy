@@ -40,6 +40,7 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
+  ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
 }
 
 MockFactoryContext::~MockFactoryContext() = default;
