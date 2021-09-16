@@ -108,6 +108,29 @@ TEST_F(BufferedAsyncClientTest, BufferLimitExceeded) {
   EXPECT_EQ(0, buffered_client.sendBufferedMessages().size());
 }
 
+TEST_F(BufferedAsyncClientTest, BufferHighWatermarkTest) {
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _)).WillOnce(Return(&http_stream));
+  EXPECT_CALL(http_stream, sendHeaders(_, _));
+  EXPECT_CALL(http_stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(true));
+  EXPECT_CALL(http_stream, reset());
+
+  DangerousDeprecatedTestTime test_time_;
+  auto raw_client = std::make_shared<AsyncClientImpl>(cm_, config_, test_time_.timeSystem());
+  AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> client(raw_client);
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> callback;
+  BufferedAsyncClient<helloworld::HelloRequest, helloworld::HelloReply> buffered_client(
+      100000, *method_descriptor_, callback, client);
+
+  helloworld::HelloRequest request;
+  request.set_name("Alice");
+  auto id = buffered_client.publishId(request);
+  buffered_client.bufferMessage(id, request);
+
+  EXPECT_EQ(0, buffered_client.sendBufferedMessages().size());
+}
+
 } // namespace
 } // namespace Grpc
 } // namespace Envoy
