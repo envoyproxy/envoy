@@ -930,6 +930,39 @@ TEST_F(GrpcMuxImplTest, DynamicContextParameters) {
   expectSendMessage("foo", {}, "", false);
 }
 
+class NullGrpcMuxImplTest : public testing::Test {
+public:
+  NullGrpcMuxImplTest() : null_mux_(std::make_unique<Config::XdsMux::NullGrpcMuxImpl>()) {}
+  Config::GrpcMuxPtr null_mux_;
+  NiceMock<MockSubscriptionCallbacks> callbacks_;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder_{"cluster_name"};
+};
+
+TEST_F(NullGrpcMuxImplTest, PauseImplemented) {
+  ScopedResume scoped;
+  EXPECT_NO_THROW(scoped = null_mux_->pause("ignored"));
+}
+
+TEST_F(NullGrpcMuxImplTest, PauseMultipleArgsImplemented) {
+  ScopedResume scoped;
+  const std::vector<std::string> params = {"ignored", "another_ignored"};
+  EXPECT_NO_THROW(scoped = null_mux_->pause(params));
+}
+
+TEST_F(NullGrpcMuxImplTest, RequestOnDemandNotImplemented) {
+  EXPECT_DEATH(null_mux_->requestOnDemandUpdate("type_url", {"for_update"}), "not implemented");
+}
+
+TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder{"cluster_name"};
+
+  EXPECT_THROW_WITH_REGEX(null_mux_->addWatch("type_url", {}, callbacks, resource_decoder, {}),
+                          EnvoyException, "ADS must be configured to support an ADS config source");
+}
+
 } // namespace
 } // namespace XdsMux
 } // namespace Config
