@@ -64,9 +64,10 @@ public class CronvoyEngineTest {
   @Before
   public void setUp() {
     if (cronvoyEngine == null) {
-      Context appContext = ApplicationProvider.getApplicationContext();
-      cronvoyEngine = new CronetUrlRequestContext(
-          new NativeCronetEngineBuilderImpl(appContext).setUserAgent("Cronvoy"));
+      NativeCronetEngineBuilderImpl nativeCronetEngineBuilder =
+          new NativeCronetEngineBuilderImpl(ApplicationProvider.getApplicationContext());
+      nativeCronetEngineBuilder.setUserAgent("Cronvoy");
+      cronvoyEngine = new CronetUrlRequestContext(nativeCronetEngineBuilder);
     }
   }
 

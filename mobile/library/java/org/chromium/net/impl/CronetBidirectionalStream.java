@@ -4,7 +4,7 @@ import android.util.Log;
 import androidx.annotation.GuardedBy;
 import androidx.annotation.IntDef;
 import androidx.annotation.VisibleForTesting;
-import io.envoyproxy.envoymobile.Engine;
+import io.envoyproxy.envoymobile.engine.EnvoyEngine;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.nio.ByteBuffer;
@@ -806,7 +806,7 @@ final class CronetBidirectionalStream extends ExperimentalBidirectionalStream {
   }
 
   interface CronetBidirectionalStreamJni {
-    long createBidirectionalStream(CronetBidirectionalStream caller, Engine envoyEngine,
+    long createBidirectionalStream(CronetBidirectionalStream caller, EnvoyEngine envoyEngine,
                                    boolean sendRequestHeadersAutomatically,
                                    boolean enableMetricsCollection, boolean trafficStatsTagSet,
                                    int trafficStatsTag, boolean trafficStatsUidSet,

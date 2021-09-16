@@ -6,7 +6,6 @@ import android.content.Context;
 import android.util.Base64;
 import androidx.annotation.IntDef;
 import androidx.annotation.VisibleForTesting;
-import io.envoyproxy.envoymobile.LogLevel;
 import java.io.File;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -82,7 +81,7 @@ public abstract class CronetEngineBuilderImpl extends ICronetEngineBuilder {
   protected long mMockCertVerifier;
   private boolean mNetworkQualityEstimatorEnabled;
   private int mThreadPriority = INVALID_THREAD_PRIORITY;
-  private LogLevel mLogLevel = LogLevel.INFO;
+  private String mLogLevel = "info";
 
   /**
    * Default config enables SPDY and QUIC, disables SDCH and HTTP cache.
@@ -362,12 +361,12 @@ public abstract class CronetEngineBuilderImpl extends ICronetEngineBuilder {
     return mThreadPriority == INVALID_THREAD_PRIORITY ? defaultThreadPriority : mThreadPriority;
   }
 
-  public CronetEngineBuilderImpl setLogLevel(LogLevel logLevel) {
+  public CronetEngineBuilderImpl setLogLevel(String logLevel) {
     mLogLevel = logLevel;
     return this;
   }
 
-  public LogLevel getLogLevel() { return mLogLevel; }
+  public String getLogLevel() { return mLogLevel; }
 
   /**
    * Returns {@link Context} for builder.
