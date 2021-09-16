@@ -841,7 +841,7 @@ TEST(HeaderParserTest, TestParseInternal) {
 
   static const TestCase test_cases[] = {
       // Valid inputs
-      {"", {}, {}},
+      {"", {""}, {}},
       {"%PROTOCOL%", {"HTTP/1.1"}, {}},
       {"[%PROTOCOL%", {"[HTTP/1.1"}, {}},
       {"%PROTOCOL%]", {"HTTP/1.1]"}, {}},
@@ -1019,11 +1019,6 @@ TEST(HeaderParserTest, TestParseInternal) {
 
     std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
 
-    if (!test_case.expected_output_) {
-      EXPECT_FALSE(header_map.has("x-header")) << descriptor;
-      continue;
-    }
-
     EXPECT_TRUE(header_map.has("x-header")) << descriptor;
     EXPECT_EQ(test_case.expected_output_.value(), header_map.get_("x-header")) << descriptor;
   }
@@ -1117,7 +1112,7 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   HeaderParserPtr req_header_parser_empty = HeaderParser::configure(
       headers_values, envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
   req_header_parser_empty->evaluateHeaders(header_map, nullptr);
-  EXPECT_FALSE(header_map.has("empty"));
+  EXPECT_TRUE(header_map.has("empty"));
 }
 
 TEST(HeaderParserTest, EvaluateEmptyHeaders) {
@@ -1131,6 +1126,14 @@ request_headers_to_add:
       key: "x-key"
       value: "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
     append_action: "APPEND_IF_EXISTS"
+  - header:
+      key: "y-key"
+      value: "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
+    append_action: "OVERWRITE_IF_EXISTS"
+  - header:
+      key: "z-key"
+      value: "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
+    append_action: "ADD_IF_ABSENT"
 )EOF";
 
   HeaderParserPtr req_header_parser =
@@ -1143,7 +1146,12 @@ request_headers_to_add:
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
   req_header_parser->evaluateHeaders(header_map, stream_info);
-  EXPECT_FALSE(header_map.has("x-key"));
+  EXPECT_TRUE(header_map.has("x-key"));
+  EXPECT_EQ("", header_map.get_("x-key"));
+  EXPECT_TRUE(header_map.has("y-key"));
+  EXPECT_EQ("", header_map.get_("y-key"));
+  EXPECT_TRUE(header_map.has("z-key"));
+  EXPECT_EQ("", header_map.get_("z-key"));
 }
 
 TEST(HeaderParserTest, EvaluateStaticHeaders) {

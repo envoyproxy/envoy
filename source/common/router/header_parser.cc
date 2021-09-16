@@ -304,11 +304,6 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   for (const auto& [key, entry] : headers_to_add_) {
     const std::string value =
         stream_info != nullptr ? entry.formatter_->format(*stream_info) : entry.original_value_;
-    // We don't have to proceed further if the value is empty.
-    if (value.empty()) {
-      continue;
-    }
-
     switch (entry.formatter_->appendAction()) {
     case envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT:
       // Check whether the header already exist or not. We only
@@ -341,11 +336,6 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
     std::string value = entry.original_value_;
     if (do_formatting) {
       value = entry.formatter_->format(stream_info);
-    }
-
-    // We don't have to proceed further if the value is empty.
-    if (value.empty()) {
-      continue;
     }
 
     switch (entry.formatter_->appendAction()) {
