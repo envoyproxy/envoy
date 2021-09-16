@@ -1897,6 +1897,7 @@ TEST_F(HttpFilterTest, ReplaceRequest) {
         auto* hdr = hdrs_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
         hdr->mutable_header()->set_key(":method");
         hdr->mutable_header()->set_value("POST");
+        hdr->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
         hdrs_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, World!");
       });
 

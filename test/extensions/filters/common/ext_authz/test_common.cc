@@ -71,12 +71,13 @@ Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_cod
   }
   if (!headers.empty()) {
     for (auto& header : headers) {
-      if (header.append().value()) {
-        authz_response.headers_to_append.emplace_back(Http::LowerCaseString(header.header().key()),
-                                                      header.header().value());
-      } else {
+      if (header.append_action() ==
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS) {
         authz_response.headers_to_set.emplace_back(Http::LowerCaseString(header.header().key()),
                                                    header.header().value());
+      } else {
+        authz_response.headers_to_append.emplace_back(Http::LowerCaseString(header.header().key()),
+                                                      header.header().value());
       }
     }
   }
@@ -96,10 +97,8 @@ HeaderValueOptionVector TestCommon::makeHeaderValueOption(KeyValueOptionVector&&
     auto* mutable_header = header_value_option.mutable_header();
     mutable_header->set_key(header.key);
     mutable_header->set_value(header.value);
-    if (!header.append) {
-      header_value_option.set_append_action(
-          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
-    }
+    header_value_option.set_append_action(header.append_action);
+    header_value_option.clear_append();
     header_option_vector.push_back(header_value_option);
   }
   return header_option_vector;

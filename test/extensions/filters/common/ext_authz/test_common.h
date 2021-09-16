@@ -19,7 +19,7 @@ namespace ExtAuthz {
 struct KeyValueOption {
   std::string key;
   std::string value;
-  bool append;
+  envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action;
 };
 
 using KeyValueOptionVector = std::vector<KeyValueOption>;

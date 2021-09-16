@@ -65,16 +65,18 @@ void MutationUtils::applyHeaderMutations(const HeaderMutation& mutation, Http::H
       // Make "false" the default. This is logical and matches the ext_authz
       // filter. However, the router handles this same protobuf and uses "true"
       // as the default instead.
-      const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
+      const envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action =
+          sh.append_action();
       const LowerCaseString lcKey(sh.header().key());
-      if (append && !headers.get(lcKey).empty() && !isAppendableHeader(lcKey)) {
+      if (append_action != envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS &&
+          !headers.get(lcKey).empty() && !isAppendableHeader(lcKey)) {
         ENVOY_LOG(debug, "Ignoring duplicate value for header {}", sh.header().key());
       } else {
-        ENVOY_LOG(trace, "Setting header {} append = {}", sh.header().key(), append);
-        if (append) {
-          headers.addCopy(lcKey, sh.header().value());
-        } else {
+        ENVOY_LOG(trace, "Setting header {} append_action = {}", sh.header().key(), append_action);
+        if (append_action == envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS) {
           headers.setCopy(lcKey, sh.header().value());
+        } else {
+          headers.addCopy(lcKey, sh.header().value());
         }
       }
     }

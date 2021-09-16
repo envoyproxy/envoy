@@ -499,6 +499,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
     auto* add2 = response_mutation->add_set_headers();
     add2->mutable_header()->set_key(":status");
     add2->mutable_header()->set_value("201");
+    add2->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
     return true;
   });
 
@@ -552,6 +553,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponseTwoStatuses) {
     auto* add2 = response_mutation->add_set_headers();
     add2->mutable_header()->set_key(":status");
     add2->mutable_header()->set_value("201");
+    add2->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
     auto* add3 = response_mutation->add_set_headers();
     add3->mutable_header()->set_key(":status");
     add3->mutable_header()->set_value("202");
@@ -946,6 +948,7 @@ TEST_P(ExtProcIntegrationTest, ConvertGetToPost) {
     auto* method = header_mut->add_set_headers();
     method->mutable_header()->set_key(":method");
     method->mutable_header()->set_value("POST");
+    method->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
     auto* content_type = header_mut->add_set_headers();
     content_type->mutable_header()->set_key("content-type");
     content_type->mutable_header()->set_value("text/plain");

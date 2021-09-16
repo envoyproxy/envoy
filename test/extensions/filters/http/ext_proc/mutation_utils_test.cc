@@ -69,11 +69,12 @@ TEST(MutationUtils, TestApplyMutations) {
   s = mutation.add_set_headers();
   s->mutable_header()->set_key(":status");
   s->mutable_header()->set_value("418");
-  // Default of "append" is "false" and mutations
+  // Default of "append_action" is "APPEND_IF_EXISTS" and mutations
   // are applied in order.
   s = mutation.add_set_headers();
   s->mutable_header()->set_key("x-replace-this");
   s->mutable_header()->set_value("nope");
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
   // Incomplete structures should be ignored
   mutation.add_set_headers();
 
