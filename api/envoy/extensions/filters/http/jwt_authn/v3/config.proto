@@ -230,7 +230,7 @@ message JwtProvider {
   //
   string payload_in_metadata = 9;
 
-  // If non empty, similar to :ref:`payload <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`,
+  // If not empty, similar to :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`,
   // a successfully verified JWT header will be written to :ref:`Dynamic State <arch_overview_data_sharing_between_filters>`
   // as an entry (``protobuf::Struct``) in **envoy.filters.http.jwt_authn** *namespace* with the
   // value of this field as the key.
@@ -261,6 +261,12 @@ message JwtProvider {
   //       alg: JWT
   //       kid: EF71iSaosbC5C4tC6Syq1Gm647M
   //       alg: PS256
+  //
+  // .. warning::
+  //   Using the same key name for :ref:`header_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  //   and :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  //   is not allowed since it will override the existing entry. In a ``protobuf::Struct`` instance,
+  //   at the same level, keys are unique.
   //
   string header_in_metadata = 14;
 
