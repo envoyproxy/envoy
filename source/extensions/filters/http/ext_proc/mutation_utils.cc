@@ -62,21 +62,18 @@ void MutationUtils::applyHeaderMutations(const HeaderMutation& mutation, Http::H
       // something sensitive like the Authorization header.
       ENVOY_LOG(debug, "Ignorning improper attempt to set header {}", sh.header().key());
     } else {
-      // Make "false" the default. This is logical and matches the ext_authz
-      // filter. However, the router handles this same protobuf and uses "true"
-      // as the default instead.
-      const envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action =
+      envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action =
           sh.append_action();
       const LowerCaseString lcKey(sh.header().key());
-      if (append_action != envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS &&
+      if (append_action == envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS &&
           !headers.get(lcKey).empty() && !isAppendableHeader(lcKey)) {
         ENVOY_LOG(debug, "Ignoring duplicate value for header {}", sh.header().key());
       } else {
         ENVOY_LOG(trace, "Setting header {} append_action = {}", sh.header().key(), append_action);
-        if (append_action == envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS) {
-          headers.setCopy(lcKey, sh.header().value());
-        } else {
+        if (append_action == envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS) {
           headers.addCopy(lcKey, sh.header().value());
+        } else {
+          headers.setCopy(lcKey, sh.header().value());
         }
       }
     }
