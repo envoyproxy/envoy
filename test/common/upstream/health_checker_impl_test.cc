@@ -495,7 +495,7 @@ public:
         - header:
             key: user-agent
             value: CoolEnvoy/HC
-          append: false
+          append_action: "OVERWRITE_IF_EXISTS"
         - header:
             key: x-protocol
             value: "%PROTOCOL%"

@@ -30,12 +30,12 @@ filter_enforced:
     numerator: 100
     denominator: HUNDRED
 response_headers_to_add:
-  - append: false
+  - append_action: "OVERWRITE_IF_EXISTS"
     header:
       key: x-test-rate-limit
       value: 'true'
 request_headers_to_add_when_not_enforced:
-  - append: false
+  - append_action: "OVERWRITE_IF_EXISTS"
     header:
       key: x-local-ratelimited
       value: 'true'
@@ -248,7 +248,7 @@ filter_enforced:
     numerator: 100
     denominator: HUNDRED
 response_headers_to_add:
-  - append: false
+  - append_action: "OVERWRITE_IF_EXISTS"
     header:
       key: x-test-rate-limit
       value: 'true'

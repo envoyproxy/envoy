@@ -33,7 +33,7 @@ mappers:
       - header:
           key: foo
           value: bar
-        append: false
+        append_action: "OVERWRITE_IF_EXISTS"
 body_format:
   json_format:
     level: TRACE
@@ -270,7 +270,7 @@ mappers:
       - header:
           key: foo
           value: bar
-        append: false
+        append_action: "OVERWRITE_IF_EXISTS"
     body:
       inline_string: "customized body text"
     body_format_override:

@@ -166,7 +166,9 @@ protected:
     return factory_context_.scope().symbolTable().toString(name);
   }
 
-  std::string responseHeadersConfig(const bool most_specific_wins, const bool append) {
+  std::string responseHeadersConfig(
+      const bool most_specific_wins,
+      const envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action) {
     factory_context_.cluster_manager_.initializeClusters(
         {"www2", "root_www2", "www2_staging", "instant-server"}, {});
 
@@ -178,11 +180,11 @@ virtual_hosts:
       - header:
           key: x-global-header1
           value: vhost-override
-        append: {1}
+        append_action: {1}
       - header:
           key: x-vhost-header1
           value: vhost1-www2
-        append: {1}
+        append_action: {1}
     response_headers_to_remove: ["x-vhost-remove"]
     routes:
       - match:
@@ -194,15 +196,15 @@ virtual_hosts:
           - header:
               key: x-route-header
               value: route-override
-            append: {1}
+            append_action: {1}
           - header:
               key: x-global-header1
               value: route-override
-            append: {1}
+            append_action: {1}
           - header:
               key: x-vhost-header1
               value: route-override
-            append: {1}
+            append_action: {1}
       - match:
           path: "/"
         route:
@@ -211,7 +213,7 @@ virtual_hosts:
           - header:
               key: x-route-header
               value: route-allpath
-            append: {1}
+            append_action: {1}
         response_headers_to_remove: ["x-route-remove"]
       - match:
           prefix: "/"
@@ -223,7 +225,7 @@ virtual_hosts:
       - header:
           key: x-vhost-header1
           value: vhost1-www2_staging
-        append: {1}
+        append_action: {1}
     routes:
       - match:
           prefix: "/"
@@ -233,7 +235,7 @@ virtual_hosts:
           - header:
               key: x-route-header
               value: route-allprefix
-            append: {1}
+            append_action: {1}
   - name: default
     domains: ["*"]
     routes:
@@ -246,12 +248,12 @@ response_headers_to_add:
   - header:
       key: x-global-header1
       value: global1
-    append: {1}
+    append_action: {1}
 response_headers_to_remove: ["x-global-remove"]
 most_specific_header_mutations_wins: {0}
 )EOF";
 
-    return fmt::format(yaml, most_specific_wins, append);
+    return fmt::format(yaml, most_specific_wins, append_action);
   }
 
   std::string requestHeadersConfig(const bool most_specific_wins) {
@@ -265,11 +267,11 @@ virtual_hosts:
       - header:
           key: x-global-header
           value: vhost-www2
-        append: false
+        append_action: "OVERWRITE_IF_EXISTS"
       - header:
           key: x-vhost-header
           value: vhost-www2
-        append: false
+        append_action: "OVERWRITE_IF_EXISTS"
     request_headers_to_remove: ["x-vhost-nope"]
     routes:
       - match:
@@ -278,15 +280,15 @@ virtual_hosts:
           - header:
               key: x-global-header
               value: route-endpoint
-            append: false
+            append_action: "OVERWRITE_IF_EXISTS"
           - header:
               key: x-vhost-header
               value: route-endpoint
-            append: false
+            append_action: "OVERWRITE_IF_EXISTS"
           - header:
               key: x-route-header
               value: route-endpoint
-            append: false
+            append_action: "OVERWRITE_IF_EXISTS"
         request_headers_to_remove: ["x-route-nope"]
         route:
           cluster: www2
@@ -305,7 +307,7 @@ request_headers_to_add:
   - header:
       key: x-global-header
       value: global
-    append: false
+    append_action: "OVERWRITE_IF_EXISTS"
 request_headers_to_remove: ["x-global-nope"]
 most_specific_header_mutations_wins: {0}
 )EOF";
@@ -1448,7 +1450,9 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalseMostSpecificWins)
 // Validates behavior of response_headers_to_add and response_headers_to_remove at router, vhost,
 // and route levels.
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
-  const std::string yaml = responseHeadersConfig(/*most_specific_wins=*/false, /*append=*/true);
+  const std::string yaml = responseHeadersConfig(
+      /*most_specific_wins=*/false,
+      /*append_action=*/envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -1541,7 +1545,9 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
 }
 
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalse) {
-  const std::string yaml = responseHeadersConfig(/*most_specific_wins=*/false, /*append=*/false);
+  const std::string yaml = responseHeadersConfig(
+      /*most_specific_wins=*/false,
+      /*append_action=*/envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -1569,7 +1575,9 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalse) {
 }
 
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
-  const std::string yaml = responseHeadersConfig(/*most_specific_wins=*/true, /*append=*/false);
+  const std::string yaml = responseHeadersConfig(
+      /*most_specific_wins=*/true,
+      /*append_action=*/envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -1611,7 +1619,7 @@ response_headers_to_add:
   - header:
       key: x-has-variable
       value: "%PER_REQUEST_STATE(testing)%"
-    append: false
+    append_action: "OVERWRITE_IF_EXISTS"
 )EOF";
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
@@ -1696,7 +1704,7 @@ virtual_hosts:
       - header:
           key: {}
           value: vhost-www2
-        append: false
+        append_action: "OVERWRITE_IF_EXISTS"
 )EOF",
                                          header);
 
@@ -1723,7 +1731,7 @@ virtual_hosts:
       - header:
           key: "host"
           value: vhost-www2
-        append: false
+        append_action: "OVERWRITE_IF_EXISTS"
 )EOF";
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;

@@ -1039,11 +1039,11 @@ request_headers_to_add:
   - header:
       key: "x-client-ip"
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "x-client-ip-port"
       value: "%DOWNSTREAM_REMOTE_ADDRESS%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
 )EOF";
 
   HeaderParserPtr req_header_parser =
@@ -1065,11 +1065,11 @@ request_headers_to_add:
   - header:
       key: "x-client-ip"
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "x-client-ip-port"
       value: "%DOWNSTREAM_REMOTE_ADDRESS%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
 )EOF";
 
   HeaderParserPtr req_header_parser =
@@ -1133,7 +1133,7 @@ request_headers_to_add:
   - header:
       key: "x-key"
       value: "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
 )EOF";
 
   HeaderParserPtr req_header_parser =
@@ -1159,7 +1159,7 @@ request_headers_to_add:
   - header:
       key: "static-header"
       value: "static-value"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
 )EOF";
 
   HeaderParserPtr req_header_parser =
@@ -1282,23 +1282,23 @@ request_headers_to_add:
   - header:
       key: "static-header"
       value: "static-value"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "x-client-ip"
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "x-request-start"
       value: "%START_TIME(%s%3f)%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "x-request-start-default"
       value: "%START_TIME%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "x-request-start-range"
       value: "%START_TIME(%f, %1f, %2f, %3f, %4f, %5f, %6f, %7f, %8f, %9f)%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
 )EOF";
 
   // Disable append mode.
@@ -1357,7 +1357,7 @@ request_headers_to_add:
   - header:
       key: "static-header"
       value: "static-value"
-    append_action: "APPEND"
+    append_action: "ADD_IF_ABSENT"
   - header:
       key: "x-client-ip"
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
@@ -1411,38 +1411,38 @@ response_headers_to_add:
   - header:
       key: "x-client-ip"
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "x-client-ip-port"
       value: "%DOWNSTREAM_REMOTE_ADDRESS%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "x-request-start"
       value: "%START_TIME(%s.%3f)%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "x-request-start-multiple"
       value: "%START_TIME(%s.%3f)% %START_TIME% %START_TIME(%s)%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "x-request-start-f"
       value: "%START_TIME(f)%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "x-request-start-range"
       value: "%START_TIME(%f, %1f, %2f, %3f, %4f, %5f, %6f, %7f, %8f, %9f)%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "x-request-start-default"
       value: "%START_TIME%"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "set-cookie"
       value: "foo"
   - header:
       key: "set-cookie"
       value: "bar"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
 
 response_headers_to_remove: ["x-nope"]
 )EOF";
@@ -1550,7 +1550,7 @@ response_headers_to_add:
   - header:
       key: "x-foobar-header"
       value: "foobar"
-    append_action: "APPEND"
+    append_action: "ADD_IF_ABSENT"
 response_headers_to_remove: ["x-baz-header"]
 )EOF";
 
@@ -1588,15 +1588,15 @@ response_headers_to_add:
   - header:
       key: "x-foo-header"
       value: "foo"
-    append: true
+    append_action: "APPEND_IF_EXISTS"
   - header:
       key: "x-bar-header"
       value: "bar"
-    append: false
+    append_action: "OVERWRITE_IF_EXISTS"
   - header:
       key: "x-per-request-header"
       value: "%PER_REQUEST_STATE(testing)%"
-    append: false
+    append_action: "OVERWRITE_IF_EXISTS"
 response_headers_to_remove: ["x-baz-header"]
 )EOF";
 

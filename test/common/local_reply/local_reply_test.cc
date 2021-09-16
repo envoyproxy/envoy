@@ -359,15 +359,15 @@ TEST_F(LocalReplyTest, TestHeaderAddition) {
         - header:
             key: foo-1
             value: bar1
-          append: true
+          append_action: "APPEND_IF_EXISTS"
         - header:
             key: foo-2
             value: override-bar2
-          append: false
+          append_action: "OVERWRITE_IF_EXISTS"
         - header:
             key: foo-3
             value: append-bar3
-          append: true
+          append_action: "APPEND_IF_EXISTS"
 )";
   TestUtility::loadFromYaml(yaml, config_);
   auto local = Factory::create(config_, context_);
