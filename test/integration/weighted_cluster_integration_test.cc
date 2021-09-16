@@ -21,7 +21,7 @@ public:
 
   void createUpstreams() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    //  Add fake upstreams
+    //  Add two fake upstreams
     for (int i = 0; i < 2; ++i) {
       addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     }
@@ -50,12 +50,12 @@ public:
                                         ->mutable_route()
                                         ->mutable_weighted_clusters();
 
-          // Add the clusters with `name` specified.
+          // Add a cluster with `name` specified.
           auto* cluster = weighted_clusters->add_clusters();
           cluster->set_name("cluster_0");
           cluster->mutable_weight()->set_value(weights[0]);
 
-          // Add the clusters with `cluster_header` specified.
+          // Add a cluster with `cluster_header` specified.
           cluster = weighted_clusters->add_clusters();
           cluster->set_cluster_header(std::string(Envoy::RepickClusterFilter::ClusterHeaderName));
           cluster->mutable_weight()->set_value(weights[1]);
