@@ -279,7 +279,7 @@ protected:
   validateDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
                         Server::Configuration::FactoryContext& factory_context,
                         bool last_filter_in_filter_chain, const std::string& filter_chain_type,
-                        const absl::flat_hash_set<std::string> require_type_urls) const PURE;
+                        const absl::flat_hash_set<std::string>& require_type_urls) const PURE;
 
   virtual Http::FilterFactoryCb
   instantiateFilterFactory(const ProtobufWkt::Any& proto_config, const std::string& stat_prefix,
@@ -292,7 +292,7 @@ protected:
   validateDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
                         Server::Configuration::FactoryContext& factory_context,
                         bool last_filter_in_filter_chain, const std::string& filter_chain_type,
-                        const absl::flat_hash_set<std::string> require_type_urls) const override;
+                        const absl::flat_hash_set<std::string>& require_type_urls) const override;
   Http::FilterFactoryCb
   instantiateFilterFactory(const ProtobufWkt::Any& proto_config, const std::string& stat_prefix,
                            Server::Configuration::FactoryContext& factory_context) const override;

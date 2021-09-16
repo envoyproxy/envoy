@@ -290,7 +290,7 @@ void HttpFilterConfigProviderManagerImpl::validateDefaultConfig(
     const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
     Server::Configuration::FactoryContext& factory_context, bool last_filter_in_filter_chain,
     const std::string& filter_chain_type,
-    const absl::flat_hash_set<std::string> require_type_urls) const {
+    const absl::flat_hash_set<std::string>& require_type_urls) const {
   auto* default_factory =
       Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
           proto_config);
