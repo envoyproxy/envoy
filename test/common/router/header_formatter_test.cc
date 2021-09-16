@@ -1093,8 +1093,7 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   first_entry.set_value("%DOWNSTREAM_REMOTE_ADDRESS%");
 
   HeaderParserPtr req_header_parser_add = HeaderParser::configure(
-      headers_values,
-      /*append_action=*/envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+      headers_values, envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
   req_header_parser_add->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("key"));
   EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS%", header_map.get_("key"));
@@ -1105,8 +1104,7 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   set_entry.set_value("great");
 
   HeaderParserPtr req_header_parser_set = HeaderParser::configure(
-      headers_values,
-      /*append_action=*/envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+      headers_values, envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
   req_header_parser_set->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("key"));
   EXPECT_EQ("great", header_map.get_("key"));
@@ -1117,8 +1115,7 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   empty_entry.set_value("");
 
   HeaderParserPtr req_header_parser_empty = HeaderParser::configure(
-      headers_values,
-      /*append_action=*/envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+      headers_values, envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
   req_header_parser_empty->evaluateHeaders(header_map, nullptr);
   EXPECT_FALSE(header_map.has("empty"));
 }
@@ -1345,6 +1342,26 @@ request_headers_to_add:
   EXPECT_EQ(1, counts["static-header"]);
   EXPECT_EQ(1, counts["x-client-ip"]);
   EXPECT_EQ(1, counts["x-request-start"]);
+}
+
+TEST(HeaderParserTest, HeadersWithAppendActionAndAppend) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "static-header"
+      value: "static-value"
+    append_action: "ADD_IF_ABSENT"
+    append: false
+)EOF";
+
+  envoy::config::route::v3::Route route = parseRouteFromV3Yaml(yaml);
+  EXPECT_THAT_THROWS_MESSAGE(Router::HeaderParser::configure(route.request_headers_to_add()),
+                             EnvoyException,
+                             testing::HasSubstr("are set for the header key: static-header"));
 }
 
 TEST(HeaderParserTest, EvaluateHeadersWithAppendActions) {

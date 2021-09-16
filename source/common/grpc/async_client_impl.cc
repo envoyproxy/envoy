@@ -19,7 +19,7 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
       host_name_(config.envoy_grpc().authority()), time_source_(time_source),
       metadata_parser_(Router::HeaderParser::configure(
           config.initial_metadata(),
-          /*append_action=*/envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS)) {}
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS)) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   ASSERT(isThreadSafe());

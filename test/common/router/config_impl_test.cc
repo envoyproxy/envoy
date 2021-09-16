@@ -1451,8 +1451,7 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalseMostSpecificWins)
 // and route levels.
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
   const std::string yaml = responseHeadersConfig(
-      /*most_specific_wins=*/false,
-      /*append_action=*/envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+      /*most_specific_wins=*/false, envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -1547,7 +1546,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalse) {
   const std::string yaml = responseHeadersConfig(
       /*most_specific_wins=*/false,
-      /*append_action=*/envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -1576,8 +1575,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalse) {
 
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
   const std::string yaml = responseHeadersConfig(
-      /*most_specific_wins=*/true,
-      /*append_action=*/envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+      /*most_specific_wins=*/true, envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);

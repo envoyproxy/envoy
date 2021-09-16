@@ -23,10 +23,7 @@ public:
 
   /**
    * @return envoy::config::core::v3::HeaderValueOption::HeaderAppendAction describes what append
-   * action to take indicating whether:
-   * 1. The formatted header should be added only if it's not already present;
-   * 2. New value should be appended to the existing values if header already exists; or
-   * 3. New value should be overwritten by discarding any existing values if header already exists;
+   * action to take.
    */
   virtual envoy::config::core::v3::HeaderValueOption::HeaderAppendAction appendAction() const PURE;
 };

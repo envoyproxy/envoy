@@ -232,9 +232,16 @@ HeaderParserPtr HeaderParser::configure(
         header_value_option.append_action();
     // Preserve the old behavior until `append` field is fully deprecated.
     if (header_value_option.has_append()) {
-      if (header_value_option.append().value()) {
-        append_action = envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS;
-      } else {
+      if (append_action != envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS) {
+        throw EnvoyException(fmt::format(
+            "Both the `append` and `append_action` fields are set for the header key: {}",
+            header_value_option.header().key()));
+      }
+
+      // If append is false then we need to set `append_action` to `OVERWRITE_IF_EXISTS`. If append
+      // is true then we don't need to do anything as `append_action` defaults to
+      // `APPEND_IF_EXISTS`.
+      if (!header_value_option.append().value()) {
         append_action = envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS;
       }
     }
