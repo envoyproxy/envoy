@@ -477,7 +477,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
 
 // Tests if address set is populated in the filter state when an upstream host is resolved
 // successfully but is null.
-TEST_F(ProxyFilterTest, IgnoreFilterStateMetadataNullAddress) {
+TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddress) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
