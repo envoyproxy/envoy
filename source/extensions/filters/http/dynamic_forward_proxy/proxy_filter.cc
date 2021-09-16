@@ -157,7 +157,7 @@ void ProxyFilter::addHostAddressToFilterState(
   }
 
   if (!address) {
-    ENVOY_STREAM_LOG(warn, "Cannot add address to filter state: invalid address",
+    ENVOY_STREAM_LOG(debug, "Cannot add address to filter state: invalid address",
                      *decoder_callbacks_);
     return;
   }
