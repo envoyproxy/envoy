@@ -62,17 +62,12 @@ public:
       ASSERT_EQ(status, expected_status);
     };
     auto set_payload_cb = [this](const std::string& name, const ProtobufWkt::Struct& payload) {
-      out_payload_name_ = name;
-      out_payload_ = payload;
-    };
-    auto set_header_cb = [this](const std::string& name, const ProtobufWkt::Struct& header) {
-      out_header_name_ = name;
-      out_header_ = header;
+      this->addPayload(name, payload);
     };
     initTokenExtractor();
     auto tokens = extractor_->extract(headers);
     auth_->verify(headers, parent_span_, std::move(tokens), std::move(set_payload_cb),
-                  std::move(set_header_cb), std::move(on_complete_cb));
+                  std::move(on_complete_cb));
   }
 
   void initTokenExtractor() {
@@ -83,6 +78,11 @@ public:
     extractor_ = Extractor::create(providers);
   }
 
+  // This is like ContextImpl::addPayload in source/extensions/filters/http/jwt_authn/verifier.cc.
+  void addPayload(const std::string& name, const ProtobufWkt::Struct& payload) {
+    *(*out_payload_.mutable_fields())[name].mutable_struct_value() = payload;
+  }
+
   JwtAuthentication proto_config_;
   ExtractorConstPtr extractor_;
   std::shared_ptr<FilterConfigImpl> filter_config_;
@@ -91,10 +91,7 @@ public:
   AuthenticatorPtr auth_;
   ::google::jwt_verify::JwksPtr jwks_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
-  std::string out_payload_name_;
-  std::string out_header_name_;
   ProtobufWkt::Struct out_payload_;
-  ProtobufWkt::Struct out_header_;
   NiceMock<Tracing::MockSpan> parent_span_;
 };
 
@@ -155,8 +152,8 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
   // Verify the token is NOT removed.
   EXPECT_TRUE(headers.has(Http::CustomHeaders::get().Authorization));
 
-  // Payload not set by default
-  EXPECT_EQ(out_payload_name_, "");
+  // Payload is not set by default.
+  EXPECT_TRUE(out_payload_.fields().empty());
 
   EXPECT_EQ(1U, filter_config_->stats().jwks_fetch_success_.value());
   EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_failed_.value());
@@ -178,16 +175,12 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
 
   expectVerifyStatus(Status::Ok, headers);
 
-  // Only the payload is set.
-  EXPECT_EQ(out_payload_name_, "my_payload");
-  EXPECT_EQ(out_header_name_, EMPTY_STRING);
+  // Only one field is set.
+  EXPECT_EQ(1, out_payload_.fields().size());
 
-  ProtobufWkt::Struct expected_payload;
-  // We should expect empty JWT header.
-  ProtobufWkt::Struct expected_header;
+  ProtobufWkt::Value expected_payload;
   TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
-  EXPECT_TRUE(TestUtility::protoEqual(out_payload_, expected_payload));
-  EXPECT_TRUE(TestUtility::protoEqual(out_header_, expected_header));
+  EXPECT_TRUE(TestUtility::protoEqual(expected_payload, out_payload_.fields().at("my_payload")));
 }
 
 // This test verifies setting only the extracted header to metadata.
@@ -207,16 +200,13 @@ TEST_F(AuthenticatorTest, TestSetHeader) {
 
   expectVerifyStatus(Status::Ok, headers);
 
-  // Payload and header are set.
-  EXPECT_EQ(out_payload_name_, EMPTY_STRING);
-  EXPECT_EQ(out_header_name_, "my_header");
+  // Only one field is set.
+  EXPECT_EQ(1, out_payload_.fields().size());
 
   // We should expect empty JWT payload.
-  ProtobufWkt::Struct expected_payload;
-  ProtobufWkt::Struct expected_header;
-  TestUtility::loadFromJson(ExpectedHeaderJSON, expected_header);
-  EXPECT_TRUE(TestUtility::protoEqual(out_payload_, expected_payload));
-  EXPECT_TRUE(TestUtility::protoEqual(out_header_, expected_header));
+  ProtobufWkt::Value expected_payload;
+  TestUtility::loadFromJson(ExpectedHeaderJSON, expected_payload);
+  EXPECT_TRUE(TestUtility::protoEqual(expected_payload, out_payload_.fields().at("my_header")));
 }
 
 // This test verifies setting the extracted payload and header to metadata.
@@ -239,15 +229,16 @@ TEST_F(AuthenticatorTest, TestSetPayloadAndHeader) {
   expectVerifyStatus(Status::Ok, headers);
 
   // Payload and header are set.
-  EXPECT_EQ(out_payload_name_, "my_payload");
-  EXPECT_EQ(out_header_name_, "my_header");
+  EXPECT_EQ(2, out_payload_.fields().size());
 
-  ProtobufWkt::Struct expected_payload;
-  ProtobufWkt::Struct expected_header;
+  // We should expect both JWT payload and header are set.
+  ProtobufWkt::Value expected_payload;
   TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
+  EXPECT_TRUE(TestUtility::protoEqual(expected_payload, out_payload_.fields().at("my_payload")));
+
+  ProtobufWkt::Value expected_header;
   TestUtility::loadFromJson(ExpectedHeaderJSON, expected_header);
-  EXPECT_TRUE(TestUtility::protoEqual(out_payload_, expected_payload));
-  EXPECT_TRUE(TestUtility::protoEqual(out_header_, expected_header));
+  EXPECT_TRUE(TestUtility::protoEqual(expected_header, out_payload_.fields().at("my_header")));
 }
 
 // This test verifies the Jwt with non existing kid
@@ -587,8 +578,7 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   auto tokens = extractor_->extract(headers);
   // callback should not be called.
   std::function<void(const Status&)> on_complete_cb = [](const Status&) { FAIL(); };
-  auth_->verify(headers, parent_span_, std::move(tokens), nullptr, nullptr,
-                std::move(on_complete_cb));
+  auth_->verify(headers, parent_span_, std::move(tokens), nullptr, std::move(on_complete_cb));
 
   // Destroy the authenticating process.
   auth_->onDestroy();
@@ -744,13 +734,8 @@ public:
       out_payload_name_ = name;
       out_payload_ = payload;
     };
-    auto set_header_cb = [this](const std::string& name, const ProtobufWkt::Struct& header) {
-      out_header_name_ = name;
-      out_header_ = header;
-    };
     auto tokens = extractor_->extract(headers);
-    auth_->verify(headers, parent_span_, std::move(tokens), set_payload_cb, set_header_cb,
-                  on_complete_cb);
+    auth_->verify(headers, parent_span_, std::move(tokens), set_payload_cb, on_complete_cb);
   }
 
   ::google::jwt_verify::JwksPtr jwks_;

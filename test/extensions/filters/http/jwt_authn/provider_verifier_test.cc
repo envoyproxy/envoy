@@ -74,7 +74,7 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
 }
 
 // Test to set the payload (hence dynamic metadata) with the header and payload extracted from the
-// JWT.
+// verified JWT.
 TEST_F(ProviderVerifierTest, TestOkJWTWithExtractedHeaderAndPayload) {
   TestUtility::loadFromYaml(ExampleConfig, proto_config_);
   (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(

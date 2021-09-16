@@ -30,13 +30,12 @@ public:
   MOCK_METHOD(void, doVerify,
               (Http::HeaderMap & headers, Tracing::Span& parent_span,
                std::vector<JwtLocationConstPtr>* tokens, SetExtractedJwtDataCallback set_payload_cb,
-               SetExtractedJwtDataCallback set_header_cb, AuthenticatorCallback callback));
+               AuthenticatorCallback callback));
 
   void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
               std::vector<JwtLocationConstPtr>&& tokens, SetExtractedJwtDataCallback set_payload_cb,
-              SetExtractedJwtDataCallback set_header_cb, AuthenticatorCallback callback) override {
-    doVerify(headers, parent_span, &tokens, std::move(set_payload_cb), std::move(set_header_cb),
-             std::move(callback));
+              AuthenticatorCallback callback) override {
+    doVerify(headers, parent_span, &tokens, std::move(set_payload_cb), std::move(callback));
   }
 
   MOCK_METHOD(void, onDestroy, ());
