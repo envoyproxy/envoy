@@ -33,8 +33,8 @@ envoy.filters.network.postgres_proxy:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: stable
-envoy.network.socket_interface.vcl:
+envoy.bootstrap.vcl:
   categories:
-  - envoy.network.socket_interface
-  security_posture: requires_trusted_downstream_and_upstream
+  - envoy.bootstrap
+  security_posture: unknown
   status: alpha

@@ -17,5 +17,5 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
 
-    "envoy.network.socket_interface.vcl":                       "//contrib/vcl/source:config",
+    "envoy.bootstrap.vcl":                                      "//contrib/vcl/source:config",
 }

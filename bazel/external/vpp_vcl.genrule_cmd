@@ -2,14 +2,11 @@
 
 set -e
 
-VPP_VER=v21.10
-
 # This works only on Linux-x86_64.
 if [[ `uname` != "Linux" || `uname -m` != "x86_64" ]]; then
   echo "ERROR: VPP VCL is currently supported only on Linux-x86_64."
   exit 1
 fi
-
 
 # Bazel magic.
 ROOT=$$(dirname $(rootpath src/CMakeLists.txt))/..
@@ -18,9 +15,6 @@ echo "ROOT $$ROOT"
 pushd $$ROOT
 
 # No dependencies beyond core dependencies
-echo $$VPP_VER > .version
-echo "PWD $$PWD"
-echo $$(git log --oneline)
 
 cmake -G Ninja -S src/ -B _vcl -DCMAKE_INSTALL_PREFIX=_vcl -DCMAKE_BUILD_TYPE:STRING=release
 ninja -C _vcl vppcom
@@ -28,4 +22,4 @@ ninja -C _vcl vppcom
 popd
 
 # Move compiled libraries to the expected destinations.
-mv $$ROOT/_vcl/lib/libvppcom.so.21.10.0 $(execpath libvppcom.so)
+mv $$ROOT/_vcl/lib/libvppcom.so.21.10 $(execpath libvppcom.so)

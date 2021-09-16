@@ -3,7 +3,7 @@
 VCL Socket Interface
 ====================
 
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.network.socket_interface.vcl.v3alpha.VclSocketInterface>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.vcl.v3alpha.VclSocketInterface>`
 
 .. attention::
 
@@ -19,7 +19,7 @@ Example configuration
 .. code-block:: yaml
 
   bootstrap_extensions:
-    - name: envoy.extensions.network.socket_interface.vcl.vcl_socket_interface
+    - name: envoy.extensions.vcl.vcl_socket_interface
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.network.socket_interface.vcl.v3alpha.VclSocketInterface
-  default_socket_interface: "envoy.extensions.network.socket_interface.vcl.vcl_socket_interface"
+        "@type": type.googleapis.com/envoy.extensions.vcl.v3alpha.VclSocketInterface
+  default_socket_interface: "envoy.extensions.vcl.vcl_socket_interface"

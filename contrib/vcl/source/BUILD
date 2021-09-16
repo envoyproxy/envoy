@@ -45,6 +45,6 @@ envoy_cc_contrib_extension(
     hdrs = ["config.h"],
     deps = [
         ":vcl_interface_lib",
-        "@envoy_api//contrib/envoy/extensions/network/socket_interface/vcl/v3alpha:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/vcl/v3alpha:pkg_cc_proto",
     ],
 )

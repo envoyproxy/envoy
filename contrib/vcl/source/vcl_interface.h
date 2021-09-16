@@ -42,9 +42,7 @@ public:
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() const override {
-    return "envoy.extensions.network.socket_interface.vcl.vcl_socket_interface";
-  };
+  std::string name() const override { return "envoy.extensions.vcl.vcl_socket_interface"; };
 
 private:
   absl::flat_hash_map<int, Envoy::Event::FileEventPtr> mq_events_;

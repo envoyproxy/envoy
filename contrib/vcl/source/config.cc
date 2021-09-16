@@ -1,6 +1,6 @@
 #include "contrib/vcl/source/config.h"
 
-#include "contrib/envoy/extensions/network/socket_interface/vcl/v3alpha/vcl_socket_interface.pb.h"
+#include "contrib/envoy/extensions/vcl/v3alpha/vcl_socket_interface.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,8 +20,7 @@ VclSocketInterface::createBootstrapExtension(const Protobuf::Message&,
 }
 
 ProtobufTypes::MessagePtr VclSocketInterface::createEmptyConfigProto() {
-  return std::make_unique<
-      envoy::extensions::network::socket_interface::vcl::v3alpha::VclSocketInterface>();
+  return std::make_unique<envoy::extensions::vcl::v3alpha::VclSocketInterface>();
 }
 
 REGISTER_FACTORY(VclSocketInterface, Server::Configuration::BootstrapExtensionFactory);
