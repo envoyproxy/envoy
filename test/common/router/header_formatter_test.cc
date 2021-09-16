@@ -638,7 +638,7 @@ TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
     std::string long_string(16385, 'a');
     header->mutable_header()->set_key("header_name");
     header->mutable_header()->set_value(long_string);
-    header->mutable_append()->set_value(true);
+    header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(route), ProtoValidationException,
                             "Proto constraint validation failed.*");
   }
@@ -1300,9 +1300,12 @@ request_headers_to_add:
 
   // Disable append mode.
   envoy::config::route::v3::Route route = parseRouteFromV3Yaml(yaml);
-  route.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
-  route.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
-  route.mutable_request_headers_to_add(2)->mutable_append()->set_value(false);
+  route.mutable_request_headers_to_add(0)->set_append_action(
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+  route.mutable_request_headers_to_add(1)->set_append_action(
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+  route.mutable_request_headers_to_add(2)->set_append_action(
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
 
   HeaderParserPtr req_header_parser =
       Router::HeaderParser::configure(route.request_headers_to_add());
@@ -1359,9 +1362,9 @@ request_headers_to_add:
 )EOF";
 
   envoy::config::route::v3::Route route = parseRouteFromV3Yaml(yaml);
-  EXPECT_THAT_THROWS_MESSAGE(Router::HeaderParser::configure(route.request_headers_to_add()),
-                             EnvoyException,
-                             testing::HasSubstr("are set for the header key: static-header"));
+  EXPECT_THAT_THROWS_MESSAGE(
+      Router::HeaderParser::configure(route.request_headers_to_add()), EnvoyException,
+      "Both the `append` and `append_action` fields are set for the header key: static-header");
 }
 
 TEST(HeaderParserTest, EvaluateHeadersWithAppendActions) {

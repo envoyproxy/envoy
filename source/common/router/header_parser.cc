@@ -304,27 +304,28 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   for (const auto& [key, entry] : headers_to_add_) {
     const std::string value =
         stream_info != nullptr ? entry.formatter_->format(*stream_info) : entry.original_value_;
+    // We don't have to proceed further if the value is empty.
+    if (value.empty()) {
+      continue;
+    }
+
     switch (entry.formatter_->appendAction()) {
     case envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT:
       // Check whether the header already exist or not. We only
       // need to add the header if it doesn't already exist.
-      if (headers.get(key).empty() && !value.empty()) {
+      if (headers.get(key).empty()) {
         headers.setReferenceKey(key, value);
       }
       break;
     case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS:
       // Append the new value to the existing values if the header
       // already exist otherwise simply add the key-value pair.
-      if (!value.empty()) {
-        headers.addReferenceKey(key, value);
-      }
+      headers.addReferenceKey(key, value);
       break;
     case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS:
       // Overwrite the new value by discarding any existing values if the
       // header already exist otherwise simply add the key-value pair.
-      if (!value.empty()) {
-        headers.setReferenceKey(key, value);
-      }
+      headers.setReferenceKey(key, value);
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -342,26 +343,25 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
       value = entry.formatter_->format(stream_info);
     }
 
+    // We don't have to proceed further if the value is empty.
+    if (value.empty()) {
+      continue;
+    }
+
     switch (entry.formatter_->appendAction()) {
     case envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT:
       // Headers to be appended if it doesn't already exist.
-      if (!value.empty()) {
-        transforms.headers_to_add_if_absent.push_back({key, value});
-      }
+      transforms.headers_to_add_if_absent.push_back({key, value});
       break;
     case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS:
       // Headers on which the new value needs to be appended
       // to the existing values if the header already exists.
-      if (!value.empty()) {
-        transforms.headers_to_append_if_exist.push_back({key, value});
-      }
+      transforms.headers_to_append_if_exist.push_back({key, value});
       break;
     case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS:
       // Headers on which the new value needs to be overwritten by
       // discarding any existing values if the header already exists.
-      if (!value.empty()) {
-        transforms.headers_to_overwrite_if_exist.push_back({key, value});
-      }
+      transforms.headers_to_overwrite_if_exist.push_back({key, value});
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;

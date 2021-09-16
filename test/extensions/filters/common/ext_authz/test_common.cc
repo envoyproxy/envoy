@@ -96,7 +96,10 @@ HeaderValueOptionVector TestCommon::makeHeaderValueOption(KeyValueOptionVector&&
     auto* mutable_header = header_value_option.mutable_header();
     mutable_header->set_key(header.key);
     mutable_header->set_value(header.value);
-    header_value_option.mutable_append()->set_value(header.append);
+    if (!header.append) {
+      header_value_option.set_append_action(
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+    }
     header_option_vector.push_back(header_value_option);
   }
   return header_option_vector;

@@ -335,11 +335,11 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
         auto add1 = headers_mut->add_set_headers();
         add1->mutable_header()->set_key("x-new-header");
         add1->mutable_header()->set_value("new");
-        add1->mutable_append()->set_value(false);
+        add1->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
         auto add2 = headers_mut->add_set_headers();
         add2->mutable_header()->set_key("x-some-other-header");
         add2->mutable_header()->set_value("no");
-        add2->mutable_append()->set_value(true);
+        add2->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
         *headers_mut->add_remove_headers() = "x-do-we-want-this";
       });
 
@@ -426,11 +426,11 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_value("text/plain");
   auto* hdr2 = immediate_headers->add_set_headers();
-  hdr2->mutable_append()->set_value(true);
+  hdr2->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
   hdr2->mutable_header()->set_key("x-another-thing");
   hdr2->mutable_header()->set_value("1");
   auto* hdr3 = immediate_headers->add_set_headers();
-  hdr3->mutable_append()->set_value(true);
+  hdr3->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
   hdr3->mutable_header()->set_key("x-another-thing");
   hdr3->mutable_header()->set_value("2");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
