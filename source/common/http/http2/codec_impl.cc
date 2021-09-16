@@ -992,6 +992,7 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
 
   case NGHTTP2_HEADERS:
   case NGHTTP2_DATA: {
+    StreamImpl* stream = getStream(frame->hd.stream_id);
     stream->local_end_stream_sent_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
     break;
   }
