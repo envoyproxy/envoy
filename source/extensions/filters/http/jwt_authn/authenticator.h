@@ -19,7 +19,8 @@ using AuthenticatorPtr = std::unique_ptr<Authenticator>;
 
 using AuthenticatorCallback = std::function<void(const ::google::jwt_verify::Status& status)>;
 
-using SetExtractedJwtDataCallback = std::function<void(const std::string&, const ProtobufWkt::Struct&)>;
+using SetExtractedJwtDataCallback =
+    std::function<void(const std::string&, const ProtobufWkt::Struct&)>;
 
 /**
  *  Authenticator object to handle all JWT authentication flow.
@@ -32,7 +33,8 @@ public:
   // extract_param.
   virtual void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
                       std::vector<JwtLocationConstPtr>&& tokens,
-                      SetExtractedJwtDataCallback set_payload_cb, SetExtractedJwtDataCallback set_header_cb,
+                      SetExtractedJwtDataCallback set_payload_cb,
+                      SetExtractedJwtDataCallback set_header_cb,
                       AuthenticatorCallback callback) PURE;
 
   // Called when the object is about to be destroyed.
