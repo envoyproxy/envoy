@@ -57,12 +57,22 @@ public:
 
   // Add a pair of (name, payload), called by Authenticator
   void addPayload(const std::string& name, const ProtobufWkt::Struct& payload) {
-    *(*payload_.mutable_fields())[name].mutable_struct_value() = payload;
+    *(*jwt_payload_.mutable_fields())[name].mutable_struct_value() = payload;
   }
 
-  void setPayload() {
-    if (!payload_.fields().empty()) {
-      callback_->setPayload(payload_);
+  // Add a pair of (name, header), called by Authenticator.
+  void addHeader(const std::string& name, const ProtobufWkt::Struct& header) {
+    *(*jwt_header_.mutable_fields())[name].mutable_struct_value() = header;
+  }
+
+  void setPayloadAndHeader() {
+    const bool jwt_header_is_set = !jwt_header_.fields().empty();
+    if (!jwt_payload_.fields().empty() || jwt_header_is_set) {
+      // If header is not empty, merge it with the payload.
+      if (jwt_header_is_set) {
+        jwt_payload_.MergeFrom(jwt_header_);
+      }
+      callback_->setPayload(jwt_payload_);
     }
   }
 
@@ -72,7 +82,8 @@ private:
   Verifier::Callbacks* callback_;
   absl::node_hash_map<const Verifier*, CompletionState> completion_states_;
   std::vector<AuthenticatorPtr> auths_;
-  ProtobufWkt::Struct payload_;
+  ProtobufWkt::Struct jwt_payload_;
+  ProtobufWkt::Struct jwt_header_;
 };
 
 // base verifier for provider_name, provider_and_audiences, and allow_missing_or_failed.
@@ -88,7 +99,7 @@ public:
     }
 
     if (Status::Ok == status) {
-      context.setPayload();
+      context.setPayloadAndHeader();
     }
     context.callback()->onComplete(status);
     context.cancel();
@@ -125,6 +136,9 @@ public:
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
         [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
           ctximpl.addPayload(name, payload);
+        },
+        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& header) {
+          ctximpl.addHeader(name, header);
         },
         [this, context](const Status& status) {
           onComplete(status, static_cast<ContextImpl&>(*context));
@@ -177,6 +191,9 @@ public:
         [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
           ctximpl.addPayload(name, payload);
         },
+        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& header) {
+          ctximpl.addHeader(name, header);
+        },
         [this, context](const Status& status) {
           onComplete(status, static_cast<ContextImpl&>(*context));
         });
@@ -211,6 +228,9 @@ public:
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
         [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
           ctximpl.addPayload(name, payload);
+        },
+        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& header) {
+          ctximpl.addHeader(name, header);
         },
         [this, context](const Status& status) {
           onComplete(status, static_cast<ContextImpl&>(*context));

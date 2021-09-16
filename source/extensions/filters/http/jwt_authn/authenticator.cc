@@ -45,8 +45,8 @@ public:
   void onJwksError(Failure reason) override;
   // Following functions are for Authenticator interface
   void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
-              std::vector<JwtLocationConstPtr>&& tokens, SetPayloadCallback set_payload_cb,
-              AuthenticatorCallback callback) override;
+              std::vector<JwtLocationConstPtr>&& tokens, SetExtractedJwtDataCallback set_payload_cb,
+              SetExtractedJwtDataCallback set_headers_cb, AuthenticatorCallback callback) override;
   void onDestroy() override;
 
   TimeSource& timeSource() { return time_source_; }
@@ -91,7 +91,9 @@ private:
   // The active span for the request
   Tracing::Span* parent_span_{&Tracing::NullSpan::instance()};
   // the callback function to set payload
-  SetPayloadCallback set_payload_cb_;
+  SetExtractedJwtDataCallback set_payload_cb_;
+  // the callback function to set JWT headers.
+  SetExtractedJwtDataCallback set_header_cb_;
   // The on_done function.
   AuthenticatorCallback callback_;
   // check audience object.
@@ -119,12 +121,15 @@ std::string AuthenticatorImpl::name() const {
 
 void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
                                std::vector<JwtLocationConstPtr>&& tokens,
-                               SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
+                               SetExtractedJwtDataCallback set_payload_cb,
+                               SetExtractedJwtDataCallback set_headers_cb,
+                               AuthenticatorCallback callback) {
   ASSERT(!callback_);
   headers_ = &headers;
   parent_span_ = &parent_span;
   tokens_ = std::move(tokens);
   set_payload_cb_ = std::move(set_payload_cb);
+  set_header_cb_ = std::move(set_headers_cb);
   callback_ = std::move(callback);
 
   ENVOY_LOG(debug, "{}: JWT authentication starts (allow_failed={}), tokens size={}", name(),
@@ -293,6 +298,9 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
   }
   if (set_payload_cb_ && !provider.payload_in_metadata().empty()) {
     set_payload_cb_(provider.payload_in_metadata(), jwt_->payload_pb_);
+  }
+  if (set_header_cb_ && !provider.header_in_metadata().empty()) {
+    set_header_cb_(provider.header_in_metadata(), jwt_->header_pb_);
   }
   if (provider_ && !cache_hit) {
     // move the ownership of "owned_jwt_" into the function.

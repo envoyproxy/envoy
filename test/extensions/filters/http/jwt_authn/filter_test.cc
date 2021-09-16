@@ -72,7 +72,6 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   std::unique_ptr<Filter> filter_;
   std::unique_ptr<MockVerifier> mock_verifier_;
-  NiceMock<MockVerifierCallbacks> verifier_callback_;
   Http::TestRequestTrailerMapImpl trailers_;
   std::shared_ptr<NiceMock<Envoy::Router::MockRoute>> mock_route_;
   std::shared_ptr<PerRouteFilterConfig> per_route_config_;

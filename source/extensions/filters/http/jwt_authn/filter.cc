@@ -101,6 +101,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 void Filter::setPayload(const ProtobufWkt::Struct& payload) {
+  std::cerr << "SET PAYLOAD\n";
   decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.jwt_authn", payload);
 }
 
