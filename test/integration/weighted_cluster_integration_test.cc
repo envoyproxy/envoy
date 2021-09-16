@@ -124,8 +124,8 @@ TEST_F(WeightedClusterIntegrationTest, SteerTrafficToOneClusterWithHeader) {
   // Set the deterministic value to the accumulation of the weights of all clusters with
   // `name`, so we can route the traffic to the first cluster with `cluster_header` based on
   // weighted cluster selection algorithm in `RouteEntryImplBase::pickWeightedCluster()`.
-  uint64_t deterministric_value = std::accumulate(
-      default_weights.begin(), default_weights.begin() + cluster_header_index, 0UL);
+  uint64_t deterministric_value =
+      std::accumulate(default_weights.begin(), default_weights.begin() + cluster_header_index, 0UL);
   setDeterministicValue(deterministric_value);
 
   initializeConfig(default_weights);
