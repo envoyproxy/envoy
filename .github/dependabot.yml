@@ -37,16 +37,6 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/deprecate_features"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/deprecate_version"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/ci/flaky_test"
   schedule:
     interval: "daily"
