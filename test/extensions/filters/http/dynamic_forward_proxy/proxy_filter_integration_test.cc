@@ -173,6 +173,20 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }
 
+TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) {
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority", "www.dsadlsajdkslajdks.com"}};
+
+  auto response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
 // Verify that after we populate the cache and reload the cluster we reattach to the cache with
 // its existing hosts.
 TEST_P(ProxyFilterIntegrationTest, ReloadClusterAndAttachToCache) {
