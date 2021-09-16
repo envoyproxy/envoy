@@ -2,14 +2,6 @@
 #
 # bazel run //tools/deprecate_version:deprecate_version
 #
-# Direct usage (not recommended):
-#
-# python tools/deprecate_version/deprecate_version.py
-#
-# e.g
-#
-#  python tools/deprecate_version/deprecate_version.py
-#
 # A GitHub access token must be set in GITHUB_TOKEN. To create one, go to
 # Settings -> Developer settings -> Personal access tokens in GitHub and create
 # a token with public_repo scope. Keep this safe, it's broader than it needs to
