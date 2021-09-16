@@ -12,8 +12,8 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/barrier.h"
 #include "absl/synchronization/blocking_counter.h"
-#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -45,38 +45,28 @@ public:
   virtual ~MultiThreadTest() = default;
 
   void postWorkToAllWorkers(std::function<void()> work) {
-    absl::BlockingCounter start_counter(num_threads_);
+    absl::Barrier start_barrier(num_threads_);
     absl::BlockingCounter end_counter(num_threads_);
-    absl::Notification workers_should_fire;
 
     ASSERT(worker_dispatchers_.size() == num_threads_);
     for (Event::DispatcherPtr& dispatcher : worker_dispatchers_) {
       dispatcher->post([&, work]() {
-        start_counter.DecrementCount();
-        // Wait for signal from main thread.
-        workers_should_fire.WaitForNotification();
+        start_barrier.Block();
         work();
         end_counter.DecrementCount();
       });
     }
-
-    main_dispatcher_->post([&]() {
-      // Wait until all the workers start to execute the callback.
-      start_counter.Wait();
-      // Notify all the worker to continue.
-      workers_should_fire.Notify();
-    });
     // Wait for all workers to finish the job.
     end_counter.Wait();
   }
 
   void postWorkToMain(std::function<void()> work) {
-    absl::Notification block_until_job_finish;
-    main_dispatcher_->post([work, &block_until_job_finish]() {
+    absl::BlockingCounter end_counter(1);
+    main_dispatcher_->post([work, &end_counter]() {
       work();
-      block_until_job_finish.Notify();
+      end_counter.DecrementCount();
     });
-    block_until_job_finish.WaitForNotification();
+    end_counter.Wait();
   }
 
 protected:
@@ -108,7 +98,6 @@ protected:
 private:
   void spawnMainThread() {
     main_dispatcher_ = api_->allocateDispatcher("main_thread");
-
     main_thread_ = api_->threadFactory().createThread([this]() {
       tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
       tls().registerThread(*main_dispatcher_, true);
