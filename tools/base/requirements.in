@@ -7,6 +7,7 @@ envoy.code_format.python_check>=0.0.4
 envoy.dependency.pip_check>=0.0.4
 envoy.distribution.release
 envoy.distribution.verify
+envoy.docs.sphinx-runner>=0.0.3
 envoy.gpg.sign
 flake8
 frozendict
