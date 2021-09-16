@@ -156,6 +156,9 @@ void ProxyFilter::addHostAddressToFilterState(
     return;
   }
 
+  // `onLoadDnsCacheComplete` is called by DNS cache on first resolution even if there was a
+  // resolution failure (null address). This check makes sure that we do not add null address to
+  // FilterState when this happens.
   if (!address) {
     ENVOY_STREAM_LOG(debug, "Cannot add address to filter state: invalid address",
                      *decoder_callbacks_);
