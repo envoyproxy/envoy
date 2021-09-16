@@ -1,3 +1,4 @@
+CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["@envoy//:contrib_library"]
 EXTENSION_CONFIG_VISIBILITY = ["//visibility:public"]
 EXTENSION_PACKAGE_VISIBILITY = ["//visibility:public"]
 EXTENSIONS = {
