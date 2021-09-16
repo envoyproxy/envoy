@@ -15,7 +15,7 @@ def generate_main_code(type, main_header_file, resolver_cc_file, metrics_header_
   - resolver_cc_file - contains request api key & version mapping to deserializer (from header file)
   - metrics_header_file - contains metrics with names corresponding to messages
   """
-    processor = StatefulProcessor()
+    processor = StatefulProcessor(type)
     # Parse provided input files.
     messages = processor.parse_messages(input_files)
 
@@ -66,7 +66,7 @@ def generate_test_code(
   - codec_test_cc_file - tests involving codec and Request/ResponseParserResolver,
   - utilities_cc_file - utilities for creating sample messages.
   """
-    processor = StatefulProcessor()
+    processor = StatefulProcessor(type)
     # Parse provided input files.
     messages = processor.parse_messages(input_files)
 
@@ -97,7 +97,8 @@ class StatefulProcessor:
   AlterConfigsResource, what would cause a compile-time error if we were to handle it trivially).
   """
 
-    def __init__(self):
+    def __init__(self, type):
+        self.type = type
         # Complex types that have been encountered during processing.
         self.known_types = set()
         # Name of parent message type that's being processed right now.
@@ -204,7 +205,9 @@ class StatefulProcessor:
                 child = self.parse_field(child_field, versions[-1])
                 if child is not None:
                     fields.append(child)
-
+            # Some structures share the same name, use request/response as prefix.
+            if type_name in ['EntityData', 'EntryData', 'PartitionData', 'TopicData']:
+                type_name = self.type.capitalize() + type_name
             # Some of the types repeat multiple times (e.g. AlterableConfig).
             # In such a case, every second or later occurrence of the same name is going to be prefixed
             # with parent type, e.g. we have AlterableConfig (for AlterConfigsRequest) and then

@@ -163,7 +163,8 @@ public:
 /**
  * Deserializer for Kafka Float64 type.
  * Reference: https://kafka.apache.org/28/protocol.html#protocol_types
- * Represents a double-precision 64-bit format IEEE 754 value. The values are encoded using eight bytes in network byte order (big-endian).
+ * Represents a double-precision 64-bit format IEEE 754 value. The values are encoded using eight
+ * bytes in network byte order (big-endian).
  */
 class Float64Deserializer : public IntDeserializer<double> {
 public:
@@ -880,7 +881,8 @@ private:
 
 /**
  * Kafka UUID is basically two longs, so we are going to keep model them the same way.
- * Reference: https://github.com/apache/kafka/blob/2.8.0/clients/src/main/java/org/apache/kafka/common/Uuid.java#L38
+ * Reference:
+ * https://github.com/apache/kafka/blob/2.8.0/clients/src/main/java/org/apache/kafka/common/Uuid.java#L38
  */
 class UuidDeserializer : public Deserializer<Uuid> {
 public:
@@ -1012,6 +1014,7 @@ template <typename T> inline uint32_t EncodingContext::computeSize(const T& arg)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(bool)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(int8_t)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(int16_t)
+COMPUTE_SIZE_OF_NUMERIC_TYPE(uint16_t)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(int32_t)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(uint32_t)
 COMPUTE_SIZE_OF_NUMERIC_TYPE(int64_t)
@@ -1071,7 +1074,9 @@ inline uint32_t EncodingContext::computeSize(const NullableArray<T>& arg) const 
   return arg ? computeSize(*arg) : sizeof(int32_t);
 }
 
-// FIXME
+/**
+ * Template overload for Uuid.
+ */
 template <> inline uint32_t EncodingContext::computeSize(const Uuid&) const {
   return 2 * sizeof(uint64_t);
 }
@@ -1188,6 +1193,7 @@ template <> inline uint32_t EncodingContext::encode(const int8_t& arg, Buffer::I
   }
 
 ENCODE_NUMERIC_TYPE(int16_t, htobe16);
+ENCODE_NUMERIC_TYPE(uint16_t, htobe16);
 ENCODE_NUMERIC_TYPE(int32_t, htobe32);
 ENCODE_NUMERIC_TYPE(uint32_t, htobe32);
 ENCODE_NUMERIC_TYPE(int64_t, htobe64);
@@ -1298,6 +1304,9 @@ uint32_t EncodingContext::encode(const NullableArray<T>& arg, Buffer::Instance& 
   }
 }
 
+/**
+ * Template overload for Uuid.
+ */
 template <> inline uint32_t EncodingContext::encode(const Uuid& arg, Buffer::Instance& dst) {
   uint32_t result = 0;
   result += encode(arg.msb_, dst);
