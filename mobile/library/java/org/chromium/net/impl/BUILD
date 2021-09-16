@@ -50,8 +50,6 @@ android_library(
         "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
         "//library/java/org/chromium/net",
         "//library/java/org/chromium/net/urlconnection",
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         artifact("androidx.annotation:annotation"),
     ],
 )

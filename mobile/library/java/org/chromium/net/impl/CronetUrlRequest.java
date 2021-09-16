@@ -6,12 +6,9 @@ import android.os.Build;
 import android.util.Log;
 import androidx.annotation.GuardedBy;
 import androidx.annotation.IntDef;
-import io.envoyproxy.envoymobile.RequestHeaders;
-import io.envoyproxy.envoymobile.RequestHeadersBuilder;
-import io.envoyproxy.envoymobile.RequestMethod;
-import io.envoyproxy.envoymobile.ResponseHeaders;
-import io.envoyproxy.envoymobile.Stream;
-import io.envoyproxy.envoymobile.UpstreamHttpProtocol;
+import io.envoyproxy.envoymobile.engine.EnvoyHTTPStream;
+import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
+import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.net.MalformedURLException;
@@ -24,6 +21,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -122,7 +120,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
   @StatusValues private volatile int mAdditionalStatusDetails = Status.INVALID;
 
   /* These change with redirects. */
-  private Stream mStream;
+  private EnvoyHTTPStream mStream;
   private PausableSerializingExecutor mEnvoyCallbackExecutor;
   private String mCurrentUrl;
   private UrlResponseInfoImpl mUrlResponseInfo;
@@ -278,7 +276,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
 
     @Override
     protected void finishEmptyBody() {
-      mStream.close(EMPTY_BYTE_BUFFER);
+      mStream.sendData(EMPTY_BYTE_BUFFER, /* endStream= */ true);
     }
 
     @Override
@@ -288,11 +286,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
         // copied to the correct size.
         buffer = ByteBuffer.allocateDirect(buffer.remaining()).put(buffer);
       }
-      if (finalChunk) {
-        mStream.close(buffer);
-      } else {
-        mStream.sendData(buffer);
-      }
+      mStream.sendData(buffer, finalChunk);
       return buffer.capacity();
     }
 
@@ -328,6 +322,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
       if (mCancelCalled.compareAndSet(false, true)) {
         if (mStream != null) {
           mStream.cancel();
+          mStream = null;
         }
       }
       fireCloseUploadDataProvider();
@@ -397,14 +392,14 @@ public final class CronetUrlRequest extends UrlRequestBase {
     });
   }
 
-  private void onResponseHeaders(ResponseHeaders responseHeaders, boolean lastCallback) {
+  private void onResponseHeaders(Map<String, List<String>> responseHeaders, boolean lastCallback) {
     mAdditionalStatusDetails = Status.WAITING_FOR_RESPONSE;
     if (mState.get() == State.CANCELLED) {
       return;
     }
     final List<Map.Entry<String, String>> headerList = new ArrayList<>();
     String selectedTransport = "unknown";
-    Set<Map.Entry<String, List<String>>> headers = responseHeaders.allHeaders().entrySet();
+    Set<Map.Entry<String, List<String>>> headers = responseHeaders.entrySet();
 
     for (Map.Entry<String, List<String>> headerEntry : headers) {
       String headerKey = headerEntry.getKey();
@@ -421,8 +416,9 @@ public final class CronetUrlRequest extends UrlRequestBase {
         }
       }
     }
+    List<String> statuses = responseHeaders.get(":status");
     int responseCode =
-        responseHeaders.getHttpStatus() == null ? -1 : responseHeaders.getHttpStatus();
+        statuses != null && !statuses.isEmpty() ? Integer.valueOf(statuses.get(0)) : -1;
     // Important to copy the list here, because although we never concurrently modify
     // the list ourselves, user code might iterate over it while we're redirecting, and
     // that would throw ConcurrentModificationException.
@@ -439,6 +435,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
           mStream.cancel(); // This is not technically needed.
           // This deals with unwanted "setOnResponseData" callbacks. By API contract, response body
           // on a redirect is to be silently ignored.
+          mStream = null;
           mEnvoyCallbackExecutor.shutdown();
         }
         fireRedirectReceived(locationFields.get(0));
@@ -478,9 +475,9 @@ public final class CronetUrlRequest extends UrlRequestBase {
 
   private void fireOpenConnection() {
     if (mInitialMethod == null) {
-      mInitialMethod = RequestMethod.GET.name();
+      mInitialMethod = "GET";
     }
-    RequestHeaders envoyRequestHeaders =
+    Map<String, List<String>> envoyRequestHeaders =
         buildEnvoyRequestHeaders(mInitialMethod, mRequestHeaders, mUploadDataProvider, mUserAgent,
                                  mCurrentUrl, mCronvoyEngine.getBuilder().http2Enabled());
     // The envoyCallbackExecutor is tied to the life cycle of the stream. If the stream is not
@@ -497,37 +494,53 @@ public final class CronetUrlRequest extends UrlRequestBase {
       // Note: none of these "callbacks" are getting executed immediately. The envoyCallbackExecutor
       // is in reality a task scheduler. The execution of these tasks are serialized - concurrency
       // issues should not be a concern here.
-      mStream = mCronvoyEngine.getEnvoyEngine()
-                    .streamClient()
-                    .newStreamPrototype()
-                    .setOnResponseHeaders((responseHeaders, lastCallback, ignored) -> {
-                      onResponseHeaders(responseHeaders, lastCallback);
-                      return null;
-                    })
-                    .setOnResponseData((data, lastCallback, ignored) -> {
-                      mEnvoyCallbackExecutor.pause();
-                      mEndStream = lastCallback;
-                      if (!mMostRecentBufferRead.compareAndSet(null, data)) {
-                        throw new IllegalStateException("mostRecentBufferRead should be clear.");
-                      }
-                      processReadResult();
-                      return null;
-                    })
-                    .setOnError((error, ignored) -> {
-                      String message = "failed with error after " + error.getAttemptCount() +
-                                       " attempts. Message=[" + error.getMessage() + "] Code=[" +
-                                       error.getErrorCode() + "]";
-                      Throwable throwable = new CronetExceptionImpl(message, error.getCause());
-                      mCronvoyExecutor.execute(() -> enterCronetErrorState(throwable));
-                      return null;
-                    })
-                    .setOnCancel((ignored) -> {
-                      mCancelCalled.set(true);
-                      cancel();
-                      return null;
-                    })
-                    .start(mEnvoyCallbackExecutor)
-                    .sendHeaders(envoyRequestHeaders, mUploadDataProvider == null);
+      mStream = mCronvoyEngine.getEnvoyEngine().startStream(new EnvoyHTTPCallbacks() {
+        private EnvoyHTTPStream attachedStream;
+
+        @Override
+        public Executor getExecutor() {
+          return mEnvoyCallbackExecutor;
+        }
+
+        @Override
+        public void onHeaders(Map<String, List<String>> headers, boolean endStream,
+                              EnvoyStreamIntel streamIntel) {
+          attachedStream = mStream;
+          onResponseHeaders(headers, endStream);
+        }
+
+        @Override
+        public void onData(ByteBuffer data, boolean endStream, EnvoyStreamIntel streamIntel) {
+          if (attachedStream != mStream) {
+            return;
+          }
+          mEnvoyCallbackExecutor.pause();
+          mEndStream = endStream;
+          if (!mMostRecentBufferRead.compareAndSet(null, data)) {
+            throw new IllegalStateException("mostRecentBufferRead should be clear.");
+          }
+          processReadResult();
+        }
+
+        @Override
+        public void onTrailers(Map<String, List<String>> trailers, EnvoyStreamIntel streamIntel) {}
+
+        @Override
+        public void onError(int errorCode, String message, int attemptCount,
+                            EnvoyStreamIntel streamIntel) {
+          String errorMessage = "failed with error after " + attemptCount + " attempts. Message=[" +
+                                message + "] Code=[" + errorCode + "]";
+          Throwable throwable = new CronetExceptionImpl(errorMessage, /* cause= */ null);
+          mCronvoyExecutor.execute(() -> enterCronetErrorState(throwable));
+        }
+
+        @Override
+        public void onCancel(EnvoyStreamIntel streamIntel) {
+          mCancelCalled.set(true);
+          cancel();
+        }
+      }, false);
+      mStream.sendHeaders(envoyRequestHeaders, mUploadDataProvider == null);
       if (mUploadDataProvider != null) {
         mOutputStreamDataSink = new OutputStreamDataSink();
         // If this is not the first time, then UploadDataProvider.rewind() will be invoked first.
@@ -536,20 +549,21 @@ public final class CronetUrlRequest extends UrlRequestBase {
     }));
   }
 
-  private static RequestHeaders buildEnvoyRequestHeaders(String initialMethod,
-                                                         HeadersList headersList,
-                                                         UploadDataProvider uploadDataProvider,
-                                                         String userAgent, String currentUrl,
-                                                         boolean isHttp2Enabled) {
+  private static Map<String, List<String>>
+  buildEnvoyRequestHeaders(String initialMethod, HeadersList headersList,
+                           UploadDataProvider uploadDataProvider, String userAgent,
+                           String currentUrl, boolean isHttp2Enabled) {
+    Map<String, List<String>> headers = new LinkedHashMap<>();
     final URL url;
     try {
       url = new URL(currentUrl);
     } catch (MalformedURLException e) {
       throw new IllegalArgumentException("Invalid URL", e);
     }
-    RequestMethod requestMethod = RequestMethod.valueOf(initialMethod);
-    RequestHeadersBuilder requestHeadersBuilder = new RequestHeadersBuilder(
-        requestMethod, url.getProtocol(), url.getAuthority(), url.getFile());
+    headers.computeIfAbsent(":authority", unused -> new ArrayList<>()).add(url.getAuthority());
+    headers.computeIfAbsent(":method", unused -> new ArrayList<>()).add(initialMethod);
+    headers.computeIfAbsent(":path", unused -> new ArrayList<>()).add(url.getFile());
+    headers.computeIfAbsent(":scheme", unused -> new ArrayList<>()).add(url.getProtocol());
     boolean hasUserAgent = false;
     boolean hasContentType = false;
     for (Map.Entry<String, String> header : headersList) {
@@ -557,19 +571,20 @@ public final class CronetUrlRequest extends UrlRequestBase {
                      (header.getKey().equalsIgnoreCase(USER_AGENT) && !header.getValue().isEmpty());
       hasContentType = hasContentType || (header.getKey().equalsIgnoreCase(CONTENT_TYPE) &&
                                           !header.getValue().isEmpty());
-      requestHeadersBuilder.add(header.getKey(), header.getValue());
+      headers.computeIfAbsent(header.getKey(), unused -> new ArrayList<>()).add(header.getValue());
     }
     if (!hasUserAgent) {
-      requestHeadersBuilder.add(USER_AGENT, userAgent);
+      headers.computeIfAbsent(USER_AGENT, unused -> new ArrayList<>()).add(userAgent);
     }
     if (!hasContentType && uploadDataProvider != null) {
       throw new IllegalArgumentException("Requests with upload data must have a Content-Type.");
     }
-    UpstreamHttpProtocol protocol = isHttp2Enabled && url.getProtocol().equalsIgnoreCase("https")
-                                        ? UpstreamHttpProtocol.HTTP2
-                                        : UpstreamHttpProtocol.HTTP1;
-    requestHeadersBuilder.addUpstreamHttpProtocol(protocol);
-    return requestHeadersBuilder.build();
+    String protocol =
+        isHttp2Enabled && url.getProtocol().equalsIgnoreCase("https") ? "http2" : "http1";
+
+    headers.computeIfAbsent("x-envoy-mobile-upstream-protocol", unused -> new ArrayList<>())
+        .add(protocol);
+    return headers;
   }
 
   private Runnable errorSetting(final CheckedRunnable delegate) {
