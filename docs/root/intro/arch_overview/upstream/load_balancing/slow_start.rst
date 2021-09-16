@@ -21,7 +21,7 @@ where,
 
 .. math::
 
-  TimeFactor = \frac{max(TimeSinceStartInSeconds,1)}{SlowStartWindowInSeconds} 
+  TimeFactor = \frac{max(TimeSinceStartInSeconds,1)}{SlowStartWindowInSeconds}
 
 As time progresses, more and more traffic would be sent to endpoint within slow start window.
 
