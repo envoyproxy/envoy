@@ -1,8 +1,10 @@
 #include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.h"
 #include "envoy/http/codes.h"
 
 #include "source/common/http/utility.h"
@@ -15,6 +17,26 @@ namespace LocalRateLimitFilter {
 
 const std::string& PerConnectionRateLimiter::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "per_connection_local_rate_limiter");
+}
+
+LocalRateLimitRequestDescriptorsQueue::LocalRateLimitRequestDescriptorsQueue()
+    : request_descriptors_queue_(
+          std::queue<absl::optional<absl::Span<const RateLimit::LocalDescriptor>>>()) {}
+
+void LocalRateLimitRequestDescriptorsQueue::push(
+    absl::optional<absl::Span<const RateLimit::LocalDescriptor>>& request_descriptors) {
+  request_descriptors_queue_.push(request_descriptors);
+}
+
+absl::optional<absl::Span<const RateLimit::LocalDescriptor>>
+LocalRateLimitRequestDescriptorsQueue::pop() {
+  auto request_descriptors = std::move(request_descriptors_queue_.front());
+  request_descriptors_queue_.pop();
+  return request_descriptors;
+}
+
+const std::string& LocalRateLimitRequestDescriptorsQueue::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "local_rate_limit_requestdescriptors_queue");
 }
 
 FilterConfig::FilterConfig(
@@ -47,7 +69,10 @@ FilterConfig::FilterConfig(
       request_headers_parser_(Envoy::Router::HeaderParser::configure(
           config.request_headers_to_add_when_not_enforced())),
       stage_(static_cast<uint64_t>(config.stage())),
-      has_descriptors_(!config.descriptors().empty()) {
+      has_descriptors_(!config.descriptors().empty()),
+      enable_x_rate_limit_headers_(
+          config.enable_x_ratelimit_headers() ==
+          envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit::DRAFT_VERSION_03) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token
@@ -61,6 +86,21 @@ FilterConfig::FilterConfig(
 bool FilterConfig::requestAllowed(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
   return rate_limiter_.requestAllowed(request_descriptors);
+}
+
+uint32_t
+FilterConfig::maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
+  return rate_limiter_.maxTokens(request_descriptors);
+}
+
+uint32_t FilterConfig::remainingTokens(
+    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
+  return rate_limiter_.remainingTokens(request_descriptors);
+}
+
+uint32_t FilterConfig::remainingFillInterval(
+    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
+  return rate_limiter_.remainingFillInterval(request_descriptors);
 }
 
 LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -79,16 +119,17 @@ bool FilterConfig::enforced() const {
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const auto* config = getConfig();
 
+  std::vector<RateLimit::LocalDescriptor> descriptors;
+  if (config->hasDescriptors()) {
+    populateDescriptors(descriptors, headers);
+  }
+  pushRequestDescriptors(descriptors);
+
   if (!config->enabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
   config->stats().enabled_.inc();
-
-  std::vector<RateLimit::LocalDescriptor> descriptors;
-  if (config->hasDescriptors()) {
-    populateDescriptors(descriptors, headers);
-  }
 
   if (requestAllowed(descriptors)) {
     config->stats().ok_.inc();
@@ -115,11 +156,75 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
+Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
+  const auto* config = getConfig();
+
+  if (config->enableXRateLimitHeaders()) {
+    auto descriptors = decoder_callbacks_->streamInfo()
+                           .filterState()
+                           ->getDataMutable<LocalRateLimitRequestDescriptorsQueue>(
+                               LocalRateLimitRequestDescriptorsQueue::key())
+                           .pop();
+    if (descriptors.has_value()) {
+      auto limit = maxTokens(descriptors.value());
+      auto remaining = remainingTokens(descriptors.value());
+      auto reset = remainingFillInterval(descriptors.value());
+
+      headers.addCopy(Http::LowerCaseString{"ratelimit-limit"}, limit);
+      headers.addCopy(Http::LowerCaseString{"ratelimit-remaining"}, remaining);
+      headers.addCopy(Http::LowerCaseString{"ratelimit-reset"}, reset);
+    }
+  }
+
+  return Http::FilterHeadersStatus::Continue;
+}
+
 bool Filter::requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
   const auto* config = getConfig();
   return config->rateLimitPerConnection()
              ? getPerConnectionRateLimiter().requestAllowed(request_descriptors)
              : config->requestAllowed(request_descriptors);
+}
+
+uint32_t Filter::maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
+  const auto* config = getConfig();
+  return config->rateLimitPerConnection()
+             ? getPerConnectionRateLimiter().maxTokens(request_descriptors)
+             : config->maxTokens(request_descriptors);
+}
+
+uint32_t Filter::remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
+  const auto* config = getConfig();
+  return config->rateLimitPerConnection()
+             ? getPerConnectionRateLimiter().remainingTokens(request_descriptors)
+             : config->remainingTokens(request_descriptors);
+}
+
+uint32_t
+Filter::remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
+  const auto* config = getConfig();
+  return config->rateLimitPerConnection()
+             ? getPerConnectionRateLimiter().remainingFillInterval(request_descriptors)
+             : config->remainingFillInterval(request_descriptors);
+}
+
+void Filter::pushRequestDescriptors(
+    absl::optional<absl::Span<const RateLimit::LocalDescriptor>> request_descriptors) {
+  if (!decoder_callbacks_->streamInfo()
+           .filterState()
+           ->hasData<LocalRateLimitRequestDescriptorsQueue>(
+               LocalRateLimitRequestDescriptorsQueue::key())) {
+    decoder_callbacks_->streamInfo().filterState()->setData(
+        LocalRateLimitRequestDescriptorsQueue::key(),
+        std::make_unique<LocalRateLimitRequestDescriptorsQueue>(),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  }
+
+  decoder_callbacks_->streamInfo()
+      .filterState()
+      ->getDataMutable<LocalRateLimitRequestDescriptorsQueue>(
+          LocalRateLimitRequestDescriptorsQueue::key())
+      .push(request_descriptors);
 }
 
 const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionRateLimiter() {

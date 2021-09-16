@@ -1,5 +1,7 @@
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
+#include <chrono>
+
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -25,6 +27,7 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
   token_bucket_.tokens_per_fill_ = tokens_per_fill;
   token_bucket_.fill_interval_ = absl::FromChrono(fill_interval);
   tokens_.tokens_ = max_tokens;
+  tokens_.fill_time_ = time_source_.monotonicTime();
 
   if (fill_timer_) {
     fill_timer_->enableTimer(fill_interval);
@@ -68,6 +71,7 @@ LocalRateLimiterImpl::~LocalRateLimiterImpl() {
 
 void LocalRateLimiterImpl::onFillTimer() {
   onFillTimerHelper(tokens_, token_bucket_);
+  tokens_.fill_time_ = time_source_.monotonicTime();
   onFillTimerDescriptorHelper();
   fill_timer_->enableTimer(absl::ToChronoMilliseconds(token_bucket_.fill_interval_));
 }
@@ -134,6 +138,51 @@ bool LocalRateLimiterImpl::requestAllowed(
     }
   }
   return requestAllowedHelper(tokens_);
+}
+
+uint32_t LocalRateLimiterImpl::maxTokens(
+    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
+  if (!descriptors_.empty() && !request_descriptors.empty()) {
+    for (const auto& request_descriptor : request_descriptors) {
+      auto it = descriptors_.find(request_descriptor);
+      if (it != descriptors_.end()) {
+        return it->token_bucket_.max_tokens_;
+      }
+    }
+  }
+  return token_bucket_.max_tokens_;
+}
+
+uint32_t LocalRateLimiterImpl::remainingTokens(
+    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
+  if (!descriptors_.empty() && !request_descriptors.empty()) {
+    for (const auto& request_descriptor : request_descriptors) {
+      auto it = descriptors_.find(request_descriptor);
+      if (it != descriptors_.end()) {
+        return it->token_state_->tokens_.load(std::memory_order_relaxed);
+      }
+    }
+  }
+  return tokens_.tokens_.load(std::memory_order_relaxed);
+}
+
+uint32_t LocalRateLimiterImpl::remainingFillInterval(
+    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
+  using namespace std::literals;
+
+  if (!descriptors_.empty() && !request_descriptors.empty()) {
+    for (const auto& request_descriptor : request_descriptors) {
+      auto it = descriptors_.find(request_descriptor);
+      if (it != descriptors_.end()) {
+        return static_cast<uint32_t>(absl::ToInt64Seconds(
+            it->token_bucket_.fill_interval_ -
+            absl::Seconds((time_source_.monotonicTime() - it->token_state_->fill_time_) / 1s)));
+      }
+    }
+  }
+  return static_cast<uint32_t>(absl::ToInt64Seconds(
+      token_bucket_.fill_interval_ -
+      absl::Seconds((time_source_.monotonicTime() - tokens_.fill_time_) / 1s)));
 }
 
 } // namespace LocalRateLimit
