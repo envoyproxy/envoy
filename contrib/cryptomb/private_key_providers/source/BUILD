@@ -5,6 +5,10 @@ load(
     "envoy_cmake_external",
     "envoy_contrib_package",
 )
+load(
+    "//contrib:all_contrib_extensions.bzl",
+    "envoy_contrib_linux_x86_64_constraints",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -21,6 +25,7 @@ envoy_cmake_external(
     lib_source = "@com_github_intel_ipp_crypto_crypto_mb//:all",
     static_libraries = ["libcrypto_mb.a"],
     tags = ["skip_on_windows"],
+    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     visibility = ["//visibility:private"],
     working_directory = "sources/ippcp/crypto_mb",
     deps = ["@boringssl//:ssl"],
