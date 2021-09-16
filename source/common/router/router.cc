@@ -160,6 +160,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
     }
   }
   timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
+  timeout.per_try_idle_timeout_ = route.retryPolicy().perTryIdleTimeout();
 
   uint64_t header_timeout;
 
@@ -502,12 +503,33 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Fetch a connection pool for the upstream cluster.
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
 
-  if (upstream_http_protocol_options.has_value()) {
-    const auto parsed_authority = Http::Utility::parseAuthority(headers.getHostValue());
-    if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options.value().auto_sni()) {
+  if (upstream_http_protocol_options.has_value() &&
+      (upstream_http_protocol_options.value().auto_sni() ||
+       upstream_http_protocol_options.value().auto_san_validation())) {
+    // Default the header to Host/Authority header.
+    absl::string_view header_value = headers.getHostValue();
+
+    // Check whether `override_auto_sni_header` is specified.
+    const auto override_auto_sni_header =
+        upstream_http_protocol_options.value().override_auto_sni_header();
+    if (!override_auto_sni_header.empty()) {
+      // Use the header value from `override_auto_sni_header` to set the SNI value.
+      const auto overridden_header_value = Http::HeaderUtility::getAllOfHeaderAsString(
+          headers, Http::LowerCaseString(override_auto_sni_header));
+      if (overridden_header_value.result().has_value() &&
+          !overridden_header_value.result().value().empty()) {
+        header_value = overridden_header_value.result().value();
+      }
+    }
+    const auto parsed_authority = Http::Utility::parseAuthority(header_value);
+    bool should_set_sni = !parsed_authority.is_ip_address_;
+    // `host_` returns a string_view so doing this should be safe.
+    absl::string_view sni_value = parsed_authority.host_;
+
+    if (should_set_sni && upstream_http_protocol_options.value().auto_sni()) {
       callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamServerName::key(),
-          std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
+          std::make_unique<Network::UpstreamServerName>(sni_value),
           StreamInfo::FilterState::StateType::Mutable);
     }
 
@@ -515,7 +537,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamSubjectAltNames::key(),
           std::make_unique<Network::UpstreamSubjectAltNames>(
-              std::vector<std::string>{std::string(parsed_authority.host_)}),
+              std::vector<std::string>{std::string(sni_value)}),
           StreamInfo::FilterState::StateType::Mutable);
     }
   }
@@ -931,6 +953,7 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
         retry_state_->shouldHedgeRetryPerTryTimeout([this]() -> void { doRetry(); });
 
     if (retry_status == RetryStatus::Yes) {
+      runRetryOptionsPredicates(upstream_request);
       pending_retries_++;
 
       // Don't increment upstream_host->stats().rq_error_ here, we'll do that
@@ -948,13 +971,24 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
   }
 }
 
+void Filter::onPerTryIdleTimeout(UpstreamRequest& upstream_request) {
+  onPerTryTimeoutCommon(upstream_request, cluster_->stats().upstream_rq_per_try_idle_timeout_,
+                        StreamInfo::ResponseCodeDetails::get().UpstreamPerTryIdleTimeout);
+}
+
 void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
+  onPerTryTimeoutCommon(upstream_request, cluster_->stats().upstream_rq_per_try_timeout_,
+                        StreamInfo::ResponseCodeDetails::get().UpstreamPerTryTimeout);
+}
+
+void Filter::onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Counter& error_counter,
+                                   const std::string& response_code_details) {
   if (hedging_params_.hedge_on_per_try_timeout_) {
     onSoftPerTryTimeout(upstream_request);
     return;
   }
 
-  cluster_->stats().upstream_rq_per_try_timeout_.inc();
+  error_counter.inc();
   if (upstream_request.upstreamHost()) {
     upstream_request.upstreamHost()->stats().rq_timeout_.inc();
   }
@@ -972,8 +1006,7 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
 
   // Remove this upstream request from the list now that we're done with it.
   upstream_request.removeFromList(upstream_requests_);
-  onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout,
-                         StreamInfo::ResponseCodeDetails::get().UpstreamPerTryTimeout);
+  onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout, response_code_details);
 }
 
 void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
@@ -1071,6 +1104,7 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
   const RetryStatus retry_status =
       retry_state_->shouldRetryReset(reset_reason, [this]() -> void { doRetry(); });
   if (retry_status == RetryStatus::Yes) {
+    runRetryOptionsPredicates(upstream_request);
     pending_retries_++;
 
     if (upstream_request.upstreamHost()) {
@@ -1288,6 +1322,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
       const RetryStatus retry_status =
           retry_state_->shouldRetryHeaders(*headers, [this]() -> void { doRetry(); });
       if (retry_status == RetryStatus::Yes) {
+        runRetryOptionsPredicates(upstream_request);
         pending_retries_++;
         upstream_request.upstreamHost()->stats().rq_error_.inc();
         Http::CodeStats& code_stats = httpContext().codeStats();
@@ -1617,6 +1652,17 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
                                                           : Http::Headers::get().SchemeValues.Https,
                                                       "://", original_host, original_path));
   return true;
+}
+
+void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
+  for (const auto& options_predicate : route_entry_->retryPolicy().retryOptionsPredicates()) {
+    const Upstream::RetryOptionsPredicate::UpdateOptionsParameters parameters{
+        retriable_request.streamInfo(), upstreamSocketOptions()};
+    auto ret = options_predicate->updateOptions(parameters);
+    if (ret.new_upstream_socket_options_.has_value()) {
+      upstream_options_ = ret.new_upstream_socket_options_.value();
+    }
+  }
 }
 
 void Filter::doRetry() {

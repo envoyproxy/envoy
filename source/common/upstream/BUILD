@@ -107,6 +107,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "retry_factory_lib",
+    hdrs = ["retry_factory.h"],
+    deps = [
+        "//envoy/upstream:retry_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_pool_map",
     hdrs = ["conn_pool_map.h"],
     deps = [

@@ -11,7 +11,7 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
   // the probability will be very low, but the rapid retries prevent this from
   // increasing total test time.
   drain_time_ = std::chrono::seconds(100);
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
   absl::Notification drain_sequence_started;
@@ -45,7 +45,7 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
 TEST_P(DrainCloseIntegrationTest, DrainCloseImmediate) {
   drain_strategy_ = Server::DrainStrategy::Immediate;
   drain_time_ = std::chrono::seconds(100);
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
   absl::Notification drain_sequence_started;
