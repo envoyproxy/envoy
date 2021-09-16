@@ -1108,6 +1108,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "vpp-{version}",
         urls = ["https://github.com/FDio/vpp/archive/{version}.tar.gz"],
         use_category = ["other"],
+        extensions = ["envoy.network.socket_interface.vcl"],
         release_date = "2021-09-16",
         cpe = "N/A",
     ),

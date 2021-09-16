@@ -1,4 +1,4 @@
-.. _config_vcl_sock_interface:
+.. _config_sock_interface_vcl:
 
 VCL Socket Interface
 ====================
@@ -11,7 +11,7 @@ VCL Socket Interface
 
 This socket interface extension provides Envoy with high speed L2-L7 user space networking by integrating with `Link fd.io VPP <https://fd.io>`_ through VPP's Comms Library (VCL).
 
-The VCL socket interface is only included in :ref:`contrib images <install_contrib>
+The VCL socket interface is only included in :ref:`contrib images <install_contrib>`
 
 Example configuration
 ---------------------
