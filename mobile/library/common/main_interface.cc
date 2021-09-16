@@ -8,6 +8,7 @@
 #include "library/common/engine.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
 #include "library/common/http/client.h"
+#include "library/common/network/mobile_utility.h"
 #include "types/c_types.h"
 
 // NOLINT(namespace-envoy)
@@ -15,7 +16,6 @@
 static Envoy::EngineSharedPtr strong_engine_;
 static Envoy::EngineWeakPtr engine_;
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
-static std::atomic<envoy_network_t> preferred_network_{ENVOY_NET_GENERIC};
 
 static std::shared_ptr<Envoy::Engine> engine() {
   // TODO(goaway): enable configurable heap-based allocation
@@ -89,7 +89,7 @@ envoy_status_t reset_stream(envoy_stream_t stream) {
 }
 
 envoy_status_t set_preferred_network(envoy_network_t network) {
-  preferred_network_.store(network);
+  Envoy::Network::MobileUtility::setPreferredNetwork(network);
   return ENVOY_SUCCESS;
 }
 
@@ -235,8 +235,7 @@ envoy_engine_t init_engine(envoy_engine_callbacks callbacks, envoy_logger logger
                            envoy_event_tracker event_tracker) {
   // TODO(goaway): return new handle once multiple engine support is in place.
   // https://github.com/lyft/envoy-mobile/issues/332
-  strong_engine_ =
-      std::make_shared<Envoy::Engine>(callbacks, logger, event_tracker, preferred_network_);
+  strong_engine_ = std::make_shared<Envoy::Engine>(callbacks, logger, event_tracker);
   engine_ = strong_engine_;
   return 1;
 }

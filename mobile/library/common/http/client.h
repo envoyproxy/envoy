@@ -43,10 +43,9 @@ struct HttpClientStats {
 class Client : public Logger::Loggable<Logger::Id::http> {
 public:
   Client(ApiListener& api_listener, Event::ProvisionalDispatcher& dispatcher, Stats::Scope& scope,
-         std::atomic<envoy_network_t>& preferred_network, Random::RandomGenerator& random)
+         Random::RandomGenerator& random)
       : api_listener_(api_listener), dispatcher_(dispatcher),
         stats_(HttpClientStats{ALL_HTTP_CLIENT_STATS(POOL_COUNTER_PREFIX(scope, "http.client."))}),
-        preferred_network_(preferred_network),
         address_(std::make_shared<Network::Address::SyntheticAddressImpl>()), random_(random) {}
 
   /**
@@ -310,7 +309,6 @@ private:
   // The set of closed streams, where end stream has been received from upstream
   // but not yet communicated to the mobile library.
   absl::flat_hash_map<envoy_stream_t, DirectStreamSharedPtr> closed_streams_;
-  std::atomic<envoy_network_t>& preferred_network_;
   // Shared synthetic address across DirectStreams.
   Network::Address::InstanceConstSharedPtr address_;
   Random::RandomGenerator& random_;

@@ -34,6 +34,7 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Extensions::HttpFilters::PlatformBridge::forceRegisterPlatformBridgeFilterFactory();
   Envoy::Extensions::HttpFilters::RouteCacheReset::forceRegisterRouteCacheResetFilterFactory();
   Envoy::Extensions::HttpFilters::RouterFilter::forceRegisterRouterFilterConfig();
+  Envoy::Extensions::HttpFilters::SocketSelection::forceRegisterSocketSelectionFilterFactory();
   Envoy::Extensions::NetworkFilters::HttpConnectionManager::
       forceRegisterHttpConnectionManagerFilterConfigFactory();
   Envoy::Extensions::StatSinks::MetricsService::forceRegisterMetricsServiceSinkFactory();
