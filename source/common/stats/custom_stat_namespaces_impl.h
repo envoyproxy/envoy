@@ -12,6 +12,7 @@ public:
   ~CustomStatNamespacesImpl() override = default;
 
   // CustomStatNamespaces
+  bool empty() const override;
   bool registered(const absl::string_view name) const override;
   void registerStatNamespace(const absl::string_view name) override;
   absl::optional<absl::string_view>

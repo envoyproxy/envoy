@@ -41,7 +41,7 @@ public:
    * Otherwise, return nullopt.
    */
   static absl::optional<std::string>
-  metricName(const std::string& extracted_name,
+  metricName(const std::string& extracted_name, const bool custom_stat_namespace_empty,
              const Stats::CustomStatNamespaces& custom_namespace_factory);
 };
 

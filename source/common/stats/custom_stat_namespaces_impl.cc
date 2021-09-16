@@ -6,6 +6,11 @@
 namespace Envoy {
 namespace Stats {
 
+bool CustomStatNamespacesImpl::empty() const {
+  ASSERT(Thread::MainThread::isMainThread());
+  return namespaces_.empty();
+}
+
 bool CustomStatNamespacesImpl::registered(const absl::string_view name) const {
   ASSERT(Thread::MainThread::isMainThread());
   return namespaces_.find(name) != namespaces_.end();

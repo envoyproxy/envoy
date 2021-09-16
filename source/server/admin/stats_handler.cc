@@ -88,14 +88,19 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   }
 
   const Stats::CustomStatNamespaces& custom_stat_namespaces = server_.api().customStatNamespaces();
+  const bool custom_stat_namespaces_empty = custom_stat_namespaces.empty();
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     if (shouldShowMetric(*counter, used_only, regex)) {
       const std::string original_name = counter->name();
-      const absl::optional<absl::string_view> stripped_name =
-          custom_stat_namespaces.stripRegisteredPrefix(original_name);
-      all_stats.emplace(stripped_name.has_value() ? stripped_name.value() : original_name,
-                        counter->value());
+      if (custom_stat_namespaces_empty) {
+        all_stats.emplace(original_name, counter->value());
+      } else {
+        const absl::optional<absl::string_view> stripped_name =
+            custom_stat_namespaces.stripRegisteredPrefix(original_name);
+        all_stats.emplace(stripped_name.has_value() ? stripped_name.value() : original_name,
+                          counter->value());
+      }
     }
   }
 
@@ -103,10 +108,14 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     if (shouldShowMetric(*gauge, used_only, regex)) {
       ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
       const std::string original_name = gauge->name();
-      const absl::optional<absl::string_view> stripped_name =
-          custom_stat_namespaces.stripRegisteredPrefix(original_name);
-      all_stats.emplace(stripped_name.has_value() ? stripped_name.value() : original_name,
-                        gauge->value());
+      if (custom_stat_namespaces_empty) {
+        all_stats.emplace(original_name, gauge->value());
+      } else {
+        const absl::optional<absl::string_view> stripped_name =
+            custom_stat_namespaces.stripRegisteredPrefix(original_name);
+        all_stats.emplace(stripped_name.has_value() ? stripped_name.value() : original_name,
+                          gauge->value());
+      }
     }
   }
 
@@ -185,16 +194,22 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
     response.add(fmt::format("{}: {}\n", stat.first, stat.second));
   }
   const Stats::CustomStatNamespaces& custom_stat_namespaces = server_.api().customStatNamespaces();
+  const bool custom_stat_namespaces_empty = custom_stat_namespaces.empty();
   std::map<std::string, std::string> all_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
     if (shouldShowMetric(*histogram, used_only, regex)) {
       const std::string original_name = histogram->name();
-      const absl::optional<absl::string_view> stripped_name =
-          custom_stat_namespaces.stripRegisteredPrefix(original_name);
-      auto insert =
-          all_histograms.emplace(stripped_name.has_value() ? stripped_name.value() : original_name,
-                                 histogram->quantileSummary());
-      ASSERT(insert.second); // No duplicates expected.
+      if (custom_stat_namespaces_empty) {
+        const auto insert = all_histograms.emplace(original_name, histogram->quantileSummary());
+        ASSERT(insert.second); // No duplicates expected.
+      } else {
+        const absl::optional<absl::string_view> stripped_name =
+            custom_stat_namespaces.stripRegisteredPrefix(original_name);
+        const auto insert = all_histograms.emplace(stripped_name.has_value() ? stripped_name.value()
+                                                                             : original_name,
+                                                   histogram->quantileSummary());
+        ASSERT(insert.second); // No duplicates expected.
+      }
     }
   }
   for (const auto& histogram : all_histograms) {

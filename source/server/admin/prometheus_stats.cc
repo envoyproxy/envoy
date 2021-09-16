@@ -112,11 +112,12 @@ uint64_t outputStatType(
     groups[metric->tagExtractedStatName()].push_back(metric.get());
   }
 
-  auto result = groups.size();
+  const bool custom_stat_namespace_empty = custom_namespaces.empty();
+  uint64_t result = groups.size();
   for (auto& group : groups) {
     const absl::optional<std::string> prefixed_tag_extracted_name =
         PrometheusStatsFormatter::metricName(global_symbol_table.toString(group.first),
-                                             custom_namespaces);
+                                             custom_stat_namespace_empty, custom_namespaces);
     if (!prefixed_tag_extracted_name.has_value()) {
       --result;
       continue;
@@ -195,22 +196,25 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
 
 absl::optional<std::string>
 PrometheusStatsFormatter::metricName(const std::string& extracted_name,
+                                     const bool custom_stat_namespace_empty,
                                      const Stats::CustomStatNamespaces& custom_namespaces) {
-  const absl::optional<absl::string_view> custom_namespace_stripped =
-      custom_namespaces.stripRegisteredPrefix(extracted_name);
-  if (custom_namespace_stripped.has_value()) {
-    // This case the name has a custom namespace, and it is a custom metric.
-    const std::string sanitized_name = sanitizeName(custom_namespace_stripped.value());
-    // We expose these metrics without modifying (e.g. without "envoy_"),
-    // so we have to check the "user-defined" stat name complies with the Prometheus naming
-    // convention. Specifically the name must start with the "[a-zA-Z_]" pattern.
-    // All the characters in sanitized_name are already in "[a-zA-Z0-9_]" pattern
-    // thanks to sanitizeName above, so the only thing we have to do is check
-    // if it does not start with digits.
-    if (sanitized_name.empty() || absl::ascii_isdigit(sanitized_name.front())) {
-      return absl::nullopt;
+  if (!custom_stat_namespace_empty) {
+    const absl::optional<absl::string_view> custom_namespace_stripped =
+        custom_namespaces.stripRegisteredPrefix(extracted_name);
+    if (custom_namespace_stripped.has_value()) {
+      // This case the name has a custom namespace, and it is a custom metric.
+      const std::string sanitized_name = sanitizeName(custom_namespace_stripped.value());
+      // We expose these metrics without modifying (e.g. without "envoy_"),
+      // so we have to check the "user-defined" stat name complies with the Prometheus naming
+      // convention. Specifically the name must start with the "[a-zA-Z_]" pattern.
+      // All the characters in sanitized_name are already in "[a-zA-Z0-9_]" pattern
+      // thanks to sanitizeName above, so the only thing we have to do is check
+      // if it does not start with digits.
+      if (sanitized_name.empty() || absl::ascii_isdigit(sanitized_name.front())) {
+        return absl::nullopt;
+      }
+      return sanitized_name;
     }
-    return sanitized_name;
   }
 
   // If it does not have a custom namespace, add namespacing prefix to avoid conflicts, as per best
