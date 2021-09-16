@@ -29,11 +29,11 @@ class MockAuthenticator : public Authenticator {
 public:
   MOCK_METHOD(void, doVerify,
               (Http::HeaderMap & headers, Tracing::Span& parent_span,
-               std::vector<JwtLocationConstPtr>* tokens, SetExtractedJwtDataCallback set_payload_cb,
+               std::vector<JwtLocationConstPtr>* tokens, SetPayloadCallback set_payload_cb,
                AuthenticatorCallback callback));
 
   void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
-              std::vector<JwtLocationConstPtr>&& tokens, SetExtractedJwtDataCallback set_payload_cb,
+              std::vector<JwtLocationConstPtr>&& tokens, SetPayloadCallback set_payload_cb,
               AuthenticatorCallback callback) override {
     doVerify(headers, parent_span, &tokens, std::move(set_payload_cb), std::move(callback));
   }

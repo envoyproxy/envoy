@@ -84,8 +84,7 @@ public:
       EXPECT_CALL(*mock_auth, doVerify(_, _, _, _, _))
           .WillOnce(Invoke([issuer = it.first, status = it.second](
                                Http::HeaderMap&, Tracing::Span&, std::vector<JwtLocationConstPtr>*,
-                               SetExtractedJwtDataCallback set_payload_cb,
-                               AuthenticatorCallback callback) {
+                               SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
             if (status == Status::Ok) {
               ProtobufWkt::Struct empty_struct;
               set_payload_cb(issuer, empty_struct);
@@ -114,9 +113,9 @@ public:
     for (const auto& provider : providers) {
       auto mock_auth = std::make_unique<MockAuthenticator>();
       EXPECT_CALL(*mock_auth, doVerify(_, _, _, _, _))
-          .WillOnce(Invoke([&, iss = provider](
-                               Http::HeaderMap&, Tracing::Span&, std::vector<JwtLocationConstPtr>*,
-                               SetExtractedJwtDataCallback, AuthenticatorCallback callback) {
+          .WillOnce(Invoke([&, iss = provider](Http::HeaderMap&, Tracing::Span&,
+                                               std::vector<JwtLocationConstPtr>*,
+                                               SetPayloadCallback, AuthenticatorCallback callback) {
             callbacks_[iss] = std::move(callback);
           }));
       EXPECT_CALL(*mock_auth, onDestroy());

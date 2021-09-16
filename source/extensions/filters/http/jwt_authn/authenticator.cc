@@ -45,7 +45,7 @@ public:
   void onJwksError(Failure reason) override;
   // Following functions are for Authenticator interface.
   void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
-              std::vector<JwtLocationConstPtr>&& tokens, SetExtractedJwtDataCallback set_payload_cb,
+              std::vector<JwtLocationConstPtr>&& tokens, SetPayloadCallback set_payload_cb,
               AuthenticatorCallback callback) override;
   void onDestroy() override;
 
@@ -91,7 +91,7 @@ private:
   // The active span for the request
   Tracing::Span* parent_span_{&Tracing::NullSpan::instance()};
   // The callback function called to set the extracted payload and header from a verified JWT.
-  SetExtractedJwtDataCallback set_payload_cb_;
+  SetPayloadCallback set_payload_cb_;
   // The on_done function.
   AuthenticatorCallback callback_;
   // check audience object.
@@ -119,8 +119,7 @@ std::string AuthenticatorImpl::name() const {
 
 void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
                                std::vector<JwtLocationConstPtr>&& tokens,
-                               SetExtractedJwtDataCallback set_payload_cb,
-                               AuthenticatorCallback callback) {
+                               SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
   ASSERT(!callback_);
   headers_ = &headers;
   parent_span_ = &parent_span;
