@@ -35,6 +35,8 @@ public:
     BadFd,
     // An existing connection was forcibly closed by the remote host.
     ConnectionReset,
+    // Network is unreachable due to network settings.
+    NetworkUnreachable,
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };
