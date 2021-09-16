@@ -301,7 +301,6 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
       set_payload_cb_(provider.payload_in_metadata(), jwt_->payload_pb_);
     }
   }
-
   if (provider_ && !cache_hit) {
     // move the ownership of "owned_jwt_" into the function.
     jwks_data_->getJwtCache().insert(curr_token_->token(), std::move(owned_jwt_));

@@ -731,7 +731,7 @@ public:
       ASSERT_EQ(status, expected_status);
     };
     auto set_payload_cb = [this](const std::string& name, const ProtobufWkt::Struct& payload) {
-      out_payload_name_ = name;
+      out_name_ = name;
       out_payload_ = payload;
     };
     auto tokens = extractor_->extract(headers);
@@ -746,10 +746,8 @@ public:
   Event::SimulatedTimeSystem time_system_;
   ExtractorConstPtr extractor_;
   NiceMock<Tracing::MockSpan> parent_span_;
-  std::string out_payload_name_;
-  std::string out_header_name_;
+  std::string out_name_;
   ProtobufWkt::Struct out_payload_;
-  ProtobufWkt::Struct out_header_;
 };
 
 TEST_F(AuthenticatorJwtCacheTest, TestNonProvider) {
@@ -810,7 +808,7 @@ TEST_F(AuthenticatorJwtCacheTest, TestCacheHit) {
   EXPECT_TRUE(headers.has(Http::CustomHeaders::get().Authorization));
 
   // Payload is set
-  EXPECT_EQ(out_payload_name_, "my_payload");
+  EXPECT_EQ(out_name_, "my_payload");
 
   ProtobufWkt::Struct expected_payload;
   TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
