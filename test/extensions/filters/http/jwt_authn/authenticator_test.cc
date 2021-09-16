@@ -162,7 +162,7 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
   EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_failed_.value());
 }
 
-// This test verifies the Jwt payload is set.
+// This test verifies the JWT payload is set.
 TEST_F(AuthenticatorTest, TestSetPayload) {
   // Config payload_in_metadata flag
   (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(
@@ -183,10 +183,40 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
   EXPECT_EQ(out_header_name_, EMPTY_STRING);
 
   ProtobufWkt::Struct expected_payload;
+  // We should expect empty JWT header.
+  ProtobufWkt::Struct expected_header;
   TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
   EXPECT_TRUE(TestUtility::protoEqual(out_payload_, expected_payload));
-  // We should not expect empty JWT header.
-  EXPECT_TRUE(TestUtility::protoEqual(out_header_, ProtobufWkt::Struct{}));
+  EXPECT_TRUE(TestUtility::protoEqual(out_header_, expected_header));
+}
+
+// This test verifies setting only the extracted header to metadata.
+TEST_F(AuthenticatorTest, TestSetHeader) {
+  // Set the extracted header to metadata.
+  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_header_in_metadata(
+      "my_header");
+
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+
+  // Expect to have a valid JWT.
+  Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+
+  // Payload and header are set.
+  EXPECT_EQ(out_payload_name_, EMPTY_STRING);
+  EXPECT_EQ(out_header_name_, "my_header");
+
+  // We should expect empty JWT payload.
+  ProtobufWkt::Struct expected_payload;
+  ProtobufWkt::Struct expected_header;
+  TestUtility::loadFromJson(ExpectedHeaderJSON, expected_header);
+  EXPECT_TRUE(TestUtility::protoEqual(out_payload_, expected_payload));
+  EXPECT_TRUE(TestUtility::protoEqual(out_header_, expected_header));
 }
 
 // This test verifies setting the extracted payload and header to metadata.
