@@ -113,8 +113,8 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     use_http3_ = options.auto_config().has_http3_protocol_options();
     if (use_http3_) {
       if (!options.auto_config().has_alternate_protocols_cache_options()) {
-        throw EnvoyException(
-            fmt::format("alternate protocols cache must be configured when HTTP/3 is enabled with auto_config"));
+        throw EnvoyException(fmt::format("alternate protocols cache must be configured when HTTP/3 "
+                                         "is enabled with auto_config"));
       }
       alternate_protocol_cache_options_ = options.auto_config().alternate_protocols_cache_options();
     }
