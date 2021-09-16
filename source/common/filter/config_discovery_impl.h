@@ -103,7 +103,7 @@ public:
 
   void onConfigRemoved(Config::ConfigAppliedCb applied_on_all_threads) override {
     const absl::optional<Envoy::Http::FilterFactoryCb> default_config =
-        default_configuration_ ? absl::make_optional(factory_cb_(default_configuration_.value()))
+        default_configuration_ ? absl::make_optional(factory_cb_(*default_configuration_))
                                : absl::nullopt;
     tls_.runOnAllThreads(
         [config = default_config](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
