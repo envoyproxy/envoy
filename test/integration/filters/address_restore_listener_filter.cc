@@ -23,6 +23,10 @@ public:
               socket.connectionInfoProvider().localAddressRestored());
     return Network::FilterStatus::Continue;
   }
+
+  Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
+    return Network::FilterStatus::Continue;
+  }
 };
 
 class FakeOriginalDstListenerFilterConfigFactory

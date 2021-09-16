@@ -73,7 +73,6 @@ Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->ne
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "tls inspector: new connection accepted");
   cb_ = &cb;
-
   // waiting for the inspect data.
   return Network::FilterStatus::StopIteration;
 }
@@ -134,12 +133,6 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     }
   }
   return Network::FilterStatus::StopIteration;
-}
-
-void Filter::done(bool success) {
-  ENVOY_LOG(trace, "tls inspector: done: {}", success);
-  cb_->socket().ioHandle().resetFileEvents();
-  cb_->continueFilterChain(success);
 }
 
 ParseState Filter::parseClientHello(const void* data, size_t len) {
