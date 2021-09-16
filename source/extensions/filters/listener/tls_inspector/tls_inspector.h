@@ -19,9 +19,7 @@ namespace TlsInspector {
  * All stats for the TLS inspector. @see stats_macros.h
  */
 #define ALL_TLS_INSPECTOR_STATS(COUNTER)                                                           \
-  COUNTER(connection_closed)                                                                       \
   COUNTER(client_hello_too_large)                                                                  \
-  COUNTER(read_error)                                                                              \
   COUNTER(tls_found)                                                                               \
   COUNTER(tls_not_found)                                                                           \
   COUNTER(alpn_found)                                                                              \

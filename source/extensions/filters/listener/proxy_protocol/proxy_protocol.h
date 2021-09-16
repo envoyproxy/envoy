@@ -1,15 +1,11 @@
 #pragma once
 
-#include <bits/stdint-uintn.h>
-
-#include "envoy/buffer/buffer.h"
 #include "envoy/event/file_event.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
@@ -86,41 +82,41 @@ enum class ReadOrParseState { Done, TryAgainLater, Error };
  */
 class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(const ConfigSharedPtr& config) : buffer_(new Buffer::OwnedImpl()), config_(config) {}
+  Filter(const ConfigSharedPtr& config) : config_(config) {}
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
-
-  Network::FilterStatus onData(Network::ListenerFilterBuffer&) override;
-  uint64_t maxReadBytes() const override { return MAX_PROXY_PROTO_LEN_V2; }
 
 private:
   static const size_t MAX_PROXY_PROTO_LEN_V2 =
       PROXY_PROTO_V2_HEADER_LEN + PROXY_PROTO_V2_ADDR_LEN_UNIX;
   static const size_t MAX_PROXY_PROTO_LEN_V1 = 108;
 
+  void onRead();
+  ReadOrParseState onReadWorker();
+
   /**
    * Helper function that attempts to read the proxy header
    * (delimited by \r\n if V1 format, or with length if V2)
    * @return bool true valid header, false if more data is needed or socket errors occurred.
    */
-  ReadOrParseState readProxyHeader(Network::ListenerFilterBuffer& buffer);
+  ReadOrParseState readProxyHeader(Network::IoHandle& io_handle);
 
   /**
    * Parse (and discard unknown) header extensions (until hdr.extensions_length == 0)
    */
-  ReadOrParseState parseExtensions(Network::ListenerFilterBuffer& buffer, const uint8_t* buf,
-                                   size_t buf_size, size_t* buf_off = nullptr);
+  ReadOrParseState parseExtensions(Network::IoHandle& io_handle, uint8_t* buf, size_t buf_size,
+                                   size_t* buf_off = nullptr);
   bool parseTlvs(const std::vector<uint8_t>& tlvs);
-  ReadOrParseState readExtensions(Network::ListenerFilterBuffer& buffer);
+  ReadOrParseState readExtensions(Network::IoHandle& io_handle);
 
   /**
    * Given a char * & len, parse the header as per spec.
    * @return bool true if parsing succeeded, false if parsing failed.
    */
-  bool parseV1Header(const char* buf, size_t len);
-  bool parseV2Header(const char* buf);
-  absl::optional<size_t> lenV2Address(const char* buf);
+  bool parseV1Header(char* buf, size_t len);
+  bool parseV2Header(char* buf);
+  absl::optional<size_t> lenV2Address(char* buf);
 
   Network::ListenerFilterCallbacks* cb_{};
 
@@ -132,7 +128,8 @@ private:
 
   ProxyProtocolVersion header_version_{Unknown};
 
-  Buffer::InstancePtr buffer_;
+  // Stores the portion of the first line that has been read so far.
+  char buf_[MAX_PROXY_PROTO_LEN_V2];
 
   /**
    * Store the extension TLVs if they need to be read.
