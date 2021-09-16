@@ -3,6 +3,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/listener_filter_buffer_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
@@ -25,14 +26,11 @@ namespace TlsInspector {
 
 class FastMockListenerFilterCallbacks : public Network::MockListenerFilterCallbacks {
 public:
-  FastMockListenerFilterCallbacks(Network::ConnectionSocket& socket, Event::Dispatcher& dispatcher)
-      : socket_(socket), dispatcher_(dispatcher) {}
+  FastMockListenerFilterCallbacks(Network::ConnectionSocket& socket)
+      : socket_(socket) {}
   Network::ConnectionSocket& socket() override { return socket_; }
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  void continueFilterChain(bool success) override { RELEASE_ASSERT(success, ""); }
 
   Network::ConnectionSocket& socket_;
-  Event::Dispatcher& dispatcher_;
 };
 
 // Don't inherit from the mock implementation at all, because this is instantiated
@@ -78,12 +76,15 @@ static void BM_TlsInspector(benchmark::State& state) {
   Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>();
   Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr);
   NiceMock<FastMockDispatcher> dispatcher;
-  FastMockListenerFilterCallbacks cb(socket, dispatcher);
+  FastMockListenerFilterCallbacks cb(socket);
+  Network::ListenerFilterBufferImpl buffer(socket.ioHandle(), dispatcher, [](){}, [](){}, cfg->maxClientHelloSize());
+  dispatcher.file_event_callback_(Event::FileReadyType::Read);
 
   for (auto _ : state) {
     Filter filter(cfg);
     filter.onAccept(cb);
-    RELEASE_ASSERT(dispatcher.file_event_callback_ == nullptr, "");
+    auto filter_state = filter.onData(buffer);
+    RELEASE_ASSERT(filter_state == Network::FilterStatus::Continue, "");
     RELEASE_ASSERT(socket.detectedTransportProtocol() == "tls", "");
     RELEASE_ASSERT(socket.requestedServerName() == "example.com", "");
     RELEASE_ASSERT(socket.requestedApplicationProtocols().size() == 2 &&
