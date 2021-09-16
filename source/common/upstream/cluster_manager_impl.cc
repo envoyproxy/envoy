@@ -971,6 +971,16 @@ void ClusterManagerImpl::drainConnections() {
   });
 }
 
+void ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
+  const auto& it = active_clusters_.find(cluster);
+  if (it == active_clusters_.end()) {
+    throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster));
+  }
+  if (it->second->added_via_api_) {
+    throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster));
+  }
+}
+
 void ClusterManagerImpl::postThreadLocalRemoveHosts(const Cluster& cluster,
                                                     const HostVector& hosts_removed) {
   tls_.runOnAllThreads([name = cluster.info()->name(),
@@ -1200,7 +1210,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
   pools->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   container.do_not_delete_ = false;
 
-  if (container.pools_->size() == 0) {
+  if (container.pools_->empty()) {
     host_http_conn_pool_map_.erase(old_host);
   }
 }
@@ -1393,7 +1403,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainAllConnPoolsWorker(
           Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
       container->do_not_delete_ = false;
 
-      if (container->pools_->size() == 0) {
+      if (container->pools_->empty()) {
         host_http_conn_pool_map_.erase(host);
       }
     }
@@ -1539,7 +1549,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
     // Guard deletion of the container with `do_not_delete_` to avoid deletion while
     // iterating through the container in `container->pools_->startDrain()`. See
     // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
-    if (!container->do_not_delete_ && container->pools_->size() == 0) {
+    if (!container->do_not_delete_ && container->pools_->empty()) {
       ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
       host_http_conn_pool_map_.erase(
           host); // NOTE: `container` is erased after this point in the lambda.

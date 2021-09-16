@@ -82,6 +82,10 @@ public:
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     // TODO(danzh): populate stats.
     Network::ConnectionImplBase::setConnectionStats(stats);
+    if (network_connection_ == nullptr) {
+      ENVOY_CONN_LOG(error, "Quic connection has been detached.", *this);
+      return;
+    }
     network_connection_->setConnectionStats(stats);
   }
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
