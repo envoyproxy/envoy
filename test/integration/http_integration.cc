@@ -257,6 +257,7 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   } else {
     cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
         http2_options.value(), quic::kStreamReceiveWindowLimit);
+    cluster->http3_options_.set_allow_extended_connect(true);
 #endif
   }
   cluster->http2_options_ = http2_options.value();
@@ -1000,7 +1001,7 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
                                                bool with_multiple_1xx_headers) {
   if (with_encoder_filter) {
     // Add a filter to make sure 100s play well with them.
-    config_helper_.addFilter("name: passthrough-filter");
+    config_helper_.prependFilter("name: passthrough-filter");
   }
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1071,7 +1072,7 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
   // created while the socket appears to be in the high watermark state, and regression tests that
   // flow control will be corrected as the socket "becomes unblocked"
   if (network_backup) {
-    config_helper_.addFilter(
+    config_helper_.prependFilter(
         fmt::format(R"EOF(
   name: pause-filter{}
   typed_config:
