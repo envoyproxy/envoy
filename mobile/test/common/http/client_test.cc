@@ -146,94 +146,14 @@ public:
   NiceMock<Event::MockProvisionalDispatcher> dispatcher_;
   envoy_http_callbacks bridge_callbacks_;
   callbacks_called cc_ = {0, 0, 0, 0, 0, 0, 0, "200", true, ""};
-  std::atomic<envoy_network_t> preferred_network_{ENVOY_NET_GENERIC};
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   bool explicit_flow_control_{GetParam()};
-  Client http_client_{api_listener_, dispatcher_, stats_store_, preferred_network_, random_};
+  Client http_client_{api_listener_, dispatcher_, stats_store_, random_};
   envoy_stream_t stream_ = 1;
 };
 
 INSTANTIATE_TEST_SUITE_P(TestModes, ClientTest, ::testing::Bool());
-
-TEST_P(ClientTest, SetDestinationCluster) {
-  // Create a stream, and set up request_decoder_ and response_encoder_
-  createStream();
-
-  // Send request headers. Sending multiple headers is illegal and the upstream codec would not
-  // accept it. However, given we are just trying to test preferred network headers and using mocks
-  // this is fine.
-
-  TestRequestHeaderMapImpl headers1;
-  HttpTestUtility::addDefaultHeaders(headers1);
-  headers1.setScheme("https");
-  envoy_headers c_headers1 = Utility::toBridgeHeaders(headers1);
-
-  preferred_network_.store(ENVOY_NET_GENERIC);
-
-  TestRequestHeaderMapImpl expected_headers1{
-      {":scheme", "https"},
-      {":method", "GET"},
-      {":authority", "host"},
-      {":path", "/"},
-      {"x-envoy-mobile-cluster", "base"},
-      {"x-forwarded-proto", "https"},
-  };
-  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
-  EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers1), false));
-  http_client_.sendHeaders(stream_, c_headers1, false);
-
-  TestRequestHeaderMapImpl headers2;
-  HttpTestUtility::addDefaultHeaders(headers2);
-  headers2.setScheme("https");
-  envoy_headers c_headers2 = Utility::toBridgeHeaders(headers2);
-
-  preferred_network_.store(ENVOY_NET_WLAN);
-
-  TestRequestHeaderMapImpl expected_headers2{
-      {":scheme", "https"},
-      {":method", "GET"},
-      {":authority", "host"},
-      {":path", "/"},
-      {"x-envoy-mobile-cluster", "base_wlan"},
-      {"x-forwarded-proto", "https"},
-  };
-  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
-  EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers2), false));
-  http_client_.sendHeaders(stream_, c_headers2, false);
-
-  TestRequestHeaderMapImpl headers3;
-  HttpTestUtility::addDefaultHeaders(headers3);
-  headers3.setScheme("https");
-  envoy_headers c_headers3 = Utility::toBridgeHeaders(headers3);
-
-  preferred_network_.store(ENVOY_NET_WWAN);
-
-  TestRequestHeaderMapImpl expected_headers3{
-      {":scheme", "https"},
-      {":method", "GET"},
-      {":authority", "host"},
-      {":path", "/"},
-      {"x-envoy-mobile-cluster", "base_wwan"},
-      {"x-forwarded-proto", "https"},
-  };
-  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
-  EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers3), true));
-  http_client_.sendHeaders(stream_, c_headers3, true);
-
-  // Encode response headers.
-  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
-  EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  response_encoder_->encodeHeaders(response_headers, true);
-  ASSERT_EQ(cc_.on_headers_calls, 1);
-  // Ensure that the callbacks on the bridge_callbacks_ were called.
-  ASSERT_EQ(cc_.on_complete_calls, 1);
-}
 
 TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
   // Create a stream, and set up request_decoder_ and response_encoder_
@@ -248,8 +168,6 @@ TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
   headers1.setScheme("https");
   envoy_headers c_headers1 = Utility::toBridgeHeaders(headers1);
 
-  preferred_network_.store(ENVOY_NET_GENERIC);
-
   TestResponseHeaderMapImpl expected_headers1{
       {":scheme", "https"},
       {":method", "GET"},
@@ -263,60 +181,18 @@ TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers1), false));
   http_client_.sendHeaders(stream_, c_headers1, false);
 
-  TestRequestHeaderMapImpl headers2{{"x-envoy-mobile-upstream-protocol", "http2"}};
-  HttpTestUtility::addDefaultHeaders(headers2);
-  headers2.setScheme("https");
-  envoy_headers c_headers2 = Utility::toBridgeHeaders(headers2);
-
-  preferred_network_.store(ENVOY_NET_WLAN);
-
-  TestResponseHeaderMapImpl expected_headers2{
-      {":scheme", "https"},
-      {":method", "GET"},
-      {":authority", "host"},
-      {":path", "/"},
-      {"x-envoy-mobile-cluster", "base_wlan_h2"},
-      {"x-forwarded-proto", "https"},
-  };
-  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
-  EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers2), false));
-  http_client_.sendHeaders(stream_, c_headers2, false);
-
-  TestRequestHeaderMapImpl headers3{{"x-envoy-mobile-upstream-protocol", "http2"}};
-  HttpTestUtility::addDefaultHeaders(headers3);
-  headers3.setScheme("https");
-  envoy_headers c_headers3 = Utility::toBridgeHeaders(headers3);
-
-  preferred_network_.store(ENVOY_NET_WWAN);
-
-  TestResponseHeaderMapImpl expected_headers3{
-      {":scheme", "https"},
-      {":method", "GET"},
-      {":authority", "host"},
-      {":path", "/"},
-      {"x-envoy-mobile-cluster", "base_wwan_h2"},
-      {"x-forwarded-proto", "https"},
-  };
-  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
-  EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers3), true));
-  http_client_.sendHeaders(stream_, c_headers3, true);
-
   // Setting ALPN
   TestRequestHeaderMapImpl headers_alpn{{"x-envoy-mobile-upstream-protocol", "alpn"}};
   HttpTestUtility::addDefaultHeaders(headers_alpn);
   headers_alpn.setScheme("https");
   envoy_headers c_headers_alpn = Utility::toBridgeHeaders(headers_alpn);
 
-  preferred_network_.store(ENVOY_NET_WWAN);
-
   TestResponseHeaderMapImpl expected_headers_alpn{
       {":scheme", "https"},
       {":method", "GET"},
       {":authority", "host"},
       {":path", "/"},
-      {"x-envoy-mobile-cluster", "base_wwan_alpn"},
+      {"x-envoy-mobile-cluster", "base_alpn"},
       {"x-forwarded-proto", "https"},
   };
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
@@ -330,14 +206,12 @@ TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
   headers4.setScheme("https");
   envoy_headers c_headers4 = Utility::toBridgeHeaders(headers4);
 
-  preferred_network_.store(ENVOY_NET_WWAN);
-
   TestResponseHeaderMapImpl expected_headers4{
       {":scheme", "https"},
       {":method", "GET"},
       {":authority", "host"},
       {":path", "/"},
-      {"x-envoy-mobile-cluster", "base_wwan"},
+      {"x-envoy-mobile-cluster", "base"},
       {"x-forwarded-proto", "https"},
   };
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));

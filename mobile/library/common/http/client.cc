@@ -13,6 +13,7 @@
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/http/headers.h"
+#include "library/common/network/mobile_utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -524,30 +525,10 @@ const LowerCaseString H2UpstreamHeader{"x-envoy-mobile-upstream-protocol"};
 // Long-term we will be working to generally provide more responsive connection handling within
 // Envoy itself.
 
-const size_t ClustersPerPool = 3;
-const char* BaseClusters[ClustersPerPool] = {
-    "base",
-    "base_wlan",
-    "base_wwan",
-};
-
-const char* H2Clusters[ClustersPerPool] = {
-    "base_h2",
-    "base_wlan_h2",
-    "base_wwan_h2",
-};
-
-const char* ClearTextClusters[ClustersPerPool] = {
-    "base_clear",
-    "base_wlan_clear",
-    "base_wwan_clear",
-};
-
-const char* AlpnClusters[ClustersPerPool] = {
-    "base_alpn",
-    "base_wlan_alpn",
-    "base_wwan_alpn",
-};
+const char* BaseCluster = "base";
+const char* H2Cluster = "base_h2";
+const char* ClearTextCluster = "base_clear";
+const char* AlpnCluster = "base_alpn";
 
 } // namespace
 
@@ -558,25 +539,21 @@ void Client::setDestinationCluster(Http::RequestHeaderMap& headers) {
   // - Force http/1.1 if request scheme is http (cleartext).
   const char* cluster{};
   auto h2_header = headers.get(H2UpstreamHeader);
-  auto network = preferred_network_.load();
-  ASSERT(network >= 0 && network < ClustersPerPool,
-         "preferred_network_ must be valid index into cluster array");
-
   if (headers.getSchemeValue() == Headers::get().SchemeValues.Http) {
-    cluster = ClearTextClusters[network];
+    cluster = ClearTextCluster;
   } else if (!h2_header.empty()) {
     ASSERT(h2_header.size() == 1);
     const auto value = h2_header[0]->value().getStringView();
     if (value == "http2") {
-      cluster = H2Clusters[network];
+      cluster = H2Cluster;
     } else if (value == "alpn") {
-      cluster = AlpnClusters[network];
+      cluster = AlpnCluster;
     } else {
       RELEASE_ASSERT(value == "http1", fmt::format("using unsupported protocol version {}", value));
-      cluster = BaseClusters[network];
+      cluster = BaseCluster;
     }
   } else {
-    cluster = BaseClusters[network];
+    cluster = BaseCluster;
   }
 
   if (!h2_header.empty()) {

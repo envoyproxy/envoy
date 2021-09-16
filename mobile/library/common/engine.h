@@ -21,10 +21,8 @@ public:
    * @param callbacks, the callbacks to use for engine lifecycle monitoring.
    * @param logger, the callbacks to use for engine logging.
    * @param event_tracker, the event tracker to use for the emission of events.
-   * @param preferred_network, hook to obtain the preferred network for new streams.
    */
-  Engine(envoy_engine_callbacks callbacks, envoy_logger logger, envoy_event_tracker event_tracker,
-         std::atomic<envoy_network_t>& preferred_network);
+  Engine(envoy_engine_callbacks callbacks, envoy_logger logger, envoy_event_tracker event_tracker);
 
   /**
    * Engine destructor.
@@ -143,7 +141,6 @@ private:
   Logger::EventTrackingDelegatePtr log_delegate_ptr_{};
   Server::Instance* server_{};
   Server::ServerLifecycleNotifier::HandlePtr postinit_callback_handler_;
-  std::atomic<envoy_network_t>& preferred_network_;
   // main_thread_ should be destroyed first, hence it is the last member variable. Objects with
   // instructions scheduled on the main_thread_ need to have a longer lifetime.
   std::thread main_thread_{}; // Empty placeholder to be populated later.
