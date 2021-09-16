@@ -108,14 +108,16 @@ public:
         deadline_.erase(timepoint);
       }
 
-      std::chrono::milliseconds timer_duration;
+      std::chrono::milliseconds next_timer_duration;
+      bool schedule_next_timer = false;
 
       if (!deadline_.empty()) {
         // When restarting the timer, set the earliest time point among the currently remaining
         // messages. This will allow you to enforce an accurate timeout.
         const auto earliest_timepoint = deadline_.rbegin()->first;
-        timer_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+        next_timer_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
             earliest_timepoint - dispatcher_.timeSource().monotonicTime());
+        schedule_next_timer = true;
       }
 
       // Restore pending messages to buffer due to timeout.
@@ -133,8 +135,8 @@ public:
         }
       }
 
-      if (!deadline_.empty()) {
-        timer_->enableTimer(timer_duration);
+      if (schedule_next_timer) {
+        timer_->enableTimer(next_timer_duration);
       }
     }
 
