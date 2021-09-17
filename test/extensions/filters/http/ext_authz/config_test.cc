@@ -12,8 +12,9 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-#include "absl/synchronization/barrier.h"
 #include "absl/synchronization/blocking_counter.h"
+#include "absl/synchronization/notification.h"
+#include "absl/synchronization/barrier.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -27,6 +28,141 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
+class RealThreadsTestBase {
+protected:
+  // Helper class to block on a number of multi-threaded operations occurring.
+  class BlockingBarrier {
+  public:
+    explicit BlockingBarrier(uint32_t count) : blocking_counter_(count) {}
+    ~BlockingBarrier() { blocking_counter_.Wait(); }
+
+    /**
+     * Returns a function that first executes 'f', and then decrements the count
+     * toward unblocking the scope. This is intended to be used as a post() callback.
+     *
+     * @param f the function to run prior to decrementing the count.
+     */
+    std::function<void()> run(std::function<void()> f) {
+      return [this, f]() {
+        f();
+        decrementCount();
+      };
+    }
+
+    /**
+     * @return a function that, when run, decrements the count, intended for passing to post().
+     */
+    std::function<void()> decrementCountFn() {
+      return [this] { decrementCount(); };
+    }
+
+    void decrementCount() { blocking_counter_.DecrementCount(); }
+
+  private:
+    absl::BlockingCounter blocking_counter_;
+  };
+
+  RealThreadsTestBase(uint32_t num_threads)
+      : num_threads_(num_threads), api_(Api::createApiForTest()),
+        thread_factory_(api_->threadFactory()) {
+    // This is the same order as InstanceImpl::initialize in source/server/server.cc.
+    thread_dispatchers_.resize(num_threads_);
+    {
+      BlockingBarrier blocking_barrier(num_threads_ + 1);
+      main_thread_ = thread_factory_.createThread(
+          [this, &blocking_barrier]() { mainThreadFn(blocking_barrier); });
+      for (uint32_t i = 0; i < num_threads_; ++i) {
+        threads_.emplace_back(thread_factory_.createThread(
+            [this, i, &blocking_barrier]() { workerThreadFn(i, blocking_barrier); }));
+      }
+    }
+    runOnMainBlocking([this]() {
+      tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
+      tls_->registerThread(*main_dispatcher_, true);
+      for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
+        // Worker threads must be registered from the main thread, per assert in registerThread().
+        tls_->registerThread(*dispatcher, false);
+      }
+    });
+  }
+
+  ~RealThreadsTestBase() {}
+
+  virtual void shutdownThreading() {
+    runOnMainBlocking([this]() {
+      if (!tls_->isShutdown()) {
+        tls_->shutdownGlobalThreading();
+      }
+      tls_->shutdownThread();
+    });
+  }
+
+  virtual void exitThreads() {
+    for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
+      dispatcher->post([&dispatcher]() { dispatcher->exit(); });
+    }
+
+    for (Thread::ThreadPtr& thread : threads_) {
+      thread->join();
+    }
+
+    main_dispatcher_->post([this]() {
+      tls_.reset();
+      main_dispatcher_->exit();
+    });
+    main_thread_->join();
+  }
+
+  void runOnAllWorkersBlocking(std::function<void()> work) {
+    absl::Barrier start_barrier(num_threads_);
+    BlockingBarrier blocking_barrier(num_threads_);
+    for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
+      thread_dispatcher->post(blocking_barrier.run([work, &start_barrier]() {
+        start_barrier.Block();
+        work();
+      }));
+    }
+  }
+
+  void runOnMainBlocking(std::function<void()> work) {
+    BlockingBarrier blocking_barrier(1);
+    main_dispatcher_->post(blocking_barrier.run([work]() { work(); }));
+  }
+
+  void mainDispatchBlock() {
+    // To ensure all stats are freed we have to wait for a few posts() to clear.
+    // First, wait for the main-dispatcher to initiate the cross-thread TLS cleanup.
+    runOnMainBlocking([]() {});
+  }
+
+  void tlsBlock() {
+    runOnAllWorkersBlocking([]() {});
+  }
+
+  const uint32_t num_threads_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr main_dispatcher_;
+  std::vector<Event::DispatcherPtr> thread_dispatchers_;
+  Thread::ThreadFactory& thread_factory_;
+  ThreadLocal::InstanceImplPtr tls_;
+  Thread::ThreadPtr main_thread_;
+  std::vector<Thread::ThreadPtr> threads_;
+
+private:
+  void workerThreadFn(uint32_t thread_index, BlockingBarrier& blocking_barrier) {
+    thread_dispatchers_[thread_index] =
+        api_->allocateDispatcher(absl::StrCat("test_worker_", thread_index));
+    blocking_barrier.decrementCount();
+    thread_dispatchers_[thread_index]->run(Event::Dispatcher::RunType::RunUntilExit);
+  }
+
+  void mainThreadFn(BlockingBarrier& blocking_barrier) {
+    main_dispatcher_ = api_->allocateDispatcher("test_main_thread");
+    blocking_barrier.decrementCount();
+    main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+  }
+};
+
 class TestAsyncClientManagerImpl : public Grpc::AsyncClientManagerImpl {
 public:
   TestAsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
@@ -39,115 +175,24 @@ public:
   }
 };
 
-class MultiThreadTest {
-public:
-  MultiThreadTest(size_t num_threads) : num_threads_(num_threads), api_(Api::createApiForTest()) {}
-  virtual ~MultiThreadTest() = default;
-
-  void postWorkToAllWorkers(std::function<void()> work) {
-    absl::Barrier start_barrier(num_threads_);
-    absl::BlockingCounter end_counter(num_threads_);
-
-    ASSERT(worker_dispatchers_.size() == num_threads_);
-    for (Event::DispatcherPtr& dispatcher : worker_dispatchers_) {
-      dispatcher->post([&, work]() {
-        start_barrier.Block();
-        work();
-        end_counter.DecrementCount();
-      });
-    }
-    // Wait for all workers to finish the job.
-    end_counter.Wait();
-  }
-
-  void postWorkToMain(std::function<void()> work) {
-    absl::BlockingCounter end_counter(1);
-    main_dispatcher_->post([work, &end_counter]() {
-      work();
-      end_counter.DecrementCount();
-    });
-    end_counter.Wait();
-  }
-
-protected:
-  void startThreading() {
-    spawnMainThread();
-    postWorkToMain([&]() { spawnWorkerThreads(); });
-  }
-
-  void cleanUpThreading() {
-    main_dispatcher_->post([&]() {
-      tls_->shutdownGlobalThreading();
-      // Post exit signals and wait for workers to end.
-      for (Event::DispatcherPtr& dispatcher : worker_dispatchers_) {
-        dispatcher->post([&dispatcher]() { dispatcher->exit(); });
-      }
-      for (Thread::ThreadPtr& worker : worker_threads_) {
-        worker->join();
-      }
-      tls_.reset();
-      main_dispatcher_->exit();
-    });
-    main_thread_->join();
-  }
-
-  ThreadLocal::InstanceImpl& tls() { return *tls_; }
-
-  Api::Api& api() { return *api_; }
-
-private:
-  void spawnMainThread() {
-    main_dispatcher_ = api_->allocateDispatcher("main_thread");
-    main_thread_ = api_->threadFactory().createThread([this]() {
-      tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
-      tls().registerThread(*main_dispatcher_, true);
-      main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-    });
-  }
-
-  void spawnWorkerThreads() {
-    absl::BlockingCounter start_counter(num_threads_);
-    // Create worker dispatchers and register tls.
-    for (size_t i = 0; i < num_threads_; i++) {
-      worker_dispatchers_.emplace_back(api_->allocateDispatcher(std::to_string(i)));
-      tls().registerThread(*worker_dispatchers_[i], false);
-      // i must be explicitly captured by value.
-      worker_threads_.emplace_back(api_->threadFactory().createThread([this, i, &start_counter]() {
-        start_counter.DecrementCount();
-        worker_dispatchers_[i]->run(Event::Dispatcher::RunType::RunUntilExit);
-      }));
-    }
-    start_counter.Wait();
-  }
-
-  const size_t num_threads_;
-
-  std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
-  Api::ApiPtr api_;
-
-  Event::DispatcherPtr main_dispatcher_;
-  Thread::ThreadPtr main_thread_;
-  std::vector<Event::DispatcherPtr> worker_dispatchers_;
-  std::vector<Thread::ThreadPtr> worker_threads_;
-};
-
 class ExtAuthzFilterTest : public Event::TestUsingSimulatedTime,
-                           public MultiThreadTest,
+                           public RealThreadsTestBase,
                            public testing::Test {
 public:
-  ExtAuthzFilterTest() : MultiThreadTest(5), stat_names_(symbol_table_) {
-    startThreading();
-    postWorkToMain([&]() {
+  ExtAuthzFilterTest() : RealThreadsTestBase(5), stat_names_(symbol_table_) {
+    runOnMainBlocking([&]() {
       async_client_manager_ = std::make_unique<TestAsyncClientManagerImpl>(
-          context_.cluster_manager_, tls(), api().timeSource(), api(), stat_names_);
+          context_.cluster_manager_, *tls_, api_->timeSource(), *api_, stat_names_);
     });
   }
 
   ~ExtAuthzFilterTest() override {
     // Reset the async client manager before shutdown threading.
     // Because its dtor will try to post to event loop to clear thread local slot.
-    postWorkToMain([&]() { async_client_manager_.reset(); });
-    cleanUpThreading();
+    runOnMainBlocking([&]() { async_client_manager_.reset(); });
+
+    shutdownThreading();
+    exitThreads();
   }
 
   Http::FilterFactoryCb createFilterFactory(
@@ -190,14 +235,14 @@ public:
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_authz_config;
     Http::FilterFactoryCb filter_factory;
     // Load config and create filter factory in main thread.
-    postWorkToMain([&]() {
+    runOnMainBlocking([&]() {
       TestUtility::loadFromYaml(ext_authz_config_yaml, ext_authz_config);
       filter_factory = createFilterFactory(ext_authz_config);
     });
 
     // Create filter from filter factory per thread.
     for (int i = 0; i < 5; i++) {
-      postWorkToAllWorkers([&, filter_factory]() {
+      runOnAllWorkersBlocking([&, filter_factory]() {
         Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
         EXPECT_NE(filter, nullptr);
       });
@@ -255,7 +300,7 @@ public:
   void testFilterFactoryAndFilterWithGrpcClient(const std::string& ext_authz_config_yaml) {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_authz_config;
     Http::FilterFactoryCb filter_factory;
-    postWorkToMain([&]() {
+    runOnMainBlocking([&]() {
       TestUtility::loadFromYaml(ext_authz_config_yaml, ext_authz_config);
       filter_factory = createFilterFactory(ext_authz_config);
     });
@@ -265,12 +310,12 @@ public:
     initAddress();
     // Create filter from filter factory per thread and send grpc request.
     for (int i = 0; i < request_sent_per_thread; i++) {
-      postWorkToAllWorkers([&, filter_factory]() {
+      runOnAllWorkersBlocking([&, filter_factory]() {
         Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
         testExtAuthzFilter(filter);
       });
     }
-    postWorkToAllWorkers(
+    runOnAllWorkersBlocking(
         [&]() { expectGrpcClientSentRequest(ext_authz_config, request_sent_per_thread); });
   }
 

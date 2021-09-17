@@ -24,6 +24,7 @@
 
 #include "absl/strings/str_split.h"
 #include "absl/synchronization/blocking_counter.h"
+#include "absl/synchronization/barrier.h"
 #include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -1519,11 +1520,8 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             parent_histogram->bucketSummary());
 }
 
-class ThreadLocalRealThreadsTestBase : public ThreadLocalStoreNoMocksTestBase {
+class RealThreadsTestBase {
 protected:
-  static constexpr uint32_t NumScopes = 1000;
-  static constexpr uint32_t NumIters = 35;
-
   // Helper class to block on a number of multi-threaded operations occurring.
   class BlockingBarrier {
   public:
@@ -1556,9 +1554,9 @@ protected:
     absl::BlockingCounter blocking_counter_;
   };
 
-  ThreadLocalRealThreadsTestBase(uint32_t num_threads)
+  RealThreadsTestBase(uint32_t num_threads)
       : num_threads_(num_threads), api_(Api::createApiForTest()),
-        thread_factory_(api_->threadFactory()), pool_(store_->symbolTable()) {
+        thread_factory_(api_->threadFactory()) {
     // This is the same order as InstanceImpl::initialize in source/server/server.cc.
     thread_dispatchers_.resize(num_threads_);
     {
@@ -1570,23 +1568,121 @@ protected:
             [this, i, &blocking_barrier]() { workerThreadFn(i, blocking_barrier); }));
       }
     }
+    runOnMainBlocking([this]() {
+      tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
+      tls_->registerThread(*main_dispatcher_, true);
+      for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
+        // Worker threads must be registered from the main thread, per assert in registerThread().
+        tls_->registerThread(*dispatcher, false);
+      }
+    });
+  }
 
-    {
-      BlockingBarrier blocking_barrier(1);
-      main_dispatcher_->post(blocking_barrier.run([this]() {
-        tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
-        tls_->registerThread(*main_dispatcher_, true);
-        for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
-          // Worker threads must be registered from the main thread, per assert in registerThread().
-          tls_->registerThread(*dispatcher, false);
-        }
-        store_->initializeThreading(*main_dispatcher_, *tls_);
+  ~RealThreadsTestBase() {}
+
+  virtual void shutdownThreading() {
+    runOnMainBlocking([this]() {
+      if (!tls_->isShutdown()) {
+        tls_->shutdownGlobalThreading();
+      }
+      tls_->shutdownThread();
+    });
+  }
+
+  virtual void exitThreads() {
+    for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
+      dispatcher->post([&dispatcher]() { dispatcher->exit(); });
+    }
+
+    for (Thread::ThreadPtr& thread : threads_) {
+      thread->join();
+    }
+
+    main_dispatcher_->post([this]() {
+      tls_.reset();
+      main_dispatcher_->exit();
+    });
+    main_thread_->join();
+  }
+
+  void runOnAllWorkersBlocking(std::function<void()> work) {
+    absl::Barrier start_barrier(num_threads_);
+    BlockingBarrier blocking_barrier(num_threads_);
+    for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
+      thread_dispatcher->post(blocking_barrier.run([work, &start_barrier]() {
+        start_barrier.Block();
+        work();
       }));
     }
   }
 
+  void runOnMainBlocking(std::function<void()> work) {
+    BlockingBarrier blocking_barrier(1);
+    main_dispatcher_->post(blocking_barrier.run([work]() { work(); }));
+  }
+
+  void mainDispatchBlock() {
+    // To ensure all stats are freed we have to wait for a few posts() to clear.
+    // First, wait for the main-dispatcher to initiate the cross-thread TLS cleanup.
+    runOnMainBlocking([]() {});
+  }
+
+  void tlsBlock() {
+    runOnAllWorkersBlocking([]() {});
+  }
+
+  const uint32_t num_threads_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr main_dispatcher_;
+  std::vector<Event::DispatcherPtr> thread_dispatchers_;
+  Thread::ThreadFactory& thread_factory_;
+  ThreadLocal::InstanceImplPtr tls_;
+  Thread::ThreadPtr main_thread_;
+  std::vector<Thread::ThreadPtr> threads_;
+
+private:
+  void workerThreadFn(uint32_t thread_index, BlockingBarrier& blocking_barrier) {
+    thread_dispatchers_[thread_index] =
+        api_->allocateDispatcher(absl::StrCat("test_worker_", thread_index));
+    blocking_barrier.decrementCount();
+    thread_dispatchers_[thread_index]->run(Event::Dispatcher::RunType::RunUntilExit);
+  }
+
+  void mainThreadFn(BlockingBarrier& blocking_barrier) {
+    main_dispatcher_ = api_->allocateDispatcher("test_main_thread");
+    blocking_barrier.decrementCount();
+    main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+  }
+};
+
+class ThreadLocalRealThreadsTestBase : public RealThreadsTestBase,
+                                       public ThreadLocalStoreNoMocksTestBase {
+protected:
+  static constexpr uint32_t NumScopes = 1000;
+  static constexpr uint32_t NumIters = 35;
+
+public:
+  ThreadLocalRealThreadsTestBase(uint32_t num_threads)
+      : RealThreadsTestBase(num_threads), pool_(store_->symbolTable()) {
+    runOnMainBlocking([this]() { store_->initializeThreading(*main_dispatcher_, *tls_); });
+  }
+
   ~ThreadLocalRealThreadsTestBase() override {
     shutdownThreading();
+    exitThreads();
+  }
+
+  void shutdownThreading() override {
+    runOnMainBlocking([this]() {
+      if (!tls_->isShutdown()) {
+        tls_->shutdownGlobalThreading();
+      }
+      store_->shutdownThreading();
+      tls_->shutdownThread();
+    });
+  }
+
+  void exitThreads() override {
     for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
       dispatcher->post([&dispatcher]() { dispatcher->exit(); });
     }
@@ -1603,17 +1699,9 @@ protected:
     main_thread_->join();
   }
 
-  void shutdownThreading() {
-    BlockingBarrier blocking_barrier(1);
-    main_dispatcher_->post(blocking_barrier.run([this]() {
-      if (!tls_->isShutdown()) {
-        tls_->shutdownGlobalThreading();
-      }
-      store_->shutdownThreading();
-      tls_->shutdownThread();
-    }));
-  }
+  StatNamePool pool_;
 
+private:
   void workerThreadFn(uint32_t thread_index, BlockingBarrier& blocking_barrier) {
     thread_dispatchers_[thread_index] =
         api_->allocateDispatcher(absl::StrCat("test_worker_", thread_index));
@@ -1626,30 +1714,6 @@ protected:
     blocking_barrier.decrementCount();
     main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
   }
-
-  void mainDispatchBlock() {
-    // To ensure all stats are freed we have to wait for a few posts() to clear.
-    // First, wait for the main-dispatcher to initiate the cross-thread TLS cleanup.
-    BlockingBarrier blocking_barrier(1);
-    main_dispatcher_->post(blocking_barrier.run([]() {}));
-  }
-
-  void tlsBlock() {
-    BlockingBarrier blocking_barrier(num_threads_);
-    for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
-      thread_dispatcher->post(blocking_barrier.run([]() {}));
-    }
-  }
-
-  const uint32_t num_threads_;
-  Api::ApiPtr api_;
-  Event::DispatcherPtr main_dispatcher_;
-  std::vector<Event::DispatcherPtr> thread_dispatchers_;
-  Thread::ThreadFactory& thread_factory_;
-  ThreadLocal::InstanceImplPtr tls_;
-  Thread::ThreadPtr main_thread_;
-  std::vector<Thread::ThreadPtr> threads_;
-  StatNamePool pool_;
 };
 
 class ClusterShutdownCleanupStarvationTest : public ThreadLocalRealThreadsTestBase {
