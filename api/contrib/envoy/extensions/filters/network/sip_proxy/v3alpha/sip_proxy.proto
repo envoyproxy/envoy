@@ -67,8 +67,6 @@ message SipFilter {
   // filter. The built-in filters are:
   //
   // [#comment:TODO(zuercher): Auto generate the following list]
-  // * :ref:`envoy.filters.sip.router <config_sip_filters_router>`
-  // * :ref:`envoy.filters.sip.rate_limit <config_sip_filters_rate_limit>`
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
@@ -78,9 +76,7 @@ message SipFilter {
   }
 }
 
-// SipProtocolOptions specifies Sip upstream protocol options. This object is used in
-// in
-// :ref:`typed_extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
+// SipProtocolOptions specifies Sip upstream protocol options.
 // keyed by the name `envoy.filters.network.sip_proxy`.
 message SipProtocolOptions {
   bool session_affinity = 1;
