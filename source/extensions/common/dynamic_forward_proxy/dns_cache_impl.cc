@@ -19,7 +19,7 @@ namespace DynamicForwardProxy {
 DnsCacheImpl::DnsCacheImpl(
     Server::Configuration::FactoryContextBase& context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
-    : main_thread_dispatcher_(context.dispatcher()),
+    : main_thread_dispatcher_(context.mainThreadDispatcher()),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(selectDnsResolver(config, main_thread_dispatcher_)),
       tls_slot_(context.threadLocal()),

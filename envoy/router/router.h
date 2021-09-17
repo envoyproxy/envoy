@@ -237,6 +237,13 @@ public:
   virtual Upstream::RetryPrioritySharedPtr retryPriority() const PURE;
 
   /**
+   * @return the retry options predicates for this policy. Each policy will be applied prior
+   * to retrying a request, allowing for request behavior to be customized.
+   */
+  virtual absl::Span<const Upstream::RetryOptionsPredicateConstSharedPtr>
+  retryOptionsPredicates() const PURE;
+
+  /**
    * Number of times host selection should be reattempted when selecting a host
    * for a retry attempt.
    */

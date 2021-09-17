@@ -61,7 +61,7 @@ MockServerFactoryContext::MockServerFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(scope_.symbolTable()), router_context_(scope_.symbolTable()) {
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+  ON_CALL(*this, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_loader_));

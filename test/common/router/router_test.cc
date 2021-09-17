@@ -911,7 +911,18 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestNotOverwritten) {
       /* expected_count */ 123);
 }
 
+class MockRetryOptionsPredicate : public Upstream::RetryOptionsPredicate {
+public:
+  MOCK_METHOD(UpdateOptionsReturn, updateOptions, (const UpdateOptionsParameters& parameters),
+              (const));
+};
+
+// Also verify retry options predicates work.
 TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
+  auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
+  callbacks_.route_->route_entry_.retry_policy_.retry_options_predicates_.emplace_back(
+      retry_options_predicate);
+
   setIncludeAttemptCountInRequest(true);
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -938,12 +949,20 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
 
   // 5xx response.
   router_.retry_state_->expectHeadersRetry();
+  Upstream::RetryOptionsPredicate::UpdateOptionsReturn update_options_return{
+      std::make_shared<Network::Socket::Options>()};
+  EXPECT_CALL(*retry_options_predicate, updateOptions(_)).WillOnce(Return(update_options_return));
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putHttpResponseCode(503));
+  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // Verify retry options predicate return values have been updated.
+  EXPECT_EQ(update_options_return.new_upstream_socket_options_.value(),
+            router_.upstreamSocketOptions());
 
   // We expect the 5xx response to kick off a new request.
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
@@ -2260,8 +2279,12 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
 
 // Tests that a retry is sent after the first request hits the per try timeout, but then
 // headers received in response to the first request are still used (and the 2nd request
-// canceled).
+// canceled). Also verify retry options predicates work.
 TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
+  auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
+  callbacks_.route_->route_entry_.retry_policy_.retry_options_predicates_.emplace_back(
+      retry_options_predicate);
+
   enableHedgeOnPerTryTimeout();
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -2296,6 +2319,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   Http::ResponseDecoder* response_decoder2 = nullptr;
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
+  EXPECT_CALL(*retry_options_predicate, updateOptions(_));
   per_try_timeout_->invokeCallback();
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
@@ -2714,8 +2738,12 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
 }
 
 // Test retrying a request, when the first attempt fails before the client
-// has sent any of the body.
+// has sent any of the body. Also verify retry options predicates work.
 TEST_F(RouterTest, RetryRequestBeforeBody) {
+  auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
+  callbacks_.route_->route_entry_.retry_policy_.retry_options_predicates_.emplace_back(
+      retry_options_predicate);
+
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
@@ -2735,6 +2763,7 @@ TEST_F(RouterTest, RetryRequestBeforeBody) {
   router_.decodeHeaders(headers, false);
 
   router_.retry_state_->expectResetRetry();
+  EXPECT_CALL(*retry_options_predicate, updateOptions(_));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 
   NiceMock<Http::MockRequestEncoder> encoder2;
@@ -2766,6 +2795,7 @@ TEST_F(RouterTest, RetryRequestBeforeBody) {
       .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.Status()->value(), "200");
       }));
+  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }

@@ -953,6 +953,7 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
         retry_state_->shouldHedgeRetryPerTryTimeout([this]() -> void { doRetry(); });
 
     if (retry_status == RetryStatus::Yes) {
+      runRetryOptionsPredicates(upstream_request);
       pending_retries_++;
 
       // Don't increment upstream_host->stats().rq_error_ here, we'll do that
@@ -1103,6 +1104,7 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
   const RetryStatus retry_status =
       retry_state_->shouldRetryReset(reset_reason, [this]() -> void { doRetry(); });
   if (retry_status == RetryStatus::Yes) {
+    runRetryOptionsPredicates(upstream_request);
     pending_retries_++;
 
     if (upstream_request.upstreamHost()) {
@@ -1320,6 +1322,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
       const RetryStatus retry_status =
           retry_state_->shouldRetryHeaders(*headers, [this]() -> void { doRetry(); });
       if (retry_status == RetryStatus::Yes) {
+        runRetryOptionsPredicates(upstream_request);
         pending_retries_++;
         upstream_request.upstreamHost()->stats().rq_error_.inc();
         Http::CodeStats& code_stats = httpContext().codeStats();
@@ -1649,6 +1652,17 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
                                                           : Http::Headers::get().SchemeValues.Https,
                                                       "://", original_host, original_path));
   return true;
+}
+
+void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
+  for (const auto& options_predicate : route_entry_->retryPolicy().retryOptionsPredicates()) {
+    const Upstream::RetryOptionsPredicate::UpdateOptionsParameters parameters{
+        retriable_request.streamInfo(), upstreamSocketOptions()};
+    auto ret = options_predicate->updateOptions(parameters);
+    if (ret.new_upstream_socket_options_.has_value()) {
+      upstream_options_ = ret.new_upstream_socket_options_.value();
+    }
+  }
 }
 
 void Filter::doRetry() {
