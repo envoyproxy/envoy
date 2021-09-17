@@ -487,8 +487,8 @@ void ScopedRdsConfigSubscription::onDemandRdsUpdate(
     std::shared_ptr<Router::ScopeKey> scope_key, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallback&& route_config_updated_cb,
     std::weak_ptr<Envoy::Config::ConfigSubscriptionCommonBase> weak_subscription) {
-  factory_context_.dispatcher().post([this, &thread_local_dispatcher, scope_key,
-                                      route_config_updated_cb, weak_subscription]() {
+  factory_context_.mainThreadDispatcher().post([this, &thread_local_dispatcher, scope_key,
+                                                route_config_updated_cb, weak_subscription]() {
     // If the subscription has been destroyed, return immediately.
     if (!weak_subscription.lock()) {
       thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
