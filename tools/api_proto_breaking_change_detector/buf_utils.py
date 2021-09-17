@@ -104,8 +104,8 @@ def check_breaking(
         if subdir:
             initial_state_input += f',subdir={subdir}'
 
-        response = subprocess.run(
-            [buf_path, "breaking", "--against", initial_state_input] + buf_args,
-            encoding="utf-8",
-            capture_output=True)
+        response = subprocess.run([buf_path, "breaking", "--against", initial_state_input]
+                                  + buf_args,
+                                  encoding="utf-8",
+                                  capture_output=True)
         return response.returncode, response.stdout.split("\n"), response.stderr.split("\n")
