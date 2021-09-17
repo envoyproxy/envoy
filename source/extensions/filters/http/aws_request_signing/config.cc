@@ -23,7 +23,7 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
           context.api(), Extensions::Common::Aws::Utility::metadataFetcher);
   auto signer = std::make_unique<Extensions::Common::Aws::SignerImpl>(
       config.service_name(), config.region(), credentials_provider,
-      context.dispatcher().timeSource());
+      context.mainThreadDispatcher().timeSource());
 
   auto filter_config =
       std::make_shared<FilterConfigImpl>(std::move(signer), stats_prefix, context.scope(),

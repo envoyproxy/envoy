@@ -454,7 +454,7 @@ stages:
         testRunTitle: "macOS"
       condition: always()
 
-    - script: ./ci/flaky_test/run_process_xml.sh
+    - script: bazel run //ci/flaky_test:process_xml
       displayName: "Process Test Results"
       env:
         TEST_TMPDIR: $(Build.SourcesDirectory)

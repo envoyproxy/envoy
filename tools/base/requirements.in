@@ -21,6 +21,7 @@ pytest-cov
 pytest-patches
 pyyaml
 setuptools
+slackclient
 sphinx
 sphinxcontrib-httpdomain
 sphinxcontrib-serializinghtml
