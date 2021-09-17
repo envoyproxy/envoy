@@ -61,6 +61,7 @@ public:
   void iterateHostMap(IterateHostMapCb cb) override;
   absl::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) override;
   Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override;
+  void forceRefreshHosts() override;
 
 private:
   struct LoadDnsCacheEntryHandleImpl
