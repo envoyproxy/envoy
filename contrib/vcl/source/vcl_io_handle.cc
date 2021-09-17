@@ -1,7 +1,5 @@
 #include "contrib/vcl/source/vcl_io_handle.h"
 
-#include <string.h>
-
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 
@@ -13,11 +11,11 @@ namespace Extensions {
 namespace Network {
 namespace Vcl {
 
-static inline int vcl_wrk_index_or_register() {
+static inline int vclWrkIndexOrRegister() {
   int wrk_index;
 
   if ((wrk_index = vppcom_worker_index()) == -1) {
-    vcl_interface_worker_register();
+    vclInterfaceWorkerRegister();
     wrk_index = vppcom_worker_index();
   }
   return wrk_index;
@@ -122,7 +120,7 @@ Api::IoCallUint64Result VclIoHandle::close() {
   RELEASE_ASSERT(VCL_SH_VALID(sh_), "sh must be valid");
   int rc = 0, wrk_index;
 
-  wrk_index = vcl_wrk_index_or_register();
+  wrk_index = vclWrkIndexOrRegister();
 
   if (is_listener_) {
     if (wrk_index) {
@@ -254,7 +252,7 @@ Api::IoCallUint64Result VclIoHandle::write(Buffer::Instance& buffer) {
 
 Api::IoCallUint64Result VclIoHandle::recv(void* buffer, size_t length, int flags) {
   VCL_LOG("recv on sh %x", sh_);
-  auto rv = vppcom_session_recvfrom(sh_, buffer, length, flags, 0);
+  auto rv = vppcom_session_recvfrom(sh_, buffer, length, flags, nullptr);
   return vclCallResultToIoCallResult(rv);
 }
 
@@ -364,7 +362,7 @@ Api::SysCallIntResult VclIoHandle::bind(Envoy::Network::Address::InstanceConstSh
     return {-1, VPPCOM_EBADFD};
   }
 
-  auto wrk_index = vcl_wrk_index_or_register();
+  auto wrk_index = vclWrkIndexOrRegister();
   RELEASE_ASSERT(wrk_index != -1, "should be initialized");
 
   vppcom_endpt_t endpt;
@@ -374,7 +372,7 @@ Api::SysCallIntResult VclIoHandle::bind(Envoy::Network::Address::InstanceConstSh
 }
 
 Api::SysCallIntResult VclIoHandle::listen(int) {
-  auto wrk_index = vcl_wrk_index_or_register();
+  auto wrk_index = vclWrkIndexOrRegister();
   RELEASE_ASSERT(wrk_index != -1, "should be initialized");
 
   VCL_LOG("trying to listen sh %u", sh_);
@@ -383,14 +381,15 @@ Api::SysCallIntResult VclIoHandle::listen(int) {
 
   is_listener_ = true;
 
-  if (!wrk_index)
+  if (!wrk_index) {
     not_listened_ = true;
+  }
 
   return {0, 0};
 }
 
 Envoy::Network::IoHandlePtr VclIoHandle::accept(sockaddr* addr, socklen_t* addrlen) {
-  auto wrk_index = vcl_wrk_index_or_register();
+  auto wrk_index = vclWrkIndexOrRegister();
   RELEASE_ASSERT(wrk_index != -1 && isListener(), "must have worker and must be listener");
 
   auto sh = sh_;
@@ -522,8 +521,9 @@ Api::SysCallIntResult VclIoHandle::getOption(int level, int optname, void* optva
                   optname);
         memset(optval, 0, *optlen);
         rv = VPPCOM_OK;
-      } else
+      } else {
         rv = -EFAULT;
+      }
       break;
     case TCP_CONGESTION:
       *optlen = strlen("cubic");
@@ -626,7 +626,7 @@ Envoy::Network::Address::InstanceConstSharedPtr VclIoHandle::peerAddress() {
 }
 
 void VclIoHandle::updateEvents(uint32_t events) {
-  auto wrk_index = vcl_wrk_index_or_register();
+  auto wrk_index = vclWrkIndexOrRegister();
   VclIoHandle* vcl_handle = this;
 
   if (wrk_index && is_listener_) {
@@ -648,15 +648,15 @@ void VclIoHandle::updateEvents(uint32_t events) {
 
   ev.data.u64 = reinterpret_cast<uint64_t>(vcl_handle);
 
-  vppcom_epoll_ctl(vcl_epoll_handle(wrk_index), EPOLL_CTL_MOD, vcl_handle->sh(), &ev);
+  vppcom_epoll_ctl(vclEpollHandle(wrk_index), EPOLL_CTL_MOD, vcl_handle->sh(), &ev);
 }
 
 void VclIoHandle::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                       Event::FileTriggerType, uint32_t events) {
   VCL_LOG("adding events for sh %x fd %u isListener %u", sh_, fd_, isListener());
 
-  auto wrk_index = vcl_wrk_index_or_register();
-  vcl_interface_register_epoll_event(dispatcher);
+  auto wrk_index = vclWrkIndexOrRegister();
+  vclInterfaceRegisterEpollEvent(dispatcher);
 
   VclIoHandle* vcl_handle = this;
 
@@ -708,13 +708,13 @@ void VclIoHandle::initializeFileEvent(Event::Dispatcher& dispatcher, Event::File
 
   cb_ = cb;
   ev.data.u64 = reinterpret_cast<uint64_t>(vcl_handle);
-  vppcom_epoll_ctl(vcl_epoll_handle(wrk_index), EPOLL_CTL_ADD, vcl_handle->sh(), &ev);
+  vppcom_epoll_ctl(vclEpollHandle(wrk_index), EPOLL_CTL_ADD, vcl_handle->sh(), &ev);
 
   file_event_ = Event::FileEventPtr{new VclEvent(dispatcher, *vcl_handle, cb)};
 }
 
 IoHandlePtr VclIoHandle::duplicate() {
-  auto wrk_index = vcl_wrk_index_or_register();
+  auto wrk_index = vclWrkIndexOrRegister();
   VCL_LOG("duplicate called");
   fprintf(stderr, "duplicate session %u\n", sh_);
 

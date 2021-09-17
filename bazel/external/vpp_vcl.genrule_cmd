@@ -23,6 +23,7 @@ ninja --version
 
 mkdir _vcl
 cmake -G Ninja -S src/ -B _vcl -DCMAKE_INSTALL_PREFIX=_vcl -DCMAKE_BUILD_TYPE:STRING=release
+ls -lah _vcl
 ninja -C _vcl vppcom
 
 popd

@@ -13,7 +13,7 @@ static uint32_t epoll_handles[128];
 static std::mutex wrk_lock;
 static absl::flat_hash_map<int, Envoy::Event::FileEventPtr> mq_events_;
 
-uint32_t& vcl_epoll_handle(uint32_t wrk_index) { return epoll_handles[wrk_index]; }
+uint32_t& vclEpollHandle(uint32_t wrk_index) { return epoll_handles[wrk_index]; }
 
 static void onMqSocketEvents(uint32_t flags) {
   ASSERT((flags & (Event::FileReadyType::Read | Event::FileReadyType::Write)));
@@ -37,8 +37,9 @@ static void onMqSocketEvents(uint32_t flags) {
       }
 
       // session closed due to some recently processed event
-      if (!vcl_handle->isOpen())
+      if (!vcl_handle->isOpen()) {
         continue;
+      }
 
       uint32_t evts = 0;
       if (events[i].events & EPOLLIN) {
@@ -60,7 +61,7 @@ static void onMqSocketEvents(uint32_t flags) {
   }
 }
 
-void vcl_interface_worker_register() {
+void vclInterfaceWorkerRegister() {
   wrk_lock.lock();
   vppcom_worker_register();
   wrk_lock.unlock();
@@ -74,7 +75,7 @@ void vcl_interface_worker_register() {
           vppcom_mq_epoll_fd());
 }
 
-void vcl_interface_register_epoll_event(Envoy::Event::Dispatcher& dispatcher) {
+void vclInterfaceRegisterEpollEvent(Envoy::Event::Dispatcher& dispatcher) {
   if (mq_events_.find(vppcom_worker_index()) != mq_events_.end()) {
     return;
   }
@@ -97,7 +98,7 @@ Envoy::Network::IoHandlePtr VclSocketInterface::socket(Envoy::Network::Socket::T
                                                        Envoy::Network::Address::IpVersion,
                                                        bool) const {
   if (vppcom_worker_index() == -1) {
-    vcl_interface_worker_register();
+    vclInterfaceWorkerRegister();
   }
   VCL_LOG("trying to create socket1 epoll fd %d", vppcom_mq_epoll_fd());
   if (addr_type == Envoy::Network::Address::Type::Pipe) {
@@ -115,7 +116,7 @@ Envoy::Network::IoHandlePtr
 VclSocketInterface::socket(Envoy::Network::Socket::Type socket_type,
                            const Envoy::Network::Address::InstanceConstSharedPtr addr) const {
   if (vppcom_worker_index() == -1) {
-    vcl_interface_worker_register();
+    vclInterfaceWorkerRegister();
   }
   VCL_LOG("trying to create socket2 epoll fd %d", vppcom_mq_epoll_fd());
   if (addr->type() == Envoy::Network::Address::Type::Pipe) {

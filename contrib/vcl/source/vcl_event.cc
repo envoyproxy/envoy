@@ -19,8 +19,9 @@ VclEvent::~VclEvent() {
   // Worker listeners are valid only as long as the event is valid
   if (io_handle_.isWrkListener()) {
     auto parentListener = io_handle_.getParentListener();
-    if (parentListener)
+    if (parentListener) {
       parentListener->clearChildWrkListener();
+    }
     io_handle_.close();
   }
 }
