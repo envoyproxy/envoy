@@ -100,8 +100,17 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
   on_close_cb_ = [&]() { is_closed = true; };
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(
-          ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INTR),
-                                                            IoSocketError::deleteIoError)))));
+          ByMove(Api::IoCallUint64Result(-1, Api::IoErrorPtr(new IoSocketError(SOCKET_ERROR_INTR),
+                                                             IoSocketError::deleteIoError)))));
+  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(is_closed);
+
+  // on remote closed
+  is_closed = false;
+  on_close_cb_ = [&]() { is_closed = true; };
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce(Return(
+          ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_TRUE(is_closed);
 

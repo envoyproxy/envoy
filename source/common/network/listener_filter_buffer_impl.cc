@@ -15,7 +15,7 @@ const Buffer::ConstRawSlice ListenerFilterBufferImpl::rawSlice() const {
 }
 
 uint64_t ListenerFilterBufferImpl::drain(uint64_t length) {
-  ASSERT(length < data_size_);
+  ASSERT(length <= data_size_);
   auto size_to_drain = std::min(length, data_size_);
   // It doesn't drain the data from buffer directly until drain the data
   // from actual socket.
@@ -60,6 +60,9 @@ PeekState ListenerFilterBufferImpl::peekFromSocket() {
     if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
       return PeekState::Again;
     }
+    return PeekState::Error;
+  }
+  if (result.return_value_ <= 0) {
     return PeekState::Error;
   }
   data_size_ = result.return_value_ - drained_size_;
