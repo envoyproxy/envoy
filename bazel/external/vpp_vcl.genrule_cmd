@@ -18,6 +18,7 @@ pushd $$ROOT
 pip3 install ply
 
 # Build
+mkdir _vcl
 cmake -G Ninja -S src/ -B _vcl -DCMAKE_INSTALL_PREFIX=_vcl -DCMAKE_BUILD_TYPE:STRING=release
 ninja -C _vcl vppcom
 
