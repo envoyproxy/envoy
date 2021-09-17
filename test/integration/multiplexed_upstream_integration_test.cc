@@ -667,10 +667,12 @@ protected:
 };
 
 TEST_P(MixedUpstreamIntegrationTest, SimultaneousRequestAutoWithHttp3) {
+  use_alternate_protocols_cache_ = true;
   testRouterRequestAndResponseWithBody(0, 0, false);
 }
 
 TEST_P(MixedUpstreamIntegrationTest, SimultaneousRequestAutoWithHttp2) {
+  use_alternate_protocols_cache_ = true;
   use_http2_ = true;
   testRouterRequestAndResponseWithBody(0, 0, false);
 }
