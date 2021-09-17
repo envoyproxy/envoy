@@ -21,14 +21,14 @@ const std::string& PerConnectionRateLimiter::key() {
 
 LocalRateLimitRequestDescriptorsQueue::LocalRateLimitRequestDescriptorsQueue()
     : request_descriptors_queue_(
-          std::queue<absl::optional<absl::Span<const RateLimit::LocalDescriptor>>>()) {}
+          std::queue<absl::optional<std::vector<RateLimit::LocalDescriptor>>>()) {}
 
 void LocalRateLimitRequestDescriptorsQueue::push(
-    absl::optional<absl::Span<const RateLimit::LocalDescriptor>> request_descriptors) {
+    absl::optional<std::vector<RateLimit::LocalDescriptor>> request_descriptors) {
   request_descriptors_queue_.push(request_descriptors);
 }
 
-absl::optional<absl::Span<const RateLimit::LocalDescriptor>>
+absl::optional<std::vector<RateLimit::LocalDescriptor>>
 LocalRateLimitRequestDescriptorsQueue::pop() {
   auto request_descriptors = std::move(request_descriptors_queue_.front());
   request_descriptors_queue_.pop();
@@ -210,7 +210,7 @@ Filter::remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> reque
 }
 
 void Filter::pushRequestDescriptors(
-    absl::optional<absl::Span<const RateLimit::LocalDescriptor>> request_descriptors) {
+    absl::optional<std::vector<RateLimit::LocalDescriptor>> request_descriptors) {
   if (!decoder_callbacks_->streamInfo()
            .filterState()
            ->hasData<LocalRateLimitRequestDescriptorsQueue>(

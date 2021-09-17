@@ -63,15 +63,14 @@ class LocalRateLimitRequestDescriptorsQueue : public StreamInfo::FilterState::Ob
 public:
   LocalRateLimitRequestDescriptorsQueue();
   static const std::string& key();
-  void push(absl::optional<absl::Span<const RateLimit::LocalDescriptor>> request_descriptors);
-  absl::optional<absl::Span<const RateLimit::LocalDescriptor>> pop();
-  const std::queue<absl::optional<absl::Span<const RateLimit::LocalDescriptor>>>& value() const {
+  void push(absl::optional<std::vector<RateLimit::LocalDescriptor>> request_descriptors);
+  absl::optional<std::vector<RateLimit::LocalDescriptor>> pop();
+  const std::queue<absl::optional<std::vector<RateLimit::LocalDescriptor>>>& value() const {
     return request_descriptors_queue_;
   }
 
 private:
-  std::queue<absl::optional<absl::Span<const RateLimit::LocalDescriptor>>>
-      request_descriptors_queue_;
+  std::queue<absl::optional<std::vector<RateLimit::LocalDescriptor>>> request_descriptors_queue_;
 };
 
 /**
@@ -172,7 +171,7 @@ private:
   uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
   uint32_t remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
   void pushRequestDescriptors(
-      absl::optional<absl::Span<const RateLimit::LocalDescriptor>> request_descriptors);
+      absl::optional<std::vector<RateLimit::LocalDescriptor>> request_descriptors);
 
   const FilterConfig* getConfig() const;
   FilterConfigSharedPtr config_;
