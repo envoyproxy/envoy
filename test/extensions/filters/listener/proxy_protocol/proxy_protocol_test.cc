@@ -174,12 +174,14 @@ public:
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
-  void expectProxyProtoError() {
+  void expectConnectionError() {
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
     dispatcher_->run(Event::Dispatcher::RunType::Block);
-
+  }
+  void expectProxyProtoError() {
+    expectConnectionError();
     EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 1);
   }
 
@@ -360,8 +362,7 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
   connect(false);
   write(buffer, sizeof(buffer));
 
-  errno = 0;
-  expectProxyProtoError();
+  expectConnectionError();
 }
 
 TEST_P(ProxyProtocolTest, ErrorRecv_1) {
@@ -421,7 +422,7 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
   connect(false);
   write(buffer, sizeof(buffer));
 
-  expectProxyProtoError();
+  expectConnectionError();
 }
 
 TEST_P(ProxyProtocolTest, V2NotLocalOrOnBehalf) {
@@ -601,17 +602,16 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
 
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
+  bool header_writed = false;
   // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t n, int flags) {
+      .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
         const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
-        if (x.return_value_ == sizeof(tlv)) {
+        if (header_writed) {
           return Api::SysCallSizeResult{-1, 0};
-        } else {
-          return x;
         }
+        return x;
       }));
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
@@ -657,9 +657,10 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
   connect(false);
   write(buffer, sizeof(buffer));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  header_writed = true;
   write(tlv, sizeof(tlv));
 
-  expectProxyProtoError();
+  expectConnectionError();
 }
 
 TEST_P(ProxyProtocolTest, V2ParseExtensionsFrag) {
@@ -757,15 +758,17 @@ TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  bool partial_writed = false;
   // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
-        return os_sys_calls_actual_.recv(fd, buf, len, flags);
+      .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
+        const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
+        if (partial_writed) {
+          return Api::SysCallSizeResult{-1, 0};
+        }
+        return x;
       }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, 1, _))
-      .Times(AnyNumber())
-      .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -809,8 +812,11 @@ TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
           }));
   connect(false);
   write(buffer, 17);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  partial_writed = true;
+  write(buffer, 11);
 
-  expectProxyProtoError();
+  expectConnectionError();
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
@@ -824,15 +830,17 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  bool partial_writed = false;
   // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
-        return os_sys_calls_actual_.recv(fd, buf, len, flags);
+      .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
+        const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
+        if (partial_writed) {
+          return Api::SysCallSizeResult{-1, 0};
+        }
+        return x;
       }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, 4, _))
-      .Times(AnyNumber())
-      .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -877,9 +885,10 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
   connect(false);
   write(buffer, 10);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  partial_writed = true;
   write(buffer + 10, 10);
 
-  expectProxyProtoError();
+  expectConnectionError();
 }
 
 TEST_P(ProxyProtocolTest, PartialRead) {
