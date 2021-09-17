@@ -15,7 +15,7 @@ Server::BootstrapExtensionPtr
 VclSocketInterface::createBootstrapExtension(const Protobuf::Message&,
                                              Server::Configuration::ServerFactoryContext& ctx) {
 
-  vclSocketInterfaceInit(ctx.dispatcher());
+  vclSocketInterfaceInit(ctx.mainThreadDispatcher());
   return std::make_unique<VclSocketInterfaceExtension>(*this);
 }
 
