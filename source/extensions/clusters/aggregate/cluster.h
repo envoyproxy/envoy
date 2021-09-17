@@ -108,17 +108,14 @@ private:
     // Preconnecting not yet implemented for extensions.
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       NOT_REACHED_GCOVR_EXCL_LINE;
-      return nullptr;
     }
     absl::optional<Upstream::SelectedPoolAndConnection>
     selectPool(Upstream::LoadBalancerContext* /*context*/, const Upstream::Host& /*host*/,
                std::vector<uint8_t>& /*hash_key*/) override {
       NOT_REACHED_GCOVR_EXCL_LINE;
-      return absl::nullopt;
     }
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
-      return {};
     }
 
     absl::optional<uint32_t> hostToLinearizedPriority(const Upstream::HostDescription& host) const;
