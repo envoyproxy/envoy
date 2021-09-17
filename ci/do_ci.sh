@@ -375,14 +375,11 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api//envoy/...
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api_compat" ]]; then
-  echo "Building buf..."
-  bazel build @com_github_bufbuild_buf//:buf
-  BUF_PATH=$(realpath "bazel-source/external/com_github_bufbuild_buf/bin/buf")
   echo "Checking API for breaking changes to protobuf backwards compatibility..."
   BASE_BRANCH_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
   COMMIT_TITLE=$(git log -n 1 --pretty='format:%C(auto)%h (%s, %ad)' "${BASE_BRANCH_REF}")
   echo -e "\tUsing base commit ${COMMIT_TITLE}"
-  "${ENVOY_SRCDIR}"/tools/api_proto_breaking_change_detector/detector_ci.sh "${BUF_PATH}" "${BASE_BRANCH_REF}"
+  bazel run //tools/api_proto_breaking_change_detector:detector_ci "${BASE_BRANCH_REF}"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
   setup_clang_toolchain
