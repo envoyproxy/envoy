@@ -35,6 +35,7 @@ sleep 10
 run_log "Test OPA service responds with 200"
 responds_with_header \
     "HTTP/1.1 200 OK" \
+    -X GET \
     http://localhost:8000/service
 
 run_log "Check OPA logs"

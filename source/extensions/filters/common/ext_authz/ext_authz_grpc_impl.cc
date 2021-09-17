@@ -109,7 +109,7 @@ void GrpcClientImpl::toAuthzResponseHeader(
     ResponsePtr& response,
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers) {
   for (const auto& header : headers) {
-    if (header.append_action() == envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS) {
+    if (header.append().value()) {
       response->headers_to_append.emplace_back(Http::LowerCaseString(header.header().key()),
                                                header.header().value());
     } else {
