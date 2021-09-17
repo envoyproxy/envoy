@@ -8,7 +8,6 @@
 #include "envoy/http/header_map.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
-#include "envoy/stats/custom_stat_namespaces.h"
 
 #include "source/common/stats/histogram_impl.h"
 #include "source/server/admin/handler_ctx.h"
@@ -62,7 +61,6 @@ private:
                                  const std::map<std::string, std::string>& text_readouts,
                                  const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                                  bool used_only, const absl::optional<std::regex>& regex,
-                                 const Stats::CustomStatNamespaces& custom_stat_namespaces,
                                  bool pretty_print = false);
 
   void statsAsText(const std::map<std::string, uint64_t>& all_stats,
