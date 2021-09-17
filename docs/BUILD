@@ -132,8 +132,8 @@ genrule(
     name = "external_deps_rst",
     srcs = [
         "//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations_utils.bzl",
+        "@envoy_api//bazel:repository_locations.bzl",
+        "@envoy_api//bazel:repository_locations_utils.bzl",
     ],
     outs = ["external_deps_rst.tar"],
     cmd = "$(location //tools/docs:generate_external_deps_rst) $@",
@@ -142,8 +142,8 @@ genrule(
 
 genquery(
     name = "v3_proto_srcs",
-    expression = "labels(srcs, labels(deps, @envoy_api_canonical//:v3_protos))",
-    scope = ["@envoy_api_canonical//:v3_protos"],
+    expression = "labels(srcs, labels(deps, @envoy_api//:v3_protos))",
+    scope = ["@envoy_api//:v3_protos"],
 )
 
 genrule(

@@ -1544,10 +1544,10 @@ TEST_F(AsyncClientImplTest, DumpState) {
 } // namespace
 
 // Must not be in anonymous namespace for friend to work.
-class AsyncClientImplUnitTest : public testing::Test {
+class AsyncClientImplUnitTest : public AsyncClientImplTest {
 public:
   std::unique_ptr<AsyncStreamImpl::RouteImpl> route_impl_{new AsyncStreamImpl::RouteImpl(
-      "foo", absl::nullopt,
+      client_, absl::nullopt,
       Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
       absl::nullopt)};
   AsyncStreamImpl::NullVirtualHost vhost_;
@@ -1559,7 +1559,7 @@ public:
     TestUtility::loadFromYaml(yaml_config, retry_policy);
 
     route_impl_ = std::make_unique<AsyncStreamImpl::RouteImpl>(
-        "foo", absl::nullopt,
+        client_, absl::nullopt,
         Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
         std::move(retry_policy));
   }
@@ -1567,7 +1567,6 @@ public:
 
 // Test the extended fake route that AsyncClient uses.
 TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
-
   auto& route_entry = *(route_impl_->routeEntry());
 
   EXPECT_EQ(nullptr, route_impl_->decorator());
@@ -1598,7 +1597,6 @@ TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
 }
 
 TEST_F(AsyncClientImplUnitTest, RouteImplInitTestWithRetryPolicy) {
-
   const std::string yaml = R"EOF(
 per_try_timeout: 30s
 num_retries: 10

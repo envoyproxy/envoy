@@ -1,7 +1,0 @@
-#include "envoy/config/route/v4alpha/route_components.pb.h"
-
-void test() {
-  envoy::config::route::v4alpha::RouteAction route_action;
-  route_action.host_rewrite_literal();
-  route_action.set_host_rewrite_literal("blah");
-}

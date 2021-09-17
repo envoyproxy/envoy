@@ -151,8 +151,6 @@ EXCEPTION_ALLOWLIST = ("./source/common/config/utility.h")
 # Please DO NOT extend this allow list without consulting
 # @envoyproxy/dependency-shepherds.
 BUILD_URLS_ALLOWLIST = (
-    "./generated_api_shadow/bazel/repository_locations.bzl",
-    "./generated_api_shadow/bazel/envoy_http_archive.bzl",
     "./bazel/repository_locations.bzl",
     "./bazel/external/cargo/crates.bzl",
     "./api/bazel/repository_locations.bzl",
@@ -282,7 +280,6 @@ class FormatChecker:
         self.operation_type = args.operation_type
         self.target_path = args.target_path
         self.api_prefix = args.api_prefix
-        self.api_shadow_root = args.api_shadow_prefix
         self.envoy_build_rule_check = not args.skip_envoy_build_rule_check
         self.namespace_check = args.namespace_check
         self.namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
@@ -486,7 +483,7 @@ class FormatChecker:
         return file_path in BUILD_URLS_ALLOWLIST
 
     def is_api_file(self, file_path):
-        return file_path.startswith(self.api_prefix) or file_path.startswith(self.api_shadow_root)
+        return file_path.startswith(self.api_prefix)
 
     def is_build_file(self, file_path):
         basename = os.path.basename(file_path)
@@ -869,7 +866,7 @@ class FormatChecker:
                 + "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
 
         if file_path.endswith(PROTO_SUFFIX):
-            exclude_path = ['v1', 'v2', 'generated_api_shadow']
+            exclude_path = ['v1', 'v2']
             result = PROTO_VALIDATION_STRING.search(line)
             if result is not None:
                 if not any(x in file_path for x in exclude_path):
@@ -926,8 +923,7 @@ class FormatChecker:
             error_messages += self.execute_command(
                 command, "envoy_build_fixer check failed", file_path)
 
-        if self.is_build_file(file_path) and (file_path.startswith(self.api_prefix + "envoy") or
-                                              file_path.startswith(self.api_shadow_root + "envoy")):
+        if self.is_build_file(file_path) and file_path.startswith(self.api_prefix + "envoy"):
             found = False
             for line in self.read_lines(file_path):
                 if "api_proto_package(" in line:
@@ -1053,21 +1049,6 @@ class FormatChecker:
             error_messages.append(
                 "New directory %s appears to not have owners in CODEOWNERS" % dir_name)
 
-    def check_api_shadow_starlark_files(self, file_path, error_messages):
-        command = "diff -u "
-        command += file_path + " "
-        api_shadow_starlark_path = self.api_shadow_root + re.sub(r"\./api/", '', file_path)
-        command += api_shadow_starlark_path
-
-        error_message = self.execute_command(
-            command, "invalid .bzl in generated_api_shadow", file_path)
-        if self.operation_type == "check":
-            error_messages += error_message
-        elif self.operation_type == "fix" and len(error_message) != 0:
-            shutil.copy(file_path, api_shadow_starlark_path)
-
-        return error_messages
-
     def check_format_visitor(self, arg, dir_name, names):
         """Run check_format in parallel for the given files.
     Args:
@@ -1103,11 +1084,6 @@ class FormatChecker:
             self.check_owners(str(top_level), owned_directories, error_messages)
 
         for file_name in names:
-            if dir_name.startswith("./api") and self.is_starlark_file(file_name):
-                result = pool.apply_async(
-                    self.check_api_shadow_starlark_files,
-                    args=(dir_name + "/" + file_name, error_messages))
-                result_list.append(result)
             result = pool.apply_async(
                 self.check_format_return_trace_on_error, args=(dir_name + "/" + file_name,))
             result_list.append(result)
@@ -1147,11 +1123,6 @@ if __name__ == "__main__":
         default=multiprocessing.cpu_count(),
         help="number of worker processes to use; defaults to one per core.")
     parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
-    parser.add_argument(
-        "--api-shadow-prefix",
-        type=str,
-        default="./generated_api_shadow/",
-        help="path of the shadow API tree.")
     parser.add_argument(
         "--skip_envoy_build_rule_check",
         action="store_true",
