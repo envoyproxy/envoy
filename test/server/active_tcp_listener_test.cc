@@ -154,8 +154,9 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataFailedWithInitPeek) {
       .WillOnce(Return(ByMove(
           Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INTR),
                                                      Network::IoSocketError::deleteIoError)))));
-  EXPECT_CALL(io_handle_, close).WillOnce(Return(ByMove(Api::IoCallUint64Result(
-          0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, close)
+      .WillOnce(Return(
+          ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
   generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
 
   dispatcher_.clearDeferredDeleteList();
@@ -181,8 +182,9 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataFailedWithPeek) {
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(
           inspect_size_ / 2, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
-  EXPECT_CALL(io_handle_, close).WillOnce(Return(ByMove(Api::IoCallUint64Result(
-          0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, close)
+      .WillOnce(Return(
+          ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
   // the filter is looking for more data.
   EXPECT_CALL(*inspect_data_filter_, onData(_))
       .WillOnce(Return(Network::FilterStatus::StopIteration));
@@ -282,8 +284,9 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose) {
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(
           inspect_size_ / 2, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
-  EXPECT_CALL(io_handle_, close).WillOnce(Return(ByMove(Api::IoCallUint64Result(
-          0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, close)
+      .WillOnce(Return(
+          ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
   // the filter is looking for more data
   EXPECT_CALL(*inspect_data_filter_, onData(_))
       .WillOnce(Return(Network::FilterStatus::StopIteration));

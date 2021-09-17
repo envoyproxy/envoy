@@ -76,8 +76,7 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     config_->stats_.downstream_cx_proxy_proto_error_.inc();
     cb_->socket().ioHandle().close();
     return Network::FilterStatus::StopIteration;
-  }
-  else if (read_state == ReadOrParseState::TryAgainLater) {
+  } else if (read_state == ReadOrParseState::TryAgainLater) {
     return Network::FilterStatus::StopIteration;
   }
   return Network::FilterStatus::Continue;
@@ -131,8 +130,7 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
         proxy_protocol_header_.value().remote_address_);
   }
 
-  buffer.drain(
-    proxy_protocol_header_.value().wholeHeaderLength());
+  buffer.drain(proxy_protocol_header_.value().wholeHeaderLength());
 
   return ReadOrParseState::Done;
 }
@@ -169,7 +167,7 @@ bool Filter::parseV2Header(const char* buf) {
 
   if ((ver_cmd & 0xf) == PROXY_PROTO_V2_LOCAL) {
     // This is locally-initiated, e.g. health-check, and should not override remote address.
-    // Accroding to the spec, this address length should be zero for local connection.
+    // According to the spec, this address length should be zero for local connection.
     proxy_protocol_header_.emplace(WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, 0, 0});
     return true;
   }
@@ -201,7 +199,8 @@ bool Filter::parseV2Header(const char* buf) {
         la4.sin_port = v4->dst_port;
         la4.sin_addr.s_addr = v4->dst_addr;
         proxy_protocol_header_.emplace(
-            WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET, hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
+            WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET,
+                       hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
                        std::make_shared<Network::Address::Ipv4Instance>(&ra4),
                        std::make_shared<Network::Address::Ipv4Instance>(&la4)});
         return true;
@@ -226,9 +225,7 @@ bool Filter::parseV2Header(const char* buf) {
         safeMemcpy(&(la6.sin6_addr.s6_addr), &(v6->dst_addr));
 
         proxy_protocol_header_.emplace(WireHeader{
-            PROXY_PROTO_V2_HEADER_LEN,
-            hdr_addr_len,
-            PROXY_PROTO_V2_ADDR_LEN_INET6,
+            PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET6,
             hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
             std::make_shared<Network::Address::Ipv6Instance>(ra6),
             std::make_shared<Network::Address::Ipv6Instance>(la6)});
@@ -372,8 +369,7 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
     auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
     if (nullptr != key_value_pair) {
       ProtobufWkt::Value metadata_value;
-      metadata_value.set_string_value(reinterpret_cast<char const*>(buf + idx),
-                                      tlv_value_length);
+      metadata_value.set_string_value(reinterpret_cast<char const*>(buf + idx), tlv_value_length);
 
       std::string metadata_key = key_value_pair->metadata_namespace().empty()
                                      ? "envoy.filters.listener.proxy_protocol"
@@ -405,9 +401,9 @@ ReadOrParseState Filter::readExtensions(Network::ListenerFilterBuffer& buffer) {
     // to metadata. Those will drained from the buffer in the end.
     return ReadOrParseState::Done;
   }
-  
-  const uint8_t* buf = static_cast<const uint8_t *>(
-    raw_slice.mem_) + proxy_protocol_header_.value().headerLengthWithoutExtension();
+
+  const uint8_t* buf = static_cast<const uint8_t*>(raw_slice.mem_) +
+                       proxy_protocol_header_.value().headerLengthWithoutExtension();
   if (!parseTlvs(buf, proxy_protocol_header_.value().extensions_length_)) {
     return ReadOrParseState::Error;
   }
@@ -445,12 +441,14 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
     uint8_t lower_byte = buf[PROXY_PROTO_V2_HEADER_LEN - 1];
     ssize_t hdr_addr_len = (upper_byte << 8) + lower_byte;
     if (hdr_addr_len < addr_len) {
-      ENVOY_LOG(debug, "incorrect address length, address length = {}, the expected address length = {}", hdr_addr_len, addr_len);
+      ENVOY_LOG(debug,
+                "incorrect address length, address length = {}, the expected address length = {}",
+                hdr_addr_len, addr_len);
       return ReadOrParseState::Error;
     }
     // waiting for more data if there is no enough data for address.
     if (raw_slice.len_ >= static_cast<size_t>(PROXY_PROTO_V2_HEADER_LEN + addr_len)) {
-      // The TLV remain, they are parsed in parseTlvs() which is called from the
+      // The TLV remain, they are parsed in `parseTlvs()` which is called from the
       // parent (if needed).
       if (parseV2Header(buf)) {
         return ReadOrParseState::Done;

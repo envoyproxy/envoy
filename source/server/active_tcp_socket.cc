@@ -76,7 +76,8 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
       iter_ = accept_filters_.begin();
       if (listener_filter_max_read_bytes_ > 0) {
         listener_filter_buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
-            socket_->ioHandle(), listener_.dispatcher(), [this]() {
+            socket_->ioHandle(), listener_.dispatcher(),
+            [this]() {
               socket_->ioHandle().close();
               continueFilterChain(false);
             },

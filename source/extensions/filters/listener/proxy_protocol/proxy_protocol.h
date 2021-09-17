@@ -66,7 +66,7 @@ private:
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
 
-enum ProxyProtocolVersion { Unknown = 0,  V1 = 1, V2 = 2 };
+enum ProxyProtocolVersion { Unknown = 0, V1 = 1, V2 = 2 };
 
 enum class ReadOrParseState { Done, TryAgainLater, Error };
 
@@ -87,9 +87,7 @@ public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
   Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
-  size_t maxReadBytes() const override {
-    return MAX_PROXY_PROTO_LEN_V2;
-  }
+  size_t maxReadBytes() const override { return MAX_PROXY_PROTO_LEN_V2; }
 
 private:
   static const size_t MAX_PROXY_PROTO_LEN_V2 =

@@ -3,8 +3,8 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
-#include "source/common/network/listener_filter_buffer_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/listener_filter_buffer_impl.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
@@ -26,8 +26,7 @@ namespace TlsInspector {
 
 class FastMockListenerFilterCallbacks : public Network::MockListenerFilterCallbacks {
 public:
-  FastMockListenerFilterCallbacks(Network::ConnectionSocket& socket)
-      : socket_(socket) {}
+  FastMockListenerFilterCallbacks(Network::ConnectionSocket& socket) : socket_(socket) {}
   Network::ConnectionSocket& socket() override { return socket_; }
 
   Network::ConnectionSocket& socket_;
@@ -77,7 +76,8 @@ static void BM_TlsInspector(benchmark::State& state) {
   Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr);
   NiceMock<FastMockDispatcher> dispatcher;
   FastMockListenerFilterCallbacks cb(socket);
-  Network::ListenerFilterBufferImpl buffer(socket.ioHandle(), dispatcher, [](){}, [](){}, cfg->maxClientHelloSize());
+  Network::ListenerFilterBufferImpl buffer(
+      socket.ioHandle(), dispatcher, []() {}, []() {}, cfg->maxClientHelloSize());
   dispatcher.file_event_callback_(Event::FileReadyType::Read);
 
   for (auto _ : state) {
