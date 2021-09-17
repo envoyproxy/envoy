@@ -5,7 +5,12 @@ licenses(["notice"])  # Apache 2
 
 cc_library(
     name = "vpp_vcl",
-    srcs = ["libvppcom.so"],
+    srcs = [
+        "libsvm.a",
+        "libvlibmemoryclient.a",
+        "libvppcom.a",
+        "libvppinfra.a",
+    ],
     hdrs = ["src/vcl/vppcom.h"],
     defines = ["VPP_VCL"],
     includes = ["src/vcl/"],
@@ -17,7 +22,10 @@ genrule(
     name = "build",
     srcs = glob(["**"]),
     outs = [
-        "libvppcom.so",
+        "libvppcom.a",
+        "libvppinfra.a",
+        "libsvm.a",
+        "libvlibmemoryclient.a",
     ],
     cmd = genrule_cmd("@envoy//bazel/external:vpp_vcl.genrule_cmd"),
 )

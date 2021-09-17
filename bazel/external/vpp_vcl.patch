@@ -37,3 +37,15 @@
  if(VPP_USE_CCACHE)
    find_program(CCACHE_FOUND ccache)
    message(STATUS "Looking for ccache")
+
+--- src/cmake/library.cmake
++++ src/cmake/library.cmake
+@@ -24,7 +24,7 @@ macro(add_vpp_library lib)
+   set_target_properties(${lo} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+   target_compile_options(${lo} PUBLIC ${VPP_DEFAULT_MARCH_FLAGS})
+
+-  add_library(${lib} SHARED)
++  add_library(${lib} STATIC)
+   target_sources(${lib} PRIVATE $<TARGET_OBJECTS:${lo}>)
+
+   if(VPP_LIB_VERSION)

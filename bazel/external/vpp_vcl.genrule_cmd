@@ -18,6 +18,9 @@ pushd $$ROOT
 pip3 install ply
 
 # Build
+cmake --version
+ninja --version
+
 mkdir _vcl
 cmake -G Ninja -S src/ -B _vcl -DCMAKE_INSTALL_PREFIX=_vcl -DCMAKE_BUILD_TYPE:STRING=release
 ninja -C _vcl vppcom
@@ -25,4 +28,7 @@ ninja -C _vcl vppcom
 popd
 
 # Move compiled libraries to the expected destinations.
-mv $$ROOT/_vcl/lib/libvppcom.so.21.10 $(execpath libvppcom.so)
+mv $$ROOT/_vcl/CMakeFiles/vcl/libvppcom.a $(execpath libvppcom.a)
+mv $$ROOT/_vcl/CMakeFiles/vppinfra/libvppinfra.a $(execpath libvppinfra.a)
+mv $$ROOT/_vcl/CMakeFiles/svm/libsvm.a $(execpath libsvm.a)
+mv $$ROOT/_vcl/CMakeFiles/vlibmemory/libvlibmemoryclient.a $(execpath libvlibmemoryclient.a)
