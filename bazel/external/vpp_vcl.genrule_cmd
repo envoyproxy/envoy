@@ -14,8 +14,10 @@ ROOT=$$(dirname $(rootpath src/CMakeLists.txt))/..
 echo "ROOT $$ROOT"
 pushd $$ROOT
 
-# No dependencies beyond core dependencies
+# Handle extra dependencies
+pip3 install ply
 
+# Build
 cmake -G Ninja -S src/ -B _vcl -DCMAKE_INSTALL_PREFIX=_vcl -DCMAKE_BUILD_TYPE:STRING=release
 ninja -C _vcl vppcom
 
