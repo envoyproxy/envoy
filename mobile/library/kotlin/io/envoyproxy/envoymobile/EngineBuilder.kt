@@ -39,6 +39,7 @@ open class EngineBuilder(
   private var h2ConnectionKeepaliveTimeoutSeconds = 10
   private var statsFlushSeconds = 60
   private var streamIdleTimeoutSeconds = 15
+  private var perTryIdleTimeoutSeconds = 15
   private var appVersion = "unspecified"
   private var appId = "unspecified"
   private var virtualClusters = "[]"
@@ -200,6 +201,18 @@ open class EngineBuilder(
   }
 
   /**
+   * Add a custom per try idle timeout for HTTP streams. Defaults to 15 seconds.
+   *
+   * @param perTryIdleTimeoutSeconds per try idle timeout for HTTP streams.
+   *
+   * @return this builder.
+   */
+  fun addPerTryIdleTimeoutSeconds(perTryIdleTimeoutSeconds: Int): EngineBuilder {
+    this.perTryIdleTimeoutSeconds = perTryIdleTimeoutSeconds
+    return this
+  }
+
+  /**
    * Add an HTTP filter factory used to create platform filters for streams sent by this client.
    *
    * @param name Custom name to use for this filter factory. Useful for having
@@ -350,8 +363,8 @@ open class EngineBuilder(
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
             dnsQueryTimeoutSeconds, dnsPreresolveHostnames,
             h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-            statsFlushSeconds, streamIdleTimeoutSeconds, appVersion, appId,
-            virtualClusters, nativeFilterChain, platformFilterChain, stringAccessors
+            statsFlushSeconds, streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion,
+            appId, virtualClusters, nativeFilterChain, platformFilterChain, stringAccessors
           ),
           configuration.yaml,
           logLevel
@@ -365,8 +378,8 @@ open class EngineBuilder(
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
             dnsQueryTimeoutSeconds, dnsPreresolveHostnames,
             h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-            statsFlushSeconds, streamIdleTimeoutSeconds, appVersion, appId,
-            virtualClusters, nativeFilterChain, platformFilterChain, stringAccessors
+            statsFlushSeconds, streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion,
+            appId, virtualClusters, nativeFilterChain, platformFilterChain, stringAccessors
           ),
           logLevel
         )

@@ -112,6 +112,7 @@ std::string EngineBuilder::generateConfigStr() {
       {"stats_domain", this->stats_domain_},
       {"stats_flush_interval", fmt::format("{}s", this->stats_flush_seconds_)},
       {"stream_idle_timeout", fmt::format("{}s", this->stream_idle_timeout_seconds_)},
+      {"per_try_idle_timeout", fmt::format("{}s", this->per_try_idle_timeout_seconds_)},
       {"virtual_clusters", this->virtual_clusters_},
   };
 

@@ -65,6 +65,7 @@ private:
   std::string device_os_ = "unspecified";
   std::string virtual_clusters_ = "[]";
   int stream_idle_timeout_seconds_ = 15;
+  int per_try_idle_timeout_seconds_ = 15;
 
   // TODO(crockeo): add after filter integration
   // private var platformFilterChain = mutableListOf<EnvoyHTTPFilterFactory>()

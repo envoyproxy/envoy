@@ -222,6 +222,20 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
+  func testAddingPerTryIdleTimeoutSecondsAddsToConfigurationWhenRunningEnvoy() {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertEqual(21, config.perTryIdleTimeoutSeconds)
+      expectation.fulfill()
+    }
+
+    _ = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .addPerTryIdleTimeoutSeconds(21)
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
   func testAddingAppVersionAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -306,6 +320,7 @@ final class EngineBuilderTests: XCTestCase {
       h2ConnectionKeepaliveTimeoutSeconds: 333,
       statsFlushSeconds: 600,
       streamIdleTimeoutSeconds: 700,
+      perTryIdleTimeoutSeconds: 777,
       appVersion: "v1.2.3",
       appId: "com.envoymobile.ios",
       virtualClusters: "[test]",
@@ -331,6 +346,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&h2_connection_keepalive_timeout 333s"))
 
     XCTAssertTrue(resolvedYAML.contains("&stream_idle_timeout 700s"))
+    XCTAssertTrue(resolvedYAML.contains("&per_try_idle_timeout 777s"))
 
     XCTAssertFalse(resolvedYAML.contains("admin: *admin_interface"))
 
@@ -365,6 +381,7 @@ final class EngineBuilderTests: XCTestCase {
       h2ConnectionKeepaliveTimeoutSeconds: 333,
       statsFlushSeconds: 600,
       streamIdleTimeoutSeconds: 700,
+      perTryIdleTimeoutSeconds: 700,
       appVersion: "v1.2.3",
       appId: "com.envoymobile.ios",
       virtualClusters: "[test]",

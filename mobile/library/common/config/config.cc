@@ -48,6 +48,7 @@ const std::string config_header = R"(
 - &statsd_host 127.0.0.1
 - &statsd_port 8125
 - &stream_idle_timeout 15s
+- &per_try_idle_timeout 15s
 - &virtual_clusters []
 
 !ignore stats_defs:
@@ -228,6 +229,7 @@ static_resources:
                   cluster_header: x-envoy-mobile-cluster
                   timeout: 0s
                   retry_policy:
+                    per_try_idle_timeout: *per_try_idle_timeout
                     retry_back_off:
                       base_interval: 0.25s
                       max_interval: 60s
