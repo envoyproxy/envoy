@@ -2,8 +2,7 @@
 
 #include "envoy/common/pure.h"
 
-#include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Stats {
@@ -22,11 +21,6 @@ namespace Stats {
 class CustomStatNamespaces {
 public:
   virtual ~CustomStatNamespaces() = default;
-
-  /**
-   * @return true if no custom stat namespace is registered, false otherwise.
-   */
-  virtual bool empty() const PURE;
 
   /**
    * @param name is the name to check.

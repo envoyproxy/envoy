@@ -7,12 +7,10 @@ namespace Stats {
 
 TEST(CustomStatNamespacesImpl, Registration) {
   CustomStatNamespacesImpl namespaces;
-  EXPECT_TRUE(namespaces.empty());
   const std::string name = "foo";
   EXPECT_FALSE(namespaces.registered(name));
   namespaces.registerStatNamespace(name);
   EXPECT_TRUE(namespaces.registered(name));
-  EXPECT_FALSE(namespaces.empty());
   EXPECT_FALSE(namespaces.registered("bar"));
 }
 
