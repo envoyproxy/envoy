@@ -1,7 +1,5 @@
 #include "source/server/admin/prometheus_stats.h"
 
-#include <bits/stdint-uintn.h>
-
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/regex.h"
