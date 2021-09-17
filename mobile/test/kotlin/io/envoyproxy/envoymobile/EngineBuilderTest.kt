@@ -121,6 +121,16 @@ class EngineBuilderTest {
   }
 
   @Test
+  fun `specifying per try idle timeout overrides default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.addPerTryIdleTimeoutSeconds(5678)
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration!!.perTryIdleTimeoutSeconds).isEqualTo(5678)
+  }
+
+  @Test
   fun `specifying app version overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }

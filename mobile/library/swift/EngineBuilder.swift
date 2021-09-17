@@ -25,6 +25,7 @@ open class EngineBuilder: NSObject {
   private var h2ConnectionKeepaliveTimeoutSeconds: UInt32 = 10
   private var statsFlushSeconds: UInt32 = 60
   private var streamIdleTimeoutSeconds: UInt32 = 15
+  private var perTryIdleTimeoutSeconds: UInt32 = 15
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
   private var virtualClusters: String = "[]"
@@ -180,6 +181,17 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Add a custom per try idle timeout for HTTP streams. Defaults to 15 seconds.
+  ///
+  /// - parameter perTryIdleSeconds: Idle timeout for HTTP streams.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addPerTryIdleTimeoutSeconds(_ perTryIdleTimeoutSeconds: UInt32) -> Self {
+    self.perTryIdleTimeoutSeconds = perTryIdleTimeoutSeconds
+    return self
+  }
+
   /// Add an HTTP platform filter factory used to construct filters for streams sent by this client.
   ///
   /// - parameter name:    Custom name to use for this filter factory. Useful for having
@@ -332,6 +344,7 @@ open class EngineBuilder: NSObject {
       h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
       statsFlushSeconds: self.statsFlushSeconds,
       streamIdleTimeoutSeconds: self.streamIdleTimeoutSeconds,
+      perTryIdleTimeoutSeconds: self.perTryIdleTimeoutSeconds,
       appVersion: self.appVersion,
       appId: self.appId,
       virtualClusters: self.virtualClusters,

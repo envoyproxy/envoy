@@ -25,6 +25,7 @@ public class EnvoyConfiguration {
   public final List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories;
   public final Integer statsFlushSeconds;
   public final Integer streamIdleTimeoutSeconds;
+  public final Integer perTryIdleTimeoutSeconds;
   public final String appVersion;
   public final String appId;
   public final String virtualClusters;
@@ -50,6 +51,7 @@ public class EnvoyConfiguration {
    * @param h2ConnectionKeepaliveTimeoutSeconds rate in seconds to timeout h2 pings.
    * @param statsFlushSeconds            interval at which to flush Envoy stats.
    * @param streamIdleTimeoutSeconds     idle timeout for HTTP streams.
+   * @param perTryIdleTimeoutSeconds     per try idle timeout for HTTP streams.
    * @param appVersion                   the App Version of the App using this Envoy Client.
    * @param appId                        the App ID of the App using this Envoy Client.
    * @param virtualClusters              the JSON list of virtual cluster configs.
@@ -64,8 +66,9 @@ public class EnvoyConfiguration {
                             String dnsPreresolveHostnames,
                             int h2ConnectionKeepaliveIdleIntervalMilliseconds,
                             int h2ConnectionKeepaliveTimeoutSeconds, int statsFlushSeconds,
-                            int streamIdleTimeoutSeconds, String appVersion, String appId,
-                            String virtualClusters, List<EnvoyNativeFilterConfig> nativeFilterChain,
+                            int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds,
+                            String appVersion, String appId, String virtualClusters,
+                            List<EnvoyNativeFilterConfig> nativeFilterChain,
                             List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
                             Map<String, EnvoyStringAccessor> stringAccessors) {
     this.adminInterfaceEnabled = adminInterfaceEnabled;
@@ -82,6 +85,7 @@ public class EnvoyConfiguration {
     this.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
     this.statsFlushSeconds = statsFlushSeconds;
     this.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
+    this.perTryIdleTimeoutSeconds = perTryIdleTimeoutSeconds;
     this.appVersion = appVersion;
     this.appId = appId;
     this.virtualClusters = virtualClusters;
@@ -133,6 +137,7 @@ public class EnvoyConfiguration {
         .append(String.format("- &h2_connection_keepalive_timeout %ss\n",
                               h2ConnectionKeepaliveTimeoutSeconds))
         .append(String.format("- &stream_idle_timeout %ss\n", streamIdleTimeoutSeconds))
+        .append(String.format("- &per_try_idle_timeout %ss\n", perTryIdleTimeoutSeconds))
         .append(String.format("- &metadata { device_os: %s, app_version: %s, app_id: %s }\n",
                               "Android", appVersion, appId))
         .append("- &virtual_clusters ")
