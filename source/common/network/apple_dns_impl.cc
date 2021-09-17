@@ -204,9 +204,8 @@ std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalAddressLis
       return pending_cb_.v6_responses_;
     }
     return pending_cb_.v4_responses_;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void AppleDnsResolverImpl::PendingResolution::finishResolve() {
