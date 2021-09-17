@@ -76,7 +76,10 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
       iter_ = accept_filters_.begin();
       if (listener_filter_max_read_bytes_ > 0) {
         listener_filter_buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
-            socket_->ioHandle(), listener_.dispatcher(), [this]() { continueFilterChain(false); },
+            socket_->ioHandle(), listener_.dispatcher(), [this]() {
+              socket_->ioHandle().close();
+              continueFilterChain(false);
+            },
             [this]() {
               // If the filter doesn't need any data, then return directly.
               if ((*iter_)->maxReadBytes() == 0) {
@@ -92,6 +95,7 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
         // when accept the connection, the socket already has the data, so trigger
         // the data peek manually instead of waiting for next reading event.
         if (listener_filter_buffer_->peekFromSocket() == Network::PeekState::Error) {
+          socket_->ioHandle().close();
           continueFilterChain(false);
           return;
         }
