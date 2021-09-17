@@ -120,7 +120,7 @@ public:
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
-  TimeSource& timeSystem() { return factory_context_.dispatcher().timeSource(); }
+  TimeSource& timeSystem() { return factory_context_.mainThreadDispatcher().timeSource(); }
 
   void initializeFilter() { initializeFilter(""); }
 
