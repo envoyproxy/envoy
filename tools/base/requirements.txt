@@ -86,6 +86,7 @@ aiohttp==3.7.4.post0 \
     #   aiodocker
     #   envoy.github.abstract
     #   envoy.github.release
+    #   slackclient
 alabaster==0.7.12 \
     --hash=sha256:446438bdcca0e05bd45ea2de1668c1d9b032e1a9154c2c259092d77031ddd359 \
     --hash=sha256:a661d72d58e6ea8a57f7a86e37d86716863ee5e92788398526d58b26a4e4dc02
@@ -626,6 +627,10 @@ six==1.16.0 \
     # via
     #   pynacl
     #   sphinxcontrib-httpdomain
+slackclient==2.9.3 \
+    --hash=sha256:07ec8fa76f6aa64852210ae235ff9e637ba78124e06c0b07a7eeea4abb955965 \
+    --hash=sha256:2d68d668c02f4038299897e5c4723ab85dd40a3548354924b24f333a435856f8
+    # via -r tools/base/requirements.in
 smmap==4.0.0 \
     --hash=sha256:7e65386bd122d45405ddf795637b7f7d2b532e7e401d46bbe3fb49b9986d5182 \
     --hash=sha256:a9a7479e4c572e2e775c404dcd3080c8dc49f39918c2cf74913d30c4c478e3c2
