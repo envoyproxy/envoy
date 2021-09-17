@@ -69,14 +69,15 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
   }
   for (const auto& r : cur_removed) {
     auto actually_erased = false;
-    // The resource we are interested in could also come from a wildcard subscription. Instead of
-    // removing it outright, mark the resource as not interesting to us any more. The server could
-    // later send us an update. If we don't have a wildcard subscription, just drop it.
+    // The resource we have lost the interest in could also come from our wildcard subscription. We
+    // just don't know it at this point. Instead of removing it outright, mark the resource as not
+    // interesting to us any more and the server will send us an update. If we don't have a wildcard
+    // subscription then there is no ambiguity and just drop the resource.
     if (requested_resource_state_.contains(Wildcard)) {
       if (auto it = requested_resource_state_.find(r); it != requested_resource_state_.end()) {
         // Wildcard resources always have a version. If our requested resource has no version, it
         // won't be a wildcard resource then. If r is Wildcard itself, then it never has a version
-        // attached to it.
+        // attached to it, so it will not be moved to ambiguous category.
         if (!it->second.isWaitingForServer()) {
           ambiguous_resource_state_.insert({it->first, it->second.version()});
         }
@@ -134,9 +135,6 @@ bool DeltaSubscriptionState::subscriptionUpdatePending() const {
   // because even if it's empty, it won't be interpreted as legacy wildcard subscription, which can
   // only for the first request in the stream. So sending an empty request at this point should be
   // harmless.
-  //
-  // If sending empty requests at this point is actually harmful, we would need to add "&&
-  // !requested_resource_state_.empty()" to the return below.
   return must_send_discovery_request_;
 }
 

@@ -45,8 +45,11 @@ namespace Config {
 // indirectly interested through the subscription to the wildcard resource.
 //
 // The "ambiguous" category is for resources that we stopped being interested in, but we may still
-// be interested indirectly through the wildcard subscription - resources in these category are
-// "waiting" for the config server to confirm their status.
+// be interested indirectly through the wildcard subscription. This situation happens because of the
+// xDS protocol limitation - the server isn't able to tell us that the resource we subscribed to is
+// also a part of our wildcard subscription. So when we unsubscribe from the resource, we need to
+// receive a confirmation from the server whether to keep the resource (which means that it was a
+// part of our wildcard subscription) or to drop it.
 //
 // Please refer to drawings (non-wildcard-resource-state-machine.png and
 // (wildcard-resource-state-machine.png) for visual depictions of the resource state machine.
