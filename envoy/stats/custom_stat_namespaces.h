@@ -23,6 +23,11 @@ public:
   virtual ~CustomStatNamespaces() = default;
 
   /**
+   * @return true if no custom stat namespace is registered, false otherwise.
+   */
+  virtual bool empty() const PURE;
+
+  /**
    * @param name is the name to check.
    * @return true if the given name is registered as a custom stat namespace, false otherwise.
    */

@@ -35,14 +35,14 @@ public:
   static std::string formattedTags(const std::vector<Stats::Tag>& tags);
 
   /**
-   * Format the given metric name, and prefixed with "envoy_" if it does not have a custom
-   * stat namespace. If it has a custom stat namespace AND the name without the custom namespace
-   * has a valid prometheus namespace, the trimmed name is returned.
-   * Otherwise, return nullopt.
+   * Format the given metric name, and prefixed with "envoy_" if custom_stat_namespace_empty=true or
+   * the metric name does not have a custom stat namespace. If it has a custom stat namespace AND
+   * the name without the custom namespace has a valid prometheus namespace, the trimmed name is
+   * returned. Otherwise, return nullopt.
    */
   static absl::optional<std::string>
-  metricName(const std::string& extracted_name,
-             const Stats::CustomStatNamespaces& custom_namespace_factory);
+  metricName(const std::string& extracted_name, const bool custom_stat_namespace_empty,
+             const Stats::CustomStatNamespaces& custom_namespaces);
 };
 
 } // namespace Server
