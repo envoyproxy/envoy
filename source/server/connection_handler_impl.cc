@@ -27,7 +27,7 @@ void ConnectionHandlerImpl::decNumConnections() {
 
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                                         Network::ListenerConfig& config) {
-  bool support_udp_in_place_filter_chain_update = Runtime::runtimeFeatureEnabled(
+  const bool support_udp_in_place_filter_chain_update = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place");
   if (support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
     ActiveListenerDetailsOptRef listener_detail =

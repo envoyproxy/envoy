@@ -114,7 +114,8 @@ New Features
 * route config: added :ref:`dynamic_metadata <envoy_v3_api_field_config.route.v3.RouteMatch.dynamic_metadata>` for routing based on dynamic metadata.
 * sxg_filter: added filter to transform response to SXG package to :ref:`contrib images <install_contrib>`. This can be enabled by setting :ref:`SXG <envoy_v3_api_msg_extensions.filters.http.sxg.v3alpha.SXG>` configuration.
 * thrift_proxy: added support for :ref:`mirroring requests <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.request_mirror_policies>`.
-* udp: allows updating filter chain in-place through LDS, which is supported by Quic listener. This will be No-op with error log in other UDP listener implementations. It can be reverted by ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place``.
+* udp: allows updating filter chain in-place through LDS, which is supported by Quic listener. Such listener config will be rejected in other connection-less UDP listener implementations. It can be reverted by ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place``.
+* udp: disallow L4 filter chain in config which configures connection-less UDP listener. It can be reverted by ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place``.
 
 Deprecated
 ----------
