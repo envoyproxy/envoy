@@ -265,8 +265,8 @@ message JwtProvider {
   // .. warning::
   //   Using the same key name for :ref:`header_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
   //   and :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
-  //   is not allowed since it will override the existing entry. In a ``protobuf::Struct`` instance,
-  //   at the same level, keys are unique.
+  //   is not suggested due to potential override of existing entry, while it is not enforced during
+  //   config validation.
   //
   string header_in_metadata = 14;
 
