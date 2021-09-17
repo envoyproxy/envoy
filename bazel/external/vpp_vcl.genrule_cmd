@@ -2,9 +2,9 @@
 
 set -e
 
-# This works only on Linux-x86_64.
-if [[ `uname` != "Linux" || `uname -m` != "x86_64" ]]; then
-  echo "ERROR: VPP VCL is currently supported only on Linux-x86_64."
+# This works only on Linux.
+if [[ `uname` != "Linux" ]]; then
+  echo "ERROR: VPP VCL is currently supported only on Linux"
   exit 1
 fi
 

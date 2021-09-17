@@ -16,6 +16,16 @@
  string(REPLACE "-" ";" VPP_LIB_VERSION ${VPP_VERSION})
  list(GET VPP_LIB_VERSION 0 VPP_LIB_VERSION)
 
+@@ -179,7 +179,7 @@ if(VPP_HOST_TOOLS_ONLY)
+ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+   find_package(OpenSSL)
+   set(SUBDIRS
+-    vppinfra svm vlib vlibmemory vlibapi vnet vpp vat vat2 vcl plugins
++    vppinfra svm vlib vlibmemory vlibapi vnet vpp vat vat2 vcl
+     vpp-api tools/vppapigen tools/g2 tools/perftool cmake pkg
+     tools/appimage
+   )
+
 --- src/cmake/ccache.cmake
 +++ src/cmake/ccache.cmake
 @@ -14,7 +14,7 @@
