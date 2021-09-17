@@ -63,8 +63,11 @@ class LocalRateLimitRequestDescriptorsQueue : public StreamInfo::FilterState::Ob
 public:
   LocalRateLimitRequestDescriptorsQueue();
   static const std::string& key();
-  void push(absl::optional<absl::Span<const RateLimit::LocalDescriptor>>& request_descriptors);
+  void push(absl::optional<absl::Span<const RateLimit::LocalDescriptor>> request_descriptors);
   absl::optional<absl::Span<const RateLimit::LocalDescriptor>> pop();
+  const std::queue<absl::optional<absl::Span<const RateLimit::LocalDescriptor>>>& value() const {
+    return request_descriptors_queue_;
+  }
 
 private:
   std::queue<absl::optional<absl::Span<const RateLimit::LocalDescriptor>>>

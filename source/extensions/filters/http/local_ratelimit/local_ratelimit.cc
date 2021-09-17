@@ -24,7 +24,7 @@ LocalRateLimitRequestDescriptorsQueue::LocalRateLimitRequestDescriptorsQueue()
           std::queue<absl::optional<absl::Span<const RateLimit::LocalDescriptor>>>()) {}
 
 void LocalRateLimitRequestDescriptorsQueue::push(
-    absl::optional<absl::Span<const RateLimit::LocalDescriptor>>& request_descriptors) {
+    absl::optional<absl::Span<const RateLimit::LocalDescriptor>> request_descriptors) {
   request_descriptors_queue_.push(request_descriptors);
 }
 
@@ -119,17 +119,18 @@ bool FilterConfig::enforced() const {
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const auto* config = getConfig();
 
+  if (!config->enabled()) {
+    pushRequestDescriptors(absl::nullopt);
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  config->stats().enabled_.inc();
+
   std::vector<RateLimit::LocalDescriptor> descriptors;
   if (config->hasDescriptors()) {
     populateDescriptors(descriptors, headers);
   }
   pushRequestDescriptors(descriptors);
-
-  if (!config->enabled()) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  config->stats().enabled_.inc();
 
   if (requestAllowed(descriptors)) {
     config->stats().ok_.inc();
