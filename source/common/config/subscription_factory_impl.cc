@@ -89,7 +89,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
                                                    scope, true)
                 ->createUncachedRawAsyncClient(),
-            dispatcher_, sotwGrpcMethod(type_url, transport_api_version), api_.randomGenerator(),
+            dispatcher_, deltaGrpcMethod(type_url, transport_api_version), api_.randomGenerator(),
             scope, Utility::parseRateLimitSettings(api_config_source), local_info_,
             api_config_source.set_node_on_first_message_only());
       } else {
