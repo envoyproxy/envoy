@@ -42,7 +42,7 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
       config_(http_context.asyncClientStatPrefix(), local_info, stats_store, cm, runtime, random,
               std::move(shadow_writer), true, false, false, false, false, {},
               dispatcher.timeSource(), http_context, router_context),
-      dispatcher_(dispatcher) {}
+      dispatcher_(dispatcher), singleton_manager_(cm.clusterManagerFactory().singletonManager()) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -81,8 +81,8 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       router_(parent.config_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
       tracing_config_(Tracing::EgressConfig::get()),
-      route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), options.timeout,
-                                         options.hash_policy, options.retry_policy)),
+      route_(std::make_shared<RouteImpl>(parent_, options.timeout, options.hash_policy,
+                                         options.retry_policy)),
       send_xff_(options.send_xff) {
 
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);

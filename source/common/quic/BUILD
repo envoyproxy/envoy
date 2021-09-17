@@ -243,7 +243,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
-        "//source/common/quic/platform:quic_platform_mem_slice_storage_impl_lib",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
     ],
 )
@@ -271,7 +270,6 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
-        "//source/common/quic/platform:quic_platform_mem_slice_storage_impl_lib",
         "@com_github_google_quiche//:quic_core_http_client_lib",
     ],
 )
