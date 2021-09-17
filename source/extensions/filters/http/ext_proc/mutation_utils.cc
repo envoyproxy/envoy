@@ -64,6 +64,11 @@ void MutationUtils::applyHeaderMutations(const HeaderMutation& mutation, Http::H
     } else {
       envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action =
           sh.append_action();
+      // Preserve the old behavior by checking whether `append` exists or not. If it exists and is
+      // false then we need to overwrite the header value.
+      if (sh.has_append() && !sh.append().value()) {
+        append_action = envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS;
+      }
       const LowerCaseString lcKey(sh.header().key());
       if (append_action == envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS &&
           !headers.get(lcKey).empty() && !isAppendableHeader(lcKey)) {
