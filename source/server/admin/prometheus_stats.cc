@@ -198,9 +198,9 @@ absl::optional<std::string>
 PrometheusStatsFormatter::metricName(const std::string& extracted_name,
                                      const bool custom_stat_namespace_empty,
                                      const Stats::CustomStatNamespaces& custom_namespaces) {
-  const absl::optional<absl::string_view> custom_namespace_stripped =
-      custom_namespaces.stripRegisteredPrefix(extracted_name);
   if (!custom_stat_namespace_empty) {
+    const absl::optional<absl::string_view> custom_namespace_stripped =
+        custom_namespaces.stripRegisteredPrefix(extracted_name);
     if (custom_namespace_stripped.has_value()) {
       // This case the name has a custom namespace, and it is a custom metric.
       const std::string sanitized_name = sanitizeName(custom_namespace_stripped.value());
