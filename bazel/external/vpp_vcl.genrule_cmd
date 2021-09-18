@@ -17,14 +17,14 @@ pushd $$ROOT
 # Handle extra dependencies
 pip3 install ply
 
-# Build
-cmake --version
-ninja --version
+echo $$(cmake --version | head -1)
+echo "ninja version" $$(ninja --version)
 
+# Build
 mkdir _vcl
-cmake -G Ninja -S src/ -B _vcl -DCMAKE_INSTALL_PREFIX=_vcl -DCMAKE_BUILD_TYPE:STRING=release
-ls -lah _vcl
-ninja -C _vcl vppcom
+cd _vcl
+cmake -G Ninja ../src -DCMAKE_BUILD_TYPE:STRING=release
+ninja -C . vppcom
 
 popd
 
