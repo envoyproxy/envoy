@@ -104,11 +104,6 @@ private:
    */
   ReadOrParseState readProxyHeader(Network::ListenerFilterBuffer& buffer);
 
-  /**
-   * Parse (and discard unknown) header extensions (until hdr.extensions_length == 0)
-   */
-  ReadOrParseState parseExtensions(Network::IoHandle& io_handle, uint8_t* buf, size_t buf_size,
-                                   size_t* buf_off = nullptr);
   bool parseTlvs(const uint8_t* buf, size_t len);
   ReadOrParseState readExtensions(Network::ListenerFilterBuffer& buffer);
 
@@ -126,9 +121,6 @@ private:
   size_t search_index_{1};
 
   ProxyProtocolVersion header_version_{Unknown};
-
-  // Stores the portion of the first line that has been read so far.
-  char buf_[MAX_PROXY_PROTO_LEN_V2];
 
   ConfigSharedPtr config_;
 

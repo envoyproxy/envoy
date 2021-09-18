@@ -299,32 +299,6 @@ bool Filter::parseV1Header(const char* buf, size_t len) {
   return true;
 }
 
-ReadOrParseState Filter::parseExtensions(Network::IoHandle& io_handle, uint8_t* buf,
-                                         size_t buf_size, size_t* buf_off) {
-  // If we ever implement extensions elsewhere, be sure to
-  // continue to skip and ignore those for LOCAL.
-  while (proxy_protocol_header_.value().extensions_length_) {
-    int to_read = std::min(buf_size, proxy_protocol_header_.value().extensions_length_);
-    buf += (nullptr != buf_off) ? *buf_off : 0;
-    const auto recv_result = io_handle.recv(buf, to_read, 0);
-    if (!recv_result.ok()) {
-      if (recv_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-        return ReadOrParseState::TryAgainLater;
-      }
-      ENVOY_LOG(debug, "failed to read proxy protocol (no bytes avail)");
-      return ReadOrParseState::Error;
-    }
-
-    proxy_protocol_header_.value().extensions_length_ -= recv_result.return_value_;
-
-    if (nullptr != buf_off) {
-      *buf_off += recv_result.return_value_;
-    }
-  }
-
-  return ReadOrParseState::Done;
-}
-
 /**
  * @note  A TLV is arranged in the following format:
  *        struct pp2_tlv {
