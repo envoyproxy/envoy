@@ -9,13 +9,9 @@
 #include "source/extensions/filters/http/ext_authz/config.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/real_threads_test.h"
-#include "test/test_common/test_runtime.h"
+#include "test/test_common/real_threads_test_helper.h"
 #include "test/test_common/utility.h"
 
-#include "absl/synchronization/barrier.h"
-#include "absl/synchronization/blocking_counter.h"
-#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -42,10 +38,10 @@ public:
 };
 
 class ExtAuthzFilterTest : public Event::TestUsingSimulatedTime,
-                           public Thread::RealThreadsTestBase,
+                           public Thread::RealThreadsTestHelper,
                            public testing::Test {
 public:
-  ExtAuthzFilterTest() : RealThreadsTestBase(5), stat_names_(symbol_table_) {
+  ExtAuthzFilterTest() : RealThreadsTestHelper(5), stat_names_(symbol_table_) {
     runOnMainBlocking([&]() {
       async_client_manager_ = std::make_unique<TestAsyncClientManagerImpl>(
           context_.cluster_manager_, *tls_, api_->timeSource(), *api_, stat_names_);

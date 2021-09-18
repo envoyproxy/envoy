@@ -1,4 +1,4 @@
-#include "real_threads_test.h"
+#include "real_threads_test_helper.h"
 
 #include "absl/synchronization/barrier.h"
 #include "utility.h"
@@ -6,8 +6,8 @@
 namespace Envoy {
 namespace Thread {
 
-RealThreadsTestBase::RealThreadsTestBase(uint32_t num_threads)
-    : num_threads_(num_threads), api_(Api::createApiForTest()),
+RealThreadsTestHelper::RealThreadsTestHelper(uint32_t num_threads)
+    : api_(Api::createApiForTest()), num_threads_(num_threads),
       thread_factory_(api_->threadFactory()) {
   // This is the same order as InstanceImpl::initialize in source/server/server.cc.
   thread_dispatchers_.resize(num_threads_);
@@ -30,7 +30,7 @@ RealThreadsTestBase::RealThreadsTestBase(uint32_t num_threads)
   });
 }
 
-void RealThreadsTestBase::shutdownThreading() {
+void RealThreadsTestHelper::shutdownThreading() {
   runOnMainBlocking([this]() {
     if (!tls_->isShutdown()) {
       tls_->shutdownGlobalThreading();
@@ -39,7 +39,7 @@ void RealThreadsTestBase::shutdownThreading() {
   });
 }
 
-void RealThreadsTestBase::exitThreads() {
+void RealThreadsTestHelper::exitThreads() {
   for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
     dispatcher->post([&dispatcher]() { dispatcher->exit(); });
   }
@@ -55,7 +55,7 @@ void RealThreadsTestBase::exitThreads() {
   main_thread_->join();
 }
 
-void RealThreadsTestBase::runOnAllWorkersBlocking(std::function<void()> work) {
+void RealThreadsTestHelper::runOnAllWorkersBlocking(std::function<void()> work) {
   absl::Barrier start_barrier(num_threads_);
   BlockingBarrier blocking_barrier(num_threads_);
   for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
@@ -66,29 +66,30 @@ void RealThreadsTestBase::runOnAllWorkersBlocking(std::function<void()> work) {
   }
 }
 
-void RealThreadsTestBase::runOnMainBlocking(std::function<void()> work) {
+void RealThreadsTestHelper::runOnMainBlocking(std::function<void()> work) {
   BlockingBarrier blocking_barrier(1);
   main_dispatcher_->post(blocking_barrier.run([work]() { work(); }));
 }
 
-void RealThreadsTestBase::mainDispatchBlock() {
+void RealThreadsTestHelper::mainDispatchBlock() {
   // To ensure all stats are freed we have to wait for a few posts() to clear.
   // First, wait for the main-dispatcher to initiate the cross-thread TLS cleanup.
   runOnMainBlocking([]() {});
 }
 
-void RealThreadsTestBase::tlsBlock() {
+void RealThreadsTestHelper::tlsBlock() {
   runOnAllWorkersBlocking([]() {});
 }
 
-void RealThreadsTestBase::workerThreadFn(uint32_t thread_index, BlockingBarrier& blocking_barrier) {
+void RealThreadsTestHelper::workerThreadFn(uint32_t thread_index,
+                                           BlockingBarrier& blocking_barrier) {
   thread_dispatchers_[thread_index] =
       api_->allocateDispatcher(absl::StrCat("test_worker_", thread_index));
   blocking_barrier.decrementCount();
   thread_dispatchers_[thread_index]->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
-void RealThreadsTestBase::mainThreadFn(BlockingBarrier& blocking_barrier) {
+void RealThreadsTestHelper::mainThreadFn(BlockingBarrier& blocking_barrier) {
   main_dispatcher_ = api_->allocateDispatcher("test_main_thread");
   blocking_barrier.decrementCount();
   main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);

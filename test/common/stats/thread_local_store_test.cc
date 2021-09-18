@@ -20,7 +20,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
-#include "test/test_common/real_threads_test.h"
+#include "test/test_common/real_threads_test_helper.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_split.h"
@@ -1517,7 +1517,7 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             "B3.6e+06(1,1)",
             parent_histogram->bucketSummary());
 }
-class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestBase,
+class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,
                                        public ThreadLocalStoreNoMocksTestBase {
 protected:
   static constexpr uint32_t NumScopes = 1000;
@@ -1525,7 +1525,7 @@ protected:
 
 public:
   ThreadLocalRealThreadsTestBase(uint32_t num_threads)
-      : RealThreadsTestBase(num_threads), pool_(store_->symbolTable()) {
+      : RealThreadsTestHelper(num_threads), pool_(store_->symbolTable()) {
     runOnMainBlocking([this]() { store_->initializeThreading(*main_dispatcher_, *tls_); });
   }
 
@@ -1534,7 +1534,7 @@ public:
     exitThreads();
   }
 
-  void shutdownThreading() override {
+  void shutdownThreading() {
     runOnMainBlocking([this]() {
       if (!tls_->isShutdown()) {
         tls_->shutdownGlobalThreading();
@@ -1544,7 +1544,7 @@ public:
     });
   }
 
-  void exitThreads() override {
+  void exitThreads() {
     for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
       dispatcher->post([&dispatcher]() { dispatcher->exit(); });
     }
@@ -1582,11 +1582,8 @@ protected:
   }
 
   void createScopesIncCountersAndCleanupAllThreads() {
-    BlockingBarrier blocking_barrier(NumThreads);
-    for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
-      thread_dispatcher->post(
-          blocking_barrier.run([this]() { createScopesIncCountersAndCleanup(); }));
-    }
+
+    runOnAllWorkersBlocking([this]() { createScopesIncCountersAndCleanup(); });
   }
 
   std::chrono::seconds elapsedTime() {
@@ -1660,7 +1657,7 @@ protected:
 
   void mergeHistograms() {
     BlockingBarrier blocking_barrier(1);
-    main_dispatcher_->post([this, &blocking_barrier]() {
+    runOnMainBlocking([this, &blocking_barrier]() {
       store_->mergeHistograms(blocking_barrier.decrementCountFn());
     });
   }
@@ -1669,7 +1666,7 @@ protected:
     uint32_t num;
     {
       BlockingBarrier blocking_barrier(1);
-      main_dispatcher_->post([this, &num, &blocking_barrier]() {
+      runOnMainBlocking([this, &num, &blocking_barrier]() {
         ThreadLocalStoreTestingPeer::numTlsHistograms(*store_,
                                                       [&num, &blocking_barrier](uint32_t num_hist) {
                                                         num = num_hist;
@@ -1682,10 +1679,7 @@ protected:
 
   // Executes a function on every worker thread dispatcher.
   void foreachThread(const std::function<void()>& fn) {
-    BlockingBarrier blocking_barrier(NumThreads);
-    for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
-      thread_dispatcher->post(blocking_barrier.run(fn));
-    }
+    runOnAllWorkersBlocking([&fn]() { fn(); });
   }
 };
 

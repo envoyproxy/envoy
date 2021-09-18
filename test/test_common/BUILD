@@ -56,9 +56,9 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "real_threads_test_lib",
-    srcs = ["real_threads_test.cc"],
-    hdrs = ["real_threads_test.h"],
+    name = "real_threads_test_helper_lib",
+    srcs = ["real_threads_test_helper.cc"],
+    hdrs = ["real_threads_test_helper.h"],
     deps = [
         "utility_lib",
         "//source/common/common:thread_lib",

@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Thread {
 
-class RealThreadsTestBase {
+class RealThreadsTestHelper {
 protected:
   // Helper class to block on a number of multi-threaded operations occurring.
   class BlockingBarrier {
@@ -40,13 +40,13 @@ protected:
     absl::BlockingCounter blocking_counter_;
   };
 
-  RealThreadsTestBase(uint32_t num_threads);
+  RealThreadsTestHelper(uint32_t num_threads);
 
-  ~RealThreadsTestBase() = default;
+  ~RealThreadsTestHelper() = default;
 
-  virtual void shutdownThreading();
+  void shutdownThreading();
 
-  virtual void exitThreads();
+  void exitThreads();
 
   void runOnAllWorkersBlocking(std::function<void()> work);
 
@@ -56,11 +56,13 @@ protected:
 
   void tlsBlock();
 
-  const uint32_t num_threads_;
+  ThreadLocal::Instance& tls() { return *tls_; }
+
+  Api::Api& api() { return *api_; }
+
   Api::ApiPtr api_;
   Event::DispatcherPtr main_dispatcher_;
   std::vector<Event::DispatcherPtr> thread_dispatchers_;
-  ThreadFactory& thread_factory_;
   ThreadLocal::InstanceImplPtr tls_;
   ThreadPtr main_thread_;
   std::vector<ThreadPtr> threads_;
@@ -69,6 +71,9 @@ private:
   void workerThreadFn(uint32_t thread_index, BlockingBarrier& blocking_barrier);
 
   void mainThreadFn(BlockingBarrier& blocking_barrier);
+
+  const uint32_t num_threads_;
+  ThreadFactory& thread_factory_;
 };
 
 } // namespace Thread
