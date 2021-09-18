@@ -268,8 +268,8 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DuplicateDescriptor) {
 
 // Verify no exception for per route config without descriptors.
 TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitNoExceptionWithoutDescriptor) {
-  VERBOSE_EXPECT_NO_THROW(
-      LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_, true));
+  VERBOSE_EXPECT_NO_THROW(LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_,
+                                               descriptors_, true));
 }
 
 // Verify various token bucket CAS edge cases for descriptors.
