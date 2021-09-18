@@ -9,12 +9,13 @@
 #include "source/extensions/filters/http/ext_authz/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/real_threads_test.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/barrier.h"
 #include "absl/synchronization/blocking_counter.h"
 #include "absl/synchronization/notification.h"
-#include "absl/synchronization/barrier.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -27,141 +28,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
-
-class RealThreadsTestBase {
-protected:
-  // Helper class to block on a number of multi-threaded operations occurring.
-  class BlockingBarrier {
-  public:
-    explicit BlockingBarrier(uint32_t count) : blocking_counter_(count) {}
-    ~BlockingBarrier() { blocking_counter_.Wait(); }
-
-    /**
-     * Returns a function that first executes 'f', and then decrements the count
-     * toward unblocking the scope. This is intended to be used as a post() callback.
-     *
-     * @param f the function to run prior to decrementing the count.
-     */
-    std::function<void()> run(std::function<void()> f) {
-      return [this, f]() {
-        f();
-        decrementCount();
-      };
-    }
-
-    /**
-     * @return a function that, when run, decrements the count, intended for passing to post().
-     */
-    std::function<void()> decrementCountFn() {
-      return [this] { decrementCount(); };
-    }
-
-    void decrementCount() { blocking_counter_.DecrementCount(); }
-
-  private:
-    absl::BlockingCounter blocking_counter_;
-  };
-
-  RealThreadsTestBase(uint32_t num_threads)
-      : num_threads_(num_threads), api_(Api::createApiForTest()),
-        thread_factory_(api_->threadFactory()) {
-    // This is the same order as InstanceImpl::initialize in source/server/server.cc.
-    thread_dispatchers_.resize(num_threads_);
-    {
-      BlockingBarrier blocking_barrier(num_threads_ + 1);
-      main_thread_ = thread_factory_.createThread(
-          [this, &blocking_barrier]() { mainThreadFn(blocking_barrier); });
-      for (uint32_t i = 0; i < num_threads_; ++i) {
-        threads_.emplace_back(thread_factory_.createThread(
-            [this, i, &blocking_barrier]() { workerThreadFn(i, blocking_barrier); }));
-      }
-    }
-    runOnMainBlocking([this]() {
-      tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
-      tls_->registerThread(*main_dispatcher_, true);
-      for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
-        // Worker threads must be registered from the main thread, per assert in registerThread().
-        tls_->registerThread(*dispatcher, false);
-      }
-    });
-  }
-
-  ~RealThreadsTestBase() {}
-
-  virtual void shutdownThreading() {
-    runOnMainBlocking([this]() {
-      if (!tls_->isShutdown()) {
-        tls_->shutdownGlobalThreading();
-      }
-      tls_->shutdownThread();
-    });
-  }
-
-  virtual void exitThreads() {
-    for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
-      dispatcher->post([&dispatcher]() { dispatcher->exit(); });
-    }
-
-    for (Thread::ThreadPtr& thread : threads_) {
-      thread->join();
-    }
-
-    main_dispatcher_->post([this]() {
-      tls_.reset();
-      main_dispatcher_->exit();
-    });
-    main_thread_->join();
-  }
-
-  void runOnAllWorkersBlocking(std::function<void()> work) {
-    absl::Barrier start_barrier(num_threads_);
-    BlockingBarrier blocking_barrier(num_threads_);
-    for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
-      thread_dispatcher->post(blocking_barrier.run([work, &start_barrier]() {
-        start_barrier.Block();
-        work();
-      }));
-    }
-  }
-
-  void runOnMainBlocking(std::function<void()> work) {
-    BlockingBarrier blocking_barrier(1);
-    main_dispatcher_->post(blocking_barrier.run([work]() { work(); }));
-  }
-
-  void mainDispatchBlock() {
-    // To ensure all stats are freed we have to wait for a few posts() to clear.
-    // First, wait for the main-dispatcher to initiate the cross-thread TLS cleanup.
-    runOnMainBlocking([]() {});
-  }
-
-  void tlsBlock() {
-    runOnAllWorkersBlocking([]() {});
-  }
-
-  const uint32_t num_threads_;
-  Api::ApiPtr api_;
-  Event::DispatcherPtr main_dispatcher_;
-  std::vector<Event::DispatcherPtr> thread_dispatchers_;
-  Thread::ThreadFactory& thread_factory_;
-  ThreadLocal::InstanceImplPtr tls_;
-  Thread::ThreadPtr main_thread_;
-  std::vector<Thread::ThreadPtr> threads_;
-
-private:
-  void workerThreadFn(uint32_t thread_index, BlockingBarrier& blocking_barrier) {
-    thread_dispatchers_[thread_index] =
-        api_->allocateDispatcher(absl::StrCat("test_worker_", thread_index));
-    blocking_barrier.decrementCount();
-    thread_dispatchers_[thread_index]->run(Event::Dispatcher::RunType::RunUntilExit);
-  }
-
-  void mainThreadFn(BlockingBarrier& blocking_barrier) {
-    main_dispatcher_ = api_->allocateDispatcher("test_main_thread");
-    blocking_barrier.decrementCount();
-    main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-  }
-};
 
 class TestAsyncClientManagerImpl : public Grpc::AsyncClientManagerImpl {
 public:
@@ -176,7 +42,7 @@ public:
 };
 
 class ExtAuthzFilterTest : public Event::TestUsingSimulatedTime,
-                           public RealThreadsTestBase,
+                           public Thread::RealThreadsTestBase,
                            public testing::Test {
 public:
   ExtAuthzFilterTest() : RealThreadsTestBase(5), stat_names_(symbol_table_) {
@@ -251,7 +117,7 @@ public:
 };
 
 TEST_F(ExtAuthzFilterHttpTest, ExtAuthzFilterFactoryTestHttp) {
-  std::string ext_authz_config_yaml = R"EOF(
+  const std::string ext_authz_config_yaml = R"EOF(
   stat_prefix: "wall"
   transport_api_version: V3
   http_service:
@@ -356,7 +222,7 @@ private:
 };
 
 TEST_F(ExtAuthzFilterGrpcTest, EnvoyGrpc) {
-  std::string ext_authz_config_yaml = R"EOF(
+  const std::string ext_authz_config_yaml = R"EOF(
    transport_api_version: V3
    grpc_service:
      envoy_grpc:
@@ -367,7 +233,7 @@ TEST_F(ExtAuthzFilterGrpcTest, EnvoyGrpc) {
 }
 
 TEST_F(ExtAuthzFilterGrpcTest, GoogleGrpc) {
-  std::string ext_authz_config_yaml = R"EOF(
+  const std::string ext_authz_config_yaml = R"EOF(
   transport_api_version: V3
   grpc_service:
     google_grpc:
