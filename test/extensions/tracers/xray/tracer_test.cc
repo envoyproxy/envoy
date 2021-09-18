@@ -38,15 +38,16 @@ struct MockDaemonBroker : DaemonBroker {
 struct TraceProperties {
   TraceProperties(const std::string span_name, const std::string origin_name,
                   const std::string aws_key_value, const std::string operation_name,
-                  const std::string http_method, const std::string http_url,
-                  const std::string user_agent)
+                  const std::string direction, const std::string http_method,
+                  const std::string http_url, const std::string user_agent)
       : span_name(span_name), origin_name(origin_name), aws_key_value(aws_key_value),
-        operation_name(operation_name), http_method(http_method), http_url(http_url),
-        user_agent(user_agent) {}
+        operation_name(operation_name), direction(direction), http_method(http_method),
+        http_url(http_url), user_agent(user_agent) {}
   const std::string span_name;
   const std::string origin_name;
   const std::string aws_key_value;
   const std::string operation_name;
+  const std::string direction;
   const std::string http_method;
   const std::string http_url;
   const std::string user_agent;
@@ -56,9 +57,9 @@ class XRayTracerTest : public ::testing::Test {
 public:
   XRayTracerTest()
       : broker_(std::make_unique<MockDaemonBroker>("127.0.0.1:2000")),
-        expected_(std::make_unique<TraceProperties>("Service 1", "AWS::Service::Proxy",
-                                                    "test_value", "Create", "POST", "/first/second",
-                                                    "Mozilla/5.0 (Macintosh; Intel Mac OS X)")) {}
+        expected_(std::make_unique<TraceProperties>(
+            "Service 1", "AWS::Service::Proxy", "test_value", "egress hostname", "egress", "POST",
+            "/first/second", "Mozilla/5.0 (Macintosh; Intel Mac OS X)")) {}
   absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   NiceMock<Server::MockInstance> server_;
   std::unique_ptr<MockDaemonBroker> broker_;
@@ -75,6 +76,7 @@ void XRayTracerTest::commonAsserts(daemon::Segment& s) {
   EXPECT_EQ(expected_->http_url, s.http().request().fields().at("url").string_value().c_str());
   EXPECT_EQ(expected_->user_agent,
             s.http().request().fields().at(Tracing::Tags::get().UserAgent).string_value().c_str());
+  EXPECT_EQ(expected_->direction, s.annotations().at("direction").c_str());
 }
 
 TEST_F(XRayTracerTest, SerializeSpanTest) {
@@ -92,7 +94,7 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
     commonAsserts(s);
     EXPECT_FALSE(s.trace_id().empty());
     EXPECT_FALSE(s.id().empty());
-    EXPECT_EQ(1, s.annotations().size());
+    EXPECT_EQ(2, s.annotations().size());
     EXPECT_TRUE(s.parent_id().empty());
     EXPECT_FALSE(s.fault());    /*server error*/
     EXPECT_FALSE(s.error());    /*client error*/
@@ -355,7 +357,7 @@ TEST_F(XRayTracerTest, UseExistingHeaderInformation) {
   xray_header.trace_id_ = "a";
   xray_header.parent_id_ = "b";
   constexpr auto span_name = "my span";
-  constexpr auto operation_name = "my operation";
+  constexpr auto operation_name = "ingress";
 
   Tracer tracer{span_name,
                 "",
@@ -377,7 +379,7 @@ TEST_F(XRayTracerTest, DontStartSpanOnNonSampledSpans) {
   xray_header.sample_decision_ =
       SamplingDecision::NotSampled; // not sampled means we should panic on calling startSpan
   constexpr auto span_name = "my span";
-  constexpr auto operation_name = "my operation";
+  constexpr auto operation_name = "ingress";
 
   Tracer tracer{span_name,
                 "",
@@ -397,7 +399,7 @@ TEST_F(XRayTracerTest, UnknownSpanStillSampled) {
   xray_header.parent_id_ = "b";
   xray_header.sample_decision_ = SamplingDecision::Unknown;
   constexpr auto span_name = "my span";
-  constexpr auto operation_name = "my operation";
+  constexpr auto operation_name = "ingress";
 
   Tracer tracer{span_name,
                 "",
@@ -417,7 +419,7 @@ TEST_F(XRayTracerTest, UnknownSpanStillSampled) {
 
 TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
   constexpr auto span_name = "my span";
-  constexpr auto operation_name = "my operation";
+  constexpr auto operation_name = "ingress";
 
   Tracer tracer{span_name,
                 "",

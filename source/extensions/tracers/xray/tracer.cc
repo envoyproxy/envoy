@@ -19,6 +19,7 @@ namespace XRay {
 
 namespace {
 constexpr auto XRaySerializationVersion = "1";
+constexpr auto DirectionKey = "direction";
 
 // X-Ray Trace ID Format
 //
@@ -93,6 +94,11 @@ void Span::finishSpan() {
   for (const auto& item : custom_annotations_) {
     s.mutable_annotations()->insert({item.first, item.second});
   }
+
+  // Gets this Span's direction from operation name, direction is either
+  // "ingress" or "egress" and will be the first word from operation_name_
+  s.mutable_annotations()->insert(
+      {DirectionKey, operation_name_.substr(0, operation_name_.find(" "))});
 
   const std::string json = MessageUtil::getJsonStringFromMessageOrDie(
       s, false /* pretty_print  */, false /* always_print_primitive_fields */);
