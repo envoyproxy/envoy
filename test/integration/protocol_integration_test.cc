@@ -669,6 +669,9 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyBytesCount) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 80, 71, 46),
                                        BytesCountExpectation(0, 58, 0, 58));
+  if (downstreamProtocol() == Http::CodecType::HTTP2) {
+    ASSERT(false);
+  }
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
