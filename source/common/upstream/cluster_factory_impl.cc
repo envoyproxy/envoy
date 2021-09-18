@@ -97,7 +97,7 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
 
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     Envoy::Network::makeDnsResolverConfig(cluster, typed_dns_resolver_config);
-    return context.dispatcher().createDnsResolver(typed_dns_resolver_config);
+    return context.mainThreadDispatcher().createDnsResolver(typed_dns_resolver_config);
   }
 
   return context.dnsResolver();
@@ -111,7 +111,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
       transport_factory_context =
           std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
               context.admin(), context.sslContextManager(), *stats_scope, context.clusterManager(),
-              context.localInfo(), context.dispatcher(), context.stats(),
+              context.localInfo(), context.mainThreadDispatcher(), context.stats(),
               context.singletonManager(), context.threadLocal(), context.messageValidationVisitor(),
               context.api(), context.options());
 
@@ -125,13 +125,13 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
     } else {
       new_cluster_pair.first->setHealthChecker(HealthCheckerFactory::create(
           cluster.health_checks()[0], *new_cluster_pair.first, context.runtime(),
-          context.dispatcher(), context.logManager(), context.messageValidationVisitor(),
+          context.mainThreadDispatcher(), context.logManager(), context.messageValidationVisitor(),
           context.api()));
     }
   }
 
   new_cluster_pair.first->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
-      *new_cluster_pair.first, cluster, context.dispatcher(), context.runtime(),
+      *new_cluster_pair.first, cluster, context.mainThreadDispatcher(), context.runtime(),
       context.outlierEventLogger()));
 
   new_cluster_pair.first->setTransportFactoryContext(std::move(transport_factory_context));
