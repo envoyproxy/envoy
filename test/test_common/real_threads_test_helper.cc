@@ -30,6 +30,17 @@ RealThreadsTestHelper::RealThreadsTestHelper(uint32_t num_threads)
   });
 }
 
+std::function<void()> RealThreadsTestHelper::BlockingBarrier::run(std::function<void()> f) {
+  return [this, f]() {
+    f();
+    decrementCount();
+  };
+}
+
+std::function<void()> RealThreadsTestHelper::BlockingBarrier::decrementCountFn() {
+  return [this] { decrementCount(); };
+}
+
 void RealThreadsTestHelper::shutdownThreading() {
   runOnMainBlocking([this]() {
     if (!tls_->isShutdown()) {

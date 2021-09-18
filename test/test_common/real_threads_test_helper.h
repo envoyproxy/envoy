@@ -20,19 +20,12 @@ protected:
      *
      * @param f the function to run prior to decrementing the count.
      */
-    std::function<void()> run(std::function<void()> f) {
-      return [this, f]() {
-        f();
-        decrementCount();
-      };
-    }
+    std::function<void()> run(std::function<void()> f);
 
     /**
      * @return a function that, when run, decrements the count, intended for passing to post().
      */
-    std::function<void()> decrementCountFn() {
-      return [this] { decrementCount(); };
-    }
+    std::function<void()> decrementCountFn();
 
     void decrementCount() { blocking_counter_.DecrementCount(); }
 
