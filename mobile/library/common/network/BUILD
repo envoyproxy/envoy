@@ -28,6 +28,7 @@ envoy_cc_library(
         "@envoy//source/common/common:assert_lib",
         "@envoy//source/common/common:scalar_to_byte_vector_lib",
         "@envoy//source/common/common:utility_lib",
+        "@envoy//source/common/network:addr_family_aware_socket_option_lib",
         "@envoy//source/common/network:socket_option_lib",
     ],
 )

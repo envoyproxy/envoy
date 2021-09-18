@@ -5,7 +5,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
-#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/addr_family_aware_socket_option_impl.h"
 
 // Used on Linux/Android
 #ifdef SO_BINDTODEVICE
@@ -32,6 +32,13 @@
 #define ENVOY_SOCKET_IP_TTL ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, IP_TTL)
 #else
 #define ENVOY_SOCKET_IP_TTL Network::SocketOptionName()
+#endif
+
+#ifdef IPV6_UNICAST_HOPS
+#define ENVOY_SOCKET_IPV6_UNICAST_HOPS                                                             \
+  ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_UNICAST_HOPS)
+#else
+#define ENVOY_SOCKET_IPV6_UNICAST_HOPS Network::SocketOptionName()
 #endif
 
 #define DEFAULT_IP_TTL 64
@@ -74,8 +81,9 @@ Socket::OptionsSharedPtr MobileUtility::getUpstreamSocketOptions(envoy_network_t
   ASSERT(network >= 0 && network < 3);
   int ttl_value = DEFAULT_IP_TTL + static_cast<int>(network);
   auto options = std::make_shared<Socket::Options>();
-  options->push_back(std::make_shared<SocketOptionImpl>(
-      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_TTL, ttl_value));
+  options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_TTL,
+      ENVOY_SOCKET_IPV6_UNICAST_HOPS, ttl_value));
   return options;
 }
 
