@@ -83,7 +83,7 @@ TEST_DeserializerShouldDeserialize(UInt16Deserializer, uint16_t, 42);
 TEST_DeserializerShouldDeserialize(Int32Deserializer, int32_t, 42);
 TEST_DeserializerShouldDeserialize(UInt32Deserializer, uint32_t, 42);
 TEST_DeserializerShouldDeserialize(Int64Deserializer, int64_t, 42);
-TEST_DeserializerShouldDeserialize(Int64Deserializer, double, 13.25);
+TEST_DeserializerShouldDeserialize(Float64Deserializer, double, 13.25);
 TEST_DeserializerShouldDeserialize(BooleanDeserializer, bool, true);
 
 EncodingContext encoder{-1}; // Provided api_version does not matter for primitive types.
