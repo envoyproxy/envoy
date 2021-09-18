@@ -166,6 +166,8 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
          !typed_dns_resolver_config.typed_config().type_url().empty());
 
   // Derive the DNS resolver factory from config.
+  // If the typed config is not registered or bogus, it will throw an exception.
+  // Since this function is only called in control plane, it is safe to throw an exception here.
   Network::DnsResolverFactory& dns_resolver_factory =
       Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(typed_dns_resolver_config);
 

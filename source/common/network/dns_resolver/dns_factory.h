@@ -52,22 +52,16 @@ void makeEmptyDnsResolverConfig(
 bool checkUseAppleApiForDnsLookups(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
-// If the config has typed_dns_resolver_config, and the corresponding DNS resolver factory is
-// registered, copy it into typed_dns_resolver_config and return true. Otherwise, return false.
+// If the config has typed_dns_resolver_config, copy it over.
 template <class ConfigType>
 bool checkTypedDnsResolverConfigExist(
     const ConfigType& config,
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   if (config.has_typed_dns_resolver_config()) {
-    Network::DnsResolverFactory* dns_resolver_factory =
-        Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(
-            config.typed_dns_resolver_config(), true);
-    if ((dns_resolver_factory != nullptr) &&
-        (dns_resolver_factory->category() == std::string(DnsResolverCategory))) {
-      typed_dns_resolver_config.MergeFrom(config.typed_dns_resolver_config());
-      return true;
-    }
+    typed_dns_resolver_config.MergeFrom(config.typed_dns_resolver_config());
+    return true;
   }
+  // If typed_dns_resolver_config is missing, fall back to default case.
   return false;
 }
 
