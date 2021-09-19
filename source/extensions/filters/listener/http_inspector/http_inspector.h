@@ -71,9 +71,7 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
   Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
 
-  size_t maxReadBytes() const override {
-    return Config::MAX_INSPECT_SIZE;
-  }
+  size_t maxReadBytes() const override { return Config::MAX_INSPECT_SIZE; }
 
 private:
   static const absl::string_view HTTP2_CONNECTION_PREFACE;

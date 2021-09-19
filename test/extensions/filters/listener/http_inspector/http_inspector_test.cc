@@ -48,10 +48,10 @@ public:
         .WillOnce(
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
-      *io_handle_, dispatcher_, [](){}, [](){}, filter_->maxReadBytes());
+        *io_handle_, dispatcher_, []() {}, []() {}, filter_->maxReadBytes());
   }
 
-  void testHttpInspaceMultipleReadsFailed(absl::string_view header, bool http2=false) {
+  void testHttpInspaceMultipleReadsFailed(absl::string_view header, bool http2 = false) {
     init();
     const std::vector<uint8_t> data = Hex::decode(std::string(header));
     {
@@ -64,18 +64,18 @@ public:
       if (http2) {
         for (size_t i = 1; i <= data.size(); i++) {
           EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Invoke(
-              [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= i);
-                memcpy(buffer, data.data(), i);
-                return Api::SysCallSizeResult{ssize_t(i), 0};
-              }));
+              .WillOnce(Invoke(
+                  [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                    ASSERT(length >= i);
+                    memcpy(buffer, data.data(), i);
+                    return Api::SysCallSizeResult{ssize_t(i), 0};
+                  }));
         }
       } else {
         for (size_t i = 1; i <= header.size(); i++) {
           EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Invoke(
-              [&header, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+              .WillOnce(Invoke([&header, i](os_fd_t, void* buffer, size_t length,
+                                            int) -> Api::SysCallSizeResult {
                 ASSERT(length >= i);
                 memcpy(buffer, header.data(), i);
                 return Api::SysCallSizeResult{ssize_t(i), 0};
@@ -96,7 +96,7 @@ public:
       auto status = filter_->onData(*buffer_);
       EXPECT_EQ(status, Network::FilterStatus::StopIteration);
     }
-  
+
     EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
   }
 
@@ -124,8 +124,8 @@ public:
       } else {
         for (size_t i = 1; i <= header.size(); i++) {
           EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Invoke(
-              [&header, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+              .WillOnce(Invoke([&header, i](os_fd_t, void* buffer, size_t length,
+                                            int) -> Api::SysCallSizeResult {
                 ASSERT(length >= i);
                 memcpy(buffer, header.data(), i);
                 return Api::SysCallSizeResult{ssize_t(i), 0};
@@ -170,8 +170,8 @@ public:
               }));
     } else {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(
-              Invoke([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+          .WillOnce(Invoke(
+              [&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
                 ASSERT(length >= header.size());
                 memcpy(buffer, header.data(), header.size());
                 return Api::SysCallSizeResult{ssize_t(header.size()), 0};
@@ -210,12 +210,12 @@ public:
               }));
     } else {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-        .WillOnce(
-            Invoke([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-              ASSERT(length >= header.size());
-              memcpy(buffer, header.data(), header.size());
-              return Api::SysCallSizeResult{ssize_t(header.size()), 0};
-            }));
+          .WillOnce(Invoke(
+              [&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= header.size());
+                memcpy(buffer, header.data(), header.size());
+                return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+              }));
     }
 
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);

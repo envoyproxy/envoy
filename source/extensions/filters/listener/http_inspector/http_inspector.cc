@@ -31,11 +31,10 @@ http_parser_settings Filter::settings_{
     nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 };
 
-Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer)  {
+Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   auto raw_slice = buffer.rawSlice();
   const char* buf = static_cast<const char*>(raw_slice.mem_);
-  const auto parse_state =
-      parseHttpHeader(absl::string_view(buf, raw_slice.len_));
+  const auto parse_state = parseHttpHeader(absl::string_view(buf, raw_slice.len_));
   switch (parse_state) {
   case ParseState::Error:
     done(false);
