@@ -34,7 +34,19 @@ bool ListenerFilterBufferImpl::drainFromSocket() {
   uint64_t read_size = 0;
   while (1) {
     auto result = io_handle_.recv(buf.get(), drained_size_ - read_size, 0);
+    ENVOY_LOG(trace, "recv returned: {}", result.return_value_);
+
     if (!result.ok()) {
+      if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+        continue;
+      }
+      ENVOY_LOG(debug, "recv failed: {}: {}", result.err_->getErrorCode(),
+                result.err_->getErrorDetails());
+      return false;
+    }
+    // remote closed
+    if (result.return_value_ == 0) {
+      ENVOY_LOG(debug, "recv failed: remote closed");
       return false;
     }
     read_size += result.return_value_;
@@ -56,13 +68,19 @@ PeekState ListenerFilterBufferImpl::peekFromSocket() {
   auto raw_slice = buffer_->frontSlice();
 
   const auto result = io_handle_.recv(raw_slice.mem_, raw_slice.len_, MSG_PEEK);
+  ENVOY_LOG(trace, "recv returned: {}", result.return_value_);
+
   if (!result.ok()) {
     if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
       return PeekState::Again;
     }
+    ENVOY_LOG(debug, "recv failed: {}: {}", result.err_->getErrorCode(),
+              result.err_->getErrorDetails());
     return PeekState::Error;
   }
-  if (result.return_value_ <= 0) {
+  // remote closed
+  if (result.return_value_ == 0) {
+    ENVOY_LOG(debug, "recv failed: remote closed");
     return PeekState::Error;
   }
   data_size_ = result.return_value_ - drained_size_;
