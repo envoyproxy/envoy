@@ -51,7 +51,7 @@ public:
         *io_handle_, dispatcher_, []() {}, []() {}, filter_->maxReadBytes());
   }
 
-  void testHttpInspaceMultipleReadsFailed(absl::string_view header, bool http2 = false) {
+  void testHttpInspectMultipleReadsSuccess(absl::string_view header, bool http2 = false) {
     init();
     const std::vector<uint8_t> data = Hex::decode(std::string(header));
     {
@@ -100,7 +100,7 @@ public:
     EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
   }
 
-  void testHttpInspaceMultipleReadsSuccess(absl::string_view header, absl::string_view alpn) {
+  void testHttpInspectMultipleReadsSuccess(absl::string_view header, absl::string_view alpn) {
     init();
     const std::vector<absl::string_view> alpn_protos{alpn};
     const std::vector<uint8_t> data = Hex::decode(std::string(header));
@@ -343,29 +343,29 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
       "8825b650c3abb8d2e053032a2f2a408df2b4a7b3c0ec90b22d5d8749ff839d29af4089f2b585ed6950958d279a18"
       "9e03f1ca5582265f59a75b0ac3111959c7e49004908db6e83f4096f2b16aee7f4b17cd65224b22d6765926a4a7b5"
       "2b528f840b60003f";
-  testHttpInspaceMultipleReadsSuccess(header, Http::Utility::AlpnNames::get().Http2c);
+  testHttpInspectMultipleReadsSuccess(header, Http::Utility::AlpnNames::get().Http2c);
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp2BadPreface) {
   const std::string header = "505249202a20485454502f322e300d0a0d0c";
-  testHttpInspaceMultipleReadsFailed(header, true);
+  testHttpInspectMultipleReadsSuccess(header, true);
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1) {
   const absl::string_view data = "GET /anything HTTP/1.0\r";
-  testHttpInspaceMultipleReadsSuccess(data, Http::Utility::AlpnNames::get().Http10);
+  testHttpInspectMultipleReadsSuccess(data, Http::Utility::AlpnNames::get().Http10);
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteBadHeader) {
   const absl::string_view data = "X";
-  testHttpInspaceMultipleReadsFailed(data);
+  testHttpInspectMultipleReadsSuccess(data);
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
   const std::string valid_header = "GET /index HTTP/1.1\r";
   //  offset:                       0         10
   const std::string truncate_header = valid_header.substr(0, 14).append("\r");
-  testHttpInspaceMultipleReadsFailed(truncate_header);
+  testHttpInspectMultipleReadsSuccess(truncate_header);
 }
 
 TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {

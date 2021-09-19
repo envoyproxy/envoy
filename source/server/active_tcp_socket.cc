@@ -122,7 +122,7 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
           return;
         } else {
           // When reach this branch, the maxReadBytes must greater than 0.
-          // the nagative maxReadBytes is invalid.
+          // the negative maxReadBytes is invalid.
           ASSERT((*iter_)->maxReadBytes() > 0);
           // There may already have data peeked due to previous filter.
           if (listener_filter_buffer_ != nullptr) {
