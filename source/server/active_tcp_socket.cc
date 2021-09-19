@@ -114,9 +114,18 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
           // break the loop but should not create new connection
           no_error = false;
           break;
+        } else if ((*iter_)->maxReadBytes() == 0) {
+          // The filter return stop the filters iteration and doesn't need to inspect data.
+          // We consider it as the filter reject the connection.
+          socket_->ioHandle().close();
+          continueFilterChain(false);
+          return;
         } else {
+          // When reach this branch, the maxReadBytes must greater than 0.
+          // the nagative maxReadBytes is invalid.
+          ASSERT((*iter_)->maxReadBytes() > 0);
           // There may already have data peeked due to previous filter.
-          if ((*iter_)->maxReadBytes() > 0 && listener_filter_buffer_ != nullptr) {
+          if (listener_filter_buffer_ != nullptr) {
             if (listener_filter_buffer_->length() > 0) {
               Network::FilterStatus status = (*iter_)->onData(*listener_filter_buffer_);
               // The filter needn't to inspect more data, then go to next filter.
@@ -125,7 +134,7 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
               }
             }
           }
-          // Blocking at the filter but no error
+          // waiting for more data
           return;
         }
       }
