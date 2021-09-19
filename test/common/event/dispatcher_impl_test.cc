@@ -390,7 +390,7 @@ TEST_F(DispatcherImplTest, InitializeStats) {
 }
 
 // createDnsResolver test with unregistered typed_dns_resolver_config.
-// Verify it throws an EnvoyException as expeced.
+// Verify it throws an EnvoyException as expected.
 TEST_F(DispatcherImplTest, CreateDnsResolverTestWithUnregisteredType) {
   // Need to call createDnsResolver within the dispatcher thread's context
   // to pass the check: ASSERT(isThreadSafe()).
