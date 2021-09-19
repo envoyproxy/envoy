@@ -648,7 +648,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("InvalidHeaderFilter_ready\n"));
 }
 
-TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyBytesCount) {
+TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%\n");
   config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
@@ -669,9 +669,29 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyBytesCount) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   expectDownstreamBytesSentAndReceived(BytesCountExpectation(90, 80, 71, 46),
                                        BytesCountExpectation(0, 58, 0, 58));
-  if (downstreamProtocol() == Http::CodecType::HTTP2) {
-    ASSERT(false);
-  }
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
+  useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
+               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%\n");
+  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Missing method
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"remove-method", "yes"},
+                                     {"send-reply", "yes"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(0, 0, 0, 0),
+                                       BytesCountExpectation(0, 0, 0, 0));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
@@ -3199,6 +3219,20 @@ TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireByt
 
   expectUpstreamBytesSentAndReceived(BytesCountExpectation(187, 0, 156, 0),
                                      BytesCountExpectation(114, 0, 114, 0));
+}
+
+TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireBytesCountDownstream) {
+  // we only care about upstream protocol.
+  if (upstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%\n");
+
+  testRouterDownstreamDisconnectBeforeRequestComplete(nullptr);
+
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(0, 71, 0, 35),
+                                     BytesCountExpectation(0, 28, 0, 28));
 }
 
 TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytesCountUpstream) {

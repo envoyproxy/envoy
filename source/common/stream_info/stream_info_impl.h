@@ -293,13 +293,12 @@ struct StreamInfoImpl : public StreamInfo {
 
   void setUpstreamBytesMeterer(const BytesMetererSharedPtr& upstream_bytes_meterer) override {
     // Accumulate the byte measurement from previous upstream request during a retry.
-    if (upstream_bytes_meterer_) {
-      upstream_bytes_meterer->addWireBytesSent(upstream_bytes_meterer_->wireBytesSent());
-      upstream_bytes_meterer->addWireBytesReceived(upstream_bytes_meterer_->wireBytesReceived());
-      upstream_bytes_meterer->addHeaderBytesSent(upstream_bytes_meterer_->headerBytesSent());
-      upstream_bytes_meterer->addHeaderBytesReceived(
-          upstream_bytes_meterer_->headerBytesReceived());
-    }
+    upstream_bytes_meterer->addWireBytesSent(upstream_bytes_meterer_->wireBytesSent());
+    upstream_bytes_meterer->addWireBytesReceived(upstream_bytes_meterer_->wireBytesReceived());
+    upstream_bytes_meterer->addHeaderBytesSent(upstream_bytes_meterer_->headerBytesSent());
+    upstream_bytes_meterer->addHeaderBytesReceived(
+        upstream_bytes_meterer_->headerBytesReceived());
+
     upstream_bytes_meterer_ = upstream_bytes_meterer;
   }
 
@@ -367,7 +366,8 @@ private:
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
-  BytesMetererSharedPtr upstream_bytes_meterer_;
+  // Default construct the bytes meterer because upstream stream is not constructed in some cases.
+  BytesMetererSharedPtr upstream_bytes_meterer_{std::make_shared<BytesMeterer>()};
   BytesMetererSharedPtr downstream_bytes_meterer_;
 };
 
