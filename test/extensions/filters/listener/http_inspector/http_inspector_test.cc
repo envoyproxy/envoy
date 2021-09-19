@@ -158,9 +158,8 @@ public:
 
   void testHttpInspectSuccess(absl::string_view header, absl::string_view alpn) {
     init();
+    std::vector<uint8_t> data = Hex::decode(std::string(header));
     if (alpn == Http::Utility::AlpnNames::get().Http2c) {
-      std::vector<uint8_t> data = Hex::decode(std::string(header));
-
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
               Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -198,9 +197,8 @@ public:
 
   void testHttpInspectFail(absl::string_view header, bool http2 = false) {
     init();
+    std::vector<uint8_t> data = Hex::decode(std::string(header));
     if (http2) {
-      std::vector<uint8_t> data = Hex::decode(std::string(header));
-
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
               Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
