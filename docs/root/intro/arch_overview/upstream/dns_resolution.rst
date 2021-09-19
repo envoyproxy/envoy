@@ -17,7 +17,7 @@ Envoy provides DNS resolution through extensions, and contains 2 built-in extens
 
 1) c-ares: :ref:`CaresDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
 
-2) Apple: (iOS/macOS only) :ref:`AppleDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig>`.
+2) Apple (iOS/macOS only): :ref:`AppleDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig>`
 
 For an example of a built-in DNS typed configuration see the :ref:`HTTP filter configuration documentation <config_http_filters_dynamic_forward_proxy>`.
 
