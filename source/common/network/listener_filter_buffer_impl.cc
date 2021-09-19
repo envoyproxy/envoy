@@ -1,6 +1,5 @@
 #include "source/common/network/listener_filter_buffer_impl.h"
 
-#include <bits/stdint-uintn.h>
 #include <string.h>
 
 namespace Envoy {
