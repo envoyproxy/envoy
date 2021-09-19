@@ -41,7 +41,7 @@ int HeaderMapWrapper::luaAdd(lua_State* state) {
 }
 
 int HeaderMapWrapper::luaGet(lua_State* state) {
-  const absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   const Http::HeaderUtility::GetAllOfHeaderAsStringResult value =
       Http::HeaderUtility::getAllOfHeaderAsString(headers_, Http::LowerCaseString(key));
   if (value.result().has_value()) {
@@ -53,11 +53,11 @@ int HeaderMapWrapper::luaGet(lua_State* state) {
 }
 
 int HeaderMapWrapper::luaGetAtIndex(lua_State* state) {
-  const absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   const int index = luaL_checknumber(state, 3);
   const Http::HeaderMap::GetResult header_value = headers_.get(Http::LowerCaseString(key));
   if (index >= 0 && header_value.size() > static_cast<uint64_t>(index)) {
-    const absl::string_view value = header_value[index]->value().getStringView();
+    absl::string_view value = header_value[index]->value().getStringView();
     if (!value.empty()) {
       lua_pushlstring(state, value.data(), value.length());
       return 1;
@@ -67,7 +67,7 @@ int HeaderMapWrapper::luaGetAtIndex(lua_State* state) {
 }
 
 int HeaderMapWrapper::luaGetValueSize(lua_State* state) {
-  const absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   const Http::HeaderMap::GetResult header_value = headers_.get(Http::LowerCaseString(key));
   lua_pushnumber(state, header_value.size());
   return 1;

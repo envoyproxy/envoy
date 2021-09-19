@@ -322,7 +322,7 @@ typed_config:
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},      {":path", "/test/long/url"},     {":scheme", "http"},
       {":authority", "host"},   {"x-forwarded-for", "10.0.0.1"}, {"x-test-header", "foo"},
-      {"x-test-header", "bar"}, {"set-cookie", "foo;bar;"},      {"set-cookie", "1;2;"}};
+      {"x-test-header", "bar"}, {"set-cookie", "foo;bar;"},      {"set-cookie", "1,3;2,5;"}};
 
   auto encoder_decoder = codec_client_->startRequest(request_headers);
   Http::StreamEncoder& encoder = encoder_decoder.first;
@@ -358,10 +358,10 @@ typed_config:
                             ->value()
                             .getStringView());
 
-  EXPECT_EQ("1;2;", upstream_request_->headers()
-                        .get(Http::LowerCaseString("cookie_1"))[0]
-                        ->value()
-                        .getStringView());
+  EXPECT_EQ("1,3;2,5;", upstream_request_->headers()
+                            .get(Http::LowerCaseString("cookie_1"))[0]
+                            ->value()
+                            .getStringView());
 
   EXPECT_EQ("2", upstream_request_->headers()
                      .get(Http::LowerCaseString("cookie_size"))[0]
