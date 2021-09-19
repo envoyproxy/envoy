@@ -36,3 +36,4 @@ sphinx-rtd-theme
 sphinx-tabs
 verboselogs
 yapf
+remote-pdb
