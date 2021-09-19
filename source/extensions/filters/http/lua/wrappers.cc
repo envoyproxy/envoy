@@ -52,6 +52,27 @@ int HeaderMapWrapper::luaGet(lua_State* state) {
   }
 }
 
+int HeaderMapWrapper::luaGetAtIndex(lua_State* state) {
+  const char* key = luaL_checkstring(state, 2);
+  const auto index = luaL_checknumber(state, 3);
+  const auto header_value = headers_.get(Http::LowerCaseString(key));
+  if (index >= 0 && header_value.size() > index) {
+    const auto value = header_value[index]->value().getStringView();
+    if (!value.empty()) {
+      lua_pushlstring(state, value.data(), value.length());
+      return 1;
+    }
+  }
+  return 0;
+}
+
+int HeaderMapWrapper::luaGetValueSize(lua_State* state) {
+  const char* key = luaL_checkstring(state, 2);
+  const auto header_value = headers_.get(Http::LowerCaseString(key));
+  lua_pushnumber(state, header_value.size());
+  return 1;
+}
+
 int HeaderMapWrapper::luaPairs(lua_State* state) {
   if (iterator_.get() != nullptr) {
     luaL_error(state, "cannot create a second iterator before completing the first");

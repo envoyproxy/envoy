@@ -68,6 +68,50 @@ TEST_F(LuaHeaderMapWrapperTest, Methods) {
   start("callMe");
 }
 
+// Get the value size of a certain header with multiple values.
+TEST_F(LuaHeaderMapWrapperTest, GetValueSize) {
+  const std::string SCRIPT{R"EOF(
+      function callMe(object)
+        testPrint(object:getValueSize("X-Test"))
+        testPrint(object:getValueSize(":path"))
+        testPrint(object:getValueSize("foobar"))
+      end
+    )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"x-test", "foo"}, {"x-test", "bar"}};
+  HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
+  EXPECT_CALL(printer_, testPrint("2"));
+  EXPECT_CALL(printer_, testPrint("1"));
+  EXPECT_CALL(printer_, testPrint("0"));
+  start("callMe");
+}
+
+// Get the value on a certain index for a header with multiple values.
+TEST_F(LuaHeaderMapWrapperTest, GetAtIndex) {
+  const std::string SCRIPT{R"EOF(
+        function callMe(object)
+          testPrint(object:getAtIndex("X-Test", 0))
+          testPrint(object:getAtIndex("x-test", 1))
+          if object:getAtIndex("x-test", 2) == nil then
+            testPrint("nil_value")
+          end
+        end
+      )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"x-test", "foo"}, {"x-test", "bar"}};
+  HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
+  EXPECT_CALL(printer_, testPrint("foo"));
+  EXPECT_CALL(printer_, testPrint("bar"));
+  EXPECT_CALL(printer_, testPrint("nil_value"));
+  start("callMe");
+}
+
 // Test modifiable methods.
 TEST_F(LuaHeaderMapWrapperTest, ModifiableMethods) {
   const std::string SCRIPT{R"EOF(
