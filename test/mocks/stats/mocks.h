@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <list>
 #include <string>
 
@@ -285,6 +286,13 @@ public:
   MOCK_METHOD(Histogram&, histogramFromString, (const std::string& name, Histogram::Unit unit));
   MOCK_METHOD(TextReadout&, textReadout, (const std::string&));
   MOCK_METHOD(std::vector<TextReadoutSharedPtr>, text_readouts, (), (const));
+  MOCK_METHOD(void, forEachCounter,
+              (std::function<void(std::size_t)>, std::function<void(Stats::Counter&)>), (const));
+  MOCK_METHOD(void, forEachGauge,
+              (std::function<void(std::size_t)>, std::function<void(Stats::Gauge&)>), (const));
+  MOCK_METHOD(void, forEachTextReadout,
+              (std::function<void(std::size_t)>, std::function<void(Stats::TextReadout&)>),
+              (const));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));

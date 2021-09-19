@@ -12,7 +12,7 @@ StaticClusterImpl::StaticClusterImpl(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api,
-                      factory_context.dispatcher().timeSource()),
+                      factory_context.mainThreadDispatcher().timeSource()),
       priority_state_manager_(
           new PriorityStateManager(*this, factory_context.localInfo(), nullptr)) {
   const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
@@ -20,7 +20,7 @@ StaticClusterImpl::StaticClusterImpl(
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 
-  Event::Dispatcher& dispatcher = factory_context.dispatcher();
+  Event::Dispatcher& dispatcher = factory_context.mainThreadDispatcher();
 
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     validateEndpointsForZoneAwareRouting(locality_lb_endpoint);

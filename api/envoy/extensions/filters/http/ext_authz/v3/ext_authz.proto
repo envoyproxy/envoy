@@ -10,6 +10,7 @@ import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http_status.proto";
 
+import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -308,7 +309,7 @@ message CheckSettings {
   //
   //   These settings are only applied to a filter configured with a
   //   :ref:`grpc_service<envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`.
-  map<string, string> context_extensions = 1;
+  map<string, string> context_extensions = 1 [(udpa.annotations.sensitive) = true];
 
   // When set to true, disable the configured :ref:`with_request_body
   // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` for a route.

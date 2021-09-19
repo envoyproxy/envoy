@@ -386,6 +386,7 @@ envoy_cc_test(
         "buffer_accounting_integration_test.cc",
     ],
     deps = [
+        ":base_overload_integration_test_lib",
         ":http_integration_lib",
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
@@ -1329,12 +1330,14 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "tcp_tunneling_integration_test",
+    size = "large",
     srcs = [
         "tcp_tunneling_integration_test.cc",
     ],
     data = [
         "//test/config/integration/certs",
     ],
+    shard_count = 3,
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",

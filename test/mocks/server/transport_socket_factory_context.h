@@ -27,7 +27,7 @@ public:
   MOCK_METHOD(Stats::Scope&, scope, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
   MOCK_METHOD(const Server::Options&, options, ());
   MOCK_METHOD(Envoy::Random::RandomGenerator&, random, ());
   MOCK_METHOD(Stats::Store&, stats, ());

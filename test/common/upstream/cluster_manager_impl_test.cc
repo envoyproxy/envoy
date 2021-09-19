@@ -524,10 +524,7 @@ public:
     for (int i = first; i <= last; i++) {
       if (envoy::config::cluster::v3::Cluster::LbPolicy_IsValid(i)) {
         auto policy = static_cast<envoy::config::cluster::v3::Cluster::LbPolicy>(i);
-        if (policy !=
-            envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB) {
-          policies.push_back(policy);
-        }
+        policies.push_back(policy);
       }
     }
     return policies;
@@ -757,53 +754,10 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNotConfigured) {
                             "'cluster_0' provided one. Check cluster documentation.");
 }
 
-class CustomLbFactory : public TypedLoadBalancerFactoryBase {
-public:
-  CustomLbFactory() : TypedLoadBalancerFactoryBase("envoy.load_balancers.custom_lb") {}
-
-  ThreadAwareLoadBalancerPtr
-  create(const PrioritySet&, ClusterStats&, Stats::Scope&, Runtime::Loader&,
-         Random::RandomGenerator&,
-         const ::envoy::config::cluster::v3::LoadBalancingPolicy_Policy&) override {
-    return std::make_unique<ThreadAwareLbImpl>();
-  }
-
-private:
-  class LbImpl : public LoadBalancer {
-  public:
-    LbImpl() = default;
-
-    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override {
-      return nullptr;
-    }
-    Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
-      return nullptr;
-    }
-  };
-
-  class LbFactory : public LoadBalancerFactory {
-  public:
-    LbFactory() = default;
-
-    Upstream::LoadBalancerPtr create() override { return std::make_unique<LbImpl>(); }
-  };
-
-  class ThreadAwareLbImpl : public Upstream::ThreadAwareLoadBalancer {
-  public:
-    ThreadAwareLbImpl() = default;
-
-    Upstream::LoadBalancerFactorySharedPtr factory() override {
-      return std::make_shared<LbFactory>();
-    }
-    void initialize() override {}
-  };
-};
-
 // Verify that specifying LOAD_BALANCING_POLICY_CONFIG with CommonLbConfig is an error.
 TEST_F(ClusterManagerImplTest, LbPolicyConfigCannotSpecifyCommonLbConfig) {
-  CustomLbFactory factory;
-  Registry::InjectFactory<TypedLoadBalancerFactory> registration(factory);
-
+  // envoy.load_balancers.custom_lb is registered by linking in
+  // //test/integration/load_balancers:custom_lb_policy.
   const std::string yaml = fmt::format(R"EOF(
  static_resources:
   clusters:
@@ -871,9 +825,8 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfigMustSpecifyLbPolicy) {
 // Verify that multiple load balancing policies can be specified, and Envoy selects the first
 // policy that it has a factory for.
 TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
-  CustomLbFactory factory;
-  Registry::InjectFactory<TypedLoadBalancerFactory> registration(factory);
-
+  // envoy.load_balancers.custom_lb is registered by linking in
+  // //test/integration/load_balancers:custom_lb_policy.
   const std::string yaml = fmt::format(R"EOF(
  static_resources:
   clusters:
@@ -1813,8 +1766,8 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   // Now remove the cluster. This should drain the connection pools, but not affect
   // tcp connections.
   EXPECT_CALL(*callbacks, onClusterRemoval(_));
-  EXPECT_CALL(*cp, startDrain());
-  EXPECT_CALL(*cp2, startDrain());
+  EXPECT_CALL(*cp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
+  EXPECT_CALL(*cp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
   EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
   EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("fake_cluster"));
   EXPECT_EQ(0UL, cluster_manager_->clusters().active_clusters_.size());
@@ -1953,7 +1906,8 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
     outlier_detector.runCallbacks(test_host);
     health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
 
-    EXPECT_CALL(*cp1, drainConnections());
+    EXPECT_CALL(*cp1,
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     outlier_detector.runCallbacks(test_host);
 
@@ -1963,8 +1917,10 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
   }
 
   // Order of these calls is implementation dependent, so can't sequence them!
-  EXPECT_CALL(*cp1, drainConnections());
-  EXPECT_CALL(*cp2, drainConnections());
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*cp2,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker.runCallbacks(test_host, HealthTransition::Changed);
 
@@ -2017,7 +1973,9 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsAndDeletePoolOnHealthFailure)
   outlier_detector.runCallbacks(test_host);
   health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
 
-  EXPECT_CALL(*cp1, drainConnections()).WillOnce(Invoke([&]() { cp1->idle_cb_(); }));
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections))
+      .WillOnce(Invoke([&]() { cp1->idle_cb_(); }));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
 
@@ -2064,7 +2022,8 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
     outlier_detector.runCallbacks(test_host);
     health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
 
-    EXPECT_CALL(*cp1, drainConnections());
+    EXPECT_CALL(*cp1,
+                drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     outlier_detector.runCallbacks(test_host);
 
@@ -2074,8 +2033,10 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
   }
 
   // Order of these calls is implementation dependent, so can't sequence them!
-  EXPECT_CALL(*cp1, drainConnections());
-  EXPECT_CALL(*cp2, drainConnections());
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*cp2,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker.runCallbacks(test_host, HealthTransition::Changed);
 
@@ -3000,14 +2961,16 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
                                    ->tcpConnPool(ResourcePriority::Default, nullptr));
 
   // Immediate drain, since this can happen with the HTTP codecs.
-  EXPECT_CALL(*cp, startDrain()).WillOnce(Invoke([&]() {
-    cp->idle_cb_();
-    cp->idle_cb_ = nullptr;
-  }));
-  EXPECT_CALL(*tcp, startDrain()).WillOnce(Invoke([&]() {
-    tcp->idle_cb_();
-    tcp->idle_cb_ = nullptr;
-  }));
+  EXPECT_CALL(*cp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        cp->idle_cb_();
+        cp->idle_cb_ = nullptr;
+      }));
+  EXPECT_CALL(*tcp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        tcp->idle_cb_();
+        tcp->idle_cb_ = nullptr;
+      }));
 
   // Remove the first host, this should lead to the cp being drained, without
   // crash.
@@ -3079,13 +3042,13 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   Http::ConnectionPool::Instance::IdleCb drained_cb;
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(mock_cp));
   EXPECT_CALL(*mock_cp, addIdleCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
-  EXPECT_CALL(*mock_cp, startDrain());
+  EXPECT_CALL(*mock_cp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
 
   MockTcpConnPoolWithDestroy* mock_tcp = new NiceMock<MockTcpConnPoolWithDestroy>();
   Tcp::ConnectionPool::Instance::IdleCb tcp_drained_cb;
   EXPECT_CALL(factory_, allocateTcpConnPool_).WillOnce(Return(mock_tcp));
   EXPECT_CALL(*mock_tcp, addIdleCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
-  EXPECT_CALL(*mock_tcp, startDrain());
+  EXPECT_CALL(*mock_tcp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
 
   HttpPoolDataPeer::getPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
@@ -4647,22 +4610,26 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   EXPECT_NE(cp1, cp2);
   EXPECT_NE(tcp1, tcp2);
 
-  EXPECT_CALL(*cp2, startDrain()).WillOnce(Invoke([&]() {
-    cp2->idle_cb_();
-    cp2->idle_cb_ = nullptr;
-  }));
-  EXPECT_CALL(*cp1, startDrain()).WillOnce(Invoke([&]() {
-    cp1->idle_cb_();
-    cp1->idle_cb_ = nullptr;
-  }));
-  EXPECT_CALL(*tcp1, startDrain()).WillOnce(Invoke([&]() {
-    tcp1->idle_cb_();
-    tcp1->idle_cb_ = nullptr;
-  }));
-  EXPECT_CALL(*tcp2, startDrain()).WillOnce(Invoke([&]() {
-    tcp2->idle_cb_();
-    tcp2->idle_cb_ = nullptr;
-  }));
+  EXPECT_CALL(*cp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        cp2->idle_cb_();
+        cp2->idle_cb_ = nullptr;
+      }));
+  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        cp1->idle_cb_();
+        cp1->idle_cb_ = nullptr;
+      }));
+  EXPECT_CALL(*tcp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        tcp1->idle_cb_();
+        tcp1->idle_cb_ = nullptr;
+      }));
+  EXPECT_CALL(*tcp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        tcp2->idle_cb_();
+        tcp2->idle_cb_ = nullptr;
+      }));
 
   HostVector hosts_removed;
   hosts_removed.push_back(host2);
@@ -4685,14 +4652,16 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   HostVector hosts_added;
   hosts_added.push_back(host3);
 
-  EXPECT_CALL(*cp1, startDrain()).WillOnce(Invoke([&]() {
-    cp1->idle_cb_();
-    cp1->idle_cb_ = nullptr;
-  }));
-  EXPECT_CALL(*tcp1, startDrain()).WillOnce(Invoke([&]() {
-    tcp1->idle_cb_();
-    tcp1->idle_cb_ = nullptr;
-  }));
+  EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        cp1->idle_cb_();
+        cp1->idle_cb_ = nullptr;
+      }));
+  EXPECT_CALL(*tcp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
+      .WillOnce(Invoke([&]() {
+        tcp1->idle_cb_();
+        tcp1->idle_cb_ = nullptr;
+      }));
 
   // Adding host3 should drain connection pool for host1.
   cluster.prioritySet().updateHosts(
@@ -4756,8 +4725,12 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   hosts_added.push_back(host2);
 
   // No connection pools should be drained.
-  EXPECT_CALL(*cp1, drainConnections()).Times(0);
-  EXPECT_CALL(*tcp1, drainConnections()).Times(0);
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections))
+      .Times(0);
+  EXPECT_CALL(*tcp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections))
+      .Times(0);
 
   // No connection pools should be drained.
   cluster.prioritySet().updateHosts(
@@ -4982,6 +4955,51 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
             HttpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
                                           ->httpConnPool(ResourcePriority::Default,
                                                          Http::Protocol::Http11, &lb_context)));
+}
+
+TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: good
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: good
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+  const std::string added_via_api_yaml = R"EOF(
+    name: added_via_api
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: added_via_api
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  EXPECT_TRUE(
+      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(added_via_api_yaml), "v1"));
+
+  EXPECT_EQ(2, cluster_manager_->clusters().active_clusters_.size());
+  EXPECT_NO_THROW(cluster_manager_->checkActiveStaticCluster("good"));
+  EXPECT_THROW_WITH_MESSAGE(cluster_manager_->checkActiveStaticCluster("nonexist"), EnvoyException,
+                            "Unknown gRPC client cluster 'nonexist'");
+  EXPECT_THROW_WITH_MESSAGE(cluster_manager_->checkActiveStaticCluster("added_via_api"),
+                            EnvoyException, "gRPC client cluster 'added_via_api' is not static");
 }
 
 class PreconnectTest : public ClusterManagerImplTest {
