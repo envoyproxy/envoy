@@ -31,6 +31,7 @@ CDS
 CEL
 DSR
 EBADF
+ENDIF
 ENOTCONN
 EPIPE
 HEXDIG
@@ -1050,6 +1051,7 @@ retriable
 retriggers
 revalidated
 revalidation
+rfield
 rmdir
 rocketmq
 rewriter
