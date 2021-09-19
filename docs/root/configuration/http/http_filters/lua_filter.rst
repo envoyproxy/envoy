@@ -547,27 +547,27 @@ Gets a header. *key* is a string that supplies the header key. Returns a string 
 value or nil if there is no such header.
 
 getAtIndex()
-^^^^^
+^^^^^^^^^^^^
 
 .. code-block:: lua
 
   headers:getAtIndex(key, index)
 
-Gets the value at the given index for a header. Can be used to fetch a single value in case the
+Gets the header value at the given index. It can be used to fetch a specific value in case the
 given header has multiple values. *key* is a string that supplies the header key and index is
-an integer for the value position. It returns a string that is the header value or nil if there
-is no such header or there is no value at the specified index.
+an integer that supplies the position. It returns a string that is the header value or nil if
+there is no such header or if there is no value at the specified index.
 
 getValueSize()
-^^^^^
+^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
   headers:getValueSize(key)
 
-Gets the value size of a given header. Can be used to fetch the total number of values in case
+Gets the value size of a given header. It can be used to fetch the total number of values in case
 the given header has multiple values. *key* is a string that supplies the header key. It returns
-an integer with the value size for the given header or zero if there is no such header.
+an integer with the value size for the given header or *0* if there is no such header.
 
 __pairs()
 ^^^^^^^^^
