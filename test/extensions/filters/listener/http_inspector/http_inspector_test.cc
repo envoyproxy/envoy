@@ -330,8 +330,25 @@ TEST_F(HttpInspectorTest, InspectHttp2) {
 }
 
 TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
+  init();
+
   const std::string header = "505249202a20485454502f322e300d0a";
-  testHttpInspectFail(header, true);
+  std::vector<uint8_t> data = Hex::decode(std::string(header));
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(
+          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= data.size());
+            memcpy(buffer, data.data(), data.size());
+            return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+          }));
+
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  auto accepted = filter_->onAccept(cb_);
+  EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
+  file_event_callback_(Event::FileReadyType::Read);
+  auto status = filter_->onData(*buffer_);
+  EXPECT_EQ(status, Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0, cfg_->stats().http_not_found_.value());
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
