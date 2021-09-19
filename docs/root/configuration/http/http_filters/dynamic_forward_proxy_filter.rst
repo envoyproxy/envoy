@@ -37,7 +37,7 @@ host when forwarding. See the example below within the configured routes.
     :language: yaml
 
 Above example is using typed config :ref:`CaresDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`.
-To use :ref:`AppleDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig>` (iOS/macOS only), check below.
+To use :ref:`AppleDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig>` (iOS/macOS only), follow below example:
 
 .. literalinclude:: _include/dns-cache-circuit-breaker-apple.yaml
     :language: yaml
