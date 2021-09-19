@@ -56,7 +56,7 @@ int HeaderMapWrapper::luaGetAtIndex(lua_State* state) {
   const absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   const unsigned long index = luaL_checknumber(state, 3);
   const Http::HeaderMap::GetResult header_value = headers_.get(Http::LowerCaseString(key));
-  if (index >= 0 && header_value.size() > index) {
+  if (header_value.size() > index) {
     const absl::string_view value = header_value[index]->value().getStringView();
     if (!value.empty()) {
       lua_pushlstring(state, value.data(), value.length());
