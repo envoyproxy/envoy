@@ -284,6 +284,9 @@ typed_config:
       end
       local test_header_value_size = request_handle:headers():getValueSize("x-test-header")
       request_handle:headers():add("test_header_value_size", test_header_value_size)
+      request_handle:headers():add("cookie_0", request_handle:headers():getAtIndex("set-cookie", 0))
+      request_handle:headers():add("cookie_1", request_handle:headers():getAtIndex("set-cookie", 1))
+      request_handle:headers():add("cookie_size", request_handle:headers():getValueSize("set-cookie"))
 
       request_handle:headers():add("request_body_size", body_length)
       request_handle:headers():add("request_metadata_foo", metadata["foo"])
@@ -317,9 +320,9 @@ typed_config:
   initializeFilter(FILTER_AND_CODE);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},     {":path", "/test/long/url"},     {":scheme", "http"},
-      {":authority", "host"},  {"x-forwarded-for", "10.0.0.1"}, {"x-test-header", "foo"},
-      {"x-test-header", "bar"}};
+      {":method", "POST"},      {":path", "/test/long/url"},     {":scheme", "http"},
+      {":authority", "host"},   {"x-forwarded-for", "10.0.0.1"}, {"x-test-header", "foo"},
+      {"x-test-header", "bar"}, {"set-cookie", "foo;bar;"},      {"set-cookie", "1;2;"}};
 
   auto encoder_decoder = codec_client_->startRequest(request_headers);
   Http::StreamEncoder& encoder = encoder_decoder.first;
@@ -347,6 +350,21 @@ typed_config:
 
   EXPECT_EQ("2", upstream_request_->headers()
                      .get(Http::LowerCaseString("test_header_value_size"))[0]
+                     ->value()
+                     .getStringView());
+
+  EXPECT_EQ("foo;bar;", upstream_request_->headers()
+                            .get(Http::LowerCaseString("cookie_0"))[0]
+                            ->value()
+                            .getStringView());
+
+  EXPECT_EQ("1;2;", upstream_request_->headers()
+                        .get(Http::LowerCaseString("cookie_1"))[0]
+                        ->value()
+                        .getStringView());
+
+  EXPECT_EQ("2", upstream_request_->headers()
+                     .get(Http::LowerCaseString("cookie_size"))[0]
                      ->value()
                      .getStringView());
 

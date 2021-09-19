@@ -510,8 +510,6 @@ base64Escape()
 
 Encodes the input string as base64. This can be useful for escaping binary data.
 
-.. _config_http_filters_lua_header_wrapper:
-
 timestamp()
 ^^^^^^^^^^^
 
@@ -522,6 +520,8 @@ timestamp()
 High resolution timestamp function. *format* is an optional enum parameter to indicate the format of the timestamp.
 *EnvoyTimestampResolution.MILLISECOND* is supported
 The function returns timestamp in milliseconds since epoch by default if format is not set.
+
+.. _config_http_filters_lua_header_wrapper:
 
 Header object API
 -----------------

@@ -95,6 +95,9 @@ TEST_F(LuaHeaderMapWrapperTest, GetAtIndex) {
         function callMe(object)
           testPrint(object:getAtIndex("X-Test", 0))
           testPrint(object:getAtIndex("x-test", 1))
+          if object:getAtIndex("x-test", -1) == nil then
+            testPrint("invalid_value")
+          end
           if object:getAtIndex("x-test", 2) == nil then
             testPrint("nil_value")
           end
@@ -108,6 +111,7 @@ TEST_F(LuaHeaderMapWrapperTest, GetAtIndex) {
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
   EXPECT_CALL(printer_, testPrint("foo"));
   EXPECT_CALL(printer_, testPrint("bar"));
+  EXPECT_CALL(printer_, testPrint("invalid_value"));
   EXPECT_CALL(printer_, testPrint("nil_value"));
   start("callMe");
 }
