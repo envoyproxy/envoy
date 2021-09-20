@@ -1,8 +1,12 @@
 #include "source/common/http/alternate_protocols_cache_impl.h"
 
+#include "test/mocks/common.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
+
+using testing::_;
+using testing::NiceMock;
 
 namespace Envoy {
 namespace Http {
@@ -10,8 +14,11 @@ namespace Http {
 namespace {
 class AlternateProtocolsCacheImplTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
-  AlternateProtocolsCacheImplTest() : protocols_(simTime()) {}
+  AlternateProtocolsCacheImplTest()
+      : store_(new NiceMock<MockKeyValueStore>()),
+        protocols_(simTime(), std::unique_ptr<KeyValueStore>(store_)) {}
 
+  MockKeyValueStore* store_;
   AlternateProtocolsCacheImpl protocols_;
   const std::string hostname1_ = "hostname1";
   const std::string hostname2_ = "hostname2";
@@ -29,24 +36,26 @@ public:
   const AlternateProtocolsCacheImpl::Origin origin1_ = {https_, hostname1_, port1_};
   const AlternateProtocolsCacheImpl::Origin origin2_ = {https_, hostname2_, port2_};
 
-  const AlternateProtocolsCacheImpl::AlternateProtocol protocol1_ = {alpn1_, hostname1_, port1_,
-                                                                     expiration1_};
-  const AlternateProtocolsCacheImpl::AlternateProtocol protocol2_ = {alpn2_, hostname2_, port2_,
-                                                                     expiration2_};
+  AlternateProtocolsCacheImpl::AlternateProtocol protocol1_ = {alpn1_, hostname1_, port1_,
+                                                               expiration1_};
+  AlternateProtocolsCacheImpl::AlternateProtocol protocol2_ = {alpn2_, hostname2_, port2_,
+                                                               expiration2_};
 
-  const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols1_ = {protocol1_};
-  const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols2_ = {protocol2_};
+  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols1_ = {protocol1_};
+  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols2_ = {protocol2_};
 };
 
 TEST_F(AlternateProtocolsCacheImplTest, Init) { EXPECT_EQ(0, protocols_.size()); }
 
 TEST_F(AlternateProtocolsCacheImplTest, SetAlternatives) {
   EXPECT_EQ(0, protocols_.size());
+  EXPECT_CALL(*store_, addOrUpdate(_, _));
   protocols_.setAlternatives(origin1_, protocols1_);
   EXPECT_EQ(1, protocols_.size());
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternatives) {
+  EXPECT_CALL(*store_, addOrUpdate(_, _));
   protocols_.setAlternatives(origin1_, protocols1_);
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_.findAlternatives(origin1_);
@@ -55,7 +64,9 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternatives) {
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterReplacement) {
+  EXPECT_CALL(*store_, addOrUpdate(_, _));
   protocols_.setAlternatives(origin1_, protocols1_);
+  EXPECT_CALL(*store_, addOrUpdate(_, _));
   protocols_.setAlternatives(origin1_, protocols2_);
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_.findAlternatives(origin1_);
@@ -65,7 +76,9 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterReplacement) {
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesForMultipleOrigins) {
+  EXPECT_CALL(*store_, addOrUpdate(_, _));
   protocols_.setAlternatives(origin1_, protocols1_);
+  EXPECT_CALL(*store_, addOrUpdate(_, _));
   protocols_.setAlternatives(origin2_, protocols2_);
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_.findAlternatives(origin1_);
@@ -77,8 +90,10 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesForMultipleOrigins) {
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterExpiration) {
+  EXPECT_CALL(*store_, addOrUpdate(_, _));
   protocols_.setAlternatives(origin1_, protocols1_);
   simTime().setMonotonicTime(expiration1_ + Seconds(1));
+  EXPECT_CALL(*store_, remove(_));
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_.findAlternatives(origin1_);
   ASSERT_FALSE(protocols.has_value());
@@ -86,7 +101,8 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterExpiration) {
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterPartialExpiration) {
-  protocols_.setAlternatives(origin1_, {protocol1_, protocol2_});
+  std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> both = {protocol1_, protocol2_};
+  protocols_.setAlternatives(origin1_, both);
   simTime().setMonotonicTime(expiration1_ + Seconds(1));
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
       protocols_.findAlternatives(origin1_);
@@ -96,17 +112,15 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterPartialExpiration) 
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterTruncation) {
-  AlternateProtocolsCacheImpl::AlternateProtocol protocol = protocol1_;
-
   std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> expected_protocols;
   for (size_t i = 0; i < 10; ++i) {
-    protocol.port_++;
-    expected_protocols.push_back(protocol);
+    protocol1_.port_++;
+    expected_protocols.push_back(protocol1_);
   }
   std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> full_protocols = expected_protocols;
-  protocol.port_++;
-  full_protocols.push_back(protocol);
-  full_protocols.push_back(protocol);
+  protocol1_.port_++;
+  full_protocols.push_back(protocol1_);
+  full_protocols.push_back(protocol1_);
 
   protocols_.setAlternatives(origin1_, full_protocols);
   OptRef<const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol>> protocols =
@@ -114,6 +128,47 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterTruncation) {
   ASSERT_TRUE(protocols.has_value());
   EXPECT_EQ(10, protocols->size());
   EXPECT_EQ(expected_protocols, protocols.ref());
+}
+
+TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
+  auto testAltSvc = [&](const std::string& original_alt_svc,
+                        const std::string& expected_alt_svc) -> void {
+    auto protocols = AlternateProtocolsCacheImpl::protocolsFromString(original_alt_svc, simTime());
+    ASSERT(protocols.has_value());
+    ASSERT_GE(protocols.value().size(), 1);
+
+    auto& protocol = protocols.value()[0];
+    EXPECT_EQ("h3-29", protocol.alpn_);
+    EXPECT_EQ("", protocol.hostname_);
+    EXPECT_EQ(443, protocol.port_);
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(protocol.expiration_ -
+                                                                     simTime().monotonicTime());
+    EXPECT_EQ(86400, duration.count());
+
+    if (protocols.value().size() == 2) {
+      auto& protocol2 = protocols.value()[1];
+      EXPECT_EQ("h3", protocol2.alpn_);
+      EXPECT_EQ("", protocol2.hostname_);
+      EXPECT_EQ(443, protocol2.port_);
+      duration = std::chrono::duration_cast<std::chrono::seconds>(protocol2.expiration_ -
+                                                                  simTime().monotonicTime());
+      EXPECT_EQ(60, duration.count());
+    }
+
+    std::string alt_svc =
+        AlternateProtocolsCacheImpl::protocolsToString(protocols.value(), simTime());
+    EXPECT_EQ(expected_alt_svc, alt_svc);
+  };
+
+  testAltSvc("h3-29=\":443\"; ma=86400", "h3-29=\":443\"; ma=86400");
+  testAltSvc("h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60",
+             "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60");
+
+  // Test once more to make sure we handle time advancing correctly.
+  // protocolsToString spits out the absolute expiry time, which is now 60 (time
+  // since epoch) + 86400 (max age)
+  simTime().setMonotonicTime(simTime().monotonicTime() + std::chrono::seconds(60));
+  testAltSvc("h3-29=\":443\"; ma=86400", "h3-29=\":443\"; ma=86460");
 }
 
 } // namespace

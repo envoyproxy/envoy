@@ -120,7 +120,7 @@ public:
     if (!use_alternate_protocols) {
       return nullptr;
     }
-    return std::make_shared<AlternateProtocolsCacheImpl>(simTime());
+    return std::make_shared<AlternateProtocolsCacheImpl>(simTime(), nullptr);
   }
 
   void addHttp3AlternateProtocol() {
