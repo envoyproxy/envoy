@@ -228,23 +228,7 @@ HeaderParserPtr HeaderParser::configure(
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value_option : headers_to_add) {
-    envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action =
-        header_value_option.append_action();
-    // Preserve the old behavior until `append` field is fully deprecated.
-    if (header_value_option.has_append()) {
-      if (append_action != envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS) {
-        throw EnvoyException(fmt::format(
-            "Both the `append` and `append_action` fields are set for the header key: {}",
-            header_value_option.header().key()));
-      }
-
-      // If append is false then we need to set `append_action` to `OVERWRITE_IF_EXISTS`. If append
-      // is true then we don't need to do anything as `append_action` defaults to
-      // `APPEND_IF_EXISTS`.
-      if (!header_value_option.append().value()) {
-        append_action = envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS;
-      }
-    }
+    const auto append_action = Http::HeaderUtility::getHeaderAppendAction(header_value_option);
     HeaderFormatterPtr header_formatter =
         parseInternal(header_value_option.header(), append_action);
     header_parser->headers_to_add_.emplace_back(

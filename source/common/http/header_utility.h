@@ -265,6 +265,14 @@ public:
   validateContentLength(absl::string_view header_value,
                         bool override_stream_error_on_invalid_http_message,
                         bool& should_close_connection);
+
+  /**
+   * Utility method to get the header append action by evaluating both the `append` and
+   * `append_action` fields in the HeaderValueOption. We need this to keep supporting the old
+   * behavior with `append` field until its fully deprecated.
+   */
+  static envoy::config::core::v3::HeaderValueOption::HeaderAppendAction
+      getHeaderAppendAction(envoy::config::core::v3::HeaderValueOption);
 };
 
 } // namespace Http
