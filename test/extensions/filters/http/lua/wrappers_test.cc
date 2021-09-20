@@ -68,7 +68,7 @@ TEST_F(LuaHeaderMapWrapperTest, Methods) {
   start("callMe");
 }
 
-// Get the value size of a certain header with multiple values.
+// Get the total number of values for a certain header with multiple values.
 TEST_F(LuaHeaderMapWrapperTest, GetNumValues) {
   const std::string SCRIPT{R"EOF(
       function callMe(object)
