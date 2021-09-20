@@ -40,6 +40,7 @@ TEST_EmptyDeserializerShouldNotBeReady(NullableCompactStringDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(BytesDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(CompactBytesDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(NullableBytesDeserializer);
+TEST_EmptyDeserializerShouldNotBeReady(UuidDeserializer);
 
 TEST(ArrayDeserializer, EmptyBufferShouldNotBeReady) {
   // given
@@ -523,6 +524,13 @@ TEST(NullableCompactArrayDeserializer, ShouldConsumeCorrectAmountOfDataForLargeI
   const NullableArray<int32_t> value{raw};
   serializeCompactThenDeserializeAndCheckEquality<
       NullableCompactArrayDeserializer<Int32Deserializer>>(value);
+}
+
+// UUID.
+
+TEST(UuidDeserializer, ShouldDeserialize) {
+  const Uuid value = {13, 42};
+  serializeThenDeserializeAndCheckEquality<UuidDeserializer>(value);
 }
 
 // Tagged fields.

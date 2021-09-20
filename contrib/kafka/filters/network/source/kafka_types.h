@@ -33,7 +33,7 @@ template <typename T> using NullableArray = absl::optional<std::vector<T>>;
 
 /**
  * Analogous to:
- * https://github.com/apache/kafka/blob/2.8.0/clients/src/main/java/org/apache/kafka/common/Uuid.java#L28
+ * https://github.com/apache/kafka/blob/2.8.1/clients/src/main/java/org/apache/kafka/common/Uuid.java#L28
  */
 struct Uuid {
 

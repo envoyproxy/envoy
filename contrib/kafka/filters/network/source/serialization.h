@@ -203,9 +203,10 @@ private:
  * https://cwiki.apache.org/confluence/display/KAFKA/KIP-482%3A+The+Kafka+Protocol+should+Support+Optional+Tagged+Fields#KIP-482:TheKafkaProtocolshouldSupportOptionalTaggedFields-UnsignedVarints
  *
  * Impl note:
- * This implementation is equivalent to the one present in Kafka 2.4.0, what means that for 5-byte
+ * This implementation is equivalent to the one present in Kafka, what means that for 5-byte
  * inputs, the data at bits 5-7 in 5th byte are *ignored* (as long as 8th bit is unset).
- * Reference: org.apache.kafka.common.utils.ByteUtils.readUnsignedVarint
+ * Reference:
+ * https://github.com/apache/kafka/blob/2.8.1/clients/src/main/java/org/apache/kafka/common/utils/ByteUtils.java#L142
  */
 class VarUInt32Deserializer : public Deserializer<uint32_t> {
 public:
@@ -255,12 +256,13 @@ private:
 
 /**
  * Deserializer for Kafka 'varint' type.
- * Encoding documentation: https://kafka.apache.org/24/protocol.html#protocol_types
+ * Encoding documentation: https://kafka.apache.org/28/protocol.html#protocol_types
  *
  * Impl note:
- * This implementation is equivalent to the one present in Kafka 2.4.0, what means that for 5-byte
+ * This implementation is equivalent to the one present in Kafka, what means that for 5-byte
  * inputs, the data at bits 5-7 in 5th byte are *ignored* (as long as 8th bit is unset).
- * Reference: org.apache.kafka.common.utils.ByteUtils.readVarint
+ * Reference:
+ * https://github.com/apache/kafka/blob/2.8.1/clients/src/main/java/org/apache/kafka/common/utils/ByteUtils.java#L189
  */
 class VarInt32Deserializer : public Deserializer<int32_t> {
 public:
@@ -281,12 +283,13 @@ private:
 
 /**
  * Deserializer for Kafka 'varlong' type.
- * Encoding documentation: https://kafka.apache.org/24/protocol.html#protocol_types
+ * Encoding documentation: https://kafka.apache.org/28/protocol.html#protocol_types
  *
  * Impl note:
- * This implementation is equivalent to the one present in Kafka 2.4.0, what means that for 10-byte
+ * This implementation is equivalent to the one present in Kafka, what means that for 10-byte
  * inputs, the data at bits 3-7 in 10th byte are *ignored* (as long as 8th bit is unset).
- * Reference: org.apache.kafka.common.utils.ByteUtils.readVarlong
+ * Reference:
+ * https://github.com/apache/kafka/blob/2.8.1/clients/src/main/java/org/apache/kafka/common/utils/ByteUtils.java#L242
  */
 class VarInt64Deserializer : public Deserializer<int64_t> {
 public:
@@ -882,7 +885,7 @@ private:
 /**
  * Kafka UUID is basically two longs, so we are going to keep model them the same way.
  * Reference:
- * https://github.com/apache/kafka/blob/2.8.0/clients/src/main/java/org/apache/kafka/common/Uuid.java#L38
+ * https://github.com/apache/kafka/blob/2.8.1/clients/src/main/java/org/apache/kafka/common/Uuid.java#L38
  */
 class UuidDeserializer : public Deserializer<Uuid> {
 public:
