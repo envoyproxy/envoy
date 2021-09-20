@@ -35,7 +35,7 @@ protected:
 
   RealThreadsTestHelper(uint32_t num_threads);
   // TODO(chaoqin-li1123): Clean up threading resources from the destructor when we figure out how
-  // to handle different
+  // to handle different destruction orders of thread local object.
   ~RealThreadsTestHelper() = default;
 
   void shutdownThreading();
