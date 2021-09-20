@@ -20,13 +20,15 @@ namespace TcpGrpc {
 
 // TODO(mattklein123): Stats
 
+using envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig;
+using TcpGrpcAccessLogConfigConstSharedPtr = std::shared_ptr<const TcpGrpcAccessLogConfig>;
+
 /**
  * Access log Instance that streams TCP logs over gRPC.
  */
 class TcpGrpcAccessLog : public Common::ImplBase {
 public:
-  TcpGrpcAccessLog(AccessLog::FilterPtr&& filter,
-                   envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig config,
+  TcpGrpcAccessLog(AccessLog::FilterPtr&& filter, const TcpGrpcAccessLogConfig config,
                    ThreadLocal::SlotAllocator& tls,
                    GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache);
 
@@ -46,7 +48,7 @@ private:
                const Http::ResponseTrailerMap& response_trailers,
                const StreamInfo::StreamInfo& stream_info) override;
 
-  const envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig config_;
+  const TcpGrpcAccessLogConfigConstSharedPtr config_;
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
 };

@@ -102,6 +102,7 @@ New Features
 * access_log: added :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` token to handle all types of metadata (DYNAMIC, CLUSTER, ROUTE).
 * bootstrap: added :ref:`inline_headers <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.inline_headers>` in the bootstrap to make custom inline headers bootstrap configurable.
 * contrib: added new :ref:`contrib images <install_contrib>` which contain contrib extensions.
+* dns: added :ref:`V4_PREFERRED <envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.V4_PREFERRED>` option to return V6 addresses only if V4 addresses are not available.
 * grpc reverse bridge: added a new :ref:`option <envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.response_size_header>` to support streaming response bodies when withholding gRPC frames from the upstream.
 * http: added :ref:`alternate_protocols_cache_options <envoy_v3_api_msg_config.core.v3.AlternateProtocolsCacheOptions>` for enabling HTTP/3 connections to servers which advertise HTTP/3 support via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`_.
 * http: added :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>` in the header matcher.
