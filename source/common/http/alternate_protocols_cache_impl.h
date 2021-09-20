@@ -23,7 +23,7 @@ public:
   ~AlternateProtocolsCacheImpl() override;
 
   // Note this does not do standards-required normalization. Entries requiring
-  // nomalization will simply not be read from cache.
+  // normalization will simply not be read from cache.
   static std::string protocolsToString(const std::vector<AlternateProtocol>& protocols,
                                        TimeSource& time_source);
   static absl::optional<std::vector<AlternateProtocol>>

@@ -104,7 +104,7 @@ message AlternateProtocolsCacheOptions {
   google.protobuf.UInt32Value max_entries = 2 [(validate.rules).uint32 = {gt: 0}];
 
   // Allows configuring a persistent
-  // :ref:`key value store <envoy_v3_api_msg_config.common.matcher.v3.KeyValueStoreConfig>` to flush
+  // :ref:`key value store <envoy_v3_api_msg_config.common.key_value.v3.KeyValueStoreConfig>` to flush
   // alternate protocols entries to disk.
   TypedExtensionConfig key_value_store_config = 3;
 }
