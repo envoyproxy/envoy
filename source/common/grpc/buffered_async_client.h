@@ -3,6 +3,8 @@
 #include "source/common/grpc/typed_async_client.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/container/btree_map.h"
+
 namespace Envoy {
 namespace Grpc {
 
@@ -18,7 +20,11 @@ public:
 
   virtual ~BufferedAsyncClient() { cleanup(); }
 
-  uint32_t publishId(RequestType& message) { return MessageUtil::hash(message); }
+  virtual uint32_t publishId(RequestType&) {
+    auto tmp = next_message_id_;
+    ++next_message_id_;
+    return tmp;
+  }
 
   void bufferMessage(uint32_t id, RequestType& message) {
     const auto buffer_size = message.ByteSizeLong();
@@ -65,6 +71,7 @@ public:
     if (message_buffer_.find(message_id) == message_buffer_.end()) {
       return;
     }
+
     message_buffer_.at(message_id).first = BufferState::Buffered;
   }
 
@@ -103,8 +110,9 @@ private:
   Grpc::AsyncStreamCallbacks<ResponseType>& callbacks_;
   Grpc::AsyncClient<RequestType, ResponseType> client_;
   Grpc::AsyncStream<RequestType> active_stream_;
-  absl::flat_hash_map<uint32_t, std::pair<BufferState, RequestType>> message_buffer_;
+  absl::btree_map<uint32_t, std::pair<BufferState, RequestType>> message_buffer_;
   uint32_t current_buffer_bytes_ = 0;
+  uint64_t next_message_id_ = 0;
 };
 
 template <class RequestType, class ResponseType>
