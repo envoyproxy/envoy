@@ -2,6 +2,7 @@
 
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/alternate_protocols_cache.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
@@ -11,10 +12,18 @@
 namespace Envoy {
 namespace Http {
 
+struct AlternateProtocolsData {
+  AlternateProtocolsData(Server::Configuration::FactoryContextBase& context)
+      : dispatcher_(context.mainThreadDispatcher()),
+        validation_visitor_(context.messageValidationVisitor()) {}
+  Event::Dispatcher& dispatcher_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+};
+
 class AlternateProtocolsCacheManagerImpl : public AlternateProtocolsCacheManager,
                                            public Singleton::Instance {
 public:
-  AlternateProtocolsCacheManagerImpl(TimeSource& time_source, ThreadLocal::SlotAllocator& tls);
+  AlternateProtocolsCacheManagerImpl(AlternateProtocolsData& data, ThreadLocal::SlotAllocator& tls);
 
   // AlternateProtocolsCacheManager
   AlternateProtocolsCacheSharedPtr
@@ -37,7 +46,7 @@ private:
     absl::flat_hash_map<std::string, CacheWithOptions> caches_;
   };
 
-  TimeSource& time_source_;
+  AlternateProtocolsData& data_;
 
   // Thread local state for the cache.
   ThreadLocal::TypedSlot<State> slot_;
@@ -46,16 +55,16 @@ private:
 class AlternateProtocolsCacheManagerFactoryImpl : public AlternateProtocolsCacheManagerFactory {
 public:
   AlternateProtocolsCacheManagerFactoryImpl(Singleton::Manager& singleton_manager,
-                                            TimeSource& time_source,
-                                            ThreadLocal::SlotAllocator& tls)
-      : singleton_manager_(singleton_manager), time_source_(time_source), tls_(tls) {}
+                                            ThreadLocal::SlotAllocator& tls,
+                                            AlternateProtocolsData data)
+      : singleton_manager_(singleton_manager), tls_(tls), data_(data) {}
 
   AlternateProtocolsCacheManagerSharedPtr get() override;
 
 private:
   Singleton::Manager& singleton_manager_;
-  TimeSource& time_source_;
   ThreadLocal::SlotAllocator& tls_;
+  AlternateProtocolsData data_;
 };
 
 } // namespace Http

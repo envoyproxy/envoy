@@ -62,8 +62,7 @@ public:
         tls_(tls), dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
         local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
         singleton_manager_(singleton_manager), quic_stat_names_(quic_stat_names),
-        alternate_protocols_cache_manager_factory_(singleton_manager,
-                                                   main_thread_dispatcher.timeSource(), tls_),
+        alternate_protocols_cache_manager_factory_(singleton_manager, tls_, {context_}),
         alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()) {}
 
   // Upstream::ClusterManagerFactory
