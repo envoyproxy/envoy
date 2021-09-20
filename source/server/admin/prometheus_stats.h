@@ -42,7 +42,7 @@ public:
    */
   static absl::optional<std::string>
   metricName(const std::string& extracted_name,
-             const Stats::CustomStatNamespaces& custom_namespaces);
+             const Stats::CustomStatNamespaces& custom_namespace_factory);
 };
 
 } // namespace Server
