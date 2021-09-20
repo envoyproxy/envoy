@@ -282,11 +282,11 @@ typed_config:
       if test_header_value_2 == nil then
         request_handle:headers():add("test_header_value_2", "nil_value")
       end
-      local test_header_value_size = request_handle:headers():getValueSize("x-test-header")
+      local test_header_value_size = request_handle:headers():getNumValues("x-test-header")
       request_handle:headers():add("test_header_value_size", test_header_value_size)
       request_handle:headers():add("cookie_0", request_handle:headers():getAtIndex("set-cookie", 0))
       request_handle:headers():add("cookie_1", request_handle:headers():getAtIndex("set-cookie", 1))
-      request_handle:headers():add("cookie_size", request_handle:headers():getValueSize("set-cookie"))
+      request_handle:headers():add("cookie_size", request_handle:headers():getNumValues("set-cookie"))
 
       request_handle:headers():add("request_body_size", body_length)
       request_handle:headers():add("request_metadata_foo", metadata["foo"])

@@ -48,7 +48,7 @@ public:
     return {{"add", static_luaAdd},
             {"get", static_luaGet},
             {"getAtIndex", static_luaGetAtIndex},
-            {"getValueSize", static_luaGetValueSize},
+            {"getNumValues", static_luaGetNumValues},
             {"remove", static_luaRemove},
             {"replace", static_luaReplace},
             {"__pairs", static_luaPairs}};
@@ -83,7 +83,7 @@ private:
    * @param 1 (string): header name.
    * @return int value size if found or 0.
    */
-  DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaGetValueSize);
+  DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaGetNumValues);
 
   /**
    * Implementation of the __pairs metamethod so a headers wrapper can be iterated over using

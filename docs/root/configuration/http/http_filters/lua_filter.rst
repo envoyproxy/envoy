@@ -558,14 +558,14 @@ given header has multiple values. *key* is a string that supplies the header key
 an integer that supplies the position. It returns a string that is the header value or nil if
 there is no such header or if there is no value at the specified index.
 
-getValueSize()
+getNumValues()
 ^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
-  headers:getValueSize(key)
+  headers:getNumValues(key)
 
-Gets the value size of a given header. It can be used to fetch the total number of values in case
+Gets the number of values of a given header. It can be used to fetch the total number of values in case
 the given header has multiple values. *key* is a string that supplies the header key. It returns
 an integer with the value size for the given header or *0* if there is no such header.
 

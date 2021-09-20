@@ -58,15 +58,13 @@ int HeaderMapWrapper::luaGetAtIndex(lua_State* state) {
   const Http::HeaderMap::GetResult header_value = headers_.get(Http::LowerCaseString(key));
   if (index >= 0 && header_value.size() > static_cast<uint64_t>(index)) {
     absl::string_view value = header_value[index]->value().getStringView();
-    if (!value.empty()) {
-      lua_pushlstring(state, value.data(), value.length());
-      return 1;
-    }
+    lua_pushlstring(state, value.data(), value.length());
+    return 1;
   }
   return 0;
 }
 
-int HeaderMapWrapper::luaGetValueSize(lua_State* state) {
+int HeaderMapWrapper::luaGetNumValues(lua_State* state) {
   absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   const Http::HeaderMap::GetResult header_value = headers_.get(Http::LowerCaseString(key));
   lua_pushnumber(state, header_value.size());

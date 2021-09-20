@@ -69,12 +69,12 @@ TEST_F(LuaHeaderMapWrapperTest, Methods) {
 }
 
 // Get the value size of a certain header with multiple values.
-TEST_F(LuaHeaderMapWrapperTest, GetValueSize) {
+TEST_F(LuaHeaderMapWrapperTest, GetNumValues) {
   const std::string SCRIPT{R"EOF(
       function callMe(object)
-        testPrint(object:getValueSize("X-Test"))
-        testPrint(object:getValueSize(":path"))
-        testPrint(object:getValueSize("foobar"))
+        testPrint(object:getNumValues("X-Test"))
+        testPrint(object:getNumValues(":path"))
+        testPrint(object:getNumValues("foobar"))
       end
     )EOF"};
 
@@ -93,12 +93,13 @@ TEST_F(LuaHeaderMapWrapperTest, GetValueSize) {
 TEST_F(LuaHeaderMapWrapperTest, GetAtIndex) {
   const std::string SCRIPT{R"EOF(
         function callMe(object)
+          if object:getAtIndex("x-test", -1) == nil then
+            testPrint("invalid_negative_index")
+          end
           testPrint(object:getAtIndex("X-Test", 0))
           testPrint(object:getAtIndex("x-test", 1))
-          if object:getAtIndex("x-test", -1) == nil then
-            testPrint("invalid_value")
-          end
-          if object:getAtIndex("x-test", 2) == nil then
+          testPrint(object:getAtIndex("x-test", 2))
+          if object:getAtIndex("x-test", 3) == nil then
             testPrint("nil_value")
           end
         end
@@ -107,11 +108,13 @@ TEST_F(LuaHeaderMapWrapperTest, GetAtIndex) {
   InSequence s;
   setup(SCRIPT);
 
-  Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"x-test", "foo"}, {"x-test", "bar"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {":path", "/"}, {"x-test", "foo"}, {"x-test", "bar"}, {"x-test", ""}};
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
+  EXPECT_CALL(printer_, testPrint("invalid_negative_index"));
   EXPECT_CALL(printer_, testPrint("foo"));
   EXPECT_CALL(printer_, testPrint("bar"));
-  EXPECT_CALL(printer_, testPrint("invalid_value"));
+  EXPECT_CALL(printer_, testPrint(""));
   EXPECT_CALL(printer_, testPrint("nil_value"));
   start("callMe");
 }
