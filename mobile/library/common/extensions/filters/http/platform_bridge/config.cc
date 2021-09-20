@@ -15,7 +15,7 @@ Http::FilterFactoryCb PlatformBridgeFilterFactory::createFilterFactoryFromProtoT
       std::make_shared<PlatformBridgeFilterConfig>(proto_config);
   return [filter_config, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
-        std::make_shared<PlatformBridgeFilter>(filter_config, context.dispatcher()));
+        std::make_shared<PlatformBridgeFilter>(filter_config, context.mainThreadDispatcher()));
   };
 }
 
