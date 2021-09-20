@@ -482,7 +482,10 @@ class Primitive(TypeSpecification):
   Represents a Kafka primitive value.
   """
 
-    USABLE_PRIMITIVE_TYPE_NAMES = ['bool', 'int8', 'int16', 'int32', 'int64', 'uint16', 'float64', 'string', 'bytes', 'records', 'uuid']
+    USABLE_PRIMITIVE_TYPE_NAMES = [
+        'bool', 'int8', 'int16', 'int32', 'int64', 'uint16', 'float64', 'string', 'bytes',
+        'records', 'uuid'
+    ]
 
     KAFKA_TYPE_TO_ENVOY_TYPE = {
         'string': 'std::string',
