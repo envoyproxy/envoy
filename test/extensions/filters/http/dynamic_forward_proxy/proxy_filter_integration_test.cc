@@ -173,7 +173,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }
 
-// Currenctly if the first DNS resolution fails, the filter will continue with
+// Currently if the first DNS resolution fails, the filter will continue with
 // a null address. Make sure this mode fails gracefully.
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) {
   initializeWithArgs();
