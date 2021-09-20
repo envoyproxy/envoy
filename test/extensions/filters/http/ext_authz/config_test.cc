@@ -52,7 +52,8 @@ public:
     // Reset the async client manager before shutdown threading.
     // Because its dtor will try to post to event loop to clear thread local slot.
     runOnMainBlocking([&]() { async_client_manager_.reset(); });
-
+    // TODO(chaoqin-li1123): clean this up when we figure out how to free the threading resources in
+    // RealThreadsTestHelper.
     shutdownThreading();
     exitThreads();
   }
