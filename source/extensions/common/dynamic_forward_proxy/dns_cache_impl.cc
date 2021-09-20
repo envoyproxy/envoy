@@ -54,10 +54,7 @@ DnsCacheImpl::DnsCacheImpl(
     // cache to load an entry. Further if this particular resolution fails all the is lost is the
     // potential optimization of having the entry be preresolved the first time a true consumer of
     // this DNS cache asks for it.
-    main_thread_dispatcher_.post(
-        [this, host = hostname.address(), default_port = hostname.port_value()]() {
-          startCacheLoad(host, default_port);
-        });
+    startCacheLoad(hostname.address(), hostname.port_value());
   }
 }
 
@@ -271,6 +268,22 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
     notifyThreads(host, primary_host.host_info_);
   } else {
     startResolve(host, primary_host);
+  }
+}
+
+void DnsCacheImpl::forceRefreshHosts() {
+  absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
+  for (auto& primary_host : primary_hosts_) {
+    // Avoid holding the lock for longer than necessary by just triggering the refresh timer for
+    // each host IFF the host is not already refreshing.
+    // TODO(mattklein123): In the future we may want to cancel an ongoing refresh and start a new
+    // one to avoid a situation in which an older refresh races with a concurrent network change,
+    // for example.
+    if (primary_host.second->active_query_ == nullptr) {
+      ASSERT(!primary_host.second->timeout_timer_->enabled());
+      primary_host.second->refresh_timer_->enableTimer(std::chrono::milliseconds(0), nullptr);
+      ENVOY_LOG(debug, "force refreshing host='{}'", primary_host.first);
+    }
   }
 }
 
