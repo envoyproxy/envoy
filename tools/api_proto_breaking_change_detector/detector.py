@@ -16,8 +16,8 @@ The tool is currently implemented with buf (https://buf.build/)
 from pathlib import Path
 from typing import List
 
-from buf_utils import check_breaking, pull_buf_deps
-from detector_errors import ChangeDetectorError
+from tools.api_proto_breaking_change_detector.buf_utils import check_breaking, pull_buf_deps
+from tools.api_proto_breaking_change_detector.detector_errors import ChangeDetectorError
 
 
 class ProtoBreakingChangeDetector(object):
