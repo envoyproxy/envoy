@@ -69,7 +69,7 @@ public:
       FilterConfigSubscriptionSharedPtr& subscription,
       const absl::flat_hash_set<std::string>& require_type_urls,
       Server::Configuration::FactoryContext& factory_context,
-      absl::optional<ProtobufWkt::Any> default_config, bool last_filter_in_filter_chain,
+      const absl::optional<ProtobufWkt::Any>& default_config, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type,
       std::function<Envoy::Http::FilterFactoryCb(const ProtobufWkt::Any&)> factory_cb)
       : DynamicFilterConfigProviderImplBase(subscription, require_type_urls,
