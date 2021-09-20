@@ -69,6 +69,12 @@ protected:
       const auto addr = Network::Test::getCanonicalLoopbackAddress(ipVersion());
       const auto addr_port = Network::Utility::getAddressWithPort(*addr, test_processor_.port());
       setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server", addr_port);
+      // Insert some extra metadata. This ensures that we are actually passing the
+      // "stream info" from the original HTTP request all the way down to the
+      // ext_proc stream.
+      auto* metadata = proto_config_.mutable_grpc_service()->mutable_initial_metadata()->Add();
+      metadata->set_key("x-request_id");
+      metadata->set_value("%REQ(x-request-id)%");
 
       // Merge the filter.
       envoy::config::listener::v3::Filter ext_proc_filter;

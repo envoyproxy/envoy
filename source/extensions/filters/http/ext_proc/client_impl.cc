@@ -15,19 +15,23 @@ ExternalProcessorClientImpl::ExternalProcessorClientImpl(
 }
 
 ExternalProcessorStreamPtr
-ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks) {
+ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks,
+                                   const StreamInfo::StreamInfo& stream_info) {
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(
       factory_->createUncachedRawAsyncClient());
-  return std::make_unique<ExternalProcessorStreamImpl>(std::move(grpcClient), callbacks);
+  return std::make_unique<ExternalProcessorStreamImpl>(std::move(grpcClient), callbacks,
+                                                       stream_info);
 }
 
 ExternalProcessorStreamImpl::ExternalProcessorStreamImpl(
     Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-    ExternalProcessorCallbacks& callbacks)
+    ExternalProcessorCallbacks& callbacks, const StreamInfo::StreamInfo& stream_info)
     : callbacks_(callbacks) {
   client_ = std::move(client);
   auto descriptor = Protobuf::DescriptorPool::generated_pool()->FindMethodByName(kExternalMethod);
+  grpc_context_.stream_info = &stream_info;
   Http::AsyncClient::StreamOptions options;
+  options.setParentContext(grpc_context_);
   stream_ = client_.start(*descriptor, *this, options);
 }
 
