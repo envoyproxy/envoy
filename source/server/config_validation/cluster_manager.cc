@@ -12,7 +12,7 @@ ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   return std::make_unique<ValidationClusterManager>(
       bootstrap, *this, stats_, tls_, context_.runtime(), local_info_, log_manager_,
-      context_.dispatcher(), admin_, validation_context_, context_.api(), http_context_,
+      context_.mainThreadDispatcher(), admin_, validation_context_, context_.api(), http_context_,
       grpc_context_, router_context_);
 }
 

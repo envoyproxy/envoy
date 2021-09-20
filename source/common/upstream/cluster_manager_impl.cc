@@ -1644,8 +1644,8 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   return ClusterManagerPtr{new ClusterManagerImpl(
       bootstrap, *this, stats_, tls_, context_.runtime(), context_.localInfo(), log_manager_,
-      context_.dispatcher(), context_.admin(), validation_context_, context_.api(), http_context_,
-      grpc_context_, router_context_)};
+      context_.mainThreadDispatcher(), context_.admin(), validation_context_, context_.api(),
+      http_context_, grpc_context_, router_context_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
@@ -1725,8 +1725,8 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterFactoryImplBase::create(
       cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, context_.runtime(),
-      context_.dispatcher(), log_manager_, context_.localInfo(), admin_, singleton_manager_,
-      outlier_event_logger, added_via_api,
+      context_.mainThreadDispatcher(), log_manager_, context_.localInfo(), admin_,
+      singleton_manager_, outlier_event_logger, added_via_api,
       added_via_api ? validation_context_.dynamicValidationVisitor()
                     : validation_context_.staticValidationVisitor(),
       context_.api(), context_.options());

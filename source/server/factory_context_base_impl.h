@@ -20,7 +20,7 @@ public:
 
   // FactoryContextBase
   const Options& options() override { return options_; };
-  Event::Dispatcher& dispatcher() override { return main_thread_dispatcher_; };
+  Event::Dispatcher& mainThreadDispatcher() override { return main_thread_dispatcher_; };
   Api::Api& api() override { return api_; };
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; };
   Server::Admin& admin() override { return admin_; };

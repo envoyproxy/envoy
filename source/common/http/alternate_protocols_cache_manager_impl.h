@@ -14,8 +14,8 @@ namespace Http {
 
 struct AlternateProtocolsData {
   AlternateProtocolsData(Server::Configuration::FactoryContextBase& context)
-      : dispatcher_(context.dispatcher()), validation_visitor_(context.messageValidationVisitor()) {
-  }
+      : dispatcher_(context.mainThreadDispatcher()),
+        validation_visitor_(context.messageValidationVisitor()) {}
   Event::Dispatcher& dispatcher_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };

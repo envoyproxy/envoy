@@ -112,7 +112,7 @@ protected:
       bool isHalfCloseEnabled() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       void close(Network::ConnectionCloseType) override {}
       Event::Dispatcher& dispatcher() override {
-        return parent_.parent_.factory_context_.dispatcher();
+        return parent_.parent_.factory_context_.mainThreadDispatcher();
       }
       uint64_t id() const override { return 12345; }
       void hashKey(std::vector<uint8_t>&) const override {}

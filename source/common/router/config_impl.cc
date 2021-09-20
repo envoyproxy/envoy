@@ -389,7 +389,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           vhost_.globalRouteConfig().maxDirectResponseBodySizeBytes())),
       per_filter_configs_(route.typed_per_filter_config(), optional_http_filters, factory_context,
                           validator),
-      route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()) {
+      route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
