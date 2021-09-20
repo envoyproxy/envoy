@@ -23,7 +23,7 @@ struct UpstreamAddressSet : public FilterState::Object {
   }
 
   static const std::string& key() {
-    CONSTRUCT_ON_FIRST_USE(std::string, "envoy.stream.upstream_address_set");
+    CONSTRUCT_ON_FIRST_USE(std::string, "envoy.stream.upstream_addresses");
   }
 
   absl::flat_hash_set<Network::Address::InstanceConstSharedPtr> addresses_;
