@@ -70,10 +70,7 @@ def is_waiting(labels):
 
 
 def is_contrib(labels):
-    for label in labels:
-        if label.name == 'contrib':
-            return True
-    return False
+    return any(label.name == "contrib" for label in labels)
 
 
 # Return true if the PR has an API tag, false otherwise.
