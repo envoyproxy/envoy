@@ -1,6 +1,6 @@
 #include "source/common/network/listener_filter_buffer_impl.h"
 
-#include <string.h>
+#include <string>
 
 namespace Envoy {
 namespace Network {

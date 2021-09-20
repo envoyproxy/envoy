@@ -28,8 +28,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::DoAll;
-using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::MockFunction;

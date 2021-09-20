@@ -81,6 +81,7 @@ static void BM_TlsInspector(benchmark::State& state) {
   dispatcher.file_event_callback_(Event::FileReadyType::Read);
 
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     Filter filter(cfg);
     filter.onAccept(cb);
     auto filter_state = filter.onData(buffer);
