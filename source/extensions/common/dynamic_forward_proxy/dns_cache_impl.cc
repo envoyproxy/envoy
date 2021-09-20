@@ -276,6 +276,9 @@ void DnsCacheImpl::forceRefreshHosts() {
   for (auto& primary_host : primary_hosts_) {
     // Avoid holding the lock for longer than necessary by just triggering the refresh timer for
     // each host IFF the host is not already refreshing.
+    // TODO(mattklein123): In the future we may want to cancel an ongoing refresh and start a new
+    // one to avoid a situation in which an older refresh races with a concurrent network change,
+    // for example.
     if (primary_host.second->active_query_ == nullptr) {
       ASSERT(!primary_host.second->timeout_timer_->enabled());
       primary_host.second->refresh_timer_->enableTimer(std::chrono::milliseconds(0), nullptr);
