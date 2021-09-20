@@ -9,15 +9,15 @@ TEST(CustomStatNamespacesImpl, Registration) {
   CustomStatNamespacesImpl namespaces;
   const std::string name = "foo";
   EXPECT_FALSE(namespaces.registered(name));
-  EXPECT_TRUE(namespaces.empty());
   namespaces.registerStatNamespace(name);
   EXPECT_TRUE(namespaces.registered(name));
-  EXPECT_FALSE(namespaces.empty());
   EXPECT_FALSE(namespaces.registered("bar"));
 }
 
 TEST(CustomStatNamespacesImpl, StripRegisteredPrefix) {
   CustomStatNamespacesImpl namespaces;
+  // no namespace is registered.
+  EXPECT_FALSE(namespaces.stripRegisteredPrefix("foo.bar").has_value());
   namespaces.registerStatNamespace("foo");
   // namespace is not registered.
   EXPECT_FALSE(namespaces.stripRegisteredPrefix("bar.my.value").has_value());

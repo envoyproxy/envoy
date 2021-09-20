@@ -6,11 +6,6 @@
 namespace Envoy {
 namespace Stats {
 
-bool CustomStatNamespacesImpl::empty() const {
-  ASSERT(Thread::MainThread::isMainThread());
-  return namespaces_.empty();
-}
-
 bool CustomStatNamespacesImpl::registered(const absl::string_view name) const {
   ASSERT(Thread::MainThread::isMainThread());
   return namespaces_.find(name) != namespaces_.end();
@@ -24,10 +19,12 @@ void CustomStatNamespacesImpl::registerStatNamespace(const absl::string_view nam
 absl::optional<absl::string_view>
 CustomStatNamespacesImpl::stripRegisteredPrefix(const absl::string_view stat_name) const {
   ASSERT(Thread::MainThread::isMainThread());
-  const auto pos = stat_name.find_first_of('.');
-  if (pos != std::string::npos && registered(stat_name.substr(0, pos))) {
-    // Trim the custom namespace.
-    return stat_name.substr(pos + 1);
+  if (!namespaces_.empty()) {
+    const auto pos = stat_name.find_first_of('.');
+    if (pos != std::string::npos && registered(stat_name.substr(0, pos))) {
+      // Trim the custom namespace.
+      return stat_name.substr(pos + 1);
+    }
   }
   return absl::nullopt;
 };
