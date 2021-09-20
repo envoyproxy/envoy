@@ -252,7 +252,7 @@ R"(
                 preresolve_hostnames: *dns_preresolve_hostnames
 )"              // TODO: Support IPV6 https://github.com/lyft/envoy-mobile/issues/1022
 R"(
-                dns_lookup_family: V4_ONLY
+                dns_lookup_family: V4_PREFERRED
 )"              // On mobile, backgrounding might cause the host to be past its TTL without good
                 // reason. Given the host would be deleted, and new streams for a given domain
                 // would have to wait for resolution, it is better to not delete existing hosts;
