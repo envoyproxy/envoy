@@ -69,6 +69,13 @@ def is_waiting(labels):
     return False
 
 
+def is_contrib(labels):
+    for label in labels:
+        if label.name == 'contrib':
+            return True
+    return False
+
+
 # Return true if the PR has an API tag, false otherwise.
 def is_api(labels):
     for label in labels:
@@ -174,7 +181,7 @@ def track_prs():
             pr_info.assignees, maintainers_and_prs, message, MAINTAINERS, FIRST_PASS)
 
         # If there was no maintainer, track it as unassigned.
-        if not has_maintainer_assignee:
+        if not has_maintainer_assignee and not is_contrib(labels):
             maintainers_and_prs['unassigned'] = maintainers_and_prs['unassigned'] + message
 
     # Return the dict of {maintainers : PR notifications},
