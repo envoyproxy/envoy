@@ -22,6 +22,12 @@ public:
    * Resets the intervals so that the back off intervals can start again.
    */
   virtual void reset() PURE;
+
+  /**
+   * Resets the interval with a (potentially) new starting point.
+   */
+  virtual void reset(uint64_t base) PURE;
+
 };
 
 using BackOffStrategyPtr = std::unique_ptr<BackOffStrategy>;
