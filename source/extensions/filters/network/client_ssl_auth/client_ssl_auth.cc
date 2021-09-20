@@ -22,11 +22,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ClientSslAuth {
 
-struct RcDetailsValues {
-  // SSL certificate is not in the allowed principals list.
-  const std::string AuthDigestNoMatch = "auth_digest_no_match";
-};
-using RcDetails = ConstSingleton<RcDetailsValues>;
+constexpr absl::string_view AuthDigestNoMatch = "auth_digest_no_match";
 
 ClientSslAuthConfig::ClientSslAuthConfig(
     const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
@@ -129,8 +125,7 @@ void ClientSslAuthFilter::onEvent(Network::ConnectionEvent event) {
           read_callbacks_->connection().ssl()->sha256PeerCertificateDigest())) {
     read_callbacks_->connection().streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::UpstreamProtocolError);
-    read_callbacks_->connection().streamInfo().setResponseCodeDetails(
-        RcDetails::get().AuthDigestNoMatch);
+    read_callbacks_->connection().streamInfo().setResponseCodeDetails(AuthDigestNoMatch);
     config_->stats().auth_digest_no_match_.inc();
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return;
