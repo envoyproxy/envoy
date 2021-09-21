@@ -120,13 +120,14 @@ message HealthCheck {
 
     // Specifies a list of HTTP response statuses considered retriable. If provided, responses in this range
     // will count towards the configured :ref:`unhealthy_threshold <envoy_v3_api_field_config.core.v3.HealthCheck.unhealthy_threshold>`,
-    // and will not result in the host being considered immediately unhealthy
-    // (By default all responses not in :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`
-    // will result in the host being considered immediately unhealthy). Ranges follow half-open semantics of
+    // but will not result in the host being considered immediately unhealthy. Ranges follow half-open semantics of
     // :ref:`Int64Range <envoy_v3_api_msg_type.v3.Int64Range>`. The start and end of each range are required.
     // Only statuses in the range [100, 600) are allowed. The :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`
     // field takes precedence for any range overlaps with this field i.e. if status code 200 is both retriable and expected, a 200 response will
-    // be considered a successful health check.
+    // be considered a successful health check. By default all responses not in
+    // :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>` will result in
+    // the host being considered immediately unhealthy i.e. if status code 200 is expected and there are no configured retriable statuses, any
+    // non-200 response will result in the host being marked unhealthy.
     repeated type.v3.Int64Range retriable_statuses = 12;
 
     // Use specified application protocol for health checks.
