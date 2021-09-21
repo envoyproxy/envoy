@@ -16,14 +16,21 @@ if [[ ! $(command -v jq) ]]; then
     exit 1
 fi
 
+MAIN_BRANCH="refs/heads/main"
 RELEASE_TAG_REGEX="^refs/tags/v.*"
 
 if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
     DOCS_TAG="${AZP_BRANCH/refs\/tags\//}"
     export DOCS_TAG
+    # no need to build rst explicitly, just html
+    HTML_ONLY=true
 else
     BUILD_SHA=$(git rev-parse HEAD)
     export BUILD_SHA
+    if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
+        # no need to build html, just rst
+        RST_ONLY=true
+    fi
 fi
 
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
@@ -33,9 +40,30 @@ BAZEL_BUILD_OPTIONS+=(
     "--action_env=BUILD_SHA"
     "--action_env=SPHINX_SKIP_CONFIG_VALIDATION")
 
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:html
+# Building html/rst is determined by then needs of CI but can be overridden in dev.
+if [[ -z "${RST_ONLY}" ]] || [[ -n "${DOCS_BUILD_HTML}" ]]; then
+    BUILD_HTML=1
+fi
+if [[ -z "${HTML_ONLY}" ]] || [[ -n "${DOCS_BUILD_RST}" ]]; then
+    BUILD_RST=1
+fi
+
+# Build html/rst
+if [[ -n "${BUILD_RST}" ]]; then
+    bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:rst
+fi
+if [[ -n "${BUILD_HTML}" ]]; then
+    bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:html
+fi
 
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
 rm -rf "${DOCS_OUTPUT_DIR}"
 mkdir -p "${DOCS_OUTPUT_DIR}"
-tar -xf bazel-bin/docs/html.tar -C "$DOCS_OUTPUT_DIR"
+
+# Save html/rst to output directory
+if [[ -n "${BUILD_HTML}" ]]; then
+    tar -xf bazel-bin/docs/html.tar -C "$DOCS_OUTPUT_DIR"
+fi
+if [[ -n "${BUILD_RST}" ]]; then
+    gzip -c bazel-bin/docs/rst.tar > "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
+fi
