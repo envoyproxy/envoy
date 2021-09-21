@@ -62,7 +62,8 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
           if (query_parameter.remove()) {
             authz_response->query_parameters_to_remove.push_back(query_parameter.key());
           } else {
-            authz_response->query_parameters_to_set.push_back(std::pair(query_parameter.key(), query_parameter.value()));
+            authz_response->query_parameters_to_set.push_back(
+                std::pair(query_parameter.key(), query_parameter.value()));
           }
         }
       }
