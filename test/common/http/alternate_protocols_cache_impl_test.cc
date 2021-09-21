@@ -136,7 +136,7 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
   auto testAltSvc = [&](const std::string& original_alt_svc,
                         const std::string& expected_alt_svc) -> void {
     absl::optional<std::vector<AlternateProtocolsCache::AlternateProtocol>> protocols =
-        AlternateProtocolsCacheImpl::protocolsFromString(original_alt_svc, simTime());
+        AlternateProtocolsCacheImpl::protocolsFromString(original_alt_svc, simTime(), true);
     ASSERT(protocols.has_value());
     ASSERT_GE(protocols.value().size(), 1);
 
@@ -168,10 +168,10 @@ TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
              "h3-29=\":443\"; ma=86400,h3=\":443\"; ma=60");
 
   // Test once more to make sure we handle time advancing correctly.
-  // protocolsToString spits out the absolute expiry time, which is now 60 (time
-  // since epoch) + 86400 (max age)
+  // the absolute expiration time in testAltSvc is expected to be 86400 so add
+  // 60s to the default max age.
   simTime().setMonotonicTime(simTime().monotonicTime() + std::chrono::seconds(60));
-  testAltSvc("h3-29=\":443\"; ma=86400", "h3-29=\":443\"; ma=86460");
+  testAltSvc("h3-29=\":443\"; ma=86460", "h3-29=\":443\"; ma=86460");
 }
 
 } // namespace

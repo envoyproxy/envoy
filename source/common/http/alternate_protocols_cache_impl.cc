@@ -45,13 +45,13 @@ AlternateProtocolsCacheImpl::protocolsFromString(absl::string_view alt_svc_strin
   for (const auto& alt_svc : altsvc_vector) {
     MonotonicTime expiration;
     if (from_cache) {
-      auto expire_time_from_epoch = std::chrono::minutes(alt_svc.max_age);
-      auto time_since_epoch = std::chrono::duration_cast<std::chrono::minutes>(
+      auto expire_time_from_epoch = std::chrono::seconds(alt_svc.max_age);
+      auto time_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(
           time_source.monotonicTime().time_since_epoch());
       if (expire_time_from_epoch < time_since_epoch) {
         expiration = time_source.monotonicTime();
       } else {
-        expiration = time_source.monotonicTime() + (time_since_epoch - expire_time_from_epoch);
+        expiration = time_source.monotonicTime() + (expire_time_from_epoch - time_since_epoch);
       }
     } else {
       expiration = time_source.monotonicTime() + std::chrono::seconds(alt_svc.max_age);

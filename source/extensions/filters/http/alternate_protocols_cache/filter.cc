@@ -50,7 +50,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     absl::optional<std::vector<Http::AlternateProtocolsCache::AlternateProtocol>>
         potential_protocols = Http::AlternateProtocolsCacheImpl::protocolsFromString(
             alt_svc[i]->value().getStringView(), time_source_);
-    if (potential_protocols.has_value()) {
+    if (!potential_protocols.has_value()) {
       ENVOY_LOG(trace, "Invalid Alt-Svc header received: '{}'",
                 alt_svc[i]->value().getStringView());
       return Http::FilterHeadersStatus::Continue;
