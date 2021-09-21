@@ -11,8 +11,8 @@ namespace StreamInfo {
 /*
  * A FilterState object that wraps a set of network address shared pointers.
  */
-struct UpstreamAddressSet : public FilterState::Object {
-
+class UpstreamAddressSet : public FilterState::Object {
+public:
   void iterate(const std::function<bool(const Network::Address::InstanceConstSharedPtr& address)>&
                    fn) const {
     for (const auto& address : addresses_) {

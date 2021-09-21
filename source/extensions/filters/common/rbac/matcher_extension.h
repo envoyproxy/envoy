@@ -47,9 +47,7 @@ public:
     return std::make_shared<M>(proto_message);
   }
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new P()};
-  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return std::make_unique<P>(); }
 };
 
 } // namespace RBAC
