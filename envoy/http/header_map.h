@@ -549,8 +549,8 @@ public:
    * @param key specifies the name of the header to set; it WILL be copied.
    * @param value specifies the value of the header to set; it WILL be copied.
    *
-   * Caution: This iterates over the HeaderMap to find the header to set. This will modify only the
-   * first occurrence of the header.
+   * Caution: This iterates over the HeaderMap to find the header to set. If there are multiple
+   * values for one header, this removes all existing values and add the new one.
    * TODO(asraa): Investigate whether necessary to set all headers with the key.
    */
   virtual void setCopy(const LowerCaseString& key, absl::string_view value) PURE;

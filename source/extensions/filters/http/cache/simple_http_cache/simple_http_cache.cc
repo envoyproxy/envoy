@@ -109,8 +109,9 @@ LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
   return std::make_unique<SimpleLookupContext>(*this, std::move(request));
 }
 
-const absl::flat_hash_set<Http::LowerCaseString> SimpleHttpCache::headersNotToUpdate =
-    absl::flat_hash_set<Http::LowerCaseString>({
+const absl::flat_hash_set<Http::LowerCaseString> SimpleHttpCache::headersNotToUpdate() {
+    CONSTRUCT_ON_FIRST_USE(
+        absl::flat_hash_set<Http::LowerCaseString>,
         // Content range should not be changed upon validation
         Http::Headers::get().ContentRange,
 
@@ -128,7 +129,8 @@ const absl::flat_hash_set<Http::LowerCaseString> SimpleHttpCache::headersNotToUp
         // We don't update the cached response on a Vary; we just delete it
         // entirely. So don't bother copying over the Vary header.
         Http::CustomHeaders::get().Vary,
-    });
+    );
+}
 
 void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
                                     const Http::ResponseHeaderMap& response_headers,
@@ -159,11 +161,10 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
   response_headers.iterate(
       [&entry](const Http::HeaderEntry& response_header) -> Http::HeaderMap::Iterate {
         Http::LowerCaseString lower_case_key{response_header.key().getStringView()};
-        if (headersNotToUpdate.contains(lower_case_key)) {
+        if (headersNotToUpdate().contains(lower_case_key)) {
           return Http::HeaderMap::Iterate::Continue;
         }
-        entry.response_headers_->remove(lower_case_key);
-        entry.response_headers_->addCopy(lower_case_key, response_header.value().getStringView());
+        entry.response_headers_->setCopy(lower_case_key, response_header.value().getStringView());
         return Http::HeaderMap::Iterate::Continue;
       });
   entry.metadata_ = metadata;

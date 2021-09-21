@@ -32,7 +32,7 @@ private:
   // We skip these headers because either it's updated by other application logic
   // or they are fall into categories defined in the IETF doc below
   // https://www.ietf.org/archive/id/draft-ietf-httpbis-cache-18.html s3.2
-  static const absl::flat_hash_set<Http::LowerCaseString> headersNotToUpdate;
+  static const absl::flat_hash_set<Http::LowerCaseString> headersNotToUpdate();
 
 public:
   // HttpCache
