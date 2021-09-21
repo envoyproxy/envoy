@@ -22,6 +22,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ClientSslAuth {
 
+constexpr absl::string_view AuthDigestNoMatch = "auth_digest_no_match";
+
 ClientSslAuthConfig::ClientSslAuthConfig(
     const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
     ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
@@ -121,6 +123,9 @@ void ClientSslAuthFilter::onEvent(Network::ConnectionEvent event) {
 
   if (!config_->allowedPrincipals().allowed(
           read_callbacks_->connection().ssl()->sha256PeerCertificateDigest())) {
+    read_callbacks_->connection().streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UpstreamProtocolError);
+    read_callbacks_->connection().streamInfo().setResponseCodeDetails(AuthDigestNoMatch);
     config_->stats().auth_digest_no_match_.inc();
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return;

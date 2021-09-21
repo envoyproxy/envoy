@@ -52,7 +52,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
@@ -230,6 +230,46 @@ message JwtProvider {
   //       exp: 1501281058
   //
   string payload_in_metadata = 9;
+
+  // If not empty, similar to :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`,
+  // a successfully verified JWT header will be written to :ref:`Dynamic State <arch_overview_data_sharing_between_filters>`
+  // as an entry (``protobuf::Struct``) in **envoy.filters.http.jwt_authn** *namespace* with the
+  // value of this field as the key.
+  //
+  // For example, if ``header_in_metadata`` is *my_header*:
+  //
+  // .. code-block:: yaml
+  //
+  //   envoy.filters.http.jwt_authn:
+  //     my_header:
+  //       alg: JWT
+  //       kid: EF71iSaosbC5C4tC6Syq1Gm647M
+  //       alg: PS256
+  //
+  // When the metadata has **envoy.filters.http.jwt_authn** entry already (for example if
+  // :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  // is not empty), it will be inserted as a new entry in the same *namespace* as shown below:
+  //
+  // .. code-block:: yaml
+  //
+  //   envoy.filters.http.jwt_authn:
+  //     my_payload:
+  //       iss: https://example.com
+  //       sub: test@example.com
+  //       aud: https://example.com
+  //       exp: 1501281058
+  //     my_header:
+  //       alg: JWT
+  //       kid: EF71iSaosbC5C4tC6Syq1Gm647M
+  //       alg: PS256
+  //
+  // .. warning::
+  //   Using the same key name for :ref:`header_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  //   and :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  //   is not suggested due to potential override of existing entry, while it is not enforced during
+  //   config validation.
+  //
+  string header_in_metadata = 14;
 
   // Specify the clock skew in seconds when verifying JWT time constraint,
   // such as `exp`, and `nbf`. If not specified, default is 60 seconds.
