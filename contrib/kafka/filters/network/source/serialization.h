@@ -547,6 +547,36 @@ private:
 };
 
 /**
+ * Deserializer of nullable compact bytes value.
+ * First reads length (UNSIGNED_VARINT32) and then allocates the buffer of given length.
+ * If length was 0, buffer allocation is omitted and deserializer is immediately ready (returning
+ * null value).
+ *
+ * From Kafka documentation:
+ * First the length N+1 is given as an UNSIGNED_VARINT. Then N bytes follow.
+ * A null object is represented with a length of 0.
+ */
+class NullableCompactBytesDeserializer : public Deserializer<NullableBytes> {
+public:
+  /**
+   * Can throw EnvoyException if given bytes length is not valid.
+   */
+  uint32_t feed(absl::string_view& data) override;
+
+  bool ready() const override { return ready_; }
+
+  NullableBytes get() const override;
+
+private:
+  VarUInt32Deserializer length_buf_;
+  bool length_consumed_{false};
+  uint32_t required_;
+
+  std::vector<unsigned char> data_buf_;
+  bool ready_{false};
+};
+
+/**
  * Deserializer for array of objects of the same type.
  *
  * First reads the length of the array, then initializes N underlying deserializers of type
@@ -1145,6 +1175,14 @@ template <> inline uint32_t EncodingContext::computeCompactSize(const Bytes& arg
 }
 
 /**
+ * Template overload for nullable compact byte array.
+ * Kafka NullableCompactBytes' size is var-len encoding of N+1 + N bytes.
+ */
+template <> inline uint32_t EncodingContext::computeCompactSize(const NullableBytes& arg) const {
+  return arg ? computeCompactSize(*arg) : 1;
+}
+
+/**
  * Template overload for CompactArray of T.
  * The size of array is compact size of header and all of its elements.
  */
@@ -1397,6 +1435,20 @@ inline uint32_t EncodingContext::encodeCompact(const Bytes& arg, Buffer::Instanc
   const uint32_t header_length = encodeCompact(data_length + 1, dst);
   dst.add(arg.data(), data_length);
   return header_length + data_length;
+}
+
+/**
+ * Template overload for NullableBytes.
+ * Encode byte array as VAR_UINT + N bytes.
+ */
+template <>
+inline uint32_t EncodingContext::encodeCompact(const NullableBytes& arg, Buffer::Instance& dst) {
+  if (arg.has_value()) {
+    return encodeCompact(*arg, dst);
+  } else {
+    const uint32_t len = 0;
+    return encodeCompact(len, dst);
+  }
 }
 
 /**

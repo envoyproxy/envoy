@@ -519,7 +519,8 @@ class Primitive(TypeSpecification):
 
     KAFKA_TYPE_TO_COMPACT_DESERIALIZER = {
         'string': 'CompactStringDeserializer',
-        'bytes': 'CompactBytesDeserializer'
+        'bytes': 'CompactBytesDeserializer',
+        'records': 'CompactBytesDeserializer'
     }
 
     # See https://github.com/apache/kafka/tree/trunk/clients/src/main/resources/common/message#deserializing-messages
@@ -591,7 +592,7 @@ class Primitive(TypeSpecification):
             return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_DEFAULT_VALUE)
 
     def has_flexible_handling(self):
-        return self.original_name in ['string', 'bytes', 'tagged_fields']
+        return self.original_name in ['string', 'bytes', 'records', 'tagged_fields']
 
     def example_value_for_test(self, version):
         return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_EXAMPLE_VALUE_FOR_TEST)

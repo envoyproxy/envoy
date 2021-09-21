@@ -40,6 +40,7 @@ TEST_EmptyDeserializerShouldNotBeReady(NullableCompactStringDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(BytesDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(CompactBytesDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(NullableBytesDeserializer);
+TEST_EmptyDeserializerShouldNotBeReady(NullableCompactBytesDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(UuidDeserializer);
 
 TEST(ArrayDeserializer, EmptyBufferShouldNotBeReady) {
@@ -429,7 +430,24 @@ TEST(NullableBytesDeserializer, ShouldThrowOnInvalidLength) {
   EXPECT_THROW(testee.feed(data), EnvoyException);
 }
 
-// Generic array tests.
+// Nullable compact byte-array tests.
+
+TEST(NullableCompactBytesDeserializer, ShouldDeserialize) {
+  const NullableBytes value{{'a', 'b', 'c', 'd'}};
+  serializeCompactThenDeserializeAndCheckEquality<NullableCompactBytesDeserializer>(value);
+}
+
+TEST(NullableCompactBytesDeserializer, ShouldDeserializeEmptyBytes) {
+  const NullableBytes value = {{}};
+  serializeCompactThenDeserializeAndCheckEquality<NullableCompactBytesDeserializer>(value);
+}
+
+TEST(NullableCompactBytesDeserializer, ShouldDeserializeNullBytes) {
+  const NullableBytes value = absl::nullopt;
+  serializeCompactThenDeserializeAndCheckEquality<NullableCompactBytesDeserializer>(value);
+}
+
+// Generic-array tests.
 
 TEST(ArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
   const std::vector<std::string> value{{"aaa", "bbbbb", "cc", "d", "e", "ffffffff"}};
@@ -451,7 +469,7 @@ TEST(ArrayDeserializer, ShouldThrowOnInvalidLength) {
   EXPECT_THROW(testee.feed(data), EnvoyException);
 }
 
-// Compact generic array tests.
+// Compact generic-array tests.
 
 TEST(CompactArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
   const std::vector<int32_t> value{{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}};
@@ -474,7 +492,7 @@ TEST(CompactArrayDeserializer, ShouldThrowOnInvalidLength) {
   EXPECT_THROW(testee.feed(data), EnvoyException);
 }
 
-// Generic nullable array tests.
+// Nullable generic-array tests.
 
 TEST(NullableArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
   const NullableArray<std::string> value{{"aaa", "bbbbb", "cc", "d", "e", "ffffffff"}};
@@ -501,7 +519,7 @@ TEST(NullableArrayDeserializer, ShouldThrowOnInvalidLength) {
   EXPECT_THROW(testee.feed(data), EnvoyException);
 }
 
-// Compact nullable generic array tests.
+// Nullable compact generic-array tests.
 
 TEST(NullableCompactArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
   const NullableArray<int32_t> value{{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}};
