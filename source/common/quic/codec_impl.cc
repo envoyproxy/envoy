@@ -55,11 +55,7 @@ void QuicHttpServerConnectionImpl::shutdownNotice() {
 }
 
 void QuicHttpServerConnectionImpl::goAway() {
-// TODO(alyssawilk) remove these guards once QUICHE has been updated to remove
-// the perspective check.
-#if defined(NDEBUG)
-  quic_server_session_.SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "client goaway");
-#endif
+  quic_server_session_.SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "server shutdown imminent");
 }
 
 QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(
@@ -76,7 +72,11 @@ QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(
 }
 
 void QuicHttpClientConnectionImpl::goAway() {
-  quic_client_session_.SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "server shutdown imminent");
+// TODO(alyssawilk) remove these guards once QUICHE has been updated to remove
+// the perspective check.
+#if defined(NDEBUG)
+  quic_client_session_.SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "client goaway");
+#endif
 }
 
 Http::RequestEncoder&
