@@ -116,8 +116,7 @@ public:
   }
 
   void newActiveClientAndStream(ActiveClient::State expected_state = ActiveClient::State::BUSY) {
-    ON_CALL(*cluster_, maxConnectionDuration)
-        .WillByDefault(Return(max_connection_duration_opt_));
+    ON_CALL(*cluster_, maxConnectionDuration).WillByDefault(Return(max_connection_duration_opt_));
 
     // Create a new stream using the pool
     EXPECT_CALL(pool_, instantiateActiveClient);
@@ -150,15 +149,16 @@ public:
   }
 
   void newClosedClient() {
-    // Start with a draining client. Then, close the stream. This will result in the client being closed.
+    // Start with a draining client. Then, close the stream. This will result in the client being
+    // closed.
     newDrainingClient();
     closeStream();
   }
 
   // Advance time and block until the next event
   void advanceTimeAndRun(uint32_t duration_ms) {
-    time_system_.advanceTimeAndRun(std::chrono::milliseconds(duration_ms),
-                                  *dispatcher_, Event::Dispatcher::RunType::Block);
+    time_system_.advanceTimeAndRun(std::chrono::milliseconds(duration_ms), *dispatcher_,
+                                   Event::Dispatcher::RunType::Block);
   }
 
   // Close the active stream
