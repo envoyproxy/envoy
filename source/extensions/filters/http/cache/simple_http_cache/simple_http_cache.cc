@@ -116,10 +116,7 @@ const absl::flat_hash_set<Http::LowerCaseString> SimpleHttpCache::headersNotToUp
       Http::Headers::get().ContentRange,
 
       // Headers that describe the body content should never be updated.
-      Http::Headers::get().ContentLength, Http::Headers::get().ContentType,
-
-      // The age is calculated and set by the general cache_filter code logic.
-      Http::CustomHeaders::get().Age,
+      Http::Headers::get().ContentLength,
 
       // It does not make sense for this level of the code to be updating the ETag, when
       // presumably the cached_response_headers reflect this specific ETag.
