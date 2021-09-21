@@ -76,6 +76,44 @@ TEST_F(TcpGrpcAccessLogConfigTest, Ok) { run("good_cluster"); }
 // Wrong configuration with invalid clusters.
 TEST_F(TcpGrpcAccessLogConfigTest, InvalidCluster) { run("invalid"); }
 
+class MockGrpcAccessLoggerCache : public GrpcCommon::GrpcAccessLoggerCache {
+public:
+  // GrpcAccessLoggerCache
+  MOCK_METHOD(GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
+              (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+               Common::GrpcAccessLoggerType logger_type, Stats::Scope& scope));
+};
+
+// Test for the issue described in https://github.com/envoyproxy/envoy/pull/18081
+TEST(TcpGrpcAccessLog, TlsLifetimeCheck) {
+  NiceMock<ThreadLocal::MockInstance> tls;
+  Stats::IsolatedStoreImpl scope;
+  std::shared_ptr<MockGrpcAccessLoggerCache> logger_cache{new MockGrpcAccessLoggerCache()};
+  tls.defer_data_ = true;
+  {
+    AccessLog::MockFilter* filter{new NiceMock<AccessLog::MockFilter>()};
+    envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig config;
+    config.mutable_common_config()->set_transport_api_version(
+        envoy::config::core::v3::ApiVersion::V3);
+    EXPECT_CALL(*logger_cache, getOrCreateLogger(_, _, _))
+        .WillOnce([](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
+                         common_config,
+                     Common::GrpcAccessLoggerType type, Stats::Scope&) {
+          // This is a part of the actual getOrCreateLogger code path and shouldn't crash.
+          std::make_pair(MessageUtil::hash(common_config), type);
+          return nullptr;
+        });
+    // Set tls callback in the TcpGrpcAccessLog constructor,
+    // but it is not called yet since we have defer_data_ = true.
+    const auto access_log = std::make_unique<TcpGrpcAccessLog>(AccessLog::FilterPtr{filter}, config,
+                                                               tls, logger_cache, scope);
+    // Intentionally make access_log die earlier in this scope to simulate the situation where the
+    // creator has been deleted yet the tls callback is not called yet.
+  }
+  // Verify the tls callback does not crash since it captures the env with proper lifetime.
+  tls.call();
+}
+
 } // namespace
 } // namespace TcpGrpc
 } // namespace AccessLoggers
