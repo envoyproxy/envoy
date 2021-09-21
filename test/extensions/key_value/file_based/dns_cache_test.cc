@@ -37,8 +37,8 @@ public:
 TEST_F(AlternateProtocolsCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
   envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig config;
   config.set_filename("foo");
-  options_.mutable_key_value_store_config()->set_name("envoy.key_value.file_based");
   envoy::config::common::key_value::v3::KeyValueStoreConfig kv_config;
+  kv_config.mutable_config()->set_name("envoy.key_value.file_based");
   kv_config.mutable_config()->mutable_typed_config()->PackFrom(config);
   options_.mutable_key_value_store_config()->set_name("envoy.common.key_value");
   options_.mutable_key_value_store_config()->mutable_typed_config()->PackFrom(kv_config);

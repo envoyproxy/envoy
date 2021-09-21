@@ -1,6 +1,8 @@
 #include "source/common/http/alternate_protocols_cache_manager_impl.h"
 
 #include "envoy/common/key_value_store.h"
+#include "envoy/config/common/key_value/v3/config.pb.h"
+#include "envoy/config/common/key_value/v3/config.pb.validate.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/http/alternate_protocols_cache_impl.h"
@@ -40,10 +42,12 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
 
   std::unique_ptr<KeyValueStore> store;
   if (options.has_key_value_store_config()) {
-    auto& factory =
-        Config::Utility::getAndCheckFactory<KeyValueStoreFactory>(options.key_value_store_config());
-    store = factory.createStore(options.key_value_store_config(), data_.validation_visitor_,
-                                data_.dispatcher_, data_.file_system_);
+    envoy::config::common::key_value::v3::KeyValueStoreConfig kv_config;
+    MessageUtil::anyConvertAndValidate(options.key_value_store_config().typed_config(), kv_config,
+                                       data_.validation_visitor_);
+    auto& factory = Config::Utility::getAndCheckFactory<KeyValueStoreFactory>(kv_config.config());
+    store = factory.createStore(kv_config, data_.validation_visitor_, data_.dispatcher_,
+                                data_.file_system_);
   }
 
   AlternateProtocolsCacheSharedPtr new_cache = std::make_shared<AlternateProtocolsCacheImpl>(
