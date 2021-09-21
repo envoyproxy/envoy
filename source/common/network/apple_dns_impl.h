@@ -84,7 +84,8 @@ private:
 
   struct PendingResolution : public ActiveDnsQuery {
     PendingResolution(AppleDnsResolverImpl& parent, ResolveCb callback,
-                      Event::Dispatcher& dispatcher, const std::string& dns_name);
+                      Event::Dispatcher& dispatcher, const std::string& dns_name,
+                      DnsLookupFamily dns_lookup_family);
 
     ~PendingResolution();
 
@@ -97,17 +98,20 @@ private:
     void finishResolve();
 
     // Wrappers for the API calls.
-    DNSServiceErrorType dnsServiceGetAddrInfo(DnsLookupFamily dns_lookup_family);
+    DNSServiceErrorType dnsServiceGetAddrInfo();
     void onDNSServiceGetAddrInfoReply(DNSServiceFlags flags, uint32_t interface_index,
                                       DNSServiceErrorType error_code, const char* hostname,
                                       const struct sockaddr* address, uint32_t ttl);
     bool dnsServiceRefSockFD();
 
+    std::list<DnsResponse>& finalAddressList();
+
     // Small wrapping struct to accumulate addresses from firings of the
     // onDNSServiceGetAddrInfoReply callback.
     struct FinalResponse {
       ResolutionStatus status_;
-      std::list<DnsResponse> responses_;
+      std::list<DnsResponse> v4_responses_;
+      std::list<DnsResponse> v6_responses_;
     };
 
     AppleDnsResolverImpl& parent_;
@@ -124,6 +128,7 @@ private:
     // and informs via flags if more IP addresses are incoming. Therefore, these addresses need to
     // be accumulated before firing callback_.
     FinalResponse pending_cb_;
+    DnsLookupFamily dns_lookup_family_;
   };
 
   Event::Dispatcher& dispatcher_;

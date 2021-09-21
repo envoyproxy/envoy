@@ -510,8 +510,6 @@ base64Escape()
 
 Encodes the input string as base64. This can be useful for escaping binary data.
 
-.. _config_http_filters_lua_header_wrapper:
-
 timestamp()
 ^^^^^^^^^^^
 
@@ -522,6 +520,8 @@ timestamp()
 High resolution timestamp function. *format* is an optional enum parameter to indicate the format of the timestamp.
 *EnvoyTimestampResolution.MILLISECOND* is supported
 The function returns timestamp in milliseconds since epoch by default if format is not set.
+
+.. _config_http_filters_lua_header_wrapper:
 
 Header object API
 -----------------
@@ -545,6 +545,29 @@ get()
 
 Gets a header. *key* is a string that supplies the header key. Returns a string that is the header
 value or nil if there is no such header.
+
+getAtIndex()
+^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  headers:getAtIndex(key, index)
+
+Gets the header value at the given index. It can be used to fetch a specific value in case the
+given header has multiple values. *key* is a string that supplies the header key and index is
+an integer that supplies the position. It returns a string that is the header value or nil if
+there is no such header or if there is no value at the specified index.
+
+getNumValues()
+^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  headers:getNumValues(key)
+
+Gets the number of values of a given header. It can be used to fetch the total number of values in case
+the given header has multiple values. *key* is a string that supplies the header key. It returns
+an integer with the value size for the given header or *0* if there is no such header.
 
 __pairs()
 ^^^^^^^^^

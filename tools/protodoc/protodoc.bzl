@@ -17,10 +17,15 @@ protodoc_aspect = api_proto_plugin_aspect("//tools/protodoc", _protodoc_impl)
 def _protodoc_rule_impl(ctx):
     return [
         DefaultInfo(
-            files = depset(transitive = [
-                d[OutputGroupInfo].rst
-                for d in ctx.attr.deps
-            ]),
+            files = depset(
+                transitive = [
+                    depset([
+                        x
+                        for x in ctx.attr.deps[0][OutputGroupInfo].rst.to_list()
+                        if x.short_path.startswith("../envoy_api")
+                    ]),
+                ],
+            ),
         ),
     ]
 

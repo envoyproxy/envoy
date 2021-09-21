@@ -37,6 +37,7 @@
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/common/upstream/retry_factory.h"
 #include "source/extensions/filters/http/common/utility.h"
 
 #include "absl/strings/match.h"
@@ -87,7 +88,8 @@ HedgePolicyImpl::HedgePolicyImpl(const envoy::config::route::v3::HedgePolicy& he
 HedgePolicyImpl::HedgePolicyImpl() : initial_requests_(1), hedge_on_per_try_timeout_(false) {}
 
 RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor)
+                                 ProtobufMessage::ValidationVisitor& validation_visitor,
+                                 Upstream::RetryExtensionFactoryContext& factory_context)
     : retriable_headers_(
           Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_headers())),
       retriable_request_headers_(
@@ -95,6 +97,8 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
       validation_visitor_(&validation_visitor) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
+  per_try_idle_timeout_ =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_idle_timeout, 0));
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
   retry_on_ = RetryStateImpl::parseRetryOn(retry_policy.retry_on()).first;
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(retry_policy.retry_on()).first;
@@ -114,6 +118,16 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
     retry_priority_config_ =
         std::make_pair(&factory, Envoy::Config::Utility::translateToFactoryConfig(
                                      retry_priority, validation_visitor, factory));
+  }
+
+  for (const auto& options_predicate : retry_policy.retry_options_predicates()) {
+    auto& factory =
+        Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryOptionsPredicateFactory>(
+            options_predicate);
+    retry_options_predicates_.emplace_back(
+        factory.createOptionsPredicate(*Envoy::Config::Utility::translateToFactoryConfig(
+                                           options_predicate, validation_visitor, factory),
+                                       factory_context));
   }
 
   auto host_selection_attempts = retry_policy.host_selection_retry_max_attempts();
@@ -348,7 +362,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
       strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
-      retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route(), validator)),
+      retry_policy_(
+          buildRetryPolicy(vhost.retryPolicy(), route.route(), validator, factory_context)),
       internal_redirect_policy_(
           buildInternalRedirectPolicy(route.route(), validator, route.name())),
       rate_limit_policy_(route.route().rate_limits(), validator),
@@ -374,7 +389,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           vhost_.globalRouteConfig().maxDirectResponseBodySizeBytes())),
       per_filter_configs_(route.typed_per_filter_config(), optional_http_filters, factory_context,
                           validator),
-      route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()) {
+      route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -891,15 +906,18 @@ HedgePolicyImpl RouteEntryImplBase::buildHedgePolicy(
 RetryPolicyImpl RouteEntryImplBase::buildRetryPolicy(
     const absl::optional<envoy::config::route::v3::RetryPolicy>& vhost_retry_policy,
     const envoy::config::route::v3::RouteAction& route_config,
-    ProtobufMessage::ValidationVisitor& validation_visitor) const {
+    ProtobufMessage::ValidationVisitor& validation_visitor,
+    Server::Configuration::ServerFactoryContext& factory_context) const {
+  Upstream::RetryExtensionFactoryContextImpl retry_factory_context(
+      factory_context.singletonManager());
   // Route specific policy wins, if available.
   if (route_config.has_retry_policy()) {
-    return RetryPolicyImpl(route_config.retry_policy(), validation_visitor);
+    return RetryPolicyImpl(route_config.retry_policy(), validation_visitor, retry_factory_context);
   }
 
   // If not, we fallback to the virtual host policy if there is one.
   if (vhost_retry_policy) {
-    return RetryPolicyImpl(vhost_retry_policy.value(), validation_visitor);
+    return RetryPolicyImpl(vhost_retry_policy.value(), validation_visitor, retry_factory_context);
   }
 
   // Otherwise, an empty policy will do.
@@ -965,6 +983,23 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
   }
 }
 
+RouteConstSharedPtr
+RouteEntryImplBase::pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
+                                                const Http::HeaderMap& headers) const {
+  const auto entry = headers.get(cluster_header_name);
+  std::string final_cluster_name;
+  if (!entry.empty()) {
+    // This is an implicitly untrusted header, so per the API documentation only
+    // the first value is used.
+    final_cluster_name = std::string(entry[0]->value().getStringView());
+  }
+
+  // NOTE: Though we return a shared_ptr here, the current ownership model
+  // assumes that the route table sticks around. See snapped_route_config_ in
+  // ConnectionManagerImpl::ActiveStream.
+  return std::make_shared<DynamicRouteEntry>(this, final_cluster_name);
+}
+
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& headers,
                                                      uint64_t random_value) const {
   // Gets the route object chosen from the list of weighted clusters
@@ -974,23 +1009,42 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
       return shared_from_this();
     } else {
       ASSERT(!cluster_header_name_.get().empty());
-      const auto entry = headers.get(cluster_header_name_);
-      std::string final_cluster_name;
-      if (!entry.empty()) {
-        // This is an implicitly untrusted header, so per the API documentation only the first
-        // value is used.
-        final_cluster_name = std::string(entry[0]->value().getStringView());
-      }
-
-      // NOTE: Though we return a shared_ptr here, the current ownership model assumes that
-      //       the route table sticks around. See snapped_route_config_ in
-      //       ConnectionManagerImpl::ActiveStream.
-      return std::make_shared<DynamicRouteEntry>(this, final_cluster_name);
+      return pickClusterViaClusterHeader(cluster_header_name_, headers);
     }
   }
+  return pickWeightedCluster(headers, random_value, true);
+}
 
-  return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_, random_value,
-                                          true);
+RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMap& headers,
+                                                            const uint64_t random_value,
+                                                            const bool ignore_overflow) const {
+  const uint64_t selected_value = random_value % total_cluster_weight_;
+  uint64_t begin = 0;
+  uint64_t end = 0;
+
+  // Find the right cluster to route to based on the interval in which
+  // the selected value falls. The intervals are determined as
+  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
+  for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
+    end = begin + cluster->clusterWeight();
+    if (!ignore_overflow) {
+      // end > total_cluster_weight: This case can only occur with Runtimes,
+      // when the user specifies invalid weights such that
+      // sum(weights) > total_cluster_weight.
+      ASSERT(end <= total_cluster_weight_);
+    }
+
+    if (selected_value >= begin && selected_value < end) {
+      if (!cluster->clusterHeaderName().get().empty() &&
+          !headers.get(cluster->clusterHeaderName()).empty()) {
+        return pickClusterViaClusterHeader(cluster->clusterHeaderName(), headers);
+      }
+      return cluster;
+    }
+    begin = end;
+  }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void RouteEntryImplBase::validateClusters(
@@ -1011,9 +1065,17 @@ void RouteEntryImplBase::validateClusters(
     }
   } else if (!weighted_clusters_.empty()) {
     for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
-      if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
-        throw EnvoyException(
-            fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
+      if (!cluster->clusterName().empty()) {
+        if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
+          throw EnvoyException(
+              fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
+        }
+      }
+      // For weighted clusters with `cluster_header_name`, we only verify that this field is
+      // not empty because the cluster name is not set yet at config time (hence the validation
+      // here).
+      else if (cluster->clusterHeaderName().get().empty()) {
+        throw EnvoyException("route: unknown weighted cluster with no cluster_header field");
       }
     }
   }
@@ -1360,9 +1422,9 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
     validation_clusters = factory_context.clusterManager().clusters();
   }
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
-    VirtualHostSharedPtr virtual_host(
-        new VirtualHostImpl(virtual_host_config, optional_http_filters, global_route_config,
-                            factory_context, *vhost_scope_, validator, validation_clusters));
+    VirtualHostSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
+        virtual_host_config, optional_http_filters, global_route_config, factory_context,
+        *vhost_scope_, validator, validation_clusters);
     for (const std::string& domain_name : virtual_host_config.domains()) {
       const std::string domain = Http::LowerCaseString(domain_name).get();
       bool duplicate_found = false;

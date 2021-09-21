@@ -95,6 +95,11 @@ stream timeouts already introduced above.
   is sent to the downstream, which normally happens after the upstream has sent response headers.
   This timeout can be used with streaming endpoints to retry if the upstream fails to begin a
   response within the timeout.
+* The route :ref:`per_try_idle_timeout <envoy_v3_api_field_config.route.v3.RetryPolicy.per_try_idle_timeout>`
+  can be configured to ensure continued response progress of individual retry attempts (including
+  the first attempt). This is useful in cases where the total upstream request time is bounded
+  by the number of attempts multiplied by the per try timeout, but while the user wants to
+  ensure that individual attempts are making progress.
 * The route :ref:`MaxStreamDuration proto <envoy_v3_api_msg_config.route.v3.RouteAction.MaxStreamDuration>`
   can be used to override the HttpConnectionManager's
   :ref:`max_stream_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>`

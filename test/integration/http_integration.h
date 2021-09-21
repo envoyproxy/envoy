@@ -89,13 +89,24 @@ using IntegrationCodecClientPtr = std::unique_ptr<IntegrationCodecClient>;
  */
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
+  HttpIntegrationTest(Http::CodecType downstream_protocol, Network::Address::IpVersion version)
+      : HttpIntegrationTest(
+            downstream_protocol, version,
+            ConfigHelper::httpProxyConfig(/*downstream_use_quic=*/downstream_protocol ==
+                                          Http::CodecType::HTTP3)) {}
   HttpIntegrationTest(Http::CodecType downstream_protocol, Network::Address::IpVersion version,
-                      const std::string& config = ConfigHelper::httpProxyConfig());
+                      const std::string& config);
 
   HttpIntegrationTest(Http::CodecType downstream_protocol,
                       const InstanceConstSharedPtrFn& upstream_address_fn,
-                      Network::Address::IpVersion version,
-                      const std::string& config = ConfigHelper::httpProxyConfig());
+                      Network::Address::IpVersion version)
+      : HttpIntegrationTest(
+            downstream_protocol, upstream_address_fn, version,
+            ConfigHelper::httpProxyConfig(/*downstream_use_quic=*/downstream_protocol ==
+                                          Http::CodecType::HTTP3)) {}
+  HttpIntegrationTest(Http::CodecType downstream_protocol,
+                      const InstanceConstSharedPtrFn& upstream_address_fn,
+                      Network::Address::IpVersion version, const std::string& config);
   ~HttpIntegrationTest() override;
 
   void initialize() override;
@@ -136,7 +147,13 @@ protected:
   IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
       const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
       const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
-      int upstream_index = 0, std::chrono::milliseconds time = TestUtility::DefaultTimeout);
+      uint64_t upstream_index = 0, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
+      const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
+      const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
+      const std::vector<uint64_t>& upstream_indices,
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Wait for the end of stream on the next upstream stream on any of the provided fake upstreams.
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.

@@ -17,23 +17,24 @@ namespace Common {
 namespace DynamicForwardProxy {
 
 DnsCacheImpl::DnsCacheImpl(
-    Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-    Random::RandomGenerator& random, Filesystem::Instance& file_system, Runtime::Loader& loader,
-    Stats::Scope& root_scope, ProtobufMessage::ValidationVisitor& validation_visitor,
+    Server::Configuration::FactoryContextBase& context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
-    : main_thread_dispatcher_(main_thread_dispatcher),
+    : main_thread_dispatcher_(context.mainThreadDispatcher()),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
-      resolver_(selectDnsResolver(config, main_thread_dispatcher)), tls_slot_(tls),
-      scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
+      resolver_(selectDnsResolver(config, main_thread_dispatcher_)),
+      tls_slot_(context.threadLocal()),
+      scope_(context.scope().createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
-      resource_manager_(*scope_, loader, config.name(), config.dns_cache_circuit_breaker()),
+      resource_manager_(*scope_, context.runtime(), config.name(),
+                        config.dns_cache_circuit_breaker()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       timeout_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_query_timeout, 5000)),
       failure_backoff_strategy_(
           Config::Utility::prepareDnsRefreshStrategy<
               envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>(
-              config, refresh_interval_.count(), random)),
-      file_system_(file_system), validation_visitor_(validation_visitor),
+              config, refresh_interval_.count(), context.api().randomGenerator())),
+      file_system_(context.api().fileSystem()),
+      validation_visitor_(context.messageValidationVisitor()),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
@@ -53,10 +54,7 @@ DnsCacheImpl::DnsCacheImpl(
     // cache to load an entry. Further if this particular resolution fails all the is lost is the
     // potential optimization of having the entry be preresolved the first time a true consumer of
     // this DNS cache asks for it.
-    main_thread_dispatcher_.post(
-        [this, host = hostname.address(), default_port = hostname.port_value()]() {
-          startCacheLoad(host, default_port);
-        });
+    startCacheLoad(hostname.address(), hostname.port_value());
   }
 }
 
@@ -270,6 +268,22 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
     notifyThreads(host, primary_host.host_info_);
   } else {
     startResolve(host, primary_host);
+  }
+}
+
+void DnsCacheImpl::forceRefreshHosts() {
+  absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
+  for (auto& primary_host : primary_hosts_) {
+    // Avoid holding the lock for longer than necessary by just triggering the refresh timer for
+    // each host IFF the host is not already refreshing.
+    // TODO(mattklein123): In the future we may want to cancel an ongoing refresh and start a new
+    // one to avoid a situation in which an older refresh races with a concurrent network change,
+    // for example.
+    if (primary_host.second->active_query_ == nullptr) {
+      ASSERT(!primary_host.second->timeout_timer_->enabled());
+      primary_host.second->refresh_timer_->enableTimer(std::chrono::milliseconds(0), nullptr);
+      ENVOY_LOG(debug, "force refreshing host='{}'", primary_host.first);
+    }
   }
 }
 

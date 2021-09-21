@@ -41,7 +41,7 @@ class TestFilter : public Filter {
 public:
   using Filter::Filter;
 
-  MOCK_METHOD(void, scriptLog, (spdlog::level::level_enum level, const char* message));
+  MOCK_METHOD(void, scriptLog, (spdlog::level::level_enum level, absl::string_view message));
 };
 
 class LuaHttpFilterTest : public testing::Test {
@@ -818,6 +818,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
                 {":method", "POST"},
                 {":path", "/"},
                 {":authority", "foo"},
+
                 {"set-cookie", "flavor=chocolate; Path=/"},
                 {"set-cookie", "variant=chewy; Path=/"},
                 {"content-length", "11"}};
@@ -841,7 +842,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   response_message->body().add(response, 8);
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("8")));
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("resp")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(std::string("resp\0nse", 8))));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("0")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("nse")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
@@ -2390,6 +2391,77 @@ TEST_F(LuaHttpFilterTest, LuaFilterSetResponseBufferChunked) {
   Buffer::OwnedImpl response_body("1234567890");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("4")));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
+}
+
+// BodyBuffer should not truncated when bodyBuffer set hex character
+TEST_F(LuaHttpFilterTest, LuaBodyBufferSetBytesWithHex) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local bodyBuffer = response_handle:body()
+      bodyBuffer:setBytes("\x471111")
+      local body_str = bodyBuffer:getBytes(0, bodyBuffer:length())
+      response_handle:logTrace(body_str)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
+
+  Buffer::OwnedImpl response_body("");
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("G1111")));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
+  EXPECT_EQ(5, encoder_callbacks_.buffer_->length());
+}
+
+// BodyBuffer should not truncated when bodyBuffer set zero
+TEST_F(LuaHttpFilterTest, LuaBodyBufferSetBytesWithZero) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local bodyBuffer = response_handle:body()
+      bodyBuffer:setBytes("\0")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
+
+  Buffer::OwnedImpl response_body("1111");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
+  EXPECT_EQ(1, encoder_callbacks_.buffer_->length());
+}
+
+// Script logging a table instead of the expected string.
+TEST_F(LuaHttpFilterTest, LogTableInsteadOfString) {
+  const std::string LOG_TABLE{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace({})
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(LOG_TABLE);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(
+      *filter_,
+      scriptLog(
+          spdlog::level::err,
+          StrEq("[string \"...\"]:3: bad argument #1 to 'logTrace' (string expected, got table)")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 } // namespace

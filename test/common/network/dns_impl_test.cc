@@ -796,6 +796,60 @@ TEST_P(DnsImplTest, MultiARecordLookupWithV6) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+TEST_P(DnsImplTest, AutoOnlyV6IfBothV6andV4) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                             DnsResolver::ResolutionStatus::Success, {{"1::2"}}, {},
+                                             absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplTest, AutoV6IfOnlyV6) {
+  server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                             DnsResolver::ResolutionStatus::Success, {{"1::2"}}, {},
+                                             absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplTest, AutoV4IfOnlyV4) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {{"201.134.56.7"}}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplTest, V4PreferredOnlyV4IfBothV6andV4) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {{"201.134.56.7"}}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplTest, V4PreferredV6IfOnlyV6) {
+  server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
+                                             DnsResolver::ResolutionStatus::Success, {{"1::2"}}, {},
+                                             absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplTest, V4PreferredV4IfOnlyV4) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {{"201.134.56.7"}}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 // Validate working of cancellation provided by ActiveDnsQuery return.
 TEST_P(DnsImplTest, Cancel) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);

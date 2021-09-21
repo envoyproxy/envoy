@@ -9,6 +9,7 @@
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
+#include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -20,6 +21,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -2095,6 +2097,98 @@ TEST_P(IntegrationTest, RandomPreconnect) {
     clients.front()->close();
     clients.pop_front();
   }
+}
+
+class TestRetryOptionsPredicateFactory : public Upstream::RetryOptionsPredicateFactory {
+public:
+  Upstream::RetryOptionsPredicateConstSharedPtr
+  createOptionsPredicate(const Protobuf::Message&,
+                         Upstream::RetryExtensionFactoryContext&) override {
+    return std::make_shared<TestPredicate>();
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    // Using Struct instead of a custom empty config proto. This is only allowed in tests.
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+
+  std::string name() const override { return "test_retry_options_predicate_factory"; }
+
+private:
+  struct TestPredicate : public Upstream::RetryOptionsPredicate {
+    UpdateOptionsReturn updateOptions(const UpdateOptionsParameters&) const override {
+      UpdateOptionsReturn ret;
+      Network::TcpKeepaliveConfig tcp_keepalive_config;
+      tcp_keepalive_config.keepalive_probes_ = 1;
+      tcp_keepalive_config.keepalive_time_ = 1;
+      tcp_keepalive_config.keepalive_interval_ = 1;
+      ret.new_upstream_socket_options_ =
+          Network::SocketOptionFactory::buildTcpKeepaliveOptions(tcp_keepalive_config);
+      return ret;
+    }
+  };
+};
+
+// Verify that a test retry options predicate starts a new connection pool with a new connection.
+TEST_P(IntegrationTest, RetryOptionsPredicate) {
+  TestRetryOptionsPredicateFactory factory;
+  Registry::InjectFactory<Upstream::RetryOptionsPredicateFactory> registered(factory);
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        auto* route = virtual_host->mutable_routes(0)->mutable_route();
+        auto* retry_policy = route->mutable_retry_policy();
+        retry_policy->set_retry_on("5xx");
+        auto* predicate = retry_policy->add_retry_options_predicates();
+        predicate->set_name("test_retry_options_predicate_factory");
+        predicate->mutable_typed_config()->set_type_url(
+            "type.googleapis.com/google.protobuf.Struct");
+      });
+
+  initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/some/path"},
+      {":scheme", "http"},
+      {":authority", "cluster_0"},
+  };
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Force a retry and run the predicate
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+
+  // Using a different socket option will cause a new connection pool to be used and a new
+  // connection.
+  FakeHttpConnectionPtr new_upstream_connection;
+  FakeStreamPtr new_upstream_request;
+  result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, new_upstream_connection);
+  RELEASE_ASSERT(result, result.message());
+  result = new_upstream_connection->waitForNewStream(*dispatcher_, new_upstream_request);
+  RELEASE_ASSERT(result, result.message());
+  result = new_upstream_request->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  new_upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  result = response->waitForEndStream();
+  RELEASE_ASSERT(result, result.message());
+
+  result = new_upstream_connection->close();
+  RELEASE_ASSERT(result, result.message());
+  result = new_upstream_connection->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
 }
 
 // Tests that a filter (set-route-filter) using the setRoute callback and DelegatingRoute mechanism
