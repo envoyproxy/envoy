@@ -32,6 +32,7 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* client_ssl_auth filter: now sets additional termination details and **UAEX** response flag when the client certificate is not in the allowed-list.
 * config: configuration files ending in .yml now load as YAML.
 * config: configuration file extensions now ignore case when deciding the file type. E.g., .JSON file load as JSON.
 * config: reduced log level for "Unable to establish new stream" xDS logs to debug. The log level
