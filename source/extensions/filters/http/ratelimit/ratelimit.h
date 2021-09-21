@@ -32,7 +32,7 @@ enum class FilterRequestType { Internal, External, Both };
 /**
  * Type of rate limit options
  */
-enum class RateLimitOptions { Unknown, Override, Include, Ignore };
+enum class RateLimitOptions { Default, Override, Include, Ignore };
 
 /**
  * Global configuration for the HTTP rate limit filter.

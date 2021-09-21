@@ -273,13 +273,14 @@ RateLimitOptions Filter::getRateLimitOption(const Router::RouteConstSharedPtr& r
             "envoy.filters.http.ratelimit", route);
     if (specific_per_route_config != nullptr) {
       // If rate limit option is `DEFAULT`, it means we need to get the rate limit policy from the
-      // old config. Otherwise, we just get the policy from new config directly.
+      // old config. This check can be removed once the API verison is promoted.
       RateLimitOptionsPerRoute rate_limits_options =
           (specific_per_route_config->rateLimits() ==
            envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::DEFAULT)
+              // Map VhRateLimitsOptions to RateLimitsOptions by shifting one. See the enum
+              // definition in rate_limit.proto
               ? static_cast<RateLimitOptionsPerRoute>(
-                    specific_per_route_config->virtualHostRateLimits() +
-                    1) /*Map VhRateLimitsOptions to RateLimitsOptions by shifting one*/
+                    specific_per_route_config->virtualHostRateLimits() + 1)
               : specific_per_route_config->rateLimits();
 
       switch (rate_limits_options) {
