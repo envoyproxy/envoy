@@ -1239,13 +1239,6 @@ TEST_F(HttpRateLimitFilterTest,
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 }
 
-// TEST_F(HttpRateLimitFilterTest, InvalidRateLimitOption) {
-//   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
-//   EXPECT_THROW_WITH_MESSAGE(settings.set_rate_limits(
-//       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::DEFAULT),
-//       EnvoyException, "Should use the rate limit options from VhRateLimitsOptions");
-// }
-
 // Tests that the virtual host rate limit is used when RateLimitsOptions::OVERRIDE_POLICY is set and
 // route rate limit is empty
 TEST_F(HttpRateLimitFilterTest, OverrideRateLimitOptionWithoutRouteRateLimit) {
