@@ -42,3 +42,7 @@
 -keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmStringAccessorContext {
    <methods>;
 }
+
+-keep class io.envoyproxy.envoymobile.engine.types.EnvoyLogger {
+   <methods>;
+}
