@@ -419,7 +419,6 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
       {"cache-control", "public,max-age=3600"},
       {"content-range", "bytes 200-1000/67589"},
       {"content-length", "800"},
-      {"content-type", "text/html; charset=UTF-8"},
       {"etag", "0000-0000"},
       {"link", "<https://example.com>; rel=\"preconnect\""}};
   insert(request_path_1, response_headers_1, "body");
@@ -431,7 +430,6 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
       {"cache-control", "public,max-age=3600"},
       {"content-range", "bytes 5-1000/67589"},
       {"content-length", "995"},
-      {"content-type", "application/json; charset=UTF-8"},
       {"age", "20"},
       {"etag", "1111-1111"},
       {"link", "<https://changed.com>; rel=\"preconnect\""}};
@@ -443,8 +441,7 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
       {"cache-control", "public,max-age=3600"},
       {"content-range", "bytes 200-1000/67589"},
       {"content-length", "800"},
-      {"content-type", "text/html; charset=UTF-8"},
-      {"age", "0"},
+      {"age", "20"},
       {"etag", "0000-0000"},
       {"link", "<https://changed.com>; rel=\"preconnect\""}};
 

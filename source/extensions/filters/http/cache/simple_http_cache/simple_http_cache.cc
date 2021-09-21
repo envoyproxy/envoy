@@ -124,7 +124,7 @@ const absl::flat_hash_set<Http::LowerCaseString> SimpleHttpCache::headersNotToUp
 
       // We don't update the cached response on a Vary; we just delete it
       // entirely. So don't bother copying over the Vary header.
-      Http::CustomHeaders::get().Vary, );
+      Http::CustomHeaders::get().Vary);
 }
 
 void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
