@@ -414,7 +414,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   buildFilterChains();
 
   if (socket_type == Network::Socket::Type::Stream) {
-    // Apply below tcp only initialization.
+    // Apply the options below only for TCP.
     buildSocketOptions();
     buildOriginalDstListenerFilter();
     buildProxyProtocolListenerFilter();

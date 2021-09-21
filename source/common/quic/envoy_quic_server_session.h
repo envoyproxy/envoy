@@ -34,13 +34,17 @@ using FilterChainToConnectionMap =
                         std::list<std::reference_wrapper<Network::Connection>>>;
 using ConnectionMapIter = std::list<std::reference_wrapper<Network::Connection>>::iterator;
 
+// Used to track the matching filter chain and its position in the filter chain to connection map.
 struct ConnectionMapPosition {
   ConnectionMapPosition(FilterChainToConnectionMap& connection_map,
                         const Network::FilterChain& filter_chain, ConnectionMapIter iterator)
       : connection_map_(connection_map), filter_chain_(filter_chain), iterator_(iterator) {}
 
+  // Stores the map from filter chain of connections.
   FilterChainToConnectionMap& connection_map_;
+  // The matching filter chain of a connection.
   const Network::FilterChain& filter_chain_;
+  // The position of the connection in the map.
   ConnectionMapIter iterator_;
 };
 

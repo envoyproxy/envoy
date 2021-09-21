@@ -71,7 +71,7 @@ public:
                            std::unique_ptr<StreamInfo::StreamInfo> stream_info) override;
 
   /**
-   * The follow up connections will see the new config. The existing
+   * Update the listener config. The follow up connections will see the new config. The existing
    * connections are not impacted.
    */
   void updateListenerConfig(Network::ListenerConfig& config) override;
