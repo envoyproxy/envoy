@@ -31,10 +31,11 @@ std::string ipSuppressEnvoyHeadersTestParamsToString(
       std::get<1>(params.param) ? "with_x_envoy_from_router" : "without_x_envoy_from_router");
 }
 
-void disableHeaderValueOptionAppend(
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& header_value_options) {
+void setHeaderValueOptionAppendAction(
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& header_value_options,
+    envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action) {
   for (auto& i : header_value_options) {
-    i.set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+    i.set_append_action(append_action);
   }
 }
 
@@ -285,9 +286,6 @@ public:
           router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
           hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
 
-          const bool append =
-              append_action == envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS;
-
           auto* route_config = hcm.mutable_route_config();
           if (inject_route_config_headers) {
             // Configure route config level headers.
@@ -330,27 +328,28 @@ public:
           hcm.mutable_normalize_path()->set_value(normalize_path_);
           hcm.set_path_with_escaped_slashes_action(path_with_escaped_slashes_action_);
 
-          if (append) {
-            // The config specifies append by default: no modifications needed.
-            return;
-          }
-
-          // Iterate over VirtualHosts and nested Routes, disabling header append.
+          // Iterate over VirtualHosts and nested Routes, set the given header append action.
           for (auto& vhost : *route_config->mutable_virtual_hosts()) {
-            disableHeaderValueOptionAppend(*vhost.mutable_request_headers_to_add());
-            disableHeaderValueOptionAppend(*vhost.mutable_response_headers_to_add());
+            setHeaderValueOptionAppendAction(*vhost.mutable_request_headers_to_add(),
+                                             append_action);
+            setHeaderValueOptionAppendAction(*vhost.mutable_response_headers_to_add(),
+                                             append_action);
 
             for (auto& route : *vhost.mutable_routes()) {
-              disableHeaderValueOptionAppend(*route.mutable_request_headers_to_add());
-              disableHeaderValueOptionAppend(*route.mutable_response_headers_to_add());
+              setHeaderValueOptionAppendAction(*route.mutable_request_headers_to_add(),
+                                               append_action);
+              setHeaderValueOptionAppendAction(*route.mutable_response_headers_to_add(),
+                                               append_action);
 
               if (route.has_route()) {
                 auto* route_action = route.mutable_route();
 
                 if (route_action->has_weighted_clusters()) {
                   for (auto& c : *route_action->mutable_weighted_clusters()->mutable_clusters()) {
-                    disableHeaderValueOptionAppend(*c.mutable_request_headers_to_add());
-                    disableHeaderValueOptionAppend(*c.mutable_response_headers_to_add());
+                    setHeaderValueOptionAppendAction(*c.mutable_request_headers_to_add(),
+                                                     append_action);
+                    setHeaderValueOptionAppendAction(*c.mutable_response_headers_to_add(),
+                                                     append_action);
                   }
                 }
               }
@@ -759,6 +758,51 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteAppendHeaderMani
           {"x-route-response", "route"},
           {"x-vhost-response", "vhost"},
           {"x-routeconfig-response", "routeconfig"},
+          {":status", "200"},
+      });
+}
+
+// Validates the relationship between route configuration, virtual host and route header
+// manipulations when the append action is set to `ADD_IF_ABSENT`.
+TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteAaddAbsentHeaderManipulation) {
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT, true);
+  performRequest(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/vhost-and-route"},
+          {":scheme", "http"},
+          {":authority", "vhost-headers.com"},
+          {"x-routeconfig-request", "downstream"},
+          {"x-routeconfig-request-remove", "downstream"},
+          {"x-vhost-request", "downstream"},
+          {"x-vhost-request-remove", "downstream"},
+          {"x-route-request", "downstream"},
+          {"x-route-request-remove", "downstream"},
+      },
+      Http::TestRequestHeaderMapImpl{
+          {":authority", "vhost-headers.com"},
+          {"x-routeconfig-request", "downstream"},
+          {"x-vhost-request", "downstream"},
+          {"x-route-request", "downstream"},
+          {":path", "/vhost-and-route"},
+          {":method", "GET"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-routeconfig-response", "upstream"},
+          {"x-routeconfig-response-remove", "upstream"},
+          {"x-vhost-response", "upstream"},
+          {"x-vhost-response-remove", "upstream"},
+          {"x-route-response", "upstream"},
+          {"x-route-response-remove", "upstream"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-routeconfig-response", "upstream"},
+          {"x-vhost-response", "upstream"},
+          {"x-route-response", "upstream"},
           {":status", "200"},
       });
 }

@@ -933,5 +933,51 @@ TEST(ValidateHeaders, ContentLength) {
   EXPECT_TRUE(should_close_connection);
 }
 
+TEST(HeaderAppendActionTest, DEPRECATED_FEATURE_TEST(HeadersWithDifferentAppendActionAndAppend)) {
+  envoy::config::core::v3::HeaderValueOption header_value_option;
+  auto* mutable_header = header_value_option.mutable_header();
+  mutable_header->set_key("foo");
+  mutable_header->set_value("bar");
+  header_value_option.set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
+  header_value_option.mutable_append()->set_value(true);
+  EXPECT_THAT_THROWS_MESSAGE(
+      HeaderUtility::getHeaderAppendAction(header_value_option), EnvoyException,
+      "Both the `append` and `append_action` fields are set for the header key: foo");
+}
+
+TEST(HeaderAppendActionTest, DEPRECATED_FEATURE_TEST(HeadersWithSameAppendActionAndAppend)) {
+  envoy::config::core::v3::HeaderValueOption header_value_option;
+  auto* mutable_header = header_value_option.mutable_header();
+  mutable_header->set_key("foo");
+  mutable_header->set_value("bar");
+  header_value_option.set_append_action(
+      envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+  header_value_option.mutable_append()->set_value(true);
+  EXPECT_EQ(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS,
+            HeaderUtility::getHeaderAppendAction(header_value_option));
+}
+
+TEST(HeaderAppendActionTest, DEPRECATED_FEATURE_TEST(HeadersWithAppendFalse)) {
+  envoy::config::core::v3::HeaderValueOption header_value_option;
+  header_value_option.mutable_append()->set_value(false);
+  EXPECT_EQ(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS,
+            HeaderUtility::getHeaderAppendAction(header_value_option));
+}
+
+TEST(HeaderAppendActionTest, DEPRECATED_FEATURE_TEST(HeadersWithAppendTrue)) {
+  envoy::config::core::v3::HeaderValueOption header_value_option;
+  header_value_option.mutable_append()->set_value(true);
+  EXPECT_EQ(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS,
+            HeaderUtility::getHeaderAppendAction(header_value_option));
+}
+
+TEST(HeaderAppendActionTest, DEPRECATED_FEATURE_TEST(HeadersWithNoAppend)) {
+  envoy::config::core::v3::HeaderValueOption header_value_option;
+  header_value_option.set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
+  header_value_option.clear_append();
+  EXPECT_EQ(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT,
+            HeaderUtility::getHeaderAppendAction(header_value_option));
+}
+
 } // namespace Http
 } // namespace Envoy
