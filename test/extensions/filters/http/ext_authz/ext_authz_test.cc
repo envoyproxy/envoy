@@ -71,8 +71,8 @@ public:
   }
 
   void queryParameterTest(const std::string& original_path, const std::string& expected_path,
-                          const std::vector<std::pair<std::string, std::string>>& add_me,
-                          const std::string& remove_me) {
+                          const Http::Utility::QueryParamsVector& add_me,
+                          const std::vector<std::string>& remove_me) {
     InSequence s;
 
     // Set up all the typical headers plus a path with a query string that we'll remove later.
@@ -85,16 +85,8 @@ public:
 
     Filters::Common::ExtAuthz::Response response{};
     response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-
-    if (!add_me.empty()) {
-      for (const auto& [key, value] : add_me) {
-        response.query_parameters_to_set[key] = value;
-      }
-    }
-    if (!remove_me.empty()) {
-      const std::vector<std::string> query_parameters_to_remove{remove_me};
-      response.query_parameters_to_remove = query_parameters_to_remove;
-    }
+    response.query_parameters_to_set = add_me;
+    response.query_parameters_to_remove = remove_me;
 
     auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -1830,49 +1822,48 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
 TEST_P(HttpFilterTestParam, ImmediateOkResponseWithUnmodifiedQueryParameters) {
   const std::string original_path{"/users?leave-me=alone"};
   const std::string expected_path{"/users?leave-me=alone"};
-  const std::vector<std::pair<std::string, std::string>> add_me{};
-  const std::string remove_me{"remove-me"};
+  const Http::Utility::QueryParamsVector add_me{};
+  const std::vector<std::string> remove_me{"remove-me"};
   queryParameterTest(original_path, expected_path, add_me, remove_me);
 }
 
 TEST_P(HttpFilterTestParam, ImmediateOkResponseWithAddedQueryParameters) {
   const std::string original_path{"/users"};
   const std::string expected_path{"/users?add-me=123"};
-  const std::vector<std::pair<std::string, std::string>> add_me{{"add-me", "123"}};
-  const std::string remove_me{};
+  const Http::Utility::QueryParamsVector add_me{{"add-me", "123"}};
+  const std::vector<std::string> remove_me{};
   queryParameterTest(original_path, expected_path, add_me, remove_me);
 }
 
 TEST_P(HttpFilterTestParam, ImmediateOkResponseWithAddedAndRemovedQueryParameters) {
   const std::string original_path{"/users?remove-me=123"};
   const std::string expected_path{"/users?add-me=456"};
-  const std::vector<std::pair<std::string, std::string>> add_me{{"add-me", "456"}};
-  const std::string remove_me{"remove-me"};
+  const Http::Utility::QueryParamsVector add_me{{"add-me", "456"}};
+  const std::vector<std::string> remove_me{{"remove-me"}};
   queryParameterTest(original_path, expected_path, add_me, remove_me);
 }
 
 TEST_P(HttpFilterTestParam, ImmediateOkResponseWithRemovedQueryParameters) {
   const std::string original_path{"/users?remove-me=definitely"};
   const std::string expected_path{"/users"};
-  const std::vector<std::pair<std::string, std::string>> add_me{};
-  const std::string remove_me{"remove-me"};
+  const Http::Utility::QueryParamsVector add_me{};
+  const std::vector<std::string> remove_me{{"remove-me"}};
   queryParameterTest(original_path, expected_path, add_me, remove_me);
 }
 
 TEST_P(HttpFilterTestParam, ImmediateOkResponseWithOverwrittenQueryParameters) {
   const std::string original_path{"/users?overwrite-me=original"};
   const std::string expected_path{"/users?overwrite-me=new"};
-  const std::vector<std::pair<std::string, std::string>> add_me{{"overwrite-me", "new"}};
-  const std::string remove_me{};
+  const Http::Utility::QueryParamsVector add_me{{"overwrite-me", "new"}};
+  const std::vector<std::string> remove_me{};
   queryParameterTest(original_path, expected_path, add_me, remove_me);
 }
 
 TEST_P(HttpFilterTestParam, ImmediateOkResponseWithManyModifiedQueryParameters) {
   const std::string original_path{"/users?remove-me=1&overwrite-me=2&leave-me=3"};
   const std::string expected_path{"/users?add-me=9&leave-me=3&overwrite-me=new"};
-  const std::vector<std::pair<std::string, std::string>> add_me{{"add-me", "9"},
-                                                                {"overwrite-me", "new"}};
-  const std::string remove_me{"remove-me"};
+  const Http::Utility::QueryParamsVector add_me{{"add-me", "9"}, {"overwrite-me", "new"}};
+  const std::vector<std::string> remove_me{{"remove-me"}};
   queryParameterTest(original_path, expected_path, add_me, remove_me);
 }
 

@@ -280,9 +280,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           trace, "ext_authz filter set query parameter(s) on the request:", *decoder_callbacks_);
       for (const auto& [key, value] : response->query_parameters_to_set) {
         ENVOY_STREAM_LOG(trace, "'{}={}'", *decoder_callbacks_, key, value);
-        // TODO(esmet): Sanitize key/value and/or declare the security posture that we trust the
-        // authorization server.
-        (*modified_query_parameters).push_back(std::pair(key, value));
+        (*modified_query_parameters)[key] = value;
       }
     }
 
@@ -302,16 +300,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     // We modified the query parameters in some way, so regenerate the `path` header and set it
     // here.
     if (modified_query_parameters) {
-      std::string new_path;
-      const auto path_without_query =
-          Http::Utility::stripQueryString(request_headers_->Path()->value());
-      // TODO: These two lines should probably be abstracted as
-      // Http::Utility::formatPathAndQueryParams
-      const auto new_query_string =
-          Http::Utility::queryParamsToString(modified_query_parameters.value());
-      absl::StrAppend(&new_path, path_without_query, new_query_string);
+      const auto new_path =
+          Http::Utility::replaceQueryString(request_headers_->Path()->value(), modified_query_parameters.value());
       ENVOY_STREAM_LOG(trace,
-                       "ext_authz filter modified query parameter, using new path for request: {}",
+                       "ext_authz filter modified query parameter(s), using new path for request: {}",
                        *decoder_callbacks_, new_path);
       request_headers_->setPath(new_path);
     }
