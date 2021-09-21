@@ -149,8 +149,9 @@ message HttpProtocolOptions {
 
   // The maximum duration of a connection. The duration is defined as a period since a connection
   // was established. If not set, there is no max duration. When max_connection_duration is reached
-  // the connection will be closed. Drain sequence will occur prior to closing the connection if
-  // if's applicable. See :ref:`drain_timeout
+  // the connection will be closed. Any inflight requests will still get processed correctly if this
+  // timeout fires during request processing. Drain sequence will occur prior to closing the connection
+  // if it's applicable. See :ref:`drain_timeout
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
   // Note: not implemented for upstream connections.
   google.protobuf.Duration max_connection_duration = 3;
