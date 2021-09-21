@@ -12,7 +12,7 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-// Matcher extension factory for RBAC filter. Matchers could be extended to support Ip address,
+// Matcher extension factory for RBAC filter. Matchers could be extended to support IP address,
 // header value etc.
 class MatcherExtensionFactory : public Envoy::Config::TypedFactory {
 public:
