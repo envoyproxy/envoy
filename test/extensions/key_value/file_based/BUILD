@@ -9,8 +9,8 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "dns_cache_test",
-    srcs = ["dns_cache_test.cc"],
+    name = "alternate_protocols_cache_impl_test",
+    srcs = ["alternate_protocols_cache_impl_test.cc"],
     deps = [
         "//source/common/common:key_value_store_lib",
         "//source/common/http:alternate_protocols_cache",
