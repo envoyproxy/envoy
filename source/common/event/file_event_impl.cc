@@ -17,6 +17,7 @@ FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb
         ASSERT(injected_activation_events_ != 0);
         mergeInjectedEventsAndRunCb(0);
       })) {
+  //std::cout << "file event created" << std::endl;
   // Treat the lack of a valid fd (which in practice should only happen if we run out of FDs) as
   // an OOM condition and just crash.
   RELEASE_ASSERT(SOCKET_VALID(fd), "");
@@ -139,6 +140,7 @@ void FileEventImpl::registerEventIfEmulatedEdge(uint32_t event) {
         // We never ask for both early close and read at the same time.
         new_event_mask = new_event_mask & ~FileReadyType::Read;
       }
+      std::cout << "update event" << std::endl;
       updateEvents(new_event_mask);
     }
   }

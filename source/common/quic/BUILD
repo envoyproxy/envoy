@@ -322,6 +322,7 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
+        "@com_github_google_quiche//:quic_platform_base",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

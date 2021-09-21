@@ -47,6 +47,7 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
       headers_with_underscores_action_(headers_with_underscores_action) {
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
+  std::cout << "server stream created" << std::endl;
 }
 
 void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {

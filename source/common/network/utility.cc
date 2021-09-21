@@ -571,6 +571,7 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
                             Address::InstanceConstSharedPtr peer_addess,
                             Address::InstanceConstSharedPtr local_address,
                             UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time) {
+  //std::cout << "passing payload to processor. local addr: " << local_address->asString() << std::endl;
   RELEASE_ASSERT(
       peer_addess != nullptr,
       fmt::format("Unable to get remote address on the socket bount to local address: {} ",
@@ -590,6 +591,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 UdpPacketProcessor& udp_packet_processor,
                                                 MonotonicTime receive_time, bool use_gro,
                                                 uint32_t* packets_dropped) {
+  //std::cout << "reading from socket" << local_address.asString() << std::endl;
 
   if (use_gro) {
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
@@ -603,6 +605,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     Api::IoCallUint64Result result =
         receiveMessage(max_rx_datagram_size_with_gro, buffer, output, handle, local_address);
 
+    std::cout << "gro read from socket " << handle.fdDoNotUse() << std::endl;
     if (!result.ok() || output.msg_[0].truncated_and_dropped_) {
       return result;
     }
@@ -660,6 +663,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     ENVOY_LOG_MISC(trace, "starting recvmmsg with packets={} max={}", NUM_DATAGRAMS_PER_RECEIVE,
                    max_rx_datagram_size);
     Api::IoCallUint64Result result = handle.recvmmsg(slices, local_address.ip()->port(), output);
+    std::cout << "receive mmsg on " << handle.fdDoNotUse() << std::endl;
     if (!result.ok()) {
       return result;
     }
@@ -692,6 +696,8 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   Api::IoCallUint64Result result =
       receiveMessage(udp_packet_processor.maxDatagramSize(), buffer, output, handle, local_address);
 
+  std::cout << "normal read from " << handle.fdDoNotUse() << std::endl;
+
   if (!result.ok() || output.msg_[0].truncated_and_dropped_) {
     return result;
   }
@@ -709,6 +715,7 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                                                UdpPacketProcessor& udp_packet_processor,
                                                TimeSource& time_source, bool prefer_gro,
                                                uint32_t& packets_dropped) {
+  //std::cout << "read packet from socket on " << local_address.asString() << std::endl;
   // Read at least one time, and attempt to read numPacketsExpectedPerEventLoop() packets unless
   // this goes over MAX_NUM_PACKETS_PER_EVENT_LOOP.
   size_t num_packets_to_read = std::min<size_t>(

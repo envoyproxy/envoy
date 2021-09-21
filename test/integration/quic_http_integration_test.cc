@@ -323,10 +323,11 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
       Network::Test::getCanonicalLoopbackAddress(version_);
   quic_connection_->switchConnectionSocket(
       createConnectionSocket(server_addr_, local_addr, nullptr));
+  std::cout << "switch socket complete" <<std::endl;
   EXPECT_NE(old_port, local_addr->ip()->port());
   // Send the rest data.
-  codec_client_->sendData(*request_encoder_, 1024u, true);
-  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
+  /*codec_client_->sendData(*request_encoder_, 1024u, true);
+  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);*/
   // Send response headers, and end_stream if there is no response body.
   const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   size_t response_size{5u};
@@ -356,7 +357,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   cleanupUpstreamAndDownstream();
 }
 
-/*
+
 TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   concurrency_ = 2;
   initialize();
@@ -371,9 +372,25 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   auto response = std::move(encoder_decoder.second);
 
   codec_client_->sendData(*request_encoder_, 1024u, false);
+  sleep(2);
+
+  quic_connection_->OnPathDegradingDetected();
+  Network::Address::InstanceConstSharedPtr local_addr =
+      Network::Test::getCanonicalLoopbackAddress(version_);
+  quic_connection_->MaybeMigratePort(local_addr);
+  sleep(2);
+  //quic_connection_->onFileEvent(1);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  constexpr auto timeout_first = std::chrono::seconds(15);
+  if (GetParam() == Network::Address::IpVersion::v4) {
+      test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 0u, timeout_first);
+    } else {
+      test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_total", 0u, timeout_first);
+    }
+  //dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Change to a new port by switching socket, and connection should still continue.
-  Network::Address::InstanceConstSharedPtr local_addr =
+  /*Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
   std::cout << "original port " << local_addr->ip()->port() << std::endl;
   quic_connection_->switchConnectionSocket(
@@ -396,8 +413,8 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
 
   EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
-}*/
+  EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());*/
+}
 
 TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {
   testAdminDrain(Http::CodecType::HTTP1);

@@ -63,6 +63,7 @@ constexpr int messageTruncatedOption() {
 namespace Network {
 
 IoSocketHandleImpl::~IoSocketHandleImpl() {
+  std::cout << "closing socket " << fd_ << std::endl;
   if (SOCKET_VALID(fd_)) {
     IoSocketHandleImpl::close();
   }
@@ -83,6 +84,8 @@ bool IoSocketHandleImpl::isOpen() const { return SOCKET_VALID(fd_); }
 
 Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
                                                   uint64_t num_slice) {
+  std::cout << "socket readv, fd: " << fd_ << std::endl;
+  //ASSERT(false);
   absl::FixedArray<iovec> iov(num_slice);
   uint64_t num_slices_to_read = 0;
   uint64_t num_bytes_to_read = 0;
@@ -134,6 +137,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer,
 
 Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
                                                    uint64_t num_slice) {
+  std::cout << "socket writev" << std::endl;
   absl::FixedArray<iovec> iov(num_slice);
   uint64_t num_slices_to_write = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
@@ -271,6 +275,10 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
         file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
       }
     }
+    std::cout << "socket sendmsg, fd: " << fd_ << " self ip: " << self_ip->addressAsString() << std::endl;
+    //if (fd_ == 41 || fd_ == 40) {
+    //ASSERT(false);
+    //}
     return io_result;
   }
 }
@@ -396,6 +404,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     }
   }
 
+  std::cout << "socket rcvmsg, fd: " << fd_ << " self port: " << self_port << std::endl;
   return sysCallResultToIoCallResult(result);
 }
 
@@ -498,10 +507,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
       }
     }
   }
+  std::cout << "socket rcvmmsg, fd: " << fd_ << " self port: " << self_port << std::endl;
   return sysCallResultToIoCallResult(result);
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
+  std :: cout << "socket recv, fd: " << fd_ << std::endl;
   const Api::SysCallSizeResult result =
       Api::OsSysCallsSingleton::get().recv(fd_, buffer, length, flags);
   auto io_result = sysCallResultToIoCallResult(result);
@@ -528,6 +539,7 @@ Api::SysCallIntResult IoSocketHandleImpl::bind(Address::InstanceConstSharedPtr a
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::listen(int backlog) {
+  //std::cout << "socket listen: " << fd_ <<std::endl;
   return Api::OsSysCallsSingleton::get().listen(fd_, backlog);
 }
 
@@ -618,6 +630,7 @@ void IoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Even
                                              Event::FileTriggerType trigger, uint32_t events) {
   ASSERT(file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
                                  "file descriptor. This is not allowed.");
+  std::cout << "initialize file event" << std::endl;
   file_event_ = dispatcher.createFileEvent(fd_, cb, trigger, events);
 }
 
