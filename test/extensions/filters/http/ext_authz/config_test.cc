@@ -44,7 +44,7 @@ public:
   ExtAuthzFilterTest() : RealThreadsTestHelper(5), stat_names_(symbol_table_) {
     runOnMainBlocking([&]() {
       async_client_manager_ = std::make_unique<TestAsyncClientManagerImpl>(
-          context_.cluster_manager_, *tls_, api_->timeSource(), *api_, stat_names_);
+          context_.cluster_manager_, tls(), api().timeSource(), api(), stat_names_);
     });
   }
 

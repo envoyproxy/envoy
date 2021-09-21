@@ -37,23 +37,27 @@ protected:
   // TODO(chaoqin-li1123): Clean up threading resources from the destructor when we figure out how
   // to handle different destruction orders of thread local object.
   ~RealThreadsTestHelper() = default;
-
+  // Shutdown thread local instance.
   void shutdownThreading();
-
+  // Post exit siginal and wait for main thread and worker threads to join.
   void exitThreads();
-
+  // Run the callback in all the workers, block until the callback has finished in all threads.
   void runOnAllWorkersBlocking(std::function<void()> work);
-
+  // Run the callback in main thread, block until the callback has been executed in main thread.
   void runOnMainBlocking(std::function<void()> work);
-
+  // Post an empty callback to main thread and block until all the previous callbacks have been
+  // executed.
   void mainDispatchBlock();
-
+  // Post an empty callback to worker threads and block until all the previous callbacks have been
+  // executed.
   void tlsBlock();
 
   ThreadLocal::Instance& tls() { return *tls_; }
 
   Api::Api& api() { return *api_; }
 
+  // TODO(chaoqin-li1123): make these variables private when we figure out how to clean up the
+  // threading resources inside the helper class.
   Api::ApiPtr api_;
   Event::DispatcherPtr main_dispatcher_;
   std::vector<Event::DispatcherPtr> thread_dispatchers_;
