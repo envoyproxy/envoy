@@ -300,11 +300,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     // We modified the query parameters in some way, so regenerate the `path` header and set it
     // here.
     if (modified_query_parameters) {
-      const auto new_path =
-          Http::Utility::replaceQueryString(request_headers_->Path()->value(), modified_query_parameters.value());
-      ENVOY_STREAM_LOG(trace,
-                       "ext_authz filter modified query parameter(s), using new path for request: {}",
-                       *decoder_callbacks_, new_path);
+      const auto new_path = Http::Utility::replaceQueryString(request_headers_->Path()->value(),
+                                                              modified_query_parameters.value());
+      ENVOY_STREAM_LOG(
+          trace, "ext_authz filter modified query parameter(s), using new path for request: {}",
+          *decoder_callbacks_, new_path);
       request_headers_->setPath(new_path);
     }
 

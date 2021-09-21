@@ -468,14 +468,12 @@ std::string Utility::replaceQueryString(const HeaderString& path,
   std::string new_path{Http::Utility::stripQueryString(path)};
 
   if (!params.empty()) {
-    const auto new_query_string =
-        Http::Utility::queryParamsToString(params);
+    const auto new_query_string = Http::Utility::queryParamsToString(params);
     absl::StrAppend(&new_path, new_query_string);
   }
 
   return new_path;
 }
-
 
 std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
   // TODO(wbpcode): Modify the headers parameter type to 'RequestHeaderMap'.
