@@ -22,10 +22,19 @@ public:
   AlternateProtocolsCacheImpl(TimeSource& time_source, std::unique_ptr<KeyValueStore>&& store);
   ~AlternateProtocolsCacheImpl() override;
 
-  // Note this does not do standards-required normalization. Entries requiring
+  // Convert an AlternateProtocol vector to a string to cache to the key value
+  // store. Note that in order to determine the lifetime of entries, this
+  // function will serialize ma= as absolute time from the epoch rather than
+  // relative time.
+  // This function also does not do standards-required normalization. Entries requiring
   // normalization will simply not be read from cache.
-  static std::string protocolsToString(const std::vector<AlternateProtocol>& protocols,
-                                       TimeSource& time_source);
+  static std::string protocolsToStringForCache(const std::vector<AlternateProtocol>& protocols,
+                                               TimeSource& time_source);
+  // Parse an alternate protocols string into structured data, or absl::nullopt
+  // if it is empty or invalid.
+  // If from_cache is true, it is assumed the string was serialized using
+  // protocolsToStringForCache and the the ma fields will be parsed as absolute times
+  // rather than relative time.
   static absl::optional<std::vector<AlternateProtocol>>
   protocolsFromString(absl::string_view protocols, TimeSource& time_source,
                       bool from_cache = false);

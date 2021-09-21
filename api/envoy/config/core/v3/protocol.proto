@@ -106,6 +106,7 @@ message AlternateProtocolsCacheOptions {
   // Allows configuring a persistent
   // :ref:`key value store <envoy_v3_api_msg_config.common.key_value.v3.KeyValueStoreConfig>` to flush
   // alternate protocols entries to disk.
+  // This function is currently only supported if concurrency is 1
   TypedExtensionConfig key_value_store_config = 3;
 }
 

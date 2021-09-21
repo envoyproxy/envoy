@@ -6,14 +6,14 @@
 
 namespace Envoy {
 namespace Http {
-
+namespace {
 std::string originToString(const AlternateProtocolsCache::Origin& origin) {
   return absl::StrCat(origin.scheme_, "://", origin.hostname_, ":", origin.port_);
 }
+} // namespace
 
-std::string
-AlternateProtocolsCacheImpl::protocolsToString(const std::vector<AlternateProtocol>& protocols,
-                                               TimeSource& /*time_source*/) {
+std::string AlternateProtocolsCacheImpl::protocolsToStringForCache(
+    const std::vector<AlternateProtocol>& protocols, TimeSource& /*time_source*/) {
   if (protocols.empty()) {
     return std::string("clear");
   }
@@ -79,7 +79,7 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
   protocols_[origin] = protocols;
   if (key_value_store_) {
     key_value_store_->addOrUpdate(originToString(origin),
-                                  protocolsToString(protocols, time_source_));
+                                  protocolsToStringForCache(protocols, time_source_));
   }
 }
 
@@ -109,7 +109,7 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
   }
   if (key_value_store_ && original_size != protocols.size()) {
     key_value_store_->addOrUpdate(originToString(origin),
-                                  protocolsToString(protocols, time_source_));
+                                  protocolsToStringForCache(protocols, time_source_));
   }
 
   return makeOptRef(const_cast<const std::vector<AlternateProtocol>&>(protocols));
