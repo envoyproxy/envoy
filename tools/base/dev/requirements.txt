@@ -1,1 +1,1 @@
- -e git+https://github.com/envoyproxy/pytooling@envoy.docs.abstract#egg=envoy.docs.abstract
+ -e git+https://github.com/envoyproxy/pytooling@b26500db6686bc018b2ad22d5a9d25790776f86c#egg=envoy.docs.abstract&subdirectory=envoy.docs.abstract
