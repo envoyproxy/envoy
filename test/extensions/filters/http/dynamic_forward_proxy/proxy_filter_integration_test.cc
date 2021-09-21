@@ -131,7 +131,9 @@ typed_config:
       std::string host =
           fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port());
       std::string value =
-          absl::StrCat(fake_upstreams_[0]->localAddress()->asString(), "|1000000|0");
+          absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_),
+                       ":", fake_upstreams_[0]->localAddress()->ip()->port(),
+                       "|1000000|0");
       TestEnvironment::writeStringToFileForTest(
           "dns_cache.txt", absl::StrCat(host.length(), "\n", host, value.length(), "\n", value));
     }
