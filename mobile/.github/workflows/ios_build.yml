@@ -10,7 +10,7 @@ jobs:
   iosbuild:
     name: ios_build
     runs-on: macos-11
-    timeout-minutes: 75
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
         with:
