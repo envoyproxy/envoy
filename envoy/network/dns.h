@@ -46,7 +46,7 @@ struct DnsResponse {
   const std::chrono::seconds ttl_;
 };
 
-enum class DnsLookupFamily { V4Only, V6Only, Auto };
+enum class DnsLookupFamily { V4Only, V6Only, Auto, V4Preferred };
 
 /**
  * An asynchronous DNS resolver.
