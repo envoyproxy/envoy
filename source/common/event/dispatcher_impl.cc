@@ -160,10 +160,8 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
 
   ASSERT(isThreadSafe());
-
-  // typed_dns_resolver_config need to be populated.
-  ASSERT(!typed_dns_resolver_config.name().empty() &&
-         !typed_dns_resolver_config.typed_config().type_url().empty());
+  // This function has to be called in main thread.
+  ASSERT(Thread::MainThread::isMainThread());
 
   // Derive the DNS resolver factory from config.
   // If the typed config is not registered or bogus, it will throw an exception.
