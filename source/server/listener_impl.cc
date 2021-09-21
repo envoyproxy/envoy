@@ -223,7 +223,9 @@ AccessLog::AccessLogManager& ListenerFactoryContextBaseImpl::accessLogManager() 
 Upstream::ClusterManager& ListenerFactoryContextBaseImpl::clusterManager() {
   return server_.clusterManager();
 }
-Event::Dispatcher& ListenerFactoryContextBaseImpl::dispatcher() { return server_.dispatcher(); }
+Event::Dispatcher& ListenerFactoryContextBaseImpl::mainThreadDispatcher() {
+  return server_.dispatcher();
+}
 const Server::Options& ListenerFactoryContextBaseImpl::options() { return server_.options(); }
 Grpc::Context& ListenerFactoryContextBaseImpl::grpcContext() { return server_.grpcContext(); }
 bool ListenerFactoryContextBaseImpl::healthCheckFailed() { return server_.healthCheckFailed(); }
@@ -631,8 +633,8 @@ AccessLog::AccessLogManager& PerListenerFactoryContextImpl::accessLogManager() {
 Upstream::ClusterManager& PerListenerFactoryContextImpl::clusterManager() {
   return listener_factory_context_base_->clusterManager();
 }
-Event::Dispatcher& PerListenerFactoryContextImpl::dispatcher() {
-  return listener_factory_context_base_->dispatcher();
+Event::Dispatcher& PerListenerFactoryContextImpl::mainThreadDispatcher() {
+  return listener_factory_context_base_->mainThreadDispatcher();
 }
 const Server::Options& PerListenerFactoryContextImpl::options() {
   return listener_factory_context_base_->options();

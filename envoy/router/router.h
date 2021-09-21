@@ -204,9 +204,14 @@ public:
   virtual ~RetryPolicy() = default;
 
   /**
-   * @return std::chrono::milliseconds timeout per retry attempt.
+   * @return std::chrono::milliseconds timeout per retry attempt. 0 is disabled.
    */
   virtual std::chrono::milliseconds perTryTimeout() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the optional per try idle timeout. 0 is disabled.
+   */
+  virtual std::chrono::milliseconds perTryIdleTimeout() const PURE;
 
   /**
    * @return uint32_t the number of retries to allow against the route.
@@ -230,6 +235,13 @@ public:
    * if none should be used.
    */
   virtual Upstream::RetryPrioritySharedPtr retryPriority() const PURE;
+
+  /**
+   * @return the retry options predicates for this policy. Each policy will be applied prior
+   * to retrying a request, allowing for request behavior to be customized.
+   */
+  virtual absl::Span<const Upstream::RetryOptionsPredicateConstSharedPtr>
+  retryOptionsPredicates() const PURE;
 
   /**
    * Number of times host selection should be reattempted when selecting a host

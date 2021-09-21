@@ -177,6 +177,7 @@ envoy_cc_library(
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:resource_manager_interface",
         "//source/common/common:logger_lib",
+        "//source/common/config:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

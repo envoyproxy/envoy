@@ -140,7 +140,6 @@ void ActiveMessageDecoderFilter::continueDecoding() {
       // If the filter stack was paused during messageEnd, handle end-of-request details.
       parent_.finalizeRequest();
     }
-    parent_.continueDecoding();
   }
 }
 
@@ -413,8 +412,6 @@ uint64_t ActiveMessage::requestId() const {
 }
 
 uint64_t ActiveMessage::streamId() const { return stream_id_; }
-
-void ActiveMessage::continueDecoding() { parent_.continueDecoding(); }
 
 SerializationType ActiveMessage::serializationType() const {
   return parent_.downstreamSerializationType();

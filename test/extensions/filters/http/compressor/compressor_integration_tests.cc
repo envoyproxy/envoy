@@ -145,7 +145,7 @@ void WebsocketWithCompressorIntegrationTest::initialize() {
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
   }
-  config_helper_.addFilter(compressorFilterConfig);
+  config_helper_.prependFilter(compressorFilterConfig);
   HttpProtocolIntegrationTest::initialize();
 }
 
@@ -247,7 +247,7 @@ void CompressorProxyingConnectIntegrationTest::initialize() {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { ConfigHelper::setConnectConfig(hcm, false, false); });
-  config_helper_.addFilter(compressorFilterConfig);
+  config_helper_.prependFilter(compressorFilterConfig);
   HttpProtocolIntegrationTest::initialize();
 }
 

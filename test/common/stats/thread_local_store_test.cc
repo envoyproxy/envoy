@@ -508,10 +508,15 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
   scope1.reset();
-  EXPECT_EQ(0UL, store_->counters().size());
+  // The counter is gone from all scopes, but is still held in the local
+  // variable c1. Hence, it will not be removed from the allocator or store.
+  EXPECT_EQ(1UL, store_->counters().size());
 
   EXPECT_EQ(1L, c1.use_count());
   c1.reset();
+  // Removing the counter from the local variable, should now remove it from the
+  // allocator.
+  EXPECT_EQ(0UL, store_->counters().size());
 
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
@@ -1187,6 +1192,48 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 42));
   histogram.recordValue(42);
   textReadout.set("fortytwo");
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
+// Verify that asking for deleted stats by name does not create new copies on
+// the allocator.
+TEST_F(StatsThreadLocalStoreTest, AskForRejectedStat) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  Counter& counter = store_->counterFromString("c1");
+  Gauge& gauge = store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+  TextReadout& text_readout = store_->textReadoutFromString("t1");
+  ASSERT_EQ(1, store_->counters().size()); // "c1".
+  ASSERT_EQ(1, store_->gauges().size());
+  ASSERT_EQ(1, store_->textReadouts().size());
+
+  // Will effectively block all stats, and remove all the non-matching stats.
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
+      "no-such-stat");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config, symbol_table_));
+
+  // They can no longer be found.
+  EXPECT_EQ(0, store_->counters().size());
+  EXPECT_EQ(0, store_->gauges().size());
+  EXPECT_EQ(0, store_->textReadouts().size());
+
+  // Ask for the rejected stats again by name.
+  Counter& counter2 = store_->counterFromString("c1");
+  Gauge& gauge2 = store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+  TextReadout& text_readout2 = store_->textReadoutFromString("t1");
+
+  // Verify we got the same stats.
+  EXPECT_EQ(&counter, &counter2);
+  EXPECT_EQ(&gauge, &gauge2);
+  EXPECT_EQ(&text_readout, &text_readout2);
+
+  // Verify that new stats were not created.
+  EXPECT_EQ(0, store_->counters().size());
+  EXPECT_EQ(0, store_->gauges().size());
+  EXPECT_EQ(0, store_->textReadouts().size());
+
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();

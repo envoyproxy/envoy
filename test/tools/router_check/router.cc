@@ -30,8 +30,6 @@ const std::string toString(envoy::type::matcher::v3::StringMatcher::MatchPattern
     return "suffix";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
     return "safe_regex";
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
-    return "deprecated_regex";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains:
     return "contains";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::MATCH_PATTERN_NOT_SET:
@@ -44,10 +42,6 @@ const std::string toString(const envoy::config::route::v3::HeaderMatcher& header
   switch (header.header_match_specifier_case()) {
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
     return "exact_match";
-    break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
-      kHiddenEnvoyDeprecatedRegexMatch:
-    return "regex_match";
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
     return "safe_regex_match";
@@ -249,9 +243,9 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
     headers_finalized_ = false;
     auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
         nullptr, Network::Utility::getCanonicalIpv4LoopbackAddress());
-    Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                  factory_context_->dispatcher().timeSource(),
-                                                  connection_info_provider);
+    Envoy::StreamInfo::StreamInfoImpl stream_info(
+        Envoy::Http::Protocol::Http11, factory_context_->mainThreadDispatcher().timeSource(),
+        connection_info_provider);
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ =
         config_->route(*tool_config.request_headers_, stream_info, tool_config.random_value_);

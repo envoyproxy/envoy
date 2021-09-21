@@ -197,6 +197,12 @@ public:
    * @return RAII handle for pending request circuit breaker if the request was allowed.
    */
   virtual Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() PURE;
+
+  /**
+   * Force a DNS refresh of all known hosts, ignoring any ongoing failure or success timers. This
+   * can be used in response to network changes which might alter DNS responses, for example.
+   */
+  virtual void forceRefreshHosts() PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;

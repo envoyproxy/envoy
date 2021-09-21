@@ -281,6 +281,21 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.counterFromStatNameWithTags(name, tags);
   }
+  void forEachCounter(std::function<void(std::size_t)> f_size,
+                      std::function<void(Stats::Counter&)> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachCounter(f_size, f_stat);
+  }
+  void forEachGauge(std::function<void(std::size_t)> f_size,
+                    std::function<void(Stats::Gauge&)> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachGauge(f_size, f_stat);
+  }
+  void forEachTextReadout(std::function<void(std::size_t)> f_size,
+                          std::function<void(Stats::TextReadout&)> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachTextReadout(f_size, f_stat);
+  }
   Counter& counterFromString(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.counterFromString(name);
@@ -400,7 +415,7 @@ public:
   static IntegrationTestServerPtr create(
       const std::string& config_path, const Network::Address::IpVersion version,
       std::function<void(IntegrationTestServer&)> on_server_ready_function,
-      std::function<void()> on_server_init_function, bool deterministic,
+      std::function<void()> on_server_init_function, absl::optional<uint64_t> deterministic_value,
       Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization = false,
       ProcessObjectOptRef process_object = absl::nullopt,
       Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
@@ -430,10 +445,11 @@ public:
   void onWorkersStarted() override {}
 
   void start(const Network::Address::IpVersion version,
-             std::function<void()> on_server_init_function, bool deterministic,
-             bool defer_listener_finalization, ProcessObjectOptRef process_object,
-             Server::FieldValidationConfig validation_config, uint32_t concurrency,
-             std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
+             std::function<void()> on_server_init_function,
+             absl::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
+             ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
+             uint32_t concurrency, std::chrono::seconds drain_time,
+             Server::DrainStrategy drain_strategy,
              Buffer::WatermarkFactorySharedPtr watermark_factory);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
@@ -460,11 +476,6 @@ public:
 
   void waitForCounterExists(const std::string& name) override {
     notifyingStatsAllocator().waitForCounterExists(name);
-  }
-
-  // TODO(#17956): Add Gauge type to NotifyingAllocator and adopt it in this method.
-  void waitForGaugeDestroyed(const std::string& name) override {
-    ASSERT_TRUE(TestUtility::waitForGaugeDestroyed(statStore(), name, time_system_));
   }
 
   void waitUntilHistogramHasSamples(
@@ -543,7 +554,8 @@ private:
   /**
    * Runs the real server on a thread.
    */
-  void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
+  void threadRoutine(const Network::Address::IpVersion version,
+                     absl::optional<uint64_t> deterministic_value,
                      ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
