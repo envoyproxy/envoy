@@ -118,7 +118,6 @@ message HttpProtocolOptions {
     //   is alpha is not guaranteed to be API-stable.
     config.core.v3.Http3ProtocolOptions http3_protocol_options = 3;
 
-    // [#not-implemented-hide:]
     // The presence of alternate protocols cache options causes the use of the
     // alternate protocols cache, which is responsible for parsing and caching
     // HTTP Alt-Svc headers. This enables the use of HTTP/3 for origins that

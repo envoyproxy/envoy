@@ -7,6 +7,7 @@ already tests for these circumstances, these specify Envoy's requirements
 and ensure that tool behavior is consistent across dependency updates.
 """
 
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,10 +15,9 @@ from shutil import copyfile, copytree
 
 from rules_python.python.runfiles import runfiles
 
-from buf_utils import pull_buf_deps
-from detector import BufWrapper
-from tools.base.utils import cd_and_return
-from tools.run_command import run_command
+from tools.api_proto_breaking_change_detector.buf_utils import pull_buf_deps
+from tools.api_proto_breaking_change_detector.detector import BufWrapper
+from envoy.base.utils import cd_and_return
 
 
 class BreakingChangeDetectorTests(object):
@@ -89,8 +89,8 @@ class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
 
     @classmethod
     def _run_command_print_error(cls, cmd):
-        code, out, err = run_command(cmd)
-        out, err = '\n'.join(out), '\n'.join(err)
+        response = subprocess.run([cmd], shell=True, capture_output=True, encoding="utf-8")
+        code, out, err = response.returncode, response.stdout, response.stderr
         if code != 0:
             raise Exception(
                 f"Error running command {cmd}\nExit code: {code} | stdout: {out} | stderr: {err}")
@@ -109,8 +109,7 @@ class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
             copytree(testdata_path, cls._temp_dir.name, dirs_exist_ok=True)
 
             # copy in buf config
-            bazel_buf_config_loc = Path.cwd().joinpath(
-                "external", "envoy_api_canonical", "buf.yaml")
+            bazel_buf_config_loc = Path.cwd().joinpath("external", "envoy_api", "buf.yaml")
             copyfile(bazel_buf_config_loc, cls._config_file_loc)
 
             # pull buf dependencies and initialize git repo with test data files

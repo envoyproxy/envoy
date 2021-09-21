@@ -118,8 +118,9 @@ class CurrentVersionFile:
                 if self.invalid_reflink_re.match(line) else [])
 
     def check_ticks(self, line: str) -> List[str]:
-        return ([f"Backticks should come in pairs (except for links and refs): {line}"] if
-                (self.backticks_re.match(line)) else [])
+        return ([
+            f"Backticks should come in pairs (``foo``) except for links (`title <url>`_) or refs (ref:`text <ref>`): {line}"
+        ] if (self.backticks_re.match(line)) else [])
 
     def run_checks(self) -> Iterator[str]:
         self.set_tokens()
