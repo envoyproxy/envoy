@@ -1,6 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_binary")
+load("@base_pip3//:requirements.bzl", "entry_point")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("@base_pip3//:requirements.bzl", "requirement")
 load("//tools/base:envoy_python.bzl", "envoy_py_binary")
 
 licenses(["notice"])  # Apache 2
@@ -33,20 +33,20 @@ py_binary(
     ],
 )
 
-envoy_py_binary(
-    name = "tools.docs.sphinx_runner",
-    deps = [
-        "//tools/base:runner",
-        "//tools/base:utils",
-        requirement("colorama"),
-        requirement("Sphinx"),
-        requirement("sphinx-copybutton"),
-        requirement("sphinx-rtd-theme"),
-        requirement("sphinx-tabs"),
-        requirement("sphinxcontrib-httpdomain"),
-        requirement("sphinxcontrib-serializinghtml"),
-        requirement("sphinxext-rediraffe"),
-    ],
+# The upstream lib is maintained here:
+#
+#    https://github.com/envoyproxy/pytooling/tree/main/envoy.docs.sphinx_runner
+#
+# Please submit issues/PRs to the pytooling repo:
+#
+#    https://github.com/envoyproxy/pytooling
+
+alias(
+    name = "sphinx_runner",
+    actual = entry_point(
+        pkg = "envoy.docs.sphinx_runner",
+        script = "envoy.docs.sphinx_runner",
+    ),
 )
 
 envoy_py_binary(

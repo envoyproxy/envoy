@@ -199,9 +199,9 @@ threshold for tracking and a single overload action entry that resets streams:
   ...
 
 We will only track streams using >=
-:math:`2^minimum_account_to_track_power_of_two` worth of allocated memory in
+:math:`2^{minimum\_account\_to\_track\_power\_of\_two}` worth of allocated memory in
 buffers. In this case, by setting the `minimum_account_to_track_power_of_two`
-to `20` we will track streams using >= 1MiB since :math:`2^20` is 1MiB. Streams
+to `20` we will track streams using >= 1MiB since :math:`2^{20}` is 1MiB. Streams
 using >= 1MiB will be classified into 8 power of two sized buckets. Currently,
 the number of buckets is hardcoded to 8.  For this example, the buckets are as
 follows:
@@ -240,7 +240,7 @@ of streams that end up getting reset and to prevent the worker thread from
 locking up and triggering the Watchdog system.
 
 Given that there are only 8 buckets, we partition the space with a gradation of
-:math:`gradation = (saturation_threshold - scaling_threshold)/8`. Hence at 85%
+:math:`gradation = (saturation\_threshold - scaling\_threshold)/8`. Hence at 85%
 heap usage we reset streams in the last bucket e.g. those using `>= 128MiB`. At
 :math:`85% + 1 * gradation` heap usage we reset streams in the last two buckets
 e.g. those using `>= 64MiB`, prioritizing the streams in the last bucket since

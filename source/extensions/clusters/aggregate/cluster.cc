@@ -19,7 +19,7 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                  Stats::ScopePtr&& stats_scope, bool added_via_api)
     : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
-                                added_via_api, factory_context.dispatcher().timeSource()),
+                                added_via_api, factory_context.mainThreadDispatcher().timeSource()),
       cluster_manager_(cluster_manager), runtime_(runtime), random_(random),
       clusters_(std::make_shared<ClusterSet>(config.clusters().begin(), config.clusters().end())) {}
 

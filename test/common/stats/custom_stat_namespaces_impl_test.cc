@@ -16,6 +16,8 @@ TEST(CustomStatNamespacesImpl, Registration) {
 
 TEST(CustomStatNamespacesImpl, StripRegisteredPrefix) {
   CustomStatNamespacesImpl namespaces;
+  // no namespace is registered.
+  EXPECT_FALSE(namespaces.stripRegisteredPrefix("foo.bar").has_value());
   namespaces.registerStatNamespace("foo");
   // namespace is not registered.
   EXPECT_FALSE(namespaces.stripRegisteredPrefix("bar.my.value").has_value());
