@@ -1,6 +1,7 @@
 #include "test/test_listener.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
 
 #include "test/test_common/global.h"
 
@@ -14,6 +15,8 @@ void TestListener::OnTestEnd(const ::testing::TestInfo& test_info) {
                               "]: Active singletons exist. Something is leaking. Consider "
                               "commenting out this assert and letting the heap checker run:\n",
                               active_singletons));
+  Thread::MainThread::clear();
+  Thread::MainThread::initTestThread();
 }
 
 } // namespace Envoy

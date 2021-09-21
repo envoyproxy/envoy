@@ -96,6 +96,8 @@ int TestRunner::RunTests(int argc, char** argv) {
 
   TestEnvironment::setEnvVar("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory(), 1);
 
+  Thread::MainThread::initTestThread();
+
   // Before letting TestEnvironment latch argv and argc, remove any runtime override flag.
   // This allows doing test overrides of Envoy runtime features without adding
   // test flags to the Envoy production command line.
