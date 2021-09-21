@@ -288,20 +288,11 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
 
 // Buffer the request after it's been decompressed.
 TEST_P(DecompressorIntegrationTest, DecompressAndBuffer) {
-<<<<<<< HEAD
 
   config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
                                "type.googleapis.com/google.protobuf.Empty } }");
 
   config_helper_.prependFilter(R"EOF(
-=======
-  // filters are prepended, so add them in reverse order
-
-  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
-
-  config_helper_.addFilter(R"EOF(
->>>>>>> b37b726ca (decompressor: fixing a bug for requests with added trailers (#18055))
   name: envoy.filters.http.decompressor
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
