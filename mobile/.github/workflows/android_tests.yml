@@ -49,7 +49,7 @@ jobs:
   javatestsmac:
     name: java_tests_mac
     runs-on: macos-11
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
         with:

@@ -10,7 +10,7 @@ jobs:
   sizecurrent:
     name: size_current
     runs-on: ubuntu-18.04
-    timeout-minutes: 90
+    timeout-minutes: 120
     container:
       image: envoyproxy/envoy-build-ubuntu:b51ac7a0f2cb5dd729984a379a301ce029ac765d
       env:
