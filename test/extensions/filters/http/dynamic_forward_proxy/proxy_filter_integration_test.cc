@@ -396,9 +396,8 @@ TEST_P(ProxyFilterIntegrationTest, DnsCacheCircuitBreakersInvoked) {
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 }
 
-#ifndef WIN32
-// TODO(alyssawilk) figure out why this test doesn't pass on windows.
 TEST_P(ProxyFilterIntegrationTest, UseCacheFile) {
+  LogLevelSetter save_levels(spdlog::level::trace);
   write_cache_file_ = true;
 
   initializeWithArgs();
@@ -413,7 +412,6 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFile) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }
-#endif
 
 } // namespace
 } // namespace Envoy
