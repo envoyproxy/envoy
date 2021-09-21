@@ -59,6 +59,7 @@ public:
   MOCK_METHOD((void), iterateHostMap, (IterateHostMapCb));
   MOCK_METHOD((absl::optional<const DnsHostInfoSharedPtr>), getHost, (absl::string_view));
   MOCK_METHOD(Upstream::ResourceAutoIncDec*, canCreateDnsRequest_, ());
+  MOCK_METHOD(void, forceRefreshHosts, ());
 };
 
 class MockLoadDnsCacheEntryHandle : public DnsCache::LoadDnsCacheEntryHandle {

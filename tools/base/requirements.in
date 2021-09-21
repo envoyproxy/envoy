@@ -3,8 +3,11 @@ colorama
 coloredlogs
 coverage
 envoy.base.utils
+envoy.code_format.python_check>=0.0.4
+envoy.dependency.pip_check>=0.0.4
 envoy.distribution.release
 envoy.distribution.verify
+envoy.docs.sphinx-runner>=0.0.3
 envoy.gpg.sign
 flake8
 frozendict
@@ -19,6 +22,7 @@ pytest-cov
 pytest-patches
 pyyaml
 setuptools
+slackclient
 sphinx
 sphinxcontrib-httpdomain
 sphinxcontrib-serializinghtml

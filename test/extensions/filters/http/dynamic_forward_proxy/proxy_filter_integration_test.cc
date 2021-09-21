@@ -173,6 +173,21 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }
 
+// Currently if the first DNS resolution fails, the filter will continue with
+// a null address. Make sure this mode fails gracefully.
+TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) {
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "doesnotexist.example.com"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
 // Verify that after we populate the cache and reload the cluster we reattach to the cache with
 // its existing hosts.
 TEST_P(ProxyFilterIntegrationTest, ReloadClusterAndAttachToCache) {

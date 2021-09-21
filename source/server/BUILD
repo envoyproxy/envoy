@@ -539,6 +539,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "factory_context_base_impl_lib",
+    hdrs = ["factory_context_base_impl.h"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],

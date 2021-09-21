@@ -1350,6 +1350,11 @@ message RetryPolicy {
   // details.
   repeated RetryHostPredicate retry_host_predicate = 5;
 
+  // Retry options predicates that will be applied prior to retrying a request. These predicates
+  // allow customizing request behavior between retries.
+  // [#comment: add [#extension-category: envoy.retry_options_predicates] when there are built-in extensions]
+  repeated core.v3.TypedExtensionConfig retry_options_predicates = 12;
+
   // The maximum number of times host selection will be reattempted before giving up, at which
   // point the host that was last selected will be routed to. If unspecified, this will default to
   // retrying once.
