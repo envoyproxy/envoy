@@ -7,6 +7,11 @@
 
 namespace Envoy {
 
+void TestListener::OnTestStart(const ::testing::TestInfo& test_info) {
+  UNREFERENCED_PARAMETER(test_info);
+  Thread::MainThread::clear();
+}
+
 void TestListener::OnTestEnd(const ::testing::TestInfo& test_info) {
   // Check that all singletons have been destroyed.
   std::string active_singletons = Envoy::Test::Globals::describeActiveSingletons();
@@ -16,7 +21,6 @@ void TestListener::OnTestEnd(const ::testing::TestInfo& test_info) {
                               "commenting out this assert and letting the heap checker run:\n",
                               active_singletons));
   Thread::MainThread::clear();
-  Thread::MainThread::initTestThread();
 }
 
 } // namespace Envoy

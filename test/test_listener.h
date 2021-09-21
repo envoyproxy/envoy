@@ -20,6 +20,7 @@ namespace Envoy {
 // Note: nothing compute-intensive should be put in this class, as it will
 // be a tax paid by every test method in the codebase.
 class TestListener : public ::testing::EmptyTestEventListener {
+  void OnTestStart(const ::testing::TestInfo& test_info) override;
   void OnTestEnd(const ::testing::TestInfo& test_info) override;
 };
 
