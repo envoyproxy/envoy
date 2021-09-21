@@ -55,9 +55,12 @@ class MainActivity : Activity() {
       .setOnEngineRunning { Log.d("MainActivity", "Envoy async internal setup completed") }
       .setEventTracker({
         for (entry in it.entries) {
-          Log.d("MainActivity", String.format("Event emitted: %s1, %s2", entry.key, entry.value))
+          Log.d("MainActivity", "Event emitted: ${entry.key}, ${entry.value}")
         }
       })
+      .setLogger {
+        Log.d("MainActivity", it)
+      }
       .build()
 
     recyclerView = findViewById(R.id.recycler_view) as RecyclerView
