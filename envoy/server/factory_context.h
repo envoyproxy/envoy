@@ -52,7 +52,7 @@ public:
    * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used
    *         for all singleton processing.
    */
-  virtual Event::Dispatcher& dispatcher() PURE;
+  virtual Event::Dispatcher& mainThreadDispatcher() PURE;
 
   /**
    * @return Api::Api& a reference to the api object.

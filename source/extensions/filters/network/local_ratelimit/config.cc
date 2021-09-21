@@ -14,7 +14,7 @@ Network::FilterFactoryCb LocalRateLimitConfigFactory::createFilterFactoryFromPro
     const envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& proto_config,
     Server::Configuration::FactoryContext& context) {
   ConfigSharedPtr filter_config(
-      new Config(proto_config, context.dispatcher(), context.scope(), context.runtime()));
+      new Config(proto_config, context.mainThreadDispatcher(), context.scope(), context.runtime()));
   return [filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<Filter>(filter_config));
   };

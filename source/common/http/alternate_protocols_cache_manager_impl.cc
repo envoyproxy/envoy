@@ -11,8 +11,8 @@ namespace Http {
 SINGLETON_MANAGER_REGISTRATION(alternate_protocols_cache_manager);
 
 AlternateProtocolsCacheManagerImpl::AlternateProtocolsCacheManagerImpl(
-    TimeSource& time_source, ThreadLocal::SlotAllocator& tls)
-    : time_source_(time_source), slot_(tls) {
+    AlternateProtocolsData& data, ThreadLocal::SlotAllocator& tls)
+    : data_(data), slot_(tls) {
   slot_.set([](Event::Dispatcher& /*dispatcher*/) { return std::make_shared<State>(); });
 }
 
@@ -31,7 +31,7 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
   }
 
   AlternateProtocolsCacheSharedPtr new_cache =
-      std::make_shared<AlternateProtocolsCacheImpl>(time_source_);
+      std::make_shared<AlternateProtocolsCacheImpl>(data_.dispatcher_.timeSource());
   (*slot_).caches_.emplace(options.name(), CacheWithOptions{options, new_cache});
   return new_cache;
 }
@@ -39,7 +39,7 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
 AlternateProtocolsCacheManagerSharedPtr AlternateProtocolsCacheManagerFactoryImpl::get() {
   return singleton_manager_.getTyped<AlternateProtocolsCacheManager>(
       SINGLETON_MANAGER_REGISTERED_NAME(alternate_protocols_cache_manager),
-      [this] { return std::make_shared<AlternateProtocolsCacheManagerImpl>(time_source_, tls_); });
+      [this] { return std::make_shared<AlternateProtocolsCacheManagerImpl>(data_, tls_); });
 }
 
 } // namespace Http
