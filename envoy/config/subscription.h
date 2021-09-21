@@ -159,6 +159,17 @@ public:
                               const std::string& version_info) PURE;
 
   /**
+   * Called when a non-delta gRPC configuration update is received.
+   * @param resources vector of fetched resources corresponding to the configuration update.
+   * @param version_info supplies the version information as supplied by the xDS discovery response.
+   * @throw EnvoyException with reason if the configuration is rejected. Otherwise the configuration
+   *        is accepted. Accepted configurations have their version_info reflected in subsequent
+   *        requests.
+   */
+  virtual void onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
+                              const std::string& version_info) PURE;
+
+  /**
    * Called when a delta configuration update is received.
    * @param added_resources resources newly added since the previous fetch.
    * @param removed_resources names of resources that this fetch instructed to be removed.
