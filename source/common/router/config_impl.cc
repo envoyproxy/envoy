@@ -444,7 +444,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   // Returns true if include_vh_rate_limits is explicitly set to true otherwise it defaults to false
-  // which is similar to VhRateLimitOptions::Override and will only use virtual host rate limits if
+  // which is similar to RateLimitOptions::Override and will only use virtual host rate limits if
   // the route is empty
   include_vh_rate_limits_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false);

@@ -361,10 +361,27 @@ message RateLimitPerRoute {
     IGNORE = 2;
   }
 
-  // Specifies if the rate limit filter should include the virtual host rate limits.
-  VhRateLimitsOptions vh_rate_limits = 1 [(validate.rules).enum = {defined_only: true}];
+  enum RateLimitsOptions {
+    // Use the rate limits options defined in `VhRateLimitsOptions`.
+    DEFAULT = 0;
 
-  // Specifies a set of rate limit configurations that can be applied to typed filter config.
-  // [#not-implemented-hide:]
-  repeated RateLimitConfig rate_limits = 2;
+    // Use the rate limits unless the route has a rate limit policy.
+    OVERRIDE_POLICY = 1;
+
+    // Use the rate limits even if the route has a rate limit policy.
+    INCLUDE_POLICY = 2;
+
+    // Ignore the rate limits even if the route does not have a rate limit policy.
+    IGNORE_POLICY = 3;
+  }
+
+  // Specifies if the rate limit filter should include the virtual host rate limits.
+  VhRateLimitsOptions vh_rate_limits = 1 [
+    deprecated = true,
+    (validate.rules).enum = {defined_only: true},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
+
+  // Specifies if the rate limit filter should include the lower levels (route level, virtual host level or cluster weight level) rate limits options.
+  RateLimitsOptions rate_limits = 2 [(validate.rules).enum = {defined_only: true}];
 }
