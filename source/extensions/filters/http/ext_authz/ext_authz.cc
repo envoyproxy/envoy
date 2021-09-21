@@ -282,7 +282,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         ENVOY_STREAM_LOG(trace, "'{}={}'", *decoder_callbacks_, key, value);
         // TODO(esmet): Sanitize key/value and/or declare the security posture that we trust the
         // authorization server.
-        (*modified_query_parameters)[key] = value;
+        (*modified_query_parameters).push_back(std::pair(key, value));
       }
     }
 

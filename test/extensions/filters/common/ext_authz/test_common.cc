@@ -132,9 +132,10 @@ bool TestCommon::compareVectorOfUnorderedStrings(const std::vector<std::string>&
 }
 
 // TODO(esmet): This belongs in a QueryParams class
-bool TestCommon::compareQueryParams(const Http::Utility::QueryParams& lhs,
-                                    const Http::Utility::QueryParams& rhs) {
-  return lhs == rhs;
+bool TestCommon::compareQueryParamsVector(const Http::Utility::QueryParamsVector& lhs,
+                                          const Http::Utility::QueryParamsVector& rhs) {
+  return std::set<std::pair<std::string, std::string>>(lhs.begin(), lhs.end()) ==
+         std::set<std::pair<std::string, std::string>>(rhs.begin(), rhs.end());
 }
 
 } // namespace ExtAuthz

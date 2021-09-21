@@ -46,8 +46,8 @@ public:
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 
   static bool compareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs);
-  static bool compareQueryParams(const Http::Utility::QueryParams& lhs,
-                                 const Http::Utility::QueryParams& rhs);
+  static bool compareQueryParamsVector(const Http::Utility::QueryParamsVector& lhs,
+                                       const Http::Utility::QueryParamsVector& rhs);
   static bool compareVectorOfHeaderName(const std::vector<Http::LowerCaseString>& lhs,
                                         const std::vector<Http::LowerCaseString>& rhs);
   static bool compareVectorOfUnorderedStrings(const std::vector<std::string>& lhs,
@@ -116,8 +116,8 @@ MATCHER_P(AuthzOkResponse, response, "") {
   }
 
   // Compare query_parameters_to_set.
-  if (!TestCommon::compareQueryParams(response.query_parameters_to_set,
-                                      arg->query_parameters_to_set)) {
+  if (!TestCommon::compareQueryParamsVector(response.query_parameters_to_set,
+                                            arg->query_parameters_to_set)) {
     return false;
   }
 

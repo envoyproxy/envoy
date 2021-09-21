@@ -84,7 +84,7 @@ struct Response {
   std::vector<Envoy::Http::LowerCaseString> headers_to_remove;
   // A set of query string parameters to be set (possibly overwritten) on the
   // request to the upstream server.
-  Http::Utility::QueryParams query_parameters_to_set;
+  Http::Utility::QueryParamsVector query_parameters_to_set;
   // A set of query string parameters to remove from the request to the upstream server.
   std::vector<std::string> query_parameters_to_remove;
   // Optional http body used only on denied response.
