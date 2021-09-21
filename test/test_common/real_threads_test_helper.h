@@ -39,7 +39,7 @@ protected:
   ~RealThreadsTestHelper() = default;
   // Shutdown thread local instance.
   void shutdownThreading();
-  // Post exit siginal and wait for main thread and worker threads to join.
+  // Post exit signal and wait for main thread and worker threads to join.
   void exitThreads();
   // Run the callback in all the workers, block until the callback has finished in all threads.
   void runOnAllWorkersBlocking(std::function<void()> work);
