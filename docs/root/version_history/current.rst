@@ -118,3 +118,4 @@ Deprecated
 * listener: :ref:`reuse_port <envoy_v3_api_field_config.listener.v3.Listener.reuse_port>` has been
   deprecated in favor of :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>`.
   At the same time, the default has been changed from false to true. See above for more information.
+* ratelimit: :ref:`vh_rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>` is deprecated by :ref:`rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>` in order to represent any lower levels (route level, virtual host level or cluster weight level) rate limits options.
