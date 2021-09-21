@@ -3,7 +3,7 @@ import EnvoyEngine
 import Foundation
 import XCTest
 
-final class ReceiveErrorTests: XCTestCase {
+final class GRPCReceiveErrorTests: XCTestCase {
   func testReceiveError() {
     // swiftlint:disable:next line_length
     let emhcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
