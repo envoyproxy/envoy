@@ -3,70 +3,19 @@ load("@envoy_mobile//bazel:apple_test.bzl", "envoy_mobile_swift_test")
 licenses(["notice"])  # Apache 2
 
 envoy_mobile_swift_test(
-    name = "engine_builder_tests",
+    name = "test",
     srcs = [
         "EngineBuilderTests.swift",
-    ],
-    deps = [
-        "//library/objective-c:envoy_engine_objc_lib",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "grpc_request_headers_builder_tests",
-    srcs = [
         "GRPCRequestHeadersBuilderTests.swift",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "grpc_stream_tests",
-    srcs = [
         "GRPCStreamTests.swift",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "headers_builder_tests",
-    srcs = [
         "HeadersBuilderTests.swift",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "pulse_client_impl_tests",
-    srcs = [
         "PulseClientImplTests.swift",
-    ],
-    deps = [
-        "//library/objective-c:envoy_engine_objc_lib",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "request_headers_builder_tests",
-    srcs = [
         "RequestHeadersBuilderTests.swift",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "response_headers_tests",
-    srcs = [
         "ResponseHeadersTests.swift",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "retry_policy_tests",
-    srcs = [
+        "RetryPolicyMapperTests.swift",
         "RetryPolicyTests.swift",
     ],
-)
-
-envoy_mobile_swift_test(
-    name = "retry_policy_mapper_tests",
-    srcs = [
-        "RetryPolicyMapperTests.swift",
+    deps = [
+        "//library/objective-c:envoy_engine_objc_lib",
     ],
 )
