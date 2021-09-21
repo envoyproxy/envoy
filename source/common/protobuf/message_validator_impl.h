@@ -16,9 +16,8 @@ public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view) override {}
   void onDeprecatedField(absl::string_view, bool) override {}
-
-  // Envoy::ProtobufMessage::ValidationVisitor
   bool skipValidation() override { return true; }
+  void onWorkInProgress(absl::string_view) override {}
 };
 
 ValidationVisitor& getNullValidationVisitor();
@@ -31,9 +30,8 @@ public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
   void onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
-
-  // Envoy::ProtobufMessage::ValidationVisitor
   bool skipValidation() override { return false; }
+  void onWorkInProgress(absl::string_view description) override;
 
 private:
   // Track hashes of descriptions we've seen, to avoid log spam. A hash is used here to avoid
@@ -49,10 +47,9 @@ class StrictValidationVisitorImpl : public ValidationVisitor {
 public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
-
-  // Envoy::ProtobufMessage::ValidationVisitor
   bool skipValidation() override { return false; }
   void onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
+  void onWorkInProgress(absl::string_view description) override;
 };
 
 ValidationVisitor& getStrictValidationVisitor();

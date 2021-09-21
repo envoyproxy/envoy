@@ -23,6 +23,10 @@ void onDeprecatedFieldCommon(absl::string_view description, bool soft_deprecatio
     throw DeprecatedProtoFieldException(absl::StrCat(description, deprecation_error));
   }
 }
+
+void onWorkInProgressCommon(absl::string_view description) {
+  ENVOY_LOG_MISC(warn, "{}", description);
+}
 } // namespace
 
 void WarningValidationVisitorImpl::setUnknownCounter(Stats::Counter& counter) {
@@ -53,6 +57,10 @@ void WarningValidationVisitorImpl::onDeprecatedField(absl::string_view descripti
   onDeprecatedFieldCommon(description, soft_deprecation);
 }
 
+void WarningValidationVisitorImpl::onWorkInProgress(absl::string_view description) {
+  onWorkInProgressCommon(description);
+}
+
 void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) {
   throw UnknownProtoFieldException(
       absl::StrCat("Protobuf message (", description, ") has unknown fields"));
@@ -61,6 +69,10 @@ void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) 
 void StrictValidationVisitorImpl::onDeprecatedField(absl::string_view description,
                                                     bool soft_deprecation) {
   onDeprecatedFieldCommon(description, soft_deprecation);
+}
+
+void StrictValidationVisitorImpl::onWorkInProgress(absl::string_view description) {
+  onWorkInProgressCommon(description);
 }
 
 ValidationVisitor& getNullValidationVisitor() {
