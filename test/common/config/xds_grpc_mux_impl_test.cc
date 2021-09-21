@@ -930,6 +930,20 @@ TEST_F(GrpcMuxImplTest, DynamicContextParameters) {
   expectSendMessage("foo", {}, "", false);
 }
 
+TEST_F(GrpcMuxImplTest, AllMuxesStateTest) {
+  setup();
+  auto grpc_mux_1 = std::make_unique<XdsMux::GrpcMuxSotw>(
+      std::unique_ptr<Grpc::MockAsyncClient>(), dispatcher_,
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
+      random_, stats_, rate_limit_settings_, local_info_, true);
+
+  Config::XdsMux::GrpcMuxSotw::shutdownAll();
+
+  EXPECT_TRUE(grpc_mux_->isShutdown());
+  EXPECT_TRUE(grpc_mux_1->isShutdown());
+}
+
 class NullGrpcMuxImplTest : public testing::Test {
 public:
   NullGrpcMuxImplTest() : null_mux_(std::make_unique<Config::XdsMux::NullGrpcMuxImpl>()) {}

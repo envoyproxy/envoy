@@ -72,6 +72,7 @@ public:
   static void shutdownAll();
 
   void shutdown() override { shutdown_ = true; }
+  bool isShutdown() { return shutdown_; }
 
   // TODO (dmitri-d) return a naked pointer instead of the wrapper once the legacy mux has been
   // removed and the mux interface can be changed
