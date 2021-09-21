@@ -31,11 +31,11 @@ public:
     RELEASE_ASSERT(0, "not supported");
   }
 
-  VclIoHandle(uint32_t sh, os_fd_t fd) : sh_(sh), fd_(fd) { (void)fd_; }
+  VclIoHandle(uint32_t sh, os_fd_t fd) : sh_(sh), fd_(fd) {}
 
   ~VclIoHandle() override;
 
-  os_fd_t fdDoNotUse() const override { return 1 << 23; }
+  os_fd_t fdDoNotUse() const override { return fd_; }
 
   uint32_t sh() const { return sh_; }
   bool isListener() const { return is_listener_; }
@@ -109,7 +109,7 @@ public:
 
 private:
   uint32_t sh_{VCL_INVALID_SH};
-  os_fd_t fd_{~0};
+  os_fd_t fd_;
   Event::FileEventPtr file_event_{nullptr};
 
   bool is_listener_ = false;

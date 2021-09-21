@@ -116,7 +116,7 @@ VclIoHandle::~VclIoHandle() {
 }
 
 Api::IoCallUint64Result VclIoHandle::close() {
-  VCL_LOG("closing sh %x", sh_);
+  VCL_LOG("closing sh {:x}", sh_);
   RELEASE_ASSERT(VCL_SH_VALID(sh_), "sh must be valid");
   int rc = 0, wrk_index;
 
@@ -150,7 +150,7 @@ Api::IoCallUint64Result VclIoHandle::readv(uint64_t max_length, Buffer::RawSlice
     return vclCallResultToIoCallResult(VPPCOM_EBADFD);
   }
 
-  VCL_LOG("reading on sh %x", sh_);
+  VCL_LOG("reading on sh {:x}", sh_);
 
   int32_t result = 0, rv = 0, num_bytes_read = 0;
   size_t slice_length;
@@ -167,7 +167,7 @@ Api::IoCallUint64Result VclIoHandle::readv(uint64_t max_length, Buffer::RawSlice
     }
   }
   result = (num_bytes_read == 0) ? rv : num_bytes_read;
-  VCL_LOG("done reading on sh %x bytes %d result %d", sh_, num_bytes_read, result);
+  VCL_LOG("done reading on sh {:x} bytes {} result {}", sh_, num_bytes_read, result);
   return vclCallResultToIoCallResult(result);
 }
 
@@ -223,7 +223,7 @@ Api::IoCallUint64Result VclIoHandle::writev(const Buffer::RawSlice* slices, uint
     return vclCallResultToIoCallResult(VPPCOM_EBADFD);
   }
 
-  VCL_LOG("writing on sh %x", sh_);
+  VCL_LOG("writing on sh {:x}", sh_);
 
   uint64_t num_bytes_written = 0;
   int32_t result = 0, rv = 0;
@@ -251,7 +251,7 @@ Api::IoCallUint64Result VclIoHandle::write(Buffer::Instance& buffer) {
 }
 
 Api::IoCallUint64Result VclIoHandle::recv(void* buffer, size_t length, int flags) {
-  VCL_LOG("recv on sh %x", sh_);
+  VCL_LOG("recv on sh {:x}", sh_);
   auto rv = vppcom_session_recvfrom(sh_, buffer, length, flags, nullptr);
   return vclCallResultToIoCallResult(rv);
 }
@@ -375,7 +375,7 @@ Api::SysCallIntResult VclIoHandle::listen(int) {
   auto wrk_index = vclWrkIndexOrRegister();
   RELEASE_ASSERT(wrk_index != -1, "should be initialized");
 
-  VCL_LOG("trying to listen sh %u", sh_);
+  VCL_LOG("trying to listen sh {}", sh_);
   RELEASE_ASSERT(is_listener_ == false, "");
   RELEASE_ASSERT(vppcom_session_worker(sh_) == wrk_index, "");
 
@@ -395,7 +395,7 @@ Envoy::Network::IoHandlePtr VclIoHandle::accept(sockaddr* addr, socklen_t* addrl
   auto sh = sh_;
   if (wrk_index) {
     sh = wrk_listener_->sh();
-    VCL_LOG("trying to accept fd %d sh %x", fd_, sh);
+    VCL_LOG("trying to accept fd {} sh {:x}", fd_, sh);
   }
 
   vppcom_endpt_t endpt;
@@ -598,7 +598,7 @@ Api::SysCallIntResult VclIoHandle::setBlocking(bool) {
 }
 
 absl::optional<int> VclIoHandle::domain() {
-  VCL_LOG("grabbing domain sh %x", sh_);
+  VCL_LOG("grabbing domain sh {:x}", sh_);
   return {AF_INET};
 };
 
@@ -614,7 +614,7 @@ Envoy::Network::Address::InstanceConstSharedPtr VclIoHandle::localAddress() {
 }
 
 Envoy::Network::Address::InstanceConstSharedPtr VclIoHandle::peerAddress() {
-  VCL_LOG("grabbing peer address sh %x", sh_);
+  VCL_LOG("grabbing peer address sh {:x}", sh_);
   vppcom_endpt_t ep;
   uint32_t eplen = sizeof(ep);
   uint8_t addr_buf[sizeof(struct sockaddr_in6)];
@@ -653,7 +653,7 @@ void VclIoHandle::updateEvents(uint32_t events) {
 
 void VclIoHandle::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                       Event::FileTriggerType, uint32_t events) {
-  VCL_LOG("adding events for sh %x fd %u isListener %u", sh_, fd_, isListener());
+  VCL_LOG("adding events for sh {:x} fd {} isListener {}", sh_, fd_, isListener());
 
   auto wrk_index = vclWrkIndexOrRegister();
   vclInterfaceRegisterEpollEvent(dispatcher);
@@ -679,11 +679,11 @@ void VclIoHandle::initializeFileEvent(Event::Dispatcher& dispatcher, Event::File
         wrk_listener_->bind(address);
         uint32_t rv = vppcom_session_listen(sh, 5);
         if (rv) {
-          VCL_LOG("listen failed sh %x", sh);
+          VCL_LOG("listen failed sh {:x}", sh);
           return;
         }
         wrk_listener_->setChildWrkListener(this);
-        fprintf(stderr, "add worker listener sh %x wrk_index %u new sh %x\n", sh_, wrk_index, sh);
+        VCL_LOG("add worker listener sh {:x} wrk_index {} new sh {:x}", sh_, wrk_index, sh);
       }
       vcl_handle = wrk_listener_.get();
     } else if (not_listened_) {
@@ -716,7 +716,6 @@ void VclIoHandle::initializeFileEvent(Event::Dispatcher& dispatcher, Event::File
 IoHandlePtr VclIoHandle::duplicate() {
   auto wrk_index = vclWrkIndexOrRegister();
   VCL_LOG("duplicate called");
-  fprintf(stderr, "duplicate session %u\n", sh_);
 
   if (vppcom_session_worker(sh_) == wrk_index) {
     return std::unique_ptr<VclIoHandle>(this);

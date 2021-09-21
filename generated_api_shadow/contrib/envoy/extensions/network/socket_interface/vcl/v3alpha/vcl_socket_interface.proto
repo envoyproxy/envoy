@@ -13,6 +13,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Vcl Socket Interface configuration]
 
-// Configuration for vcl socket interface that relies on vpp comms library (VCL)
+// Configuration for vcl socket interface that relies on vpp `comms` library (VCL)
 message VclSocketInterface {
 }

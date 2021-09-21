@@ -29,7 +29,7 @@ public:
   void registerEventIfEmulatedEdge(uint32_t event) override;
 
 private:
-  void mergeInjectedEventsAndRunCb(uint32_t events);
+  void mergeInjectedEventsAndRunCb();
 
   FileReadyCb cb_;
   VclIoHandle& io_handle_;

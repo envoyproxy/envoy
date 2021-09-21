@@ -9,7 +9,7 @@ VCL Socket Interface
 
   The VCL socket interface extension is experimental and is currently under active development.
 
-This socket interface extension provides Envoy with high speed L2-L7 user space networking by integrating with `Link fd.io VPP <https://fd.io>`_ through VPP's Comms Library (VCL).
+This socket interface extension provides Envoy with high speed L2-L7 user space networking by integrating with `Link fd.io VPP <https://fd.io>`_ through VPP's `Comms` Library (VCL).
 
 The VCL socket interface is only included in :ref:`contrib images <install_contrib>`
 
