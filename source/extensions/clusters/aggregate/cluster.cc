@@ -180,7 +180,8 @@ AggregateClusterLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context)
   return nullptr;
 }
 
-Upstream::HostConstSharedPtr AggregateClusterLoadBalancer::peekAnotherHost(Upstream::LoadBalancerContext* context) {
+Upstream::HostConstSharedPtr
+AggregateClusterLoadBalancer::peekAnotherHost(Upstream::LoadBalancerContext* context) {
   if (load_balancer_) {
     return load_balancer_->peekAnotherHost(context);
   }
@@ -188,15 +189,17 @@ Upstream::HostConstSharedPtr AggregateClusterLoadBalancer::peekAnotherHost(Upstr
 }
 
 absl::optional<Upstream::SelectedPoolAndConnection>
-    AggregateClusterLoadBalancer::selectPool(Upstream::LoadBalancerContext* context, const Upstream::Host& host,
-               std::vector<uint8_t>& hash_key) {
+AggregateClusterLoadBalancer::selectPool(Upstream::LoadBalancerContext* context,
+                                         const Upstream::Host& host,
+                                         std::vector<uint8_t>& hash_key) {
   if (load_balancer_) {
     return load_balancer_->selectPool(context, host, hash_key);
   }
   return absl::nullopt;
 }
 
-OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> AggregateClusterLoadBalancer::lifetimeCallbacks() {
+OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+AggregateClusterLoadBalancer::lifetimeCallbacks() {
   if (load_balancer_) {
     return load_balancer_->lifetimeCallbacks();
   }
