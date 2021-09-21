@@ -42,7 +42,6 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
                                                             api_config_source);
     Utility::checkTransportVersion(api_config_source);
-    const auto transport_api_version = envoy::config::core::v3::ApiVersion::V3;
     switch (api_config_source.api_type()) {
     case envoy::config::core::v3::ApiConfigSource::DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE:
       throw EnvoyException(
@@ -54,7 +53,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_,
           api_.randomGenerator(), Utility::apiConfigSourceRefreshDelay(api_config_source),
           Utility::apiConfigSourceRequestTimeout(api_config_source),
-          restMethod(type_url, transport_api_version), type_url, callbacks, resource_decoder, stats,
+          restMethod(type_url), type_url, callbacks, resource_decoder, stats,
           Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
     case envoy::config::core::v3::ApiConfigSource::GRPC:
       return std::make_unique<GrpcSubscriptionImpl>(
@@ -63,7 +62,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                      api_config_source, scope, true)
                   ->createUncachedRawAsyncClient(),
-              dispatcher_, sotwGrpcMethod(type_url, transport_api_version), api_.randomGenerator(),
+              dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(),
               scope, Utility::parseRateLimitSettings(api_config_source),
               api_config_source.set_node_on_first_message_only()),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
@@ -75,7 +74,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                              api_config_source, scope, true)
                   ->createUncachedRawAsyncClient(),
-              dispatcher_, deltaGrpcMethod(type_url, transport_api_version), api_.randomGenerator(),
+              dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(),
               scope, Utility::parseRateLimitSettings(api_config_source), local_info_),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config), /*is_aggregated*/ false, options);
