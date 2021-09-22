@@ -183,6 +183,9 @@ PathTransformer::PathTransformer(
     }
     // The action to be performed if the transformation changed the path.
     switch (operation.normalize_path_action()) {
+    case envoy::type::http::v3::PathTransformation::DEFAULT:
+      normalize_path_actions_.push_back(NormalizePathAction::Continue);
+      break;
     case envoy::type::http::v3::PathTransformation::CONTINUE:
       normalize_path_actions_.push_back(NormalizePathAction::Continue);
       break;

@@ -22,6 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message PathTransformation {
   // Action to take on a HTTP request when the request path URL has been modified by a transformation.
   enum NormalizePathAction {
+    // For Envoy clients, the DEFAULT option is CONTINUE.
     DEFAULT = 0;
 
     // Keep the changes and continue processing the request.
