@@ -198,11 +198,13 @@ protected:
       auto result = leds_upstream_info_.connection_->waitForNewStream(*dispatcher_, temp_stream);
       RELEASE_ASSERT(result, result.message());
       temp_stream->startGrpcStream();
-      ASSERT(temp_stream->waitForGrpcMessage(*dispatcher_, request));
-      ASSERT(request.resource_names_subscribe().size() == 1);
+      RELEASE_ASSERT(temp_stream->waitForGrpcMessage(*dispatcher_, request),
+                     "LEDS message did not arrive as expected");
+      RELEASE_ASSERT(request.resource_names_subscribe().size() == 1,
+                     "Each LEDS request in this test must have a single resource");
       // Remove the "*" from the collection name to match against the set
       // contents.
-      absl::string_view request_collection_name = *request.resource_names_subscribe().begin();
+      const auto request_collection_name = *request.resource_names_subscribe().begin();
       const auto pos = request_collection_name.find_last_of('*');
       ASSERT(pos != std::string::npos);
       const auto request_collection_prefix = request_collection_name.substr(0, pos);
