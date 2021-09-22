@@ -9,7 +9,6 @@
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
 #include "library/common/http/client.h"
 #include "library/common/network/mobile_utility.h"
-#include "types/c_types.h"
 
 // NOLINT(namespace-envoy)
 

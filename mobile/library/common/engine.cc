@@ -9,7 +9,6 @@
 #include "library/common/data/utility.h"
 #include "library/common/network/mobile_utility.h"
 #include "library/common/stats/utility.h"
-#include "types/c_types.h"
 
 namespace Envoy {
 
