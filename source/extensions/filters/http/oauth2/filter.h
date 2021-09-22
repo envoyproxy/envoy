@@ -110,9 +110,9 @@ struct CookieNames {
         oauth_hmac_(oauth_hmac.empty() ? "OauthHMAC" : oauth_hmac),
         oauth_expires_(oauth_expires.empty() ? "OauthExpires" : oauth_expires) {}
 
-  std::string bearer_token_;
-  std::string oauth_hmac_;
-  std::string oauth_expires_;
+  const std::string bearer_token_;
+  const std::string oauth_hmac_;
+  const std::string oauth_expires_;
 };
 
 /**
