@@ -19,17 +19,18 @@ fi
 MAIN_BRANCH="refs/heads/main"
 RELEASE_TAG_REGEX="^refs/tags/v.*"
 
+# default is to build html only
+BUILD_TYPE=html
+
 if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
     DOCS_TAG="${AZP_BRANCH/refs\/tags\//}"
     export DOCS_TAG
-    # no need to build rst explicitly, just html
-    HTML_ONLY=true
 else
     BUILD_SHA=$(git rev-parse HEAD)
     export BUILD_SHA
     if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
         # no need to build html, just rst
-        RST_ONLY=true
+        BUILD_TYPE=rst
     fi
 fi
 
@@ -41,10 +42,10 @@ BAZEL_BUILD_OPTIONS+=(
     "--action_env=SPHINX_SKIP_CONFIG_VALIDATION")
 
 # Building html/rst is determined by then needs of CI but can be overridden in dev.
-if [[ -z "${RST_ONLY}" ]] || [[ -n "${DOCS_BUILD_HTML}" ]]; then
+if [[ "${BUILD_TYPE}" == "html" ]] || [[ -n "${DOCS_BUILD_HTML}" ]]; then
     BUILD_HTML=1
 fi
-if [[ -z "${HTML_ONLY}" ]] || [[ -n "${DOCS_BUILD_RST}" ]]; then
+if [[ "${BUILD_TYPE}" == "rst" ]] || [[ -n "${DOCS_BUILD_RST}" ]]; then
     BUILD_RST=1
 fi
 
