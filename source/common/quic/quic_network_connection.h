@@ -28,7 +28,9 @@ public:
   // Called in session Initialize().
   void setEnvoyConnection(Network::Connection& connection) { envoy_connection_ = &connection; }
 
-  const Network::ConnectionSocketPtr& connectionSocket() const { return connection_socket_; }
+  const Network::ConnectionSocketPtr& connectionSocket() const { 
+    std::cout << "socket list size " << connection_sockets_.size() << std::endl;
+    return connection_sockets_.back(); }
 
   // Needed for ENVOY_CONN_LOG.
   uint64_t id() const;
@@ -37,15 +39,15 @@ protected:
   Network::Connection::ConnectionStats& connectionStats() const { return *connection_stats_; }
 
   void setConnectionSocket(Network::ConnectionSocketPtr&& connection_socket) {
-    connection_socket_ = std::move(connection_socket);
+    connection_sockets_.push_back(std::move(connection_socket));
   }
 
 private:
   // TODO(danzh): populate stats.
   std::unique_ptr<Network::Connection::ConnectionStats> connection_stats_;
   // Assigned upon construction. Constructed with empty local address if unknown
-  // by then.
-  Network::ConnectionSocketPtr connection_socket_;
+  // by then. The last one is the default active socket.
+  std::vector<Network::ConnectionSocketPtr> connection_sockets_;
   // Points to an instance of EnvoyQuicServerSession or EnvoyQuicClientSession.
   Network::Connection* envoy_connection_{nullptr};
 };

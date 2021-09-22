@@ -103,7 +103,7 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
   quic::QuicSocketAddress peer_address = envoyIpAddressToQuicSocketAddress(
       connection_socket->connectionInfoProvider().remoteAddress()->ip());
 
-  // The old socket is closed in this call.
+  // The old socket is not closed in this call.
   setConnectionSocket(std::move(connection_socket));
   setUpConnectionSocket(*connectionSocket(), delegate_);
   if (connection_migration_use_new_cid()) {
@@ -139,7 +139,6 @@ void EnvoyQuicClientConnection::MaybeMigratePort(Network::Address::InstanceConst
       probing_socket_->connectionInfoProvider().localAddress()->ip());
   quic::QuicSocketAddress peer_address = envoyIpAddressToQuicSocketAddress(
       probing_socket_->connectionInfoProvider().remoteAddress()->ip());
-  probing_socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
 
   auto context = std::make_unique<EnvoyQuicPathValidationContext>(self_address, peer_address, std::move(writer));
   std::cout << "validating path on local addr " << self_address << std::endl << "peer addr " << peer_address << std::endl;
@@ -149,8 +148,8 @@ void EnvoyQuicClientConnection::MaybeMigratePort(Network::Address::InstanceConst
 void EnvoyQuicClientConnection::OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context) {
   std::cout << "path validation success" << std::endl;
   auto envoy_context = static_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(context.get());
-  //setConnectionSocket(std::move(probing_socket_));
   MigratePath(envoy_context->self_address(), envoy_context->peer_address(), envoy_context->ReleaseWriter().release(), true);
+  setConnectionSocket(std::move(probing_socket_));
   std::cout << "after path migration" << std::endl;
 }
 
@@ -178,13 +177,18 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
   // TODO(mattklein123): Right now QUIC client is hard coded to use GRO because it is probably the
   // right default for QUIC. Determine whether this should be configurable or not.
   if (connected() && (events & Event::FileReadyType::Read)) {
+    if (!connectionSocket()) {
+      return;
+    }
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
         connectionSocket()->ioHandle(),
         *connectionSocket()->connectionInfoProvider().localAddress(), *this,
         dispatcher_.timeSource(), true, packets_dropped_);
     if (err == nullptr) {
+      if (!connectionSocket()) {
+        return;
+      }
       connectionSocket()->ioHandle().activateFileEvents(Event::FileReadyType::Read);
-      return;
     }
     if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this, static_cast<int>(err->getErrorCode()),
@@ -199,6 +203,7 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
         *probing_socket_->connectionInfoProvider().localAddress(), *this,
         dispatcher_.timeSource(), true, packets_dropped_);
     if (err == nullptr) {
+      std::cout << "probing socket moved ? " << (probing_socket_ == nullptr) << std::endl;
       probing_socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
       return;
     }

@@ -380,7 +380,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   quic_connection_->MaybeMigratePort(local_addr);
   sleep(2);
   //quic_connection_->onFileEvent(1);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   constexpr auto timeout_first = std::chrono::seconds(15);
   if (GetParam() == Network::Address::IpVersion::v4) {
       test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 0u, timeout_first);
