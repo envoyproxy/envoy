@@ -260,6 +260,7 @@ public:
                             const Headers& headers_to_remove,
                             const Http::TestRequestHeaderMapImpl& new_headers_from_upstream,
                             const Http::TestRequestHeaderMapImpl& headers_to_append_multiple,
+                            const Headers& response_headers_to_add_if_absent,
                             const Headers& response_headers_to_append,
                             const Headers& response_headers_to_set = {}) {
     ext_authz_request_->startGrpcStream();
@@ -311,6 +312,19 @@ public:
           return Http::HeaderMap::Iterate::Continue;
         });
 
+    for (const auto& response_header_to_add : response_headers_to_add_if_absent) {
+      auto* entry = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
+      const auto key = std::string(response_header_to_add.first);
+      const auto value = std::string(response_header_to_add.second);
+
+      entry->set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
+      entry->clear_append();
+      entry->mutable_header()->set_key(key);
+      entry->mutable_header()->set_value(value);
+      ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_add_if_absent {}={}", key,
+                     value);
+    }
+
     for (const auto& response_header_to_add : response_headers_to_append) {
       auto* entry = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
       const auto key = std::string(response_header_to_add.first);
@@ -319,7 +333,8 @@ public:
       entry->mutable_append()->set_value(true);
       entry->mutable_header()->set_key(key);
       entry->mutable_header()->set_value(value);
-      ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_add {}={}", key, value);
+      ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_append {}={}", key,
+                     value);
     }
 
     for (const auto& response_header_to_set : response_headers_to_set) {
@@ -401,7 +416,8 @@ attributes:
           std::make_pair(header_to_append.first, header_to_append.second + "-appended"));
     }
     sendExtAuthzResponse(updated_headers_to_add, updated_headers_to_append, headers_to_remove,
-                         new_headers_from_upstream, headers_to_append_multiple, Headers{});
+                         new_headers_from_upstream, headers_to_append_multiple, Headers{},
+                         Headers{});
 
     waitForSuccessfulUpstreamResponse("200", updated_headers_to_add, updated_headers_to_append,
                                       headers_to_remove, new_headers_from_upstream,
@@ -694,6 +710,8 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   sendExtAuthzResponse(
       Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
       Http::TestRequestHeaderMapImpl{},
+      Headers{{"add-if-absent", "add-if-absent-value"},
+              {"replaceable", "should-never-be-this-value"}},
       Headers{{"downstream2", "downstream-should-see-me"}, {"set-cookie", "cookie2=gingerbread"}},
       Headers{{"replaceable", "by-ext-authz"}});
 
@@ -710,6 +728,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   const std::string expected_body(response_size_, 'a');
   verifyResponse(std::move(response_), "200",
                  Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                 {"add-if-absent", "add-if-absent-value"},
                                                  {"downstream2", "downstream-should-see-me"},
                                                  {"replaceable", "by-ext-authz"}},
                  expected_body);
@@ -889,7 +908,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   initiateClientConnection(4, Headers{}, Headers{});
   waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
   sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                       Http::TestRequestHeaderMapImpl{}, Headers{});
+                       Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{});
 
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
 
@@ -927,7 +946,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
               test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
   }
   sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                       Http::TestRequestHeaderMapImpl{}, Headers{});
+                       Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{});
 
   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
   RELEASE_ASSERT(result, result.message());

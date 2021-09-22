@@ -1745,12 +1745,17 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   response.headers_to_set = Http::HeaderVector{{key_to_add, "foo"}, {key_to_override, "bar"}};
   response.headers_to_remove = std::vector<Http::LowerCaseString>{key_to_remove};
   // This cookie will be appended to the encoded headers.
-  response.response_headers_to_add =
+  response.response_headers_to_append =
       Http::HeaderVector{{Http::LowerCaseString{"set-cookie"}, "cookie2=gingerbread"}};
   // This "should-be-overridden" header value from the auth server will override the
   // "should-be-overridden" entry from the upstream server.
   response.response_headers_to_set = Http::HeaderVector{
       {Http::LowerCaseString{"should-be-overridden"}, "finally-set-by-auth-server"}};
+  // First header should be a no-op as there is already a header present with this name but the
+  // second one should be added as there is not one already present.
+  response.response_headers_to_add_if_absent =
+      Http::HeaderVector{{Http::LowerCaseString{"should-be-overridden"}, "add-if-absent"},
+                         {Http::LowerCaseString{"should-be-added-as-absent"}, "add-if-absent"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -1787,6 +1792,7 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
                 .value(),
             "cookie1=snickerdoodle,cookie2=gingerbread");
   EXPECT_EQ(response_headers.get_("should-be-overridden"), "finally-set-by-auth-server");
+  EXPECT_EQ(response_headers.get_("should-be-added-as-absent"), "add-if-absent");
 }
 
 // Test that an synchronous denied response from the authorization service, on the call stack,

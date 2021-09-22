@@ -303,7 +303,7 @@ using HeaderValuePair = std::pair<const Http::LowerCaseString, const std::string
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   const auto expected_headers = TestCommon::makeHeaderValueOption(
       {{":status", "200", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {"x-downstream-ok", "1", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
+       {"x-downstream-ok", "1", envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS},
        {"x-upstream-ok", "1", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS}});
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::OK, Http::Code::OK, EMPTY_STRING, TestCommon::makeHeaderValueOption({}),

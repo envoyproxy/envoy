@@ -160,18 +160,32 @@ Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderM
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   ENVOY_STREAM_LOG(trace,
-                   "ext_authz filter has {} response header(s) to add and {} response header(s) to "
-                   "set to the encoded response:",
-                   *encoder_callbacks_, response_headers_to_add_.size());
-  if (!response_headers_to_add_.empty()) {
+                   "ext_authz filter has {} response header(s) to append, {} response header(s) "
+                   "to add, {} response header(s) to set to the encoded response:",
+                   *encoder_callbacks_, response_headers_to_append_.size(),
+                   response_headers_to_add_if_absent_.size(), response_headers_to_set_.size());
+  // Headers to be added only if they are absent.
+  if (!response_headers_to_add_if_absent_.empty()) {
+    ENVOY_STREAM_LOG(trace, "ext_authz filter add header(s) if absent to the encoded response:",
+                     *encoder_callbacks_);
+    for (const auto& header : response_headers_to_add_if_absent_) {
+      if (headers.get(header.first).empty()) {
+        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, header.first.get(),
+                         header.second);
+        headers.setCopy(header.first, header.second);
+      }
+    }
+  }
+  // Headers to be appended. New values will be appended to any existing values.
+  if (!response_headers_to_append_.empty()) {
     ENVOY_STREAM_LOG(
-        trace, "ext_authz filter added header(s) to the encoded response:", *encoder_callbacks_);
-    for (const auto& header : response_headers_to_add_) {
+        trace, "ext_authz filter append header(s) to the encoded response:", *encoder_callbacks_);
+    for (const auto& header : response_headers_to_append_) {
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, header.first.get(), header.second);
       headers.addCopy(header.first, header.second);
     }
   }
-
+  // Headers to be set/overwritten by discarding existing values (if any).
   if (!response_headers_to_set_.empty()) {
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter set header(s) to the encoded response:", *encoder_callbacks_);
@@ -274,10 +288,17 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       request_headers_->remove(header);
     }
 
-    if (!response->response_headers_to_add.empty()) {
-      ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to add to the response:",
-                       *decoder_callbacks_, response->response_headers_to_add.size());
-      response_headers_to_add_ = std::move(response->response_headers_to_add);
+    if (!response->response_headers_to_add_if_absent.empty()) {
+      ENVOY_STREAM_LOG(trace,
+                       "ext_authz filter saving {} header(s) to add (if absent) to the response:",
+                       *decoder_callbacks_, response->response_headers_to_add_if_absent.size());
+      response_headers_to_add_if_absent_ = std::move(response->response_headers_to_add_if_absent);
+    }
+
+    if (!response->response_headers_to_append.empty()) {
+      ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to append to the response:",
+                       *decoder_callbacks_, response->response_headers_to_append.size());
+      response_headers_to_append_ = std::move(response->response_headers_to_append);
     }
 
     if (!response->response_headers_to_set.empty()) {
