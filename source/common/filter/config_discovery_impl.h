@@ -71,11 +71,11 @@ public:
       Server::Configuration::FactoryContext& factory_context,
       const absl::optional<ProtobufWkt::Any>& default_config, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type,
-      std::function<Envoy::Http::FilterFactoryCb(const ProtobufWkt::Any&)> factory_cb)
+      std::function<Envoy::Http::FilterFactoryCb(const ProtobufWkt::Any&)> factory_cb_fn)
       : DynamicFilterConfigProviderImplBase(subscription, require_type_urls,
                                             last_filter_in_filter_chain, filter_chain_type),
         default_configuration_(default_config), tls_(factory_context.threadLocal()),
-        factory_cb_(factory_cb) {
+        factory_cb_fn_(factory_cb_fn) {
     tls_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
   };
 
@@ -86,7 +86,7 @@ public:
   // Config::DynamicExtensionConfigProviderBase
   void onConfigUpdate(const ProtobufWkt::Any& proto_config, const std::string&,
                       Config::ConfigAppliedCb cb) override {
-    const Envoy::Http::FilterFactoryCb config = factory_cb_(proto_config);
+    const Envoy::Http::FilterFactoryCb config = factory_cb_fn_(proto_config);
     tls_.runOnAllThreads(
         [config, cb](OptRef<ThreadLocalConfig> tls) {
           tls->config_ = config;
@@ -103,7 +103,7 @@ public:
 
   void onConfigRemoved(Config::ConfigAppliedCb applied_on_all_threads) override {
     const absl::optional<Envoy::Http::FilterFactoryCb> default_config =
-        default_configuration_ ? absl::make_optional(factory_cb_(*default_configuration_))
+        default_configuration_ ? absl::make_optional(factory_cb_fn_(*default_configuration_))
                                : absl::nullopt;
     tls_.runOnAllThreads(
         [config = default_config](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
@@ -134,7 +134,7 @@ private:
   absl::optional<Envoy::Http::FilterFactoryCb> current_config_{absl::nullopt};
   const absl::optional<ProtobufWkt::Any> default_configuration_;
   ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
-  const std::function<Envoy::Http::FilterFactoryCb(const ProtobufWkt::Any&)> factory_cb_;
+  const std::function<Envoy::Http::FilterFactoryCb(const ProtobufWkt::Any&)> factory_cb_fn_;
 };
 
 /**
