@@ -1643,8 +1643,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   return ClusterManagerPtr{new ClusterManagerImpl(
-      bootstrap, *this, stats_, tls_, runtime_, local_info_, log_manager_, main_thread_dispatcher_,
-      admin_, validation_context_, api_, http_context_, grpc_context_, router_context_)};
+      bootstrap, *this, stats_, tls_, context_.runtime(), context_.localInfo(), log_manager_,
+      context_.mainThreadDispatcher(), context_.admin(), validation_context_, context_.api(),
+      http_context_, grpc_context_, router_context_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
@@ -1655,7 +1656,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     TimeSource& source, ClusterConnectivityState& state) {
-  if (protocols.size() == 3 && runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+  if (protocols.size() == 3 &&
+      context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
     Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache;
@@ -1667,9 +1669,9 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     // TODO(RyanTheOptimist): Plumb an actual alternate protocols cache.
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
-        dispatcher, api_.randomGenerator(), host, priority, options, transport_socket_options,
-        state, source, alternate_protocols_cache, std::chrono::milliseconds(300), coptions,
-        quic_stat_names_, stats_);
+        dispatcher, context_.api().randomGenerator(), host, priority, options,
+        transport_socket_options, state, source, alternate_protocols_cache,
+        std::chrono::milliseconds(300), coptions, quic_stat_names_, stats_);
 #else
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -1677,20 +1679,20 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   }
   if (protocols.size() >= 2) {
     ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
-    return std::make_unique<Http::HttpConnPoolImplMixed>(dispatcher, api_.randomGenerator(), host,
-                                                         priority, options,
-                                                         transport_socket_options, state);
+    return std::make_unique<Http::HttpConnPoolImplMixed>(
+        dispatcher, context_.api().randomGenerator(), host, priority, options,
+        transport_socket_options, state);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
-      runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
-    return Http::Http2::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options, state);
+      context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
+    return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
+                                         priority, options, transport_socket_options, state);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
-      runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+      context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
 #ifdef ENVOY_ENABLE_QUIC
-    return Http::Http3::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options, state, source,
+    return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
+                                         priority, options, transport_socket_options, state, source,
                                          quic_stat_names_, stats_);
 #else
     UNREFERENCED_PARAMETER(source);
@@ -1699,8 +1701,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
-  return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority, options,
-                                       transport_socket_options, state);
+  return Http::Http1::allocateConnPool(dispatcher, context_.api().randomGenerator(), host, priority,
+                                       options, transport_socket_options, state);
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
@@ -1722,12 +1724,12 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterFactoryImplBase::create(
-      cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
-      main_thread_dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-      outlier_event_logger, added_via_api,
+      cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, context_.runtime(),
+      context_.mainThreadDispatcher(), log_manager_, context_.localInfo(), admin_,
+      singleton_manager_, outlier_event_logger, added_via_api,
       added_via_api ? validation_context_.dynamicValidationVisitor()
                     : validation_context_.staticValidationVisitor(),
-      api_, options_);
+      context_.api(), context_.options());
 }
 
 CdsApiPtr

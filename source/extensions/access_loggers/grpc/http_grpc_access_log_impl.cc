@@ -25,34 +25,37 @@ HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(
     GrpcCommon::GrpcAccessLoggerSharedPtr logger)
     : logger_(std::move(logger)) {}
 
-HttpGrpcAccessLog::HttpGrpcAccessLog(
-    AccessLog::FilterPtr&& filter,
-    envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config,
-    GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-    Server::Configuration::CommonFactoryContext& context)
-    : Common::ImplBase(std::move(filter)), scope_(context.scope()), config_(std::move(config)),
+HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
+                                     const HttpGrpcAccessLogConfig config,
+                                     GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+                                     Server::Configuration::CommonFactoryContext& context)
+    : Common::ImplBase(std::move(filter)), scope_(context.scope()),
+      config_(std::make_shared<const HttpGrpcAccessLogConfig>(std::move(config))),
       tls_slot_(context.threadLocal().allocateSlot()),
       access_logger_cache_(std::move(access_logger_cache)) {
-  for (const auto& header : config_.additional_request_headers_to_log()) {
+  for (const auto& header : config_->additional_request_headers_to_log()) {
     request_headers_to_log_.emplace_back(header);
   }
 
-  for (const auto& header : config_.additional_response_headers_to_log()) {
+  for (const auto& header : config_->additional_response_headers_to_log()) {
     response_headers_to_log_.emplace_back(header);
   }
 
-  for (const auto& header : config_.additional_response_trailers_to_log()) {
+  for (const auto& header : config_->additional_response_trailers_to_log()) {
     response_trailers_to_log_.emplace_back(header);
   }
-  Envoy::Config::Utility::checkTransportVersion(config_.common_config());
-  tls_slot_->set([this](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
-        config_.common_config(), Common::GrpcAccessLoggerType::HTTP, scope_));
+  Envoy::Config::Utility::checkTransportVersion(config_->common_config());
+  // Note that &scope might have died by the time when this callback is called on each thread.
+  // This is supposed to be fixed by https://github.com/envoyproxy/envoy/issues/18066.
+  tls_slot_->set([config = config_, access_logger_cache = access_logger_cache_,
+                  &scope = scope_](Event::Dispatcher&) {
+    return std::make_shared<ThreadLocalLogger>(access_logger_cache->getOrCreateLogger(
+        config->common_config(), Common::GrpcAccessLoggerType::HTTP, scope));
   });
 
-  if (config_.has_common_config() && config_.common_config().has_critical_buffer_log_filter()) {
+  if (config_->has_common_config() && config_->common_config().has_critical_buffer_log_filter()) {
     critical_log_filter_ = AccessLog::FilterFactory::fromProto(
-        config_.common_config().critical_buffer_log_filter(), context.runtime(),
+        config_->common_config().critical_buffer_log_filter(), context.runtime(),
         context.api().randomGenerator(), context.messageValidationVisitor());
   }
 }
@@ -65,7 +68,7 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
   // TODO(mattklein123): Populate sample_rate field.
   envoy::data::accesslog::v3::HTTPAccessLogEntry log_entry;
   GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
-                                                        stream_info, config_.common_config());
+                                                        stream_info, config_->common_config());
 
   if (stream_info.protocol()) {
     switch (stream_info.protocol().value()) {

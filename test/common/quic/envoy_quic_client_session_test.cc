@@ -70,10 +70,8 @@ public:
   EnvoyQuicClientSessionTest()
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_decline_server_push_stream, true);
-          return quic::CurrentSupportedHttp3Versions();
-        }()),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
+        quic_version_([]() { return quic::CurrentSupportedHttp3Versions(); }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
                                                         12345)),
         self_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
