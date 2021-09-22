@@ -996,7 +996,9 @@ num_retries: 10
 
   envoy::config::core::v3::RetryPolicy core_retry_policy2;
   TestUtility::loadFromYaml(core_policy2, core_retry_policy2);
-  EXPECT_THROW(Utility::convertCoreToRouteRetryPolicy(core_retry_policy2, "5xx"), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(Utility::convertCoreToRouteRetryPolicy(core_retry_policy2, "5xx"),
+                            EnvoyException,
+                            "max_interval must be greater than or equal to the base_interval");
 }
 
 // Validates TE header is stripped if it contains an unsupported value
