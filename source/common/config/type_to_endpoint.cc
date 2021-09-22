@@ -92,22 +92,19 @@ TypeUrlToV3ServiceMap& typeUrlToV3ServiceMap() {
 
 } // namespace
 
-const Protobuf::MethodDescriptor&
-deltaGrpcMethod(absl::string_view type_url/) {
+const Protobuf::MethodDescriptor& deltaGrpcMethod(absl::string_view type_url) {
   const auto it = typeUrlToV3ServiceMap().find(static_cast<TypeUrl>(type_url));
   ASSERT(it != typeUrlToV3ServiceMap().cend());
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(it->second.delta_grpc_);
 }
 
-const Protobuf::MethodDescriptor&
-sotwGrpcMethod(absl::string_view type_url ){
+const Protobuf::MethodDescriptor& sotwGrpcMethod(absl::string_view type_url) {
   const auto it = typeUrlToV3ServiceMap().find(static_cast<TypeUrl>(type_url));
   ASSERT(it != typeUrlToV3ServiceMap().cend());
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(it->second.sotw_grpc_);
 }
 
-const Protobuf::MethodDescriptor&
-restMethod(absl::string_view type_url) {
+const Protobuf::MethodDescriptor& restMethod(absl::string_view type_url) {
   const auto it = typeUrlToV3ServiceMap().find(static_cast<TypeUrl>(type_url));
   ASSERT(it != typeUrlToV3ServiceMap().cend());
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(it->second.rest_);
