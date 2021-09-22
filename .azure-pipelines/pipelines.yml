@@ -546,7 +546,7 @@ stages:
         artifactName: windows.clang-cl
       condition: always()
 
-  - job: docker
+  - job: dockerWindowsServer2019
     dependsOn: ["release"]
     timeoutInMinutes: 120
     pool:
@@ -571,6 +571,42 @@ stages:
         AZP_SHA1: $(Build.SourceVersion)
         DOCKERHUB_USERNAME: $(DockerUsername)
         DOCKERHUB_PASSWORD: $(DockerPassword)
+        WINDOWS_BUILD_TYPE: "windows"
+        WINDOWS_IMAGE_BASE: "mcr.microsoft.com/windows/servercore"
+        WINDOWS_IMAGE_TAG: "ltsc2019"
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: "$(Build.StagingDirectory)/build_images"
+        artifactName: docker_windows
+      condition: always()
+  - job: dockerWindowsServer2022
+    dependsOn: ["release"]
+    timeoutInMinutes: 120
+    pool:
+      vmImage: "windows-2022"
+    steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "windows.release"
+        itemPattern: "windows.release/envoy_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - bash: |
+        set -e
+        # Convert to Unix-style path so tar doesn't think drive letter is a hostname
+        STAGING_DIR="/$(echo '$(Build.StagingDirectory)' | tr -d ':' | tr '\\' '/')"
+        mkdir -p windows/amd64 && tar zxf "${STAGING_DIR}/windows.release/envoy_binary.tar.gz" -C ./windows/amd64
+        ci/docker_ci.sh
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        AZP_BRANCH: $(Build.SourceBranch)
+        AZP_SHA1: $(Build.SourceVersion)
+        DOCKERHUB_USERNAME: $(DockerUsername)
+        DOCKERHUB_PASSWORD: $(DockerPassword)
+        WINDOWS_BUILD_TYPE: "windows-ltsc2022"
+        WINDOWS_IMAGE_BASE: "mcr.microsoft.com/windows/nanoserver"
+        WINDOWS_IMAGE_TAG: "ltsc2022"
     - task: PublishBuildArtifacts@1
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/build_images"
