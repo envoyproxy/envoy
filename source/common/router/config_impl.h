@@ -191,7 +191,8 @@ class ConfigImpl;
 /**
  * Holds all routing configuration for an entire virtual host.
  */
-class VirtualHostImpl : public VirtualHost {
+class VirtualHostImpl : public VirtualHost,
+                           Logger::Loggable<Logger::Id::router> {
 public:
   VirtualHostImpl(
       const envoy::config::route::v3::VirtualHost& virtual_host,

@@ -13,6 +13,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/type/matcher/v3/http_inputs.pb.h"
+#include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/type/matcher/v3/string.pb.h"
@@ -115,8 +117,14 @@ class RouteActionValidationVisitor
     : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
 public:
   absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
-                                          absl::string_view) override {
-    return absl::OkStatus();
+                                          absl::string_view type_url) override {
+    static std::string request_header_input_name = TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name());
+    if (type_url == request_header_input_name) {
+      return absl::OkStatus();
+    }
+
+    return absl::InvalidArgumentError("Route table can only match on request headers");
   }
 };
 
@@ -1318,9 +1326,10 @@ VirtualHostImpl::VirtualHostImpl(
     hedge_policy_ = virtual_host.hedge_policy();
   }
 
+  constexpr absl::string_view feature_flag = "envoy.reloadable_features.experimental_matching_api";
   if (virtual_host.has_matcher() &&
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.experimental_matching_api")) {
-    throw EnvoyException("Experimental matching API is not enabled");
+      !Runtime::runtimeFeatureEnabled(feature_flag)) {
+    throw EnvoyException(fmt::format("Experimental matching API is not enabled: set `{}` to true to enable", feature_flag));
   }
 
   if (virtual_host.has_matcher() && !virtual_host.routes().empty()) {
@@ -1336,9 +1345,6 @@ VirtualHostImpl::VirtualHostImpl(
     matcher_ = factory.create(virtual_host.matcher())();
   } else {
     for (const auto& route : virtual_host.routes()) {
-      if (!route.has_match()) {
-        throw EnvoyException("RouteValidationError.Match");
-      }
       routes_.emplace_back(createAndValidateRoute(route, *this, optional_http_filters,
                                                   factory_context, validator, validation_clusters));
     }
@@ -1471,19 +1477,23 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
 
     if (match.result_) {
-      ASSERT(dynamic_cast<RouteMatchAction*>(match.result_.get()));
+      if (match.result_->typeUrl() != RouteMatchAction::staticTypeUrl()) {
+        ENVOY_LOG(error, "resolved unexpected match action {}", match.result_->typeUrl());
+        return nullptr;
+      }
 
+      ASSERT(dynamic_cast<RouteMatchAction*>(match.result_.get()));
       const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*match.result_);
 
       if (route_action.route()->matches(headers, stream_info, random_value)) {
         return route_action.route();
       }
 
+      ENVOY_LOG(debug, "route was resolved but final route did not match incoming request");
       return nullptr;
     }
 
-    // TODO(snowp): Add logger
-    // ENVOY_LOG(debug, "failed to match incoming request: {}", match.result_);
+    ENVOY_LOG(debug, "failed to match incoming request: {}", match.match_state_);
 
     return nullptr;
   } else {

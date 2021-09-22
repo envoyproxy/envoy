@@ -25,12 +25,13 @@ namespace Matcher {
 
 template <class ProtoType> class ActionBase : public Action {
 public:
-  ActionBase() : type_name_(ProtoType().GetTypeName()) {}
+  absl::string_view typeUrl() const override { return staticTypeUrl(); }
 
-  absl::string_view typeUrl() const override { return type_name_; }
+  static absl::string_view staticTypeUrl() {
+    const static std::string typeUrl = ProtoType().GetTypeName();
 
-private:
-  const std::string type_name_;
+    return typeUrl;
+  }
 };
 
 struct MaybeMatchResult {
