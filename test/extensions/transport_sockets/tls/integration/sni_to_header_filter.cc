@@ -14,16 +14,15 @@ public:
   constexpr static char name[] = "sni-to-header-filter";
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& header_map, bool) override {
-    header_map.addCopy(
-        Http::LowerCaseString("x-envoy-client-sni"),
-        decoder_callbacks_->connection()->ssl()->requestedServerName());
+    header_map.addCopy(Http::LowerCaseString("x-envoy-client-sni"),
+                       decoder_callbacks_->connection()->ssl()->requestedServerName());
     return Http::FilterHeadersStatus::Continue;
   }
 };
 
 constexpr char SniToHeaderFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<SniToHeaderFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::InjectFactory<SimpleFilterConfig<SniToHeaderFilter>,
+                               Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
 } // namespace Envoy

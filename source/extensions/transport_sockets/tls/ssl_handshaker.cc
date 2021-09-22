@@ -289,7 +289,7 @@ const std::string& SslHandshakerImpl::subjectPeerCertificate() const {
 
 const std::string& SslHandshakerImpl::requestedServerName() const {
   if (cached_sni_.empty()) {
-    auto *sni = SSL_get_servername(ssl(), TLSEXT_NAMETYPE_host_name);
+    auto* sni = SSL_get_servername(ssl(), TLSEXT_NAMETYPE_host_name);
     if (sni) {
       cached_sni_ = sni;
     }
