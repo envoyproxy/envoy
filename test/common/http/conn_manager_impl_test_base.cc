@@ -62,7 +62,6 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
     EXPECT_CALL(drain_close_, addOnDrainCloseCb(_))
         .WillOnce(Invoke([&](Network::DrainDecision::DrainCloseCb cb) -> Common::CallbackHandlePtr {
           // for our tests, invoke immediately
-          drain_close_func_set_ = true;
           drain_close_func_ = cb;
           return nullptr;
         }));
@@ -87,7 +86,7 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
       ssl_connection_);
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
       *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
-      overload_manager_, test_time_.timeSystem());
+      overload_manager_, test_time_.timeSystem(), true);
   conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
   if (tracing) {
@@ -108,7 +107,7 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
 }
 
 void HttpConnectionManagerImplTest::invokeOnDrainClose() {
-  if (drain_close_func_set_) {
+  if (drain_close_func_ != nullptr) {
     drain_begin_timer_ = setUpTimer();
     EXPECT_CALL(*drain_begin_timer_, enableTimer(_, _));
     drain_close_func_(std::chrono::milliseconds{0});

@@ -15,10 +15,6 @@ public:
   MockListenerComponentFactory();
   ~MockListenerComponentFactory() override;
 
-  DrainManagerPtr
-  createDrainManager(envoy::config::listener::v3::Listener::DrainType drain_type) override {
-    return DrainManagerPtr{createDrainManager_(drain_type)};
-  }
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
                          const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     return LdsApiPtr{createLdsApi_(lds_config, lds_resources_locator)};
@@ -40,8 +36,6 @@ public:
               (Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
                const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
                uint32_t worker_index));
-  MOCK_METHOD(DrainManager*, createDrainManager_,
-              (envoy::config::listener::v3::Listener::DrainType drain_type));
   MOCK_METHOD(uint64_t, nextListenerTag, ());
 
   std::shared_ptr<Network::MockListenSocket> socket_;

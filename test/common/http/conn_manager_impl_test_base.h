@@ -175,8 +175,7 @@ public:
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))};
   Event::MockTimer* drain_begin_timer_;
-  Network::DrainDecision::DrainCloseCb drain_close_func_;
-  bool drain_close_func_set_{false};
+  Network::DrainDecision::DrainCloseCb drain_close_func_{nullptr};
   NiceMock<Network::MockDrainDecision> drain_close_;
   std::unique_ptr<ConnectionManagerImpl> conn_manager_;
   std::string server_name_;
