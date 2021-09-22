@@ -7,17 +7,17 @@ through a variety of Envoy specific macros.
 
 #### Level
 
-Log messages are emitted with a log level chose from one of the following:
+Log messages are emitted with a log level chosen from one of the following:
 * trace
 * debug
-* info,
+* info
 * warn
 * error
 * critical
 
 This log level can be used to restrict which log messages are actually
 shown via the `setLevel()` method of `Envoy::Logger::Logger` or via the command
-line argument `--l <level>`. Any messages which a level less than the specified
+line argument `--l <level>`. Any messages which has a level less than the specified
 level will be squelched.
 
 In addition, the log level is typically show in the emitted log line. For example
@@ -32,8 +32,8 @@ in the following line, you can see the level is `debug`:
 In addition the the level, every log is emitted with an ID. This ID is not
 a numeric ID (like a stream ID or a connection ID) but is instead a token that
 is used to groups log messages in by category. The list of known ID is defined
-in `ALL_LOGGER_IDS` in `source/common/common/logger.h`. Similar to level, these
-ID show up in log lines. For example in the following line, you can see the
+in `ALL_LOGGER_IDS` from `source/common/common/logger.h`. Similar to level, these
+IDs show up in log lines. For example in the following line, you can see the
 ID is `pool`:
 
 ```
