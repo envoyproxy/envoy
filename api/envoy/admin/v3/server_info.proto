@@ -87,9 +87,9 @@ message CommandLineOptions {
     Immediate = 1;
   }
 
-  reserved 12, 20, 21;
+  reserved 12, 20, 21, 29;
 
-  reserved "max_stats", "max_obj_name_len";
+  reserved "max_stats", "max_obj_name_len", "bootstrap_version";
 
   // See :option:`--base-id` for details.
   uint64 base_id = 1;
@@ -177,9 +177,6 @@ message CommandLineOptions {
 
   // See :option:`--disable-extensions` for details.
   repeated string disabled_extensions = 28;
-
-  // See :option:`--bootstrap-version` for details.
-  uint32 bootstrap_version = 29;
 
   // See :option:`--enable-fine-grain-logging` for details.
   bool enable_fine_grain_logging = 34;

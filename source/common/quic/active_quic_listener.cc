@@ -21,6 +21,8 @@
 namespace Envoy {
 namespace Quic {
 
+bool ActiveQuicListenerFactory::disable_kernel_bpf_packet_routing_for_test_ = false;
+
 ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
     Network::UdpConnectionHandler& parent, Network::ListenerConfig& listener_config,
@@ -300,8 +302,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       {0x16, 0, 0, 0000000000},   //                 ret a
   };
   // SPELLCHECKER(on)
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing")) {
+  if (!disable_kernel_bpf_packet_routing_for_test_) {
     if (concurrency_ > 1) {
       // Note that this option refers to the BPF program data above, which must live until the
       // option is used. The program is kept as a member variable for this purpose.

@@ -536,7 +536,9 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
     EXPECT_CALL(*decoder_filter, onLocalReply(_));
     EXPECT_CALL(*stream_filter, onLocalReply(_));
     EXPECT_CALL(*encoder_filter, onLocalReply(_));
-    EXPECT_CALL(dispatcher_, trackedObjectStackIsEmpty());
+    // trackedObjectStackIsEmpty() is never called since sendLocalReply will abort encoder filter
+    // iteration.
+    EXPECT_CALL(dispatcher_, trackedObjectStackIsEmpty()).Times(0);
 
     decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
                                                absl::nullopt, "details");

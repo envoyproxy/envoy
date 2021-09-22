@@ -158,6 +158,8 @@ struct ResponseCodeDetailValues {
   const std::string UpstreamTimeout = "upstream_response_timeout";
   // The final upstream try timed out.
   const std::string UpstreamPerTryTimeout = "upstream_per_try_timeout";
+  // The final upstream try idle timed out.
+  const std::string UpstreamPerTryIdleTimeout = "upstream_per_try_idle_timeout";
   // The request was destroyed because of user defined max stream duration.
   const std::string UpstreamMaxStreamDurationReached = "upstream_max_stream_duration_reached";
   // The upstream connection was reset before a response was started. This
@@ -464,9 +466,9 @@ public:
   virtual void healthCheck(bool is_health_check) PURE;
 
   /**
-   * @return the downstream address provider.
+   * @return the downstream connection info provider.
    */
-  virtual const Network::SocketAddressProvider& downstreamAddressProvider() const PURE;
+  virtual const Network::ConnectionInfoProvider& downstreamAddressProvider() const PURE;
 
   /**
    * @param connection_info sets the upstream ssl connection.

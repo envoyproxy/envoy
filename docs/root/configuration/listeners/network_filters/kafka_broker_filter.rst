@@ -16,6 +16,10 @@ this filter) are forwarded as-is.
 
 .. attention::
 
+   The Kafka broker filter is only included in :ref:`contrib images <install_contrib>`
+
+.. attention::
+
    The kafka_broker filter is experimental and is currently under active development.
    Capabilities will be expanded over time and the configuration structures are likely to change.
 

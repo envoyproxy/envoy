@@ -95,6 +95,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
+        "@com_google_absl//absl/container:btree",
         "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
     ],
 )

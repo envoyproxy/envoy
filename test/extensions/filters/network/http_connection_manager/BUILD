@@ -25,7 +25,7 @@ envoy_extension_cc_test_library(
     extension_names = ["envoy.filters.network.http_connection_manager"],
     deps = [
         ":config_cc_proto",
-        "//source/common/filter/http:filter_config_discovery_lib",
+        "//source/common/filter:config_discovery_lib",
         "//source/common/network:address_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

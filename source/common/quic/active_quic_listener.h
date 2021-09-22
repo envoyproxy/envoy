@@ -106,6 +106,10 @@ public:
   bool isTransportConnectionless() const override { return false; }
   const Network::Socket::OptionsSharedPtr& socketOptions() const override { return options_; }
 
+  static void setDisableKernelBpfPacketRoutingForTest(bool val) {
+    disable_kernel_bpf_packet_routing_for_test_ = val;
+  }
+
 private:
   friend class ActiveQuicListenerFactoryPeer;
 
@@ -120,6 +124,8 @@ private:
   const uint32_t packets_to_read_to_connection_count_ratio_;
   const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
   bool kernel_worker_routing_{};
+
+  static bool disable_kernel_bpf_packet_routing_for_test_;
 
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   sock_fprog prog_;

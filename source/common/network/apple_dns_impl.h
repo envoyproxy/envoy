@@ -61,7 +61,7 @@ struct AppleDnsResolverStats {
  * Implementation of DnsResolver that uses Apple dns_sd.h APIs. All calls and callbacks are assumed
  * to happen on the thread that owns the creating dispatcher.
  */
-class AppleDnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::upstream> {
+class AppleDnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
   AppleDnsResolverImpl(Event::Dispatcher& dispatcher, Stats::Scope& root_scope);
 
@@ -72,11 +72,20 @@ public:
                           ResolveCb callback) override;
 
 private:
+  struct PendingResolution;
+
+  // The newly created pending resolution and whether this action was successful. Note
+  // that {nullptr, true} is possible in the case where the resolution succeeds inline.
+  using StartResolutionResult = std::pair<std::unique_ptr<PendingResolution>, bool>;
+  StartResolutionResult startResolution(const std::string& dns_name,
+                                        DnsLookupFamily dns_lookup_family, ResolveCb callback);
+
   void chargeGetAddrInfoErrorStats(DNSServiceErrorType error_code);
 
   struct PendingResolution : public ActiveDnsQuery {
     PendingResolution(AppleDnsResolverImpl& parent, ResolveCb callback,
-                      Event::Dispatcher& dispatcher, const std::string& dns_name);
+                      Event::Dispatcher& dispatcher, const std::string& dns_name,
+                      DnsLookupFamily dns_lookup_family);
 
     ~PendingResolution();
 
@@ -89,17 +98,20 @@ private:
     void finishResolve();
 
     // Wrappers for the API calls.
-    DNSServiceErrorType dnsServiceGetAddrInfo(DnsLookupFamily dns_lookup_family);
+    DNSServiceErrorType dnsServiceGetAddrInfo();
     void onDNSServiceGetAddrInfoReply(DNSServiceFlags flags, uint32_t interface_index,
                                       DNSServiceErrorType error_code, const char* hostname,
                                       const struct sockaddr* address, uint32_t ttl);
     bool dnsServiceRefSockFD();
 
+    std::list<DnsResponse>& finalAddressList();
+
     // Small wrapping struct to accumulate addresses from firings of the
     // onDNSServiceGetAddrInfoReply callback.
     struct FinalResponse {
       ResolutionStatus status_;
-      std::list<DnsResponse> responses_;
+      std::list<DnsResponse> v4_responses_;
+      std::list<DnsResponse> v6_responses_;
     };
 
     AppleDnsResolverImpl& parent_;
@@ -116,6 +128,7 @@ private:
     // and informs via flags if more IP addresses are incoming. Therefore, these addresses need to
     // be accumulated before firing callback_.
     FinalResponse pending_cb_;
+    DnsLookupFamily dns_lookup_family_;
   };
 
   Event::Dispatcher& dispatcher_;

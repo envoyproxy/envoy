@@ -77,16 +77,16 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
                                   Grpc::CacheOption) { return async_client_; }));
 
-    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
-        pipe_addr_);
-    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
-        pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
+        ->setLocalAddress(pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(pipe_addr_);
   } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager ||
              filter_name == NetworkFilterNames::get().EnvoyMobileHttpConnectionManager) {
-    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
-        pipe_addr_);
-    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
-        pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
+        ->setLocalAddress(pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(pipe_addr_);
   } else if (filter_name == NetworkFilterNames::get().RateLimit) {
     async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
     async_client_ = std::make_unique<Grpc::MockAsyncClient>();
@@ -106,10 +106,10 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
             getOrCreateRawAsyncClient(_, _, _, _))
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
                                   Grpc::CacheOption) { return async_client_; }));
-    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
-        pipe_addr_);
-    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
-        pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
+        ->setLocalAddress(pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(pipe_addr_);
   }
 }
 

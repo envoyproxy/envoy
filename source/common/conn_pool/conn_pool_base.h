@@ -162,9 +162,14 @@ public:
                             int64_t connecting_and_connected_capacity, float preconnect_ratio,
                             bool anticipate_incoming_stream = false);
 
+  // Envoy::ConnectionPool::Instance implementation helpers
   void addIdleCallbackImpl(Instance::IdleCb cb);
-  void startDrainImpl();
-  void drainConnectionsImpl();
+  // Returns true if the pool is idle.
+  bool isIdleImpl() const;
+  void drainConnectionsImpl(DrainBehavior drain_behavior);
+  const Upstream::HostConstSharedPtr& host() const { return host_; }
+  // Called if this pool is likely to be picked soon, to determine if it's worth preconnecting.
+  bool maybePreconnectImpl(float global_preconnect_ratio);
 
   // Closes and destroys all connections. This must be called in the destructor of
   // derived classes because the derived ActiveClient will downcast parent_ to a more
@@ -196,16 +201,11 @@ public:
   void onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                          Network::ConnectionEvent event);
 
-  // Returns true if the pool is idle.
-  bool isIdleImpl() const;
-
   // See if the pool has gone idle. If we're draining, this will also close idle connections.
   void checkForIdleAndCloseIdleConnsIfDraining();
 
   void scheduleOnUpstreamReady();
-  ConnectionPool::Cancellable* newStream(AttachContext& context);
-  // Called if this pool is likely to be picked soon, to determine if it's worth preconnecting.
-  bool maybePreconnect(float global_preconnect_ratio);
+  ConnectionPool::Cancellable* newStreamImpl(AttachContext& context);
 
   virtual ConnectionPool::Cancellable* newPendingStream(AttachContext& context) PURE;
 
@@ -220,7 +220,6 @@ public:
   // Called by derived classes any time a stream is completed or destroyed for any reason.
   void onStreamClosed(Envoy::ConnectionPool::ActiveClient& client, bool delay_attaching_stream);
 
-  const Upstream::HostConstSharedPtr& host() const { return host_; }
   Event::Dispatcher& dispatcher() { return dispatcher_; }
   Upstream::ResourcePriority priority() const { return priority_; }
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() { return socket_options_; }
@@ -335,7 +334,7 @@ private:
 
   // Whether the connection pool is currently in the process of closing
   // all connections so that it can be gracefully deleted.
-  bool is_draining_{false};
+  bool is_draining_for_deletion_{false};
 
   // True iff this object is in the deferred delete list.
   bool deferred_deleting_{false};

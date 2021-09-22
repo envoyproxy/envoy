@@ -70,7 +70,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, PreserveCaseIntegrationTest,
 
 // Verify that we preserve case in both directions.
 TEST_P(PreserveCaseIntegrationTest, EndToEnd) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: preserve-case-filter
   )EOF");
   initialize();

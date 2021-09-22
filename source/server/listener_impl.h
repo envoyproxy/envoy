@@ -19,6 +19,7 @@
 #include "source/common/init/target_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/filter_chain_manager_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -103,7 +104,7 @@ public:
                                  Server::DrainManagerPtr drain_manager);
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& dispatcher() override;
+  Event::Dispatcher& mainThreadDispatcher() override;
   const Server::Options& options() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
@@ -176,7 +177,7 @@ public:
   // FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& dispatcher() override;
+  Event::Dispatcher& mainThreadDispatcher() override;
   const Options& options() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
@@ -429,6 +430,8 @@ private:
   // Important: local_init_watcher_ must be the last field in the class to avoid unexpected watcher
   // callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
+  std::shared_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
+      transport_factory_context_;
 
   Quic::QuicStatNames& quic_stat_names_;
 

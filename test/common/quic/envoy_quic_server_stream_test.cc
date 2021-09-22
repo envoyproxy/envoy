@@ -223,6 +223,23 @@ TEST_F(EnvoyQuicServerStreamTest, ResetStreamByHCM) {
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
+TEST_F(EnvoyQuicServerStreamTest, ReceiveStopSending) {
+  size_t payload_offset = receiveRequest(request_body_, false, request_body_.size() * 2);
+  // Receiving STOP_SENDING alone should trigger upstream reset.
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  quic_stream_->OnStopSending(quic::QUIC_STREAM_NO_ERROR);
+  EXPECT_FALSE(quic_stream_->read_side_closed());
+
+  // Following FIN should be discarded and the stream should be closed.
+  std::string second_part_request = bodyToHttp3StreamPayload("aaaa");
+  EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0u);
+  quic::QuicStreamFrame frame(stream_id_, true, payload_offset, second_part_request);
+  quic_stream_->OnStreamFrame(frame);
+  EXPECT_TRUE(quic_stream_->read_side_closed());
+  EXPECT_TRUE(quic_stream_->write_side_closed());
+}
+
 TEST_F(EnvoyQuicServerStreamTest, EarlyResponseWithStopSending) {
   receiveRequest(request_body_, false, request_body_.size() * 2);
   // Write response headers with FIN before finish receiving request.

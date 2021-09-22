@@ -50,7 +50,10 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
     decoder_->onData(upstream_buffer_, underflow);
     return underflow;
   }
-  MessageMetadataSharedPtr& responseMetadata() { return metadata_; }
+  MessageMetadataSharedPtr& responseMetadata() {
+    ASSERT(metadata_ != nullptr);
+    return metadata_;
+  }
   bool responseSuccess() { return success_.value_or(false); }
 
   // ProtocolConverter
@@ -86,7 +89,7 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
 
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override { return *this; }
-  bool passthroughEnabled() const override { return false; }
+  bool passthroughEnabled() const override { return true; }
 
   DecoderPtr decoder_;
   Buffer::OwnedImpl response_buffer_;
@@ -150,15 +153,7 @@ public:
   Buffer::OwnedImpl& buffer() override { return upstream_request_buffer_; }
   Event::Dispatcher& dispatcher() override;
   void addSize(uint64_t size) override { request_size_ += size; }
-  void continueDecoding() override {
-    if (pending_callbacks_.empty()) {
-      return;
-    }
-
-    for (auto& cb : pending_callbacks_) {
-      cb();
-    }
-  }
+  void continueDecoding() override { flushPendingCallbacks(); }
   void resetDownstreamConnection() override {}
   void sendLocalReply(const ThriftProxy::DirectResponse&, bool) override {}
   void recordResponseDuration(uint64_t value, Stats::Histogram::Unit unit) override {
@@ -199,12 +194,19 @@ public:
   const Network::Connection* downstreamConnection() const override { return nullptr; }
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
 
+  // Event::DeferredDeletable
+  void deleteIsPending() override { deferred_deleting_ = true; }
+
 private:
   friend class ShadowWriterTest;
+  using ConverterCallback = std::function<FilterStatus()>;
 
   void writeRequest();
   bool requestInProgress();
   bool requestStarted() const;
+  void flushPendingCallbacks();
+  FilterStatus runOrSave(std::function<FilterStatus()>&& cb,
+                         const std::function<void()>& on_save = {});
 
   ShadowWriterImpl& parent_;
   const std::string cluster_name_;
@@ -223,23 +225,55 @@ private:
   uint64_t response_size_{};
   bool request_ready_ : 1;
 
-  using ConverterCallback = std::function<void()>;
   std::list<ConverterCallback> pending_callbacks_;
+  bool removed_{};
+  bool deferred_deleting_{};
+};
+
+#define ALL_SHADOW_WRITER_STATS(COUNTER, GAUGE, HISTOGRAM) COUNTER(shadow_request_submit_failure)
+
+struct ShadowWriterStats {
+  ALL_SHADOW_WRITER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+};
+
+class ActiveRouters : public ThreadLocal::ThreadLocalObject {
+public:
+  ActiveRouters(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+  ~ActiveRouters() override {
+    while (!active_routers_.empty()) {
+      auto& router = active_routers_.front();
+      router->resetStream();
+      remove(*router);
+    }
+  }
+
+  std::list<std::unique_ptr<ShadowRouterImpl>>& activeRouters() { return active_routers_; }
+
+  void remove(ShadowRouterImpl& router) {
+    dispatcher_.deferredDelete(router.removeFromList(active_routers_));
+  }
+
+private:
+  Event::Dispatcher& dispatcher_;
+  std::list<std::unique_ptr<ShadowRouterImpl>> active_routers_;
 };
 
 class ShadowWriterImpl : public ShadowWriter, Logger::Loggable<Logger::Id::thrift> {
 public:
   ShadowWriterImpl(Upstream::ClusterManager& cm, const std::string& stat_prefix,
-                   Stats::Scope& scope, Event::Dispatcher& dispatcher)
-      : cm_(cm), stat_prefix_(stat_prefix), scope_(scope), dispatcher_(dispatcher) {}
+                   Stats::Scope& scope, Event::Dispatcher& dispatcher,
+                   ThreadLocal::SlotAllocator& tls)
+      : cm_(cm), stat_prefix_(stat_prefix), scope_(scope), dispatcher_(dispatcher),
+        stats_(generateStats(stat_prefix, scope)), tls_(tls.allocateSlot()) {
 
-  ~ShadowWriterImpl() override {
-    while (!active_routers_.empty()) {
-      auto& router = active_routers_.front();
-      router->resetStream();
-      router->onRouterDestroy();
-    }
+    tls_->set([](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      return std::make_shared<ActiveRouters>(dispatcher);
+    });
   }
+
+  ~ShadowWriterImpl() override = default;
+
+  void remove(ShadowRouterImpl& router) { tls_->getTyped<ActiveRouters>().remove(router); }
 
   // Router::ShadowWriter
   Upstream::ClusterManager& clusterManager() override { return cm_; }
@@ -253,11 +287,18 @@ public:
 private:
   friend class ShadowRouterImpl;
 
+  ShadowWriterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return ShadowWriterStats{ALL_SHADOW_WRITER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
+                                                     POOL_GAUGE_PREFIX(scope, prefix),
+                                                     POOL_HISTOGRAM_PREFIX(scope, prefix))};
+  }
+
   Upstream::ClusterManager& cm_;
   const std::string stat_prefix_;
   Stats::Scope& scope_;
   Event::Dispatcher& dispatcher_;
-  std::list<std::unique_ptr<ShadowRouterImpl>> active_routers_;
+  ShadowWriterStats stats_;
+  ThreadLocal::SlotPtr tls_;
 };
 
 } // namespace Router

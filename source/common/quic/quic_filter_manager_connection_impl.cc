@@ -14,7 +14,7 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
     : Network::ConnectionImplBase(dispatcher, /*id=*/connection_id.Hash()),
       network_connection_(&connection), filter_manager_(*this, *connection.connectionSocket()),
       stream_info_(dispatcher.timeSource(),
-                   connection.connectionSocket()->addressProviderSharedPtr()),
+                   connection.connectionSocket()->connectionInfoProviderSharedPtr()),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {

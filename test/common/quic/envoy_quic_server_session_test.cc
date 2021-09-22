@@ -151,10 +151,8 @@ public:
   EnvoyQuicServerSessionTest()
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_({[]() {
-          SetQuicReloadableFlag(quic_decline_server_push_stream, true);
-          return quic::CurrentSupportedHttp3Versions()[0];
-        }()}),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
+        quic_version_({[]() { return quic::CurrentSupportedHttp3Versions()[0]; }()}),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()),
         quic_connection_(new MockEnvoyQuicServerConnection(
             connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_)),
@@ -1005,8 +1003,8 @@ TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   EXPECT_TRUE(stream2->IsFlowControlBlocked());
 
   // Resetting stream3 should lower the buffered bytes, but callbacks will not
-  // be triggered because reset callback has been already triggered.
-  EXPECT_CALL(stream_callbacks3, onResetStream(Http::StreamResetReason::LocalReset, ""));
+  // be triggered because end stream is already encoded.
+  EXPECT_CALL(stream_callbacks3, onResetStream(Http::StreamResetReason::LocalReset, "")).Times(0);
   // Connection buffered data book keeping should also be updated.
   EXPECT_CALL(network_connection_callbacks_, onBelowWriteBufferLowWatermark());
   stream3->resetStream(Http::StreamResetReason::LocalReset);

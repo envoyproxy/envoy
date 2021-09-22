@@ -22,6 +22,8 @@ StandardLogger::StandardLogger(const std::string& name)
     : Logger(std::make_shared<spdlog::logger>(name, Registry::getSink())) {}
 
 SinkDelegate::SinkDelegate(DelegatingLogSinkSharedPtr log_sink) : log_sink_(log_sink) {}
+void SinkDelegate::logWithStableName(absl::string_view, absl::string_view, absl::string_view,
+                                     absl::string_view) {}
 
 SinkDelegate::~SinkDelegate() {
   // The previous delegate should have never been set or should have been reset by now via

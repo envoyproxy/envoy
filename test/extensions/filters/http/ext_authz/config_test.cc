@@ -21,54 +21,73 @@ namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
 
-void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
-  std::unique_ptr<TestDeprecatedV2Api> _deprecated_v2_api;
-  if (api_version != envoy::config::core::v3::ApiVersion::V3) {
-    _deprecated_v2_api = std::make_unique<TestDeprecatedV2Api>();
-  }
-  std::string yaml = R"EOF(
-  transport_api_version: V3
-  grpc_service:
-    google_grpc:
-      target_uri: ext_authz_server
-      stat_prefix: google
-  failure_mode_allow: false
-  transport_api_version: {}
-  )EOF";
-
+void expectCorrectProtoGrpc(std::string const& grpc_service_yaml) {
   ExtAuthzFilterConfig factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  TestUtility::loadFromYaml(
-      fmt::format(yaml, TestUtility::getVersionStringFromApiVersion(api_version)), *proto_config);
+  TestUtility::loadFromYaml(grpc_service_yaml, *proto_config);
 
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
   testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
   EXPECT_CALL(context, getServerFactoryContext())
       .WillRepeatedly(testing::ReturnRef(server_context));
   EXPECT_CALL(context, messageValidationVisitor());
-  EXPECT_CALL(context, clusterManager());
+  EXPECT_CALL(context, clusterManager()).Times(2);
   EXPECT_CALL(context, runtime());
-  EXPECT_CALL(context, scope()).Times(2);
+  EXPECT_CALL(context, scope()).Times(3);
+
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  // Expect the raw async client to be created inside the callback.
+  // The creation of the filter callback is in main thread while the execution of callback is in
+  // worker thread. Because of the thread local cache of async client, it must be created in worker
+  // thread inside the callback.
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
       .WillOnce(Invoke(
           [](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool, Grpc::CacheOption) {
             return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
           }));
-
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
+
+  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([&context, cb]() {
+    Http::MockFilterChainFactoryCallbacks filter_callback;
+    EXPECT_CALL(filter_callback, addStreamFilter(_));
+    // Execute the filter factory callback in another thread.
+    EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+                getOrCreateRawAsyncClient(_, _, _, _))
+        .WillOnce(Invoke(
+            [](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+               Grpc::CacheOption) { return std::make_unique<NiceMock<Grpc::MockAsyncClient>>(); }));
+    cb(filter_callback);
+  });
+  thread->join();
 }
 
 } // namespace
 
-TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
-#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::AUTO);
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V2);
-#endif
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V3);
+TEST(HttpExtAuthzConfigTest, CorrectProtoGoogleGrpc) {
+  std::string google_grpc_service_yaml = R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    google_grpc:
+      target_uri: ext_authz_server
+      stat_prefix: google
+  failure_mode_allow: false
+  transport_api_version: V3
+  )EOF";
+  expectCorrectProtoGrpc(google_grpc_service_yaml);
+}
+
+TEST(HttpExtAuthzConfigTest, CorrectProtoEnvoyGrpc) {
+  std::string envoy_grpc_service_yaml = R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    envoy_grpc:
+      cluster_name: ext_authz_server
+  failure_mode_allow: false
+  transport_api_version: V3
+  )EOF";
+  expectCorrectProtoGrpc(envoy_grpc_service_yaml);
 }
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {

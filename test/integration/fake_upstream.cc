@@ -92,7 +92,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
   if (add_served_by_header_) {
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
-                          parent_.connection().addressProvider().localAddress()->asString());
+                          parent_.connection().connectionInfoProvider().localAddress()->asString());
   }
 
   postToConnectionThread([this, headers_copy, end_stream]() -> void {

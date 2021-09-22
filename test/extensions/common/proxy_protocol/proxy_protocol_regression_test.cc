@@ -48,10 +48,10 @@ public:
         init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
     EXPECT_CALL(socket_factory_, localAddress())
-        .WillOnce(ReturnRef(socket_->addressProvider().localAddress()));
+        .WillOnce(ReturnRef(socket_->connectionInfoProvider().localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket(_)).WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this);
-    conn_ = dispatcher_->createClientConnection(socket_->addressProvider().localAddress(),
+    conn_ = dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
     conn_->addConnectionCallbacks(connection_callbacks_);
@@ -199,9 +199,9 @@ TEST_P(ProxyProtocolRegressionTest, V1Basic) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+  EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
             source_addr);
-  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
+  EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
 }
@@ -222,9 +222,9 @@ TEST_P(ProxyProtocolRegressionTest, V2Basic) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+  EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
             source_addr);
-  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
+  EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
 }
@@ -239,13 +239,13 @@ TEST_P(ProxyProtocolRegressionTest, V2LocalConnection) {
   expectData("more data");
 
   if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
-    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+    EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
               "127.0.0.1");
   } else {
-    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+    EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
               "::1");
   }
-  EXPECT_FALSE(server_connection_->addressProvider().localAddressRestored());
+  EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
 }

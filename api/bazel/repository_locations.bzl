@@ -118,4 +118,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/open-telemetry/opentelemetry-proto/archive/v{version}.tar.gz"],
         use_category = ["api"],
     ),
+    com_github_bufbuild_buf = dict(
+        project_name = "buf",
+        project_desc = "A new way of working with Protocol Buffers.",  # Used for breaking change detection in API protobufs
+        project_url = "https://buf.build",
+        version = "0.53.0",
+        sha256 = "888bb52d358e34a8d6a57ecff426bed896bdf478ad13c78a70a9e1a9a2d75715",
+        strip_prefix = "buf",
+        urls = ["https://github.com/bufbuild/buf/releases/download/v{version}/buf-Linux-x86_64.tar.gz"],
+        release_date = "2021-08-25",
+        use_category = ["api"],
+        tags = ["manual"],
+    ),
 )

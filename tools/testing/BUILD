@@ -1,5 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_library")
-load("@testing_pip3//:requirements.bzl", "requirement")
+load("@base_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_py_binary")
 
@@ -24,8 +24,9 @@ envoy_py_binary(
         requirement("pytest"),
         requirement("pytest-asyncio"),
         requirement("pytest-cov"),
-        "//tools/base:runner",
-        "//tools/base:utils",
+        requirement("pytest-patches"),
+        requirement("envoy.base.runner"),
+        requirement("envoy.base.utils"),
     ],
 )
 
@@ -34,18 +35,18 @@ envoy_py_binary(
     data = [
         ":plugin",
         "//:.coveragerc",
-        "//tools/base:runner",
-        "//tools/base:utils",
     ],
     deps = [
         requirement("coverage"),
+        requirement("envoy.base.runner"),
+        requirement("envoy.base.utils"),
     ],
 )
 
 envoy_py_binary(
     name = "tools.testing.all_pytests",
     deps = [
-        "//tools/base:checker",
-        "//tools/base:utils",
+        requirement("envoy.base.checker"),
+        requirement("envoy.base.utils"),
     ],
 )

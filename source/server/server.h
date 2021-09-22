@@ -174,7 +174,7 @@ public:
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
-  Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
+  Event::Dispatcher& mainThreadDispatcher() override { return server_.dispatcher(); }
   const Server::Options& options() override { return server_.options(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
@@ -345,6 +345,7 @@ private:
   Assert::ActionRegistrationPtr envoy_bug_action_registration_;
   ThreadLocal::Instance& thread_local_;
   Random::RandomGeneratorPtr random_generator_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<AdminImpl> admin_;
@@ -367,7 +368,6 @@ private:
   std::unique_ptr<Server::GuardDog> worker_guard_dog_;
   bool terminated_;
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
-  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;

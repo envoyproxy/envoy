@@ -315,7 +315,8 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
       registerPort(*port_it, listen_addr->ip()->port());
     }
   }
-  const auto admin_addr = test_server_->server().admin().socket().addressProvider().localAddress();
+  const auto admin_addr =
+      test_server_->server().admin().socket().connectionInfoProvider().localAddress();
   if (admin_addr->type() == Network::Address::Type::Ip) {
     registerPort("admin", admin_addr->ip()->port());
   }
@@ -331,11 +332,12 @@ std::string getListenerDetails(Envoy::Server::Instance& server) {
 void BaseIntegrationTest::createGeneratedApiTestServer(
     const std::string& bootstrap_path, const std::vector<std::string>& port_names,
     Server::FieldValidationConfig validator_config, bool allow_lds_rejection) {
+
   test_server_ = IntegrationTestServer::create(
-      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
-      timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
-      concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_, use_real_stats_,
-      v2_bootstrap_);
+      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_,
+      deterministic_value_, timeSystem(), *api_, defer_listener_finalization_, process_object_,
+      validator_config, concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_,
+      use_real_stats_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 

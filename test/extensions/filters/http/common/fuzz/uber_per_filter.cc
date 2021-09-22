@@ -1,6 +1,5 @@
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
-#include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 
 #include "source/common/tracing/http_tracer_impl.h"
@@ -74,17 +73,6 @@ void UberFilterFuzzer::guideAnyProtoType(test::fuzz::HttpData* mutable_data, uin
   mutable_any->set_type_url(type_url);
 }
 
-void cleanAttachmentTemplate(Protobuf::Message* message) {
-  envoy::extensions::filters::http::squash::v3::Squash& config =
-      dynamic_cast<envoy::extensions::filters::http::squash::v3::Squash&>(*message);
-  std::string json;
-  Protobuf::util::JsonPrintOptions json_options;
-  if (!Protobuf::util::MessageToJsonString(config.attachment_template(), &json, json_options)
-           .ok()) {
-    config.clear_attachment_template();
-  }
-}
-
 void cleanTapConfig(Protobuf::Message* message) {
   envoy::extensions::filters::http::tap::v3::Tap& config =
       dynamic_cast<envoy::extensions::filters::http::tap::v3::Tap&>(*message);
@@ -111,8 +99,6 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
   if (filter_name == "envoy.filters.http.grpc_json_transcoder") {
     // Add a valid service proto descriptor.
     addBookstoreProtoDescriptor(message);
-  } else if (name == "envoy.filters.http.squash") {
-    cleanAttachmentTemplate(message);
   } else if (name == "envoy.filters.http.tap") {
     // TapDS oneof field and OutputSinkType StreamingGrpc not implemented
     cleanTapConfig(message);
@@ -122,8 +108,8 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
 void UberFilterFuzzer::perFilterSetup() {
   // Prepare expectations for the ext_authz filter.
   addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
-  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
-  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   ON_CALL(factory_context_, clusterManager()).WillByDefault(testing::ReturnRef(cluster_manager_));
   ON_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillByDefault(Return(&async_request_));
@@ -150,6 +136,8 @@ void UberFilterFuzzer::perFilterSetup() {
   // Prepare expectations for WASM filter.
   ON_CALL(factory_context_, listenerMetadata())
       .WillByDefault(testing::ReturnRef(listener_metadata_));
+  ON_CALL(factory_context_.api_, customStatNamespaces())
+      .WillByDefault(testing::ReturnRef(custom_stat_namespaces_));
 }
 
 } // namespace HttpFilters

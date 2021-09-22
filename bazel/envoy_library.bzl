@@ -12,6 +12,7 @@ load(":envoy_pch.bzl", "envoy_pch_copts")
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
+    "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_CONFIG_VISIBILITY",
 )
 
@@ -70,6 +71,14 @@ def envoy_cc_extension(
         }),
         visibility = visibility,
     )
+
+def envoy_cc_contrib_extension(
+        name,
+        tags = [],
+        extra_visibility = [],
+        visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY,
+        **kwargs):
+    envoy_cc_extension(name, tags, extra_visibility, visibility, **kwargs)
 
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(

@@ -115,11 +115,15 @@ pkg_tar(
 
 genrule(
     name = "extensions_security_rst",
-    srcs = ["//source/extensions:extensions_metadata.yaml"],
+    srcs = [
+        "//source/extensions:extensions_metadata.yaml",
+        "//contrib:extensions_metadata.yaml",
+    ],
     outs = ["extensions_security_rst.tar"],
     cmd = """
     $(location //tools/docs:generate_extensions_security_rst) \\
-        $(location //source/extensions:extensions_metadata.yaml) $@
+        $(location //source/extensions:extensions_metadata.yaml) \\
+        $(location //contrib:extensions_metadata.yaml) $@
     """,
     tools = ["//tools/docs:generate_extensions_security_rst"],
 )
@@ -128,8 +132,8 @@ genrule(
     name = "external_deps_rst",
     srcs = [
         "//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations_utils.bzl",
+        "@envoy_api//bazel:repository_locations.bzl",
+        "@envoy_api//bazel:repository_locations_utils.bzl",
     ],
     outs = ["external_deps_rst.tar"],
     cmd = "$(location //tools/docs:generate_external_deps_rst) $@",
@@ -138,8 +142,8 @@ genrule(
 
 genquery(
     name = "v3_proto_srcs",
-    expression = "labels(srcs, labels(deps, @envoy_api_canonical//:v3_protos))",
-    scope = ["@envoy_api_canonical//:v3_protos"],
+    expression = "labels(srcs, labels(deps, @envoy_api//:v3_protos))",
+    scope = ["@envoy_api//:v3_protos"],
 )
 
 genrule(

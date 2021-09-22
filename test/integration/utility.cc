@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/network/connection.h"
@@ -187,8 +188,9 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   NiceMock<Random::MockRandomGenerator> random;
   Event::GlobalTimeSystem time_system;
   NiceMock<Random::MockRandomGenerator> random_generator;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
-                Filesystem::fileSystemForTest(), random_generator);
+                Filesystem::fileSystemForTest(), random_generator, bootstrap);
   Event::DispatcherPtr dispatcher(api.allocateDispatcher("test_thread"));
   TestConnectionCallbacks connection_callbacks(*dispatcher);
 

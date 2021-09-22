@@ -26,7 +26,7 @@ public:
   }
 
   void initializeFilter(const std::string& filter_config) {
-    config_helper_.addFilter(filter_config);
+    config_helper_.prependFilter(filter_config);
     initialize();
   }
 
@@ -369,7 +369,7 @@ tap_config:
 
   ConfigHelper new_config_helper(
       version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
-  new_config_helper.addFilter(admin_filter_config_);
+  new_config_helper.prependFilter(admin_filter_config_);
   new_config_helper.renameListener("foo");
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);

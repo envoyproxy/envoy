@@ -1,3 +1,6 @@
+#include <memory>
+
+#include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/http/codec.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -19,6 +22,7 @@ using MemoryClassesToAccountsSet = std::array<absl::flat_hash_set<BufferMemoryAc
 
 constexpr uint64_t kMinimumBalanceToTrack = 1024 * 1024;
 constexpr uint64_t kThresholdForFinalBucket = 128 * 1024 * 1024;
+constexpr int kMaxStreamsResetPerCall = 50;
 
 // Gets the balance of an account assuming it's a BufferMemoryAccountImpl.
 static int getBalance(const BufferMemoryAccountSharedPtr& account) {
@@ -34,7 +38,7 @@ static void noAccountsTracked(MemoryClassesToAccountsSet& memory_classes_to_acco
 
 class BufferMemoryAccountTest : public testing::Test {
 protected:
-  TrackedWatermarkBufferFactory factory_;
+  TrackedWatermarkBufferFactory factory_{absl::bit_width(kMinimumBalanceToTrack)};
   Http::MockStreamResetHandler mock_reset_handler_;
 };
 
@@ -474,6 +478,203 @@ TEST_F(BufferMemoryAccountTest, RemainsInSameBucketIfChangesWithinThreshold) {
 
   account->credit(getBalance(account));
   account->clearDownstream();
+}
+
+TEST(WatermarkBufferFactoryTest, CanConfigureMinimumTrackingAmount) {
+  auto config = envoy::config::overload::v3::BufferFactoryConfig();
+  config.set_minimum_account_to_track_power_of_two(3);
+  WatermarkBufferFactory factory(config);
+  EXPECT_EQ(factory.bitshift(), 2);
+}
+
+TEST(WatermarkBufferFactoryTest, DefaultsToEffectivelyNotTracking) {
+  auto config = envoy::config::overload::v3::BufferFactoryConfig();
+  WatermarkBufferFactory factory(config);
+  EXPECT_EQ(factory.bitshift(), 63); // Too large for any reasonable account size.
+}
+
+TEST(WatermarkBufferFactoryTest, ShouldOnlyResetAllStreamsGreatThanOrEqualToProvidedIndex) {
+  TrackedWatermarkBufferFactory factory(absl::bit_width(kMinimumBalanceToTrack));
+  Http::MockStreamResetHandler largest_stream_to_reset;
+  Http::MockStreamResetHandler stream_to_reset;
+  Http::MockStreamResetHandler stream_that_should_not_be_reset;
+
+  auto largest_account_to_reset = factory.createAccount(largest_stream_to_reset);
+  auto account_to_reset = factory.createAccount(stream_to_reset);
+  auto account_to_not_reset = factory.createAccount(stream_that_should_not_be_reset);
+
+  largest_account_to_reset->charge(kThresholdForFinalBucket);
+  account_to_reset->charge(2 * kMinimumBalanceToTrack);
+  account_to_not_reset->charge(kMinimumBalanceToTrack);
+
+  // Check that all of the accounts are tracked
+  factory.inspectMemoryClasses([](MemoryClassesToAccountsSet& memory_classes_to_account) {
+    EXPECT_EQ(memory_classes_to_account[0].size(), 1);
+    EXPECT_EQ(memory_classes_to_account[1].size(), 1);
+    EXPECT_EQ(memory_classes_to_account[7].size(), 1);
+  });
+
+  EXPECT_CALL(largest_stream_to_reset, resetStream(_)).WillOnce(Invoke([&]() {
+    largest_account_to_reset->credit(getBalance(largest_account_to_reset));
+    largest_account_to_reset->clearDownstream();
+  }));
+
+  EXPECT_CALL(stream_to_reset, resetStream(_)).WillOnce(Invoke([&]() {
+    account_to_reset->credit(getBalance(account_to_reset));
+    account_to_reset->clearDownstream();
+  }));
+
+  EXPECT_CALL(stream_that_should_not_be_reset, resetStream(_)).Times(0);
+  // Should call resetStream on all streams in bucket >= 1.
+  EXPECT_EQ(factory.resetAccountsGivenPressure(0.85), 2);
+
+  account_to_not_reset->credit(kMinimumBalanceToTrack);
+  account_to_not_reset->clearDownstream();
+}
+
+TEST(WatermarkBufferFactoryTest, ComputesBucketToResetCorrectly) {
+  TrackedWatermarkBufferFactory factory(absl::bit_width(kMinimumBalanceToTrack));
+
+  // Create vector of accounts and handlers
+  std::vector<std::unique_ptr<Http::MockStreamResetHandler>> reset_handlers;
+  std::vector<BufferMemoryAccountSharedPtr> accounts;
+  uint32_t seed_account_balance = kMinimumBalanceToTrack;
+
+  for (uint32_t i = 0; i < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_; ++i) {
+    reset_handlers.emplace_back(std::make_unique<Http::MockStreamResetHandler>());
+    accounts.emplace_back(factory.createAccount(*(reset_handlers.back())));
+    accounts.back()->charge(seed_account_balance);
+    seed_account_balance *= 2;
+  }
+
+  // Check that all memory classes have a corresponding account
+  factory.inspectMemoryClasses([](MemoryClassesToAccountsSet& memory_classes_to_account) {
+    for (auto& account_set : memory_classes_to_account) {
+      EXPECT_EQ(account_set.size(), 1);
+    }
+  });
+
+  // Reset accounts checking correct threshold
+  float pressure = 0.0;
+  const float pressure_gradation = 1.0 / BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_;
+  for (uint32_t i = 0; i < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_; ++i) {
+    EXPECT_CALL(*reset_handlers.back(), resetStream(_)).WillOnce(Invoke([&]() {
+      auto current_account = accounts.back();
+      current_account->credit(getBalance(current_account));
+      current_account->clearDownstream();
+    }));
+
+    EXPECT_EQ(factory.resetAccountsGivenPressure(pressure), 1);
+
+    // Move onto next reset handler and account
+    accounts.pop_back();
+    reset_handlers.pop_back();
+
+    pressure += pressure_gradation;
+  }
+}
+
+// Encapsulates an Account and its corresponding StreamResetHandler, tracking
+// whether the reset handler was invoked.
+struct AccountWithResetHandler {
+
+  AccountWithResetHandler(WatermarkBufferFactory& factory)
+      : reset_handler_(std::make_unique<Http::MockStreamResetHandler>()),
+        account_(factory.createAccount(*reset_handler_)) {}
+
+  void expectResetStream() {
+    EXPECT_CALL(*reset_handler_, resetStream(_)).WillOnce([this](Http::StreamResetReason) {
+      account_->credit(getBalance(account_));
+      account_->clearDownstream();
+      reset_handler_invoked_ = true;
+    });
+  }
+
+  std::unique_ptr<Http::MockStreamResetHandler> reset_handler_;
+  bool reset_handler_invoked_{false};
+  BufferMemoryAccountSharedPtr account_;
+};
+
+using AccountWithResetHandlerPtr = std::unique_ptr<AccountWithResetHandler>;
+
+TEST(WatermarkBufferFactoryTest,
+     LimitsNumberOfStreamsResetPerInvocationOfResetAccountsGivenPressure) {
+  TrackedWatermarkBufferFactory factory(absl::bit_width(kMinimumBalanceToTrack));
+
+  std::vector<AccountWithResetHandlerPtr> accounts_to_reset;
+  for (int i = 0; i < 2 * kMaxStreamsResetPerCall; ++i) {
+    accounts_to_reset.push_back(std::make_unique<AccountWithResetHandler>(factory));
+    accounts_to_reset.back()->account_->charge(kThresholdForFinalBucket);
+    accounts_to_reset.back()->expectResetStream();
+  }
+
+  // Assert accounts tracked.
+  factory.inspectMemoryClasses([](MemoryClassesToAccountsSet& memory_classes_to_account) {
+    ASSERT_EQ(memory_classes_to_account[BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - 1].size(),
+              2 * kMaxStreamsResetPerCall);
+  });
+
+  // We should only reset up to the max number of streams that should be reset.
+  int streams_reset = 0;
+  EXPECT_EQ(factory.resetAccountsGivenPressure(1.0), kMaxStreamsResetPerCall);
+  for (const auto& account : accounts_to_reset) {
+    if (account->reset_handler_invoked_) {
+      ++streams_reset;
+    }
+  }
+
+  EXPECT_EQ(streams_reset, kMaxStreamsResetPerCall);
+
+  // Subsequent call to reset the remaining streams.
+  EXPECT_EQ(factory.resetAccountsGivenPressure(1.0), kMaxStreamsResetPerCall);
+  for (const auto& account : accounts_to_reset) {
+    EXPECT_TRUE(account->reset_handler_invoked_);
+  }
+}
+
+// Tests that of the eligible streams to reset, we start resetting the largest
+// streams.
+TEST(WatermarkBufferFactoryTest,
+     ShouldPrioritizeResettingTheLargestEligibleStreamsPerInvocationOfResetAccountGivenPressure) {
+  TrackedWatermarkBufferFactory factory(absl::bit_width(kMinimumBalanceToTrack));
+
+  std::vector<AccountWithResetHandlerPtr> accounts_reset_in_first_batch;
+  for (int i = 0; i < kMaxStreamsResetPerCall; ++i) {
+    accounts_reset_in_first_batch.push_back(std::make_unique<AccountWithResetHandler>(factory));
+    accounts_reset_in_first_batch.back()->account_->charge(kThresholdForFinalBucket);
+    accounts_reset_in_first_batch.back()->expectResetStream();
+  }
+
+  std::vector<AccountWithResetHandlerPtr> accounts_reset_in_second_batch;
+  for (int i = 0; i < kMaxStreamsResetPerCall; ++i) {
+    accounts_reset_in_second_batch.push_back(std::make_unique<AccountWithResetHandler>(factory));
+    accounts_reset_in_second_batch.back()->account_->charge(kMinimumBalanceToTrack);
+  }
+
+  // Assert accounts tracked.
+  factory.inspectMemoryClasses([](MemoryClassesToAccountsSet& memory_classes_to_account) {
+    ASSERT_EQ(memory_classes_to_account[0].size(), kMaxStreamsResetPerCall);
+    ASSERT_EQ(memory_classes_to_account[BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - 1].size(),
+              kMaxStreamsResetPerCall);
+  });
+
+  // All buckets are eligible for having streams reset given the pressure.
+  // However we will hit the maximum number to reset per call and shouldn't
+  // have any in the second batch reset.
+  EXPECT_EQ(factory.resetAccountsGivenPressure(1.0), kMaxStreamsResetPerCall);
+  for (int i = 0; i < kMaxStreamsResetPerCall; ++i) {
+    EXPECT_TRUE(accounts_reset_in_first_batch[i]->reset_handler_invoked_);
+    EXPECT_FALSE(accounts_reset_in_second_batch[i]->reset_handler_invoked_);
+  }
+
+  // Subsequent call should get those in the second batch.
+  for (int i = 0; i < kMaxStreamsResetPerCall; ++i) {
+    accounts_reset_in_second_batch[i]->expectResetStream();
+  }
+  EXPECT_EQ(factory.resetAccountsGivenPressure(1.0), kMaxStreamsResetPerCall);
+  for (int i = 0; i < kMaxStreamsResetPerCall; ++i) {
+    EXPECT_TRUE(accounts_reset_in_second_batch[i]->reset_handler_invoked_);
+  }
 }
 
 } // namespace

@@ -68,11 +68,11 @@ public:
   void readDisable(bool /*disable*/) override { ASSERT(false); }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
   bool readEnabled() const override { return true; }
-  const Network::SocketAddressSetter& addressProvider() const override {
-    return network_connection_->connectionSocket()->addressProvider();
+  const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
+    return network_connection_->connectionSocket()->connectionInfoProvider();
   }
-  Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
-    return network_connection_->connectionSocket()->addressProviderSharedPtr();
+  Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return network_connection_->connectionSocket()->connectionInfoProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
@@ -82,6 +82,10 @@ public:
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     // TODO(danzh): populate stats.
     Network::ConnectionImplBase::setConnectionStats(stats);
+    if (network_connection_ == nullptr) {
+      ENVOY_CONN_LOG(error, "Quic connection has been detached.", *this);
+      return;
+    }
     network_connection_->setConnectionStats(stats);
   }
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;

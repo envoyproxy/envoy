@@ -207,6 +207,8 @@ void Router::onDestroy() {
   for (auto& shadow_router : shadow_routers_) {
     shadow_router.get().onRouterDestroy();
   }
+
+  shadow_routers_.clear();
 }
 
 void Router::setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) {
@@ -452,7 +454,7 @@ FilterStatus Router::setEnd() {
 
 void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   const bool done =
-      upstream_request_->handleUpstreamData(data, end_stream, *this, *upstream_response_callbacks_);
+      upstream_request_->handleUpstreamData(data, end_stream, *upstream_response_callbacks_);
   if (done) {
     cleanup();
   }
