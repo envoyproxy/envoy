@@ -173,6 +173,34 @@ TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponse) {
   checkStats();
 }
 
+TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
+  config_helper_.addFilter("name: sni-to-header-filter");
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ClientSslTransportOptions().setSni("host.com"));
+  };
+  initialize();
+  codec_client_ = makeHttpConnection(makeSslClientConnection(
+      ClientSslTransportOptions().setSni("www.host.com")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "https"},
+                                                 {":authority", "host.com"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("www.host.com",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("x-envoy-client-sni"))[0]
+                ->value()
+                .getStringView());
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+  RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
+
+  checkStats();
+}
+
 TEST_P(SslIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});

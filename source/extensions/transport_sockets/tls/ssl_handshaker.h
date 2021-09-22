@@ -64,6 +64,7 @@ public:
   uint16_t ciphersuiteId() const override;
   std::string ciphersuiteString() const override;
   const std::string& tlsVersion() const override;
+  const std::string& requestedServerName() const override;
 
   // Ssl::Handshaker
   Network::PostIoAction doHandshake() override;
@@ -94,6 +95,7 @@ private:
   mutable std::string cached_session_id_;
   mutable std::string cached_tls_version_;
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
+  mutable std::string cached_sni_;
 };
 
 using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;

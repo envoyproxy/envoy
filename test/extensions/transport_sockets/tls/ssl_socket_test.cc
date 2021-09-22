@@ -256,6 +256,13 @@ public:
 
   bool ocspStaplingEnabled() const { return ocsp_stapling_enabled_; }
 
+  TestUtilOptions& setExpectedSni(absl::string_view expected_sni) {
+    expected_sni_ = std::string(expected_sni);
+    return *this;
+  }
+
+  const std::string& expectedSni() const { return expected_sni_; }
+
   TestUtilOptions& setExpectedTransportFailureReasonContains(
       const std::string& expected_transport_failure_reason_contains) {
     expected_transport_failure_reason_contains_ = expected_transport_failure_reason_contains;
@@ -295,6 +302,7 @@ private:
   bool ocsp_stapling_enabled_{false};
   std::string expected_transport_failure_reason_contains_;
   std::string not_expected_client_stats_;
+  std::string expected_sni_;
 };
 
 void testUtil(const TestUtilOptions& options) {
@@ -452,6 +460,9 @@ void testUtil(const TestUtilOptions& options) {
       if (options.expectNoCertChain()) {
         EXPECT_EQ(EMPTY_STRING,
                   server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
+      }
+      if (!options.expectedSni().empty()) {
+        EXPECT_EQ(options.expectedSni(), server_connection->ssl()->requestedServerName());
       }
 
       const SslHandshakerImpl* ssl_socket =
@@ -1175,6 +1186,25 @@ TEST_P(SslSocketTest, NoCert) {
   testUtil(test_options.setExpectedServerStats("ssl.no_certificate")
                .setExpectNoCert()
                .setExpectNoCertChain());
+}
+
+TEST_P(SslSocketTest, Sni) {
+  const std::string client_ctx_yaml = R"EOF(
+    sni: "foo.bar.com"
+    common_tls_context:
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
+  testUtil(test_options.setExpectedSni("foo.bar.com"));
 }
 
 // Prefer ECDSA certificate when multiple RSA certificates are present and the

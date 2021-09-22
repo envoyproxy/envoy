@@ -137,6 +137,11 @@ public:
    *         connection.
    **/
   virtual const std::string& tlsVersion() const PURE;
+
+  /**
+   * @return const std::string& the Server Name Indication (SNI) supplied by the TLS client.
+   **/
+  virtual const std::string& requestedServerName() const PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;
