@@ -153,13 +153,20 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
 
   // use other header fields provided in the new response to replace all instances
   // of the corresponding header fields in the stored response
+  absl::flat_hash_set<Http::LowerCaseString> updatedHeaderFields;
   response_headers.iterate(
-      [&entry](const Http::HeaderEntry& response_header) -> Http::HeaderMap::Iterate {
-        Http::LowerCaseString lower_case_key{response_header.key().getStringView()};
+      [&entry, &updatedHeaderFields](const Http::HeaderEntry& incoming_response_header) 
+        -> Http::HeaderMap::Iterate {
+        Http::LowerCaseString lower_case_key{incoming_response_header.key().getStringView()};
+        absl::string_view incoming_value{incoming_response_header.value().getStringView()};
         if (headersNotToUpdate().contains(lower_case_key)) {
           return Http::HeaderMap::Iterate::Continue;
         }
-        entry.response_headers_->setCopy(lower_case_key, response_header.value().getStringView());
+        if (!updatedHeaderFields.contains(lower_case_key)) {
+          entry.response_headers_->remove(lower_case_key);
+          updatedHeaderFields.insert(lower_case_key);
+        }
+        entry.response_headers_->addCopy(lower_case_key, incoming_value);
         return Http::HeaderMap::Iterate::Continue;
       });
   entry.metadata_ = metadata;
