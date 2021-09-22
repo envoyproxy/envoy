@@ -38,7 +38,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager =
       Extensions::Common::Redis::getClusterRefreshManager(
-          context.singletonManager(), context.dispatcher(), context.clusterManager(),
+          context.singletonManager(), context.mainThreadDispatcher(), context.clusterManager(),
           context.timeSource());
 
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(

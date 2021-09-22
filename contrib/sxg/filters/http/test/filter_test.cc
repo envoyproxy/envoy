@@ -365,7 +365,7 @@ TEST_F(FilterTest, SdsDynamicGenericSecret) {
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
   EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
   EXPECT_CALL(init_manager, add(_))

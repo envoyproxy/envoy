@@ -11,7 +11,7 @@ from importlib.util import spec_from_loader, module_from_spec
 from importlib.machinery import ModuleSpec, SourceFileLoader
 from typing import Iterator
 
-from tools.base import checker, utils
+from envoy.base import checker, utils
 
 BUILD_CONFIG_PATH = "source/extensions/extensions_build_config.bzl"
 CONTRIB_BUILD_CONFIG_PATH = "contrib/contrib_build_config.bzl"

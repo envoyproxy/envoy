@@ -18,14 +18,14 @@ EdsClusterImpl::EdsClusterImpl(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                             added_via_api, factory_context.dispatcher().timeSource()),
+                             added_via_api, factory_context.mainThreadDispatcher().timeSource()),
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           factory_context.messageValidationVisitor(), "cluster_name"),
       local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()) {
-  Event::Dispatcher& dispatcher = factory_context.dispatcher();
+  Event::Dispatcher& dispatcher = factory_context.mainThreadDispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
   if (eds_config.config_source_specifier_case() ==
