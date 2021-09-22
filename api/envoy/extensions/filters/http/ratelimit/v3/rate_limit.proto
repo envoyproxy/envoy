@@ -361,17 +361,18 @@ message RateLimitPerRoute {
     IGNORE = 2;
   }
 
-  enum RateLimitsOptions {
-    // Use the rate limits options defined in `VhRateLimitsOptions`.
+  // The override option determines how the filter handles the cases where there is an override at multiple levels (virtual host, route, cluster weight).
+  enum OverrideOptions {
+    // Client-defined default, typically OVERRIDE_POLICY. If VhRateLimitsOptions is set, that will be used instead.
     DEFAULT = 0;
 
-    // Use the rate limits unless the route has a rate limit policy.
+    // Only use the specific rate limit policy override when the route doesn't have a rate limit policy.
     OVERRIDE_POLICY = 1;
 
-    // Use the rate limits even if the route has a rate limit policy.
+    // Always include the specific rate limit policy override even if the route has a rate limit policy.
     INCLUDE_POLICY = 2;
 
-    // Ignore the rate limits even if the route does not have a rate limit policy.
+    // Always ignore the specific rate limit policy override.
     IGNORE_POLICY = 3;
   }
 
@@ -383,5 +384,5 @@ message RateLimitPerRoute {
   ];
 
   // Specifies if the rate limit filter should include the lower levels (route level, virtual host level or cluster weight level) rate limits options.
-  RateLimitsOptions rate_limits = 2 [(validate.rules).enum = {defined_only: true}];
+  OverrideOptions override_option = 2 [(validate.rules).enum = {defined_only: true}];
 }

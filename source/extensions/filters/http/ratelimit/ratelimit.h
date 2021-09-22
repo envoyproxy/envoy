@@ -30,9 +30,9 @@ namespace RateLimitFilter {
 enum class FilterRequestType { Internal, External, Both };
 
 /**
- * Type of rate limit options
+ * Type of rate limit override options
  */
-enum class RateLimitOptions { Default, Override, Include, Ignore };
+enum class OverrideOptions { Default, Override, Include, Ignore };
 
 /**
  * Global configuration for the HTTP rate limit filter.
@@ -98,26 +98,26 @@ private:
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
-using RateLimitOptionsPerRoute =
-    envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::RateLimitsOptions;
+using RateLimitOverrideOptions =
+    envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OverrideOptions;
 
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
   FilterConfigPerRoute(
       const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& config)
-      : vh_rate_limits_(config.vh_rate_limits()), rate_limits_(config.rate_limits()) {}
+      : vh_rate_limits_(config.vh_rate_limits()), override_option_(config.override_option()) {}
 
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
   virtualHostRateLimits() const {
     return vh_rate_limits_;
   }
 
-  RateLimitOptionsPerRoute rateLimits() const { return rate_limits_; }
+  RateLimitOverrideOptions rateLimits() const { return override_option_; }
 
 private:
   const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
       vh_rate_limits_;
-  const RateLimitOptionsPerRoute rate_limits_;
+  const RateLimitOverrideOptions override_option_;
 };
 
 /**
@@ -164,7 +164,7 @@ private:
   void populateResponseHeaders(Http::HeaderMap& response_headers, bool from_local_reply);
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
 
-  RateLimitOptions getRateLimitOption(const Router::RouteConstSharedPtr& route);
+  OverrideOptions getRateLimitOverrideOption(const Router::RouteConstSharedPtr& route);
 
   Http::Context& httpContext() { return config_->httpContext(); }
 
@@ -174,7 +174,7 @@ private:
   Filters::Common::RateLimit::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   State state_{State::NotStarted};
-  RateLimitOptions rate_limits_;
+  OverrideOptions override_option_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;

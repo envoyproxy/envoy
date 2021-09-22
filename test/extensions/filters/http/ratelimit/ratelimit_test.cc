@@ -1137,12 +1137,12 @@ TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 }
 
-// Tests that the route rate limit is used when RateLimitsOptions::OVERRIDE_POLICY and route rate
+// Tests that the route rate limit is used when OverrideOptions::OVERRIDE_POLICY and route rate
 // limit is set
 TEST_F(HttpRateLimitFilterTest, OverrideRateLimitOptionWithRouteRateLimitSet) {
   SetUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
-  settings.set_rate_limits(
+  settings.set_override_option(
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE_POLICY);
   FilterConfigPerRoute per_route_config_(settings);
 
@@ -1239,12 +1239,12 @@ TEST_F(HttpRateLimitFilterTest,
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 }
 
-// Tests that the virtual host rate limit is used when RateLimitsOptions::OVERRIDE_POLICY is set and
+// Tests that the virtual host rate limit is used when OverrideOptions::OVERRIDE_POLICY is set and
 // route rate limit is empty
 TEST_F(HttpRateLimitFilterTest, OverrideRateLimitOptionWithoutRouteRateLimit) {
   SetUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
-  settings.set_rate_limits(
+  settings.set_override_option(
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE_POLICY);
   FilterConfigPerRoute per_route_config_(settings);
 
@@ -1290,12 +1290,12 @@ TEST_F(HttpRateLimitFilterTest, OverrideRateLimitOptionWithoutRouteRateLimit) {
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 }
 
-// Tests that the virtual host rate limit is used when RateLimitsOptions::INCLUDE_POLICY is set and
+// Tests that the virtual host rate limit is used when OverrideOptions::INCLUDE_POLICY is set and
 // route rate limit is empty
 TEST_F(HttpRateLimitFilterTest, IncludeRateLimitOptionWithOnlyVHRateLimitSet) {
   SetUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
-  settings.set_rate_limits(
+  settings.set_override_option(
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE_POLICY);
   FilterConfigPerRoute per_route_config_(settings);
 
@@ -1338,12 +1338,12 @@ TEST_F(HttpRateLimitFilterTest, IncludeRateLimitOptionWithOnlyVHRateLimitSet) {
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 }
 
-// Tests that the virtual host rate limit is used when RateLimitsOptions::INCLUDE_POLICY and route
+// Tests that the virtual host rate limit is used when OverrideOptions::INCLUDE_POLICY and route
 // rate limit is set
 TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitSet) {
   SetUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
-  settings.set_rate_limits(
+  settings.set_override_option(
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE_POLICY);
   FilterConfigPerRoute per_route_config_(settings);
 
@@ -1388,12 +1388,12 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitS
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 }
 
-// Tests that the route rate limit is used when RateLimitsOptions::IGNORE_POLICY and route rate
+// Tests that the route rate limit is used when OverrideOptions::IGNORE_POLICY and route rate
 // limit is set
 TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
   SetUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
-  settings.set_rate_limits(
+  settings.set_override_option(
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE_POLICY);
   FilterConfigPerRoute per_route_config_(settings);
 
@@ -1436,12 +1436,12 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 }
 
-// Tests that no rate limit is used when RateLimitsOptions::IGNORE_POLICY is set and route rate
+// Tests that no rate limit is used when OverrideOptions::IGNORE_POLICY is set and route rate
 // limit empty
 TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
   SetUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
-  settings.set_rate_limits(
+  settings.set_override_option(
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE_POLICY);
   FilterConfigPerRoute per_route_config_(settings);
 

@@ -49,16 +49,16 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   // Get all applicable rate limit policy entries for the route.
   populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, headers);
 
-  RateLimitOptions rate_limit_option = getRateLimitOption(route);
+  OverrideOptions override_option_ = getRateLimitOverrideOption(route);
 
-  switch (rate_limit_option) {
-  case RateLimitOptions::Ignore:
+  switch (override_option_) {
+  case OverrideOptions::Ignore:
     break;
-  case RateLimitOptions::Include:
+  case OverrideOptions::Include:
     populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
                                  headers);
     break;
-  case RateLimitOptions::Override:
+  case OverrideOptions::Override:
     if (route_entry->rateLimitPolicy().empty()) {
       populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
                                    headers);
@@ -264,9 +264,9 @@ void Filter::appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add) {
   }
 }
 
-RateLimitOptions Filter::getRateLimitOption(const Router::RouteConstSharedPtr& route) {
+OverrideOptions Filter::getRateLimitOverrideOption(const Router::RouteConstSharedPtr& route) {
   if (route->routeEntry()->includeVirtualHostRateLimits()) {
-    rate_limits_ = RateLimitOptions::Include;
+    override_option_ = OverrideOptions::Include;
   } else {
     const auto* specific_per_route_config =
         Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
@@ -274,34 +274,34 @@ RateLimitOptions Filter::getRateLimitOption(const Router::RouteConstSharedPtr& r
     if (specific_per_route_config != nullptr) {
       // If rate limit option is `DEFAULT`, it means we need to get the rate limit policy from the
       // old config. This check can be removed once the API version is promoted.
-      RateLimitOptionsPerRoute rate_limits_options =
+      RateLimitOverrideOptions override_options =
           (specific_per_route_config->rateLimits() ==
            envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::DEFAULT)
-              // Map VhRateLimitsOptions to RateLimitsOptions by shifting one. See the enum
+              // Map VhRateLimitsOptions to OverrideOptions by shifting one. See the enum
               // definition in rate_limit.proto
-              ? static_cast<RateLimitOptionsPerRoute>(
+              ? static_cast<RateLimitOverrideOptions>(
                     specific_per_route_config->virtualHostRateLimits() + 1)
               : specific_per_route_config->rateLimits();
 
-      switch (rate_limits_options) {
+      switch (override_options) {
       case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE_POLICY:
-        rate_limits_ = RateLimitOptions::Include;
+        override_option_ = OverrideOptions::Include;
         break;
       case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE_POLICY:
-        rate_limits_ = RateLimitOptions::Ignore;
+        override_option_ = OverrideOptions::Ignore;
         break;
       case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE_POLICY:
-        rate_limits_ = RateLimitOptions::Override;
+        override_option_ = OverrideOptions::Override;
         break;
       case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::DEFAULT:
       default:
         NOT_REACHED_GCOVR_EXCL_LINE;
       }
     } else {
-      rate_limits_ = RateLimitOptions::Override;
+      override_option_ = OverrideOptions::Override;
     }
   }
-  return rate_limits_;
+  return override_option_;
 }
 
 } // namespace RateLimitFilter
