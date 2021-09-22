@@ -145,6 +145,7 @@ pkg_files(
     strip_prefix = "/docs/root",
 )
 
+# TODO(phlax): this appears unused, fix or remove
 pkg_files(
     name = "google_vrp_config",
     srcs = ["//configs:google-vrp/envoy-edge.yaml"],
