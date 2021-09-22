@@ -41,7 +41,7 @@ public:
 
   /**
    * Update the provider with a new configuration.
-   * @param proto_config is a candidate configuration update.
+   * @param proto_config is the new configuration.
    * @param version_info is the version of the new extension configuration.
    * @param cb the continuation callback for a completed configuration application on all threads.
    */
