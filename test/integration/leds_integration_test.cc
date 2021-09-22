@@ -76,9 +76,9 @@ protected:
   // filesystem delivery to simplify test mechanics.
   void setEndpoints(const absl::flat_hash_set<uint32_t>& healthy_endpoints_idxs,
                     const absl::flat_hash_set<uint32_t>& degraded_endpoints_idxs,
-                    const absl::flat_hash_set<uint32_t>& removed_endpoints_idxs,
                     const absl::flat_hash_set<uint32_t>& unhealthy_endpoints_idxs,
                     const absl::flat_hash_set<uint32_t>& unknown_endpoints_idxs,
+                    const absl::flat_hash_set<uint32_t>& removed_endpoints_idxs,
                     uint32_t locality_idx = 0, bool await_update = true) {
     const auto& collection_prefix = localities_prefixes_[locality_idx];
     absl::flat_hash_map<std::string, envoy::config::endpoint::v3::LbEndpoint> updated_endpoints;
@@ -387,7 +387,7 @@ TEST_P(LedsIntegrationTest, BasicLeds) {
   initializeTest(true);
 
   // Send an endpoint update with an unknown state using LEDS.
-  setEndpoints({}, {}, {}, {}, {0});
+  setEndpoints({}, {}, {}, {0}, {});
 
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 1);
   // Waiting for the endpoint to become Healthy to end warming and move the cluster to active.
@@ -423,7 +423,7 @@ TEST_P(LedsIntegrationTest, LedsAdd) {
   initializeTest(true);
 
   // Send an endpoint update with an unknown state using LEDS.
-  setEndpoints({}, {}, {}, {}, {0});
+  setEndpoints({}, {}, {}, {0}, {});
 
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 1);
   // Waiting for the endpoint to become Healthy to end warming and move the cluster to active.
@@ -452,7 +452,7 @@ TEST_P(LedsIntegrationTest, LedsAdd) {
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
   // Add 2 more endpoints using LEDS in unknown state.
-  setEndpoints({}, {}, {}, {}, {1, 2});
+  setEndpoints({}, {}, {}, {1, 2}, {});
 
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 2);
 
@@ -478,7 +478,7 @@ TEST_P(LedsIntegrationTest, LedsUpdateSameEndpoint) {
   initializeTest(true);
 
   // Send an endpoint update with an unknown state using LEDS.
-  setEndpoints({}, {}, {}, {}, {0});
+  setEndpoints({}, {}, {}, {0}, {});
 
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 1);
   // Waiting for the endpoint to become Healthy to end warming and move the cluster to active.
@@ -508,7 +508,7 @@ TEST_P(LedsIntegrationTest, LedsUpdateSameEndpoint) {
 
   // "Update" the endpoint by sending the same state. The endpoint should still
   // be healthy, as the active health check cleared it.
-  setEndpoints({}, {}, {}, {}, {0});
+  setEndpoints({}, {}, {}, {0}, {});
 
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 2);
 
@@ -529,7 +529,7 @@ TEST_P(LedsIntegrationTest, EndpointRemoval) {
   initializeTest(false);
 
   // Send 2 endpoints update with an unknown state using LEDS.
-  setEndpoints({}, {}, {}, {}, {0, 1});
+  setEndpoints({}, {}, {}, {0, 1}, {});
 
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 1);
   // Waiting for the endpoint to become Healthy to end warming and move the cluster to active.
@@ -544,7 +544,7 @@ TEST_P(LedsIntegrationTest, EndpointRemoval) {
   registerTestServerPorts({"http"});
 
   // Remove one of the endpoints.
-  setEndpoints({}, {}, {0}, {}, {});
+  setEndpoints({}, {}, {}, {}, {0});
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 2);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
@@ -555,7 +555,7 @@ TEST_P(LedsIntegrationTest, UnknownEndpointRemoval) {
   initializeTest(true);
 
   // Send 2 endpoints update with an unknown state using LEDS.
-  setEndpoints({}, {}, {}, {}, {0});
+  setEndpoints({}, {}, {}, {0}, {});
 
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 1);
   // Waiting for the endpoint to become Healthy to end warming and move the cluster to active.
@@ -571,8 +571,7 @@ TEST_P(LedsIntegrationTest, UnknownEndpointRemoval) {
   waitForHealthCheck(0);
   hosts_upstreams_info_[0].defaultStream()->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 1);
-  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 
   // Wait for our statically specified listener to become ready, and register its port in the
@@ -587,7 +586,7 @@ TEST_P(LedsIntegrationTest, UnknownEndpointRemoval) {
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
   // Remove one of the endpoints.
-  setEndpoints({}, {}, {2}, {}, {});
+  setEndpoints({}, {}, {}, {}, {2});
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 2);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.leds.update_rejected")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
@@ -604,7 +603,7 @@ TEST_P(LedsIntegrationTest, MoveEndpointsBetweenLocalities) {
   EXPECT_EQ(2, test_server_->gauge("cluster_manager.active_clusters")->value());
 
   // Send an endpoint update using LEDS for locality 0.
-  setEndpoints({}, {}, {}, {}, {0}, 0);
+  setEndpoints({}, {}, {}, {0}, {}, 0);
 
   // The update only updates the first locality, but the cluster should still be
   // in warmed state.
@@ -614,7 +613,7 @@ TEST_P(LedsIntegrationTest, MoveEndpointsBetweenLocalities) {
   EXPECT_EQ(2, test_server_->gauge("cluster_manager.active_clusters")->value());
 
   // Send an endpoint update using LEDS for locality 1.
-  setEndpoints({}, {}, {}, {}, {1, 2}, 1);
+  setEndpoints({}, {}, {}, {1, 2}, {}, 1);
 
   // All localities should have endpoints so the cluster warm-up should be over.
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 2);
@@ -631,8 +630,8 @@ TEST_P(LedsIntegrationTest, MoveEndpointsBetweenLocalities) {
   registerTestServerPorts({"http"});
 
   // Move one endpoint from locality1 to locality0.
-  setEndpoints({}, {}, {}, {}, {0, 2}, 0);
-  setEndpoints({}, {}, {2}, {}, {}, 1);
+  setEndpoints({}, {}, {}, {0, 2}, {}, 0);
+  setEndpoints({}, {}, {}, {}, {2}, 1);
 
   // Wait for the additional 2 LEDS updates.
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 4);
@@ -641,8 +640,8 @@ TEST_P(LedsIntegrationTest, MoveEndpointsBetweenLocalities) {
   EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
   // Move one endpoint from locality0 to locality1, and remove the other endpoint.
-  setEndpoints({}, {}, {2}, {}, {}, 0);
-  setEndpoints({}, {}, {}, {}, {0}, 1);
+  setEndpoints({}, {}, {}, {}, {2}, 0);
+  setEndpoints({}, {}, {}, {0}, {}, 1);
 
   // Wait for the additional 2 LEDS updates.
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 6);
@@ -660,7 +659,7 @@ TEST_P(LedsIntegrationTest, LocalitiesShareEndpoint) {
   EXPECT_EQ(2, test_server_->gauge("cluster_manager.active_clusters")->value());
 
   // Send an endpoint update using LEDS for locality 0.
-  setEndpoints({}, {}, {}, {}, {0}, 0);
+  setEndpoints({}, {}, {}, {0}, {}, 0);
 
   // The update only updates the first locality, but the cluster should still be
   // in warmed state.
@@ -670,7 +669,7 @@ TEST_P(LedsIntegrationTest, LocalitiesShareEndpoint) {
   EXPECT_EQ(2, test_server_->gauge("cluster_manager.active_clusters")->value());
 
   // Send an endpoint update using LEDS for locality 1 with a different endpoint.
-  setEndpoints({}, {}, {}, {}, {1}, 1);
+  setEndpoints({}, {}, {}, {1}, {}, 1);
 
   // All localities should have endpoints so the cluster warm-up should be over.
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 2);
@@ -686,7 +685,7 @@ TEST_P(LedsIntegrationTest, LocalitiesShareEndpoint) {
   registerTestServerPorts({"http"});
 
   // Send a LEDS update to locality 1 with the same endpoint that is in locality 0.
-  setEndpoints({}, {}, {}, {}, {0}, 1);
+  setEndpoints({}, {}, {}, {0}, {}, 1);
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 3);
 
   // There should be 2 hosts in the cluster, all healthy as there isn't active health-check.
@@ -694,7 +693,7 @@ TEST_P(LedsIntegrationTest, LocalitiesShareEndpoint) {
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
   // Remove the endpoint from one locality.
-  setEndpoints({}, {}, {0}, {}, {}, 0);
+  setEndpoints({}, {}, {}, {}, {0}, 0);
 
   // Wait for the additional LEDS update.
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 4);
@@ -708,7 +707,7 @@ TEST_P(LedsIntegrationTest, LocalitiesShareEndpoint) {
 // then fails health checking is removed.
 TEST_P(LedsIntegrationTest, RemoveAfterHcFail) {
   initializeTest(true);
-  setEndpoints({}, {}, {}, {}, {0});
+  setEndpoints({}, {}, {}, {0}, {});
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.leds.update_success")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
@@ -721,7 +720,7 @@ TEST_P(LedsIntegrationTest, RemoveAfterHcFail) {
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 
   // Clear out the host and verify the host is still healthy.
-  setEndpoints({}, {}, {0}, {}, {});
+  setEndpoints({}, {}, {}, {}, {0});
 
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.leds.update_success")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
@@ -748,17 +747,17 @@ TEST_P(LedsIntegrationTest, HealthUpdate) {
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   // Drop to 0/2 healthy endpoints (2 unknown health state).
-  setEndpoints({}, {}, {}, {0, 1}, {});
+  setEndpoints({}, {}, {0, 1}, {}, {});
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   // Increase to 1/2 healthy endpoints (host 1 will remain unhealthy).
-  setEndpoints({0}, {}, {}, {1}, {});
+  setEndpoints({0}, {}, {1}, {}, {});
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   // Add host and modify healthy to 2/3 healthy endpoints.
-  setEndpoints({2}, {}, {}, {1}, {});
+  setEndpoints({2}, {}, {1}, {}, {});
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.membership_change")->value());
   EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
