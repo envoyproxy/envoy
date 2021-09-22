@@ -24,8 +24,9 @@ public:
     options2_.mutable_max_entries()->set_value(max_entries2_);
   }
   void initialize() {
-    factory_.reset(
-        new Http::AlternateProtocolsCacheManagerFactoryImpl(singleton_manager_, tls_, {context_}));
+    AlternateProtocolsData data(context_);
+    factory_ = std::make_unique<Http::AlternateProtocolsCacheManagerFactoryImpl>(singleton_manager_,
+                                                                                 tls_, data);
     manager_ = factory_->get();
   }
 
