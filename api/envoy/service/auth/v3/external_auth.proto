@@ -60,20 +60,8 @@ message DeniedHttpResponse {
   string body = 3;
 }
 
-// TODO: Should this be in the core API?
-message QueryParameterOption {
-  // The key of a the query parameter. Must be non-empty.
-  string key = 1 [(validate.rules).string = {min_len: 1}];
-
-  // The value of the query parameter. May be empty, e.g. for a query parameter such as `foo=`.
-  string value = 2;
-
-  // Whether to remove the query parameter with the above `key`.
-  bool remove = 3;
-}
-
 // HTTP attributes for an OK response.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message OkHttpResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v2.OkHttpResponse";
@@ -118,7 +106,12 @@ message OkHttpResponse {
 
   // This field allows the authorization service to set (and overwrite) query
   // string parameters on the original request before it is sent upstream.
-  repeated QueryParameterOption query_parameters_to_set = 7;
+  repeated config.core.v3.QueryParameter query_parameters_to_set = 7;
+
+  // This field allows the authorization service to specify which query parameters
+  // should be removed from the original request before it is sent upstream. Each
+  // element in this list is a case-sensitive query parameter name to be removed.
+  repeated string query_parameters_to_remove = 8;
 }
 
 // Intended for gRPC and Network Authorization servers `only`.

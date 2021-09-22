@@ -59,12 +59,13 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
       }
       if (response->ok_response().query_parameters_to_set_size() > 0) {
         for (const auto& query_parameter : response->ok_response().query_parameters_to_set()) {
-          if (query_parameter.remove()) {
-            authz_response->query_parameters_to_remove.push_back(query_parameter.key());
-          } else {
             authz_response->query_parameters_to_set.push_back(
                 std::pair(query_parameter.key(), query_parameter.value()));
-          }
+        }
+      }
+      if (response->ok_response().query_parameters_to_remove_size() > 0) {
+        for (const auto& key : response->ok_response().query_parameters_to_remove()) {
+            authz_response->query_parameters_to_remove.push_back(key);
         }
       }
       if (response->ok_response().response_headers_to_add_size() > 0) {

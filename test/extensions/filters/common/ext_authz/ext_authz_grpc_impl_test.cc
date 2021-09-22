@@ -324,13 +324,16 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
 
   status->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
 
-  const std::vector<std::tuple<std::string, std::string, bool>> query_parameters_to_set = {
-      {"add-me", "yes", false}, {"remove-me", "", true}};
-  for (const auto& [key, value, remove] : query_parameters_to_set) {
+  const Http::Utility::QueryParamsVector query_parameters_to_set{{"add-me", "yes"}};
+  for (const auto& [key, value] : query_parameters_to_set) {
     auto* query_parameter = check_response->mutable_ok_response()->add_query_parameters_to_set();
     query_parameter->set_key(key);
     query_parameter->set_value(value);
-    query_parameter->set_remove(remove);
+  }
+
+  const std::vector<std::string> query_parameters_to_remove{"remove-me"};
+  for (const auto& key : query_parameters_to_remove) {
+    check_response->mutable_ok_response()->add_query_parameters_to_remove(key);
   }
 
   // This is the expected authz response.
