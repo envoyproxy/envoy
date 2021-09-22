@@ -82,46 +82,40 @@ public:
     ~InflightMessageTtlManager() { timer_->disableTimer(); }
 
     void setDeadline(absl::flat_hash_set<uint32_t>&& ids) {
-      auto expires_at = dispatcher_.timeSource().monotonicTime() + message_ack_timeout_;
+      const auto expires_at = dispatcher_.timeSource().monotonicTime() + message_ack_timeout_;
       deadline_.emplace(expires_at, std::move(ids));
-      timer_->enableTimer(message_ack_timeout_);
+
+      if (!timer_->enabled()) {
+        timer_->enableTimer(message_ack_timeout_);
+      }
     }
 
   private:
     void callback() {
       const auto now = dispatcher_.timeSource().monotonicTime();
-      std::vector<MonotonicTime> expired_timepoints;
-      absl::flat_hash_set<uint32_t> expired_message_ids;
 
-      // Extract timeout message ids.
-      auto it = deadline_.lower_bound(now);
-      while (it != deadline_.end()) {
+      auto begin_it = deadline_.lower_bound(now);
+      const auto& message_buffer = client_.messageBuffer();
+
+      for (auto it = begin_it; it != deadline_.end(); ++it) {
         for (auto&& id : it->second) {
-          expired_message_ids.emplace(id);
-        }
-        expired_timepoints.push_back(it->first);
-        ++it;
-      }
+          const auto& message_it = message_buffer.find(id);
 
-      // Clear buffered message ids on the set of waiting timeout.
-      for (auto&& timepoint : expired_timepoints) {
-        deadline_.erase(timepoint);
-      }
+          if (message_it == message_buffer.end()) {
+            continue;
+          }
 
-      // Restore pending messages to buffer due to timeout.
-      for (auto&& id : expired_message_ids) {
-        const auto& message_buffer = client_.messageBuffer();
-
-        if (message_buffer.find(id) == message_buffer.end()) {
-          continue;
-        }
-
-        auto& message = message_buffer.at(id);
-        if (message.first == Grpc::BufferState::PendingFlush) {
-          client_.onError(id);
-          stats_.critical_logs_message_timeout_.inc();
+          // If the retrieved message is a PendingFlush, it means that the message
+          // has timed out. A timeout is treated as an error, and the callback will
+          // re-buffer the message.
+          if (message_it->second.first == Grpc::BufferState::PendingFlush) {
+            client_.onError(id);
+            stats_.critical_logs_message_timeout_.inc();
+          }
         }
       }
+
+      deadline_.erase(begin_it, deadline_.end());
 
       if (!deadline_.empty()) {
         const auto earliest_timepoint = deadline_.rbegin()->first;

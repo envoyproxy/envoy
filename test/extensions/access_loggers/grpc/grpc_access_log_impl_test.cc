@@ -148,6 +148,7 @@ class CriticalGrpcAccessLoggerImplTest : public GrpcAccessLoggerImplTest {
 public:
   CriticalGrpcAccessLoggerImplTest() {
     mock_buffer_timer_ = new Event::MockTimer(&dispatcher_);
+    EXPECT_CALL(*mock_buffer_timer_, enabled());
     EXPECT_CALL(*mock_buffer_timer_, enableTimer(_, _));
     EXPECT_CALL(*mock_buffer_timer_, disableTimer());
   }
