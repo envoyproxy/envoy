@@ -20,6 +20,8 @@ namespace Vcl {
 #define VCL_LOG(fmt, _args...)
 #endif
 
+constexpr int VclInvalidFd = 1 << 23;
+
 void vclInterfaceInit(Event::Dispatcher& dispatcher);
 void vclInterfaceWorkerRegister();
 void vclInterfaceRegisterEpollEvent(Envoy::Event::Dispatcher& dispatcher);

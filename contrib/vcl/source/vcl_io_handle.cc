@@ -408,7 +408,7 @@ Envoy::Network::IoHandlePtr VclIoHandle::accept(sockaddr* addr, socklen_t* addrl
   auto new_sh = vppcom_session_accept(sh, &endpt, O_NONBLOCK);
   if (new_sh >= 0) {
     vclEndptCopy(addr, addrlen, endpt);
-    return std::make_unique<VclIoHandle>(new_sh, 1 << 23);
+    return std::make_unique<VclIoHandle>(new_sh, VclInvalidFd);
   }
   return nullptr;
 }
@@ -679,7 +679,7 @@ void VclIoHandle::initializeFileEvent(Event::Dispatcher& dispatcher, Event::File
 
         auto address = vclEndptToAddress(ep, -1);
         auto sh = vppcom_session_create(proto, 1);
-        wrk_listener_ = std::make_unique<VclIoHandle>(static_cast<uint32_t>(sh), 1 << 23);
+        wrk_listener_ = std::make_unique<VclIoHandle>(static_cast<uint32_t>(sh), VclInvalidFd);
         wrk_listener_->bind(address);
         uint32_t rv = vppcom_session_listen(sh, 5);
         if (rv) {
@@ -737,7 +737,7 @@ IoHandlePtr VclIoHandle::duplicate() {
 
   auto address = vclEndptToAddress(ep, -1);
   auto sh = vppcom_session_create(proto, 1);
-  IoHandlePtr io_handle = std::make_unique<VclIoHandle>(static_cast<uint32_t>(sh), 1 << 23);
+  IoHandlePtr io_handle = std::make_unique<VclIoHandle>(static_cast<uint32_t>(sh), VclInvalidFd);
 
   io_handle->bind(address);
 

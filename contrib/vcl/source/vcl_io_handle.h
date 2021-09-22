@@ -88,20 +88,14 @@ public:
 
   IoHandlePtr duplicate() override;
 
-  bool no_sh_ = false;
-
-  void setChildWrkListener(VclIoHandle* parent_listener) {
-    is_wrk_listener_ = true;
-    parent_listener_ = parent_listener;
-  }
+  void setChildWrkListener(VclIoHandle* parent_listener) { parent_listener_ = parent_listener; }
   void clearChildWrkListener() {
     if (wrk_listener_) {
-      wrk_listener_.release();
       wrk_listener_ = nullptr;
     }
   }
   VclIoHandle* getParentListener() { return parent_listener_; }
-  bool isWrkListener() { return is_wrk_listener_; }
+  bool isWrkListener() { return parent_listener_ != nullptr; }
 
 private:
   uint32_t sh_{VCL_INVALID_SH};
@@ -109,7 +103,6 @@ private:
   Event::FileEventPtr file_event_{nullptr};
 
   bool is_listener_ = false;
-  bool is_wrk_listener_ = false;
   bool not_listened_ = false;
   VclIoHandle* parent_listener_{nullptr};
   std::unique_ptr<VclIoHandle> wrk_listener_{nullptr};

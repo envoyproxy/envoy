@@ -14,12 +14,9 @@ namespace Extensions {
 namespace Network {
 namespace Vcl {
 
-using namespace Envoy::Event;
-using namespace Envoy::Network;
-
-class VclEvent : public FileEvent {
+class VclEvent : public Envoy::Event::FileEvent {
 public:
-  VclEvent(Dispatcher& dispatcher, VclIoHandle& io_handle, FileReadyCb cb);
+  VclEvent(Event::Dispatcher& dispatcher, VclIoHandle& io_handle, Event::FileReadyCb cb);
   ~VclEvent() override;
 
   // Event::FileEvent
@@ -31,14 +28,14 @@ public:
 private:
   void mergeInjectedEventsAndRunCb();
 
-  FileReadyCb cb_;
+  Event::FileReadyCb cb_;
   VclIoHandle& io_handle_;
 
   // Injected FileReadyType events that were scheduled by recent calls to activate() and are pending
   // delivery.
   uint32_t injected_activation_events_{};
   // Used to schedule delayed event activation. Armed iff pending_activation_events_ != 0.
-  SchedulableCallbackPtr activation_cb_;
+  Event::SchedulableCallbackPtr activation_cb_;
 };
 
 } // namespace Vcl

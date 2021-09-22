@@ -77,8 +77,8 @@ void vclInterfaceWorkerRegister() {
     RELEASE_ASSERT(0, "failed to create epoll handle");
   }
   epoll_handles[vppcom_worker_index()] = epoll_handle;
-  VCL_LOG("registered worker {} and epoll handle {} mq fd {}", vppcom_worker_index(), epoll_handle,
-          vppcom_mq_epoll_fd());
+  VCL_LOG("registered worker {} and epoll handle {:x} mq fd {}", vppcom_worker_index(),
+          epoll_handle, vppcom_mq_epoll_fd());
 }
 
 void vclInterfaceRegisterEpollEvent(Envoy::Event::Dispatcher& dispatcher) {

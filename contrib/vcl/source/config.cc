@@ -37,7 +37,7 @@ Envoy::Network::IoHandlePtr VclSocketInterface::socket(Envoy::Network::Socket::T
   if (sh < 0) {
     return nullptr;
   }
-  return std::make_unique<VclIoHandle>(static_cast<uint32_t>(sh), 1 << 23);
+  return std::make_unique<VclIoHandle>(static_cast<uint32_t>(sh), VclInvalidFd);
 }
 
 Envoy::Network::IoHandlePtr
@@ -55,7 +55,7 @@ VclSocketInterface::socket(Envoy::Network::Socket::Type socket_type,
   if (sh < 0) {
     return nullptr;
   }
-  return std::make_unique<VclIoHandle>(static_cast<uint32_t>(sh), 1 << 23);
+  return std::make_unique<VclIoHandle>(static_cast<uint32_t>(sh), VclInvalidFd);
 }
 
 bool VclSocketInterface::ipFamilySupported(int) { return true; };

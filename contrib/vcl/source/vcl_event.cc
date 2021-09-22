@@ -7,13 +7,11 @@ namespace Extensions {
 namespace Network {
 namespace Vcl {
 
-VclEvent::VclEvent(Dispatcher& dispatcher, VclIoHandle& io_handle, FileReadyCb cb)
-    : cb_(cb), io_handle_(io_handle) {
-  activation_cb_ = dispatcher.createSchedulableCallback([this]() {
-    ASSERT(injected_activation_events_ != 0);
-    mergeInjectedEventsAndRunCb();
-  });
-}
+VclEvent::VclEvent(Event::Dispatcher& dispatcher, VclIoHandle& io_handle, Event::FileReadyCb cb)
+    : cb_(cb), io_handle_(io_handle), activation_cb_(dispatcher.createSchedulableCallback([this]() {
+        ASSERT(injected_activation_events_ != 0);
+        mergeInjectedEventsAndRunCb();
+      })) {}
 
 VclEvent::~VclEvent() {
   // Worker listeners are valid only as long as the event is valid
@@ -22,7 +20,9 @@ VclEvent::~VclEvent() {
     if (parentListener) {
       parentListener->clearChildWrkListener();
     }
-    io_handle_.close();
+    if (VCL_SH_VALID(io_handle_.sh())) {
+      io_handle_.close();
+    }
   }
 }
 
@@ -30,7 +30,8 @@ void VclEvent::activate(uint32_t events) {
   // events is not empty.
   ASSERT(events != 0);
   // Only supported event types are set.
-  ASSERT((events & (FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed)) == events);
+  ASSERT((events & (Event::FileReadyType::Read | Event::FileReadyType::Write |
+                    Event::FileReadyType::Closed)) == events);
 
   cb_(events);
 
