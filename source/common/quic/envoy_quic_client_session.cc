@@ -28,6 +28,7 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return host_name_; }
 
 void EnvoyQuicClientSession::connect() {
+  std::cout << "connect is called!!!" << std::endl;
   dynamic_cast<EnvoyQuicClientConnection*>(network_connection_)->setUpConnectionSocket(*static_cast<EnvoyQuicClientConnection*>(connection())->connectionSocket(), *this);
   // Start version negotiation and crypto handshake during which the connection may fail if server
   // doesn't support the one and only supported version.

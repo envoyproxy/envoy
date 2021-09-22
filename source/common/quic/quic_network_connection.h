@@ -29,7 +29,7 @@ public:
   void setEnvoyConnection(Network::Connection& connection) { envoy_connection_ = &connection; }
 
   const Network::ConnectionSocketPtr& connectionSocket() const { 
-    std::cout << "socket list size " << connection_sockets_.size() << std::endl;
+    //std::cout << "socket list size " << connection_sockets_.size() << std::endl;
     return connection_sockets_.back(); }
 
   // Needed for ENVOY_CONN_LOG.

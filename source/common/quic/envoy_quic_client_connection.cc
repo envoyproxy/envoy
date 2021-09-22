@@ -45,7 +45,9 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
                                connection_socket->connectionInfoProvider().remoteAddress()->ip()),
                            &helper, &alarm_factory, writer, owns_writer,
                            quic::Perspective::IS_CLIENT, supported_versions),
-      QuicNetworkConnection(std::move(connection_socket)), dispatcher_(dispatcher) {}
+      QuicNetworkConnection(std::move(connection_socket)), dispatcher_(dispatcher) {
+        std::cout << "envoy connection created!!!" << std::endl;
+      }
 
 void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
@@ -184,20 +186,25 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
         connectionSocket()->ioHandle(),
         *connectionSocket()->connectionInfoProvider().localAddress(), *this,
         dispatcher_.timeSource(), true, packets_dropped_);
+    std::cout << "done reading from " << connectionSocket()->ioHandle().fdDoNotUse() << std::endl;
     if (err == nullptr) {
       if (!connectionSocket()) {
+        std::cout << "socket disappeared" << std::endl;
         return;
       }
+      std::cout << "at here!!!!!!!!!!!!!!!!!" << std::endl;
       connectionSocket()->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+      std::cout << "past here!!!!!!!!!!!!!!!!!" << std::endl;
     }
+    std::cout << "error is nullptr??" << (err ==nullptr) <<std::endl;
     if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this, static_cast<int>(err->getErrorCode()),
                      err->getErrorDetails());
+      std::cout << "passed logging" <<std::endl;
     }
+    std::cout << "reached return" << std::endl;
+    return;
 
-    if (!probing_socket_) {
-      return;
-    }
     err = Network::Utility::readPacketsFromSocket(
         probing_socket_->ioHandle(),
         *probing_socket_->connectionInfoProvider().localAddress(), *this,
