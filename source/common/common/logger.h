@@ -28,6 +28,7 @@ namespace Logger {
 // TODO: find out a way for extensions to register new logger IDs
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
   FUNCTION(admin)                                                                                  \
+  FUNCTION(alternate_protocols_cache)                                                              \
   FUNCTION(aws)                                                                                    \
   FUNCTION(assert)                                                                                 \
   FUNCTION(backtrace)                                                                              \
