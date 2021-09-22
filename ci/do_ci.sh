@@ -379,7 +379,8 @@ elif [[ "$CI_TARGET" == "bazel.api_compat" ]]; then
   BASE_BRANCH_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
   COMMIT_TITLE=$(git log -n 1 --pretty='format:%C(auto)%h (%s, %ad)' "${BASE_BRANCH_REF}")
   echo -e "\tUsing base commit ${COMMIT_TITLE}"
-  bazel run //tools/api_proto_breaking_change_detector:detector_ci "${BASE_BRANCH_REF}"
+  # BAZEL_BUILD_OPTIONS needed for setting the repository_cache param.
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/api_proto_breaking_change_detector:detector_ci "${BASE_BRANCH_REF}"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
   setup_clang_toolchain
