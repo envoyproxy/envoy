@@ -279,6 +279,12 @@ EXTENSIONS = {
     "envoy.http.original_ip_detection.xff":                  "//source/extensions/http/original_ip_detection/xff:config",
 
     #
+    # Stateful session sticky
+    #
+
+    "envoy.http.stateful_session.cookie":                "//source/extensions/http/stateful_session/cookie:config",
+
+    #
     # Quic extensions
     #
 

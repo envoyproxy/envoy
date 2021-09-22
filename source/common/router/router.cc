@@ -569,6 +569,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     Network::Socket::appendOptions(upstream_options_, callbacks_->getUpstreamSocketOptions());
   }
 
+  if (config_.session_state_config_.enabled_) {
+    session_state_ = config_.session_state_config_.factory_->create(headers);
+  }
+
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(*cluster);
 
   if (!generic_conn_pool) {
@@ -1414,6 +1418,12 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   resetOtherUpstreams(upstream_request);
   if (end_stream) {
     onUpstreamComplete(upstream_request);
+  }
+
+  // TODO(wbpcode): session state may be updated only under certain conditions. For example, when
+  // upstream returns a 200 response code.
+  if (session_state_ != nullptr) {
+    session_state_->onUpdate(*upstream_request.upstreamHost(), *headers);
   }
 
   callbacks_->encodeHeaders(std::move(headers), end_stream,

@@ -16,6 +16,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/hash_policy.h"
+#include "envoy/http/stateful_session.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -594,6 +595,20 @@ public:
   MOCK_METHOD(UpstreamToDownstream&, upstreamToDownstream, ());
 
   NiceMock<MockUpstreamToDownstream> upstream_to_downstream_;
+};
+
+class MockSessionState : public Http::SessionState {
+public:
+  MOCK_METHOD(absl::optional<absl::string_view>, upstreamAddress, (), (const));
+  MOCK_METHOD(void, onUpdate,
+              (const Upstream::HostDescription& host, Http::ResponseHeaderMap& headers));
+};
+
+class MockSessionStateFactory : public Http::SessionStateFactory {
+public:
+  MockSessionStateFactory();
+
+  MOCK_METHOD(Http::SessionStatePtr, create, (const Http::RequestHeaderMap& headers), (const));
 };
 
 } // namespace Router

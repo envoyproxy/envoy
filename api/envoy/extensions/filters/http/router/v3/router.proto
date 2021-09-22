@@ -27,14 +27,15 @@ message Router {
       "envoy.config.filter.http.router.v2.Router";
 
   message StatefulSessionSticky {
-    // The expected health status of the host. Suppose the current session
-    // stuck on the host X. However, if the health status of host X does not
-    // meet expectations, Envoy will select a new host for the current request
-    // according to the load balancing algorithm.
-    repeated config.core.v3.HealthStatus expected_statuses = 1
+    // The expected health status of the host. Suppose the one session stuck on the
+    // host X. However, if the health status of host X does not meet expectations,
+    // Envoy will select new host for the session according to the load balancing
+    // algorithm.
+    repeated config.core.v3.HealthStatus host_statuses = 1
         [(validate.rules).repeated = {min_items: 1}];
 
-    // Specific implementation of stateful session sticky.
+    // Specific implementation of session state. This session state will be used to
+    // store and get address of upstream host that session stuck on.
     config.core.v3.TypedExtensionConfig session_state = 2
         [(validate.rules).message = {required: true}];
   }

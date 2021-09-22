@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/random_generator.h"
@@ -11,6 +12,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/stateful_session.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
@@ -26,6 +28,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
+#include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
@@ -176,6 +179,15 @@ public:
 };
 
 /**
+ * Simple struct wrapper for the stateful session sticky.
+ */
+struct SessionStateConfig {
+  bool enabled_{false};
+  Upstream::LoadBalancerContext::OverrideHostStatus host_statuses_;
+  Envoy::Http::SessionStateFactorySharedPtr factory_;
+};
+
+/**
  * Configuration for the router filter.
  */
 class FilterConfig {
@@ -217,6 +229,23 @@ public:
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
+
+    if (config.has_stateful_session_sticky()) {
+      session_state_config_.enabled_ = true;
+      std::vector<envoy::config::core::v3::HealthStatus> host_statuses;
+      for (int i = 0; i < config.stateful_session_sticky().host_statuses_size(); i++) {
+        host_statuses.push_back(config.stateful_session_sticky().host_statuses(i));
+      }
+      session_state_config_.host_statuses_ =
+          Upstream::LoadBalancerContextBase::createOverrideHostStatus(host_statuses);
+
+      auto& factory =
+          Envoy::Config::Utility::getAndCheckFactoryByName<Envoy::Http::SessionStateFactoryConfig>(
+              config.stateful_session_sticky().session_state().name());
+
+      session_state_config_.factory_ = factory.createSessionStateFactory(
+          config.stateful_session_sticky().session_state().typed_config(), context);
+    }
   }
   using HeaderVector = std::vector<Http::LowerCaseString>;
   using HeaderVectorPtr = std::unique_ptr<HeaderVector>;
@@ -241,6 +270,9 @@ public:
   Http::Context& http_context_;
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
+
+  // Config for the stateful session sticky.
+  SessionStateConfig session_state_config_;
 
 private:
   ShadowWriterPtr shadow_writer_;
@@ -408,6 +440,19 @@ public:
     return transport_socket_options_;
   }
 
+  absl::optional<OverrideHost> overrideHostToSelect() const override {
+    if (session_state_ == nullptr || is_retry_) {
+      return {};
+    }
+
+    auto address = session_state_->upstreamAddress();
+    if (address.has_value()) {
+      return std::make_pair(std::string(address.value()),
+                            config_.session_state_config_.host_statuses_);
+    }
+    return {};
+  }
+
   /**
    * Set a computed cookie to be sent with the downstream headers.
    * @param key supplies the size of the cookie
@@ -573,6 +618,8 @@ private:
 
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::Socket::OptionsSharedPtr upstream_options_;
+
+  mutable Http::SessionStatePtr session_state_;
 };
 
 class ProdFilter : public Filter {

@@ -193,6 +193,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/matching/input_matchers/ip @aguinet @snowp
 # Key Value store
 /*/extensions/key_value @alyssawilk @ryantheoptimist
+# Stateful session sticky
+/*/extensions/http/stateful_session/cookie @wbpcode
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan

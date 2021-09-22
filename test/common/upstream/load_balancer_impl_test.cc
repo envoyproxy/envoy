@@ -2025,6 +2025,49 @@ TEST(LoadBalancerContextBaseTest, LoadBalancerContextBaseTest) {
     EXPECT_EQ(nullptr, context.upstreamTransportSocketOptions());
     EXPECT_EQ(absl::nullopt, context.overrideHostToSelect());
   }
+  {
+    std::vector<envoy::config::core::v3::HealthStatus> statuses{
+        envoy::config::core::v3::HealthStatus::UNKNOWN,
+        envoy::config::core::v3::HealthStatus::HEALTHY};
+    EXPECT_EQ(LoadBalancerContextBase::createOverrideHostStatus(statuses), HealthyStatus);
+  }
+  {
+    std::vector<envoy::config::core::v3::HealthStatus> statuses{
+        envoy::config::core::v3::HealthStatus::UNHEALTHY,
+        envoy::config::core::v3::HealthStatus::DRAINING,
+        envoy::config::core::v3::HealthStatus::TIMEOUT};
+
+    EXPECT_EQ(LoadBalancerContextBase::createOverrideHostStatus(statuses), UnhealthyStatus);
+  }
+  {
+    std::vector<envoy::config::core::v3::HealthStatus> statuses{
+        envoy::config::core::v3::HealthStatus::DEGRADED};
+    EXPECT_EQ(LoadBalancerContextBase::createOverrideHostStatus(statuses), DegradedStatus);
+  }
+  {
+    std::vector<envoy::config::core::v3::HealthStatus> statuses;
+    EXPECT_EQ(LoadBalancerContextBase::createOverrideHostStatus(statuses), 0);
+  }
+  {
+    std::vector<envoy::config::core::v3::HealthStatus> statuses{
+        envoy::config::core::v3::HealthStatus::UNHEALTHY,
+        envoy::config::core::v3::HealthStatus::DRAINING,
+        envoy::config::core::v3::HealthStatus::TIMEOUT,
+        envoy::config::core::v3::HealthStatus::UNKNOWN,
+        envoy::config::core::v3::HealthStatus::HEALTHY};
+    EXPECT_EQ(LoadBalancerContextBase::createOverrideHostStatus(statuses), 0b101u);
+  }
+
+  {
+    std::vector<envoy::config::core::v3::HealthStatus> statuses{
+        envoy::config::core::v3::HealthStatus::UNHEALTHY,
+        envoy::config::core::v3::HealthStatus::DRAINING,
+        envoy::config::core::v3::HealthStatus::TIMEOUT,
+        envoy::config::core::v3::HealthStatus::UNKNOWN,
+        envoy::config::core::v3::HealthStatus::HEALTHY,
+        envoy::config::core::v3::HealthStatus::DEGRADED};
+    EXPECT_EQ(LoadBalancerContextBase::createOverrideHostStatus(statuses), 0b111u);
+  }
 
   EXPECT_TRUE(LoadBalancerContextBase::validateOverrideHostStatus(Host::Health::Unhealthy,
                                                                   UnhealthyStatus));

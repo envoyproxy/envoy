@@ -561,6 +561,30 @@ HostConstSharedPtr LoadBalancerContextBase::selectOverrideHost(const HostMap* ho
   return nullptr;
 }
 
+LoadBalancerContext::OverrideHostStatus LoadBalancerContextBase::createOverrideHostStatus(
+    const std::vector<envoy::config::core::v3::HealthStatus>& statuses) {
+  LoadBalancerContext::OverrideHostStatus override_host_statuses = 0;
+  for (auto status : statuses) {
+    switch (status) {
+    case envoy::config::core::v3::HealthStatus::UNKNOWN:
+    case envoy::config::core::v3::HealthStatus::HEALTHY:
+      override_host_statuses |= HealthyStatus;
+      break;
+    case envoy::config::core::v3::HealthStatus::UNHEALTHY:
+    case envoy::config::core::v3::HealthStatus::DRAINING:
+    case envoy::config::core::v3::HealthStatus::TIMEOUT:
+      override_host_statuses |= UnhealthyStatus;
+      break;
+    case envoy::config::core::v3::HealthStatus::DEGRADED:
+      override_host_statuses |= DegradedStatus;
+      break;
+    default:
+      break;
+    }
+  }
+  return override_host_statuses;
+}
+
 HostConstSharedPtr ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
   HostConstSharedPtr host =
       LoadBalancerContextBase::selectOverrideHost(cross_priority_host_map_.get(), context);
