@@ -10,6 +10,7 @@ namespace Envoy {
 void TestListener::OnTestStart(const ::testing::TestInfo& test_info) {
   UNREFERENCED_PARAMETER(test_info);
   Thread::MainThread::clear();
+  Thread::MainThread::initTestThread();
 }
 
 void TestListener::OnTestEnd(const ::testing::TestInfo& test_info) {
