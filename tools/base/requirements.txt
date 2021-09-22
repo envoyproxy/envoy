@@ -31,6 +31,7 @@ aio.tasks==0.0.4 \
     --hash=sha256:9abd4b0881edb292c4f91a2f63b1dea7a9829a4bd4e8440225a1a412a90461fc
     # via
     #   envoy.code-format.python-check
+    # via -r tools/base/requirements.in
     #   envoy.github.abstract
     #   envoy.github.release
 aiodocker==0.21.0 \
@@ -280,6 +281,7 @@ envoy.base.checker==0.0.2 \
 envoy.base.runner==0.0.4 \
     --hash=sha256:4eeb2b661f1f0c402df4425852be554a8a83ef5d338bfae69ddcb9b90755379e
     # via
+    #   -r tools/base/requirements.in
     #   envoy.base.checker
     #   envoy.distribution.release
     #   envoy.docs.sphinx-runner
