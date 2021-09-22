@@ -65,7 +65,7 @@ public:
  * Generic integer deserializer (uses array of sizeof(T) bytes).
  * After all bytes are filled in, the value is converted from network byte-order and returned.
  */
-template <typename T> class IntDeserializer : public Deserializer<T> {
+template <typename T> class FixedSizeDeserializer : public Deserializer<T> {
 public:
   uint32_t feed(absl::string_view& data) override {
     const uint32_t available = std::min<uint32_t>(sizeof(buf_) - written_, data.size());
@@ -92,7 +92,7 @@ protected:
 /**
  * Integer deserializer for int8_t.
  */
-class Int8Deserializer : public IntDeserializer<int8_t> {
+class Int8Deserializer : public FixedSizeDeserializer<int8_t> {
 public:
   int8_t get() const override {
     int8_t result = buf_[0];
@@ -103,7 +103,7 @@ public:
 /**
  * Integer deserializer for int16_t.
  */
-class Int16Deserializer : public IntDeserializer<int16_t> {
+class Int16Deserializer : public FixedSizeDeserializer<int16_t> {
 public:
   int16_t get() const override {
     int16_t result;
@@ -115,7 +115,7 @@ public:
 /**
  * Integer deserializer for uint16_t.
  */
-class UInt16Deserializer : public IntDeserializer<uint16_t> {
+class UInt16Deserializer : public FixedSizeDeserializer<uint16_t> {
 public:
   uint16_t get() const override {
     uint16_t result;
@@ -127,7 +127,7 @@ public:
 /**
  * Integer deserializer for int32_t.
  */
-class Int32Deserializer : public IntDeserializer<int32_t> {
+class Int32Deserializer : public FixedSizeDeserializer<int32_t> {
 public:
   int32_t get() const override {
     int32_t result;
@@ -139,7 +139,7 @@ public:
 /**
  * Integer deserializer for uint32_t.
  */
-class UInt32Deserializer : public IntDeserializer<uint32_t> {
+class UInt32Deserializer : public FixedSizeDeserializer<uint32_t> {
 public:
   uint32_t get() const override {
     uint32_t result;
@@ -151,7 +151,7 @@ public:
 /**
  * Integer deserializer for uint64_t.
  */
-class Int64Deserializer : public IntDeserializer<int64_t> {
+class Int64Deserializer : public FixedSizeDeserializer<int64_t> {
 public:
   int64_t get() const override {
     int64_t result;
@@ -166,13 +166,19 @@ public:
  * Represents a double-precision 64-bit format IEEE 754 value. The values are encoded using eight
  * bytes in network byte order (big-endian).
  */
-class Float64Deserializer : public IntDeserializer<double> {
+class Float64Deserializer : public FixedSizeDeserializer<double> {
+
+  static_assert(sizeof(double) == sizeof(uint64_t), "sizeof(double) != sizeof(uint64_t)");
+  static_assert(std::numeric_limits<double>::is_iec559, "non-IEC559 (IEEE 754) double");
+
 public:
   double get() const override {
     uint64_t in_network_order;
     safeMemcpyUnsafeSrc(&in_network_order, buf_);
     uint64_t in_host_order = be64toh(in_network_order);
-    return *reinterpret_cast<double*>(&in_host_order);
+    double result;
+    safeMemcpy(&result, &in_host_order);
+    return result;
   }
 };
 
@@ -180,8 +186,8 @@ public:
  * Deserializer for boolean values.
  * Uses a single int8 deserializer, and checks whether the results equals 0.
  * When reading a boolean value, any non-zero value is considered true.
- * Impl note: could have been a subclass of IntDeserializer<int8_t> with a different get function,
- * but it makes it harder to understand.
+ * Impl note: could have been a subclass of FixedSizeDeserializer<int8_t> with a different get
+ * function, but it makes it harder to understand.
  */
 class BooleanDeserializer : public Deserializer<bool> {
 public:
@@ -1244,11 +1250,10 @@ ENCODE_NUMERIC_TYPE(int64_t, htobe64);
  * Encodes 8 bytes.
  */
 template <> inline uint32_t EncodingContext::encode(const double& arg, Buffer::Instance& dst) {
-  static_assert(sizeof(double) == sizeof(uint64_t));
-
   double tmp = arg;
-  const uint64_t as_long = *reinterpret_cast<uint64_t*>(&tmp);
-  const uint64_t in_network_order = htobe64(as_long);
+  uint64_t in_host_order;
+  safeMemcpy(&in_host_order, &tmp);
+  const uint64_t in_network_order = htobe64(in_host_order);
   dst.add(&in_network_order, sizeof(uint64_t));
   return sizeof(uint64_t);
 }
