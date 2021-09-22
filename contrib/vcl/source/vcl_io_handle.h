@@ -21,10 +21,6 @@ using namespace Envoy::Network;
 #define VCL_SH_VALID(_sh) (_sh != static_cast<uint32_t>(~0))
 #define VCL_SET_SH_INVALID(_sh) (_sh = static_cast<uint32_t>(~0))
 
-int peekVclSession(vcl_session_handle_t sh, vppcom_endpt_t* ep, uint32_t* proto);
-Envoy::Network::Address::InstanceConstSharedPtr vclEndptToAddress(const vppcom_endpt_t& endpt,
-                                                                  uint32_t sh);
-
 class VclIoHandle : public Envoy::Network::IoHandle, Logger::Loggable<Logger::Id::connection> {
 public:
   explicit VclIoHandle(os_fd_t fd = INVALID_SOCKET) : sh_(fd) {

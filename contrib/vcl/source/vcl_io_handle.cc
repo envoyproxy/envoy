@@ -11,7 +11,9 @@ namespace Extensions {
 namespace Network {
 namespace Vcl {
 
-static inline int vclWrkIndexOrRegister() {
+namespace {
+
+int vclWrkIndexOrRegister() {
   int wrk_index;
 
   if ((wrk_index = vppcom_worker_index()) == -1) {
@@ -43,7 +45,7 @@ int peekVclSession(vcl_session_handle_t sh, vppcom_endpt_t* ep, uint32_t* proto)
   return 0;
 }
 
-static void vclEndptCopy(sockaddr* addr, socklen_t* addrlen, const vppcom_endpt_t& ep) {
+void vclEndptCopy(sockaddr* addr, socklen_t* addrlen, const vppcom_endpt_t& ep) {
   if (ep.is_ip4) {
     sockaddr_in* addr4 = reinterpret_cast<sockaddr_in*>(addr);
     addr4->sin_family = AF_INET;
@@ -93,8 +95,8 @@ Envoy::Network::Address::InstanceConstSharedPtr vclEndptToAddress(const vppcom_e
   }
 }
 
-static void vclEndptFromAddress(vppcom_endpt_t& endpt,
-                                Envoy::Network::Address::InstanceConstSharedPtr address) {
+void vclEndptFromAddress(vppcom_endpt_t& endpt,
+                         Envoy::Network::Address::InstanceConstSharedPtr address) {
   endpt.is_cut_thru = 0;
   if (address->ip()->version() == Envoy::Network::Address::IpVersion::v4) {
     const sockaddr_in* in = reinterpret_cast<const sockaddr_in*>(address->sockAddr());
@@ -108,6 +110,8 @@ static void vclEndptFromAddress(vppcom_endpt_t& endpt,
     endpt.port = static_cast<uint16_t>(in6->sin6_port);
   }
 }
+
+} // namespace
 
 VclIoHandle::~VclIoHandle() {
   if (VCL_SH_VALID(sh_)) {
