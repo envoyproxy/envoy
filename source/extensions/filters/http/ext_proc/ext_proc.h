@@ -149,6 +149,7 @@ public:
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();
+  void closeStream();
 
   void cleanUpTimers();
   void clearAsyncState();

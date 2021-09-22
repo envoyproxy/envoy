@@ -37,20 +37,14 @@ void ExternalProcessorStreamImpl::send(
 }
 
 bool ExternalProcessorStreamImpl::close() {
-  bool newly_closed = false;
   if (!stream_closed_) {
-    // If we get here, then we received no "onRemoteClose" callback, so
-    // send a close frame to the other side.
     ENVOY_LOG(debug, "Closing gRPC stream");
-    stream_->closeStream();
+    stream_.closeStream();
     stream_closed_ = true;
-    newly_closed = true;
+    stream_.resetStream();
+    return true;
   }
-  // Make sure that we don't get any more callbacks after this point -- this
-  // object will be destroyed soon and the gRPC stream implementation will
-  // crash if it tries to invoke a callback now.
-  stream_->resetStream();
-  return newly_closed;
+  return false;
 }
 
 void ExternalProcessorStreamImpl::onReceiveMessage(ProcessingResponsePtr&& response) {
