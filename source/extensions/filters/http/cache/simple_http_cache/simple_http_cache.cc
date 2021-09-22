@@ -155,8 +155,8 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
   // of the corresponding header fields in the stored response
   absl::flat_hash_set<Http::LowerCaseString> updatedHeaderFields;
   response_headers.iterate(
-      [&entry, &updatedHeaderFields](const Http::HeaderEntry& incoming_response_header) 
-        -> Http::HeaderMap::Iterate {
+      [&entry, &updatedHeaderFields](
+          const Http::HeaderEntry& incoming_response_header) -> Http::HeaderMap::Iterate {
         Http::LowerCaseString lower_case_key{incoming_response_header.key().getStringView()};
         absl::string_view incoming_value{incoming_response_header.value().getStringView()};
         if (headersNotToUpdate().contains(lower_case_key)) {
