@@ -69,8 +69,7 @@ TEST_F(ConfigTest, AutoHttp3NoCache) {
   options_.mutable_auto_config();
   options_.mutable_auto_config()->mutable_http3_protocol_options();
   EXPECT_THROW_WITH_MESSAGE(
-      ProtocolOptionsConfigImpl config(options_, validation_visitor_),
-      EnvoyException,
+      ProtocolOptionsConfigImpl config(options_, validation_visitor_), EnvoyException,
       "alternate protocols cache must be configured when HTTP/3 is enabled with auto_config");
 }
 
