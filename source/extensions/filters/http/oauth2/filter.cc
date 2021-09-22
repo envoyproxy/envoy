@@ -36,11 +36,13 @@ namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     authorization_handle(Http::CustomHeaders::get().Authorization);
 
-constexpr absl::string_view SignoutCookieValue =
-    "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+// Deleted OauthHMAC cookie.
+constexpr const char* SignoutCookieValue =
+    "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
-constexpr absl::string_view SignoutBearerTokenValue =
-    "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+// Deleted BearerToken cookie.
+constexpr const char* SignoutBearerTokenValue =
+    "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
 constexpr const char* CookieTailFormatString = ";version=1;path=/;Max-Age={};secure";
 
@@ -130,7 +132,8 @@ FilterConfig::FilterConfig(
           absl::StrJoin(authScopesList(proto_config.auth_scopes()), " "), ":/=&? ")),
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
       forward_bearer_token_(proto_config.forward_bearer_token()),
-      pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())) {
+      pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())),
+      cookie_names_(proto_config.credentials().cookie_names()) {
   if (!cluster_manager.clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
@@ -144,13 +147,14 @@ FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope&
 
 void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
                                       const std::string& secret) {
-  const auto& cookies = Http::Utility::parseCookies(headers, [](absl::string_view key) -> bool {
-    return key == "OauthExpires" || key == "BearerToken" || key == "OauthHMAC";
+  const auto& cookies = Http::Utility::parseCookies(headers, [this](absl::string_view key) -> bool {
+    return key == cookie_names_.oauth_expires_ || key == cookie_names_.bearer_token_ ||
+           key == cookie_names_.oauth_hmac_;
   });
 
-  expires_ = findValue(cookies, "OauthExpires");
-  token_ = findValue(cookies, "BearerToken");
-  hmac_ = findValue(cookies, "OauthHMAC");
+  expires_ = findValue(cookies, cookie_names_.oauth_expires_);
+  token_ = findValue(cookies, cookie_names_.bearer_token_);
+  hmac_ = findValue(cookies, cookie_names_.oauth_hmac_);
   host_ = headers.Host()->value().getStringView();
 
   secret_.assign(secret.begin(), secret.end());
@@ -180,7 +184,7 @@ bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampI
 
 OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
                            std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source)
-    : validator_(std::make_shared<OAuth2CookieValidator>(time_source)),
+    : validator_(std::make_shared<OAuth2CookieValidator>(time_source, config->cookieNames())),
       oauth_client_(std::move(oauth_client)), config_(std::move(config)),
       time_source_(time_source) {
 
@@ -397,8 +401,12 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
 
   const std::string new_path = absl::StrCat(Http::Utility::getScheme(headers), "://", host_, "/");
-  response_headers->addReference(Http::Headers::get().SetCookie, SignoutCookieValue);
-  response_headers->addReference(Http::Headers::get().SetCookie, SignoutBearerTokenValue);
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      fmt::format(SignoutCookieValue, config_->cookieNames().oauth_hmac_));
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      fmt::format(SignoutBearerTokenValue, config_->cookieNames().bearer_token_));
   response_headers->setLocation(new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
@@ -457,18 +465,21 @@ void OAuth2Filter::finishFlow() {
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
 
+  const CookieNames& cookie_names = config_->cookieNames();
+
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      absl::StrCat("OauthHMAC=", encoded_token, cookie_tail_http_only));
+      absl::StrCat(cookie_names.oauth_hmac_, "=", encoded_token, cookie_tail_http_only));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      absl::StrCat("OauthExpires=", new_expires_, cookie_tail_http_only));
+      absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_, cookie_tail_http_only));
 
   // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
   // auth server.
   if (config_->forwardBearerToken()) {
-    response_headers->addReferenceKey(Http::Headers::get().SetCookie,
-                                      absl::StrCat("BearerToken=", access_token_, cookie_tail));
+    response_headers->addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail));
   }
 
   response_headers->setLocation(state_);

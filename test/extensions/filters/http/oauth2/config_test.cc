@@ -86,6 +86,10 @@ config:
       name: token
     hmac_secret:
       name: hmac
+    cookie_names:
+      bearer_token: BearerToken
+      oauth_hmac: OauthHMAC
+      oauth_expires: OauthExpires
   authorization_endpoint: https://oauth.com/oauth/authorize/
   redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
   redirect_path_matcher:
