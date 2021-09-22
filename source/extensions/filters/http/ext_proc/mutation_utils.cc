@@ -69,10 +69,20 @@ void MutationUtils::applyHeaderMutations(const HeaderMutation& mutation, Http::H
         ENVOY_LOG(debug, "Ignoring duplicate value for header {}", sh.header().key());
       } else {
         ENVOY_LOG(trace, "Setting header {} append_action = {}", sh.header().key(), append_action);
-        if (append_action == envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS) {
+        switch (append_action) {
+        case envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT:
+          if (headers.get(lcKey).empty()) {
+            headers.setCopy(lcKey, sh.header().value());
+          }
+          break;
+        case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS:
           headers.addCopy(lcKey, sh.header().value());
-        } else {
+          break;
+        case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS:
           headers.setCopy(lcKey, sh.header().value());
+          break;
+        default:
+          NOT_REACHED_GCOVR_EXCL_LINE;
         }
       }
     }

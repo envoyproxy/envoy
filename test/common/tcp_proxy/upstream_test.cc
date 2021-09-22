@@ -253,6 +253,18 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
   hdr->set_value("value2");
   header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
 
+  header = this->config_.add_headers_to_add();
+  hdr = header->mutable_header();
+  hdr->set_key("header0");
+  hdr->set_value("some-value");
+  header->set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
+
+  header = this->config_.add_headers_to_add();
+  hdr = header->mutable_header();
+  hdr->set_key("add-if-absent");
+  hdr->set_value("true");
+  header->set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
+
   this->setupUpstream();
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
   expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
@@ -271,6 +283,8 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
   expected_headers->setCopy(Http::LowerCaseString("header0"), "value0");
   expected_headers->addCopy(Http::LowerCaseString("header1"), "value1");
   expected_headers->addCopy(Http::LowerCaseString("header1"), "value2");
+  // Should be added as there is no such header already present.
+  expected_headers->addCopy(Http::LowerCaseString("add-if-absent"), "true");
 
   EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
   this->upstream_->setRequestEncoder(this->encoder_, false);

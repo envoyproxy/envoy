@@ -69,6 +69,15 @@ TEST(MutationUtils, TestApplyMutations) {
   s = mutation.add_set_headers();
   s->mutable_header()->set_key(":status");
   s->mutable_header()->set_value("418");
+  // ADD_IF_ABSENT cases where a header should only be added if it's not already present.
+  s = mutation.add_set_headers();
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
+  s->mutable_header()->set_key("x-add-this");
+  s->mutable_header()->set_value("foobar");
+  s = mutation.add_set_headers();
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
+  s->mutable_header()->set_key("x-append-this");
+  s->mutable_header()->set_value("do-nothing");
   // Default of "append_action" is "APPEND_IF_EXISTS" and mutations
   // are applied in order.
   s = mutation.add_set_headers();
@@ -124,6 +133,7 @@ TEST(MutationUtils, TestApplyMutations) {
       {":authority", "localhost:1000"},
       {":status", "418"},
       {"content-type", "text/plain; encoding=UTF8"},
+      {"x-add-this", "foobar"},
       {"x-append-this", "1"},
       {"x-append-this", "2"},
       {"x-append-this", "3"},

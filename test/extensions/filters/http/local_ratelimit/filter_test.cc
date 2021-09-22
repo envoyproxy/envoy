@@ -34,6 +34,14 @@ response_headers_to_add:
     header:
       key: x-test-rate-limit
       value: 'true'
+  - append_action: "ADD_IF_ABSENT"
+    header:
+      key: x-test-add-if-absent-1
+      value: 'right-value'
+  - append_action: "ADD_IF_ABSENT"
+    header:
+      key: x-test-add-if-absent-2
+      value: 'wrong-value'
 request_headers_to_add_when_not_enforced:
   - append_action: "OVERWRITE_IF_EXISTS"
     header:
@@ -149,11 +157,23 @@ TEST_F(FilterTest, RequestRateLimited) {
         EXPECT_EQ(Http::Code::TooManyRequests, code);
         EXPECT_EQ("local_rate_limited", body);
 
-        Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+        Http::TestResponseHeaderMapImpl response_headers{
+            {":status", "200"}, {"x-test-add-if-absent-2", "initial-value"}};
         modify_headers(response_headers);
         EXPECT_EQ("true", response_headers.get(Http::LowerCaseString("x-test-rate-limit"))[0]
                               ->value()
                               .getStringView());
+        // `x-test-add-if-absent-1` should point to the value described in response_headers_to_add.
+        EXPECT_EQ("right-value",
+                  response_headers.get(Http::LowerCaseString("x-test-add-if-absent-1"))[0]
+                      ->value()
+                      .getStringView());
+        // `x-test-add-if-absent-2` should point to the initial value and not the one in
+        // response_headers_to_add.
+        EXPECT_EQ("initial-value",
+                  response_headers.get(Http::LowerCaseString("x-test-add-if-absent-2"))[0]
+                      ->value()
+                      .getStringView());
 
         EXPECT_EQ(grpc_status, absl::nullopt);
         EXPECT_EQ(details, "local_rate_limited");
