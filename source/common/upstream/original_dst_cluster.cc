@@ -110,8 +110,8 @@ OriginalDstCluster::OriginalDstCluster(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api,
-                      factory_context.dispatcher().timeSource()),
-      dispatcher_(factory_context.dispatcher()),
+                      factory_context.mainThreadDispatcher().timeSource()),
+      dispatcher_(factory_context.mainThreadDispatcher()),
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })),

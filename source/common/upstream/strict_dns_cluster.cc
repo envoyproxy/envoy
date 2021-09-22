@@ -14,7 +14,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                             added_via_api, factory_context.dispatcher().timeSource()),
+                             added_via_api, factory_context.mainThreadDispatcher().timeSource()),
       load_assignment_(cluster.load_assignment()), local_info_(factory_context.localInfo()),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
@@ -37,8 +37,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
 
       const std::string& url =
           fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
-      resolve_targets.emplace_back(new ResolveTarget(*this, factory_context.dispatcher(), url,
-                                                     locality_lb_endpoint, lb_endpoint));
+      resolve_targets.emplace_back(new ResolveTarget(*this, factory_context.mainThreadDispatcher(),
+                                                     url, locality_lb_endpoint, lb_endpoint));
     }
   }
   resolve_targets_ = std::move(resolve_targets);

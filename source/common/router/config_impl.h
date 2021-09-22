@@ -819,7 +819,7 @@ private:
         const std::string& filter_name,
         std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
-    const Http::LowerCaseString& clusterHeaderName() { return cluster_header_name_; }
+    const Http::LowerCaseString& clusterHeaderName() const { return cluster_header_name_; }
 
   private:
     const std::string runtime_key_;
@@ -862,6 +862,12 @@ private:
   buildInternalRedirectPolicy(const envoy::config::route::v3::RouteAction& route_config,
                               ProtobufMessage::ValidationVisitor& validator,
                               absl::string_view current_route_name) const;
+
+  RouteConstSharedPtr pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
+                                                  const Http::HeaderMap& headers) const;
+
+  RouteConstSharedPtr pickWeightedCluster(const Http::HeaderMap& headers, uint64_t random_value,
+                                          bool ignore_overflow) const;
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
