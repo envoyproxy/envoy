@@ -10,8 +10,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::Return;
-
 namespace Envoy {
 namespace {
 class AlternateProtocolsCacheManagerTest : public testing::Test,
@@ -22,8 +20,9 @@ public:
     options_.mutable_max_entries()->set_value(10);
   }
   void initialize() {
-    factory_.reset(
-        new Http::AlternateProtocolsCacheManagerFactoryImpl(singleton_manager_, tls_, {context_}));
+    Http::AlternateProtocolsData data = {context_};
+    factory_ = std::make_unique<Http::AlternateProtocolsCacheManagerFactoryImpl>(singleton_manager_,
+                                                                                 tls_, data);
     manager_ = factory_->get();
   }
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
