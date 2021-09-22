@@ -1,5 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_binary")
-load("@base_pip3//:requirements.bzl", "entry_point")
+load("@base_pip3//:requirements.bzl", "entry_point", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_py_binary")
 
@@ -11,7 +11,7 @@ py_binary(
     name = "generate_extensions_security_rst",
     srcs = ["generate_extensions_security_rst.py"],
     deps = [
-        "//tools/base:utils",
+        requirement("envoy.base.utils"),
     ],
 )
 
@@ -52,5 +52,5 @@ alias(
 envoy_py_binary(
     name = "tools.docs.rst_check",
     data = ["//docs:root/version_history/current.rst"],
-    deps = ["//tools/base:checker"],
+    deps = [requirement("envoy.base.checker")],
 )
