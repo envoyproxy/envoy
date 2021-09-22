@@ -309,7 +309,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
       CheckStatus::OK, Http::Code::OK, EMPTY_STRING, TestCommon::makeHeaderValueOption({}),
       TestCommon::makeHeaderValueOption(
           {{"x-downstream-ok", "1",
-            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS}}));
+            envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS}}));
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
   envoy::service::auth::v3::CheckRequest request;
   auto mutable_headers =
