@@ -398,7 +398,6 @@ TEST_P(ProxyFilterIntegrationTest, DnsCacheCircuitBreakersInvoked) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, UseCacheFile) {
-  LogLevelSetter save_levels(spdlog::level::trace);
   write_cache_file_ = true;
 
   initializeWithArgs();
