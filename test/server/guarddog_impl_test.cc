@@ -761,6 +761,8 @@ TEST_P(GuardDogActionsTest, MegaMissShouldSaturateOnMegaMissEvent) {
   EXPECT_THAT(events_, ElementsAre("MEGAMISS : 10", "MEGAMISS : 10"));
 }
 
+// Disabled for coverage per #18229
+#if !defined(ENVOY_CONFIG_COVERAGE)
 TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
   // Priority of events are KILL, MULTIKILL, MEGAMISS and MISS
 
@@ -804,6 +806,7 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
   guard_dog_->forceCheckForTest();
   EXPECT_THAT(events_, ElementsAre("MEGAMISS : 10", "MISS : 10"));
 }
+#endif
 
 TEST_P(GuardDogActionsTest, KillShouldTriggerGuardDogActions) {
   auto die_function = [&]() -> void {
