@@ -9,8 +9,8 @@ namespace Envoy {
 
 void TestListener::OnTestStart(const ::testing::TestInfo& test_info) {
   UNREFERENCED_PARAMETER(test_info);
-  Thread::MainThread::clear();
-  Thread::MainThread::initTestThread();
+  // Thread::MainThread::clear();
+  // Thread::MainThread::initTestThread();
 }
 
 void TestListener::OnTestEnd(const ::testing::TestInfo& test_info) {
@@ -21,7 +21,7 @@ void TestListener::OnTestEnd(const ::testing::TestInfo& test_info) {
                               "]: Active singletons exist. Something is leaking. Consider "
                               "commenting out this assert and letting the heap checker run:\n",
                               active_singletons));
-  Thread::MainThread::clear();
+  Thread::MainThread::clearMainThread();
 }
 
 } // namespace Envoy

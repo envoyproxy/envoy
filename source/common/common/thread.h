@@ -169,9 +169,17 @@ public:
   T* get(const MakeObject& make_object) { return BaseClass::get(0, make_object); }
 };
 
+class TestThread {
+public:
+  TestThread();
+  ~TestThread();
+};
+
 struct MainThread {
   using MainThreadSingleton = InjectableSingleton<MainThread>;
-  bool inMainThread() const { return main_thread_id_ == std::this_thread::get_id(); }
+  bool inMainThread() const {
+    return main_thread_id_.has_value() && (main_thread_id_.value() == std::this_thread::get_id());
+  }
   bool inTestThread() const {
     return test_thread_id_.has_value() && (test_thread_id_.value() == std::this_thread::get_id());
   }
@@ -187,18 +195,23 @@ struct MainThread {
    * Register the test thread id, should be called in test thread before threading is on. Allow
    * some main thread only code to be executed on test thread.
    */
-  static void initTestThread();
+  // static void initTestThread();
   /*
    * Delete the main thread singleton, should be called in main thread after threading
    * has been shut down. Currently called in ~ThreadLocal::InstanceImpl().
    */
-  static void clear();
+  static void clearSingleton();
+  static void clearMainThread();
   static bool isMainThread();
   static bool isWorkerThread();
 
+  void incRefCount();
+  void decRefCount();
+
 private:
-  std::thread::id main_thread_id_;
+  absl::optional<std::thread::id> main_thread_id_;
   absl::optional<std::thread::id> test_thread_id_;
+  std::atomic<int32_t> ref_count_{1};
 };
 
 // To improve exception safety in data plane, we plan to forbid the use of raw try in the core code
