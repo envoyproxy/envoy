@@ -164,12 +164,13 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
         }
         // A single `setCopy` cannot be used here, because if there's a repeated header in the
         // incoming update, the second occurrence would overwrite our first occurrence. We need
-        // to make sure each field is only removed once with `updatedHeaderFields`
+        // to make sure each field is only removed once using the `updatedHeaderFields`
         if (!updatedHeaderFields.contains(lower_case_key)) {
-          entry.response_headers_->remove(lower_case_key);
+          entry.response_headers_->setCopy(lower_case_key, incoming_value);
           updatedHeaderFields.insert(lower_case_key);
+        } else {
+          entry.response_headers_->addCopy(lower_case_key, incoming_value);
         }
-        entry.response_headers_->addCopy(lower_case_key, incoming_value);
         return Http::HeaderMap::Iterate::Continue;
       });
   entry.metadata_ = metadata;
