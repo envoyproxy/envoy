@@ -43,4 +43,8 @@ extension PulseClientImpl: PulseClient {
   func distribution(elements: [Element]) -> Distribution {
     return DistributionImpl(elements: elements, tags: TagsBuilder().build(), engine: self.engine)
   }
+
+  func log(level: LogLevel, message: String, logTags: [String: String]?) {
+    // TODO: to be implemented.
+  }
 }
