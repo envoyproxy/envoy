@@ -166,16 +166,26 @@ void InstanceImpl::failHealthcheck(bool fail) {
 }
 
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
-  store.forEachCounter([this](std::size_t size) mutable { counters_.reserve(size); },
-                       [this](Stats::Counter& counter) mutable {
-                         counters_.push_back({counter.latch(), counter});
-                       });
+  store.forEachCounter(
+      [this](std::size_t size) mutable {
+        snapped_counters_.reserve(size);
+        counters_.reserve(size);
+      },
+      [this](Stats::Counter& counter) mutable {
+        snapped_counters_.push_back(Stats::CounterSharedPtr(&counter));
+        counters_.push_back({counter.latch(), counter});
+      });
 
-  store.forEachGauge([this](std::size_t size) mutable { gauges_.reserve(size); },
-                     [this](Stats::Gauge& gauge) mutable {
-                       ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
-                       gauges_.push_back(gauge);
-                     });
+  store.forEachGauge(
+      [this](std::size_t size) mutable {
+        snapped_gauges_.reserve(size);
+        gauges_.reserve(size);
+      },
+      [this](Stats::Gauge& gauge) mutable {
+        ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
+        snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
+        gauges_.push_back(gauge);
+      });
 
   snapped_histograms_ = store.histograms();
   histograms_.reserve(snapped_histograms_.size());
@@ -184,8 +194,14 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
   }
 
   store.forEachTextReadout(
-      [this](std::size_t size) mutable { text_readouts_.reserve(size); },
-      [this](Stats::TextReadout& text_readout) { text_readouts_.push_back(text_readout); });
+      [this](std::size_t size) mutable {
+        snapped_text_readouts_.reserve(size);
+        text_readouts_.reserve(size);
+      },
+      [this](Stats::TextReadout& text_readout) {
+        snapped_text_readouts_.push_back(Stats::TextReadoutSharedPtr(&text_readout));
+        text_readouts_.push_back(text_readout);
+      });
 
   snapshot_time_ = time_source.systemTime();
 }

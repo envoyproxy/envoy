@@ -6,7 +6,7 @@
 
 /**
  * This header file provides serialization support for tagged fields structure added in 2.4.
- * https://github.com/apache/kafka/blob/2.4.0/clients/src/main/java/org/apache/kafka/common/protocol/types/TaggedFields.java
+ * https://github.com/apache/kafka/blob/2.8.1/clients/src/main/java/org/apache/kafka/common/protocol/types/TaggedFields.java
  *
  * Impl note: contrary to other compact data structures, data in tagged field does not have +1 in
  * data length.

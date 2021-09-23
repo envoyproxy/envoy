@@ -3,6 +3,8 @@
   This file contains implementation of request-related methods contained in 'message_utilities.h'.
 #}
 
+#include <algorithm>
+
 #include "contrib/kafka/filters/network/test/message_utilities.h"
 
 #include "contrib/kafka/filters/network/source/external/requests.h"
@@ -12,8 +14,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-int16_t MessageUtilities::apiKeys() {
-  return {{ message_types | length }};
+std::vector<int16_t> MessageUtilities::apiKeys() {
+  std::vector<int16_t> result;
+  {% for message_type in message_types %}
+  result.push_back({{ message_type.get_extra('api_key') }});
+  {% endfor %}
+  return result;
 }
 
 int16_t MessageUtilities::requestApiVersions(const int16_t api_key) {
@@ -30,7 +36,8 @@ int16_t MessageUtilities::requestApiVersions(const int16_t api_key) {
 std::vector<AbstractRequestSharedPtr> MessageUtilities::makeRequests(
   const int16_t api_key, int32_t& correlation_id) {
 
-  if ((api_key < 0) || (api_key >= {{ message_types | length }})) {
+  const std::vector<int16_t> api_keys = apiKeys();
+  if (std::find(api_keys.begin(), api_keys.end(), api_key) == api_keys.end()) {
     throw EnvoyException("unsupported api key used in test code");
   }
 
@@ -56,7 +63,7 @@ std::vector<AbstractRequestSharedPtr> MessageUtilities::makeRequests(
 std::vector<AbstractRequestSharedPtr> MessageUtilities::makeAllRequests() {
   std::vector<AbstractRequestSharedPtr> result;
   int32_t correlation_id = 0;
-  for (int16_t i = 0; i < MessageUtilities::apiKeys(); ++i) {
+  for (const int16_t i : MessageUtilities::apiKeys()) {
     const std::vector<AbstractRequestSharedPtr> tmp =
         MessageUtilities::makeRequests(i, correlation_id);
     result.insert(result.end(), tmp.begin(), tmp.end());

@@ -743,7 +743,10 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyDownstreamFlush) {
 // Test that an upstream flush works correctly (all data is flushed)
 TEST_P(TcpTunnelingIntegrationTest, TcpProxyUpstreamFlush) {
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(alyssawilk) debug.
+    // The payload data depends on having TCP buffers upstream and downstream.
+    // For HTTP/3, upstream, the flow control window will back up sooner, Envoy
+    // flow control will kick in, and the large write of |data| will fail to
+    // complete.
     return;
   }
   // Use a very large size to make sure it is larger than the kernel socket read buffer.

@@ -983,6 +983,23 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
   }
 }
 
+RouteConstSharedPtr
+RouteEntryImplBase::pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
+                                                const Http::HeaderMap& headers) const {
+  const auto entry = headers.get(cluster_header_name);
+  std::string final_cluster_name;
+  if (!entry.empty()) {
+    // This is an implicitly untrusted header, so per the API documentation only
+    // the first value is used.
+    final_cluster_name = std::string(entry[0]->value().getStringView());
+  }
+
+  // NOTE: Though we return a shared_ptr here, the current ownership model
+  // assumes that the route table sticks around. See snapped_route_config_ in
+  // ConnectionManagerImpl::ActiveStream.
+  return std::make_shared<DynamicRouteEntry>(this, final_cluster_name);
+}
+
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& headers,
                                                      uint64_t random_value) const {
   // Gets the route object chosen from the list of weighted clusters
@@ -992,23 +1009,42 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
       return shared_from_this();
     } else {
       ASSERT(!cluster_header_name_.get().empty());
-      const auto entry = headers.get(cluster_header_name_);
-      std::string final_cluster_name;
-      if (!entry.empty()) {
-        // This is an implicitly untrusted header, so per the API documentation only the first
-        // value is used.
-        final_cluster_name = std::string(entry[0]->value().getStringView());
-      }
-
-      // NOTE: Though we return a shared_ptr here, the current ownership model assumes that
-      //       the route table sticks around. See snapped_route_config_ in
-      //       ConnectionManagerImpl::ActiveStream.
-      return std::make_shared<DynamicRouteEntry>(this, final_cluster_name);
+      return pickClusterViaClusterHeader(cluster_header_name_, headers);
     }
   }
+  return pickWeightedCluster(headers, random_value, true);
+}
 
-  return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_, random_value,
-                                          true);
+RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMap& headers,
+                                                            const uint64_t random_value,
+                                                            const bool ignore_overflow) const {
+  const uint64_t selected_value = random_value % total_cluster_weight_;
+  uint64_t begin = 0;
+  uint64_t end = 0;
+
+  // Find the right cluster to route to based on the interval in which
+  // the selected value falls. The intervals are determined as
+  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
+  for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
+    end = begin + cluster->clusterWeight();
+    if (!ignore_overflow) {
+      // end > total_cluster_weight: This case can only occur with Runtimes,
+      // when the user specifies invalid weights such that
+      // sum(weights) > total_cluster_weight.
+      ASSERT(end <= total_cluster_weight_);
+    }
+
+    if (selected_value >= begin && selected_value < end) {
+      if (!cluster->clusterHeaderName().get().empty() &&
+          !headers.get(cluster->clusterHeaderName()).empty()) {
+        return pickClusterViaClusterHeader(cluster->clusterHeaderName(), headers);
+      }
+      return cluster;
+    }
+    begin = end;
+  }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void RouteEntryImplBase::validateClusters(
@@ -1029,9 +1065,17 @@ void RouteEntryImplBase::validateClusters(
     }
   } else if (!weighted_clusters_.empty()) {
     for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
-      if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
-        throw EnvoyException(
-            fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
+      if (!cluster->clusterName().empty()) {
+        if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
+          throw EnvoyException(
+              fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
+        }
+      }
+      // For weighted clusters with `cluster_header_name`, we only verify that this field is
+      // not empty because the cluster name is not set yet at config time (hence the validation
+      // here).
+      else if (cluster->clusterHeaderName().get().empty()) {
+        throw EnvoyException("route: unknown weighted cluster with no cluster_header field");
       }
     }
   }
@@ -1378,9 +1422,9 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
     validation_clusters = factory_context.clusterManager().clusters();
   }
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
-    VirtualHostSharedPtr virtual_host(
-        new VirtualHostImpl(virtual_host_config, optional_http_filters, global_route_config,
-                            factory_context, *vhost_scope_, validator, validation_clusters));
+    VirtualHostSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
+        virtual_host_config, optional_http_filters, global_route_config, factory_context,
+        *vhost_scope_, validator, validation_clusters);
     for (const std::string& domain_name : virtual_host_config.domains()) {
       const std::string domain = Http::LowerCaseString(domain_name).get();
       bool duplicate_found = false;
