@@ -51,8 +51,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "upstream_address_set_lib",
-    hdrs = ["upstream_address_set.h"],
+    name = "upstream_address_lib",
+    hdrs = ["upstream_address.h"],
     deps = [
         "//envoy/stream_info:filter_state_interface",
     ],

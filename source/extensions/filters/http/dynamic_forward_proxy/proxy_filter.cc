@@ -5,7 +5,7 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "source/common/http/utility.h"
-#include "source/common/stream_info/upstream_address_set.h"
+#include "source/common/stream_info/upstream_address.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
@@ -171,10 +171,10 @@ void ProxyFilter::addHostAddressToFilterState(
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
 
-  auto address_set = std::make_unique<StreamInfo::UpstreamAddressSet>();
-  address_set->addresses_.emplace(address);
+  auto address_obj = std::make_unique<StreamInfo::UpstreamAddress>();
+  address_obj->address_ = address;
 
-  filter_state->setData(StreamInfo::UpstreamAddressSet::key(), std::move(address_set),
+  filter_state->setData(StreamInfo::UpstreamAddress::key(), std::move(address_obj),
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Request);
 }

@@ -13,15 +13,13 @@ namespace Common {
 namespace RBAC {
 namespace Matchers {
 
-// RBAC matcher extension for matching upstream's IP address. It matches the CIDR range provided by
-// the `envoy::extensions::rbac::matchers::upstream_ip::v3::UpstreamIpMatcher`
+// RBAC matcher extension for matching upstream's IP address (and port range if configured).
 // configuration with the resolved upstream IP (v4 and v6).
 class UpstreamIpMatcher : public Filters::Common::RBAC::Matcher,
                           public Logger::Loggable<Logger::Id::rbac> {
 public:
   UpstreamIpMatcher(
-      const envoy::extensions::rbac::matchers::upstream_ip::v3::UpstreamIpMatcher& proto)
-      : range_(Network::Address::CidrRange::create(proto.upstream_ip())) {}
+      const envoy::extensions::rbac::matchers::upstream_ip::v3::UpstreamIpMatcher& proto);
 
   // Matcher interface.
   bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
@@ -29,6 +27,7 @@ public:
 
 private:
   const Network::Address::CidrRange range_;
+  absl::optional<envoy::type::v3::Int64Range> port_;
 };
 
 // Extension factory for UpstreamIpMatcher.

@@ -1,7 +1,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
-#include "source/common/stream_info/upstream_address_set.h"
+#include "source/common/stream_info/upstream_address.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "source/extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
@@ -399,7 +399,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, AddResolvedHostFilterStateMetadata
 
   // We expect FilterState to be populated
   EXPECT_TRUE(
-      filter_state->hasData<StreamInfo::UpstreamAddressSet>(StreamInfo::UpstreamAddressSet::key()));
+      filter_state->hasData<StreamInfo::UpstreamAddress>(StreamInfo::UpstreamAddress::key()));
 
   filter_->onDestroy();
 }
@@ -415,9 +415,9 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
   // Pre-populate the filter state with an address.
   auto& filter_state = callbacks_.streamInfo().filterState();
   const auto pre_address = Network::Utility::parseInternetAddress("1.2.3.3", 80);
-  auto address_set = std::make_unique<StreamInfo::UpstreamAddressSet>();
-  address_set->addresses_.emplace(pre_address);
-  filter_state->setData(StreamInfo::UpstreamAddressSet::key(), std::move(address_set),
+  auto address_obj = std::make_unique<StreamInfo::UpstreamAddress>();
+  address_obj->address_ = pre_address;
+  filter_state->setData(StreamInfo::UpstreamAddress::key(), std::move(address_obj),
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Request);
 
@@ -454,23 +454,16 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
 
   // We expect FilterState to be populated
   EXPECT_TRUE(
-      filter_state->hasData<StreamInfo::UpstreamAddressSet>(StreamInfo::UpstreamAddressSet::key()));
+      filter_state->hasData<StreamInfo::UpstreamAddress>(StreamInfo::UpstreamAddress::key()));
 
-  // Make sure filter state has pre and new addresses.
-  const StreamInfo::UpstreamAddressSet& updated_address_set =
-      filter_state->getDataReadOnly<StreamInfo::UpstreamAddressSet>(
-          StreamInfo::UpstreamAddressSet::key());
-
-  absl::flat_hash_set<absl::string_view> populated_addresses;
-  updated_address_set.iterate([&](const Network::Address::InstanceConstSharedPtr& address) {
-    populated_addresses.insert(address->asStringView());
-    return true;
-  });
+  const StreamInfo::UpstreamAddress& updated_address_obj =
+      filter_state->getDataReadOnly<StreamInfo::UpstreamAddress>(
+          StreamInfo::UpstreamAddress::key());
 
   // Verify the data
-  EXPECT_EQ(populated_addresses.size(), 1);
-  EXPECT_FALSE(populated_addresses.contains(pre_address->asStringView()));
-  EXPECT_TRUE(populated_addresses.contains(host_info->address_->asStringView()));
+  EXPECT_TRUE(updated_address_obj.address_);
+  EXPECT_EQ(
+      updated_address_obj.address_->asStringView(), host_info->address_->asStringView());
 
   filter_->onDestroy();
 }
@@ -514,7 +507,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
 
   // We do not expect FilterState to be populated
   EXPECT_FALSE(
-      filter_state->hasData<StreamInfo::UpstreamAddressSet>(StreamInfo::UpstreamAddressSet::key()));
+      filter_state->hasData<StreamInfo::UpstreamAddress>(StreamInfo::UpstreamAddress::key()));
 
   filter_->onDestroy();
 }

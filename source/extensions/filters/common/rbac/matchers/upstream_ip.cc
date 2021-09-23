@@ -3,7 +3,7 @@
 #include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "source/common/stream_info/upstream_address_set.h"
+#include "source/common/stream_info/upstream_address.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,38 +14,48 @@ namespace Matchers {
 
 using namespace Filters::Common::RBAC;
 
+UpstreamIpMatcher::UpstreamIpMatcher(
+    const envoy::extensions::rbac::matchers::upstream_ip::v3::UpstreamIpMatcher& proto)
+    : range_(Network::Address::CidrRange::create(proto.upstream_ip())) {
+  if (proto.has_upstream_port_range()) {
+    port_ = proto.upstream_port_range();
+  }
+}
+
 bool UpstreamIpMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                                 const StreamInfo::StreamInfo& info) const {
 
-  if (!info.filterState().hasDataWithName(StreamInfo::UpstreamAddressSet::key())) {
+  if (!info.filterState().hasDataWithName(StreamInfo::UpstreamAddress::key())) {
     ENVOY_LOG_EVERY_POW_2(
         warn,
         "Did not find filter state with key: {}. Do you have a filter in the filter chain "
         "before the RBAC filter which populates the filter state with upstream addresses ?",
-        StreamInfo::UpstreamAddressSet::key());
+        StreamInfo::UpstreamAddress::key());
 
     return false;
   }
 
-  bool ip_match = false;
+  const StreamInfo::UpstreamAddress& address_obj =
+      info.filterState().getDataReadOnly<StreamInfo::UpstreamAddress>(
+          StreamInfo::UpstreamAddress::key());
 
-  const StreamInfo::UpstreamAddressSet& address_set =
-      info.filterState().getDataReadOnly<StreamInfo::UpstreamAddressSet>(
-          StreamInfo::UpstreamAddressSet::key());
+  bool is_match = false;
+  if (range_.isInRange(*address_obj.address_)) {
+    ENVOY_LOG(debug, "UpstreamIp matcher for range: {} evaluated to: true", range_.asString());
+	is_match = true;
+  }
 
-  address_set.iterate([&, this](const Network::Address::InstanceConstSharedPtr& address) {
-    ip_match = range_.isInRange(*address.get());
-    if (ip_match) {
-      ENVOY_LOG(debug, "Address {} matched range: {}", address->asString(), range_.asString());
-      return false;
+  if (is_match && port_) {
+    const auto port = address_obj.address_->ip()->port();
+    if (port >= port_->start() && port <= port_->end()) {
+      ENVOY_LOG(debug, "UpstreamIp matcher matched port: {}", port);
+    } else {
+        is_match = false;
     }
+  }
 
-    return true;
-  });
-
-  ENVOY_LOG(debug, "UpstreamIp matcher for range: {} evaluated to: {}", range_.asString(),
-            ip_match);
-  return ip_match;
+  ENVOY_LOG(trace, "UpstreamIp matcher evaluated to: {}", is_match);
+  return is_match;
 }
 
 REGISTER_FACTORY(UpstreamIpMatcherFactory, MatcherExtensionFactory);
