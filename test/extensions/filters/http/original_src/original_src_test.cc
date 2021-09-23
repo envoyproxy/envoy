@@ -110,9 +110,17 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressUsesCorrectAddress) {
     option->hashKey(key);
   }
 
-  std::vector<uint8_t> expected_key = {1, 2, 3, 4};
-
-  EXPECT_EQ(key, expected_key);
+  // The first part of the hash is the address. Then come the other options. On Windows there are
+  // is only the single option. On other platforms there are more that get hashed.
+  EXPECT_EQ(key[0], 1);
+  EXPECT_EQ(key[1], 2);
+  EXPECT_EQ(key[2], 3);
+  EXPECT_EQ(key[3], 4);
+#ifndef WIN32
+  EXPECT_GT(key.size(), 4);
+#else
+  EXPECT_EQ(key.size(), 4);
+#endif
 }
 
 TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressBleachesPort) {

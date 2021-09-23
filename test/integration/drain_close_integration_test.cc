@@ -11,7 +11,7 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
   // the drain window, so the drain time of 100s should mean all draining is
   // initiated within the first 25s.
   drain_time_ = std::chrono::seconds(100);
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -50,7 +50,7 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
 TEST_P(DrainCloseIntegrationTest, DrainCloseImmediate) {
   drain_strategy_ = Server::DrainStrategy::Immediate;
   drain_time_ = std::chrono::seconds(100);
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

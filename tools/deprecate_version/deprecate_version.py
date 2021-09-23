@@ -1,14 +1,6 @@
-# Script for automating cleanup PR creation for deprecated runtime features
+# Bazel usage
 #
-# sh tools/deprecate_version/deprecate_version.sh
-#
-# Direct usage (not recommended):
-#
-# python tools/deprecate_version/deprecate_version.py
-#
-# e.g
-#
-#  python tools/deprecate_version/deprecate_version.py
+# bazel run //tools/deprecate_version:deprecate_version
 #
 # A GitHub access token must be set in GITHUB_TOKEN. To create one, go to
 # Settings -> Developer settings -> Personal access tokens in GitHub and create

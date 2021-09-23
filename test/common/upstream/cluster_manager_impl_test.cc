@@ -524,10 +524,7 @@ public:
     for (int i = first; i <= last; i++) {
       if (envoy::config::cluster::v3::Cluster::LbPolicy_IsValid(i)) {
         auto policy = static_cast<envoy::config::cluster::v3::Cluster::LbPolicy>(i);
-        if (policy !=
-            envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB) {
-          policies.push_back(policy);
-        }
+        policies.push_back(policy);
       }
     }
     return policies;
@@ -4958,6 +4955,51 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
             HttpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
                                           ->httpConnPool(ResourcePriority::Default,
                                                          Http::Protocol::Http11, &lb_context)));
+}
+
+TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: good
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: good
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+  const std::string added_via_api_yaml = R"EOF(
+    name: added_via_api
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: added_via_api
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  EXPECT_TRUE(
+      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(added_via_api_yaml), "v1"));
+
+  EXPECT_EQ(2, cluster_manager_->clusters().active_clusters_.size());
+  EXPECT_NO_THROW(cluster_manager_->checkActiveStaticCluster("good"));
+  EXPECT_THROW_WITH_MESSAGE(cluster_manager_->checkActiveStaticCluster("nonexist"), EnvoyException,
+                            "Unknown gRPC client cluster 'nonexist'");
+  EXPECT_THROW_WITH_MESSAGE(cluster_manager_->checkActiveStaticCluster("added_via_api"),
+                            EnvoyException, "gRPC client cluster 'added_via_api' is not static");
 }
 
 class PreconnectTest : public ClusterManagerImplTest {

@@ -79,7 +79,7 @@ public:
       envoy::config::listener::v3::Filter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
     });
   }
 
@@ -188,7 +188,11 @@ public:
     result = upstream_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
 
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeHeaders(
+        Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                        {"replaceable", "set-by-upstream"},
+                                        {"set-cookie", "cookie1=snickerdoodle"}},
+        false);
     upstream_request_->encodeData(response_size_, true);
 
     for (const auto& header_to_add : headers_to_add) {
@@ -256,7 +260,8 @@ public:
                             const Headers& headers_to_remove,
                             const Http::TestRequestHeaderMapImpl& new_headers_from_upstream,
                             const Http::TestRequestHeaderMapImpl& headers_to_append_multiple,
-                            const Headers& response_headers_to_add) {
+                            const Headers& response_headers_to_append,
+                            const Headers& response_headers_to_set = {}) {
     ext_authz_request_->startGrpcStream();
     envoy::service::auth::v3::CheckResponse check_response;
     check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
@@ -306,15 +311,27 @@ public:
           return Http::HeaderMap::Iterate::Continue;
         });
 
-    for (const auto& response_header_to_add : response_headers_to_add) {
+    for (const auto& response_header_to_add : response_headers_to_append) {
       auto* entry = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
       const auto key = std::string(response_header_to_add.first);
       const auto value = std::string(response_header_to_add.second);
 
-      entry->mutable_append()->set_value(false);
+      entry->mutable_append()->set_value(true);
       entry->mutable_header()->set_key(key);
       entry->mutable_header()->set_value(value);
       ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_add {}={}", key, value);
+    }
+
+    for (const auto& response_header_to_set : response_headers_to_set) {
+      auto* entry = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
+      const auto key = std::string(response_header_to_set.first);
+      const auto value = std::string(response_header_to_set.second);
+
+      // Replaces the one sent by the upstream.
+      entry->mutable_append()->set_value(false);
+      entry->mutable_header()->set_key(key);
+      entry->mutable_header()->set_value(value);
+      ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_set {}={}", key, value);
     }
 
     ext_authz_request_->sendGrpcMessage(check_response);
@@ -506,7 +523,7 @@ public:
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
     });
   }
 
@@ -674,18 +691,27 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
 
   // Send back an ext_authz response with response_headers_to_add set.
-  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                       Http::TestRequestHeaderMapImpl{},
-                       Headers{{"downstream2", "downstream-should-see-me"}});
+  sendExtAuthzResponse(
+      Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+      Http::TestRequestHeaderMapImpl{},
+      Headers{{"downstream2", "downstream-should-see-me"}, {"set-cookie", "cookie2=gingerbread"}},
+      Headers{{"replaceable", "by-ext-authz"}});
 
   // Wait for the upstream response.
   waitForSuccessfulUpstreamResponse("200");
+
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(response_->headers(),
+                                                        Http::LowerCaseString("set-cookie"))
+                .result()
+                .value(),
+            "cookie1=snickerdoodle,cookie2=gingerbread");
 
   // Verify the response is HTTP 200 with the header from `response_headers_to_add` above.
   const std::string expected_body(response_size_, 'a');
   verifyResponse(std::move(response_), "200",
                  Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                                 {"downstream2", "downstream-should-see-me"}},
+                                                 {"downstream2", "downstream-should-see-me"},
+                                                 {"replaceable", "by-ext-authz"}},
                  expected_body);
   cleanup();
 }
@@ -795,7 +821,7 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
     envoy::config::listener::v3::Filter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
     ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
-    config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
   });
 
   const std::string local_reply_yaml = R"EOF(

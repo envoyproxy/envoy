@@ -2757,7 +2757,7 @@ TEST_F(Http1ClientConnectionImplTest, ConnectResponse) {
 
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
-  TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}};
+  TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   // Send response headers
@@ -2788,7 +2788,7 @@ TEST_F(Http1ClientConnectionImplTest, ConnectResponseWithEarlyData) {
 
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
-  TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}};
+  TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   // Send response headers and payload
@@ -2807,7 +2807,7 @@ TEST_F(Http1ClientConnectionImplTest, ConnectRejected) {
 
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
-  TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}};
+  TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));

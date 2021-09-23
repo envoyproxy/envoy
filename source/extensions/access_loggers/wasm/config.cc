@@ -41,13 +41,15 @@ AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
   };
 
   if (!Common::Wasm::createWasm(plugin, context.scope().createScope(""), context.clusterManager(),
-                                context.initManager(), context.dispatcher(), context.api(),
-                                context.lifecycleNotifier(), remote_data_provider_,
+                                context.initManager(), context.mainThreadDispatcher(),
+                                context.api(), context.lifecycleNotifier(), remote_data_provider_,
                                 std::move(callback))) {
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm access log {}", plugin->name_));
   }
 
+  context.api().customStatNamespaces().registerStatNamespace(
+      Extensions::Common::Wasm::CustomStatNamespace);
   return access_log;
 }
 
