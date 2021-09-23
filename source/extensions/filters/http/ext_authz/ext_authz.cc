@@ -241,7 +241,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     // cache.
     if (config_->clearRouteCache() &&
         (!response->headers_to_set.empty() || !response->headers_to_append.empty() ||
-         !response->headers_to_remove.empty())) {
+         !response->headers_to_add_if_absent.empty() || !response->headers_to_remove.empty())) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *decoder_callbacks_);
       decoder_callbacks_->clearRouteCache();
     }
@@ -255,6 +255,14 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     for (const auto& header : response->headers_to_add) {
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, header.first.get(), header.second);
       request_headers_->addCopy(header.first, header.second);
+    }
+    for (const auto& header : response->headers_to_add_if_absent) {
+      const auto header_to_modify = request_headers_->get(header.first);
+      if (header_to_modify.empty()) {
+        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, header.first.get(),
+                         header.second);
+        request_headers_->setCopy(header.first, header.second);
+      }
     }
     for (const auto& header : response->headers_to_append) {
       const auto header_to_modify = request_headers_->get(header.first);

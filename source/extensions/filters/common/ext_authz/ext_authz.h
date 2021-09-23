@@ -68,6 +68,9 @@ struct Response {
   // A set of HTTP headers returned by the authorization server, that will be optionally appended
   // to the request to the upstream server.
   Http::HeaderVector headers_to_append;
+  // A set of HTTP headers returned by the authorization server, that will be optionally be added
+  // to the request to the upstream server if they don't already exist.
+  Http::HeaderVector headers_to_add_if_absent;
   // A set of HTTP headers returned by the authorization server, will be optionally set
   // (using "setCopy") to the request to the upstream server.
   Http::HeaderVector headers_to_set;

@@ -126,12 +126,22 @@ void GrpcClientImpl::toAuthzResponseHeader(
     ResponsePtr& response,
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers) {
   for (const auto& header : headers) {
-    if (header.append().value()) {
+    const auto append_action = Http::HeaderUtility::getHeaderAppendAction(header);
+    switch (append_action) {
+    case envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT:
+      response->headers_to_add_if_absent.emplace_back(Http::LowerCaseString(header.header().key()),
+                                                      header.header().value());
+      break;
+    case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS:
       response->headers_to_append.emplace_back(Http::LowerCaseString(header.header().key()),
                                                header.header().value());
-    } else {
+      break;
+    case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS:
       response->headers_to_set.emplace_back(Http::LowerCaseString(header.header().key()),
                                             header.header().value());
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 }
