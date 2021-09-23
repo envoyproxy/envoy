@@ -168,16 +168,26 @@ public:
   T* get(const MakeObject& make_object) { return BaseClass::get(0, make_object); }
 };
 
+// RAII object to declare the TestThread. This should be declared in main() or
+// equivalent for any test binaries.
 class TestThread {
 public:
   TestThread();
   ~TestThread();
 };
 
+// RAII object to declare the MainThread. This should be declared in the thread
+// function or equivalent.
 class MainThread {
 public:
   MainThread();
   ~MainThread();
+
+  /**
+   * Returns whether the current thread is the main thread or test thread.
+   *
+   * TODO(jmarantz): rename to isMainOrTestThread().
+   */
   static bool isMainThread();
 };
 
