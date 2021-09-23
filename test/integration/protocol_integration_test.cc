@@ -691,7 +691,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyUpstreamBytesC
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   expectUpstreamBytesSentAndReceived(BytesCountExpectation(0, 0, 0, 0),
-                                       BytesCountExpectation(0, 0, 0, 0));
+                                     BytesCountExpectation(0, 0, 0, 0));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
@@ -3232,7 +3232,7 @@ TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireByt
   testRouterDownstreamDisconnectBeforeRequestComplete(nullptr);
 
   expectDownstreamBytesSentAndReceived(BytesCountExpectation(0, 71, 0, 35),
-                                     BytesCountExpectation(0, 28, 0, 28));
+                                       BytesCountExpectation(0, 28, 0, 28));
 }
 
 TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytesCountUpstream) {

@@ -72,10 +72,10 @@ protected:
   };
 
   void expectUpstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
-                                          BytesCountExpectation h2_expectation);
+                                          BytesCountExpectation h2_expectation, const int id = 0);
 
   void expectDownstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
-                                            BytesCountExpectation h2_expectation);
+                                            BytesCountExpectation h2_expectation, const int id = 0);
 };
 
 } // namespace Envoy

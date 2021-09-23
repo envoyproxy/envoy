@@ -296,8 +296,7 @@ struct StreamInfoImpl : public StreamInfo {
     upstream_bytes_meterer->addWireBytesSent(upstream_bytes_meterer_->wireBytesSent());
     upstream_bytes_meterer->addWireBytesReceived(upstream_bytes_meterer_->wireBytesReceived());
     upstream_bytes_meterer->addHeaderBytesSent(upstream_bytes_meterer_->headerBytesSent());
-    upstream_bytes_meterer->addHeaderBytesReceived(
-        upstream_bytes_meterer_->headerBytesReceived());
+    upstream_bytes_meterer->addHeaderBytesReceived(upstream_bytes_meterer_->headerBytesReceived());
 
     upstream_bytes_meterer_ = upstream_bytes_meterer;
   }
