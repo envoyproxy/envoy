@@ -299,6 +299,7 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::RequestHeaderMap* request_headers_;
   Http::HeaderVector response_headers_to_add_{};
+  Http::HeaderVector response_headers_to_set_{};
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;

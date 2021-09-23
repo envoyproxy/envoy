@@ -6,11 +6,9 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
-#include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -786,22 +784,6 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   bool custom_cluster = false;
   bool original_dst_cluster = false;
   auto* static_resources = bootstrap_.mutable_static_resources();
-  const auto tap_path = TestEnvironment::getOptionalEnvVar("TAP_PATH");
-  if (tap_path) {
-    ENVOY_LOG_MISC(debug, "Test tap path set to {}", tap_path.value());
-  } else {
-    ENVOY_LOG_MISC(debug, "No tap path set for tests");
-  }
-  for (int i = 0; i < bootstrap_.mutable_static_resources()->listeners_size(); ++i) {
-    auto* listener = static_resources->mutable_listeners(i);
-    for (int j = 0; j < listener->filter_chains_size(); ++j) {
-      if (tap_path) {
-        auto* filter_chain = listener->mutable_filter_chains(j);
-        setTapTransportSocket(tap_path.value(), fmt::format("listener_{}_{}", i, j),
-                              *filter_chain->mutable_transport_socket());
-      }
-    }
-  }
   for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
     if (cluster->type() == envoy::config::cluster::v3::Cluster::EDS) {
@@ -831,11 +813,6 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
         }
       }
     }
-
-    if (tap_path) {
-      setTapTransportSocket(tap_path.value(), absl::StrCat("cluster_", i),
-                            *cluster->mutable_transport_socket());
-    }
   }
   ASSERT(skip_port_usage_validation_ || port_idx == ports.size() || eds_hosts ||
          original_dst_cluster || custom_cluster || bootstrap_.dynamic_resources().has_cds_config());
@@ -852,39 +829,6 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   }
 
   finalized_ = true;
-}
-
-void ConfigHelper::setTapTransportSocket(
-    const std::string& tap_path, const std::string& type,
-    envoy::config::core::v3::TransportSocket& transport_socket) {
-  // Determine inner transport socket.
-  envoy::config::core::v3::TransportSocket inner_transport_socket;
-  if (!transport_socket.name().empty()) {
-    inner_transport_socket.MergeFrom(transport_socket);
-  } else {
-    inner_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
-  }
-  // Configure outer tap transport socket.
-  transport_socket.set_name("envoy.transport_sockets.tap");
-  envoy::extensions::transport_sockets::tap::v3::Tap tap_config;
-  tap_config.mutable_common_config()
-      ->mutable_static_config()
-      ->mutable_match_config()
-      ->set_any_match(true);
-  auto* output_sink = tap_config.mutable_common_config()
-                          ->mutable_static_config()
-                          ->mutable_output_config()
-                          ->mutable_sinks()
-                          ->Add();
-  output_sink->set_format(envoy::config::tap::v3::OutputSink::PROTO_TEXT);
-  const ::testing::TestInfo* const test_info =
-      ::testing::UnitTest::GetInstance()->current_test_info();
-  const std::string test_id =
-      std::string(test_info->name()) + "_" + std::string(test_info->test_case_name()) + "_" + type;
-  output_sink->mutable_file_per_tap()->set_path_prefix(tap_path + "_" +
-                                                       absl::StrReplaceAll(test_id, {{"/", "_"}}));
-  tap_config.mutable_transport_socket()->MergeFrom(inner_transport_socket);
-  transport_socket.mutable_typed_config()->PackFrom(tap_config);
 }
 
 void ConfigHelper::setSourceAddress(const std::string& address_string) {
