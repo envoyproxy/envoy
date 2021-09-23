@@ -8,7 +8,6 @@
 #include "envoy/thread/thread.h"
 
 #include "source/common/common/non_copyable.h"
-#include "source/common/singleton/threadsafe_singleton.h"
 
 #include "absl/synchronization/mutex.h"
 
@@ -175,42 +174,11 @@ public:
   ~TestThread();
 };
 
-struct MainThread {
-  using MainThreadSingleton = InjectableSingleton<MainThread>;
-  bool inMainThread() const {
-    return main_thread_id_.has_value() && (main_thread_id_.value() == std::this_thread::get_id());
-  }
-  bool inTestThread() const {
-    return test_thread_id_.has_value() && (test_thread_id_.value() == std::this_thread::get_id());
-  }
-  void registerTestThread() { test_thread_id_ = std::this_thread::get_id(); }
-  void registerMainThread() { main_thread_id_ = std::this_thread::get_id(); }
-  static bool initialized() { return MainThreadSingleton::getExisting() != nullptr; }
-  /*
-   * Register the main thread id, should be called in main thread before threading is on. Currently
-   * called in ThreadLocal::InstanceImpl().
-   */
-  static void initMainThread();
-  /*
-   * Register the test thread id, should be called in test thread before threading is on. Allow
-   * some main thread only code to be executed on test thread.
-   */
-  // static void initTestThread();
-  /*
-   * Delete the main thread singleton, should be called in main thread after threading
-   * has been shut down. Currently called in ~ThreadLocal::InstanceImpl().
-   */
-  static void clearSingleton();
-  static void clearMainThread();
+class MainThread {
+public:
+  MainThread();
+  ~MainThread();
   static bool isMainThread();
-
-  void incRefCount();
-  void decRefCount();
-
-private:
-  absl::optional<std::thread::id> main_thread_id_;
-  absl::optional<std::thread::id> test_thread_id_;
-  std::atomic<int32_t> ref_count_{1};
 };
 
 // To improve exception safety in data plane, we plan to forbid the use of raw try in the core code

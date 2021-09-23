@@ -21,7 +21,7 @@ void TestListener::OnTestEnd(const ::testing::TestInfo& test_info) {
                               "]: Active singletons exist. Something is leaking. Consider "
                               "commenting out this assert and letting the heap checker run:\n",
                               active_singletons));
-  Thread::MainThread::clearMainThread();
+  // Thread::MainThread::clearMainThread();
 }
 
 } // namespace Envoy
