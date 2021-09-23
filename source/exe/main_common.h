@@ -138,7 +138,7 @@ public:
   static int main(int argc, char** argv, PostServerHook hook = nullptr);
 
 private:
-  Thread::MainThread main_thread;
+  Thread::MainThread main_thread_;
 
 #ifdef ENVOY_HANDLE_SIGNALS
   Envoy::SignalAction handle_sigs_;
